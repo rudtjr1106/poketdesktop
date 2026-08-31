@@ -5,12 +5,8 @@ import random
 import sys
 import tkinter as tk
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
 from common import pokelogic as P              # noqa: E402
+from common.version import VERSION             # noqa: E402
 
 from . import api as apimod                    # noqa: E402
 from . import config, sprite_cache             # noqa: E402

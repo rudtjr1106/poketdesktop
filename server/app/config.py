@@ -2,6 +2,11 @@
 """환경변수 설정. 전부 기본값이 있어서 그냥 띄워도 돌아간다."""
 import os
 
+try:
+    from common.version import VERSION
+except ImportError:
+    VERSION = "0.0.0"
+
 
 def _int(name, default):
     try:
@@ -68,5 +73,3 @@ STARTERS = [
 ]
 STARTER_SET = set(x for row in STARTERS for x in row[1:])
 STARTER_LEVEL = _int("POKET_STARTER_LEVEL", 5)
-
-VERSION = "0.2.0"
