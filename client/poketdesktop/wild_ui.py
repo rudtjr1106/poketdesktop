@@ -511,6 +511,7 @@ class WildController(object):
                 self.app.notify(getattr(err, "message", str(err)))
                 self.check()
                 return
+            self.hide_wild_sprite()          # 무대에 따로 그리므로 원본은 감춘다
             self.app.open_battle(r.get("battle"), r.get("intro"))
         run_async(self.app.root, lambda: self.app.api.battle_start(wid), done)
 
