@@ -1,0 +1,33 @@
+services:
+  poket-server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: poketdesktop-server:latest
+    container_name: poketdesktop-server
+    restart: unless-stopped
+    ports:
+      - "8787:8080"
+    volumes:
+      - poketdata:/data
+    environment:
+      POKET_DB: /data/poket.db
+      POKET_POKEDEX: /app/data/pokedex.json
+      # 자동 로그인 때 IP 까지 확인할지. 도커 포트포워딩 뒤에서는 실제 IP 가
+      # 게이트웨이로 보일 수 있어서, whoami 로 확인한 뒤 켜고 끄면 된다.
+      POKET_REQUIRE_IP: "1"
+      POKET_TRUST_PROXY: "0"
+      POKET_SPAWN_COOLDOWN: "300"
+      POKET_WILD_MIN_LEVEL: "2"
+      POKET_WILD_MAX_LEVEL: "12"
+      POKET_MAX_DESKTOP: "6"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  poketdata:
