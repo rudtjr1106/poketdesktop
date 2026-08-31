@@ -61,6 +61,12 @@ class Api(object):
         """1MB 가 넘어서 requests 가 알아서 gzip 을 풀어준다."""
         return self._call("GET", "/api/pokedex", auth=False, timeout=60)
 
+    def check_name(self, name):
+        """닉네임을 쓸 수 있는지 물어본다 (회원가입 화면에서 타이핑 중)."""
+        import urllib.parse
+        return self._call("GET", "/api/auth/check?name=" +
+                          urllib.parse.quote(name), auth=False, timeout=8)
+
     def starters(self):
         return self._call("GET", "/api/starters", auth=False)
 

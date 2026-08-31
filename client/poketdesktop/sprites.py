@@ -171,6 +171,23 @@ def load_animation(path, target_height=48, min_scale=0.25, max_scale=2.5,
     return anim
 
 
+def to_rgba(img, key):
+    """투명색으로 칠해둔 도트를 알파 있는 그림으로 되돌린다.
+
+    이걸 ImageTk.PhotoImage 로 만들어 Label 에 올리면 위젯 배경색 위에
+    알아서 합성된다. 카드가 선택돼 배경색이 바뀌어도 도트는 그대로 쓴다.
+    """
+    px = img.tobytes()
+    mb = bytearray(img.width * img.height)
+    kr, kg, kb = key
+    for i in range(0, len(px), 3):
+        if px[i] != kr or px[i + 1] != kg or px[i + 2] != kb:
+            mb[i // 3] = 255
+    out = img.convert("RGBA")
+    out.putalpha(Image.frombytes("L", img.size, bytes(mb)))
+    return out
+
+
 def probe_key_color(paths):
     """대표 몇 장만 훑어 투명색을 정한다. 결과는 기억해둔다."""
     ck = tuple(sorted(paths))
