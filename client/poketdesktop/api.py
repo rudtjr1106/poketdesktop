@@ -149,6 +149,25 @@ class Api(object):
     def wild_flee(self, wid):
         return self._call("POST", "/api/wild/%d/flee" % wid, {})
 
+    # ---------------- 배틀 ----------------
+    def battle_start(self, wid):
+        return self._call("POST", "/api/wild/%d/battle" % wid, {})
+
+    def battle_current(self):
+        return self._call("GET", "/api/battle")
+
+    def battle_move(self, bid, move):
+        return self._call("POST", "/api/battle/%d/move" % bid, {"move": move})
+
+    def battle_switch(self, bid, pid):
+        return self._call("POST", "/api/battle/%d/switch" % bid, {"pokemon": pid})
+
+    def battle_ball(self, bid, ball="POKEBALL"):
+        return self._call("POST", "/api/battle/%d/ball" % bid, {"ball": ball})
+
+    def battle_run(self, bid):
+        return self._call("POST", "/api/battle/%d/run" % bid, {})
+
 
 # ---------------------------------------------------------------- 도감 캐시
 def load_pokedex(api):

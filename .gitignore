@@ -6,6 +6,8 @@ client/sprites/
 assets/sprites/
 *.gif
 !docs/*.gif
+battle_shot*.png
+sprite_*.png
 
 # 도감 원본 CSV 캐시 (tools/build_pokedex.py 가 다시 받는다)
 tools/_cache/

@@ -140,12 +140,24 @@ class WildPet(Pet):
 
     def tip_text(self):
         info = self.mon.get("info", {})
-        t = "야생의 %s  Lv.%s\n%s" % (info.get("species", "?"),
-                                   info.get("level", "?"),
-                                   " / ".join(info.get("types", [])))
+        t = "야생의 %s  Lv.%s" % (info.get("species", "?"), info.get("level", "?"))
+        types = " / ".join(info.get("types", []))
+        if types:
+            t += "\n" + types
         if self.mon.get("shiny"):
             t = "★ 색이 다른 개체!\n" + t
-        return t + "\n\n오른쪽 클릭 = 몬스터볼 던지기"
+        return t + "\n\n왼쪽 클릭 = 배틀\n오른쪽 클릭 = 바로 몬스터볼"
+
+    def on_press(self, e):
+        Pet.on_press(self, e)
+        self._down = (e.x_root, e.y_root)
+
+    def on_release(self, e):
+        d = getattr(self, "_down", None)
+        moved = bool(d) and (abs(e.x_root - d[0]) > 4 or abs(e.y_root - d[1]) > 4)
+        Pet.on_release(self, e)
+        if not moved:                      # 끌지 않고 그냥 눌렀으면 배틀
+            self.ctl.start_battle()
 
     def on_menu(self, e):
         self.ctl.throw_ball()
@@ -482,6 +494,25 @@ class WildController(object):
                     self.app.api, mon["num"], mon.get("shiny"))
             return r
         run_async(self.app.root, work, done)
+
+    def start_battle(self):
+        """야생 포켓몬을 눌렀다. 배틀 창을 연다."""
+        if self.throwing or not self.pet or not self.wild_id:
+            return
+        if self.app.battle_window:
+            return self.app.battle_window.focus()
+        wid = self.wild_id
+        self.hide_hint()
+        self.throwing = True               # 여는 동안 중복 클릭 방지
+
+        def done(r, err):
+            self.throwing = False
+            if err:
+                self.app.notify(getattr(err, "message", str(err)))
+                self.check()
+                return
+            self.app.open_battle(r.get("battle"), r.get("intro"))
+        run_async(self.app.root, lambda: self.app.api.battle_start(wid), done)
 
     def throw_ball(self):
         if self.throwing or not self.pet or not self.wild_id:
