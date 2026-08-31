@@ -70,7 +70,7 @@ def notes(version, prev_tag):
     changes = (r.stdout or "").strip() or "- 첫 릴리스"
     return """## 받는 법
 
-아래 **Assets** 에서 `포켓데스크톱-v{v}.exe` 를 받아 실행하세요.
+아래 **Assets** 에서 `poketdesktop-v{v}.exe` 를 받아 실행하세요.
 파이썬을 따로 깔 필요 없습니다.
 
 처음 실행하면 로그인 창이 뜹니다. **서버 주소**에 서버 주소를 넣고
@@ -132,7 +132,7 @@ def main():
         raise SystemExit("  태그 %s 가 이미 있습니다. 버전을 올려 주세요." % tag)
 
     # ---- 빌드 ----
-    exe = os.path.join(ROOT, "dist", "포켓데스크톱-v%s.exe" % new)
+    exe = os.path.join(ROOT, "dist", "poketdesktop-v%s.exe" % new)
     if not a.skip_build:
         print("")
         run([sys.executable, os.path.join(HERE, "build_exe.py")])

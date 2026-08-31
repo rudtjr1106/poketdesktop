@@ -294,6 +294,9 @@ class WildController(object):
 
         def done(r, err):
             if err:
+                if getattr(err, "status", 0) == 401:
+                    self.app.on_session_lost()
+                    return
                 self.schedule(POLL_SAFETY)
                 return
             self.apply(r)
