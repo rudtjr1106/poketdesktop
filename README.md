@@ -148,6 +148,7 @@ common/version.py         버전은 여기 한 곳에만 적는다
 python server/test_server.py     # 계정 · 도감 · 야생 조우 · 포획   72개
 python server/test_battle.py     # 배틀 · 경험치 · 학습장치        33개
 python client/smoke_battle.py    # 배틀 창을 실제로 띄워 확인
+python client/smoke_anim.py      # 연출이 도는 동안 프레임을 찍어 확인
 ```
 
 전부 임시 계정을 만들고 끝나면 지웁니다.
