@@ -37,6 +37,17 @@ def has_batchim(word):
     return None
 
 
+def _rieul(word):
+    """마지막 글자의 받침이 'ㄹ' 인지. (이상해풀, 물, 서울 ...)"""
+    for ch in reversed(word or ""):
+        if ch.isspace():
+            continue
+        if "가" <= ch <= "힣":
+            return (ord(ch) - 0xAC00) % 28 == 8
+        return False
+    return False
+
+
 def josa(word, kind="을"):
     """단어 뒤에 붙일 조사 하나를 고른다."""
     pair = PAIRS.get(kind)
@@ -45,6 +56,9 @@ def josa(word, kind="을"):
     b = has_batchim(word)
     if b is None:                       # 판단할 수 없으면 원래 표기를 지킨다
         return pair[0]
+    # 'ㄹ' 받침은 '으로' 가 아니라 '로' 다 — 이상해풀로, 서울로, 물로.
+    if b and pair == ("으로", "로") and _rieul(word):
+        return "로"
     return pair[0] if b else pair[1]
 
 
@@ -67,11 +81,15 @@ def natural(text):
         import re
         _PAIR_RE = re.compile(
             r"(\S+?)\s*(을\(를\)|를\(을\)|은\(는\)|는\(은\)"
-            r"|이\(가\)|가\(이\)|와\(과\)|과\(와\)|으로\(로\)|로\(으로\))")
+            r"|이\(가\)|가\(이\)|와\(과\)|과\(와\)|으로\(로\)|로\(으로\)"
+            r"|\(으\)로)")
 
     def rep(m):
         word, pair = m.group(1), m.group(2)
-        return word + josa(word, pair[0])
+        # 앞쪽 표기가 곧 조사 이름이다. 한 글자만 떼면 '으로(로)' 가
+        # '으' 가 되어버려서 "리자드으" 같은 글자가 남는다.
+        kind = "으로" if pair == "(으)로" else pair.split("(")[0]
+        return word + josa(word, kind)
     try:
         return _PAIR_RE.sub(rep, text or "")
     except Exception:

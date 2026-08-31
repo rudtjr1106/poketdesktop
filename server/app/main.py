@@ -48,6 +48,9 @@ def dex():
 
 @app.on_event("startup")
 def _startup():
+    if config.WARM_SPRITES:
+        import threading
+        threading.Thread(target=_warm_sprites, daemon=True).start()
     db.init()
     auth.purge_expired()
     d = dex()
@@ -193,7 +196,9 @@ def _sprite_fetch(num, shiny):
     for pat, ext in SPRITE_SOURCES:
         url = "%s/%s" % (SPRITE_BASE, pat % (sub, num))
         try:
-            with urllib.request.urlopen(url, timeout=25) as r:
+            # 짧게 잡는다. 세 군데를 도는데 각각 25초면 최악에 75초가 되고,
+            # 그 전에 클라이언트가 먼저 포기해서 그림이 안 뜬다.
+            with urllib.request.urlopen(url, timeout=8) as r:
                 data = r.read()
         except (urllib.error.URLError, OSError):
             continue
@@ -206,6 +211,30 @@ def _sprite_fetch(num, shiny):
         os.replace(tmp, p)
         return p, ext
     return None, None
+
+
+def _warm_sprites():
+    """빠진 도트를 뒤에서 천천히 받아 둔다.
+
+    도트는 처음 필요할 때 받아오는데, 그 순간 깃허브가 느리면 화면에
+    아무것도 안 뜬다. 그래서 서버가 뜨고 나면 조용히 미리 받아 둔다.
+    한 번에 몰아 받으면 깃허브가 막으므로 사이를 띄운다.
+    """
+    import time
+    time.sleep(20)                       # 서버가 자리를 잡은 뒤에
+    done = 0
+    for num in range(1, 1026):
+        for shiny in (False, True):
+            if _sprite_cached(num, shiny)[0]:
+                continue
+            try:
+                if _sprite_fetch(num, shiny)[0]:
+                    done += 1
+            except Exception:
+                pass
+            time.sleep(0.35)             # 깃허브에 부담을 주지 않는다
+    if done:
+        print("[sprites] 미리 받아둔 도트 %d개" % done, flush=True)
 
 
 @app.get("/api/sprite/{num}")
@@ -227,6 +256,29 @@ def sprite(num: int, shiny: bool = False):
     return Response(data, media_type=CONTENT_TYPE.get(ext, "image/gif"),
                     headers={"Cache-Control": "public, max-age=604800",
                              "X-Sprite-Ext": ext})
+
+
+ITEM_SPRITE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "..", "data", "item_sprites")
+
+
+@app.get("/api/item-sprite/{item_id}")
+def item_sprite(item_id: str):
+    """도구 그림. 저장소에 같이 들어 있어서 받아올 일이 없다.
+
+    포켓몬 도트와 달리 개당 1~2KB 라서 전부 담아 뒀다. 그래서 처음
+    열 때도 비어 보이지 않는다.
+    """
+    safe = "".join(c for c in (item_id or "").upper() if c.isalnum())
+    if not safe:
+        raise HTTPException(404, "그런 도구가 없습니다.")
+    path = os.path.join(ITEM_SPRITE_DIR, safe + ".png")
+    if not os.path.exists(path):
+        raise HTTPException(404, "도구 그림이 없습니다.")
+    with open(path, "rb") as f:
+        data = f.read()
+    return Response(data, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=2592000"})
 
 
 @app.get("/api/auth/check")

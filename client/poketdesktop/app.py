@@ -15,7 +15,9 @@ from . import ui_common as U                   # noqa: E402
 from .overlay import Overlay                   # noqa: E402
 from .tray import Tray                         # noqa: E402
 from .desktop_battle import DesktopBattle       # noqa: E402
+from .ui_bag import BagWindow                  # noqa: E402
 from .ui_box import BoxWindow, confirm         # noqa: E402
+from .ui_shop import ShopWindow                # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
 from .wild_ui import WildController            # noqa: E402
@@ -28,10 +30,13 @@ class App(object):
         self.dex = None
         self.username = None
         self.balls = 0
+        self.money = 0
         self.overlay = None
         self.tray = None
         self.wild = None
         self.box_window = None
+        self.shop_window = None
+        self.bag_window = None
         self.battle = None
         self._quitting = False
         self._relogin = False
@@ -73,6 +78,7 @@ class App(object):
         self.api = res["api"]
         self.username = res["user"]["username"]
         self.balls = res.get("balls") or 0
+        self.money = res.get("money") or 0
         self.after_login()
 
     def after_login(self):
@@ -167,6 +173,7 @@ class App(object):
             mons, paths, me = r
             if me:
                 self.balls = me.get("balls", self.balls)
+                self.money = me.get("money", self.money)
             if self.overlay:
                 self.overlay.sync(mons or [], paths or {})
             self.refresh_tray()
@@ -184,13 +191,13 @@ class App(object):
             self.wild.stop()
         if self.overlay:
             self.overlay.clear()
-        if self.box_window:
-            self.box_window.close()
+        self.close_windows()
         if self.battle:
             self.battle.close()
         self.api = None
         self.username = None
         self.balls = 0
+        self.money = 0
         self.refresh_tray()
         try:
             self.show_login()
@@ -202,6 +209,27 @@ class App(object):
         if self.box_window:
             return self.box_window.focus()
         self.box_window = BoxWindow(self.root, self)
+
+    def open_shop(self):
+        if self.shop_window:
+            return self.shop_window.focus()
+        self.shop_window = ShopWindow(self.root, self)
+
+    def open_bag(self):
+        if self.bag_window:
+            return self.bag_window.focus()
+        self.bag_window = BagWindow(self.root, self)
+
+    def close_windows(self):
+        """열려 있는 창을 전부 닫는다. 로그아웃·탈퇴·종료 때 부른다."""
+        for name in ("box_window", "shop_window", "bag_window"):
+            w = getattr(self, name, None)
+            if w:
+                try:
+                    w.close()
+                except Exception:
+                    pass
+            setattr(self, name, None)
 
     def open_battle(self, battle, intro=None):
         """바탕화면에서 배틀을 시작한다. 창은 안 뜬다."""
@@ -348,13 +376,13 @@ class App(object):
             self.wild.stop()
         if self.overlay:
             self.overlay.clear()
-        if self.box_window:
-            self.box_window.close()
+        self.close_windows()
         if self.battle:
             self.battle.close()
         self.api = None
         self.username = None
         self.balls = 0
+        self.money = 0
         self.refresh_tray()
         self.show_login()
         if self.api:
@@ -384,6 +412,7 @@ class App(object):
         if self._quitting:
             return
         self._quitting = True
+        self.close_windows()
         if self.wild:
             self.wild.stop()
         if self.overlay:
