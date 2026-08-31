@@ -185,6 +185,15 @@ class Api(object):
     def battle_run(self, bid):
         return self._call("POST", "/api/battle/%d/run" % bid, {})
 
+    def item_sprite(self, item_id):
+        """도구 그림 원본 바이트. 없으면 None."""
+        url = "%s/api/item-sprite/%s" % (self.base, item_id)
+        try:
+            r = self.session.get(url, timeout=20)
+        except requests.RequestException:
+            return None
+        return r.content if r.status_code == 200 and r.content else None
+
     # ---------------- 가방 · 상점 ----------------
     def bag(self):
         return self._call("GET", "/api/bag")

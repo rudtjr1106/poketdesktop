@@ -82,6 +82,10 @@ MISS_COOLDOWN = _int("POKET_MISS_COOLDOWN", 300)
 # 테스트용 경험치 주입 경로를 열어 둘지. 운영에서는 반드시 0.
 ALLOW_ADD_EXP = _bool("POKET_ALLOW_ADD_EXP", True)
 
+# 서버가 뜬 뒤 빠진 도트를 뒤에서 미리 받아둘지.
+# 처음 며칠은 이걸 켜두면 "그림이 안 뜨는" 일이 거의 없어진다.
+WARM_SPRITES = _bool("POKET_WARM_SPRITES", True)
+
 # ---- 도구 / 돈 ----
 ITEMS_PATH = os.environ.get("POKET_ITEMS", os.path.join(ROOT, "data", "items.json"))
 MONEY_START = _int("POKET_MONEY_START", 3000)     # 처음 주는 돈

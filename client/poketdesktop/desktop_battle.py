@@ -16,6 +16,7 @@ from common.korean import natural
 
 from . import battle_fx as FX
 from . import config
+from . import evolve_fx
 from .fx_layer import FloatText, FxLayer
 from .ui_common import run_async
 
@@ -210,6 +211,11 @@ class DesktopBattle(object):
                            % b.get("foe", {}).get("name", "야생"))
             if msgs:
                 head += "  " + " ".join(msgs)
+            drop = result.get("drop")
+            if drop:
+                head += "  " + natural("%s 을(를) 주웠다!" % drop["kr"])
+                if self.mine:
+                    self.float_over(self.mine, drop["kr"], "#ffd447")
             self.app.notify(head)
         elif res == "lost":
             party = result.get("party") or []
@@ -218,6 +224,13 @@ class DesktopBattle(object):
             self.app.notify("%s 은(는) 쓰러졌다..." % self.b["me"]["name"])
         elif res == "fled":
             self.app.notify("야생 포켓몬이 떠나버렸다.")
+        # 진화는 배틀 정리가 끝난 뒤에 한다. 배틀이 남아 있는 동안 종을
+        # 바꾸면 서버가 들고 있는 배틀 스냅샷과 어긋난다.
+        # 어느 포켓몬이 진화했는지 id 로 들고 간다. 같은 종이 파티에 둘 있으면
+        # 종 이름으로는 누가 진화했는지 가릴 수 없다.
+        evolves = [dict(e["evolve"], pokemonId=e.get("id"))
+                   for e in (result.get("exp") or []) if e.get("evolve")]
+        self.pending_evolve = evolves
         self.after(RESULT_MS, self.finish_cleanup)
 
     def switch_to(self, mon):
@@ -382,6 +395,9 @@ class DesktopBattle(object):
         if self.closed:
             return
         self.closed = True
+        evolves = getattr(self, "pending_evolve", None) or []
+        if evolves:
+            self.root.after(400, lambda: play_evolutions(self.app, evolves))
         if self.fx:
             self.fx.stop()
         for t in self.texts:
@@ -415,3 +431,26 @@ class DesktopBattle(object):
 
     def close(self):
         self.finish_cleanup()
+
+
+def play_evolutions(app, infos):
+    """진화 연출을 차례로 재생한다.
+
+    학습장치로 파티 전원이 경험치를 받으므로 한 판에 두 마리가 같이
+    진화할 수 있다. 겹쳐서 틀면 뒤죽박죽이 되니 하나씩 이어서 튼다.
+    """
+    rest = list(infos)
+    if not rest:
+        app.request_sync()
+        return
+    info = rest.pop(0)
+    ov = getattr(app, "overlay", None)
+    pet = (getattr(ov, "pets", {}) or {}).get(info.get("pokemonId")) if ov else None
+    text = natural("%s 은(는) %s 으로(로) 진화했다!"
+                   % (info["fromKr"], info["toKr"]))
+    if pet is None:
+        # 바탕화면에 없으면(박스에 있으면) 글로만 알린다
+        app.notify("축하합니다! " + text)
+        return play_evolutions(app, rest)
+    evolve_fx.play(app, pet, info,
+                   on_done=lambda: play_evolutions(app, rest))

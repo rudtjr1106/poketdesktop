@@ -30,6 +30,7 @@ from common.korean import natural
 
 from . import sprite_cache, sprites
 from . import ui_box
+from . import item_icons
 from . import ui_common as U
 
 LIST_W = 292            # 왼쪽 도구 목록 폭
@@ -191,13 +192,20 @@ class ItemRow(object):
         self.f.pack_propagate(False)
         self.mark = tk.Frame(self.f, bg=ROW_BG, width=3)
         self.mark.place(x=0, y=0, relheight=1.0)
-        self.dot = tk.Frame(self.f, bg=CAT_COLOR.get(item.get("cat"), U.BG3),
-                            width=5, height=5)
-        self.dot.place(x=13, rely=0.5, anchor="w")
+        # 도구 그림. 아직 못 받았으면 분류 색점으로 대신한다.
+        ph = item_icons.photo(item["id"], 20)
+        if ph is not None:
+            self.dot = tk.Label(self.f, image=ph, bg=ROW_BG, bd=0)
+            self.dot.image = ph
+            self.dot.place(x=8, rely=0.5, anchor="w")
+        else:
+            self.dot = tk.Frame(self.f, bg=CAT_COLOR.get(item.get("cat"), U.BG3),
+                                width=5, height=5)
+            self.dot.place(x=13, rely=0.5, anchor="w")
         self.name = tk.Label(self.f, text=item["kr"], bg=ROW_BG,
                              fg=U.FG if self.usable else U.FG_FAINT,
                              font=U.FONT_S, anchor="w")
-        self.name.place(x=26, rely=0.5, anchor="w")
+        self.name.place(x=32, rely=0.5, anchor="w")
         self.count = tk.Label(self.f, text="%d개" % count, bg=ROW_BG,
                               fg=U.FG_DIM if self.usable else U.FG_FAINT,
                               font=U.FONT_XS, anchor="e")
@@ -609,6 +617,12 @@ class BagWindow(object):
                         anim.frames[sprites.RIGHT][0], anim.key)
                 except Exception:                       # noqa: BLE001
                     pass
+            # 도구 그림도 같이 받아 둔다 (가진 것만)
+            try:
+                bag = (shop or {}).get("bag") or {}
+                item_icons.prefetch(api, list(bag))
+            except Exception:                           # noqa: BLE001
+                pass
             return shop, mons, thumbs
         U.run_async(self.root, work, self._loaded)
 

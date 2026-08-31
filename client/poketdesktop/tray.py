@@ -75,6 +75,8 @@ class Tray(object):
         return Menu(
             MenuItem("포켓몬 관리...", lambda _i, _it: self.call(a.open_box),
                      default=True),
+            MenuItem("가방...", lambda _i, _it: self.call(a.open_bag)),
+            MenuItem("상점...", lambda _i, _it: self.call(a.open_shop)),
             MenuItem("풀숲 찾아보기", lambda _i, _it: self.call(a.encounter_now)),
             Menu.SEPARATOR,
             MenuItem("바탕화면", Menu(
@@ -91,6 +93,8 @@ class Tray(object):
             MenuItem(lambda _it: "계정: %s" % (a.username or "-"), None,
                      enabled=False),
             MenuItem(lambda _it: "몬스터볼 %d개" % a.balls, None, enabled=False),
+            MenuItem(lambda _it: "소지금 %s원" % format(getattr(a, "money", 0), ","),
+                     None, enabled=False),
             MenuItem("버전 %s" % VERSION, None, enabled=False),
             MenuItem("서버 연결 확인", lambda _i, _it: self.call(a.check_server)),
             MenuItem("로그아웃", lambda _i, _it: self.call(a.logout)),
