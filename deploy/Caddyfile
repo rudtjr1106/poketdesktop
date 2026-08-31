@@ -1,0 +1,37 @@
+# Caddy 는 인증서를 알아서 받아서 갱신한다. 우리가 할 일은 도메인만 알려주는 것.
+#
+# 이게 없으면 비밀번호와 토큰이 평문으로 인터넷을 지나간다.
+# 공인 IP 에 올릴 거라면 HTTPS 는 선택이 아니다.
+{
+	email {$ACME_EMAIL}
+	# 서버 종류를 굳이 알려줄 필요가 없다
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+{$POKET_DOMAIN} {
+	encode gzip
+
+	# 실제 접속자 IP 를 서버에 알려준다.
+	# 이게 있어야 '자동 로그인 때 IP 확인' 이 실제로 동작한다.
+	#
+	# 중요: 두 헤더 모두 '덧붙이기'가 아니라 '덮어쓰기'다.
+	# 그냥 두면 클라이언트가 X-Forwarded-For 를 직접 넣어 보낼 때
+	# 그 값이 맨 앞에 오기 때문에 IP 를 마음대로 위조할 수 있다.
+	reverse_proxy poket-server:8080 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

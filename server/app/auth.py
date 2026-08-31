@@ -108,11 +108,27 @@ def touch_session(token, ip):
 
 
 def client_ip(request):
-    """프록시를 신뢰하도록 설정했을 때만 X-Forwarded-For 를 본다."""
+    """프록시를 신뢰하도록 설정했을 때만 프록시가 넣은 헤더를 본다.
+
+    X-Real-IP 를 먼저 본다. 우리 프록시(Caddy)는 이 헤더를 항상 실제
+    접속자 IP 로 '덮어쓰기' 때문에 위조할 수 없다.
+
+    X-Forwarded-For 는 원래 여러 값이 쉼표로 이어지는 형식이라,
+    프록시가 덧붙이기만 하면 클라이언트가 미리 넣어둔 가짜 값이 맨 앞에
+    온다. 그래서 이걸 그대로 믿으면 IP 를 마음대로 속일 수 있다.
+    deploy/Caddyfile 에서 이 헤더도 덮어쓰도록 해뒀고, 혹시 다른 프록시를
+    쓰더라도 안전하도록 여기서는 **마지막 값**을 쓴다.
+    (마지막 값 = 우리와 가장 가까운 프록시가 본 주소)
+    """
     if config.TRUST_PROXY:
+        real = request.headers.get("x-real-ip")
+        if real:
+            return real.strip()
         fwd = request.headers.get("x-forwarded-for")
         if fwd:
-            return fwd.split(",")[0].strip()
+            parts = [p.strip() for p in fwd.split(",") if p.strip()]
+            if parts:
+                return parts[-1]
     return request.client.host if request.client else ""
 
 
@@ -127,7 +143,8 @@ def ip_is_real(request):
     - 도커/루프백 대역이 아니다 (도커 없이 직접 띄운 경우)                -> 진짜
     - 그 외                                                            -> 가짜
     """
-    if config.TRUST_PROXY and request.headers.get("x-forwarded-for"):
+    if config.TRUST_PROXY and (request.headers.get("x-real-ip")
+                               or request.headers.get("x-forwarded-for")):
         return True
     raw = request.client.host if request.client else ""
     if not raw:

@@ -56,6 +56,9 @@
 
 ## 실행
 
+> 인터넷에 올릴 거라면 **[docs/DEPLOY.md](docs/DEPLOY.md)** 를 보세요.
+> 비밀번호가 평문으로 지나가지 않도록 HTTPS 를 반드시 붙여야 합니다.
+
 ### 1. 서버 (도커)
 
 ```bash
@@ -165,6 +168,20 @@ curl http://localhost:8787/api/whoami   # 서버가 내 IP 를 뭘로 보는지
 ```
 
 ---
+
+## 서버를 인터넷에 올리기
+
+내 PC 를 안 켜도 돌아가게 하려면 → **[docs/DEPLOY.md](docs/DEPLOY.md)**
+
+Oracle Cloud 무료 VM 기준 절차와 설치 스크립트(`deploy/setup-oracle.sh`)가
+들어 있습니다. Caddy 가 앞에 서서 인증서를 자동으로 받고,
+그때부터 자동 로그인의 IP 확인도 제대로 동작합니다.
+
+측정한 사용량 — **한 사람당 월 12MB** (하루 8시간 기준). 어떤 무료 티어든 남습니다.
+
+```bash
+bash deploy/setup-oracle.sh
+```
 
 ## 앞으로
 

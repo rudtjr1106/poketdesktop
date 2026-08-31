@@ -92,6 +92,22 @@ def main():
     chk("전부 한글 이름", all(p["kr"] for g in gens for p in g["pokemon"]), "")
     chk("전부 도감 번호 있음", all(p["num"] for g in gens for p in g["pokemon"]), "")
 
+    section("IP 위조 차단")
+    # 프록시를 신뢰하지 않도록 설정된 상태(개발/도커 기본)에서는
+    # 클라이언트가 어떤 헤더를 넣어 보내도 무시해야 한다.
+    import urllib.request as _r
+    base_ip = call("GET", "/api/whoami")[1].get("ip")
+    for hdr, val in [("X-Forwarded-For", "203.0.113.77"),
+                     ("X-Real-IP", "198.51.100.9")]:
+        rq = _r.Request(BASE + "/api/whoami")
+        rq.add_header(hdr, val)
+        try:
+            with _r.urlopen(rq, timeout=15) as rr:
+                got = json.loads(rr.read().decode("utf-8")).get("ip")
+        except Exception as e:
+            got = "오류 %s" % e
+        chk("%s 헤더를 넣어도 IP 가 안 바뀜" % hdr, got == base_ip, (base_ip, got))
+
     section("정식 도트 내려받기")
     import urllib.request as _u
     for num, kr in [(25, "피카츄"), (94, "팬텀"), (906, "나오하")]:
