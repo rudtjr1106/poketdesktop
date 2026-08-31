@@ -18,7 +18,7 @@ STAT_KR = {"hp": "HP", "atk": "공격", "def": "방어",
            "spa": "특수공격", "spd": "특수방어", "spe": "스피드"}
 
 IV_MAX = 31
-EV_MAX = 255
+EV_MAX = 252          # 6세대 이후 기준 (그 전에는 255)
 EV_TOTAL_MAX = 510
 LEVEL_MAX = 100
 
@@ -138,6 +138,21 @@ def calc_stat(stat, base, iv, ev, level, nature):
     return int(math.floor(raw * nature_mult(nature, stat)))
 
 
+def effective_ivs(mon):
+    """능력치를 셀 때 쓰는 개체값.
+
+    하이퍼트레이닝(병뚜껑)은 본가에서도 **실제 개체값을 바꾸지 않는다.**
+    "이 능력은 31로 쳐준다" 는 표시만 남는다. 그래서 화면에 보여줄 때는
+    원래 값을, 계산할 때는 이 값을 쓴다.
+    """
+    ivs = dict(mon.get("ivs") or {})
+    hyper = mon.get("hyper") or {}
+    for s in STATS:
+        if hyper.get(s):
+            ivs[s] = IV_MAX
+    return ivs
+
+
 def calc_all_stats(species, ivs, evs, level, nature):
     base = species["base"]
     return dict((s, calc_stat(s, base[s], ivs.get(s, 0), evs.get(s, 0), level, nature))
@@ -162,6 +177,17 @@ BALL_BONUS = {
 }
 
 
+def ball_bonus(ball):
+    """볼 보정을 숫자로. 이름을 줘도 되고 숫자를 그대로 줘도 된다.
+
+    특수한 볼(네스트볼·타이머볼처럼 상황을 봐야 하는 것)은 서버가 상황을
+    계산해서 숫자로 넘긴다. 그래서 숫자를 그대로 받는 길을 열어 둔다.
+    """
+    if isinstance(ball, (int, float)):
+        return float(ball)
+    return BALL_BONUS.get(ball, 1.0)
+
+
 def catch_attempt(species, mon, rng, ball="POKEBALL",
                   hp_ratio=1.0, status_bonus=1.0):
     """5세대 이후 포획 판정. (잡혔는지, 흔들린 횟수) 를 돌려준다.
@@ -172,7 +198,7 @@ def catch_attempt(species, mon, rng, ball="POKEBALL",
 
     아직 배틀이 없어서 체력은 항상 가득 찬 상태(1/3 보정)로 들어간다.
     """
-    bonus = BALL_BONUS.get(ball, 1.0)
+    bonus = ball_bonus(ball)
     rate = max(1, species.get("catch", 45))
     if bonus >= 255:
         return True, 4
@@ -193,7 +219,7 @@ def catch_attempt(species, mon, rng, ball="POKEBALL",
 
 def catch_chance(species, ball="POKEBALL", hp_ratio=1.0, status_bonus=1.0):
     """설명용 확률(0~1). 실제 판정은 catch_attempt 가 한다."""
-    bonus = BALL_BONUS.get(ball, 1.0)
+    bonus = ball_bonus(ball)
     rate = max(1, species.get("catch", 45))
     if bonus >= 255:
         return 1.0
@@ -371,7 +397,7 @@ class Pokedex(object):
         s = self.get(mon["species"])
         if not s:
             return dict((k, 0) for k in STATS)
-        return calc_all_stats(s, mon.get("ivs", {}), mon.get("evs", {}),
+        return calc_all_stats(s, effective_ivs(mon), mon.get("evs", {}),
                               mon.get("level", 1), mon.get("nature", "HARDY"))
 
     def describe(self, mon):
@@ -381,6 +407,8 @@ class Pokedex(object):
         curve = s.get("growth", "medium")
         lv, got, need = exp_progress(curve, mon.get("exp", 0))
         ivs = mon.get("ivs", {})
+        evs = mon.get("evs", {})
+        hyper = mon.get("hyper") or {}
         return {
             "num": s["num"],
             "name": mon.get("nickname") or s["kr"],
@@ -389,6 +417,9 @@ class Pokedex(object):
             "level": mon.get("level", lv),
             "stats": self.stats_of(mon),
             "ivs": ivs,
+            "hyper": dict((k, bool(hyper.get(k))) for k in STATS),
+            "evs": dict((k, int(evs.get(k, 0))) for k in STATS),
+            "evTotal": sum(int(evs.get(k, 0)) for k in STATS),
             "ivTotal": sum(ivs.get(k, 0) for k in STATS),
             "ivPercent": round(100.0 * sum(ivs.get(k, 0) for k in STATS) / (IV_MAX * 6), 1),
             "nature": NATURE_BY_NAME.get(mon.get("nature", "HARDY"), ("", None, None, "?"))[3],

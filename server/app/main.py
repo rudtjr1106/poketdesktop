@@ -25,11 +25,13 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
-from . import auth, battle_routes, config, db, deps   # noqa: E402
+from . import auth, battle_routes, config, db, deps, item_routes, items   # noqa: E402
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
+app.include_router(item_routes.router)
 
 RNG = deps.RNG
 
@@ -122,6 +124,7 @@ class ExpIn(BaseModel):
 
 class CatchIn(BaseModel):
     ball: str = "POKEBALL"
+    hour: int = -1        # 클라이언트의 시각. 다크볼이 밤인지 볼 때 쓴다.
 
 
 # ---------------------------------------------------------------- 공개
@@ -294,8 +297,10 @@ def register(body: RegisterIn, request: Request):
     h, salt, it = auth.hash_password(body.password)
     ip, ts = auth.client_ip(request), auth.now_iso()
     cur = db.run("INSERT INTO users (username, pw_hash, pw_salt, pw_iter, balls,"
-                 " created_at, last_login, last_ip) VALUES (?,?,?,?,?,?,?,?)",
-                 (name, h, salt, it, config.BALLS_START, ts, ts, ip))
+                 " money, created_at, last_login, last_ip)"
+                 " VALUES (?,?,?,?,?,?,?,?,?)",
+                 (name, h, salt, it, config.BALLS_START, config.MONEY_START,
+                  ts, ts, ip))
     uid = cur.lastrowid
     _schedule_next(uid, RNG.randint(60, 180))     # 첫 풀숲은 조금 빨리
     _give_starter(uid, body.starter)
@@ -377,6 +382,8 @@ def me(ctx=Depends(current)):
     return {
         "user": auth.user_public(u),
         "balls": u["balls"],
+        "money": u["money"],
+        "bag": items.bag_get(uid),
         "box": box, "onDesktop": desk,
         "limits": {"maxBox": config.MAX_BOX, "maxParty": config.MAX_PARTY,
                    "grassTtl": config.GRASS_TTL, "wildTtl": config.WILD_TTL},
@@ -456,29 +463,26 @@ def release(pid: int, ctx=Depends(current)):
 
 @app.post("/api/pokemon/{pid}/exp")
 def add_exp(pid: int, body: ExpIn, ctx=Depends(current)):
-    """경험치 부여. 배틀이 붙으면 이 경로는 막고 전투 결과에서만 부르게 바꾼다."""
+    """경험치 부여.
+
+    **이 경로는 테스트용이다.** 인증만 통과하면 경험치를 마음대로 넣을 수
+    있어서, 도구 드랍이나 돈처럼 보상이 걸린 것에는 절대 연결하지 않는다.
+    실제 경험치는 배틀 결과에서만 붙는다.
+    운영에서는 POKET_ALLOW_ADD_EXP=0 으로 막는다.
+    """
+    if not config.ALLOW_ADD_EXP:
+        raise HTTPException(403, "경험치는 배틀로만 얻을 수 있습니다.")
     uid = ctx["user"]["id"]
-    r = _own(uid, pid)
-    sp = dex().get(r["species"])
-    if not sp:
+    _own(uid, pid)
+    got = deps.grant_exp(uid, pid, body.amount)
+    if got is None:
         raise HTTPException(500, "도감에 없는 종입니다.")
-    curve = sp.get("growth", "medium")
-    before = r["level"]
-    exp = min(r["exp"] + body.amount, P.exp_for_level(curve, P.LEVEL_MAX))
-    lv = P.level_from_exp(curve, exp)
-    moves = json.loads(r["moves"])
-    learned = []
-    if lv > before:
-        for mlv, mv in sp.get("moves", []):
-            if before < mlv <= lv and mv not in moves:
-                learned.append(mv)
-                moves.append(mv)
-        moves = moves[-4:]
-    db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
-           (exp, lv, json.dumps(moves), pid))
-    return {"ok": True, "level": lv, "leveledUp": lv > before,
-            "learned": [dex().move_name(m) for m in learned],
-            "pokemon": _decorate(db.row_to_mon(_own(uid, pid)))}
+    out = {"ok": True, "level": got["level"], "leveledUp": got["leveledUp"],
+           "learned": got["learned"],
+           "pokemon": _decorate(db.row_to_mon(_own(uid, pid)))}
+    if got.get("evolve"):
+        out["evolve"] = got["evolve"]
+    return out
 
 
 # ---------------------------------------------------------------- 야생 조우
@@ -531,19 +535,24 @@ def _active(uid):
 
 
 def _wild_levels(uid):
-    """파티 수준에 맞춘 야생 레벨 범위.
+    """야생 레벨은 **바탕화면에 나와 있는 것 중 가장 낮은 레벨과 같게** 맞춘다.
 
-    Lv.5 스타팅으로 시작했는데 Lv.12 짜리가 나오면 이길 방법이 없다.
-    반대로 계속 Lv.2 만 나오면 금방 질린다. 그래서 파티 선두를 기준으로
-    조금 낮은 것부터 조금 높은 것까지 나오게 한다.
+    가장 높은 쪽에 맞추면 새로 잡은 저레벨이 영영 못 따라온다. 가장 낮은
+    쪽에 맞추면 제일 약한 애가 항상 제 몫의 상대를 만나고, 학습장치로
+    나머지도 같이 오르므로 파티 전체가 뒤처지지 않고 굴러간다.
+
+    바닥이 고정되는 건 아니다 — 그 저레벨이 경험치를 받아 올라가면
+    최저 레벨도 같이 올라가고, 야생도 따라 올라간다.
+
+    종족값 상한은 그 레벨 기준으로 잡는다. 레벨만 같고 종족값이 두 배인
+    상대가 나오면 레벨을 맞춘 의미가 없어지기 때문이다.
     """
-    r = db.q1("SELECT MAX(level) top FROM pokemon WHERE user_id=? AND on_desktop=1",
+    r = db.q1("SELECT MIN(level) low FROM pokemon WHERE user_id=? AND on_desktop=1",
               (uid,))
-    top = (r["top"] if r and r["top"] else config.WILD_MIN_LEVEL)
-    lo = max(config.WILD_MIN_LEVEL, top - config.WILD_BELOW)
-    hi = max(lo, min(config.WILD_MAX_LEVEL, top + config.WILD_ABOVE))
-    cap = config.WILD_BST_BASE + top * config.WILD_BST_PER_LEVEL
-    return lo, hi, cap
+    low = (r["low"] if r and r["low"] else config.WILD_MIN_LEVEL)
+    lvl = max(config.WILD_MIN_LEVEL, min(config.WILD_MAX_LEVEL, low))
+    cap = config.WILD_BST_BASE + lvl * config.WILD_BST_PER_LEVEL
+    return lvl, lvl, cap
 
 
 def _make_grass(uid):
@@ -605,6 +614,42 @@ def wild_reveal(wid: int, ctx=Depends(current)):
     return {"wild": _wild_public(row, True)}
 
 
+def _take_ball(uid, balls, want, mon, row, body):
+    """던질 볼을 하나 뺀다. (도구 id, 포획 배율, 남은 몬스터볼) 을 준다.
+
+    몬스터볼은 예전부터 users.balls 로 따로 세고 있어서 그 방식을 유지한다.
+    그 밖의 볼은 가방에서 뺀다. 그래야 옛 저장 데이터가 그대로 굴러간다.
+    """
+    want = (want or "POKEBALL").upper()
+    it = items.get(want)
+    if it is None or it.get("effect", {}).get("kind") != "ball":
+        want = "POKEBALL"
+        it = items.get("POKEBALL")
+
+    if not items.bag_take(uid, want, 1):
+        raise HTTPException(409, "%s 이(가) 없습니다." % it["kr"])
+    if want == "POKEBALL":
+        balls -= 1
+
+    lead = db.q1("SELECT * FROM pokemon WHERE user_id=? AND on_desktop=1"
+                 " ORDER BY slot, id LIMIT 1", (uid,))
+    mine = db.row_to_mon(lead) if lead else None
+    h = getattr(body, "hour", -1)
+    hour = h if isinstance(h, int) and 0 <= h <= 23 else None
+    bonus = items.ball_bonus(want, dex(), mon, mine=mine,
+                             turn=row["throws"], uid=uid, hour=hour)
+    return want, bonus, balls
+
+
+def _drop(uid, mon, chance):
+    """야생 하나를 처리했을 때 도구가 떨어지는지."""
+    if chance <= 0 or RNG.random() > chance:
+        return None
+    item_id = items.roll_drop(RNG, bool(mon.get("shiny")))
+    items.bag_add(uid, item_id, 1)
+    return items.drop_public(item_id)
+
+
 @app.post("/api/wild/{wid}/catch")
 def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     """몬스터볼을 던진다. 판정은 본가 5세대 이후 공식 그대로."""
@@ -616,17 +661,16 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     if row["state"] != "revealed":
         raise HTTPException(409, "아직 모습을 드러내지 않았습니다.")
 
-    balls = ctx["user"]["balls"]
-    if balls <= 0:
-        raise HTTPException(409, "몬스터볼이 없습니다.")
-    ball = body.ball if body.ball in P.BALL_BONUS else "POKEBALL"
-    db.run("UPDATE users SET balls=balls-1 WHERE id=? AND balls>0", (uid,))
-    db.run("UPDATE wild SET throws=throws+1 WHERE id=?", (wid,))
-    balls -= 1
-
     mon = json.loads(row["data"])
     sp = dex().get(mon["species"])
-    caught, shakes = P.catch_attempt(sp, mon, RNG, ball)
+
+    # 어떤 볼을 던질지. 기본 몬스터볼은 users.balls 에서, 그 밖의 볼은
+    # 가방에서 뺀다. (몬스터볼은 예전부터 따로 세고 있어서 그대로 둔다)
+    ball_id, bonus, balls = _take_ball(uid, ctx["user"]["balls"], body.ball,
+                                       mon, row, body)
+    db.run("UPDATE wild SET throws=throws+1 WHERE id=?", (wid,))
+
+    caught, shakes = P.catch_attempt(sp, mon, RNG, bonus)
 
     if not caught:
         left = db.q1("SELECT * FROM wild WHERE id=?", (wid,))
@@ -638,15 +682,23 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
                             "아앗! 조금만 더 하면 잡을 수 있었는데!",
                             "아깝다! 다 잡았다고 생각했는데!"][min(shakes, 3)]}
 
+    extra = items.ball_extra(ball_id)
+    if extra.get("happiness"):
+        mon["happiness"] = extra["happiness"]
     got, where = battle_routes.store_caught(uid, mon)
     db.run("DELETE FROM wild WHERE id=?", (wid,))
     _bump(uid, "caught")
     _schedule_next(uid, _cooldown())
+    items.mark_seen(uid, mon["species"], True, auth.now_iso())
+    drop = _drop(uid, mon, config.DROP_ON_CATCH)
     msg = "신난다! %s 을(를) 잡았다!" % dex().name(mon["species"])
     if where == "box":
         msg += " 자리가 없어서 PC 박스로 보냈다."
+    if drop:
+        msg += "  %s 을(를) 주웠다!" % drop["kr"]
     return {"caught": True, "shakes": 4, "balls": balls, "where": where,
-            "pokemon": got, "message": msg}
+            "pokemon": got, "drop": drop, "money": items.money(uid),
+            "bag": items.bag_get(uid), "message": korean.natural(msg)}
 
 
 @app.post("/api/wild/{wid}/flee")

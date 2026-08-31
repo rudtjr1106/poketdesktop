@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
     pw_salt     BLOB NOT NULL,
     pw_iter     INTEGER NOT NULL,
     balls       INTEGER NOT NULL DEFAULT 10,
+    money       INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL,
     last_login  TEXT,
     last_ip     TEXT
@@ -56,7 +57,12 @@ CREATE TABLE IF NOT EXISTS pokemon (
     on_desktop     INTEGER NOT NULL DEFAULT 0,
     slot           INTEGER,
     met_level      INTEGER NOT NULL,
-    caught_at      TEXT NOT NULL
+    caught_at      TEXT NOT NULL,
+    -- 하이퍼트레이닝. 개체값 자체는 그대로 두고 "이 능력은 31로 쳐준다" 는
+    -- 표시만 남긴다. 본가도 실제 개체값은 안 바꾼다.
+    hyper          TEXT NOT NULL DEFAULT '{}',
+    -- 변함없는돌을 쥐여준 것과 같은 상태. 레벨업 진화를 멈춘다.
+    no_evolve      INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_pokemon_user ON pokemon(user_id);
 
@@ -98,6 +104,22 @@ CREATE TABLE IF NOT EXISTS wild_state (
     battles     INTEGER NOT NULL DEFAULT 0,
     wins        INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS bag (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item     TEXT NOT NULL,
+    count    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, item)
+);
+
+-- 리피트볼이 "이미 잡아본 종" 을 봐야 해서 남긴다. 도감 역할도 겸한다.
+CREATE TABLE IF NOT EXISTS seen (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    species  TEXT NOT NULL,
+    caught   INTEGER NOT NULL DEFAULT 0,
+    first_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, species)
+);
 """
 
 MIGRATIONS = [
@@ -109,6 +131,12 @@ MIGRATIONS = [
      "ALTER TABLE sessions ADD COLUMN ip_real INTEGER NOT NULL DEFAULT 0"),
     ("users", "balls",
      "ALTER TABLE users ADD COLUMN balls INTEGER NOT NULL DEFAULT 10"),
+    ("users", "money",
+     "ALTER TABLE users ADD COLUMN money INTEGER NOT NULL DEFAULT 0"),
+    ("pokemon", "hyper",
+     "ALTER TABLE pokemon ADD COLUMN hyper TEXT NOT NULL DEFAULT '{}'"),
+    ("pokemon", "no_evolve",
+     "ALTER TABLE pokemon ADD COLUMN no_evolve INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
@@ -173,6 +201,9 @@ def row_to_mon(r):
         "slot": r["slot"],
         "metLevel": r["met_level"],
         "caughtAt": r["caught_at"],
+        # 옛 DB 행에는 없을 수 있어 keys() 로 확인하고 꺼낸다
+        "hyper": json.loads(r["hyper"]) if "hyper" in r.keys() and r["hyper"] else {},
+        "noEvolve": bool(r["no_evolve"]) if "no_evolve" in r.keys() else False,
     }
 
 
@@ -180,11 +211,12 @@ def insert_mon(user_id, mon, now):
     cur = run(
         "INSERT INTO pokemon (user_id, species, nickname, level, exp, nature, ability,"
         " hidden_ability, gender, shiny, happiness, ivs, evs, moves, on_desktop, slot,"
-        " met_level, caught_at)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " met_level, caught_at, hyper, no_evolve)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user_id, mon["species"], mon.get("nickname"), mon["level"], mon["exp"],
          mon["nature"], mon.get("ability"), int(bool(mon.get("hiddenAbility"))),
          mon.get("gender", "N"), int(bool(mon.get("shiny"))), mon.get("happiness", 70),
          json.dumps(mon["ivs"]), json.dumps(mon["evs"]), json.dumps(mon["moves"]),
-         0, None, mon["level"], now))
+         0, None, mon["level"], now,
+         json.dumps(mon.get("hyper") or {}), int(bool(mon.get("noEvolve")))))
     return cur.lastrowid

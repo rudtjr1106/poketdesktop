@@ -18,13 +18,14 @@ from pydantic import BaseModel
 from common import battle as B
 from common import pokelogic as P
 
-from . import auth, config, db, deps
+from . import auth, config, db, deps, items
 
 router = APIRouter()
 
 
 class MoveIn(BaseModel):
     move: str = ""
+    hour: int = -1        # 클라이언트의 시각 (이브이 낮/밤 진화용)
 
 
 class SwitchIn(BaseModel):
@@ -33,6 +34,7 @@ class SwitchIn(BaseModel):
 
 class BallIn(BaseModel):
     ball: str = "POKEBALL"
+    hour: int = -1
 
 
 def _now():
@@ -147,48 +149,74 @@ def _view(dex, row, bt):
 
 
 # ---------------------------------------------------------------- 경험치
-def grant_exp(dex, uid, mon_id, amount):
-    """경험치를 주고 레벨업/기술습득을 처리한다."""
-    r = db.q1("SELECT * FROM pokemon WHERE id=? AND user_id=?", (mon_id, uid))
-    if not r or amount <= 0:
-        return None
-    sp = dex.get(r["species"])
-    if not sp:
-        return None
-    curve = sp.get("growth", "medium")
-    before = r["level"]
-    exp = min(r["exp"] + int(amount), P.exp_for_level(curve, P.LEVEL_MAX))
-    lv = P.level_from_exp(curve, exp)
-    moves = json.loads(r["moves"])
-    learned = []
-    if lv > before:
-        for mlv, mv in sp.get("moves", []):
-            if before < mlv <= lv and mv not in moves:
-                learned.append(mv)
-                moves.append(mv)
-        moves = moves[-4:]
-    db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
-           (exp, lv, json.dumps(moves), mon_id))
-    return {
-        "id": mon_id,
-        "name": r["nickname"] or sp["kr"],
-        "gained": int(amount),
-        "level": lv,
-        "levelBefore": before,
-        "leveledUp": lv > before,
-        "learned": [dex.move_name(m) for m in learned],
-    }
+def grant_exp(dex, uid, mon_id, amount, hour=None):
+    """경험치 주기. 실제 처리는 deps 에 모아 뒀다 (main 과 같은 코드를 쓴다)."""
+    return deps.grant_exp(uid, mon_id, amount, hour)
 
 
-def award(dex, uid, foe, participant_id):
+def _take_ball(uid, balls, want, wild, mine, turn, hour):
+    """던질 볼을 하나 뺀다. (도구 id, 포획 배율, 남은 몬스터볼).
+
+    몬스터볼만 users.balls 에서 세고 나머지는 가방에서 뺀다. main.py 의
+    _take_ball 과 같은 규칙이다 — 한쪽만 고치지 않도록 주의.
+    """
+    want = (want or "POKEBALL").upper()
+    it = items.get(want)
+    if it is None or it.get("effect", {}).get("kind") != "ball":
+        want, it = "POKEBALL", items.get("POKEBALL")
+    if not items.bag_take(uid, want, 1):
+        raise HTTPException(409, "%s 이(가) 없습니다." % it["kr"])
+    if want == "POKEBALL":
+        balls -= 1
+    bonus = items.ball_bonus(want, deps.dex(), wild, mine=mine, turn=turn,
+                             uid=uid, hour=hour)
+    return want, bonus, balls
+
+
+def _drop(uid, mon, chance):
+    """야생 하나를 처리했을 때 도구가 떨어지는지."""
+    if chance <= 0 or deps.RNG.random() > chance:
+        return None
+    item_id = items.roll_drop(deps.RNG, bool(mon.get("shiny")))
+    items.bag_add(uid, item_id, 1)
+    return items.drop_public(item_id)
+
+
+def give_evs(uid, mon_id, yields):
+    """쓰러뜨린 종이 주는 노력치를 더한다.
+
+    종마다 '쓰러뜨리면 무슨 노력치를 얼마나 주는지' 가 본가에 정해져 있고
+    (도감의 ev 칸), 합계는 1~3 이다. 스탯당 252 · 총합 510 을 넘지 않는다.
+    """
+    if not yields:
+        return None
+    r = db.q1("SELECT evs FROM pokemon WHERE id=? AND user_id=?", (mon_id, uid))
+    if not r:
+        return None
+    before = items.clamp_evs(json.loads(r["evs"]))
+    after = items.add_evs(before, yields)
+    if after == before:
+        return None
+    db.run("UPDATE pokemon SET evs=? WHERE id=?", (json.dumps(after), mon_id))
+    return dict((k, after[k] - before[k]) for k in after
+                if after[k] != before[k])
+
+
+def award(dex, uid, foe, participant_id, hour=None):
     """싸운 포켓몬은 전부, 파티의 나머지는 학습장치 몫."""
     out = []
+    foe_sp = dex.get(foe.mon["species"]) or {}
+    ev_yield = foe_sp.get("ev") or {}
+
     part = db.q1("SELECT level FROM pokemon WHERE id=?", (participant_id,))
     lv = part["level"] if part else 5
     main = B.exp_gain(dex, foe, lv)
-    g = grant_exp(dex, uid, participant_id, main)
+    got_ev = give_evs(uid, participant_id, ev_yield)
+    g = grant_exp(dex, uid, participant_id, main, hour)
     if g:
         g["shared"] = False
+        if got_ev:
+            g["evs"] = got_ev
         out.append(g)
     if config.EXP_SHARE:
         for m in _party(uid):
@@ -196,9 +224,12 @@ def award(dex, uid, foe, participant_id):
                 continue
             amt = B.exp_gain(dex, foe, m["level"], shared=True)
             amt = int(amt * config.EXP_SHARE_RATE / 50.0)   # 기본 50% 기준
-            g = grant_exp(dex, uid, m["id"], amt)
+            share_ev = give_evs(uid, m["id"], ev_yield) if config.EV_SHARE else None
+            g = grant_exp(dex, uid, m["id"], amt, hour)
             if g:
                 g["shared"] = True
+                if share_ev:
+                    g["evs"] = share_ev
                 out.append(g)
     return out
 
@@ -316,7 +347,16 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
     if bt.over and bt.result == "won":
         db.run("INSERT INTO wild_state (user_id, wins) VALUES (?,1)"
                " ON CONFLICT(user_id) DO UPDATE SET wins=wins+1", (uid,))
-        out["exp"] = award(d, uid, foe, row["mine_id"])
+        hour = body.hour if 0 <= body.hour <= 23 else None
+        out["exp"] = award(d, uid, foe, row["mine_id"], hour)
+        items.mark_seen(uid, foe.mon["species"], False, auth.now_iso())
+        # 쓰러뜨려도 도구가 떨어진다. 포획보다는 덜 나온다.
+        # 볼이 다 떨어져도 배틀로는 다시 일어설 수 있어야 하기 때문이다.
+        drop = _drop(uid, foe.mon, config.DROP_ON_WIN)
+        if drop:
+            out["drop"] = drop
+        out["money"] = items.money(uid)
+        out["bag"] = items.bag_get(uid)
         db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
         reschedule(uid)
     elif bt.over and bt.result == "lost":
@@ -371,19 +411,19 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
     row = _load(ctx, bid)
     me, foe = _fighters(d, row)
 
-    balls = ctx["user"]["balls"]
-    if balls <= 0:
-        raise HTTPException(409, "몬스터볼이 없습니다.")
-    ball = body.ball if body.ball in P.BALL_BONUS else "POKEBALL"
-    db.run("UPDATE users SET balls=balls-1 WHERE id=? AND balls>0", (uid,))
-    balls -= 1
+    hour = body.hour if 0 <= body.hour <= 23 else None
+    # 드림볼처럼 상대의 상태를 보는 볼이 있다. 지금 모습을 같이 넘긴다.
+    wild_view = dict(foe.mon)
+    wild_view["status"] = "SLP" if foe.status == "sleep" else (foe.status or "")
+    ball, bonus, balls = _take_ball(uid, ctx["user"]["balls"], body.ball,
+                                    wild_view, me.mon, row["turn"], hour)
 
     sp = d.get(foe.mon["species"])
     hp_ratio = foe.hp / float(foe.maxhp) if foe.maxhp else 1.0
     # 잠들거나 얼면 2배, 그 밖의 상태이상은 1.5배 (본가와 같다)
     status_bonus = 2.0 if foe.status in ("sleep", "freeze") else \
         (1.5 if foe.status in ("paralysis", "poison", "burn") else 1.0)
-    caught, shakes = P.catch_attempt(sp, foe.mon, deps.RNG, ball,
+    caught, shakes = P.catch_attempt(sp, foe.mon, deps.RNG, bonus,
                                      hp_ratio, status_bonus)
 
     out = {"caught": caught, "shakes": shakes, "balls": balls,
@@ -407,11 +447,20 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
         out["battle"] = _view(d, row, bt)
         return out
 
+    extra = items.ball_extra(ball)
+    if extra.get("happiness"):
+        foe.mon["happiness"] = extra["happiness"]
     caught_mon, where = store_caught(uid, foe.mon)
     db.run("UPDATE battle SET state='done', result='caught' WHERE id=?", (row["id"],))
     db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
     db.run("INSERT INTO wild_state (user_id, caught) VALUES (?,1)"
            " ON CONFLICT(user_id) DO UPDATE SET caught=caught+1", (uid,))
+    items.mark_seen(uid, foe.mon["species"], True, auth.now_iso())
+    drop = _drop(uid, foe.mon, config.DROP_ON_CATCH)
+    if drop:
+        out["drop"] = drop
+    out["money"] = items.money(uid)
+    out["bag"] = items.bag_get(uid)
     reschedule(uid)
     out["pokemon"] = caught_mon
     out["where"] = where
