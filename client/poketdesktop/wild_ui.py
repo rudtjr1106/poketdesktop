@@ -88,10 +88,12 @@ class WildPet(Pet):
 
     def __init__(self, ctl, mon, anim):
         self.ctl = ctl
-        Pet.__init__(self, ctl.app.overlay, mon, anim)
+        # Pet.__init__ 안에서 place() 가 불리고, 그게 place_badge() 를 부른다.
+        # 그래서 배지 관련 값은 반드시 그 전에 만들어둬야 한다.
         self.badge_win = None
         self.badge_on = True
         self._blink = None
+        Pet.__init__(self, ctl.app.overlay, mon, anim)
         self.make_badge()
         self.blink()
 
@@ -156,14 +158,18 @@ class WildPet(Pet):
         d = getattr(self, "_down", None)
         moved = bool(d) and (abs(e.x_root - d[0]) > 4 or abs(e.y_root - d[1]) > 4)
         Pet.on_release(self, e)
-        if not moved:                      # 끌지 않고 그냥 눌렀으면 배틀
-            self.ctl.start_battle()
+        if moved or self.ctl.app.battle:   # 끌었거나 이미 싸우는 중이면 무시
+            return
+        self.ctl.start_battle()
 
     def on_menu(self, e):
+        # 배틀 중이면 배틀 쪽으로 넘긴다 (체력이 깎여 있어 잘 잡힌다)
+        if self.ctl.app.battle:
+            return self.ctl.app.battle.throw_ball()
         self.ctl.throw_ball()
 
     def on_double(self, e):
-        self.ctl.throw_ball()
+        self.on_menu(e)
 
     def destroy(self):
         if self._blink:
@@ -499,8 +505,8 @@ class WildController(object):
         """야생 포켓몬을 눌렀다. 배틀 창을 연다."""
         if self.throwing or not self.pet or not self.wild_id:
             return
-        if self.app.battle_window:
-            return self.app.battle_window.focus()
+        if self.app.battle:
+            return self.app.battle.focus()
         wid = self.wild_id
         self.hide_hint()
         self.throwing = True               # 여는 동안 중복 클릭 방지
@@ -511,7 +517,7 @@ class WildController(object):
                 self.app.notify(getattr(err, "message", str(err)))
                 self.check()
                 return
-            self.hide_wild_sprite()          # 무대에 따로 그리므로 원본은 감춘다
+            # 바탕화면에서 그대로 싸우므로 야생 도트는 그 자리에 그대로 둔다
             self.app.open_battle(r.get("battle"), r.get("intro"))
         run_async(self.app.root, lambda: self.app.api.battle_start(wid), done)
 
@@ -535,6 +541,30 @@ class WildController(object):
             self.app.refresh_tray()
             self.play_throw(r)
         run_async(self.app.root, lambda: self.app.api.wild_catch(wid), done)
+
+    def play_catch(self, r, on_done=None):
+        """볼 던지는 연출만 재생한다. 결과 처리는 부르는 쪽에서.
+
+        배틀 중에 던질 때도 이걸 쓴다.
+        """
+        pet = self.pet
+        if not pet:
+            if on_done:
+                on_done()
+            return
+        x1, y1, x2, y2 = self.app.overlay.area()
+        start = (x2 - 30, y2 - 10)
+        target = (pet.x + pet.fw // 2, pet.y + pet.fh // 2)
+
+        def after():
+            if r.get("caught"):
+                self.clear()
+            else:
+                self.show_wild_sprite()
+            if on_done:
+                on_done()
+        BallThrow(self, start, target, r.get("shakes", 1),
+                  bool(r.get("caught")), after)
 
     def play_throw(self, r):
         pet = self.pet

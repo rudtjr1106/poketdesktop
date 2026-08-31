@@ -72,6 +72,7 @@ class Pet(object):
         self.timer = random.randint(20, 80)
         self.vx = self.vy = 0.0
         self.drag = None
+        self.battling = False        # 배틀 중에는 스스로 돌아다니지 않는다
 
         self.label.bind("<Enter>", self.on_enter)
         self.label.bind("<Leave>", self.on_leave)
@@ -230,9 +231,16 @@ class Pet(object):
             self.facing = RIGHT if self.vx > 0 else LEFT
             self.redraw()
 
+    def face_towards(self, x):
+        """저쪽을 바라보게 방향을 돌린다."""
+        want = RIGHT if x > self.x else LEFT
+        if want != self.facing:
+            self.facing = want
+            self.redraw()
+
     def update(self, ms):
         self.advance(ms)
-        if self.state == "held":
+        if self.state == "held" or self.battling:
             return
         s = self.ov.settings
         self.timer -= 1

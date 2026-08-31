@@ -150,8 +150,9 @@ def particle(cv, mtype, x, y, r):
 class Effect(object):
     """캔버스 위에서 도는 연출 하나. root.after 로 스스로 굴러간다."""
 
-    def __init__(self, stage, move, src, dst, on_done):
+    def __init__(self, stage, move, src, dst, on_done, who="me"):
         self.st = stage
+        self.who = who
         self.cv = stage.cv
         self.root = stage.root
         self.move = move or {}
@@ -392,7 +393,7 @@ class Effect(object):
         self.st.lunge(self.src_side(), lambda: self.fangs())
 
     def src_side(self):
-        return "me" if self.src[1] > self.dst[1] else "foe"
+        return self.who
 
     def slash(self):
         """베기 자국 세 줄."""
