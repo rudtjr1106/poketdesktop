@@ -26,12 +26,12 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
         sys.path.insert(0, _p)
 
 from common import pokelogic as P          # noqa: E402
-from . import auth, config, db             # noqa: E402
+from . import auth, battle_routes, config, db, deps   # noqa: E402
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
+app.include_router(battle_routes.router)
 
-DEX = None
-RNG = random.SystemRandom()
+RNG = deps.RNG
 
 _fails = collections.defaultdict(list)
 FAIL_WINDOW = 300
@@ -39,10 +39,7 @@ FAIL_LIMIT = 8
 
 
 def dex():
-    global DEX
-    if DEX is None:
-        DEX = P.Pokedex.load(config.POKEDEX_PATH)
-    return DEX
+    return deps.dex()
 
 
 @app.on_event("startup")
@@ -83,18 +80,7 @@ def _fail_clear(username, ip):
 
 
 # ---------------------------------------------------------------- 인증
-def current(request: Request, authorization: str = Header(default="")):
-    if not authorization.lower().startswith("bearer "):
-        raise HTTPException(401, "로그인이 필요합니다.")
-    token = authorization[7:].strip()
-    sess = auth.lookup_session(token)
-    if not sess:
-        raise HTTPException(401, "세션이 만료되었습니다. 다시 로그인해 주세요.")
-    user = db.q1("SELECT * FROM users WHERE id=?", (sess["user_id"],))
-    if not user:
-        raise HTTPException(401, "계정을 찾을 수 없습니다.")
-    auth.touch_session(token, auth.client_ip(request))
-    return {"user": user, "session": sess, "token": token}
+current = deps.current
 
 
 # ---------------------------------------------------------------- 스키마
@@ -375,7 +361,7 @@ def me(ctx=Depends(current)):
         "user": auth.user_public(u),
         "balls": u["balls"],
         "box": box, "onDesktop": desk,
-        "limits": {"maxBox": config.MAX_BOX, "maxDesktop": config.MAX_DESKTOP,
+        "limits": {"maxBox": config.MAX_BOX, "maxParty": config.MAX_PARTY,
                    "grassTtl": config.GRASS_TTL, "wildTtl": config.WILD_TTL},
         "stats": {"encounters": st["encounters"] if st else 0,
                   "caught": st["caught"] if st else 0,
@@ -393,15 +379,7 @@ def _mons(user_id, only_desktop=False):
     return [db.row_to_mon(r) for r in db.q(sql, (user_id,))]
 
 
-def _decorate(mon):
-    d = dex()
-    out = dict(mon)
-    out["info"] = d.describe(mon)
-    sp = d.get(mon["species"])
-    if sp:
-        out["num"] = sp["num"]
-        out["gen"] = sp.get("gen")
-    return out
+_decorate = deps.decorate
 
 
 @app.get("/api/pokemon")
@@ -428,13 +406,13 @@ def set_desktop(pid: int, body: DesktopIn, ctx=Depends(current)):
     if body.on:
         cnt = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=? AND on_desktop=1"
                     " AND id<>?", (uid, pid))["c"]
-        if cnt >= config.MAX_DESKTOP:
-            raise HTTPException(409, "바탕화면에는 최대 %d마리까지만 내보낼 수 있습니다."
-                                % config.MAX_DESKTOP)
+        if cnt >= config.MAX_PARTY:
+            raise HTTPException(409, "데리고 다닐 수 있는 건 최대 %d마리입니다."
+                                % config.MAX_PARTY)
         used = set(r["slot"] for r in db.q(
             "SELECT slot FROM pokemon WHERE user_id=? AND on_desktop=1 AND id<>?",
             (uid, pid)))
-        slot = next(i for i in range(config.MAX_DESKTOP + 1) if i not in used)
+        slot = next(i for i in range(config.MAX_PARTY + 1) if i not in used)
         db.run("UPDATE pokemon SET on_desktop=1, slot=? WHERE id=?", (slot, pid))
     else:
         db.run("UPDATE pokemon SET on_desktop=0, slot=NULL WHERE id=?", (pid,))
@@ -535,10 +513,26 @@ def _active(uid):
     return db.q1("SELECT * FROM wild WHERE user_id=? ORDER BY id DESC LIMIT 1", (uid,))
 
 
+def _wild_levels(uid):
+    """파티 수준에 맞춘 야생 레벨 범위.
+
+    Lv.5 스타팅으로 시작했는데 Lv.12 짜리가 나오면 이길 방법이 없다.
+    반대로 계속 Lv.2 만 나오면 금방 질린다. 그래서 파티 선두를 기준으로
+    조금 낮은 것부터 조금 높은 것까지 나오게 한다.
+    """
+    r = db.q1("SELECT MAX(level) top FROM pokemon WHERE user_id=? AND on_desktop=1",
+              (uid,))
+    top = (r["top"] if r and r["top"] else config.WILD_MIN_LEVEL)
+    lo = max(config.WILD_MIN_LEVEL, top - config.WILD_BELOW)
+    hi = max(lo, min(config.WILD_MAX_LEVEL, top + config.WILD_ABOVE))
+    cap = config.WILD_BST_BASE + top * config.WILD_BST_PER_LEVEL
+    return lo, hi, cap
+
+
 def _make_grass(uid):
     """풀숲을 만들면서 어떤 포켓몬이 숨어 있을지 미리 정해둔다."""
-    mon = dex().roll_wild(config.WILD_MIN_LEVEL, config.WILD_MAX_LEVEL,
-                          RNG, shiny_rate=config.SHINY_RATE)
+    lo, hi, cap = _wild_levels(uid)
+    mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, shiny_rate=config.SHINY_RATE)
     if mon is None:
         raise HTTPException(500, "등장 가능한 포켓몬이 없습니다.")
     t = now()
@@ -627,15 +621,15 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
                             "아앗! 조금만 더 하면 잡을 수 있었는데!",
                             "아깝다! 다 잡았다고 생각했는데!"][min(shakes, 3)]}
 
-    now_iso = auth.now_iso()
-    mid = db.insert_mon(uid, mon, now_iso)
+    got, where = battle_routes.store_caught(uid, mon)
     db.run("DELETE FROM wild WHERE id=?", (wid,))
     _bump(uid, "caught")
     _schedule_next(uid, _cooldown())
-    got = db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (mid,)))
-    return {"caught": True, "shakes": 4, "balls": balls,
-            "pokemon": _decorate(got),
-            "message": "신난다! %s 을(를) 잡았다!" % dex().name(mon["species"])}
+    msg = "신난다! %s 을(를) 잡았다!" % dex().name(mon["species"])
+    if where == "box":
+        msg += " 자리가 없어서 PC 박스로 보냈다."
+    return {"caught": True, "shakes": 4, "balls": balls, "where": where,
+            "pokemon": got, "message": msg}
 
 
 @app.post("/api/wild/{wid}/flee")

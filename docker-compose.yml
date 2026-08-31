@@ -17,7 +17,10 @@ services:
       # 게이트웨이로 보일 수 있어서, whoami 로 확인한 뒤 켜고 끄면 된다.
       POKET_REQUIRE_IP: "1"
       POKET_TRUST_PROXY: "0"
-      POKET_SPAWN_COOLDOWN: "300"
+      # --- 테스트용: 1분마다 풀숲이 돋는다 (실제 배포는 600~900) ---
+      POKET_WILD_COOLDOWN_MIN: "60"
+      POKET_WILD_COOLDOWN_MAX: "60"
+      POKET_MISS_COOLDOWN: "60"
       POKET_WILD_MIN_LEVEL: "2"
       POKET_WILD_MAX_LEVEL: "12"
       POKET_MAX_DESKTOP: "6"

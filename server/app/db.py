@@ -73,16 +73,38 @@ CREATE TABLE IF NOT EXISTS wild (
 );
 CREATE INDEX IF NOT EXISTS idx_wild_user ON wild(user_id);
 
+-- 진행 중인 야생 배틀. 판정은 전부 서버가 한다.
+CREATE TABLE IF NOT EXISTS battle (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    wild_id     INTEGER NOT NULL,
+    mine_id     INTEGER NOT NULL,
+    state       TEXT NOT NULL,          -- active / done
+    result      TEXT,                   -- won / lost / fled / caught
+    turn        INTEGER NOT NULL DEFAULT 0,
+    me          TEXT NOT NULL,          -- json (hp, pp, status, stages)
+    foe         TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_battle_user ON battle(user_id);
+
 CREATE TABLE IF NOT EXISTS wild_state (
     user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     next_at     TEXT,
     encounters  INTEGER NOT NULL DEFAULT 0,
     caught      INTEGER NOT NULL DEFAULT 0,
-    fled        INTEGER NOT NULL DEFAULT 0
+    fled        INTEGER NOT NULL DEFAULT 0,
+    battles     INTEGER NOT NULL DEFAULT 0,
+    wins        INTEGER NOT NULL DEFAULT 0
 );
 """
 
 MIGRATIONS = [
+    ("wild_state", "battles",
+     "ALTER TABLE wild_state ADD COLUMN battles INTEGER NOT NULL DEFAULT 0"),
+    ("wild_state", "wins",
+     "ALTER TABLE wild_state ADD COLUMN wins INTEGER NOT NULL DEFAULT 0"),
     ("sessions", "ip_real",
      "ALTER TABLE sessions ADD COLUMN ip_real INTEGER NOT NULL DEFAULT 0"),
     ("users", "balls",

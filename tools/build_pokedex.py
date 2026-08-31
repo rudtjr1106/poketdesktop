@@ -29,6 +29,7 @@ NEEDED = [
     "ability_names.csv", "moves.csv", "move_names.csv", "move_damage_classes.csv",
     "growth_rates.csv", "egg_groups.csv", "pokemon_egg_groups.csv",
     "pokemon_moves.csv", "pokemon_evolution.csv", "evolution_triggers.csv",
+    "move_meta.csv", "move_meta_stat_changes.csv", "move_meta_ailments.csv",
 ]
 
 KO = 3          # PokeAPI 언어 id: 한국어
@@ -43,6 +44,9 @@ GROWTH = {
     "fast-then-very-slow": "fluctuating",
 }
 STAT_ID = {1: "hp", 2: "atk", 3: "def", 4: "spa", 5: "spd", 6: "spe"}
+# 기술의 능력 변화는 명중률/회피율까지 다룬다
+MOVE_STAT_ID = dict(STAT_ID)
+MOVE_STAT_ID.update({7: "acc", 8: "eva"})
 
 # 울트라비스트와 패러독스는 PokeAPI 가 전설로 표시하지 않는 경우가 있다.
 # 야생에 흔히 나오면 곤란하므로 전설과 같이 취급한다.
@@ -148,6 +152,17 @@ def build():
     for r in rows("move_names.csv"):
         if as_int(r["local_language_id"]) == KO:
             move_kr[as_int(r["move_id"])] = r["name"]
+    # 기술 효과 (상태이상, 능력변화, 흡수, 풀죽음, 연속타)
+    ailment = dict((as_int(r["id"]), r["identifier"])
+                   for r in rows("move_meta_ailments.csv"))
+    meta = dict((as_int(r["move_id"]), r) for r in rows("move_meta.csv"))
+    stat_change = {}
+    for r in rows("move_meta_stat_changes.csv"):
+        st = MOVE_STAT_ID.get(as_int(r["stat_id"]))
+        if st:
+            stat_change.setdefault(as_int(r["move_id"]), []).append(
+                [st, as_int(r["change"])])
+
     move_ident, move_out = {}, {}
     for r in rows("moves.csv"):
         mid = as_int(r["id"])
@@ -164,6 +179,21 @@ def build():
             "pp": as_int(r["pp"]), "pri": as_int(r["priority"]),
             "eff": as_int(r["effect_chance"]),
         }
+        m = meta.get(mid)
+        if m:
+            ail = ailment.get(as_int(m.get("meta_ailment_id")), "none")
+            move_out[ident].update({
+                "ail": None if ail in ("none", "unknown") else ail,
+                "ailChance": as_int(m.get("ailment_chance")),
+                "stat": stat_change.get(mid, []),
+                "statChance": as_int(m.get("stat_chance")),
+                "drain": as_int(m.get("drain")),       # 양수=흡수, 음수=반동
+                "heal": as_int(m.get("healing")),
+                "crit": as_int(m.get("crit_rate")),
+                "flinch": as_int(m.get("flinch_chance")),
+                "hits": [as_int(m.get("min_hits"), 1) or 1,
+                         as_int(m.get("max_hits"), 1) or 1],
+            })
 
     # ---- 종 기본 ----
     species_row = {}
