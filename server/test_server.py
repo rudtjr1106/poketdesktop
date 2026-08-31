@@ -8,6 +8,7 @@
 import json
 import random
 import sys
+import urllib.parse
 import urllib.error
 import urllib.request
 
@@ -54,7 +55,7 @@ def section(t):
 
 def main():
     user = "t%06d" % random.randrange(1000000)
-    pw = "testpass1234"
+    pw = "1234"                       # 비밀번호는 숫자 4자리 고정
     dev = "testdevice-%d" % random.randrange(10000)
 
     section("공개 엔드포인트")
@@ -137,9 +138,44 @@ def main():
     st, r2 = call("POST", "/api/auth/register",
                   {"username": user, "password": pw})
     chk("같은 아이디 재가입 거부(409)", st == 409, st)
-    st, r3 = call("POST", "/api/auth/register",
-                  {"username": "u%d" % random.randrange(99999), "password": "short"})
-    chk("짧은 비밀번호 거부(400)", st == 400, st)
+    st, _ = call("POST", "/api/auth/register",
+                 {"username": "u%d" % random.randrange(99999), "password": "123"})
+    chk("3자리 비밀번호 거부(400)", st == 400, st)
+    st, _ = call("POST", "/api/auth/register",
+                 {"username": "u%d" % random.randrange(99999), "password": "12345"})
+    chk("5자리 비밀번호 거부(400)", st == 400, st)
+    st, _ = call("POST", "/api/auth/register",
+                 {"username": "u%d" % random.randrange(99999), "password": "abcd"})
+    chk("숫자 아닌 비밀번호 거부(400)", st == 400, st)
+
+    section("닉네임 규칙과 중복 확인")
+    kor = "지우%d" % random.randrange(9999)
+    st, rk = call("POST", "/api/auth/register",
+                  {"username": kor, "password": "0000", "starter": "SNIVY"})
+    chk("한글 닉네임 가입 가능", st == 200 and rk.get("token"), st)
+    ktoken = rk.get("token")
+    def check(nm):
+        return call("GET", "/api/auth/check?name=" + urllib.parse.quote(nm))
+    st, c = check(kor)
+    chk("쓰는 닉네임은 못 씀", st == 200 and c.get("available") is False, c)
+    chk("이유가 '이미 쓰고 있는'", "이미" in (c.get("reason") or ""), c.get("reason"))
+    st, c = check("빈자리%d" % random.randrange(999999))
+    chk("안 쓰는 닉네임은 쓸 수 있음", st == 200 and c.get("available") is True, c)
+    st, c = check("a")
+    chk("1자 닉네임 거부", st == 200 and c.get("available") is False, c)
+    st, c = check("가" * 13)
+    chk("13자 닉네임 거부", st == 200 and c.get("available") is False, c)
+    st, c = check("나쁜!이름")
+    chk("특수문자 닉네임 거부", st == 200 and c.get("available") is False, c)
+    st, c = check("띄어  쓰기")
+    chk("연속 공백 닉네임 거부", st == 200 and c.get("available") is False, c)
+    st, c = check("Ash_Ketchum")
+    chk("영문+밑줄 닉네임 허용", st == 200 and c.get("available") is True, c)
+    st, _ = call("POST", "/api/auth/register",
+                 {"username": kor, "password": "0000"})
+    chk("한글 닉네임도 중복 거부(409)", st == 409, st)
+    if ktoken:
+        call("DELETE", "/api/auth/account", {"password": "0000"}, ktoken)
 
     st, p = call("GET", "/api/pokemon", token=token)
     mons = p.get("pokemon", [])
@@ -157,7 +193,7 @@ def main():
 
     section("로그인 / 자동 로그인")
     st, r = call("POST", "/api/auth/login",
-                 {"username": user, "password": "wrongpass123"})
+                 {"username": user, "password": "9999"})
     chk("틀린 비밀번호 거부(401)", st == 401, st)
     st, r = call("POST", "/api/auth/login",
                  {"username": user, "password": pw, "device": dev})
@@ -311,7 +347,7 @@ def main():
     chk("로그아웃 후 토큰 무효(401)", st == 401, st)
     st, r = call("POST", "/api/auth/login", {"username": user, "password": pw})
     token = r.get("token")
-    st, r = call("DELETE", "/api/auth/account", {"password": "wrongpw12345"}, token)
+    st, r = call("DELETE", "/api/auth/account", {"password": "9999"}, token)
     chk("틀린 비밀번호로 탈퇴 거부(401)", st == 401, st)
     st, r = call("DELETE", "/api/auth/account", {"password": pw}, token)
     chk("회원탈퇴", st == 200, r)

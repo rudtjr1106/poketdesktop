@@ -113,7 +113,7 @@ def fresh_wild():
 def main():
     global TOKEN
     user = "b%06d" % random.randrange(1000000)
-    pw = "battletest123"
+    pw = "1234"                       # 숫자 4자리
 
     section("준비")
     st, r = call("POST", "/api/auth/register",

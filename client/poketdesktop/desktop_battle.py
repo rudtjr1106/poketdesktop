@@ -12,6 +12,8 @@
 무슨 일이 벌어지는지는 도트의 움직임과 이펙트, 그리고 급소/효과 같은
 짧은 글씨로만 보여준다.
 """
+from common.korean import natural
+
 from . import battle_fx as FX
 from . import config
 from .fx_layer import FloatText, FxLayer
@@ -204,7 +206,8 @@ class DesktopBattle(object):
                          if not e.get("shared")), None)
             if main and self.mine:
                 self.float_over(self.mine, "+%d exp" % main["gained"], "#7bffa0")
-            head = "%s 을(를) 쓰러뜨렸다!" % b.get("foe", {}).get("name", "야생")
+            head = natural("%s 을(를) 쓰러뜨렸다!"
+                           % b.get("foe", {}).get("name", "야생"))
             if msgs:
                 head += "  " + " ".join(msgs)
             self.app.notify(head)

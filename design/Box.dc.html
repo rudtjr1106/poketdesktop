@@ -1,0 +1,265 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap">
+  <style>
+    body { margin: 0; font-family: "Noto Sans KR", "맑은 고딕", sans-serif; }
+    a { color: #ffc043; } a:hover { color: #ffd77a; }
+    .row { display: grid; grid-template-columns: 54px 1fr 44px 104px 62px 60px 74px;
+           align-items: center; padding: 7px 12px; font-size: 12px; }
+    .chip { font-size: 9px; padding: 1px 6px; color: #14141a; }
+  </style>
+</helmet>
+
+<div style="width: 980px; height: 610px; background: #131722; box-sizing: border-box;
+            border: 2px solid #39415e; position: relative; overflow: hidden;
+            font-family: 'Noto Sans KR', sans-serif;">
+
+  <!-- 헤더 -->
+  <div style="height: 62px; background: #1b2030; border-bottom: 2px solid #39415e;
+              display: flex; align-items: center; padding: 0 18px; gap: 14px;">
+    <div style="width: 26px; height: 26px; border-radius: 50%; background: #f4f6fb;
+                border: 3px solid #131722; box-sizing: border-box; position: relative; overflow: hidden;">
+      <div style="position: absolute; left: 0; right: 0; top: 0; height: 9px; background: #e8483f;"></div>
+      <div style="position: absolute; left: 0; right: 0; top: 9px; height: 3px; background: #131722;"></div>
+    </div>
+    <div>
+      <div style="color: #f2f4fb; font-size: 17px; font-weight: 900; letter-spacing: -0.3px;">포켓몬 관리</div>
+    </div>
+    <div style="color: #6f7794; font-size: 11px; margin-top: 3px;">보유 <span style="color:#c8cee0">14</span>마리
+      · 데리고 다니는 중 <span style="color:#5fd97a">6</span>마리</div>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 6px; background: #0d1017;
+                  border: 2px solid #2a3147; padding: 5px 10px;">
+        <div style="width: 13px; height: 13px; border-radius: 50%; background: #f4f6fb;
+                    border: 2px solid #131722; box-sizing: border-box; position: relative; overflow: hidden;">
+          <div style="position: absolute; left: 0; right: 0; top: 0; height: 4px; background: #e8483f;"></div>
+        </div>
+        <span style="color: #ffc043; font-size: 12px; font-weight: 700;">7</span>
+      </div>
+      <div style="background: #262d42; border: 2px solid #39415e; padding: 6px 14px;
+                  color: #c8cee0; font-size: 12px;">새로고침</div>
+    </div>
+  </div>
+
+  <div style="display: flex; height: 486px;">
+
+    <!-- 목록 -->
+    <div style="flex-grow: 1; display: flex; flex-direction: column;">
+      <div class="row" style="background: #0d1017; color: #6f7794; font-size: 10px;
+                              font-weight: 500; letter-spacing: 0.5px; border-bottom: 2px solid #2a3147;">
+        <div>도감</div><div>이름</div><div style="text-align:center">Lv</div><div>타입</div>
+        <div style="text-align:center">성격</div><div style="text-align:center">개체값</div>
+        <div style="text-align:center">위치</div>
+      </div>
+
+      <!-- 선택된 행 -->
+      <div class="row" style="background: #2b2417; border-left: 3px solid #ffc043;">
+        <div style="color: #8e97b3;">0004</div>
+        <div style="color: #ffe6b8; font-weight: 700;">파이리 <span style="color:#6fb3ff">♂</span></div>
+        <div style="text-align:center; color:#f2f4fb; font-weight:700;">12</div>
+        <div><span class="chip" style="background:#ff9d55">불꽃</span></div>
+        <div style="text-align:center; color:#c8cee0;">고집</div>
+        <div style="text-align:center; color:#5fd97a; font-weight:700;">78%</div>
+        <div style="text-align:center;"><span class="chip" style="background:#5fd97a">따라다님</span></div>
+      </div>
+
+      <div class="row" style="border-bottom: 1px solid #1b2030;">
+        <div style="color: #8e97b3;">0025</div>
+        <div style="color: #ffd447; font-weight: 500;">★ 피카츄 <span style="color:#ff8fb1">♀</span></div>
+        <div style="text-align:center; color:#c8cee0;">9</div>
+        <div><span class="chip" style="background:#f4d23c">전기</span></div>
+        <div style="text-align:center; color:#8e97b3;">명랑</div>
+        <div style="text-align:center; color:#c8cee0;">61%</div>
+        <div style="text-align:center;"><span class="chip" style="background:#5fd97a">따라다님</span></div>
+      </div>
+
+      <div class="row" style="border-bottom: 1px solid #1b2030;">
+        <div style="color: #8e97b3;">0129</div>
+        <div style="color: #c8cee0;">잉어킹 <span style="color:#6fb3ff">♂</span></div>
+        <div style="text-align:center; color:#c8cee0;">7</div>
+        <div><span class="chip" style="background:#5090d6">물</span></div>
+        <div style="text-align:center; color:#8e97b3;">겁쟁이</div>
+        <div style="text-align:center; color:#c8cee0;">44%</div>
+        <div style="text-align:center;"><span class="chip" style="background:#5fd97a">따라다님</span></div>
+      </div>
+
+      <div class="row" style="border-bottom: 1px solid #1b2030;">
+        <div style="color: #8e97b3;">0094</div>
+        <div style="color: #c8cee0;">팬텀 <span style="color:#6fb3ff">♂</span></div>
+        <div style="text-align:center; color:#c8cee0;">11</div>
+        <div><span class="chip" style="background:#5269ac">고스트</span> <span class="chip" style="background:#aa6bc8">독</span></div>
+        <div style="text-align:center; color:#8e97b3;">조심</div>
+        <div style="text-align:center; color:#c8cee0;">55%</div>
+        <div style="text-align:center;"><span class="chip" style="background:#5fd97a">따라다님</span></div>
+      </div>
+
+      <div class="row" style="border-bottom: 1px solid #1b2030;">
+        <div style="color: #8e97b3;">0133</div>
+        <div style="color: #c8cee0;">이브이 <span style="color:#ff8fb1">♀</span></div>
+        <div style="text-align:center; color:#c8cee0;">8</div>
+        <div><span class="chip" style="background:#9099a1">노말</span></div>
+        <div style="text-align:center; color:#8e97b3;">차분</div>
+        <div style="text-align:center; color:#c8cee0;">70%</div>
+        <div style="text-align:center;"><span class="chip" style="background:#5fd97a">따라다님</span></div>
+      </div>
+
+      <div class="row" style="border-bottom: 1px solid #1b2030;">
+        <div style="color: #8e97b3;">0016</div>
+        <div style="color: #c8cee0;">구구 <span style="color:#6fb3ff">♂</span></div>
+        <div style="text-align:center; color:#c8cee0;">6</div>
+        <div><span class="chip" style="background:#9099a1">노말</span> <span class="chip" style="background:#8fa9de">비행</span></div>
+        <div style="text-align:center; color:#8e97b3;">온순</div>
+        <div style="text-align:center; color:#c8cee0;">38%</div>
+        <div style="text-align:center;"><span class="chip" style="background:#5fd97a">따라다님</span></div>
+      </div>
+
+      <!-- 박스 구분선 -->
+      <div style="display: flex; align-items: center; gap: 9px; padding: 9px 12px;
+                  background: #0d1017; border-top: 2px solid #2a3147; border-bottom: 2px solid #2a3147;">
+        <div style="width: 3px; height: 10px; background: #6f7794;"></div>
+        <div style="color: #6f7794; font-size: 10px; font-weight: 500; letter-spacing: 0.5px;">PC 박스 · 8마리</div>
+      </div>
+
+      <div class="row" style="border-bottom: 1px solid #1b2030;">
+        <div style="color: #6f7794;">0074</div>
+        <div style="color: #9aa3bd;">꼬마돌 <span style="color:#6fb3ff">♂</span></div>
+        <div style="text-align:center; color:#9aa3bd;">5</div>
+        <div><span class="chip" style="background:#c5b78c">바위</span> <span class="chip" style="background:#d97845">땅</span></div>
+        <div style="text-align:center; color:#6f7794;">용감</div>
+        <div style="text-align:center; color:#9aa3bd;">52%</div>
+        <div style="text-align:center; color:#6f7794; font-size:10px;">박스</div>
+      </div>
+      <div class="row" style="border-bottom: 1px solid #1b2030;">
+        <div style="color: #6f7794;">0010</div>
+        <div style="color: #9aa3bd;">캐터피 <span style="color:#ff8fb1">♀</span></div>
+        <div style="text-align:center; color:#9aa3bd;">4</div>
+        <div><span class="chip" style="background:#90c12c">벌레</span></div>
+        <div style="text-align:center; color:#6f7794;">수줍음</div>
+        <div style="text-align:center; color:#9aa3bd;">29%</div>
+        <div style="text-align:center; color:#6f7794; font-size:10px;">박스</div>
+      </div>
+    </div>
+
+    <!-- 상세 -->
+    <div style="width: 340px; background: #1b2030; border-left: 2px solid #39415e;
+                padding: 16px; box-sizing: border-box;">
+
+      <!-- 도트 자리 -->
+      <div style="height: 118px; background: #101623; border: 2px solid #2a3147;
+                  display: flex; align-items: flex-end; justify-content: center;
+                  position: relative; overflow: hidden;">
+        <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: #171e2d;"></div>
+        <div style="position: absolute; bottom: 10px; width: 84px; height: 16px;
+                    border-radius: 50%; background: #0c111b;"></div>
+        <div style="position: relative; margin-bottom: 16px; width: 56px; height: 68px;
+                    background: #f0a860; border-radius: 44% 44% 40% 40%;">
+          <div style="position: absolute; right: -13px; top: 8px; width: 20px; height: 26px;
+                      background: #ff8a3d; border-radius: 60% 20% 60% 20%;"></div>
+        </div>
+        <div style="position: absolute; left: 8px; top: 7px; color: #4e566f; font-size: 10px;">No.0004</div>
+      </div>
+
+      <div style="margin-top: 12px; display: flex; align-items: baseline; gap: 8px;">
+        <div style="color: #ffe6b8; font-size: 20px; font-weight: 900;">파이리</div>
+        <div style="color: #6fb3ff; font-size: 15px;">♂</div>
+        <div style="margin-left: auto; background: #262d42; border: 2px solid #39415e;
+                    padding: 2px 9px; color: #f2f4fb; font-size: 12px; font-weight: 700;">Lv.12</div>
+      </div>
+      <div style="color: #6f7794; font-size: 10px; margin-top: 3px;">도롱뇽포켓몬 · 고집 성격 · 특성 맹화</div>
+
+      <div style="display: flex; gap: 4px; margin-top: 9px;">
+        <div class="chip" style="background:#ff9d55; font-size: 10px; padding: 2px 9px;">불꽃</div>
+      </div>
+
+      <!-- 능력치 -->
+      <div style="margin-top: 14px; background: #101623; border: 2px solid #2a3147; padding: 11px 12px;">
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 9px;">
+          <div style="width: 3px; height: 10px; background: #ffc043;"></div>
+          <div style="color: #8e97b3; font-size: 10px; font-weight: 500; letter-spacing: 0.5px;">능력치</div>
+          <div style="margin-left: auto; color: #5fd97a; font-size: 10px; font-weight: 700;">개체값 145/186 · 78%</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 52px 34px 1fr 42px; gap: 4px 8px; align-items: center;">
+          <div style="color:#8e97b3; font-size:10px;">HP</div>
+          <div style="color:#f2f4fb; font-size:11px; font-weight:700; text-align:right;">38</div>
+          <div style="height:7px; background:#232b3d;"><div style="width:62%; height:7px; background:#5fd97a;"></div></div>
+          <div style="color:#5fd97a; font-size:9px; text-align:right;">31</div>
+
+          <div style="color:#8e97b3; font-size:10px;">공격</div>
+          <div style="color:#f2f4fb; font-size:11px; font-weight:700; text-align:right;">27</div>
+          <div style="height:7px; background:#232b3d;"><div style="width:44%; height:7px; background:#ffc043;"></div></div>
+          <div style="color:#ffc043; font-size:9px; text-align:right;">28</div>
+
+          <div style="color:#8e97b3; font-size:10px;">방어</div>
+          <div style="color:#f2f4fb; font-size:11px; font-weight:700; text-align:right;">20</div>
+          <div style="height:7px; background:#232b3d;"><div style="width:32%; height:7px; background:#63637d;"></div></div>
+          <div style="color:#6f7794; font-size:9px; text-align:right;">14</div>
+
+          <div style="color:#8e97b3; font-size:10px;">특수공격</div>
+          <div style="color:#f2f4fb; font-size:11px; font-weight:700; text-align:right;">24</div>
+          <div style="height:7px; background:#232b3d;"><div style="width:39%; height:7px; background:#63637d;"></div></div>
+          <div style="color:#6f7794; font-size:9px; text-align:right;">19</div>
+
+          <div style="color:#8e97b3; font-size:10px;">특수방어</div>
+          <div style="color:#f2f4fb; font-size:11px; font-weight:700; text-align:right;">21</div>
+          <div style="height:7px; background:#232b3d;"><div style="width:34%; height:7px; background:#63637d;"></div></div>
+          <div style="color:#6f7794; font-size:9px; text-align:right;">22</div>
+
+          <div style="color:#8e97b3; font-size:10px;">스피드</div>
+          <div style="color:#f2f4fb; font-size:11px; font-weight:700; text-align:right;">26</div>
+          <div style="height:7px; background:#232b3d;"><div style="width:42%; height:7px; background:#ffc043;"></div></div>
+          <div style="color:#ffc043; font-size:9px; text-align:right;">31</div>
+        </div>
+      </div>
+
+      <!-- 기술 -->
+      <div style="margin-top: 10px;">
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+          <div style="width: 3px; height: 10px; background: #ffc043;"></div>
+          <div style="color: #8e97b3; font-size: 10px; font-weight: 500; letter-spacing: 0.5px;">기술</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px;">
+          <div style="background: #ff9d55; padding: 5px 8px;">
+            <div style="color:#14141a; font-size:11px; font-weight:700;">불꽃세례</div>
+            <div style="color:#3a2a12; font-size:9px;">불꽃 · 40 · PP 25</div>
+          </div>
+          <div style="background: #9099a1; padding: 5px 8px;">
+            <div style="color:#14141a; font-size:11px; font-weight:700;">할퀴기</div>
+            <div style="color:#26292e; font-size:9px;">노말 · 40 · PP 35</div>
+          </div>
+          <div style="background: #9099a1; padding: 5px 8px;">
+            <div style="color:#14141a; font-size:11px; font-weight:700;">울음소리</div>
+            <div style="color:#26292e; font-size:9px;">노말 · 변화 · PP 40</div>
+          </div>
+          <div style="background: #ff9d55; padding: 5px 8px;">
+            <div style="color:#14141a; font-size:11px; font-weight:700;">불꽃엄니</div>
+            <div style="color:#3a2a12; font-size:9px;">불꽃 · 65 · PP 15</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 바닥 버튼 -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 58px; background: #0d1017;
+              border-top: 2px solid #39415e; display: flex; align-items: center; padding: 0 18px; gap: 8px;">
+    <div style="background: #ffc043; border: 2px solid #131722; padding: 8px 16px;
+                color: #2a1f08; font-size: 12px; font-weight: 900; box-shadow: 3px 3px 0 #7a5410;">박스로 보내기</div>
+    <div style="background: #262d42; border: 2px solid #39415e; padding: 8px 16px;
+                color: #c8cee0; font-size: 12px;">별명 짓기</div>
+    <div style="background: #3a2028; border: 2px solid #5a2f3a; padding: 8px 16px;
+                color: #ff6b6b; font-size: 12px;">놓아주기</div>
+    <div style="margin-left: auto; color: #6f7794; font-size: 11px;">더블클릭하면 바탕화면에서 찾아줍니다</div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

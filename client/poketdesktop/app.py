@@ -6,6 +6,7 @@ import sys
 import tkinter as tk
 
 from common import pokelogic as P              # noqa: E402
+from common.korean import natural              # noqa: E402
 from common.version import VERSION             # noqa: E402
 
 from . import api as apimod                    # noqa: E402
@@ -112,6 +113,8 @@ class App(object):
 
     # ---------------------------------------------------------------- 알림
     def notify(self, message):
+        """알림 한 줄. 조사는 여기서 한 번에 자연스럽게 고친다."""
+        message = natural(message)
         config.log(message)
         if self.tray:
             self.tray.notify(message)
@@ -329,7 +332,7 @@ class App(object):
     # ---- 계정 ----
     def logout(self):
         if not confirm(self.root, "로그아웃",
-                       "로그아웃하면 이 기기의 저장된 로그인이 지워집니다.\n계속할까요?"):
+                       "로그아웃하면 이 기기의 저장된 로그인이 지워집니다.\n계속할까요?", danger=False, ok_text="로그아웃"):
             return
 
         def work():
@@ -360,7 +363,8 @@ class App(object):
     def delete_account(self):
         if not confirm(self.root, "회원탈퇴",
                        "계정과 보유한 포켓몬이 전부 삭제됩니다.\n"
-                       "되돌릴 수 없습니다. 정말 진행할까요?"):
+                       "되돌릴 수 없습니다. 정말 진행할까요?",
+                       ok_text="회원탈퇴"):
             return
         pw = ask_password(self.root, "회원탈퇴",
                           "확인을 위해 비밀번호를 입력해 주세요.")

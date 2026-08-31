@@ -34,8 +34,10 @@ app.include_router(battle_routes.router)
 RNG = deps.RNG
 
 _fails = collections.defaultdict(list)
+# 비밀번호가 숫자 4자리(만 가지)라 시도 제한이 사실상 유일한 방어선이다.
+# 5분에 5번까지만 틀릴 수 있다 — 전부 훑으려면 몇 년이 걸린다.
 FAIL_WINDOW = 300
-FAIL_LIMIT = 8
+FAIL_LIMIT = 5
 
 
 def dex():
@@ -134,6 +136,9 @@ def health(request: Request):
         "requireIp": config.REQUIRE_IP,
         "ipVisible": auth.ip_is_real(request),
         "observedIp": auth.client_ip(request),
+        "account": {"pinDigits": config.PIN_DIGITS,
+                    "minName": config.MIN_USERNAME,
+                    "maxName": config.MAX_USERNAME},
     }
 
 
@@ -219,6 +224,18 @@ def sprite(num: int, shiny: bool = False):
     return Response(data, media_type=CONTENT_TYPE.get(ext, "image/gif"),
                     headers={"Cache-Control": "public, max-age=604800",
                              "X-Sprite-Ext": ext})
+
+
+@app.get("/api/auth/check")
+def check_name(name: str = ""):
+    """닉네임을 쓸 수 있는지. 회원가입 화면이 타이핑 중에 물어본다."""
+    clean, err = auth.check_username(name)
+    if err:
+        return {"available": False, "reason": err, "name": name}
+    if auth.name_taken(clean):
+        return {"available": False, "reason": "이미 쓰고 있는 닉네임입니다.",
+                "name": clean}
+    return {"available": True, "reason": "쓸 수 있는 닉네임입니다.", "name": clean}
 
 
 @app.get("/api/starters")

@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap">
+  <style>
+    body { margin: 0; font-family: "Noto Sans KR", "맑은 고딕", sans-serif; }
+    a { color: #ffc043; } a:hover { color: #ffd77a; }
+  </style>
+</helmet>
+
+<div style="width: 460px; height: 680px; background: #131722; box-sizing: border-box;
+            border: 2px solid #39415e; position: relative; overflow: hidden;
+            font-family: 'Noto Sans KR', sans-serif;">
+
+  <!-- 상단 띠 : 몬스터볼 + 제목 -->
+  <div style="height: 96px; background: #e8483f; position: relative; overflow: hidden;
+              border-bottom: 2px solid #39415e;">
+    <div style="position: absolute; right: -26px; top: -34px; width: 132px; height: 132px;
+                border-radius: 50%; background: #c93a32;"></div>
+    <div style="position: absolute; right: 4px; top: 34px; width: 132px; height: 6px;
+                background: #131722;"></div>
+    <div style="position: absolute; right: 54px; top: 20px; width: 34px; height: 34px;
+                border-radius: 50%; background: #f4f6fb; border: 5px solid #131722;
+                box-sizing: border-box;"></div>
+    <div style="position: absolute; left: 22px; top: 22px;">
+      <div style="color: #ffffff; font-size: 25px; font-weight: 900; letter-spacing: -0.6px;">포켓 데스크톱</div>
+      <div style="color: #ffd9d5; font-size: 11px; font-weight: 400; margin-top: 3px;">
+        바탕화면에서 포켓몬을 만나고 키웁니다</div>
+    </div>
+    <div style="position: absolute; left: 22px; bottom: 8px; color: #ffb9b3;
+                font-size: 10px; font-weight: 500; letter-spacing: 0.4px;">v0.6.0</div>
+  </div>
+
+  <div style="padding: 18px 22px 0 22px;">
+
+    <!-- 서버 주소 -->
+    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px;">
+      <div style="width: 3px; height: 11px; background: #ffc043;"></div>
+      <div style="color: #8e97b3; font-size: 10px; font-weight: 500; letter-spacing: 0.6px;">서버 주소</div>
+    </div>
+    <div style="background: #0d1017; border: 2px solid #2a3147; padding: 9px 11px;
+                color: #c8cee0; font-size: 12px; margin-bottom: 18px;">
+      https://desktop-kb3pg3b.taile9bd90.ts.net:10000</div>
+
+    <!-- 탭 -->
+    <div style="display: flex; gap: 0; border-bottom: 2px solid #2a3147;">
+      <div style="padding: 10px 22px; background: #1b2030; border: 2px solid #2a3147;
+                  border-bottom: 2px solid #1b2030; margin-bottom: -2px;
+                  color: #ffc043; font-size: 13px; font-weight: 700;">로그인</div>
+      <div style="padding: 10px 22px; color: #6f7794; font-size: 13px; font-weight: 500;">회원가입</div>
+    </div>
+
+    <div style="background: #1b2030; border: 2px solid #2a3147; border-top: none;
+                padding: 22px 20px 20px 20px;">
+
+      <!-- 아이디 -->
+      <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+        <div style="width: 3px; height: 11px; background: #ffc043;"></div>
+        <div style="color: #8e97b3; font-size: 10px; font-weight: 500; letter-spacing: 0.6px;">아이디</div>
+      </div>
+      <div style="background: #0d1017; border: 2px solid #39415e; padding: 11px 12px;
+                  color: #f2f4fb; font-size: 13px; position: relative;">
+        rudtjr1106
+        <div style="position: absolute; right: 10px; top: 12px; width: 2px; height: 15px;
+                    background: #ffc043;"></div>
+      </div>
+
+      <!-- 비밀번호 -->
+      <div style="display: flex; align-items: center; gap: 6px; margin: 16px 0 6px 0;">
+        <div style="width: 3px; height: 11px; background: #ffc043;"></div>
+        <div style="color: #8e97b3; font-size: 10px; font-weight: 500; letter-spacing: 0.6px;">비밀번호</div>
+      </div>
+      <div style="background: #0d1017; border: 2px solid #2a3147; padding: 11px 12px;
+                  color: #9aa3bd; font-size: 13px; letter-spacing: 3px;">••••••••••</div>
+
+      <!-- 로그인 버튼 -->
+      <div style="margin-top: 24px; background: #ffc043; border: 2px solid #131722;
+                  padding: 13px 0; text-align: center; position: relative;
+                  box-shadow: 4px 4px 0 #7a5410;">
+        <span style="color: #2a1f08; font-size: 15px; font-weight: 900;">로그인</span>
+      </div>
+
+      <div style="margin-top: 14px; text-align: center; color: #6f7794; font-size: 11px;">
+        계정이 없으신가요?
+        <span style="color: #ffc043; font-weight: 500;">회원가입</span>
+      </div>
+    </div>
+
+    <!-- 상태줄 -->
+    <div style="margin-top: 16px; display: flex; align-items: center; gap: 7px;
+                background: #0f1420; border-left: 3px solid #5fd97a; padding: 9px 11px;">
+      <div style="width: 9px; height: 9px; background: #5fd97a;"></div>
+      <div style="color: #9fe8b2; font-size: 11px;">서버 연결됨 · 도감 1025종</div>
+    </div>
+  </div>
+
+  <!-- 바닥 도트 띠 -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 34px;
+              background: #0d1017; border-top: 2px solid #2a3147;
+              display: flex; align-items: center; padding: 0 22px; gap: 5px;">
+    <div style="width: 6px; height: 6px; background: #e8483f;"></div>
+    <div style="width: 6px; height: 6px; background: #ffc043;"></div>
+    <div style="width: 6px; height: 6px; background: #5fd97a;"></div>
+    <div style="width: 6px; height: 6px; background: #6fb3ff;"></div>
+    <div style="margin-left: auto; color: #4e566f; font-size: 10px;">Enter 로 로그인</div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
