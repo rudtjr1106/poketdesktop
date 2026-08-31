@@ -9,6 +9,8 @@ from tkinter import ttk
 
 from PIL import Image, ImageTk
 
+from common.version import VERSION
+
 from . import config, sprite_cache, sprites
 from . import ui_common as U
 from .api import Api
@@ -58,7 +60,7 @@ class LoginWindow(object):
         wrap.pack(fill="both", expand=True)
 
         ttk.Label(wrap, text="포켓 데스크톱", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(wrap, text="바탕화면에서 포켓몬을 만나고 키웁니다",
+        ttk.Label(wrap, text="바탕화면에서 포켓몬을 만나고 키웁니다   v%s" % VERSION,
                   style="Dim.TLabel").pack(anchor="w", pady=(3, 16))
 
         ttk.Label(wrap, text="서버 주소", style="Faint.TLabel").pack(anchor="w")

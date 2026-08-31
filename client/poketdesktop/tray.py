@@ -10,6 +10,8 @@ import pystray
 from PIL import Image, ImageDraw
 from pystray import Menu, MenuItem
 
+from common.version import VERSION
+
 SIZE_PRESETS = [("작게", 36), ("보통", 48), ("크게", 64), ("아주 크게", 84)]
 AREA_PRESETS = [("좁게", 360, 240), ("보통", 520, 360),
                 ("넓게", 760, 520), ("화면 전체", 0, 0)]
@@ -89,6 +91,7 @@ class Tray(object):
             MenuItem(lambda _it: "계정: %s" % (a.username or "-"), None,
                      enabled=False),
             MenuItem(lambda _it: "몬스터볼 %d개" % a.balls, None, enabled=False),
+            MenuItem("버전 %s" % VERSION, None, enabled=False),
             MenuItem("서버 연결 확인", lambda _i, _it: self.call(a.check_server)),
             MenuItem("로그아웃", lambda _i, _it: self.call(a.logout)),
             MenuItem("회원탈퇴", lambda _i, _it: self.call(a.delete_account)),

@@ -73,12 +73,17 @@ curl http://localhost:8787/api/health
 
 ### 2. 클라이언트
 
+**그냥 쓰실 거라면** [Releases](https://github.com/rudtjr1106/poketdesktop/releases)
+에서 `포켓데스크톱-vX.Y.Z.exe` 를 받아 실행하세요. 파이썬이 필요 없습니다.
+
+**코드를 고치면서 쓰실 거라면:**
+
 ```bash
 pip install -r client/requirements.txt
 pythonw client/run.pyw
 ```
 
-콘솔 없이 백그라운드로 돕니다. 트레이 아이콘(오른쪽 아래 숨겨진 아이콘)에서
+둘 다 콘솔 없이 백그라운드로 돕니다. 트레이 아이콘(오른쪽 아래 숨겨진 아이콘)에서
 오른쪽 클릭하면 전체 기능이 나옵니다.
 
 ---
@@ -122,6 +127,9 @@ client/
   poketdesktop/ui_*.py    로그인 · 포켓몬 관리
 
 tools/build_pokedex.py    PokeAPI 공식 데이터 -> pokedex.json
+tools/build_exe.py        클라이언트를 exe 하나로 묶기
+tools/release.py          버전 올리기 + 빌드 + 태그 + GitHub 릴리스
+common/version.py         버전은 여기 한 곳에만 적는다
 ```
 
 ---
@@ -181,6 +189,28 @@ Oracle Cloud 무료 VM 기준 절차와 설치 스크립트(`deploy/setup-oracle
 
 ```bash
 bash deploy/setup-oracle.sh
+```
+
+## 릴리스 만들기
+
+버전은 `common/version.py` 한 곳에만 적혀 있고 서버·클라이언트·exe 가 전부
+이 값을 읽습니다.
+
+```bash
+python tools/release.py --patch     # 0.3.0 -> 0.3.1
+python tools/release.py --minor     # 0.3.1 -> 0.4.0
+python tools/release.py 1.0.0       # 직접 지정
+python tools/release.py --dry-run   # 빌드까지만
+```
+
+버전 갱신 → 커밋 → exe 빌드 → 태그 → GitHub 릴리스 업로드까지 한 번에 합니다.
+
+앞 두 자리가 다르면 (0.3.x → 0.4.0) 서버와 클라이언트를 같이 올려야 합니다.
+
+exe 만 만들려면:
+
+```bash
+python tools/build_exe.py
 ```
 
 ## 앞으로
