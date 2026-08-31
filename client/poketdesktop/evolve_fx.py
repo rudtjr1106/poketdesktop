@@ -429,6 +429,11 @@ class Evolution(object):
         to_kr = self.info.get("toKr")
         if self.info.get("toNum"):
             mon["num"] = self.info["toNum"]
+        # 도감 키도 같이 바꾼다. 번호만 바꿔 두면 다음 동기화 전까지
+        # dex.get(mon["species"]) 가 진화 전 종을 돌려줘서, 타입이나
+        # 능력치를 물어보는 곳이 엉뚱한 답을 받는다.
+        if self.info.get("to"):
+            mon["species"] = self.info["to"]
         if to_kr:
             if not info.get("name") or info.get("name") == from_kr:
                 info["name"] = to_kr
