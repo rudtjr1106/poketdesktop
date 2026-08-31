@@ -3,7 +3,7 @@
 
     python tools/build_exe.py
 
-결과: dist/포켓데스크톱-vX.Y.Z.exe
+결과: dist/poketdesktop-vX.Y.Z.exe
 
 - 파일 하나로 나온다. 파이썬이 없는 PC 에서도 그냥 실행된다.
 - 콘솔 창이 안 뜬다 (백그라운드로 도는 프로그램이라서).
@@ -21,7 +21,9 @@ sys.path.insert(0, ROOT)
 
 from common.version import VERSION            # noqa: E402
 
-NAME = "포켓데스크톱-v%s" % VERSION
+# GitHub 릴리스는 첨부파일 이름의 한글을 지워버린다. 파일명은 ASCII 로 둔다.
+# (창 제목과 프로그램 이름은 그대로 한글이다)
+NAME = "poketdesktop-v%s" % VERSION
 ENTRY = os.path.join(ROOT, "client", "run.pyw")
 ICON = os.path.join(ROOT, "build", "icon.ico")
 

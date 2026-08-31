@@ -31,6 +31,7 @@ class App(object):
         self.wild = None
         self.box_window = None
         self._quitting = False
+        self._relogin = False
 
         self.root = tk.Tk()
         self.root.withdraw()
@@ -152,6 +153,10 @@ class App(object):
         def done(r, err):
             if err:
                 config.log("동기화 실패: %s" % err)
+                # 세션이 끊긴 거라면 조용히 실패만 하고 있으면 안 된다.
+                # 포켓몬이 사라진 채로 계속 돌아가서 사용자는 이유를 모른다.
+                if getattr(err, "status", 0) == 401:
+                    self.on_session_lost()
                 return
             mons, paths, me = r
             if me:
@@ -160,6 +165,29 @@ class App(object):
                 self.overlay.sync(mons or [], paths or {})
             self.refresh_tray()
         run_async(self.root, work, done)
+
+    def on_session_lost(self):
+        """세션이 만료되거나 계정이 사라졌을 때 다시 로그인 받는다."""
+        if self._quitting or self._relogin:
+            return
+        self._relogin = True
+        config.log("세션이 끊겨서 다시 로그인을 요청합니다")
+        self.notify("로그인이 만료되었습니다. 다시 로그인해 주세요.")
+        config.clear_session()
+        if self.wild:
+            self.wild.stop()
+        if self.overlay:
+            self.overlay.clear()
+        if self.box_window:
+            self.box_window.close()
+        self.api = None
+        self.username = None
+        self.balls = 0
+        self.refresh_tray()
+        try:
+            self.show_login()
+        finally:
+            self._relogin = False
 
     # ---------------------------------------------------------------- 메뉴 동작
     def open_box(self):
