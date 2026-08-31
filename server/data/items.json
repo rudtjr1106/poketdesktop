@@ -1,0 +1,2230 @@
+{
+ "dropTable": [
+  [
+   "ANTIDOTE",
+   100
+  ],
+  [
+   "AUSPICIOUSARMOR",
+   14
+  ],
+  [
+   "AWAKENING",
+   100
+  ],
+  [
+   "BIGMUSHROOM",
+   45
+  ],
+  [
+   "BIGNUGGET",
+   8
+  ],
+  [
+   "BIGPEARL",
+   45
+  ],
+  [
+   "BLACKAUGURITE",
+   14
+  ],
+  [
+   "BOTTLECAP",
+   34
+  ],
+  [
+   "BURNHEAL",
+   100
+  ],
+  [
+   "CHIPPEDPOT",
+   5
+  ],
+  [
+   "CLEVERWING",
+   100
+  ],
+  [
+   "COMETSHARD",
+   6
+  ],
+  [
+   "CRACKEDPOT",
+   14
+  ],
+  [
+   "DAWNSTONE",
+   14
+  ],
+  [
+   "DEEPSEASCALE",
+   14
+  ],
+  [
+   "DEEPSEATOOTH",
+   14
+  ],
+  [
+   "DRAGONSCALE",
+   14
+  ],
+  [
+   "DREAMBALL",
+   45
+  ],
+  [
+   "DUBIOUSDISC",
+   14
+  ],
+  [
+   "DUSKBALL",
+   45
+  ],
+  [
+   "DUSKSTONE",
+   14
+  ],
+  [
+   "ELECTIRIZER",
+   14
+  ],
+  [
+   "ETHER",
+   45
+  ],
+  [
+   "EVERSTONE",
+   45
+  ],
+  [
+   "FASTBALL",
+   45
+  ],
+  [
+   "FIRESTONE",
+   14
+  ],
+  [
+   "FRIENDBALL",
+   45
+  ],
+  [
+   "FULLHEAL",
+   45
+  ],
+  [
+   "FULLRESTORE",
+   14
+  ],
+  [
+   "GENIUSWING",
+   100
+  ],
+  [
+   "GOLDBOTTLECAP",
+   9
+  ],
+  [
+   "GREATBALL",
+   45
+  ],
+  [
+   "GREPABERRY",
+   100
+  ],
+  [
+   "HEALBALL",
+   45
+  ],
+  [
+   "HEALTHWING",
+   100
+  ],
+  [
+   "HEAVYBALL",
+   45
+  ],
+  [
+   "HONDEWBERRY",
+   100
+  ],
+  [
+   "HYPERPOTION",
+   45
+  ],
+  [
+   "ICEHEAL",
+   100
+  ],
+  [
+   "ICESTONE",
+   14
+  ],
+  [
+   "KELPSYBERRY",
+   100
+  ],
+  [
+   "KINGSROCK",
+   14
+  ],
+  [
+   "LEAFSTONE",
+   14
+  ],
+  [
+   "LEVELBALL",
+   45
+  ],
+  [
+   "LINKINGCORD",
+   5
+  ],
+  [
+   "LOVEBALL",
+   45
+  ],
+  [
+   "LUXURYBALL",
+   14
+  ],
+  [
+   "MAGMARIZER",
+   14
+  ],
+  [
+   "MALICIOUSARMOR",
+   14
+  ],
+  [
+   "MASTERBALL",
+   2
+  ],
+  [
+   "MASTERPIECETEACUP",
+   5
+  ],
+  [
+   "MAXPOTION",
+   14
+  ],
+  [
+   "MAXREVIVE",
+   14
+  ],
+  [
+   "METALALLOY",
+   14
+  ],
+  [
+   "METALCOAT",
+   14
+  ],
+  [
+   "MOONBALL",
+   45
+  ],
+  [
+   "MOONSTONE",
+   14
+  ],
+  [
+   "MUSCLEWING",
+   100
+  ],
+  [
+   "NESTBALL",
+   45
+  ],
+  [
+   "NETBALL",
+   45
+  ],
+  [
+   "NUGGET",
+   45
+  ],
+  [
+   "PARALYZEHEAL",
+   100
+  ],
+  [
+   "PEARL",
+   100
+  ],
+  [
+   "PEATBLOCK",
+   14
+  ],
+  [
+   "POKEBALL",
+   100
+  ],
+  [
+   "POMEGBERRY",
+   100
+  ],
+  [
+   "POTION",
+   100
+  ],
+  [
+   "PREMIERBALL",
+   100
+  ],
+  [
+   "PRETTYWING",
+   100
+  ],
+  [
+   "PRISMSCALE",
+   14
+  ],
+  [
+   "PROTECTOR",
+   14
+  ],
+  [
+   "QUALOTBERRY",
+   100
+  ],
+  [
+   "QUICKBALL",
+   45
+  ],
+  [
+   "RAREBONE",
+   45
+  ],
+  [
+   "RARECANDY",
+   20
+  ],
+  [
+   "REAPERCLOTH",
+   14
+  ],
+  [
+   "REPEATBALL",
+   45
+  ],
+  [
+   "RESISTWING",
+   100
+  ],
+  [
+   "REVIVE",
+   45
+  ],
+  [
+   "SACHET",
+   14
+  ],
+  [
+   "SACREDASH",
+   4
+  ],
+  [
+   "SCROLLOFDARKNESS",
+   14
+  ],
+  [
+   "SHINYSTONE",
+   14
+  ],
+  [
+   "STARDUST",
+   100
+  ],
+  [
+   "STARPIECE",
+   14
+  ],
+  [
+   "SUNSTONE",
+   14
+  ],
+  [
+   "SUPERPOTION",
+   100
+  ],
+  [
+   "SWEETAPPLE",
+   14
+  ],
+  [
+   "SWIFTWING",
+   100
+  ],
+  [
+   "SYRUPYAPPLE",
+   14
+  ],
+  [
+   "TAMATOBERRY",
+   100
+  ],
+  [
+   "TARTAPPLE",
+   14
+  ],
+  [
+   "THUNDERSTONE",
+   14
+  ],
+  [
+   "TIMERBALL",
+   45
+  ],
+  [
+   "TINYMUSHROOM",
+   100
+  ],
+  [
+   "ULTRABALL",
+   14
+  ],
+  [
+   "UNREMARKABLETEACUP",
+   14
+  ],
+  [
+   "UPGRADE",
+   14
+  ],
+  [
+   "WATERSTONE",
+   14
+  ],
+  [
+   "WHIPPEDDREAM",
+   14
+  ]
+ ],
+ "dropTotal": 4252,
+ "items": {
+  "ANTIDOTE": {
+   "cat": "heal",
+   "chance": 0.023518,
+   "cost": 200,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Antidote",
+   "id": "ANTIDOTE",
+   "ident": "antidote",
+   "kr": "해독제",
+   "rarity": "common",
+   "sell": 100,
+   "weight": 100
+  },
+  "AUSPICIOUSARMOR": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Auspicious Armor",
+   "evolves": [
+    "카르본"
+   ],
+   "id": "AUSPICIOUSARMOR",
+   "ident": "auspicious-armor",
+   "kr": "축복받은갑옷",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "AWAKENING": {
+   "cat": "heal",
+   "chance": 0.023518,
+   "cost": 200,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Awakening",
+   "id": "AWAKENING",
+   "ident": "awakening",
+   "kr": "잠깨는약",
+   "rarity": "common",
+   "sell": 100,
+   "weight": 100
+  },
+  "BIGMUSHROOM": {
+   "cat": "misc",
+   "chance": 0.010583,
+   "cost": 5000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Big Mushroom",
+   "id": "BIGMUSHROOM",
+   "ident": "big-mushroom",
+   "kr": "큰버섯",
+   "rarity": "uncommon",
+   "sell": 2500,
+   "weight": 45
+  },
+  "BIGNUGGET": {
+   "cat": "misc",
+   "chance": 0.001881,
+   "cost": 40000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Big Nugget",
+   "id": "BIGNUGGET",
+   "ident": "big-nugget",
+   "kr": "큰금구슬",
+   "rarity": "epic",
+   "sell": 20000,
+   "weight": 8
+  },
+  "BIGPEARL": {
+   "cat": "misc",
+   "chance": 0.010583,
+   "cost": 8000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Big Pearl",
+   "id": "BIGPEARL",
+   "ident": "big-pearl",
+   "kr": "큰진주",
+   "rarity": "uncommon",
+   "sell": 4000,
+   "weight": 45
+  },
+  "BLACKAUGURITE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Black Augurite",
+   "evolves": [
+    "스라크"
+   ],
+   "id": "BLACKAUGURITE",
+   "ident": "black-augurite",
+   "kr": "검은휘석",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "BOTTLECAP": {
+   "cat": "iv",
+   "chance": 0.007996,
+   "cost": 5000,
+   "effect": {
+    "count": 1,
+    "kind": "iv"
+   },
+   "en": "Bottle Cap",
+   "id": "BOTTLECAP",
+   "ident": "bottle-cap",
+   "kr": "은색병뚜껑",
+   "rarity": "epic",
+   "sell": 2500,
+   "weight": 34
+  },
+  "BURNHEAL": {
+   "cat": "heal",
+   "chance": 0.023518,
+   "cost": 200,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Burn Heal",
+   "id": "BURNHEAL",
+   "ident": "burn-heal",
+   "kr": "화상치료제",
+   "rarity": "common",
+   "sell": 100,
+   "weight": 100
+  },
+  "CALCIUM": {
+   "cat": "ev",
+   "cost": 10000,
+   "effect": {
+    "amount": 10,
+    "kind": "ev",
+    "stat": "spa"
+   },
+   "en": "Calcium",
+   "id": "CALCIUM",
+   "ident": "calcium",
+   "kr": "리보플라빈",
+   "sell": 5000
+  },
+  "CARBOS": {
+   "cat": "ev",
+   "cost": 10000,
+   "effect": {
+    "amount": 10,
+    "kind": "ev",
+    "stat": "spe"
+   },
+   "en": "Carbos",
+   "id": "CARBOS",
+   "ident": "carbos",
+   "kr": "알칼로이드",
+   "sell": 5000
+  },
+  "CHIPPEDPOT": {
+   "cat": "stone",
+   "chance": 0.001176,
+   "cost": 38000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Chipped Pot",
+   "evolves": [
+    "데인차"
+   ],
+   "id": "CHIPPEDPOT",
+   "ident": "chipped-pot",
+   "kr": "이빠진포트",
+   "rarity": "epic",
+   "sell": 19000,
+   "weight": 5
+  },
+  "CLEVERWING": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 300,
+   "effect": {
+    "amount": 1,
+    "kind": "ev",
+    "stat": "spd"
+   },
+   "en": "Clever Feather",
+   "id": "CLEVERWING",
+   "ident": "clever-wing",
+   "kr": "정신력깃털",
+   "rarity": "common",
+   "sell": 150,
+   "weight": 100
+  },
+  "COMETSHARD": {
+   "cat": "misc",
+   "chance": 0.001411,
+   "cost": 25000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Comet Shard",
+   "id": "COMETSHARD",
+   "ident": "comet-shard",
+   "kr": "혜성조각",
+   "rarity": "epic",
+   "sell": 12500,
+   "weight": 6
+  },
+  "CRACKEDPOT": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 1600,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Cracked Pot",
+   "evolves": [
+    "데인차"
+   ],
+   "id": "CRACKEDPOT",
+   "ident": "cracked-pot",
+   "kr": "깨진포트",
+   "rarity": "rare",
+   "sell": 800,
+   "weight": 14
+  },
+  "DAWNSTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Dawn Stone",
+   "evolves": [
+    "눈꼬마",
+    "킬리아"
+   ],
+   "id": "DAWNSTONE",
+   "ident": "dawn-stone",
+   "kr": "각성의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "DEEPSEASCALE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Deep Sea Scale",
+   "evolves": [
+    "진주몽"
+   ],
+   "id": "DEEPSEASCALE",
+   "ident": "deep-sea-scale",
+   "kr": "심해의비늘",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "DEEPSEATOOTH": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Deep Sea Tooth",
+   "evolves": [
+    "진주몽"
+   ],
+   "id": "DEEPSEATOOTH",
+   "ident": "deep-sea-tooth",
+   "kr": "심해의이빨",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "DRAGONSCALE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Dragon Scale",
+   "evolves": [
+    "시드라"
+   ],
+   "id": "DRAGONSCALE",
+   "ident": "dragon-scale",
+   "kr": "용의비늘",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "DREAMBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1500,
+   "effect": {
+    "cond": "asleep",
+    "kind": "ball",
+    "mult": 4.0
+   },
+   "en": "Dream Ball",
+   "id": "DREAMBALL",
+   "ident": "dream-ball",
+   "kr": "드림볼",
+   "rarity": "uncommon",
+   "sell": 750,
+   "weight": 45
+  },
+  "DUBIOUSDISC": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Dubious Disc",
+   "evolves": [
+    "폴리곤2"
+   ],
+   "id": "DUBIOUSDISC",
+   "ident": "dubious-disc",
+   "kr": "괴상한패치",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "DUSKBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "night",
+    "kind": "ball",
+    "mult": 3.0
+   },
+   "en": "Dusk Ball",
+   "id": "DUSKBALL",
+   "ident": "dusk-ball",
+   "kr": "다크볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "DUSKSTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Dusk Stone",
+   "evolves": [
+    "니로우",
+    "램프라",
+    "무우마",
+    "쌍검킬"
+   ],
+   "id": "DUSKSTONE",
+   "ident": "dusk-stone",
+   "kr": "어둠의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "ELECTIRIZER": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Electirizer",
+   "evolves": [
+    "에레브"
+   ],
+   "id": "ELECTIRIZER",
+   "ident": "electirizer",
+   "kr": "에레키부스터",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "ETHER": {
+   "cat": "heal",
+   "chance": 0.010583,
+   "cost": 1200,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Ether",
+   "id": "ETHER",
+   "ident": "ether",
+   "kr": "PP에이드",
+   "rarity": "uncommon",
+   "sell": 600,
+   "weight": 45
+  },
+  "EVERSTONE": {
+   "cat": "misc",
+   "chance": 0.010583,
+   "cost": 3000,
+   "effect": {
+    "kind": "noevolve"
+   },
+   "en": "Everstone",
+   "id": "EVERSTONE",
+   "ident": "everstone",
+   "kr": "변함없는돌",
+   "rarity": "uncommon",
+   "sell": 1500,
+   "weight": 45
+  },
+  "FASTBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "fast_species",
+    "kind": "ball",
+    "mult": 4.0
+   },
+   "en": "Fast Ball",
+   "id": "FASTBALL",
+   "ident": "fast-ball",
+   "kr": "스피드볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "FIRESTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Fire Stone",
+   "evolves": [
+    "가디",
+    "바오프",
+    "식스테일",
+    "이브이",
+    "캡싸이"
+   ],
+   "id": "FIRESTONE",
+   "ident": "fire-stone",
+   "kr": "불꽃의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "FRIENDBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "kind": "ball",
+    "mult": 1.0,
+    "note": "잡으면 친밀도 200"
+   },
+   "en": "Friend Ball",
+   "id": "FRIENDBALL",
+   "ident": "friend-ball",
+   "kr": "프렌드볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "FULLHEAL": {
+   "cat": "heal",
+   "chance": 0.010583,
+   "cost": 400,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Full Heal",
+   "id": "FULLHEAL",
+   "ident": "full-heal",
+   "kr": "만병통치제",
+   "rarity": "uncommon",
+   "sell": 200,
+   "weight": 45
+  },
+  "FULLRESTORE": {
+   "cat": "heal",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Full Restore",
+   "id": "FULLRESTORE",
+   "ident": "full-restore",
+   "kr": "회복약",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "GENIUSWING": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 300,
+   "effect": {
+    "amount": 1,
+    "kind": "ev",
+    "stat": "spa"
+   },
+   "en": "Genius Feather",
+   "id": "GENIUSWING",
+   "ident": "genius-wing",
+   "kr": "지력깃털",
+   "rarity": "common",
+   "sell": 150,
+   "weight": 100
+  },
+  "GOLDBOTTLECAP": {
+   "buyable": false,
+   "cat": "iv",
+   "chance": 0.002117,
+   "cost": 10000,
+   "effect": {
+    "count": 6,
+    "kind": "iv"
+   },
+   "en": "Gold Bottle Cap",
+   "id": "GOLDBOTTLECAP",
+   "ident": "gold-bottle-cap",
+   "kr": "금색병뚜껑",
+   "rarity": "legendary",
+   "sell": 5000,
+   "weight": 9
+  },
+  "GREATBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 600,
+   "effect": {
+    "kind": "ball",
+    "mult": 1.5
+   },
+   "en": "Great Ball",
+   "id": "GREATBALL",
+   "ident": "great-ball",
+   "kr": "슈퍼볼",
+   "rarity": "uncommon",
+   "sell": 300,
+   "weight": 45
+  },
+  "GREPABERRY": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 80,
+   "effect": {
+    "amount": -10,
+    "kind": "ev",
+    "stat": "spd"
+   },
+   "en": "Grepa Berry",
+   "id": "GREPABERRY",
+   "ident": "grepa-berry",
+   "kr": "또뽀열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "HEALBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 300,
+   "effect": {
+    "kind": "ball",
+    "mult": 1.0,
+    "note": "잡으면 완전 회복"
+   },
+   "en": "Heal Ball",
+   "id": "HEALBALL",
+   "ident": "heal-ball",
+   "kr": "힐볼",
+   "rarity": "uncommon",
+   "sell": 150,
+   "weight": 45
+  },
+  "HEALTHWING": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 300,
+   "effect": {
+    "amount": 1,
+    "kind": "ev",
+    "stat": "hp"
+   },
+   "en": "Health Feather",
+   "id": "HEALTHWING",
+   "ident": "health-wing",
+   "kr": "체력깃털",
+   "rarity": "common",
+   "sell": 150,
+   "weight": 100
+  },
+  "HEAVYBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "heavy",
+    "kind": "ball",
+    "mult": 1.0
+   },
+   "en": "Heavy Ball",
+   "id": "HEAVYBALL",
+   "ident": "heavy-ball",
+   "kr": "헤비볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "HONDEWBERRY": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 80,
+   "effect": {
+    "amount": -10,
+    "kind": "ev",
+    "stat": "spa"
+   },
+   "en": "Hondew Berry",
+   "id": "HONDEWBERRY",
+   "ident": "hondew-berry",
+   "kr": "로매열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "HPUP": {
+   "cat": "ev",
+   "cost": 10000,
+   "effect": {
+    "amount": 10,
+    "kind": "ev",
+    "stat": "hp"
+   },
+   "en": "HP Up",
+   "id": "HPUP",
+   "ident": "hp-up",
+   "kr": "맥스업",
+   "sell": 5000
+  },
+  "HYPERPOTION": {
+   "cat": "heal",
+   "chance": 0.010583,
+   "cost": 1500,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Hyper Potion",
+   "id": "HYPERPOTION",
+   "ident": "hyper-potion",
+   "kr": "고급상처약",
+   "rarity": "uncommon",
+   "sell": 750,
+   "weight": 45
+  },
+  "ICEHEAL": {
+   "cat": "heal",
+   "chance": 0.023518,
+   "cost": 200,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Ice Heal",
+   "id": "ICEHEAL",
+   "ident": "ice-heal",
+   "kr": "얼음상태치료제",
+   "rarity": "common",
+   "sell": 100,
+   "weight": 100
+  },
+  "ICESTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Ice Stone",
+   "evolves": [
+    "오기지게",
+    "이브이",
+    "터벅고래"
+   ],
+   "id": "ICESTONE",
+   "ident": "ice-stone",
+   "kr": "얼음의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "IRON": {
+   "cat": "ev",
+   "cost": 10000,
+   "effect": {
+    "amount": 10,
+    "kind": "ev",
+    "stat": "def"
+   },
+   "en": "Iron",
+   "id": "IRON",
+   "ident": "iron",
+   "kr": "사포닌",
+   "sell": 5000
+  },
+  "KELPSYBERRY": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 80,
+   "effect": {
+    "amount": -10,
+    "kind": "ev",
+    "stat": "atk"
+   },
+   "en": "Kelpsy Berry",
+   "id": "KELPSYBERRY",
+   "ident": "kelpsy-berry",
+   "kr": "시마열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "KINGSROCK": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 5000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "King’s Rock",
+   "evolves": [
+    "슈륙챙이",
+    "야돈"
+   ],
+   "id": "KINGSROCK",
+   "ident": "kings-rock",
+   "kr": "왕의징표석",
+   "rarity": "rare",
+   "sell": 2500,
+   "weight": 14
+  },
+  "LEAFSTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Leaf Stone",
+   "evolves": [
+    "냄새꼬",
+    "아라리",
+    "야나프",
+    "우츠동",
+    "이브이",
+    "잎새코"
+   ],
+   "id": "LEAFSTONE",
+   "ident": "leaf-stone",
+   "kr": "리프의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "LEVELBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "level_gap",
+    "kind": "ball",
+    "mult": 8.0
+   },
+   "en": "Level Ball",
+   "id": "LEVELBALL",
+   "ident": "level-ball",
+   "kr": "레벨볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "LINKINGCORD": {
+   "cat": "stone",
+   "chance": 0.001176,
+   "cost": 8000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Linking Cord",
+   "evolves": [
+    "고우스트",
+    "근육몬",
+    "나목령",
+    "데구리",
+    "딱정곤",
+    "암트르",
+    "윤겔라",
+    "쪼마리",
+    "토쇠골",
+    "호바귀"
+   ],
+   "id": "LINKINGCORD",
+   "ident": "linking-cord",
+   "kr": "연결의끈",
+   "rarity": "epic",
+   "sell": 4000,
+   "weight": 5
+  },
+  "LOVEBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "same_species_other_gender",
+    "kind": "ball",
+    "mult": 8.0
+   },
+   "en": "Love Ball",
+   "id": "LOVEBALL",
+   "ident": "love-ball",
+   "kr": "러브러브볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "LUXURYBALL": {
+   "cat": "ball",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "ball",
+    "mult": 1.0,
+    "note": "잡은 뒤 친밀도가 두 배로 오른다"
+   },
+   "en": "Luxury Ball",
+   "id": "LUXURYBALL",
+   "ident": "luxury-ball",
+   "kr": "럭셔리볼",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "MAGMARIZER": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Magmarizer",
+   "evolves": [
+    "마그마"
+   ],
+   "id": "MAGMARIZER",
+   "ident": "magmarizer",
+   "kr": "마그마부스터",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "MALICIOUSARMOR": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 750,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Malicious Armor",
+   "evolves": [
+    "카르본"
+   ],
+   "id": "MALICIOUSARMOR",
+   "ident": "malicious-armor",
+   "kr": "저주받은갑옷",
+   "rarity": "rare",
+   "sell": 375,
+   "weight": 14
+  },
+  "MASTERBALL": {
+   "buyable": false,
+   "cat": "ball",
+   "chance": 0.00047,
+   "cost": 0,
+   "effect": {
+    "kind": "ball",
+    "mult": 255.0,
+    "note": "반드시 잡는다"
+   },
+   "en": "Master Ball",
+   "id": "MASTERBALL",
+   "ident": "master-ball",
+   "kr": "마스터볼",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 2
+  },
+  "MASTERPIECETEACUP": {
+   "cat": "stone",
+   "chance": 0.001176,
+   "cost": 9500,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Masterpiece Teacup",
+   "evolves": [
+    "차데스"
+   ],
+   "id": "MASTERPIECETEACUP",
+   "ident": "masterpiece-teacup",
+   "kr": "걸작찻잔",
+   "rarity": "epic",
+   "sell": 4750,
+   "weight": 5
+  },
+  "MAXPOTION": {
+   "cat": "heal",
+   "chance": 0.003293,
+   "cost": 2500,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Max Potion",
+   "id": "MAXPOTION",
+   "ident": "max-potion",
+   "kr": "풀회복약",
+   "rarity": "rare",
+   "sell": 1250,
+   "weight": 14
+  },
+  "MAXREVIVE": {
+   "cat": "heal",
+   "chance": 0.003293,
+   "cost": 4000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Max Revive",
+   "id": "MAXREVIVE",
+   "ident": "max-revive",
+   "kr": "기력의덩어리",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "METALALLOY": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Metal Alloy",
+   "evolves": [
+    "두랄루돈"
+   ],
+   "id": "METALALLOY",
+   "ident": "metal-alloy",
+   "kr": "복합금속",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "METALCOAT": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Metal Coat",
+   "evolves": [
+    "롱스톤",
+    "스라크"
+   ],
+   "id": "METALCOAT",
+   "ident": "metal-coat",
+   "kr": "금속코트",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "MOONBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "moon_family",
+    "kind": "ball",
+    "mult": 4.0
+   },
+   "en": "Moon Ball",
+   "id": "MOONBALL",
+   "ident": "moon-ball",
+   "kr": "문볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "MOONSTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Moon Stone",
+   "evolves": [
+    "니드리나",
+    "니드리노",
+    "몽나",
+    "삐삐",
+    "에나비",
+    "푸린"
+   ],
+   "id": "MOONSTONE",
+   "ident": "moon-stone",
+   "kr": "달의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "MUSCLEWING": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 300,
+   "effect": {
+    "amount": 1,
+    "kind": "ev",
+    "stat": "atk"
+   },
+   "en": "Muscle Feather",
+   "id": "MUSCLEWING",
+   "ident": "muscle-wing",
+   "kr": "근력깃털",
+   "rarity": "common",
+   "sell": 150,
+   "weight": 100
+  },
+  "NESTBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "low_level",
+    "kind": "ball",
+    "mult": 4.0
+   },
+   "en": "Nest Ball",
+   "id": "NESTBALL",
+   "ident": "nest-ball",
+   "kr": "네스트볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "NETBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "water_or_bug",
+    "kind": "ball",
+    "mult": 3.5
+   },
+   "en": "Net Ball",
+   "id": "NETBALL",
+   "ident": "net-ball",
+   "kr": "네트볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "NUGGET": {
+   "cat": "misc",
+   "chance": 0.010583,
+   "cost": 10000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Nugget",
+   "id": "NUGGET",
+   "ident": "nugget",
+   "kr": "금구슬",
+   "rarity": "uncommon",
+   "sell": 5000,
+   "weight": 45
+  },
+  "PARALYZEHEAL": {
+   "cat": "heal",
+   "chance": 0.023518,
+   "cost": 200,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Paralyze Heal",
+   "id": "PARALYZEHEAL",
+   "ident": "paralyze-heal",
+   "kr": "마비치료제",
+   "rarity": "common",
+   "sell": 100,
+   "weight": 100
+  },
+  "PEARL": {
+   "cat": "misc",
+   "chance": 0.023518,
+   "cost": 2000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Pearl",
+   "id": "PEARL",
+   "ident": "pearl",
+   "kr": "진주",
+   "rarity": "common",
+   "sell": 1000,
+   "weight": 100
+  },
+  "PEATBLOCK": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Peat Block",
+   "evolves": [
+    "링곰"
+   ],
+   "id": "PEATBLOCK",
+   "ident": "peat-block",
+   "kr": "피트블록",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "POKEBALL": {
+   "cat": "ball",
+   "chance": 0.023518,
+   "cost": 200,
+   "effect": {
+    "kind": "ball",
+    "mult": 1.0
+   },
+   "en": "Poké Ball",
+   "id": "POKEBALL",
+   "ident": "poke-ball",
+   "kr": "몬스터볼",
+   "rarity": "common",
+   "sell": 100,
+   "weight": 100
+  },
+  "POMEGBERRY": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 80,
+   "effect": {
+    "amount": -10,
+    "kind": "ev",
+    "stat": "hp"
+   },
+   "en": "Pomeg Berry",
+   "id": "POMEGBERRY",
+   "ident": "pomeg-berry",
+   "kr": "유석열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "POTION": {
+   "cat": "heal",
+   "chance": 0.023518,
+   "cost": 200,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Potion",
+   "id": "POTION",
+   "ident": "potion",
+   "kr": "상처약",
+   "rarity": "common",
+   "sell": 100,
+   "weight": 100
+  },
+  "PREMIERBALL": {
+   "cat": "ball",
+   "chance": 0.023518,
+   "cost": 20,
+   "effect": {
+    "kind": "ball",
+    "mult": 1.0,
+    "note": "몬스터볼과 성능이 같다"
+   },
+   "en": "Premier Ball",
+   "id": "PREMIERBALL",
+   "ident": "premier-ball",
+   "kr": "프리미어볼",
+   "rarity": "common",
+   "sell": 10,
+   "weight": 100
+  },
+  "PRETTYWING": {
+   "cat": "misc",
+   "chance": 0.023518,
+   "cost": 1000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Pretty Feather",
+   "id": "PRETTYWING",
+   "ident": "pretty-wing",
+   "kr": "고운깃털",
+   "rarity": "common",
+   "sell": 500,
+   "weight": 100
+  },
+  "PRISMSCALE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Prism Scale",
+   "evolves": [
+    "빈티나"
+   ],
+   "id": "PRISMSCALE",
+   "ident": "prism-scale",
+   "kr": "고운비늘",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "PROTECTOR": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Protector",
+   "evolves": [
+    "코뿌리"
+   ],
+   "id": "PROTECTOR",
+   "ident": "protector",
+   "kr": "프로텍터",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "PROTEIN": {
+   "cat": "ev",
+   "cost": 10000,
+   "effect": {
+    "amount": 10,
+    "kind": "ev",
+    "stat": "atk"
+   },
+   "en": "Protein",
+   "id": "PROTEIN",
+   "ident": "protein",
+   "kr": "타우린",
+   "sell": 5000
+  },
+  "QUALOTBERRY": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 80,
+   "effect": {
+    "amount": -10,
+    "kind": "ev",
+    "stat": "def"
+   },
+   "en": "Qualot Berry",
+   "id": "QUALOTBERRY",
+   "ident": "qualot-berry",
+   "kr": "파비열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "QUICKBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "first_turn",
+    "kind": "ball",
+    "mult": 5.0
+   },
+   "en": "Quick Ball",
+   "id": "QUICKBALL",
+   "ident": "quick-ball",
+   "kr": "퀵볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "RAREBONE": {
+   "cat": "misc",
+   "chance": 0.010583,
+   "cost": 5000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Rare Bone",
+   "id": "RAREBONE",
+   "ident": "rare-bone",
+   "kr": "귀중한뼈",
+   "rarity": "uncommon",
+   "sell": 2500,
+   "weight": 45
+  },
+  "RARECANDY": {
+   "cat": "misc",
+   "chance": 0.004704,
+   "cost": 10000,
+   "effect": {
+    "amount": 1,
+    "kind": "level"
+   },
+   "en": "Rare Candy",
+   "id": "RARECANDY",
+   "ident": "rare-candy",
+   "kr": "이상한사탕",
+   "rarity": "epic",
+   "sell": 5000,
+   "weight": 20
+  },
+  "REAPERCLOTH": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Reaper Cloth",
+   "evolves": [
+    "미라몽"
+   ],
+   "id": "REAPERCLOTH",
+   "ident": "reaper-cloth",
+   "kr": "영계의천",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "REPEATBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "already_caught",
+    "kind": "ball",
+    "mult": 3.5
+   },
+   "en": "Repeat Ball",
+   "id": "REPEATBALL",
+   "ident": "repeat-ball",
+   "kr": "리피트볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "RESISTWING": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 300,
+   "effect": {
+    "amount": 1,
+    "kind": "ev",
+    "stat": "def"
+   },
+   "en": "Resist Feather",
+   "id": "RESISTWING",
+   "ident": "resist-wing",
+   "kr": "저항력깃털",
+   "rarity": "common",
+   "sell": 150,
+   "weight": 100
+  },
+  "REVIVE": {
+   "cat": "heal",
+   "chance": 0.010583,
+   "cost": 2000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Revive",
+   "id": "REVIVE",
+   "ident": "revive",
+   "kr": "기력의조각",
+   "rarity": "uncommon",
+   "sell": 1000,
+   "weight": 45
+  },
+  "SACHET": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Sachet",
+   "evolves": [
+    "슈쁘"
+   ],
+   "id": "SACHET",
+   "ident": "sachet",
+   "kr": "향기주머니",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "SACREDASH": {
+   "cat": "heal",
+   "chance": 0.000941,
+   "cost": 50000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Sacred Ash",
+   "id": "SACREDASH",
+   "ident": "sacred-ash",
+   "kr": "성스러운분말",
+   "rarity": "legendary",
+   "sell": 25000,
+   "weight": 4
+  },
+  "SCROLLOFDARKNESS": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 5000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Scroll of Darkness",
+   "evolves": [
+    "치고마"
+   ],
+   "id": "SCROLLOFDARKNESS",
+   "ident": "scroll-of-darkness",
+   "kr": "악의 족자",
+   "rarity": "rare",
+   "sell": 2500,
+   "weight": 14
+  },
+  "SHINYSTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Shiny Stone",
+   "evolves": [
+    "로젤리아",
+    "치라미",
+    "토게틱",
+    "플라엣테"
+   ],
+   "id": "SHINYSTONE",
+   "ident": "shiny-stone",
+   "kr": "빛의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "STARDUST": {
+   "cat": "misc",
+   "chance": 0.023518,
+   "cost": 3000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Stardust",
+   "id": "STARDUST",
+   "ident": "stardust",
+   "kr": "별의모래",
+   "rarity": "common",
+   "sell": 1500,
+   "weight": 100
+  },
+  "STARPIECE": {
+   "cat": "misc",
+   "chance": 0.003293,
+   "cost": 12000,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Star Piece",
+   "id": "STARPIECE",
+   "ident": "star-piece",
+   "kr": "별의조각",
+   "rarity": "rare",
+   "sell": 6000,
+   "weight": 14
+  },
+  "SUNSTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Sun Stone",
+   "evolves": [
+    "냄새꼬",
+    "목도리키텔",
+    "소미안",
+    "치릴리",
+    "해너츠"
+   ],
+   "id": "SUNSTONE",
+   "ident": "sun-stone",
+   "kr": "태양의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "SUPERPOTION": {
+   "cat": "heal",
+   "chance": 0.023518,
+   "cost": 700,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Super Potion",
+   "id": "SUPERPOTION",
+   "ident": "super-potion",
+   "kr": "좋은상처약",
+   "rarity": "common",
+   "sell": 350,
+   "weight": 100
+  },
+  "SWEETAPPLE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2200,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Sweet Apple",
+   "evolves": [
+    "과사삭벌레"
+   ],
+   "id": "SWEETAPPLE",
+   "ident": "sweet-apple",
+   "kr": "달콤한사과",
+   "rarity": "rare",
+   "sell": 1100,
+   "weight": 14
+  },
+  "SWIFTWING": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 300,
+   "effect": {
+    "amount": 1,
+    "kind": "ev",
+    "stat": "spe"
+   },
+   "en": "Swift Feather",
+   "id": "SWIFTWING",
+   "ident": "swift-wing",
+   "kr": "순발력깃털",
+   "rarity": "common",
+   "sell": 150,
+   "weight": 100
+  },
+  "SYRUPYAPPLE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 500,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Syrupy Apple",
+   "evolves": [
+    "과사삭벌레"
+   ],
+   "id": "SYRUPYAPPLE",
+   "ident": "syrupy-apple",
+   "kr": "꿀맛사과",
+   "rarity": "rare",
+   "sell": 250,
+   "weight": 14
+  },
+  "TAMATOBERRY": {
+   "cat": "ev",
+   "chance": 0.023518,
+   "cost": 80,
+   "effect": {
+    "amount": -10,
+    "kind": "ev",
+    "stat": "spe"
+   },
+   "en": "Tamato Berry",
+   "id": "TAMATOBERRY",
+   "ident": "tamato-berry",
+   "kr": "토망열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "TARTAPPLE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2200,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Tart Apple",
+   "evolves": [
+    "과사삭벌레"
+   ],
+   "id": "TARTAPPLE",
+   "ident": "tart-apple",
+   "kr": "새콤한사과",
+   "rarity": "rare",
+   "sell": 1100,
+   "weight": 14
+  },
+  "THUNDERSTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Thunder Stone",
+   "evolves": [
+    "레어코일",
+    "빈나두",
+    "이브이",
+    "저리릴",
+    "전지충이",
+    "코코파스",
+    "피카츄"
+   ],
+   "id": "THUNDERSTONE",
+   "ident": "thunder-stone",
+   "kr": "천둥의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "TIMERBALL": {
+   "cat": "ball",
+   "chance": 0.010583,
+   "cost": 1000,
+   "effect": {
+    "cond": "many_turns",
+    "kind": "ball",
+    "mult": 4.0
+   },
+   "en": "Timer Ball",
+   "id": "TIMERBALL",
+   "ident": "timer-ball",
+   "kr": "타이머볼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "TINYMUSHROOM": {
+   "cat": "misc",
+   "chance": 0.023518,
+   "cost": 500,
+   "effect": {
+    "kind": "sell"
+   },
+   "en": "Tiny Mushroom",
+   "id": "TINYMUSHROOM",
+   "ident": "tiny-mushroom",
+   "kr": "작은버섯",
+   "rarity": "common",
+   "sell": 250,
+   "weight": 100
+  },
+  "ULTRABALL": {
+   "cat": "ball",
+   "chance": 0.003293,
+   "cost": 800,
+   "effect": {
+    "kind": "ball",
+    "mult": 2.0
+   },
+   "en": "Ultra Ball",
+   "id": "ULTRABALL",
+   "ident": "ultra-ball",
+   "kr": "하이퍼볼",
+   "rarity": "rare",
+   "sell": 400,
+   "weight": 14
+  },
+  "UNREMARKABLETEACUP": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 400,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Unremarkable Teacup",
+   "evolves": [
+    "차데스"
+   ],
+   "id": "UNREMARKABLETEACUP",
+   "ident": "unremarkable-teacup",
+   "kr": "범작찻잔",
+   "rarity": "rare",
+   "sell": 200,
+   "weight": 14
+  },
+  "UPGRADE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Upgrade",
+   "evolves": [
+    "폴리곤"
+   ],
+   "id": "UPGRADE",
+   "ident": "up-grade",
+   "kr": "업그레이드",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "WATERSTONE": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 3000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Water Stone",
+   "evolves": [
+    "로토스",
+    "별가사리",
+    "셀러",
+    "슈륙챙이",
+    "앗차프",
+    "이브이"
+   ],
+   "id": "WATERSTONE",
+   "ident": "water-stone",
+   "kr": "물의돌",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "WHIPPEDDREAM": {
+   "cat": "stone",
+   "chance": 0.003293,
+   "cost": 2000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Whipped Dream",
+   "evolves": [
+    "나룸퍼프"
+   ],
+   "id": "WHIPPEDDREAM",
+   "ident": "whipped-dream",
+   "kr": "휘핑팝",
+   "rarity": "rare",
+   "sell": 1000,
+   "weight": 14
+  },
+  "ZINC": {
+   "cat": "ev",
+   "cost": 10000,
+   "effect": {
+    "amount": 10,
+    "kind": "ev",
+    "stat": "spd"
+   },
+   "en": "Zinc",
+   "id": "ZINC",
+   "ident": "zinc",
+   "kr": "키토산",
+   "sell": 5000
+  }
+ },
+ "rarityKr": {
+  "common": "흔함",
+  "epic": "매우 희귀",
+  "legendary": "전설",
+  "rare": "희귀",
+  "uncommon": "보통"
+ },
+ "sellRate": 0.5,
+ "source": "PokeAPI (이름·가격은 공식 CSV 그대로)",
+ "version": 1
+}

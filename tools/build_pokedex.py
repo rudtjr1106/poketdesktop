@@ -31,6 +31,7 @@ NEEDED = [
     "pokemon_moves.csv", "pokemon_evolution.csv", "evolution_triggers.csv",
     "move_meta.csv", "move_meta_stat_changes.csv", "move_meta_ailments.csv",
     "move_flags.csv", "move_flag_map.csv",
+    "items.csv", "item_names.csv", "item_categories.csv",
 ]
 
 KO = 3          # PokeAPI 언어 id: 한국어
@@ -271,15 +272,17 @@ def build():
                 out.append([lv, mv])
         lvmoves[pid] = out
 
-    # ---- 진화 (최소 레벨 계산용) ----
-    trigger = dict((as_int(r["id"]), r["identifier"])
-                   for r in rows("evolution_triggers.csv"))
-    evo_info = {}
-    for r in rows("pokemon_evolution.csv"):
-        sid = as_int(r["evolved_species_id"])
-        if sid in species_row and sid not in evo_info:
-            evo_info[sid] = (trigger.get(as_int(r["evolution_trigger_id"]), "?"),
-                             as_int(r["minimum_level"], 0))
+    # ---- 진화 ----
+    # CSV 에는 '어떤 종으로 진화하는가' 만 있고 '무엇에서' 는 없다.
+    # 출발종은 pokemon_species.csv 의 evolves_from_species_id 로 이어 붙인다.
+    item_ident = dict((as_int(r["id"]), norm(r["identifier"]))
+                      for r in rows("items.csv"))
+    move_ident = dict((as_int(r["id"]), norm(r["identifier"]))
+                      for r in rows("moves.csv"))
+    type_ident = dict((as_int(r["id"]), norm(r["identifier"]))
+                      for r in rows("types.csv"))
+    evo_from, evo_of = load_evolutions(species_row, item_ident, move_ident,
+                                       type_ident)
 
     # ---- 조립 ----
     species = []
@@ -316,12 +319,13 @@ def build():
             "egg": egg_of.get(sid, []),
             "isBaby": r["is_baby"] == "1",
             "prevo": as_int(r["evolves_from_species_id"], 0) or None,
+            "evo": evo_from.get(sid, []),
             "height": as_int(poke_row[pid].get("height")) / 10.0,
             "weight": as_int(poke_row[pid].get("weight")) / 10.0,
             "legendary": legendary,
         })
 
-    annotate(species, evo_info)
+    annotate(species, evo_of)
     return {
         "version": 2,
         "source": "PokeAPI (정석 데이터)",
@@ -332,11 +336,128 @@ def build():
     }
 
 
+# ---------------------------------------------------------------- 진화
+# 폼 번호. pokemon.csv 에서 10000 이상은 리전폼/메가/거다이맥스다.
+FORM_BASE = 10000
+
+# 교환 진화는 이 게임에 교환이 없으니 도구 사용으로 바꾼다.
+# 지닌 물건이 있는 교환진화는 그 물건을 그대로 쓰고,
+# 조건 없는 순수 교환은 '연결의끈' 으로 통일한다. (본가 9세대와 같은 방식)
+TRADE_ITEM = "LINKINGCORD"
+
+# 이 게임이 실제로 처리할 수 있는 방식
+MODE_LEVEL = "level"     # 레벨업
+MODE_STONE = "stone"     # 도구 사용
+MODE_FRIEND = "friend"   # 친밀도
+MODE_SPECIAL = "special"  # 아직 못 하는 것 (자료는 남겨둔다)
+
+
+def _canonical(r):
+    """지금 세대에서 유효한 진화 규칙 행인지.
+
+    is_default 가 0 인 행은 폐지된 옛 세대 규칙이다. 이걸 안 거르면
+    리피아가 '이끼바위 옆에서 레벨업'(4~7세대) 으로 남아서, 리프의돌로
+    진화하는 지금 규칙을 못 쓴다.
+
+    base_form/evolved_form 이 10000 이상이면 리전폼이다. 이 게임은
+    기본 폼만 다루므로 건너뛴다.
+    """
+    if r["is_default"] != "1":
+        return False
+    if as_int(r["base_form_id"]) >= FORM_BASE:
+        return False
+    if as_int(r["evolved_form_id"]) >= FORM_BASE:
+        return False
+    return True
+
+
+def _branch(r, trigger, item_ident, move_ident, type_ident):
+    """진화 규칙 한 줄 -> 게임이 읽을 수 있는 dict."""
+    trig = trigger.get(as_int(r["evolution_trigger_id"]), "?")
+    lvl = as_int(r["minimum_level"], 0)
+    happy = as_int(r["minimum_happiness"], 0)
+    titem = as_int(r["trigger_item_id"], 0)
+    hitem = as_int(r["held_item_id"], 0)
+
+    d = {"trigger": trig}
+    if trig == "use-item" and titem:
+        d["mode"] = MODE_STONE
+        d["item"] = item_ident.get(titem, "")
+    elif trig == "trade":
+        # 교환 -> 도구 사용으로 대체
+        d["mode"] = MODE_STONE
+        d["item"] = item_ident.get(hitem, TRADE_ITEM) if hitem else TRADE_ITEM
+        d["wasTrade"] = True
+    elif trig in ("level-up", "other") and happy:
+        d["mode"] = MODE_FRIEND
+        d["happiness"] = happy
+    elif trig in ("level-up", "other") and lvl:
+        d["mode"] = MODE_LEVEL
+        d["level"] = lvl
+    else:
+        d["mode"] = MODE_SPECIAL
+
+    # 부가 조건. 게임이 확인할 수 있는 것만 옮긴다.
+    if lvl and d["mode"] != MODE_LEVEL:
+        d["level"] = lvl
+    if r["time_of_day"]:
+        d["time"] = r["time_of_day"]          # day | night | dusk
+    g = as_int(r["gender_id"], 0)
+    if g:
+        d["gender"] = "F" if g == 1 else "M"  # 1 암컷 / 2 수컷
+    rel = (r["relative_physical_stats"] or "").strip()
+    if rel != "":
+        d["stats"] = as_int(rel)              # 1 공>방 / -1 공<방 / 0 같음
+    if hitem and trig != "trade":
+        d["held"] = item_ident.get(hitem, "")
+    km = as_int(r["known_move_id"], 0)
+    if km:
+        d["move"] = move_ident.get(km, "")
+    kt = as_int(r["known_move_type_id"], 0)
+    if kt:
+        d["moveType"] = type_ident.get(kt, "")   # 번호 말고 이름으로 남긴다
+    return d
+
+
+def load_evolutions(species_row, item_ident, move_ident, type_ident):
+    """진화표를 두 방향으로 만든다.
+
+        evo_from : {출발종 num: [분기, ...]}   -> species["evo"]
+        evo_of   : {도착종 num: 분기}          -> annotate() 의 minLevel 계산용
+
+    출발종은 evolves_from_species_id 로만 알 수 있다. 진화표 자체에는
+    '누가' 진화하는지가 안 적혀 있고 '누구로' 만 적혀 있기 때문이다.
+    """
+    trigger = dict((as_int(r["id"]), r["identifier"])
+                   for r in rows("evolution_triggers.csv"))
+    evo_from = {}
+    evo_of = {}
+    for r in rows("pokemon_evolution.csv"):
+        if not _canonical(r):
+            continue
+        sid = as_int(r["evolved_species_id"])
+        srow = species_row.get(sid)
+        if srow is None:
+            continue
+        src = as_int(srow["evolves_from_species_id"], 0)
+        if not src or src not in species_row:
+            continue
+        d = _branch(r, trigger, item_ident, move_ident, type_ident)
+        d["to"] = norm(srow["identifier"])
+        d["toNum"] = sid
+        evo_from.setdefault(src, []).append(d)
+        if sid not in evo_of:
+            evo_of[sid] = d
+    for lst in evo_from.values():
+        lst.sort(key=lambda x: (x.get("level", 99), x["toNum"]))
+    return evo_from, evo_of
+
+
 NONLEVEL_GAP = 16
 MAX_MIN_LEVEL = 55
 
 
-def annotate(species, evo_info):
+def annotate(species, evo_of):
     """진화 단계, 최소 등장 레벨, 야생 등장 가중치."""
     by = dict((s["num"], s) for s in species)
 
@@ -356,13 +477,11 @@ def annotate(species, evo_info):
             s["stage"], s["minLevel"] = 0, 1
             return 0, 1
         pstage, plevel = resolve(p, seen)
-        trig, minlv = evo_info.get(num, ("?", 0))
-        if trig == "level-up" and minlv:
-            lv = minlv
-        elif minlv:
-            lv = minlv
-        else:
-            lv = plevel + NONLEVEL_GAP
+        # 레벨이 적힌 진화면 그 레벨, 아니면(돌·친밀도·교환) 부모보다
+        # 한참 뒤에 나오도록 벌려 둔다. 야생 등장 하한을 정하는 용도다.
+        br = evo_of.get(num) or {}
+        minlv = br.get("level", 0)
+        lv = minlv if minlv else plevel + NONLEVEL_GAP
         lv = max(2, min(MAX_MIN_LEVEL, max(lv, plevel + 1)))
         s["stage"], s["minLevel"] = pstage + 1, lv
         return s["stage"], s["minLevel"]

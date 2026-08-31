@@ -15,6 +15,13 @@ def _int(name, default):
         return default
 
 
+def _float(name, default):
+    try:
+        return float(os.environ.get(name, "") or default)
+    except ValueError:
+        return default
+
+
 def _bool(name, default):
     v = os.environ.get(name)
     if v is None:
@@ -51,9 +58,7 @@ MAX_DESKTOP = MAX_PARTY
 # 야생 레벨은 파티 수준을 따라간다.
 # 고정해두면 시작하자마자 도저히 못 이기는 상대를 만나 재미가 없다.
 WILD_MIN_LEVEL = _int("POKET_WILD_MIN_LEVEL", 2)      # 절대 하한
-WILD_MAX_LEVEL = _int("POKET_WILD_MAX_LEVEL", 60)     # 절대 상한
-WILD_BELOW = _int("POKET_WILD_BELOW", 3)              # 선두보다 이만큼 낮은 것까지
-WILD_ABOVE = _int("POKET_WILD_ABOVE", 0)              # 선두보다 이만큼 높은 것까지
+WILD_MAX_LEVEL = _int("POKET_WILD_MAX_LEVEL", 100)     # 절대 상한
 # 종족값 상한 = 이 값 + 선두 레벨 * 계수.
 # 레벨 5 짜리 야생인데 종족값 600 이 나오면 스타팅이 손도 못 쓰고 진다.
 WILD_BST_BASE = _int("POKET_WILD_BST_BASE", 330)
@@ -73,6 +78,32 @@ GRASS_TTL = _int("POKET_GRASS_TTL", 90)     # 풀숲이 저절로 사라지기�
 WILD_TTL = _int("POKET_WILD_TTL", 60)       # 야생 포켓몬이 도망가기까지 (초)
 # 풀숲을 놓쳤을 때 다시 돋아나기까지 (조금 짧게)
 MISS_COOLDOWN = _int("POKET_MISS_COOLDOWN", 300)
+
+# 테스트용 경험치 주입 경로를 열어 둘지. 운영에서는 반드시 0.
+ALLOW_ADD_EXP = _bool("POKET_ALLOW_ADD_EXP", True)
+
+# ---- 도구 / 돈 ----
+ITEMS_PATH = os.environ.get("POKET_ITEMS", os.path.join(ROOT, "data", "items.json"))
+MONEY_START = _int("POKET_MONEY_START", 3000)     # 처음 주는 돈
+# 야생을 **잡으면** 도구가 하나 떨어진다.
+DROP_ON_CATCH = _float("POKET_DROP_ON_CATCH", 1.0)
+# 배틀에서 **쓰러뜨려도** 떨어진다. 볼이 떨어져 아무것도 못 하는 상황을
+# 막으려고 둔다 — 볼이 0개여도 배틀로는 다시 일어설 수 있어야 한다.
+DROP_ON_WIN = _float("POKET_DROP_ON_WIN", 0.45)
+# 이로치는 기념이니 좋은 것을 준다 (가중치가 낮은 쪽에서 다시 뽑는다).
+DROP_SHINY_BONUS = _int("POKET_DROP_SHINY_BONUS", 3)
+SELL_RATE = _float("POKET_SELL_RATE", 0.5)
+
+# ---- 노력치 / 개체값 ----
+EV_STAT_MAX = _int("POKET_EV_STAT_MAX", 252)      # 6세대 이후 기준
+EV_TOTAL_MAX = _int("POKET_EV_TOTAL_MAX", 510)
+EV_SHARE = _bool("POKET_EV_SHARE", True)          # 학습장치가 노력치도 나눠줄지
+# 하이퍼트레이닝(병뚜껑) 을 쓸 수 있는 최소 레벨.
+# 본가 9세대가 50 이다. 100 은 이 게임 속도로는 도달이 어렵다.
+HYPER_MIN_LEVEL = _int("POKET_HYPER_MIN_LEVEL", 50)
+
+# ---- 진화 ----
+EVOLVE_AUTO = _bool("POKET_EVOLVE_AUTO", True)    # 조건이 되면 바로 진화
 
 # ---- 몬스터볼 ----
 # 수급 방식은 나중에 정하기로 하고, 지금은 가입 시 이만큼 준다.

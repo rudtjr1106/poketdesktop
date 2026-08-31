@@ -226,7 +226,12 @@ def main():
     chk("야생 표시 있음", wm.get("wild") is True, wm.get("wild"))
     chk("전설이 아님", not dexmap.get(wm.get("species"), {}).get("legendary"),
         wm.get("species"))
-    chk("레벨 2~12", 2 <= wm.get("level", 0) <= 12, wm.get("level"))
+    # 야생 레벨은 바탕화면에 나와 있는 것 중 **가장 낮은 레벨과 같아야** 한다.
+    st, pp = call("GET", "/api/pokemon", token=token)
+    party = [p["level"] for p in pp.get("pokemon", []) if p.get("onDesktop")]
+    chk("야생 레벨 = 바탕화면 최저 레벨",
+        party and wm.get("level") == min(party),
+        "야생 %s / 파티 %s" % (wm.get("level"), sorted(party)))
     # 야생 id 와 보유 id 는 다른 테이블이라 번호가 겹칠 수 있다.
     # 잡기 전에는 보유 수가 늘지 않았는지로 확인한다.
     owned_now = call("GET", "/api/pokemon", token=token)[1]["pokemon"]

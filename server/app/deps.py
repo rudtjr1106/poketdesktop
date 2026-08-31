@@ -4,13 +4,14 @@
 main.py 에 두면 battle_routes 가 main 을 import 하고 main 이 다시
 battle_routes 를 import 하는 순환이 생겨서 따로 뺐다.
 """
+import json
 import random
 
 from fastapi import Header, HTTPException, Request
 
 from common import pokelogic as P
 
-from . import auth, config, db
+from . import auth, config, db, evolution
 
 RNG = random.SystemRandom()
 
@@ -65,3 +66,100 @@ def free_slot(uid, exclude=None):
         if i not in used:
             return i
     return None
+
+
+# ---------------------------------------------------------------- 성장
+MAX_MOVES = 4
+
+
+def _learn(sp, moves, before, after):
+    """구간에서 배우는 기술을 넣는다. 넘치면 오래된 것부터 밀어낸다."""
+    learned = []
+    for mlv, mv in sp.get("moves", []):
+        if before < mlv <= after and mv not in moves:
+            learned.append(mv)
+            moves.append(mv)
+    return moves[-MAX_MOVES:], learned
+
+
+def grant_exp(uid, mon_id, amount, hour=None):
+    """경험치를 주고 레벨업 · 기술습득 · 진화까지 한 번에 처리한다.
+
+    예전에는 이 코드가 battle_routes 와 main 두 군데에 복사돼 있었다.
+    진화를 붙이면서 한쪽만 고치면 조용히 어긋나므로 여기로 합쳤다.
+    """
+    d = dex()
+    r = db.q1("SELECT * FROM pokemon WHERE id=? AND user_id=?", (mon_id, uid))
+    if not r or amount <= 0:
+        return None
+    sp = d.get(r["species"])
+    if not sp:
+        return None
+    curve = sp.get("growth", "medium")
+    before = r["level"]
+    exp = min(r["exp"] + int(amount), P.exp_for_level(curve, P.LEVEL_MAX))
+    lv = P.level_from_exp(curve, exp)
+    moves = json.loads(r["moves"])
+    learned = []
+    if lv > before:
+        moves, learned = _learn(sp, moves, before, lv)
+    db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
+           (exp, lv, json.dumps(moves), mon_id))
+
+    out = {
+        "id": mon_id,
+        "name": r["nickname"] or sp["kr"],
+        "gained": int(amount),
+        "level": lv,
+        "levelBefore": before,
+        "leveledUp": lv > before,
+        "learned": [d.move_name(m) for m in learned],
+    }
+    if lv > before:
+        ev = try_evolve(uid, mon_id, hour)
+        if ev:
+            out["evolve"] = ev
+    return out
+
+
+def set_level(uid, mon_id, level, hour=None):
+    """레벨을 직접 맞춘다 (이상한사탕). 진화 판정까지 같이 한다."""
+    d = dex()
+    r = db.q1("SELECT * FROM pokemon WHERE id=? AND user_id=?", (mon_id, uid))
+    if not r:
+        return None
+    sp = d.get(r["species"])
+    if not sp:
+        return None
+    curve = sp.get("growth", "medium")
+    before = r["level"]
+    lv = max(1, min(P.LEVEL_MAX, int(level)))
+    exp = P.exp_for_level(curve, lv)
+    moves, learned = _learn(sp, json.loads(r["moves"]), before, lv)
+    db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
+           (exp, lv, json.dumps(moves), mon_id))
+    out = {"id": mon_id, "level": lv, "levelBefore": before,
+           "leveledUp": lv > before,
+           "learned": [d.move_name(m) for m in learned]}
+    if lv > before:
+        ev = try_evolve(uid, mon_id, hour)
+        if ev:
+            out["evolve"] = ev
+    return out
+
+
+def try_evolve(uid, mon_id, hour=None):
+    """조건이 되면 바로 진화시킨다. 진화했으면 알림 내용을 돌려준다."""
+    if not config.EVOLVE_AUTO:
+        return None
+    r = db.q1("SELECT * FROM pokemon WHERE id=? AND user_id=?", (mon_id, uid))
+    if not r:
+        return None
+    mon = db.row_to_mon(r)
+    d = dex()
+    b = evolution.check_level(d, mon, hour)
+    if not b:
+        return None
+    before = mon["species"]
+    evolution.apply(uid, mon, b, d, "")
+    return evolution.public(d, before, b["to"])
