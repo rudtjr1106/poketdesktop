@@ -1015,7 +1015,9 @@ def announce_evolve(parent, app, info):
 
     tk.Label(f, text="축하합니다!", bg=U.BG, fg=U.ACCENT_TEXT,
              font=(U.FAMILY_BLACK, 20)).pack(anchor="w")
-    tk.Label(f, text=natural("%s은(는) %s(으)로 진화했다!"
+    # '(으)로' 는 natural() 이 못 고치는 표기다. '로(으로)' 로 적어야
+    # 앞말의 받침을 보고 '로 / 으로' 가 제대로 골라진다.
+    tk.Label(f, text=natural("%s은(는) %s로(으로) 진화했다!"
                              % (info.get("fromKr", "?"), info.get("toKr", "?"))),
              bg=U.BG, fg=U.FG, font=U.FONT_H, wraplength=360,
              justify="left").pack(anchor="w", pady=(6, 0))
