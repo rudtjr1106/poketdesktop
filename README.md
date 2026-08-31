@@ -26,7 +26,10 @@
 | 계정 | 회원가입 / 로그인 / **자동 로그인** / 로그아웃 / 회원탈퇴 |
 | 스타팅 | 1~9세대 어태커 **27마리** 중 하나를 골라 시작 |
 | 포켓몬 | 레벨, 경험치 곡선 6종, 개체값, 성격 25종, 특성(숨은 특성 포함), 성별, 기술 |
-| 야생 조우 | 10~15분마다 풀숲 → 클릭 → 야생 등장 → 몬스터볼 → 포획/도주 |
+| 야생 조우 | 풀숲 → 클릭 → 야생 등장 → **배틀** 또는 몬스터볼 |
+| 배틀 | 1:1 턴제. 데미지/타입상성/급소/명중/능력랭크/상태이상 전부 본가 공식 |
+| 성장 | 이기면 경험치 · **학습장치**로 파티 전원이 나눠 받음 · 레벨업 시 기술 습득 |
+| 파티 | 6마리까지 데리고 다니고, 넘치면 PC 박스로 |
 | 도감 | 1~9세대 **1025종**, 공식 한글 명칭, 정석 타입/종족값 |
 | 이로치 | 1/4096 확률 (본가와 동일) |
 | 화면 | 크기 자동 통일, 활동 범위 제한, 마우스 올리면 이름, 트레이 관리 |
@@ -94,7 +97,8 @@ pythonw client/run.pyw
 |---|---|
 | 포켓몬 | 왼쪽 드래그 = 옮기기 · 마우스 올리기 = 이름 · 더블클릭 = 정보 · 오른쪽 클릭 = 메뉴 |
 | 풀숲 | 클릭 = 살펴보기 |
-| 야생 포켓몬 | **오른쪽 클릭 = 몬스터볼 던지기** |
+| 야생 포켓몬 | **왼쪽 클릭 = 배틀** · 오른쪽 클릭 = 바로 몬스터볼 |
+| 배틀 창 | 기술 클릭 = 사용 · 몬스터볼 = 포획 시도 · 도망가기 |
 | 트레이 아이콘 | 오른쪽 클릭 = 전체 메뉴 · 더블클릭 = 포켓몬 관리 |
 
 트레이 메뉴에서 포켓몬 크기(작게~아주 크게), 활동 범위(좁게~화면 전체),
@@ -107,20 +111,24 @@ pythonw client/run.pyw
 ```
 common/pokelogic.py       규칙 엔진 (서버·클라이언트 공용)
                           능력치·경험치·성격·성별·이로치·포획 공식
+common/battle.py          배틀 엔진 — 데미지/상성/랭크/상태이상/AI
 
 server/
-  app/main.py             API
+  app/main.py             계정 · 포켓몬 · 야생 조우 API
+  app/battle_routes.py    배틀 API + 경험치 분배
   app/auth.py             비밀번호(PBKDF2) · 토큰 · 세션
   app/db.py               SQLite
   app/config.py           환경변수
   data/pokedex.json       도감 (tools/build_pokedex.py 가 생성)
   test_server.py          통합 테스트 72개
+  test_battle.py          배틀 테스트 33개
 
 client/
   run.pyw                 실행 파일
   poketdesktop/app.py     본체
   poketdesktop/overlay.py 바탕화면 포켓몬
   poketdesktop/wild_ui.py 풀숲 · 야생 · 몬스터볼
+  poketdesktop/ui_battle.py 배틀 화면 (체력바 · 돌진 · 피격 연출)
   poketdesktop/sprites.py 도트 처리 (크기 통일 · 투명 처리)
   poketdesktop/effects.py 풀숲/몬스터볼 그림 (코드로 직접 그림)
   poketdesktop/tray.py    트레이 아이콘
@@ -137,11 +145,12 @@ common/version.py         버전은 여기 한 곳에만 적는다
 ## 테스트
 
 ```bash
-python server/test_server.py
+python server/test_server.py     # 계정 · 도감 · 야생 조우 · 포획   72개
+python server/test_battle.py     # 배틀 · 경험치 · 학습장치        33개
+python client/smoke_battle.py    # 배틀 창을 실제로 띄워 확인
 ```
 
-계정, 자동 로그인, 야생 조우, 포획, 소유권, 탈퇴까지 72개 항목을 확인합니다.
-임시 계정을 만들고 끝나면 지웁니다.
+전부 임시 계정을 만들고 끝나면 지웁니다.
 
 ---
 
@@ -155,7 +164,10 @@ python server/test_server.py
 | `POKET_GRASS_TTL` | 90 | 풀숲이 사라지기까지 |
 | `POKET_WILD_TTL` | 60 | 야생이 도망가기까지 |
 | `POKET_BALLS_START` | 10 | 가입 시 몬스터볼 |
-| `POKET_WILD_MIN/MAX_LEVEL` | 2 / 12 | 야생 레벨대 |
+| `POKET_WILD_BELOW/ABOVE` | 3 / 0 | 파티 선두보다 몇 레벨 아래/위까지 나올지 |
+| `POKET_WILD_BST_BASE` | 330 | 야생 종족값 상한의 기준값 |
+| `POKET_MAX_PARTY` | 6 | 데리고 다니는 수 |
+| `POKET_EXP_SHARE` | 1 | 학습장치 (파티 전원 경험치) |
 | `POKET_SHINY_RATE` | 4096 | 이로치 확률 (1/N) |
 | `POKET_MAX_DESKTOP` | 6 | 바탕화면 동시 표시 |
 | `POKET_REQUIRE_IP` | 1 | 자동 로그인 때 IP 확인 |
@@ -212,6 +224,20 @@ exe 만 만들려면:
 ```bash
 python tools/build_exe.py
 ```
+
+## 배틀 밸런스를 어떻게 맞췄나
+
+처음에는 Lv.5 스타팅의 승률이 **45%** 였습니다. 계산 버그가 아니라 설계 문제였고,
+400판씩 돌려가며 원인을 하나씩 걷어냈습니다.
+
+| 고친 것 | 승률 |
+|---|---|
+| 처음 (AI 가 매번 최적기를 고름, 야생 Lv2~7) | 45% |
+| 야생 AI 를 무작위로 (본가 야생도 무작위로 쓴다) | 51% |
+| 야생 레벨을 파티 선두에 맞춤 | 60% |
+| 종족값 상한을 레벨에 비례해 걸음 | **71%** |
+
+똑똑한 AI 는 지운 게 아니라 남겨뒀습니다. 나중에 체육관 관장이 쓸 몫입니다.
 
 ## 앞으로
 
