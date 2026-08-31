@@ -30,6 +30,7 @@ NEEDED = [
     "growth_rates.csv", "egg_groups.csv", "pokemon_egg_groups.csv",
     "pokemon_moves.csv", "pokemon_evolution.csv", "evolution_triggers.csv",
     "move_meta.csv", "move_meta_stat_changes.csv", "move_meta_ailments.csv",
+    "move_flags.csv", "move_flag_map.csv",
 ]
 
 KO = 3          # PokeAPI 언어 id: 한국어
@@ -163,6 +164,17 @@ def build():
             stat_change.setdefault(as_int(r["move_id"]), []).append(
                 [st, as_int(r["change"])])
 
+    # 기술 플래그. 연출을 고르는 데 쓴다.
+    #   contact 접촉 -> 달려들어 때린다 / ballistics 탄환 -> 둥근 것이 날아간다
+    #   sound 소리 -> 음파가 퍼진다 / powder 가루 -> 흩날린다 / pulse 파동 -> 고리가 퍼진다
+    flag_name = dict((as_int(r["id"]), r["identifier"])
+                     for r in rows("move_flags.csv"))
+    move_flags = {}
+    for r in rows("move_flag_map.csv"):
+        f = flag_name.get(as_int(r["move_flag_id"]))
+        if f:
+            move_flags.setdefault(as_int(r["move_id"]), []).append(f)
+
     move_ident, move_out = {}, {}
     for r in rows("moves.csv"):
         mid = as_int(r["id"])
@@ -178,6 +190,8 @@ def build():
             "power": as_int(r["power"]), "acc": as_int(r["accuracy"]),
             "pp": as_int(r["pp"]), "pri": as_int(r["priority"]),
             "eff": as_int(r["effect_chance"]),
+            "target": as_int(r["target_id"]),
+            "flags": sorted(move_flags.get(mid, [])),
         }
         m = meta.get(mid)
         if m:

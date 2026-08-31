@@ -289,6 +289,7 @@ class Overlay(object):
         self._menu_cb = on_pet_menu
         self._open_cb = on_pet_open
         self._running = False
+        self.hidden = False
 
     # ---------------- 영역 ----------------
     def area(self):
@@ -331,6 +332,11 @@ class Overlay(object):
             if pet:
                 self.pets[pid] = pet
                 added.append(mon)
+                if self.hidden:
+                    try:
+                        pet.win.withdraw()
+                    except Exception:
+                        pass
         return added
 
     def path_for(self, mon):
@@ -353,6 +359,19 @@ class Overlay(object):
         for p in self.pets.values():
             p.destroy()
         self.pets.clear()
+
+    def set_hidden(self, hidden):
+        """배틀 중처럼 잠깐 치워야 할 때. 목록은 그대로 두고 창만 감춘다."""
+        self.hidden = bool(hidden)
+        for p in list(self.pets.values()):
+            for w in (p.win, p.name_win):
+                if not w:
+                    continue
+                try:
+                    w.withdraw() if hidden else w.deiconify()
+                except Exception:
+                    pass
+            p.hide_tip()
 
     def refresh_visuals(self):
         """설정(크기/이름표)이 바뀌면 전부 다시 만든다."""
