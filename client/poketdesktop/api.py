@@ -17,6 +17,12 @@ class ApiError(Exception):
         self.status = status
 
 
+def _hour():
+    """지금 몇 시인지. 낮/밤을 봐야 하는 것들(다크볼, 이브이 진화)에 쓴다."""
+    import datetime
+    return datetime.datetime.now().hour
+
+
 class Api(object):
     def __init__(self, base, token=None):
         self.base = (base or "").rstrip("/")
@@ -150,7 +156,10 @@ class Api(object):
         return self._call("POST", "/api/wild/%d/reveal" % wid, {})
 
     def wild_catch(self, wid, ball="POKEBALL"):
-        return self._call("POST", "/api/wild/%d/catch" % wid, {"ball": ball})
+        # 시각을 같이 보낸다. 다크볼처럼 밤인지 봐야 하는 볼이 있고,
+        # 서버는 도커 안이라 UTC 라서 사용자의 밤을 알 수 없다.
+        return self._call("POST", "/api/wild/%d/catch" % wid,
+                          {"ball": ball, "hour": _hour()})
 
     def wild_flee(self, wid):
         return self._call("POST", "/api/wild/%d/flee" % wid, {})
@@ -163,16 +172,36 @@ class Api(object):
         return self._call("GET", "/api/battle")
 
     def battle_move(self, bid, move):
-        return self._call("POST", "/api/battle/%d/move" % bid, {"move": move})
+        return self._call("POST", "/api/battle/%d/move" % bid,
+                          {"move": move, "hour": _hour()})
 
     def battle_switch(self, bid, pid):
         return self._call("POST", "/api/battle/%d/switch" % bid, {"pokemon": pid})
 
     def battle_ball(self, bid, ball="POKEBALL"):
-        return self._call("POST", "/api/battle/%d/ball" % bid, {"ball": ball})
+        return self._call("POST", "/api/battle/%d/ball" % bid,
+                          {"ball": ball, "hour": _hour()})
 
     def battle_run(self, bid):
         return self._call("POST", "/api/battle/%d/run" % bid, {})
+
+    # ---------------- 가방 · 상점 ----------------
+    def bag(self):
+        return self._call("GET", "/api/bag")
+
+    def shop(self):
+        return self._call("GET", "/api/shop")
+
+    def buy(self, item, count=1):
+        return self._call("POST", "/api/shop/buy", {"item": item, "count": count})
+
+    def sell(self, item, count=1):
+        return self._call("POST", "/api/shop/sell", {"item": item, "count": count})
+
+    def use_item(self, item, pokemon=0, stat=""):
+        return self._call("POST", "/api/bag/use",
+                          {"item": item, "pokemon": pokemon, "stat": stat,
+                           "hour": _hour()})
 
 
 # ---------------------------------------------------------------- 도감 캐시

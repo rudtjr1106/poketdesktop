@@ -21,8 +21,6 @@ services:
       POKET_WILD_COOLDOWN_MIN: "60"
       POKET_WILD_COOLDOWN_MAX: "60"
       POKET_MISS_COOLDOWN: "60"
-      POKET_WILD_MIN_LEVEL: "2"
-      POKET_WILD_MAX_LEVEL: "12"
       POKET_MAX_DESKTOP: "6"
     healthcheck:
       test: ["CMD", "python", "-c",
