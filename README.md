@@ -109,7 +109,7 @@ server/
   app/db.py               SQLite
   app/config.py           환경변수
   data/pokedex.json       도감 (tools/build_pokedex.py 가 생성)
-  test_server.py          통합 테스트 67개
+  test_server.py          통합 테스트 72개
 
 client/
   run.pyw                 실행 파일
@@ -132,7 +132,7 @@ tools/build_pokedex.py    PokeAPI 공식 데이터 -> pokedex.json
 python server/test_server.py
 ```
 
-계정, 자동 로그인, 야생 조우, 포획, 소유권, 탈퇴까지 67개 항목을 확인합니다.
+계정, 자동 로그인, 야생 조우, 포획, 소유권, 탈퇴까지 72개 항목을 확인합니다.
 임시 계정을 만들고 끝나면 지웁니다.
 
 ---
