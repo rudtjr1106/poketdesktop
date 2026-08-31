@@ -21,7 +21,11 @@ services:
     environment:
       POKET_DB: /data/poket.db
       POKET_POKEDEX: /app/data/pokedex.json
+      POKET_ITEMS: /app/data/items.json
       POKET_SPRITE_DIR: /data/sprites
+      # 이 경로는 인증만 통과하면 경험치를 마음대로 넣을 수 있다.
+      # 도구·돈이 경험치에 걸려 있으므로 운영에서는 반드시 막는다.
+      POKET_ALLOW_ADD_EXP: "0"
       # Caddy 뒤에 있으므로 X-Forwarded-For 를 믿어도 된다
       POKET_TRUST_PROXY: "1"
       POKET_REQUIRE_IP: "1"
@@ -30,6 +34,7 @@ services:
       POKET_GRASS_TTL: "90"
       POKET_WILD_TTL: "60"
       POKET_BALLS_START: "10"
+      POKET_MONEY_START: "3000"
       POKET_MAX_DESKTOP: "6"
     healthcheck:
       test: ["CMD", "python", "-c",

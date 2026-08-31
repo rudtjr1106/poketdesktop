@@ -413,8 +413,16 @@ class ShopWindow(object):
             self._win, width=e.width))
 
     def _wheel(self, e):
-        """목록 위에 있을 때만 굴린다. 상세 패널에서는 아무 일도 없다."""
-        w = e.widget
+        """마우스가 목록 위에 있을 때만 굴린다. 상세 패널에서는 아무 일도 없다.
+
+        e.widget 을 보면 안 된다. 윈도우에서 휠은 **포커스를 가진 위젯**에게
+        가기 때문에, 검색칸을 한 번 누른 뒤에는 목록 위에서 굴려도 e.widget 이
+        검색칸이라 목록이 안 움직인다. 포인터 밑에 뭐가 있는지로 판단한다.
+        """
+        try:
+            w = self.win.winfo_containing(e.x_root, e.y_root)
+        except tk.TclError:
+            return
         while w is not None:
             if w is self.canvas or w is self.inner:
                 self.canvas.yview_scroll(int(-e.delta / 60), "units")
@@ -500,8 +508,13 @@ class ShopWindow(object):
 
     # ---------------- 데이터 ----------------
     def reload(self):
+        # 세션이 끊기면 app.api 가 None 이 된다. 그대로 .shop 을 꺼내면
+        # tk 스레드에서 AttributeError 가 터져 창이 아니라 프로그램이 죽는다.
+        api = self.app.api
+        if api is None:
+            return self.say("로그인이 필요합니다.", U.DANGER)
         self.say("상점을 불러오는 중...", U.FG_FAINT)
-        U.run_async(self.root, self.app.api.shop, self._loaded)
+        U.run_async(self.root, api.shop, self._loaded)
 
     def _loaded(self, data, err):
         if err:
@@ -689,6 +702,8 @@ class ShopWindow(object):
         it = self.current()
         if not it or self.busy or not it.get("buyable"):
             return
+        if self.app.api is None:
+            return self.say("로그인이 필요합니다.", U.DANGER)
         n = self.qty
         self.busy = True
         self._paint_buttons()
@@ -700,6 +715,8 @@ class ShopWindow(object):
         it = self.current()
         if not it or self.busy or not int(it.get("sell") or 0):
             return
+        if self.app.api is None:
+            return self.say("로그인이 필요합니다.", U.DANGER)
         n = self.qty
         self.busy = True
         self._paint_buttons()
