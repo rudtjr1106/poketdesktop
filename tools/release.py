@@ -111,20 +111,35 @@ def main():
     print("현재 버전 %s  ->  릴리스 %s" % (cur, new))
 
     # ---- 커밋 안 된 변경 확인 ----
-    dirty = run(["git", "status", "--porcelain"], capture=True).stdout.strip()
+    def changed():
+        """git status --porcelain 을 파일 경로 목록으로.
+
+        앞 두 글자가 상태 표시이고 그 뒤가 경로다. 앞 공백이 의미를 가지므로
+        출력 전체를 strip 하면 안 된다 (한 글자씩 밀린다).
+        """
+        out = run(["git", "status", "--porcelain"], capture=True).stdout
+        paths = []
+        for line in out.splitlines():
+            if not line.strip():
+                continue
+            p = line[2:].strip().replace("\\", "/")
+            if " -> " in p:                       # 이름이 바뀐 경우
+                p = p.split(" -> ", 1)[1]
+            paths.append(p.strip('"'))
+        return paths
+
+    dirty = changed()
     if new != cur:
+        if dirty:
+            raise SystemExit("  커밋 안 된 변경이 있습니다:\n    "
+                             + "\n    ".join(dirty))
         write_version(new)
-        print("  common/version.py 갱신")
-        dirty = run(["git", "status", "--porcelain"], capture=True).stdout.strip()
-        allowed = {"common/version.py"}
-        left = [l[3:].strip() for l in dirty.splitlines()
-                if l[3:].strip() not in allowed]
-        if left:
-            raise SystemExit("  커밋 안 된 변경이 있습니다:\n    " + "\n    ".join(left))
+        print("  common/version.py -> %s" % new)
         run(["git", "add", "common/version.py"])
         run(["git", "commit", "-q", "-m", "버전 %s" % new])
     elif dirty:
-        raise SystemExit("  커밋 안 된 변경이 있습니다:\n" + dirty)
+        raise SystemExit("  커밋 안 된 변경이 있습니다:\n    "
+                         + "\n    ".join(dirty))
 
     tag = "v" + new
     exists = run(["git", "tag", "-l", tag], capture=True).stdout.strip()
