@@ -13,7 +13,7 @@ from . import config, sprite_cache             # noqa: E402
 from . import ui_common as U                   # noqa: E402
 from .overlay import Overlay                   # noqa: E402
 from .tray import Tray                         # noqa: E402
-from .ui_battle import BattleWindow             # noqa: E402
+from .desktop_battle import DesktopBattle       # noqa: E402
 from .ui_box import BoxWindow, confirm         # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
@@ -31,7 +31,7 @@ class App(object):
         self.tray = None
         self.wild = None
         self.box_window = None
-        self.battle_window = None
+        self.battle = None
         self._quitting = False
         self._relogin = False
 
@@ -183,8 +183,8 @@ class App(object):
             self.overlay.clear()
         if self.box_window:
             self.box_window.close()
-        if self.battle_window:
-            self.battle_window.close()
+        if self.battle:
+            self.battle.close()
         self.api = None
         self.username = None
         self.balls = 0
@@ -201,16 +201,14 @@ class App(object):
         self.box_window = BoxWindow(self.root, self)
 
     def open_battle(self, battle, intro=None):
-        """배틀 창을 연다. 이미 열려 있으면 그 창을 앞으로."""
-        if not battle:
+        """바탕화면에서 배틀을 시작한다. 창은 안 뜬다."""
+        if not battle or self.battle:
             return
-        if self.battle_window:
-            return self.battle_window.focus()
-        self.battle_window = BattleWindow(self.root, self, battle, intro)
+        self.battle = DesktopBattle(self, battle, intro)
 
     def resume_battle(self):
         """프로그램을 껐다 켰는데 배틀이 진행 중이었다면 이어서 연다."""
-        if not self.api or self.battle_window:
+        if not self.api or self.battle:
             return
 
         def done(r, err):
@@ -218,7 +216,10 @@ class App(object):
                 return
             b = (r or {}).get("battle")
             if b and not b.get("over"):
-                self.open_battle(b, "배틀이 진행 중입니다.")
+                # 프로그램을 껐다 켠 사이에 남아 있던 배틀은 그냥 정리한다.
+                # 야생 도트가 이미 사라졌을 수 있어서 이어붙이기 어렵다.
+                run_async(self.root,
+                          lambda: self.api.battle_run(b["id"]), lambda x, e: None)
         run_async(self.root, self.api.battle_current, done)
 
     def pet_open(self, pet):
@@ -346,8 +347,8 @@ class App(object):
             self.overlay.clear()
         if self.box_window:
             self.box_window.close()
-        if self.battle_window:
-            self.battle_window.close()
+        if self.battle:
+            self.battle.close()
         self.api = None
         self.username = None
         self.balls = 0
@@ -384,8 +385,8 @@ class App(object):
         if self.overlay:
             self.overlay.stop()
             self.overlay.clear()
-        if self.battle_window:
-            self.battle_window.close()
+        if self.battle:
+            self.battle.close()
         if self.tray:
             self.tray.stop()
         try:

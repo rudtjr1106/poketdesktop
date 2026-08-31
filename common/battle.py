@@ -202,24 +202,36 @@ class Battle(object):
         return out or [STRUGGLE]
 
     def choose_ai(self):
-        """상대(야생)의 기술 선택.
+        """상대(야생)가 쓸 기술."""
+        return self.choose_for(self.foe, self.me, self.ai)
 
-        기본은 '제일 아픈 기술'이다. 변화기는 효과가 남아 있을 때만,
+    def choose_mine(self, ai="trainer"):
+        """내 포켓몬이 알아서 고르는 기술.
+
+        자동 전투에서 쓴다. 내 쪽은 머리를 쓰는 편이 보기 좋으니 기본이
+        'trainer' 다. 야생은 무작위(wild)로 둔다.
+        """
+        return self.choose_for(self.me, self.foe, ai)
+
+    def choose_for(self, user, target, ai):
+        """기술 선택.
+
+        trainer 는 '제일 아픈 기술'을 고른다. 변화기는 효과가 남아 있을 때만,
         그것도 공격보다 낮은 점수로 친다. 안 그러면 이미 잠든 상대에게
         최면술을 계속 걸면서 배틀이 끝나지 않는다.
         """
-        pool = self.usable(self.foe)
+        pool = self.usable(user)
         if not pool:
             return STRUGGLE
 
-        if self.ai == "wild":
+        if ai == "wild":
             # 위력이 있는 기술 쪽으로 살짝만 기울인 무작위
             weights = []
             for m in pool:
                 md = self.move_of(m)
                 if md.get("power"):
                     weights.append(2.0)
-                elif self._status_score(md, 1) > 0:
+                elif self._status_score(md, 1, user, target) > 0:
                     weights.append(1.0)
                 else:
                     weights.append(0.2)     # 효과 없는 변화기는 거의 안 쓴다
@@ -238,10 +250,10 @@ class Battle(object):
             md = self.move_of(m)
             acc = (md.get("acc") or 100) / 100.0
             if md.get("power"):
-                d, _c, _e = damage(self.dex, md, self.foe, self.me,
+                d, _c, _e = damage(self.dex, md, user, target,
                                    random.Random(0), crit=False)
                 score = d * acc
-                if d >= self.me.hp:         # 이걸로 끝낼 수 있으면 최우선
+                if d >= target.hp:          # 이걸로 끝낼 수 있으면 최우선
                     score *= 3
                 best_dmg = max(best_dmg, score)
             else:
@@ -252,7 +264,7 @@ class Battle(object):
             m, score, md = row
             if score >= 0:
                 continue
-            row[1] = self._status_score(md, best_dmg)
+            row[1] = self._status_score(md, best_dmg, user, target)
 
         pool2 = [(m, s) for m, s, _md in scored if s > 0]
         if not pool2:
@@ -261,20 +273,22 @@ class Battle(object):
             return self.rng.choice([m for m, _s in pool2])
         return max(pool2, key=lambda x: x[1])[0]
 
-    def _status_score(self, md, best_dmg):
+    def _status_score(self, md, best_dmg, user=None, target=None):
         """변화기가 지금 쓸 만한지. 효과가 이미 걸려 있으면 0."""
+        user = user or self.foe
+        target = target or self.me
         useful = False
         ail = md.get("ail")
         if ail in HANDLED_STATUS:
-            if self.me.status:              # 이미 상태이상이면 소용없다
+            if target.status:               # 이미 상태이상이면 소용없다
                 return 0.0
             useful = True
         for stat, change in (md.get("stat") or []):
-            target = self.foe if change > 0 else self.me
-            cur = target.stages.get(stat, 0)
+            who = user if change > 0 else target
+            cur = who.stages.get(stat, 0)
             if (change > 0 and cur < STAGE_MAX) or (change < 0 and cur > STAGE_MIN):
                 useful = True
-        if md.get("heal") and self.foe.hp < self.foe.maxhp:
+        if md.get("heal") and user.hp < user.maxhp:
             useful = True
         if not useful:
             return 0.0

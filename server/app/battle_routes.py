@@ -306,7 +306,12 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
     bt = B.Battle(d, me, foe, deps.RNG)
     bt.turn_no = row["turn"]
 
-    out = {"events": bt.take_turn(body.move or None)}
+    # 기술을 안 보내면(자동 전투) 서버가 골라준다.
+    pick = body.move
+    if not pick or pick == "AUTO":
+        pick = bt.choose_mine()
+    out = {"myMove": pick, "myMoveKr": bt.move_name(pick),
+           "events": bt.take_turn(pick)}
 
     if bt.over and bt.result == "won":
         db.run("INSERT INTO wild_state (user_id, wins) VALUES (?,1)"
