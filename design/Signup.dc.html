@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap">
+  <style>
+    body { margin: 0; font-family: "Noto Sans KR", "맑은 고딕", sans-serif; }
+    a { color: #ffc043; } a:hover { color: #ffd77a; }
+  </style>
+</helmet>
+
+<div style="width: 460px; height: 680px; background: #131722; box-sizing: border-box;
+            border: 2px solid #39415e; position: relative; overflow: hidden;
+            font-family: 'Noto Sans KR', sans-serif;">
+
+  <div style="height: 96px; background: #e8483f; position: relative; overflow: hidden;
+              border-bottom: 2px solid #39415e;">
+    <div style="position: absolute; right: -26px; top: -34px; width: 132px; height: 132px;
+                border-radius: 50%; background: #c93a32;"></div>
+    <div style="position: absolute; right: 4px; top: 34px; width: 132px; height: 6px; background: #131722;"></div>
+    <div style="position: absolute; right: 54px; top: 20px; width: 34px; height: 34px;
+                border-radius: 50%; background: #f4f6fb; border: 5px solid #131722; box-sizing: border-box;"></div>
+    <div style="position: absolute; left: 22px; top: 22px;">
+      <div style="color: #ffffff; font-size: 25px; font-weight: 900; letter-spacing: -0.6px;">포켓 데스크톱</div>
+      <div style="color: #ffd9d5; font-size: 11px; margin-top: 3px;">바탕화면에서 포켓몬을 만나고 키웁니다</div>
+    </div>
+    <div style="position: absolute; left: 22px; bottom: 8px; color: #ffb9b3; font-size: 10px;
+                font-weight: 500; letter-spacing: 0.4px;">v0.6.0</div>
+  </div>
+
+  <div style="padding: 14px 22px 0 22px;">
+    <div style="display: flex; border-bottom: 2px solid #2a3147;">
+      <div style="padding: 9px 22px; color: #6f7794; font-size: 13px; font-weight: 500;">로그인</div>
+      <div style="padding: 9px 22px; background: #1b2030; border: 2px solid #2a3147;
+                  border-bottom: 2px solid #1b2030; margin-bottom: -2px;
+                  color: #ffc043; font-size: 13px; font-weight: 700;">회원가입</div>
+    </div>
+
+    <div style="background: #1b2030; border: 2px solid #2a3147; border-top: none; padding: 16px 18px 16px 18px;">
+
+      <!-- 계정 두 줄 -->
+      <div style="display: flex; gap: 10px;">
+        <div style="flex-grow: 1;">
+          <div style="color: #8e97b3; font-size: 10px; font-weight: 500; margin-bottom: 5px;">아이디</div>
+          <div style="background: #0d1017; border: 2px solid #39415e; padding: 9px 10px;
+                      color: #f2f4fb; font-size: 12px;">rudtjr1106</div>
+        </div>
+        <div style="flex-grow: 1;">
+          <div style="color: #8e97b3; font-size: 10px; font-weight: 500; margin-bottom: 5px;">비밀번호</div>
+          <div style="background: #0d1017; border: 2px solid #2a3147; padding: 9px 10px;
+                      color: #9aa3bd; font-size: 12px; letter-spacing: 2px;">••••••••</div>
+        </div>
+      </div>
+      <div style="margin-top: 10px;">
+        <div style="color: #8e97b3; font-size: 10px; font-weight: 500; margin-bottom: 5px;">비밀번호 확인</div>
+        <div style="background: #0d1017; border: 2px solid #2a3147; padding: 9px 10px;
+                    color: #9aa3bd; font-size: 12px; letter-spacing: 2px;">••••••••</div>
+      </div>
+
+      <!-- 스타팅 -->
+      <div style="margin: 18px 0 9px 0; display: flex; align-items: center; gap: 7px;">
+        <div style="width: 3px; height: 12px; background: #ffc043;"></div>
+        <div style="color: #f2f4fb; font-size: 12px; font-weight: 700;">처음 함께할 포켓몬</div>
+        <div style="margin-left: auto; color: #6f7794; font-size: 10px;">1~9세대 27마리</div>
+      </div>
+
+      <!-- 세대 선택 -->
+      <div style="display: flex; gap: 3px; margin-bottom: 12px;">
+        <div style="width: 26px; padding: 5px 0; text-align: center; background: #ffc043;
+                    color: #2a1f08; font-size: 11px; font-weight: 700; border: 2px solid #131722;">1</div>
+        <div style="width: 26px; padding: 5px 0; text-align: center; background: #262d42;
+                    color: #8e97b3; font-size: 11px; border: 2px solid #1b2030;">2</div>
+        <div style="width: 26px; padding: 5px 0; text-align: center; background: #262d42;
+                    color: #8e97b3; font-size: 11px; border: 2px solid #1b2030;">3</div>
+        <div style="width: 26px; padding: 5px 0; text-align: center; background: #262d42;
+                    color: #8e97b3; font-size: 11px; border: 2px solid #1b2030;">4</div>
+        <div style="width: 26px; padding: 5px 0; text-align: center; background: #262d42;
+                    color: #8e97b3; font-size: 11px; border: 2px solid #1b2030;">5</div>
+        <div style="width: 26px; padding: 5px 0; text-align: center; background: #262d42;
+                    color: #8e97b3; font-size: 11px; border: 2px solid #1b2030;">6</div>
+        <div style="width: 26px; padding: 5px 0; text-align: center; background: #262d42;
+                    color: #8e97b3; font-size: 11px; border: 2px solid #1b2030;">7</div>
+        <div style="width: 26px; padding: 5px 0; text-align: center; background: #262d42;
+                    color: #8e97b3; font-size: 11px; border: 2px solid #1b2030;">8</div>
+        <div style="width: 26px; padding: 5px 0; text-align: center; background: #262d42;
+                    color: #8e97b3; font-size: 11px; border: 2px solid #1b2030;">9</div>
+      </div>
+
+      <!-- 스타팅 카드 3장 -->
+      <div style="display: flex; gap: 8px;">
+        <div style="flex-grow: 1; background: #101623; border: 2px solid #2a3147; padding: 10px 0 8px 0; text-align: center;">
+          <div style="height: 52px; display: flex; align-items: flex-end; justify-content: center;">
+            <div style="width: 40px; height: 44px; background: #4f9e4a; border-radius: 40% 40% 45% 45%;"></div>
+          </div>
+          <div style="color: #c8cee0; font-size: 12px; font-weight: 500; margin-top: 6px;">이상해씨</div>
+          <div style="display: flex; gap: 3px; justify-content: center; margin-top: 5px;">
+            <div style="background: #63bc5a; color: #14141a; font-size: 9px; padding: 1px 5px;">풀</div>
+            <div style="background: #aa6bc8; color: #14141a; font-size: 9px; padding: 1px 5px;">독</div>
+          </div>
+        </div>
+
+        <!-- 선택된 카드 -->
+        <div style="flex-grow: 1; background: #241a08; border: 2px solid #ffc043; padding: 10px 0 8px 0;
+                    text-align: center; position: relative; box-shadow: 3px 3px 0 #7a5410;">
+          <div style="position: absolute; top: -2px; right: -2px; background: #ffc043; color: #2a1f08;
+                      font-size: 9px; font-weight: 900; padding: 2px 6px;">선택</div>
+          <div style="height: 52px; display: flex; align-items: flex-end; justify-content: center;">
+            <div style="width: 36px; height: 46px; background: #f0a860; border-radius: 44% 44% 40% 40%; position: relative;">
+              <div style="position: absolute; right: -8px; top: 4px; width: 12px; height: 16px;
+                          background: #ff8a3d; border-radius: 60% 20% 60% 20%;"></div>
+            </div>
+          </div>
+          <div style="color: #ffe6b8; font-size: 12px; font-weight: 700; margin-top: 6px;">파이리</div>
+          <div style="display: flex; gap: 3px; justify-content: center; margin-top: 5px;">
+            <div style="background: #ff9d55; color: #14141a; font-size: 9px; padding: 1px 5px;">불꽃</div>
+          </div>
+        </div>
+
+        <div style="flex-grow: 1; background: #101623; border: 2px solid #2a3147; padding: 10px 0 8px 0; text-align: center;">
+          <div style="height: 52px; display: flex; align-items: flex-end; justify-content: center;">
+            <div style="width: 40px; height: 42px; background: #63a8dd; border-radius: 45% 45% 40% 40%;"></div>
+          </div>
+          <div style="color: #c8cee0; font-size: 12px; font-weight: 500; margin-top: 6px;">꼬부기</div>
+          <div style="display: flex; gap: 3px; justify-content: center; margin-top: 5px;">
+            <div style="background: #5090d6; color: #14141a; font-size: 9px; padding: 1px 5px;">물</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; background: #ffc043; border: 2px solid #131722;
+                  padding: 12px 0; text-align: center; box-shadow: 4px 4px 0 #7a5410;">
+        <span style="color: #2a1f08; font-size: 15px; font-weight: 900;">파이리와 함께 시작하기</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 34px; background: #0d1017;
+              border-top: 2px solid #2a3147; display: flex; align-items: center; padding: 0 22px; gap: 5px;">
+    <div style="width: 6px; height: 6px; background: #e8483f;"></div>
+    <div style="width: 6px; height: 6px; background: #ffc043;"></div>
+    <div style="width: 6px; height: 6px; background: #5fd97a;"></div>
+    <div style="width: 6px; height: 6px; background: #6fb3ff;"></div>
+    <div style="margin-left: auto; color: #4e566f; font-size: 10px;">몬스터볼 10개를 들고 시작합니다</div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

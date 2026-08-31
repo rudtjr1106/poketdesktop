@@ -1,0 +1,98 @@
+{
+  "pages": [
+    {
+      "id": "page-1",
+      "name": "화면"
+    },
+    {
+      "id": "page-2",
+      "name": "다른 방향"
+    }
+  ],
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "page": "page-1",
+      "x": 0,
+      "y": 0,
+      "w": 460,
+      "h": 680,
+      "title": "로그인"
+    },
+    {
+      "file": "Signup.dc.html",
+      "page": "page-1",
+      "x": 560,
+      "y": 0,
+      "w": 460,
+      "h": 680,
+      "title": "회원가입 · 스타팅 선택"
+    },
+    {
+      "file": "Box.dc.html",
+      "page": "page-1",
+      "x": 1120,
+      "y": 0,
+      "w": 980,
+      "h": 610,
+      "title": "포켓몬 관리"
+    },
+    {
+      "file": "Dialog.dc.html",
+      "page": "page-1",
+      "x": 1120,
+      "y": 800,
+      "w": 980,
+      "h": 260,
+      "title": "작은 대화상자"
+    },
+    {
+      "file": "DirB.dc.html",
+      "page": "page-2",
+      "x": 0,
+      "y": 0,
+      "w": 460,
+      "h": 680,
+      "title": "방향 B — 모던 밝은 카드"
+    },
+    {
+      "file": "DirC.dc.html",
+      "page": "page-2",
+      "x": 560,
+      "y": 0,
+      "w": 460,
+      "h": 680,
+      "title": "방향 C — 트레이너 카드"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-direction",
+      "page": "page-1",
+      "x": 0,
+      "y": -190,
+      "w": 460,
+      "text": "방향 A — 도트 게임 프레임\n\n각진 2px 테두리, 눌린 버튼 그림자, 몬스터볼 헤더.\n지금 앱이 픽셀 도트를 쓰니 이 결이 제일 맞고,\ntkinter 로도 그대로 그려집니다."
+    },
+    {
+      "id": "note-build",
+      "page": "page-1",
+      "x": 1120,
+      "y": -190,
+      "w": 980,
+      "text": "전부 tkinter 로 구현 가능한 것만 썼습니다 — 각진 테두리, 평면 색, Canvas 막대.\n둥근 모서리와 CSS 그림자는 안 씁니다(버튼의 눌린 그림자는 사각형 두 장으로 냅니다).\n글꼴은 이미 깔려 있는 Noto Sans KR 그대로입니다."
+    },
+    {
+      "id": "note-alt",
+      "page": "page-2",
+      "x": 0,
+      "y": -150,
+      "w": 1020,
+      "text": "고르지 않으신 두 방향입니다. 왼쪽이 마음에 드시면 말씀해 주세요 — 전체 화면을 그 결로 다시 그리겠습니다."
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "page-1"
+  }
+}

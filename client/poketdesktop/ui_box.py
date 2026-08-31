@@ -1,33 +1,142 @@
 # -*- coding: utf-8 -*-
-"""포켓몬 관리 창 — 보유 목록, 상세 능력치, 바탕화면 내보내기."""
+"""포켓몬 관리 창.
+
+목록은 ttk.Treeview 가 아니라 직접 그린다. 타입을 색칩으로 보여주고
+'데리고 다니는 6마리' 와 'PC 박스' 사이에 구분선을 넣으려면 그래야 한다.
+
+오른쪽 상세에는 **실제 도트**가 제자리에서 움직인다.
+"""
 import tkinter as tk
 from tkinter import ttk
 
-from PIL import Image, ImageTk
+from PIL import ImageTk
+
+from common.korean import natural
 
 from . import sprite_cache, sprites
 from . import ui_common as U
-from .ui_common import apply_theme, gender_color, gender_mark, run_async, style_window
+
+ROW_H = 30
+DETAIL_W = 340
+
+# (제목, x, 너비, 정렬)
+COLS = [("도감", 12, 50, "w"), ("이름", 66, 168, "w"), ("Lv", 240, 34, "center"),
+        ("타입", 282, 118, "w"), ("성격", 404, 56, "center"),
+        ("개체값", 464, 58, "center"), ("위치", 528, 74, "center")]
 
 STAT_ROWS = [("hp", "HP"), ("atk", "공격"), ("def", "방어"),
              ("spa", "특수공격"), ("spd", "특수방어"), ("spe", "스피드")]
 
 
-def _recolor(img, key, bg):
-    """투명색으로 칠해둔 배경을 창 배경색으로 바꾼다."""
-    src = img.tobytes()
-    out = bytearray(src)
-    kr, kg, kb = key
-    br, bgc, bb = bg
-    for i in range(0, len(src), 3):
-        if src[i] == kr and src[i + 1] == kg and src[i + 2] == kb:
-            out[i], out[i + 1], out[i + 2] = br, bgc, bb
-    return Image.frombytes("RGB", img.size, bytes(out))
+class Row(object):
+    """목록 한 줄."""
 
+    def __init__(self, parent, mon, dex, on_pick):
+        self.mon = mon
+        self.on_pick = on_pick
+        self.selected = False
+        info = mon.get("info", {})
+        self.party = bool(mon.get("onDesktop"))
+        base = U.BG if self.party else "#10131c"
+        self.base = base
 
-def _rgb(h):
-    h = h.lstrip("#")
-    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+        self.f = tk.Frame(parent, bg=base, height=ROW_H, cursor="hand2")
+        self.f.pack_propagate(False)
+        self.mark = tk.Frame(self.f, bg=base, width=3)
+        self.mark.place(x=0, y=0, relheight=1.0)
+
+        dim = U.FG_DIM if self.party else U.FG_FAINT
+        name = info.get("name", mon["species"])
+        shiny = mon.get("shiny")
+        if shiny:
+            name = "★ " + name
+        g = U.gender_mark(mon.get("gender"))
+
+        self.cells = []
+        self._cell("%04d" % mon.get("num", 0), COLS[0], U.FG_FAINT, U.FONT_XS)
+        self.name_cell = self._cell(name, COLS[1],
+                                    U.SHINY if shiny else (U.FG if self.party else dim),
+                                    U.FONT_S)
+        if g:
+            # 글자 수로 어림하면 한글에서 어긋난다. 글꼴에 실제 폭을 물어본다.
+            try:
+                import tkinter.font as tkfont
+                wpx = tkfont.Font(font=U.FONT_S).measure(name)
+            except Exception:
+                wpx = len(name) * 11
+            gx = min(COLS[1][1] + wpx + 6, COLS[2][1] - 14)
+            self.gender = tk.Label(self.f, text=g, bg=base,
+                                   fg=U.gender_color(mon.get("gender")),
+                                   font=U.FONT_S)
+            self.gender.place(x=gx, rely=0.5, anchor="w")
+            self.cells.append(self.gender)
+        else:
+            self.gender = None
+        self._cell(str(mon.get("level", "")), COLS[2],
+                   U.FG if self.party else dim, U.FONT_B)
+
+        self.types = tk.Frame(self.f, bg=base)
+        self.types.place(x=COLS[3][1], rely=0.5, anchor="w")
+        sp = dex.get(mon["species"]) if dex else None
+        for i, t in enumerate((sp or {}).get("types", [])):
+            U.chip(self.types, dex.type_name(t), U.TYPE_COLOR.get(t, U.BG3),
+                   padx=6).pack(side="left", padx=(0, 3))
+        self.cells.append(self.types)
+
+        self._cell(info.get("nature", ""), COLS[4], dim, U.FONT_XS)
+        iv = info.get("ivPercent", 0)
+        self._cell("%.0f%%" % iv, COLS[5],
+                   U.GOOD if iv >= 75 else (U.FG if self.party else dim), U.FONT_XS)
+        self._cell("따라다님" if self.party else "박스", COLS[6],
+                   U.GOOD if self.party else U.FG_FAINT, U.FONT_XS)
+
+        for w in [self.f] + self.cells:
+            w.bind("<Button-1>", lambda e: self.on_pick(self.mon["id"]))
+            w.bind("<Enter>", self._hover_in)
+            w.bind("<Leave>", self._hover_out)
+
+    def _cell(self, text, col, fg, font):
+        title, x, w, anchor = col
+        lb = tk.Label(self.f, text=text, bg=self.base, fg=fg, font=font,
+                      anchor=anchor if anchor != "center" else "center")
+        lb.place(x=x if anchor == "w" else x, y=0, width=w, relheight=1.0)
+        self.cells.append(lb)
+        return lb
+
+    def pack(self, **kw):
+        self.f.pack(fill="x", **kw)
+        return self
+
+    def _paint(self, bg, mark):
+        self.f.configure(bg=bg)
+        self.mark.configure(bg=mark)
+        for w in self.cells:
+            try:
+                w.configure(bg=bg)
+            except Exception:
+                pass
+        for c in self.types.winfo_children():
+            pass
+
+    def _hover_in(self, _e):
+        if not self.selected:
+            self._paint(U.BG2, U.LINE)
+
+    def _hover_out(self, _e):
+        if not self.selected:
+            self._paint(self.base, self.base)
+
+    def set_selected(self, on):
+        self.selected = on
+        if on:
+            self._paint("#2b2417", U.ACCENT)
+            self.name_cell.configure(fg=U.ACCENT_TEXT, font=U.FONT_B)
+        else:
+            self._paint(self.base, self.base)
+            self.name_cell.configure(
+                fg=U.SHINY if self.mon.get("shiny")
+                else (U.FG if self.party else U.FG_DIM),
+                font=U.FONT_S)
 
 
 class BoxWindow(object):
@@ -35,244 +144,342 @@ class BoxWindow(object):
         self.root = root
         self.app = app
         self.mons = []
+        self.rows = {}
         self.sel = None
         self.photos = []
-        self.anim_job = None
         self.anim = None
         self.anim_i = 0
+        self.anim_job = None
 
         self.win = tk.Toplevel(root)
-        style_window(self.win, "포켓 데스크톱 — 포켓몬 관리", 980, 610)
-        apply_theme(self.win)
-        self.win.minsize(900, 540)
+        U.style_window(self.win, "포켓 데스크톱 — 포켓몬 관리", 990, 668)
+        U.apply_theme(self.win)
+        self.win.configure(bg=U.BG, highlightthickness=2,
+                           highlightbackground=U.LINE2)
+        self.win.minsize(950, 620)
         self.win.protocol("WM_DELETE_WINDOW", self.close)
 
-        # ---- 위쪽 막대 ----
-        top = ttk.Frame(self.win, padding=(16, 14, 16, 10))
-        top.pack(fill="x")
-        ttk.Label(top, text="포켓몬 관리", style="Title.TLabel").pack(side="left")
-        self.count = ttk.Label(top, text="", style="Dim.TLabel")
-        self.count.pack(side="left", padx=(12, 0), pady=(6, 0))
-        ttk.Button(top, text="새로고침", style="Ghost.TButton",
-                   command=self.reload).pack(side="right")
-        self.balls = ttk.Label(top, text="", style="Dim.TLabel")
-        self.balls.pack(side="right", padx=(0, 14), pady=(6, 0))
+        self._header()
+        self._bottom()
 
-        body = ttk.Frame(self.win, padding=(16, 0, 16, 8))
+        body = tk.Frame(self.win, bg=U.BG)
         body.pack(fill="both", expand=True)
-
-        # ---- 목록 ----
-        left = ttk.Frame(body)
-        left.pack(side="left", fill="both", expand=True)
-        cols = ("num", "name", "lv", "type", "nature", "iv", "where")
-        self.tree = ttk.Treeview(left, columns=cols, show="headings",
-                                 selectmode="browse")
-        for c, t, w, anchor in [("num", "도감", 56, "center"),
-                                ("name", "이름", 168, "w"),
-                                ("lv", "Lv", 44, "center"),
-                                ("type", "타입", 120, "w"),
-                                ("nature", "성격", 74, "center"),
-                                ("iv", "개체값", 68, "center"),
-                                ("where", "위치", 82, "center")]:
-            self.tree.heading(c, text=t)
-            self.tree.column(c, width=w, anchor=anchor, stretch=(c == "name"))
-        sb = ttk.Scrollbar(left, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=sb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        sb.pack(side="left", fill="y")
-        self.tree.bind("<<TreeviewSelect>>", self.on_select)
-        self.tree.tag_configure("shiny", foreground=U.SHINY)
-        self.tree.tag_configure("desktop", foreground=U.GOOD)
-
-        # ---- 상세 ----
-        self.right = ttk.Frame(body, width=340, style="Card.TFrame", padding=16)
-        self.right.pack(side="left", fill="y", padx=(14, 0))
-        self.right.pack_propagate(False)
-        self._build_detail()
-
-        # ---- 아래 버튼 ----
-        bot = ttk.Frame(self.win, padding=(16, 0, 16, 14))
-        bot.pack(fill="x")
-        self.btn_desktop = ttk.Button(bot, text="바탕화면에 내보내기",
-                                      command=self.toggle_desktop, state="disabled")
-        self.btn_desktop.pack(side="left")
-        self.btn_nick = ttk.Button(bot, text="별명 짓기", style="Ghost.TButton",
-                                   command=self.do_nickname, state="disabled")
-        self.btn_nick.pack(side="left", padx=8)
-        self.btn_release = ttk.Button(bot, text="놓아주기", style="Danger.TButton",
-                                      command=self.do_release, state="disabled")
-        self.btn_release.pack(side="left")
-        self.status = ttk.Label(bot, text="", style="Dim.TLabel")
-        self.status.pack(side="right")
+        self._list(body)
+        self._detail(body)
 
         self.reload()
 
-    # ---------------- 상세 패널 ----------------
-    def _build_detail(self):
-        r = self.right
-        self.d_sprite = tk.Label(r, bg=U.BG2, height=6)
-        self.d_sprite.pack(pady=(2, 8))
-        self.d_name = tk.Label(r, text="포켓몬을 고르세요", bg=U.BG2, fg=U.FG,
-                               font=U.FONT_T)
-        self.d_name.pack()
-        self.d_sub = tk.Label(r, text="", bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS)
-        self.d_sub.pack(pady=(2, 8))
-        self.d_types = tk.Frame(r, bg=U.BG2)
-        self.d_types.pack(pady=(0, 12))
+    # ---------------- 머리 ----------------
+    def _header(self):
+        h = tk.Frame(self.win, bg=U.BG2, height=62)
+        h.pack(fill="x")
+        h.pack_propagate(False)
+        inner = tk.Frame(h, bg=U.BG2)
+        inner.pack(fill="both", expand=True, padx=16)
 
-        self.stat_bars = {}
-        grid = tk.Frame(r, bg=U.BG2)
-        grid.pack(fill="x")
+        cv = tk.Canvas(inner, width=28, height=28, bg=U.BG2,
+                       highlightthickness=0, bd=0)
+        cv.pack(side="left", pady=17)
+        cv.create_oval(2, 2, 26, 26, fill="#f4f6fb", outline=U.INK, width=3)
+        cv.create_arc(2, 2, 26, 26, start=0, extent=180, fill=U.RED,
+                      outline=U.INK, width=3)
+        cv.create_rectangle(2, 12, 26, 16, fill=U.INK, outline="")
+        cv.create_oval(10, 10, 18, 18, fill="#f4f6fb", outline=U.INK, width=2)
+
+        tk.Label(inner, text="포켓몬 관리", bg=U.BG2, fg=U.FG,
+                 font=(U.FAMILY_BLACK, 15)).pack(side="left", padx=(12, 12))
+        self.count = tk.Label(inner, text="", bg=U.BG2, fg=U.FG_FAINT,
+                              font=U.FONT_S)
+        self.count.pack(side="left")
+
+        U.ghost_button(inner, "새로고침", self.reload,
+                       height=32).pack(side="right", pady=15)
+        ball = tk.Frame(inner, bg=U.INK, highlightthickness=2,
+                        highlightbackground=U.LINE)
+        ball.pack(side="right", padx=(0, 10), pady=17)
+        bcv = tk.Canvas(ball, width=14, height=14, bg=U.INK,
+                        highlightthickness=0, bd=0)
+        bcv.pack(side="left", padx=(8, 5), pady=4)
+        bcv.create_oval(1, 1, 13, 13, fill="#f4f6fb", outline=U.INK, width=2)
+        bcv.create_arc(1, 1, 13, 13, start=0, extent=180, fill=U.RED,
+                       outline=U.INK, width=2)
+        self.balls = tk.Label(ball, text="0", bg=U.INK, fg=U.ACCENT,
+                              font=U.FONT_B, padx=(0))
+        self.balls.pack(side="left", padx=(0, 10))
+        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+
+    # ---------------- 목록 ----------------
+    def _list(self, parent):
+        wrap = tk.Frame(parent, bg=U.BG)
+        wrap.pack(side="left", fill="both", expand=True)
+
+        head = tk.Frame(wrap, bg=U.INK, height=26)
+        head.pack(fill="x")
+        head.pack_propagate(False)
+        for title, x, w, anchor in COLS:
+            tk.Label(head, text=title, bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS,
+                     anchor=anchor if anchor != "center" else "center"
+                     ).place(x=x, y=0, width=w, relheight=1.0)
+        tk.Frame(wrap, bg=U.LINE, height=2).pack(fill="x")
+
+        holder = tk.Frame(wrap, bg=U.BG)
+        holder.pack(fill="both", expand=True)
+        self.canvas = tk.Canvas(holder, bg=U.BG, highlightthickness=0, bd=0)
+        sb = ttk.Scrollbar(holder, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.inner = tk.Frame(self.canvas, bg=U.BG)
+        self._win = self.canvas.create_window((0, 0), window=self.inner,
+                                              anchor="nw")
+        self.inner.bind("<Configure>", lambda e: self.canvas.configure(
+            scrollregion=self.canvas.bbox("all")))
+        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(
+            self._win, width=e.width))
+        self.canvas.bind_all("<MouseWheel>", self._wheel)
+
+    def _wheel(self, e):
+        try:
+            if self.canvas.winfo_containing(e.x_root, e.y_root) is None:
+                return
+            self.canvas.yview_scroll(int(-e.delta / 60), "units")
+        except Exception:
+            pass
+
+    # ---------------- 상세 ----------------
+    def _detail(self, parent):
+        d = tk.Frame(parent, bg=U.BG2, width=DETAIL_W, highlightthickness=0)
+        d.pack(side="right", fill="y")
+        d.pack_propagate(False)
+        tk.Frame(d, bg=U.LINE2, width=2).place(x=0, y=0, relheight=1.0)
+
+        p = tk.Frame(d, bg=U.BG2)
+        p.pack(fill="both", expand=True, padx=(16, 14), pady=12)
+
+        # 도트 액자
+        art = tk.Frame(p, bg="#101623", highlightthickness=2,
+                       highlightbackground=U.LINE, height=112)
+        art.pack(fill="x")
+        art.pack_propagate(False)
+        self.d_num = tk.Label(art, text="", bg="#101623", fg="#4e566f",
+                              font=U.FONT_XS)
+        self.d_num.place(x=8, y=6)
+        self.d_art = tk.Label(art, bg="#101623", text="포켓몬을 고르세요",
+                              fg=U.FG_FAINT, font=U.FONT_S)
+        self.d_art.place(relx=0.5, rely=0.55, anchor="center")
+
+        row = tk.Frame(p, bg=U.BG2)
+        row.pack(fill="x", pady=(12, 0))
+        self.d_name = tk.Label(row, text="", bg=U.BG2, fg=U.ACCENT_TEXT,
+                               font=(U.FAMILY_BLACK, 16))
+        self.d_name.pack(side="left")
+        self.d_gender = tk.Label(row, text="", bg=U.BG2, fg=U.INFO, font=U.FONT_H)
+        self.d_gender.pack(side="left", padx=(6, 0))
+        self.d_lv = tk.Label(row, text="", bg=U.BG3, fg=U.FG, font=U.FONT_B,
+                             padx=9, pady=2, highlightthickness=2,
+                             highlightbackground=U.LINE2)
+        self.d_lv.pack(side="right")
+
+        self.d_sub = tk.Label(p, text="", bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS,
+                              anchor="w", justify="left")
+        self.d_sub.pack(fill="x", pady=(3, 0))
+        self.d_types = tk.Frame(p, bg=U.BG2)
+        self.d_types.pack(anchor="w", pady=(8, 0))
+
+        # 능력치
+        stats = tk.Frame(p, bg="#101623", highlightthickness=2,
+                         highlightbackground=U.LINE)
+        stats.pack(fill="x", pady=(11, 0))
+        sh = tk.Frame(stats, bg="#101623")
+        sh.pack(fill="x", padx=11, pady=(9, 6))
+        U.marker_label(sh, "능력치", bg="#101623").pack(side="left")
+        self.d_ivsum = tk.Label(sh, text="", bg="#101623", fg=U.GOOD,
+                                font=U.FONT_XS)
+        self.d_ivsum.pack(side="right")
+
+        grid = tk.Frame(stats, bg="#101623")
+        grid.pack(fill="x", padx=11, pady=(0, 10))
+        self.bars = {}
         for i, (k, label) in enumerate(STAT_ROWS):
-            tk.Label(grid, text=label, bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS,
-                     width=7, anchor="w").grid(row=i, column=0, sticky="w", pady=2)
-            val = tk.Label(grid, text="-", bg=U.BG2, fg=U.FG, font=U.FONT_NUM,
-                           width=5, anchor="e")
+            tk.Label(grid, text=label, bg="#101623", fg=U.FG_DIM, font=U.FONT_XS,
+                     anchor="w", width=7).grid(row=i, column=0, sticky="w", pady=1)
+            val = tk.Label(grid, text="-", bg="#101623", fg=U.FG, font=U.FONT_NUM,
+                           anchor="e", width=4)
             val.grid(row=i, column=1, sticky="e")
-            cv = tk.Canvas(grid, width=118, height=7, bg=U.BG3,
+            cv = tk.Canvas(grid, width=116, height=7, bg="#232b3d",
                            highlightthickness=0, bd=0)
-            cv.grid(row=i, column=2, padx=(10, 8))
-            iv = tk.Label(grid, text="", bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS,
-                          width=6, anchor="e")
+            cv.grid(row=i, column=2, padx=(9, 8))
+            iv = tk.Label(grid, text="", bg="#101623", fg=U.FG_DIM, font=U.FONT_XS,
+                          anchor="e", width=6)
             iv.grid(row=i, column=3, sticky="e")
-            self.stat_bars[k] = (val, cv, iv)
+            self.bars[k] = (val, cv, iv)
 
-        self.d_ability = tk.Label(r, text="", bg=U.BG2, fg=U.FG, font=U.FONT_S,
-                                  anchor="w", justify="left", wraplength=300)
-        self.d_ability.pack(fill="x", pady=(14, 2))
-        tk.Label(r, text="기술", bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS,
-                 anchor="w").pack(fill="x", pady=(10, 3))
-        self.d_moves = tk.Label(r, text="-", bg=U.BG2, fg=U.FG, font=U.FONT_S,
-                                anchor="w", justify="left", wraplength=300)
+        U.marker_label(p, "기술", bg=U.BG2).pack(anchor="w", pady=(11, 5))
+        self.d_moves = tk.Frame(p, bg=U.BG2)
         self.d_moves.pack(fill="x")
+
+    # ---------------- 바닥 ----------------
+    def _bottom(self):
+        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x", side="bottom")
+        bar = tk.Frame(self.win, bg=U.INK, height=58)
+        bar.pack(fill="x", side="bottom")
+        bar.pack_propagate(False)
+        inner = tk.Frame(bar, bg=U.INK)
+        inner.pack(fill="both", expand=True, padx=16)
+
+        self.btn_party = U.PushButton(inner, "데리고 다니기", self.toggle_party,
+                                      height=34)
+        self.btn_party.pack(side="left", pady=11)
+        self.btn_nick = U.ghost_button(inner, "별명 짓기", self.do_nickname,
+                                       height=34)
+        self.btn_nick.pack(side="left", padx=8, pady=11)
+        self.btn_release = U.PushButton(inner, "놓아주기", self.do_release,
+                                        fill=U.DANGER_BG, fg=U.DANGER,
+                                        shadow="#1a1013", hover="#3a2028",
+                                        height=34, border=U.DANGER_LINE,
+                                        font=U.FONT_S)
+        self.btn_release.pack(side="left", pady=11)
+        self.status = tk.Label(inner, text="", bg=U.INK, fg=U.FG_FAINT,
+                               font=U.FONT_S)
+        self.status.pack(side="right")
+        self.set_buttons(False)
+
+    def set_buttons(self, on):
+        for b in (self.btn_party, self.btn_nick, self.btn_release):
+            b.configure(state="normal" if on else "disabled")
 
     # ---------------- 데이터 ----------------
     def say(self, msg, color=None):
-        self.status.configure(text=msg, foreground=color or U.FG_DIM)
+        self.status.configure(text=natural(msg or ""), fg=color or U.FG_FAINT)
 
     def reload(self):
         self.say("불러오는 중...")
 
         def work():
             mons = self.app.api.pokemon()
-            # 바탕화면에 나와 있는 애들 도트는 미리 받아둔다
             sprite_cache.ensure_many(
                 self.app.api,
                 [(m.get("num"), m.get("shiny")) for m in mons if m.get("onDesktop")])
             return mons
-        run_async(self.root, work, self._loaded)
+        U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, mons, err):
         if err:
             return self.say(getattr(err, "message", str(err)), U.DANGER)
         self.mons = mons or []
         keep = self.sel
-        self.tree.delete(*self.tree.get_children())
-        dex = self.app.dex
-        for m in self.mons:
-            info = m.get("info", {})
-            tags = []
-            if m.get("shiny"):
-                tags.append("shiny")
-            elif m.get("onDesktop"):
-                tags.append("desktop")
-            name = info.get("name", m["species"])
-            if m.get("shiny"):
-                name = "★ " + name
-            g = gender_mark(m.get("gender"))
-            self.tree.insert("", "end", iid=str(m["id"]), tags=tags, values=(
-                "%04d" % m.get("num", 0), (name + " " + g).strip(), m["level"],
-                " / ".join(info.get("types", [])),
-                info.get("nature", ""),
-                "%.0f%%" % info.get("ivPercent", 0),
-                "바탕화면" if m.get("onDesktop") else "박스"))
-        n_desk = sum(1 for m in self.mons if m.get("onDesktop"))
-        self.count.configure(text="보유 %d마리  ·  바탕화면 %d마리"
-                                  % (len(self.mons), n_desk))
-        self.balls.configure(text="몬스터볼 %d개" % self.app.balls)
+        for w in self.inner.winfo_children():
+            w.destroy()
+        self.rows = {}
+
+        party = [m for m in self.mons if m.get("onDesktop")]
+        box = [m for m in self.mons if not m.get("onDesktop")]
+        for m in party:
+            self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
+                                     self.select).pack()
+            tk.Frame(self.inner, bg="#1a1f2e", height=1).pack(fill="x")
+        if box:
+            sep = tk.Frame(self.inner, bg=U.INK, height=28)
+            sep.pack(fill="x")
+            sep.pack_propagate(False)
+            U.marker_label(sep, "PC 박스 · %d마리" % len(box), bg=U.INK,
+                           mark=U.FG_FAINT).pack(side="left", padx=12, pady=7)
+            tk.Frame(self.inner, bg=U.LINE, height=2).pack(fill="x")
+            for m in box:
+                self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
+                                         self.select).pack()
+                tk.Frame(self.inner, bg="#161a24", height=1).pack(fill="x")
+
+        self.count.configure(text="보유 %d마리  ·  데리고 다니는 중 %d마리"
+                                  % (len(self.mons), len(party)))
+        self.balls.configure(text=str(self.app.balls))
         self.say("")
-        if keep and self.tree.exists(str(keep)):
-            self.tree.selection_set(str(keep))
+        if keep and keep in self.rows:
+            self.select(keep)
         elif self.mons:
-            self.tree.selection_set(str(self.mons[0]["id"]))
+            self.select(self.mons[0]["id"])
 
     def current(self):
-        for m in self.mons:
-            if m["id"] == self.sel:
-                return m
-        return None
+        return next((m for m in self.mons if m["id"] == self.sel), None)
 
-    def on_select(self, _e=None):
-        s = self.tree.selection()
-        if not s:
-            return
-        self.sel = int(s[0])
+    def select(self, pid):
+        self.sel = pid
+        for i, r in self.rows.items():
+            r.set_selected(i == pid)
         m = self.current()
         if m:
             self.show_detail(m)
-        for b in (self.btn_desktop, self.btn_nick, self.btn_release):
-            b.configure(state="normal")
-        self.btn_desktop.configure(
-            text="바탕화면에서 거두기" if m and m.get("onDesktop")
-            else "바탕화면에 내보내기")
+            self.set_buttons(True)
+            self.btn_party.configure(
+                text="박스로 보내기" if m.get("onDesktop") else "데리고 다니기")
 
     # ---------------- 상세 그리기 ----------------
     def show_detail(self, m):
         info = m.get("info", {})
         dex = self.app.dex
+        self.d_num.configure(text="No.%04d" % m.get("num", 0))
+        self.d_name.configure(text=info.get("name", m["species"]),
+                              fg=U.SHINY if m.get("shiny") else U.ACCENT_TEXT)
+        g = U.gender_mark(m.get("gender"))
+        self.d_gender.configure(text=g, fg=U.gender_color(m.get("gender")))
+        self.d_lv.configure(text="Lv.%d" % m["level"])
 
-        name = info.get("name", m["species"])
-        self.d_name.configure(text=name, fg=U.SHINY if m.get("shiny") else U.FG)
-        bits = ["No.%04d" % m.get("num", 0), info.get("species", ""),
-                "Lv.%d" % m["level"]]
-        g = gender_mark(m.get("gender"))
-        if g:
-            bits.append(g)
-        bits.append(info.get("nature", "") + " 성격")
+        sp = dex.get(m["species"]) if dex else None
+        bits = [(sp or {}).get("kind", ""), info.get("nature", "") + " 성격",
+                "특성 " + (info.get("ability") or "")]
         if m.get("shiny"):
             bits.append("★ 색이 다른 개체")
-        self.d_sub.configure(text="   ·   ".join(x for x in bits if x))
+        self.d_sub.configure(text="  ·  ".join(x for x in bits if x.strip()))
 
         for w in self.d_types.winfo_children():
             w.destroy()
-        sp = dex.get(m["species"]) if dex else None
-        if sp:
-            for t in sp.get("types", []):
-                tk.Label(self.d_types, text=dex.type_name(t),
-                         bg=U.TYPE_COLOR.get(t, U.BG3), fg="#14141a",
-                         font=U.FONT_XS, padx=10, pady=2).pack(side="left", padx=3)
+        for t in (sp or {}).get("types", []):
+            U.chip(self.d_types, dex.type_name(t), U.TYPE_COLOR.get(t, U.BG3),
+                   font=U.FONT_S, padx=10, pady=2).pack(side="left", padx=(0, 4))
 
         stats = info.get("stats", {})
         ivs = m.get("ivs", {})
         mx = max(list(stats.values()) or [1])
-        for k, _label in STAT_ROWS:
-            val, cv, ivl = self.stat_bars[k]
+        for k, _l in STAT_ROWS:
+            val, cv, ivl = self.bars[k]
             v = stats.get(k, 0)
+            iv = ivs.get(k, 0)
             val.configure(text=str(v))
             cv.delete("all")
-            w = int(118 * v / mx) if mx else 0
-            iv = ivs.get(k, 0)
             col = U.GOOD if iv == 31 else (U.ACCENT if iv >= 26 else "#63637d")
-            cv.create_rectangle(0, 0, w, 7, fill=col, outline="")
+            cv.create_rectangle(0, 0, int(116 * v / mx) if mx else 0, 7,
+                                fill=col, outline="")
             ivl.configure(text="개체 %d" % iv,
                           fg=U.GOOD if iv == 31 else U.FG_DIM)
+        self.d_ivsum.configure(
+            text="개체값 %d / 186  ·  %.0f%%" % (info.get("ivTotal", 0),
+                                              info.get("ivPercent", 0)))
 
-        ab = info.get("ability", "")
-        if info.get("hiddenAbility"):
-            ab += "   (숨은 특성)"
-        self.d_ability.configure(
-            text="특성   %s\n개체값   %d / 186   (%.0f%%)"
-                 % (ab, info.get("ivTotal", 0), info.get("ivPercent", 0)))
-        self.d_moves.configure(
-            text="\n".join("·  " + x for x in info.get("moves", [])) or "-")
+        for w in self.d_moves.winfo_children():
+            w.destroy()
+        moves = info.get("moves", [])
+        for i, mv in enumerate(moves[:4]):
+            md = None
+            if dex:
+                md = next((x for x in (dex.moves or {}).values()
+                           if x.get("kr") == mv), None)
+            col = U.TYPE_COLOR.get((md or {}).get("type"), U.BG3)
+            cell = tk.Frame(self.d_moves, bg=col)
+            cell.grid(row=i // 2, column=i % 2, sticky="nsew", padx=2, pady=2)
+            tk.Label(cell, text=mv, bg=col, fg="#14141a",
+                     font=U.FONT_B).pack(pady=(4, 0))
+            sub = "%s · %s" % (dex.type_name((md or {}).get("type")) if dex else "",
+                               (md or {}).get("power") or "변화")
+            tk.Label(cell, text=sub, bg=col, fg="#2a2a35",
+                     font=U.FONT_XS).pack(pady=(0, 4))
+        for c in (0, 1):
+            self.d_moves.grid_columnconfigure(c, weight=1)
 
-        self.load_sprite(m)
+        self.load_art(m)
 
-    def load_sprite(self, m):
-        """도트는 없으면 서버에서 받아온다. 받는 동안 화면은 안 멈춘다."""
+    def load_art(self, m):
         self.stop_anim()
-        self.d_sprite.configure(image="", text="...", fg=U.FG_FAINT,
-                                font=U.FONT_S)
+        self.d_art.configure(image="", text="...", fg=U.FG_FAINT)
         want = m["id"]
 
         def work():
@@ -281,33 +488,31 @@ class BoxWindow(object):
         def done(path, err):
             if err or not path or self.sel != want:
                 if self.sel == want:
-                    self.d_sprite.configure(text="도트 없음")
+                    self.d_art.configure(text="도트 없음")
                 return
             try:
-                anim = sprites.load_animation(path, target_height=96,
+                anim = sprites.load_animation(path, target_height=92,
                                               min_scale=0.2, max_scale=3.0)
-                key = anim.key
-                bg = _rgb(U.BG2)
-                self.photos = [ImageTk.PhotoImage(_recolor(f, key, bg))
+                self.photos = [ImageTk.PhotoImage(sprites.to_rgba(f, anim.key))
                                for f in anim.frames[sprites.RIGHT]]
                 self.anim = anim
                 self.anim_i = 0
-                self.d_sprite.configure(text="", image=self.photos[0])
+                self.d_art.configure(text="", image=self.photos[0])
                 self.play_anim()
             except Exception:
-                self.d_sprite.configure(text="도트 없음")
-        run_async(self.root, work, done)
+                self.d_art.configure(text="도트 없음")
+        U.run_async(self.root, work, done)
 
     def play_anim(self):
         if not self.photos:
             return
         self.anim_i = (self.anim_i + 1) % len(self.photos)
         try:
-            self.d_sprite.configure(image=self.photos[self.anim_i])
+            self.d_art.configure(image=self.photos[self.anim_i])
         except Exception:
             return
         d = self.anim.durations[self.anim_i % len(self.anim.durations)]
-        self.anim_job = self.root.after(max(50, d), self.play_anim)
+        self.anim_job = self.root.after(max(60, d), self.play_anim)
 
     def stop_anim(self):
         if self.anim_job:
@@ -329,40 +534,44 @@ class BoxWindow(object):
                 self.app.request_sync()
         return done
 
-    def toggle_desktop(self):
+    def toggle_party(self):
         m = self.current()
         if not m:
             return
         on = not m.get("onDesktop")
         self.say("적용하는 중...")
-        run_async(self.root, lambda: self.app.api.set_desktop(m["id"], on),
-                  self._after("바탕화면에 내보냈습니다." if on else "박스로 거두었습니다."))
+        U.run_async(self.root, lambda: self.app.api.set_desktop(m["id"], on),
+                    self._after("데리고 다닙니다." if on else "박스로 보냈습니다."))
 
     def do_nickname(self):
         m = self.current()
         if not m:
             return
         val = ask_text(self.win, "별명 짓기",
-                       "%s 의 별명 (비우면 원래 이름)" % m["info"]["species"],
+                       "%s 의 별명을 지어주세요." % m["info"]["species"],
+                       "비우면 원래 이름으로 돌아갑니다",
                        m.get("nickname") or "")
         if val is None:
             return
-        run_async(self.root, lambda: self.app.api.set_nickname(m["id"], val),
-                  self._after("별명을 바꿨습니다."))
+        U.run_async(self.root, lambda: self.app.api.set_nickname(m["id"], val),
+                    self._after("별명을 바꿨습니다."))
 
     def do_release(self):
         m = self.current()
         if not m:
             return
-        name = m["info"]["name"]
-        if not confirm(self.win, "놓아주기",
-                       "%s 을(를) 놓아줍니다.\n되돌릴 수 없습니다. 계속할까요?" % name):
+        if not confirm_release(self.win, self.app, m):
             return
-        run_async(self.root, lambda: self.app.api.release(m["id"]),
-                  self._after("%s 을(를) 보내주었습니다." % name))
+        name = m["info"]["name"]
+        U.run_async(self.root, lambda: self.app.api.release(m["id"]),
+                    self._after("%s 을(를) 보내주었습니다." % name))
 
     def close(self):
         self.stop_anim()
+        try:
+            self.canvas.unbind_all("<MouseWheel>")
+        except Exception:
+            pass
         self.app.box_window = None
         self.win.destroy()
 
@@ -372,61 +581,131 @@ class BoxWindow(object):
         self.win.focus_force()
 
 
-# ---------------------------------------------------------------- 작은 대화상자
-def ask_text(parent, title, message, initial=""):
+# ---------------------------------------------------------------- 대화상자
+def _shell(parent, title, w, h, danger=False):
     win = tk.Toplevel(parent)
-    style_window(win, title, 360, 190)
-    apply_theme(win)
+    U.style_window(win, title, w, h)
+    U.apply_theme(win)
+    win.configure(highlightthickness=2,
+                  highlightbackground=U.DANGER_LINE if danger else U.LINE2)
     win.resizable(False, False)
+    bar = tk.Frame(win, bg=U.DANGER_BG if danger else U.BG2, height=34)
+    bar.pack(fill="x")
+    bar.pack_propagate(False)
+    tk.Frame(bar, bg=U.DANGER if danger else U.ACCENT, width=3,
+             height=13).pack(side="left", padx=(12, 8))
+    tk.Label(bar, text=title, bg=U.DANGER_BG if danger else U.BG2,
+             fg="#ffb3b3" if danger else U.FG, font=U.FONT_B).pack(side="left")
+    tk.Frame(win, bg=U.DANGER_LINE if danger else U.LINE2, height=2).pack(fill="x")
+    body = tk.Frame(win, bg=U.BG)
+    body.pack(fill="both", expand=True, padx=18, pady=16)
+    return win, body
+
+
+def ask_text(parent, title, message, hint="", initial=""):
+    win, f = _shell(parent, title, 380, 216)
     out = {}
-    f = ttk.Frame(win, padding=20)
-    f.pack(fill="both", expand=True)
-    ttk.Label(f, text=message, wraplength=310, justify="left").pack(anchor="w")
+    tk.Label(f, text=natural(message), bg=U.BG, fg=U.FG, font=U.FONT_S,
+             wraplength=320, justify="left").pack(anchor="w")
+    if hint:
+        tk.Label(f, text=hint, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS,
+                 wraplength=320, justify="left").pack(anchor="w", pady=(3, 0))
     var = tk.StringVar(value=initial)
-    e = ttk.Entry(f, textvariable=var)
-    e.pack(fill="x", pady=14)
-    e.focus_set()
+    box = U.entry(f, var)
+    box.pack(fill="x", pady=(12, 0))
 
     def ok():
         out["v"] = var.get().strip()
         win.destroy()
-    row = ttk.Frame(f)
-    row.pack(fill="x")
-    ttk.Button(row, text="취소", style="Ghost.TButton",
-               command=win.destroy).pack(side="right")
-    ttk.Button(row, text="확인", style="Accent.TButton",
-               command=ok).pack(side="right", padx=(0, 8))
+    row = tk.Frame(f, bg=U.BG)
+    row.pack(fill="x", pady=(16, 0))
+    U.PushButton(row, "확인", ok, height=34, font=U.FONT_B).pack(side="right")
+    U.ghost_button(row, "취소", win.destroy, height=34).pack(side="right",
+                                                           padx=(0, 8))
     win.bind("<Return>", lambda ev: ok())
+    win.after(60, lambda: box.entry.focus_set())
     win.grab_set()
     parent.wait_window(win)
     return out.get("v")
 
 
-def confirm(parent, title, message):
-    win = tk.Toplevel(parent)
-    style_window(win, title, 360, 185)
-    apply_theme(win)
-    win.resizable(False, False)
+def confirm(parent, title, message, danger=True, ok_text="확인"):
+    """예/아니오 확인.
+
+    danger=True 면 머리띠와 확인 버튼이 빨강이 된다. 되돌릴 수 없는 동작
+    (회원탈퇴 같은)에만 쓴다. 그냥 되묻는 정도면 danger=False.
+    """
+    win, f = _shell(parent, title, 380, 196, danger=danger)
     out = {"v": False}
-    f = ttk.Frame(win, padding=20)
-    f.pack(fill="both", expand=True)
-    ttk.Label(f, text=message, wraplength=310,
-              justify="left").pack(anchor="w", pady=(0, 18))
+    tk.Label(f, text=natural(message), bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,
+             wraplength=320, justify="left").pack(anchor="w", pady=(0, 16))
 
     def ok():
         out["v"] = True
         win.destroy()
-    row = ttk.Frame(f)
+    row = tk.Frame(f, bg=U.BG)
     row.pack(fill="x")
-    ttk.Button(row, text="취소", style="Ghost.TButton",
-               command=win.destroy).pack(side="right")
-    ttk.Button(row, text="확인", style="Danger.TButton",
-               command=ok).pack(side="right", padx=(0, 8))
+    if danger:
+        U.danger_button(row, ok_text, ok, height=34).pack(side="right")
+    else:
+        U.PushButton(row, ok_text, ok, height=34, font=U.FONT_B).pack(side="right")
+    U.ghost_button(row, "취소", win.destroy, height=34).pack(side="right",
+                                                           padx=(0, 8))
     win.grab_set()
     parent.wait_window(win)
     return out["v"]
 
 
-# 예전 이름 (app.py 에서 쓰던 것)
+def confirm_release(parent, app, mon):
+    """놓아주기 확인. 어떤 포켓몬인지 **실제 도트**를 같이 보여준다."""
+    info = mon.get("info", {})
+    win, f = _shell(parent, "놓아주기", 380, 232, danger=True)
+    out = {"v": False}
+
+    row = tk.Frame(f, bg=U.BG)
+    row.pack(fill="x")
+    art = tk.Label(row, bg=U.BG, width=8, height=4)
+    art.pack(side="left", padx=(0, 12), anchor="n")
+    txt = tk.Frame(row, bg=U.BG)
+    txt.pack(side="left", fill="x", expand=True)
+    tk.Label(txt, text="%s  Lv.%d" % (info.get("name", "?"), mon.get("level", 0)),
+             bg=U.BG, fg=U.FG, font=U.FONT_B, anchor="w").pack(anchor="w")
+    tk.Label(txt, text="%s · 개체값 %.0f%%" % (info.get("species", ""),
+                                             info.get("ivPercent", 0)),
+             bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w").pack(anchor="w")
+    tk.Label(txt, text="정말 놓아줄까요?\n되돌릴 수 없습니다.", bg=U.BG, fg=U.DANGER,
+             font=U.FONT_S, justify="left").pack(anchor="w", pady=(8, 0))
+
+    keep = {}
+
+    def work():
+        return sprite_cache.ensure(app.api, mon.get("num"), mon.get("shiny"))
+
+    def done(path, err):
+        if err or not path:
+            return
+        try:
+            anim = sprites.load_animation(path, target_height=62,
+                                          min_scale=0.2, max_scale=3.0)
+            keep["p"] = ImageTk.PhotoImage(
+                sprites.to_rgba(anim.frames[sprites.RIGHT][0], anim.key))
+            art.configure(image=keep["p"], width=0, height=0)
+        except Exception:
+            pass
+    U.run_async(parent, work, done)
+
+    def ok():
+        out["v"] = True
+        win.destroy()
+    brow = tk.Frame(f, bg=U.BG)
+    brow.pack(fill="x", pady=(16, 0))
+    U.danger_button(brow, "놓아주기", ok, height=34).pack(side="right")
+    U.ghost_button(brow, "취소", win.destroy, height=34).pack(side="right",
+                                                            padx=(0, 8))
+    win.grab_set()
+    parent.wait_window(win)
+    return out["v"]
+
+
 _confirm = confirm
 _ask_text = ask_text

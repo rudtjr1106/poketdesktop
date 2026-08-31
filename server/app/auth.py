@@ -16,7 +16,9 @@ import secrets
 
 from . import config, db
 
-USERNAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+# 닉네임: 한글/영문/숫자와 _ - . 만. 앞뒤 공백과 연속 공백은 안 된다.
+USERNAME_RE = re.compile(r"^[0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ][0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ _.-]*$")
+PIN_RE = re.compile(r"^[0-9]+$")
 
 
 def now_iso():
@@ -46,16 +48,25 @@ def verify_password(password, pw_hash, salt, iterations):
 def check_username(name):
     name = (name or "").strip()
     if not (config.MIN_USERNAME <= len(name) <= config.MAX_USERNAME):
-        return None, "아이디는 %d~%d자여야 합니다." % (config.MIN_USERNAME, config.MAX_USERNAME)
+        return None, "닉네임은 %d~%d자여야 합니다." % (config.MIN_USERNAME,
+                                                config.MAX_USERNAME)
     if not USERNAME_RE.match(name):
-        return None, "아이디는 영문/숫자/_.- 만 쓸 수 있습니다."
+        return None, "닉네임에는 한글, 영문, 숫자와 _ - . 만 쓸 수 있습니다."
+    if "  " in name:
+        return None, "닉네임에 공백을 이어서 쓸 수 없습니다."
     return name, None
 
 
 def check_password(pw):
-    if len(pw or "") < config.MIN_PASSWORD:
-        return "비밀번호는 %d자 이상이어야 합니다." % config.MIN_PASSWORD
+    pw = pw or ""
+    n = config.PIN_DIGITS
+    if len(pw) != n or not PIN_RE.match(pw):
+        return "비밀번호는 숫자 %d자리입니다." % n
     return None
+
+
+def name_taken(name):
+    return db.q1("SELECT id FROM users WHERE username=?", (name,)) is not None
 
 
 # ---------------------------------------------------------------- 토큰

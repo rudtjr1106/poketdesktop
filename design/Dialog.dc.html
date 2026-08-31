@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap">
+  <style>
+    body { margin: 0; font-family: "Noto Sans KR", "맑은 고딕", sans-serif; }
+    a { color: #ffc043; } a:hover { color: #ffd77a; }
+    .dlg { width: 360px; flex-shrink: 0; background: #131722; border: 2px solid #39415e; box-sizing: border-box; }
+    .bar { height: 34px; display: flex; align-items: center; padding: 0 12px; gap: 8px;
+           border-bottom: 2px solid #39415e; }
+    .btn { padding: 8px 18px; font-size: 12px; }
+  </style>
+</helmet>
+
+<div style="background: #0b0e15; padding: 24px; display: flex; gap: 20px;
+            font-family: 'Noto Sans KR', sans-serif;">
+
+  <!-- 별명 짓기 -->
+  <div class="dlg">
+    <div class="bar" style="background: #1b2030;">
+      <div style="width: 14px; height: 14px; border-radius: 50%; background: #f4f6fb;
+                  border: 2px solid #131722; box-sizing: border-box; overflow: hidden; position: relative;">
+        <div style="position:absolute; left:0; right:0; top:0; height:5px; background:#e8483f;"></div>
+      </div>
+      <div style="color: #f2f4fb; font-size: 12px; font-weight: 700;">별명 짓기</div>
+    </div>
+    <div style="padding: 16px 16px 14px 16px;">
+      <div style="color: #9aa3bd; font-size: 12px;">파이리 의 별명을 지어주세요.</div>
+      <div style="color: #6f7794; font-size: 10px; margin-top: 3px;">비우면 원래 이름으로 돌아갑니다</div>
+      <div style="background: #0d1017; border: 2px solid #39415e; padding: 10px 11px;
+                  color: #f2f4fb; font-size: 13px; margin-top: 12px; position: relative;">
+        불꽃이
+        <div style="position: absolute; right: 10px; top: 11px; width: 2px; height: 15px; background: #ffc043;"></div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+        <div class="btn" style="background: #262d42; border: 2px solid #39415e; color: #c8cee0;">취소</div>
+        <div class="btn" style="background: #ffc043; border: 2px solid #131722; color: #2a1f08;
+                    font-weight: 900; box-shadow: 3px 3px 0 #7a5410;">확인</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 놓아주기 (위험) -->
+  <div class="dlg" style="border-color: #5a2f3a;">
+    <div class="bar" style="background: #2a1a1e; border-bottom-color: #5a2f3a;">
+      <div style="width: 3px; height: 13px; background: #ff6b6b;"></div>
+      <div style="color: #ffb3b3; font-size: 12px; font-weight: 700;">놓아주기</div>
+    </div>
+    <div style="padding: 16px 16px 14px 16px;">
+      <div style="display: flex; gap: 12px; align-items: flex-start;">
+        <div style="width: 44px; height: 50px; background: #f0a860; border-radius: 44% 44% 40% 40%;
+                    position: relative; flex-shrink: 0;">
+          <div style="position: absolute; right: -10px; top: 6px; width: 15px; height: 20px;
+                      background: #ff8a3d; border-radius: 60% 20% 60% 20%;"></div>
+        </div>
+        <div>
+          <div style="color: #f2f4fb; font-size: 13px; font-weight: 700;">불꽃이 (파이리) Lv.12</div>
+          <div style="color: #9aa3bd; font-size: 11px; margin-top: 5px; line-height: 1.5;">
+            정말 놓아줄까요?<br>되돌릴 수 없습니다.</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end;">
+        <div class="btn" style="background: #262d42; border: 2px solid #39415e; color: #c8cee0;">취소</div>
+        <div class="btn" style="background: #e8483f; border: 2px solid #131722; color: #fff;
+                    font-weight: 900; box-shadow: 3px 3px 0 #6e211c;">놓아주기</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 비밀번호 확인 -->
+  <div class="dlg">
+    <div class="bar" style="background: #1b2030;">
+      <div style="width: 3px; height: 13px; background: #ffc043;"></div>
+      <div style="color: #f2f4fb; font-size: 12px; font-weight: 700;">회원탈퇴</div>
+    </div>
+    <div style="padding: 16px 16px 14px 16px;">
+      <div style="background: #2a1a1e; border-left: 3px solid #ff6b6b; padding: 9px 11px;
+                  color: #ffb3b3; font-size: 11px; line-height: 1.55;">
+        계정과 포켓몬 14마리가 모두 삭제됩니다.<br>되돌릴 수 없습니다.</div>
+      <div style="color: #8e97b3; font-size: 10px; font-weight: 500; margin: 14px 0 5px 0;">비밀번호 확인</div>
+      <div style="background: #0d1017; border: 2px solid #39415e; padding: 10px 11px;
+                  color: #9aa3bd; font-size: 13px; letter-spacing: 3px;">••••••••</div>
+      <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+        <div class="btn" style="background: #262d42; border: 2px solid #39415e; color: #c8cee0;">취소</div>
+        <div class="btn" style="background: #e8483f; border: 2px solid #131722; color: #fff;
+                    font-weight: 900; box-shadow: 3px 3px 0 #6e211c;">탈퇴</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
