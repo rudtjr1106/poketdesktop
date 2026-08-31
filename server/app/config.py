@@ -41,10 +41,26 @@ MIN_PASSWORD = 8
 
 # ---- 게임 규칙 ----
 MAX_BOX = _int("POKET_MAX_BOX", 300)                   # 보유 상한
-MAX_DESKTOP = _int("POKET_MAX_DESKTOP", 6)             # 바탕화면 동시 표시 상한
-WILD_MIN_LEVEL = _int("POKET_WILD_MIN_LEVEL", 2)
-WILD_MAX_LEVEL = _int("POKET_WILD_MAX_LEVEL", 12)
+# 데리고 다니는 포켓몬 수. 이 숫자가 곧 바탕화면에 나오는 수이기도 하다.
+# 넘치면 PC 박스로 들어간다.
+MAX_PARTY = _int("POKET_MAX_PARTY", 6)
+MAX_DESKTOP = MAX_PARTY
+# 야생 레벨은 파티 수준을 따라간다.
+# 고정해두면 시작하자마자 도저히 못 이기는 상대를 만나 재미가 없다.
+WILD_MIN_LEVEL = _int("POKET_WILD_MIN_LEVEL", 2)      # 절대 하한
+WILD_MAX_LEVEL = _int("POKET_WILD_MAX_LEVEL", 60)     # 절대 상한
+WILD_BELOW = _int("POKET_WILD_BELOW", 3)              # 선두보다 이만큼 낮은 것까지
+WILD_ABOVE = _int("POKET_WILD_ABOVE", 0)              # 선두보다 이만큼 높은 것까지
+# 종족값 상한 = 이 값 + 선두 레벨 * 계수.
+# 레벨 5 짜리 야생인데 종족값 600 이 나오면 스타팅이 손도 못 쓰고 진다.
+WILD_BST_BASE = _int("POKET_WILD_BST_BASE", 330)
+WILD_BST_PER_LEVEL = _int("POKET_WILD_BST_PER_LEVEL", 8)
 SHINY_RATE = _int("POKET_SHINY_RATE", 4096)
+
+# ---- 배틀 ----
+BATTLE_TTL = _int("POKET_BATTLE_TTL", 900)        # 배틀이 방치되면 정리되는 시간(초)
+EXP_SHARE = _bool("POKET_EXP_SHARE", True)        # 학습장치: 파티 전원이 경험치를 받는다
+EXP_SHARE_RATE = _int("POKET_EXP_SHARE_RATE", 50)  # 참가 안 한 포켓몬이 받는 비율(%)
 
 # ---- 야생 조우 ----
 # 풀숲이 돋아나기까지 걸리는 시간 (초). 이 사이에서 무작위로 정해진다.

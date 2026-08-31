@@ -318,35 +318,48 @@ class Pokedex(object):
         return mult
 
     # ---- 야생 추첨 ----
-    def spawn_pool(self, max_level):
-        """해당 레벨까지 나올 수 있는 종과 누적 가중치."""
-        key = int(max_level)
+    @staticmethod
+    def bst(species):
+        return sum((species.get("base") or {}).values())
+
+    def spawn_pool(self, max_level, max_bst=None):
+        """해당 레벨까지 나올 수 있는 종과 누적 가중치.
+
+        max_bst 는 '종족값 합' 상한이다. 이게 없으면 레벨 5 짜리 야생인데
+        종족값 600 짜리가 나와서 스타팅 포켓몬이 손도 못 쓰고 진다.
+        본가가 초반 루트에 약한 포켓몬만 배치하는 것과 같은 이유다.
+        """
+        key = (int(max_level), int(max_bst) if max_bst else 0)
         if key in self._pool_cache:
             return self._pool_cache[key]
         pool, cum, total = [], [], 0
         for s in self.species:
-            if not s.get("spawnable") or s.get("minLevel", 1) > key:
+            if not s.get("spawnable") or s.get("minLevel", 1) > max_level:
+                continue
+            if max_bst and self.bst(s) > max_bst:
                 continue
             total += s.get("weight", 0)
             pool.append(s)
             cum.append(total)
+        if not pool and max_bst:            # 너무 좁으면 상한을 풀어준다
+            return self.spawn_pool(max_level, None)
         self._pool_cache[key] = (pool, cum, total)
         return pool, cum, total
 
-    def roll_species(self, max_level, rng=None):
+    def roll_species(self, max_level, rng=None, max_bst=None):
         rng = rng or random.Random()
-        pool, cum, total = self.spawn_pool(max_level)
+        pool, cum, total = self.spawn_pool(max_level, max_bst)
         if not pool or total <= 0:
             return None
         import bisect
         return pool[bisect.bisect_right(cum, rng.randrange(total))]
 
-    def roll_wild(self, min_level=2, max_level=12, rng=None, **kw):
+    def roll_wild(self, min_level=2, max_level=12, rng=None, max_bst=None, **kw):
         """야생 개체 하나. 종을 먼저 뽑고, 그 종이 나올 수 있는 레벨대로 맞춘다."""
         rng = rng or random.Random()
         max_level = max(1, min(LEVEL_MAX, int(max_level)))
         min_level = max(1, min(max_level, int(min_level)))
-        s = self.roll_species(max_level, rng)
+        s = self.roll_species(max_level, rng, max_bst)
         if s is None:
             return None
         lo = max(min_level, s.get("minLevel", 1))

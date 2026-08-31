@@ -232,9 +232,14 @@ def main():
 
     section("야생 조우 — 규칙 확인")
     st, w = call("GET", "/api/wild", token=token)
-    chk("잡은 뒤에는 바로 다음 풀숲이 안 생김",
-        w.get("wild") is None and w.get("nextInSeconds", 0) > 60,
-        (w.get("wild"), w.get("nextInSeconds")))
+    if caught:
+        chk("잡은 뒤에는 야생이 사라지고 다음 조우를 기다린다",
+            w.get("wild") is None and w.get("nextInSeconds", 0) > 0,
+            (w.get("wild"), w.get("nextInSeconds")))
+    else:
+        # 볼을 다 썼지만 못 잡은 경우. 야생은 시간이 다 될 때까지 그대로 있어야 한다.
+        chk("못 잡으면 야생이 그대로 남아 있다",
+            (w.get("wild") or {}).get("state") == "revealed", w.get("wild"))
     st, r = call("POST", "/api/wild/999999/reveal", {}, token)
     chk("없는 풀숲 공개 거부(404)", st == 404, st)
     st, r = call("POST", "/api/wild/999999/catch", {}, token)
