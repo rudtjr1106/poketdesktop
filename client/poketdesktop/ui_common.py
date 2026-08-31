@@ -39,6 +39,9 @@ DANGER = "#ff6b6b"
 DANGER_BG = "#2a1a1e"
 DANGER_LINE = "#5a2f3a"
 GOOD = "#5fd97a"
+DISABLED_BG = "#2a2f3f"      # 못 누르는 버튼
+DISABLED_SHADOW = "#1a1e2a"
+DISABLED_FG = "#6a7183"
 SHINY = "#ffd447"
 INFO = "#6fb3ff"
 PINK = "#ff8fb1"
@@ -163,6 +166,7 @@ class PushButton(object):
         self.command = command
         self.fill = fill
         self._fg = fg
+        self._shadow = shadow
         self.hover = hover or _lighten(fill)
         bg = parent["bg"]
         self.holder = tk.Frame(parent, bg=bg, height=height + 4)
@@ -201,14 +205,24 @@ class PushButton(object):
             self.holder.configure(width=max(72, self.label.winfo_reqwidth() + 34))
         if state is not None:
             self.enabled = (state == "normal")
-            self.label.configure(fg=self._fg if self.enabled else "#6a6a80",
-                                 cursor="hand2" if self.enabled else "")
+            # 글자만 흐리게 하면 금색 바탕이 그대로라 켜진 것처럼 보인다.
+            # 못 누르는 버튼은 바탕과 그림자까지 죽여야 눈에 구분된다.
+            if self.enabled:
+                self.box.configure(bg=self.fill)
+                self.shadow.configure(bg=self._shadow)
+                self.label.configure(bg=self.fill, fg=self._fg, cursor="hand2")
+            else:
+                self.box.configure(bg=DISABLED_BG)
+                self.shadow.configure(bg=DISABLED_SHADOW)
+                self.label.configure(bg=DISABLED_BG, fg=DISABLED_FG, cursor="")
 
     def _enter(self, _e):
         if self.enabled:
             self._paint(self.hover)
 
     def _leave(self, _e):
+        if not self.enabled:
+            return
         self._paint(self.fill)
         self.box.place_configure(x=0, y=0)
 

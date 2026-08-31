@@ -6,11 +6,35 @@
 """
 import os
 import threading
+import time
 
 from . import config
 
 _lock = threading.Lock()
-_missing = set()
+
+# 못 받은 것을 영영 포기하면 안 된다.
+# 예전에는 그냥 set 이었는데, 잠깐 느리거나 끊겨서 한 번 실패하면 그
+# 포켓몬은 프로그램을 끌 때까지 계속 안 보였다. "가끔 보면 이미지가 없는
+# 애들이 많다" 는 게 이 때문이다.
+# 그래서 '언제 실패했는지' 를 같이 적어 두고 조금 있다가 다시 해 본다.
+_missing = {}
+RETRY_AFTER = 30.0          # 초. 이만큼 지나면 다시 받아 본다.
+
+
+def _give_up_for_now(key):
+    with _lock:
+        _missing[key] = time.time()
+
+
+def _still_giving_up(key):
+    with _lock:
+        t = _missing.get(key)
+        if t is None:
+            return False
+        if time.time() - t < RETRY_AFTER:
+            return True
+        del _missing[key]        # 시간이 지났으니 다시 해 본다
+        return False
 
 
 def sprite_dir():
@@ -43,17 +67,15 @@ def ensure(api, num, shiny=False):
     if p:
         return p
     key = (int(num), bool(shiny))
-    if key in _missing:
+    if _still_giving_up(key):
         return find_local(num, False) if shiny else None
     try:
         data, ext = api.sprite(num, shiny)
     except Exception:
-        with _lock:
-            _missing.add(key)
+        _give_up_for_now(key)
         return find_local(num, False) if shiny else None
     if not data:
-        with _lock:
-            _missing.add(key)
+        _give_up_for_now(key)
         return None
     path = os.path.join(sprite_dir(), _stem(num, shiny) + (ext or ".gif"))
     tmp = path + ".part"

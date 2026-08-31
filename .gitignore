@@ -42,3 +42,4 @@ env/
 Thumbs.db
 ui_*.png
 dlg_*.png
+tools/_cache/

@@ -24,6 +24,7 @@ from tkinter import ttk
 
 from common.korean import natural
 
+from . import item_icons
 from . import ui_common as U
 
 ROW_H = 30
@@ -39,7 +40,8 @@ CATS = [("all", "전체"), ("ball", "몬스터볼"), ("stone", "진화의돌"),
         ("ev", "노력치"), ("iv", "개체값"), ("heal", "회복"), ("misc", "기타")]
 
 # (제목, x, 너비, 정렬)
-COLS = [("도구", 14, 194, "w"), ("등급", 214, 64, "center"),
+ICON_X = 12                   # 줄 왼쪽 도구 그림 자리
+COLS = [("도구", 40, 168, "w"), ("등급", 214, 64, "center"),
         ("사는 값", 284, 84, "e"), ("파는 값", 374, 72, "e"),
         ("보유", 452, 56, "center")]
 
@@ -174,6 +176,11 @@ class Row(object):
         self.mark.place(x=0, y=0, relheight=1.0)
 
         self.cells = []
+        # 도구 그림. 아직 안 받았으면 비워 두고, 받아지면 set_icon 이 채운다.
+        self.icon = tk.Label(self.f, bg=self.base, bd=0)
+        self.icon.place(x=ICON_X, rely=0.5, anchor="w", width=24, height=24)
+        self.cells.append(self.icon)
+        self.set_icon()
         self.name_cell = self._cell(it.get("kr", self.iid), COLS[0], U.FG, U.FONT_S)
         self._cell(RARITY_KR.get(it.get("rarity"), "-"), COLS[1],
                    self.rare, U.FONT_XS)
@@ -199,6 +206,12 @@ class Row(object):
         lb.place(x=x, y=0, width=w, relheight=1.0)
         self.cells.append(lb)
         return lb
+
+    def set_icon(self):
+        ph = item_icons.photo(self.iid, 24)
+        if ph is not None:
+            self.icon.configure(image=ph)
+            self.icon.image = ph          # 참조를 놓으면 tk 가 그림을 지운다
 
     def pack(self, **kw):
         self.f.pack(fill="x", **kw)
@@ -439,9 +452,13 @@ class ShopWindow(object):
         p = tk.Frame(d, bg=U.BG2)
         p.pack(fill="both", expand=True, padx=(17, 15), pady=14)
 
-        self.d_name = tk.Label(p, text="도구를 고르세요", bg=U.BG2, fg=U.FG_FAINT,
+        head = tk.Frame(p, bg=U.BG2)
+        head.pack(fill="x")
+        self.d_icon = tk.Label(head, bg=U.BG2, bd=0)
+        self.d_icon.pack(side="left", padx=(0, 10))
+        self.d_name = tk.Label(head, text="도구를 고르세요", bg=U.BG2, fg=U.FG_FAINT,
                                font=(U.FAMILY_BLACK, 16), anchor="w")
-        self.d_name.pack(fill="x")
+        self.d_name.pack(side="left", fill="x", expand=True)
         self.d_en = tk.Label(p, text="", bg=U.BG2, fg=U.FG_FAINT,
                              font=U.FONT_XS, anchor="w")
         self.d_en.pack(fill="x", pady=(2, 0))
@@ -514,7 +531,15 @@ class ShopWindow(object):
         if api is None:
             return self.say("로그인이 필요합니다.", U.DANGER)
         self.say("상점을 불러오는 중...", U.FG_FAINT)
-        U.run_async(self.root, api.shop, self._loaded)
+
+        def work():
+            data = api.shop()
+            # 그림도 여기서 같이 받아 둔다. 목록을 그린 뒤에 받으면
+            # 처음 한 번은 빈칸으로 보였다가 늦게 채워져서 어수선하다.
+            item_icons.prefetch(api, [i["id"] for i in (data.get("items") or [])])
+            return data
+
+        U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, data, err):
         if err:
@@ -579,6 +604,8 @@ class ShopWindow(object):
     # ---------------- 상세 그리기 ----------------
     def _clear_detail(self):
         self.d_name.configure(text="도구를 고르세요", fg=U.FG_FAINT)
+        self.d_icon.configure(image="")
+        self.d_icon.image = None
         self.d_en.configure(text="")
         for w in self.d_tags.winfo_children():
             w.destroy()
@@ -599,6 +626,9 @@ class ShopWindow(object):
         rare = RARITY_COLOR.get(it.get("rarity"), U.FG_FAINT)
         self.d_name.configure(text=it.get("kr", it["id"]), fg=U.ACCENT_TEXT)
         self.d_en.configure(text=it.get("en", ""))
+        ph = item_icons.photo(it["id"], 48)
+        self.d_icon.configure(image=ph if ph is not None else "")
+        self.d_icon.image = ph
 
         for w in self.d_tags.winfo_children():
             w.destroy()
