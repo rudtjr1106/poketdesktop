@@ -65,6 +65,7 @@ class Tray(object):
         return Menu(
             MenuItem("포켓몬 관리...", lambda _i, _it: self.call(a.open_box),
                      default=True),
+            MenuItem("도감...", lambda _i, _it: self.call(a.open_dex)),
             MenuItem("가방...", lambda _i, _it: self.call(a.open_bag)),
             MenuItem("친구...", lambda _i, _it: self.call(a.open_friends)),
             MenuItem("랜덤 배틀", lambda _i, _it: self.call(a.pvp_random)),

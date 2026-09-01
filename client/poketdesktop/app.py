@@ -17,6 +17,7 @@ from .tray import Tray                         # noqa: E402
 from .desktop_battle import DesktopBattle       # noqa: E402
 from .ui_bag import BagWindow                  # noqa: E402
 from .ui_box import BoxWindow, confirm         # noqa: E402
+from .ui_dex import DexWindow                  # noqa: E402
 from .ui_friends import FriendsWindow          # noqa: E402
 from .arena import Arena                       # noqa: E402
 from .ui_shop import ShopWindow                # noqa: E402
@@ -42,6 +43,7 @@ class App(object):
         self.shop_window = None
         self.bag_window = None
         self.friends_win = None
+        self.dex_window = None
         self.arena = None
         self.battle = None
         self._quitting = False
@@ -302,6 +304,11 @@ class App(object):
             return self.friends_win.focus()
         self.friends_win = FriendsWindow(self)
 
+    def open_dex(self):
+        if self.dex_window:
+            return self.dex_window.focus()
+        self.dex_window = DexWindow(self)
+
     # ---------------- 유저 배틀 ----------------
     # 대전은 비동기다. 상대가 켜져 있지 않아도 그 사람의 지금 파티를
     # 가져와 붙인다. 그래서 누르면 그 자리에서 끝나고, 상대는 다음에
@@ -441,7 +448,7 @@ class App(object):
         """열려 있는 창을 전부 닫는다. 로그아웃·탈퇴·종료 때 부른다."""
         self.close_arena()
         for name in ("box_window", "shop_window", "bag_window",
-                     "friends_win"):
+                     "friends_win", "dex_window"):
             w = getattr(self, name, None)
             if w:
                 try:
