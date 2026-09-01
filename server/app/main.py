@@ -650,9 +650,12 @@ def delete_account(body: DeleteIn, ctx=Depends(current)):
 def me(ctx=Depends(current)):
     u = ctx["user"]
     uid = u["id"]
-    box = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=?", (uid,))["c"]
-    desk = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=? AND on_desktop=1",
-                 (uid,))["c"]
+    # 두 숫자를 한 번에 센다. Turso 는 원격이라 왕복 한 번이 100ms 다 -
+    # 나눠 물어볼 이유가 없다.
+    c = db.q1("SELECT COUNT(*) c, SUM(on_desktop) d FROM pokemon"
+              " WHERE user_id=?", (uid,))
+    box = c["c"] or 0
+    desk = c["d"] or 0
     st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
     # 걸어다닌 만큼 친밀도를 올린다. 이 라우트가 이미 wild_state 를 읽고
     # 있어서 조회가 늘지 않고, 20분에 한 번만 쓰기 두 문장이 나간다.
@@ -662,7 +665,8 @@ def me(ctx=Depends(current)):
         "walked": walked,
         "balls": u["balls"],
         "money": u["money"],
-        "bag": items.bag_get(uid),
+        # 사용자 행을 이미 들고 있으니 balls 를 넘겨 users 를 다시 안 읽는다.
+        "bag": items.bag_get(uid, u["balls"]),
         "box": box, "onDesktop": desk,
         "limits": {"maxBox": config.MAX_BOX, "maxParty": config.MAX_PARTY,
                    "grassTtl": config.GRASS_TTL, "wildTtl": config.WILD_TTL},

@@ -119,13 +119,20 @@ def drop_public(item_id):
 BALL_ITEM = "POKEBALL"
 
 
-def bag_get(uid):
+def bag_get(uid, balls=None):
+    """가방 내용. 몬스터볼은 users.balls 에 따로 있어서 같이 얹는다.
+
+    balls 를 넘겨주면 users 를 다시 읽지 않는다. 부르는 쪽이 이미 사용자
+    행을 들고 있는 경우가 많은데, Turso 는 원격이라 그 한 번이 100ms 다.
+    """
     out = dict((r["item"], r["count"])
                for r in db.q("SELECT item, count FROM bag WHERE user_id=? AND count>0",
                              (uid,)))
-    r = db.q1("SELECT balls FROM users WHERE id=?", (uid,))
-    if r and r["balls"]:
-        out[BALL_ITEM] = r["balls"]
+    if balls is None:
+        r = db.q1("SELECT balls FROM users WHERE id=?", (uid,))
+        balls = r["balls"] if r else 0
+    if balls:
+        out[BALL_ITEM] = balls
     return out
 
 
