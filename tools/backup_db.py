@@ -34,7 +34,26 @@ def quote(v):
         return repr(v)
     if isinstance(v, (bytes, bytearray)):
         return "X'%s'" % v.hex()
-    return "'" + str(v).replace("'", "''") + "'"
+    t = str(v)
+    if "\n" in t or "\r" in t:
+        # **줄바꿈이 든 값.** 떠낸 파일은 한 줄에 한 문장이고 되살릴 때도
+        # 한 줄씩 읽는다. 그대로 넣으면 문장이 가운데서 잘려서 그 행이
+        # 통째로 사라진다 - 오류 기록(역추적)이 여기 걸렸다.
+        # char() 로 이어 붙이면 한 줄로 쓰면서 값은 그대로 살아난다.
+        out = []
+        buf = []
+        for ch in t:
+            if ch in "\n\r":
+                if buf:
+                    out.append("'" + "".join(buf).replace("'", "''") + "'")
+                    buf = []
+                out.append("char(%d)" % ord(ch))
+            else:
+                buf.append(ch)
+        if buf:
+            out.append("'" + "".join(buf).replace("'", "''") + "'")
+        return " || ".join(out) if out else "''"
+    return "'" + t.replace("'", "''") + "'"
 
 
 def dump(conn, out):
