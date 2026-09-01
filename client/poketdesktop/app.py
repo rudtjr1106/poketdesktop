@@ -238,6 +238,9 @@ class App(object):
             if me:
                 self.balls = me.get("balls", self.balls)
                 self.money = me.get("money", self.money)
+                # 상대가 걸어온 대전은 서버가 이 응답에 개수로 실어 준다.
+                # 이걸 위해 폴링을 새로 두지 않는다.
+                self.announce_pvp(me.get("pvpUnseen", 0))
             if self.overlay:
                 self.overlay.sync(mons or [], paths or {}, walks or {})
             self.refresh_tray()
@@ -293,6 +296,58 @@ class App(object):
         if self.friends_win:
             return self.friends_win.focus()
         self.friends_win = FriendsWindow(self)
+
+    # ---------------- 유저 배틀 ----------------
+    # 대전은 비동기다. 상대가 켜져 있지 않아도 그 사람의 지금 파티를
+    # 가져와 붙인다. 그래서 누르면 그 자리에서 끝나고, 상대는 다음에
+    # 켤 때 결과를 받는다.
+    def pvp_random(self):
+        self._pvp(lambda: self.api.pvp_random())
+
+    def pvp_challenge(self, uid):
+        self._pvp(lambda: self.api.pvp_challenge(uid))
+
+    def _pvp(self, fn):
+        if getattr(self, "_pvp_busy", False):
+            return
+        self._pvp_busy = True
+        self.notify("상대를 찾고 있습니다...")
+
+        def done(r, err):
+            self._pvp_busy = False
+            if err:
+                return self.notify(getattr(err, "message", str(err)))
+            self.show_pvp_result(r)
+        run_async(self.root, fn, done)
+
+    def show_pvp_result(self, r):
+        """대전 결과를 알린다.
+
+        지금은 글로만 알린다. 투기장 연출이 붙으면 여기서 그쪽으로
+        넘긴다 - 로그는 이미 서버에 저장되어 있어서 언제 재생하든 된다.
+        """
+        mine = (r or {}).get("a") or {}
+        res = mine.get("result")
+        head = {"win": "이겼습니다!", "lose": "졌습니다...",
+                "draw": "비겼습니다."}.get(res, "대전이 끝났습니다.")
+        bits = []
+        if mine.get("reward"):
+            bits.append("%s원" % format(mine["reward"], ","))
+        if mine.get("delta"):
+            bits.append("%+d점" % mine["delta"])
+        if mine.get("myLeft") is not None:
+            bits.append("%d대 %d 남음"
+                        % (mine.get("myLeft", 0), mine.get("foeLeft", 0)))
+        self.notify(head + ("  (" + " · ".join(bits) + ")" if bits else ""))
+        self.sync()
+
+    def announce_pvp(self, n):
+        """상대가 걸어온 대전이 있으면 알린다. sync 응답에 실려 온다."""
+        if not n or n == getattr(self, "_pvp_seen_n", 0):
+            return
+        self._pvp_seen_n = n
+        self.notify("확인하지 않은 대전이 %d개 있습니다. 친구 창에서 볼 수 있습니다."
+                    % n)
 
     def close_windows(self):
         """열려 있는 창을 전부 닫는다. 로그아웃·탈퇴·종료 때 부른다."""

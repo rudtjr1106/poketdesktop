@@ -273,6 +273,9 @@ class FriendsWindow(object):
                        lambda: self.act(
                            lambda: self.app.api.friend_block(uid)),
                        height=28).pack(side="right", padx=(0, 6))
+        # 접속해 있지 않아도 걸린다 - 그 사람의 지금 파티를 가져와 싸운다.
+        U.ghost_button(row, "배틀", lambda: self.app.pvp_challenge(uid),
+                       height=28, fill=U.RED).pack(side="right", padx=(0, 6))
 
     def _request_row(self, x):
         row = self._card()

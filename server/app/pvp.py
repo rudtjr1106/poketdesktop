@@ -47,6 +47,19 @@ BASE_RATING = 1000
 # 이만큼 치러야 랭킹에 오른다. 한두 판 이기고 승률 100% 로 1등이 되는 걸 막는다.
 PLACEMENT = 5
 
+# ---- 도전 규칙 ----
+# 상대는 접속해 있지 않아도 된다. 그 사람의 지금 파티를 가져와 붙인다.
+# 그래서 자는 사람을 몇 번이고 때릴 수 있는데, 점수는 서로 주고받는
+# 것이라 아침에 점수가 바닥나 있게 된다. 두 가지로 막는다.
+PAIR_COOLDOWN_MIN = 30      # 같은 사람에게 다시 걸기까지
+DAILY_BATTLES = 20          # 하루에 내가 걸 수 있는 도전 수
+
+# 레벨대. 파티 평균 레벨을 20 단위로 끊는다. 같은 칸끼리 먼저 붙이고,
+# 없으면 옆 칸으로, 그래도 없으면 아무나. 친구 몇 명이 하는 서버라
+# '상대가 없습니다' 만 뜨는 것보다는 조금 기울어도 붙는 쪽이 낫다.
+TIER_SIZE = 20
+MAX_TIER = 4
+
 # 다 본 대전 로그를 며칠이나 들고 있을지. 로그는 보고 나면 값이 없어지는
 # 자료인데 한 판에 수십 KB 라 Turso 용량을 제일 먼저 먹는다.
 KEEP_DAYS = 14
@@ -227,7 +240,140 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
             "myLeft": my_left, "foeLeft": foe_left}
 
 
+# ---------------------------------------------------------------- 상대 고르기
+def _tier(level):
+    return max(0, min(MAX_TIER, int(level) // TIER_SIZE))
+
+
+def _avg_levels():
+    """사람마다 데리고 다니는 포켓몬의 평균 레벨. 한 번에 다 가져온다."""
+    return dict((r["user_id"], r["lv"]) for r in db.q(
+        "SELECT user_id, AVG(level) lv, COUNT(*) n FROM pokemon"
+        " WHERE on_desktop=1 GROUP BY user_id HAVING n > 0"))
+
+
+def _recent_foes(uid):
+    """최근에 붙은 사람들. 연달아 같은 사람을 때리지 않게."""
+    cut = _iso(_now() - datetime.timedelta(minutes=PAIR_COOLDOWN_MIN))
+    rows = db.q("SELECT foe_id FROM battle_record WHERE user_id=?"
+                " AND ended_at > ? AND foe_id IS NOT NULL", (uid, cut))
+    return set(r["foe_id"] for r in rows)
+
+
+def _blocked_ids(uid):
+    """나를 차단했거나 내가 차단한 사람. 어느 쪽이든 안 붙인다."""
+    rows = db.q("SELECT user_id, target_id FROM friend_block"
+                " WHERE user_id=? OR target_id=?", (uid, uid))
+    out = set()
+    for r in rows:
+        out.add(r["target_id"] if r["user_id"] == uid else r["user_id"])
+    return out
+
+
+def find_opponent(uid, rng=None):
+    """랜덤 배틀 상대 하나. 없으면 None.
+
+    접속 여부는 보지 않는다. 상대가 꺼져 있어도 그 사람의 지금 파티를
+    가져와 붙인다 - 친구 몇 명이 하는 서버라 '둘 다 켜져 있을 때' 를
+    기다리면 배틀이 거의 안 성사된다.
+    """
+    rng = rng or random
+    levels = _avg_levels()
+    if uid not in levels:
+        return None
+    skip = _recent_foes(uid) | _blocked_ids(uid)
+    skip.add(uid)
+
+    my = _tier(levels[uid])
+    pool = [(u, _tier(lv)) for u, lv in levels.items() if u not in skip]
+    if not pool:
+        return None
+    # 같은 칸 -> 옆 칸 -> 아무나. 넓혀 가며 처음 걸리는 데서 멈춘다.
+    for gap in range(0, MAX_TIER + 1):
+        near = [u for u, t in pool if abs(t - my) <= gap]
+        if near:
+            return rng.choice(near)
+    return None
+
+
+def can_start(uid):
+    """내 쪽 조건만. 상대를 고르기 전에 먼저 본다.
+
+    상대까지 골라 놓고 막히면, 애먼 사람의 쿨다운만 태우게 된다.
+    """
+    if not _party(uid):
+        return "데리고 다니는 포켓몬이 없습니다."
+    row = _rating_row(uid)
+    used = row["fought"] if row["fought_day"] == _today() else 0
+    if used >= DAILY_BATTLES:
+        return "오늘은 %d판까지 걸 수 있습니다. 내일 다시 해주세요." % DAILY_BATTLES
+    return None
+
+
+def can_fight(uid, other):
+    """지금 저 사람에게 걸 수 있는가. 안 되면 이유를 돌려준다."""
+    if uid == other:
+        return "자기 자신과는 싸울 수 없습니다."
+    why = can_start(uid)
+    if why:
+        return why
+    if not db.q1("SELECT 1 x FROM users WHERE id=?", (other,)):
+        return "그런 트레이너가 없습니다."
+    if other in _blocked_ids(uid):
+        return "이 트레이너와는 싸울 수 없습니다."
+    if not _party(other):
+        return "상대가 데리고 다니는 포켓몬이 없습니다."
+    if other in _recent_foes(uid):
+        return ("같은 상대에게는 %d분에 한 번만 걸 수 있습니다."
+                % PAIR_COOLDOWN_MIN)
+    return None
+
+
+def note_fight(uid):
+    """도전 횟수를 하나 올린다. 실제로 붙인 뒤에 부른다."""
+    row = _rating_row(uid)
+    today = _today()
+    used = row["fought"] if row["fought_day"] == today else 0
+    db.run("UPDATE rank_stat SET fought_day=?, fought=? WHERE user_id=?",
+           (today, used + 1, uid))
+
+
+def fight_status(uid):
+    row = _rating_row(uid)
+    today = _today()
+    used = row["fought"] if row["fought_day"] == today else 0
+    return {"foughtToday": used, "dailyBattles": DAILY_BATTLES,
+            "left": max(0, DAILY_BATTLES - used)}
+
+
 # ---------------------------------------------------------------- 조회
+def unseen(uid, limit=10):
+    """내가 아직 안 본 대전. 상대가 걸어와서 생긴 것도 여기 들어온다."""
+    rows = db.q(
+        "SELECT id, kind, a_id, b_id, a_name, b_name, winner, created_at"
+        " FROM pvp_match WHERE (a_id=? AND a_seen=0) OR (b_id=? AND b_seen=0)"
+        " ORDER BY id DESC LIMIT ?", (uid, uid, limit))
+    out = []
+    for m in rows:
+        mine_is_a = m["a_id"] == uid
+        out.append({
+            "id": m["id"], "kind": m["kind"],
+            "foe": m["b_name"] if mine_is_a else m["a_name"],
+            # 내가 건 판인가, 상대가 걸어온 판인가. 알림 문구가 달라진다.
+            "attacked": mine_is_a,
+            "result": ("draw" if m["winner"] is None else
+                       "win" if m["winner"] == uid else "lose"),
+            "at": m["created_at"]})
+    return out
+
+
+def unseen_count(uid):
+    r = db.q1("SELECT COUNT(*) c FROM pvp_match"
+              " WHERE (a_id=? AND a_seen=0) OR (b_id=? AND b_seen=0)",
+              (uid, uid))
+    return r["c"] if r else 0
+
+
 def match_view(uid, mid):
     """재생에 필요한 것을 돌려준다. 내가 낀 판만 볼 수 있다."""
     m = db.q1("SELECT * FROM pvp_match WHERE id=?", (mid,))

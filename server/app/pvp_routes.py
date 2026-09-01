@@ -5,14 +5,64 @@
 서버가 통째로 계산해 끝내 놓는다(pvp.run_match). 그래서 클라이언트가
 보낼 수 있는 전투 입력이 존재하지 않고, 속일 대상도 없다.
 
-붙이는 순서상 매칭(대기열/도전장)은 다음 단계다. 지금은 계산된 판을
-꺼내 보는 쪽만 있다.
+대전은 **비동기**다. 상대가 접속해 있지 않아도 그 사람의 지금 파티를
+가져와 붙인다. 그래서 대기열도 도전장도 수락도 없다 - 누르면 그 자리에서
+끝나고, 상대는 다음에 켤 때 결과를 본다.
 """
 from fastapi import APIRouter, Depends, HTTPException
 
-from . import deps, pvp
+from . import deps, pvp, social
 
 router = APIRouter()
+
+
+def _fight(uid, other, kind):
+    """실제로 붙인다. 규칙 확인 -> 계산 -> 횟수 기록."""
+    why = pvp.can_fight(uid, other)
+    if why:
+        raise HTTPException(409, why)
+    out = pvp.run_match(uid, other, kind=kind)
+    pvp.note_fight(uid)
+    # 내 쪽은 지금 봤으니 안 본 것으로 세지 않는다. 상대는 다음에 켤 때
+    # 알림으로 받는다.
+    pvp.mark_seen(uid, out["matchId"])
+    return out
+
+
+@router.post("/api/pvp/random")
+def random_battle(ctx=Depends(deps.current)):
+    """아무나 하나 골라 붙는다. 상대는 접속해 있지 않아도 된다.
+
+    레벨대가 비슷한 사람부터 찾고, 없으면 넓혀 간다. 친구 몇 명이 하는
+    서버라 '상대가 없습니다' 만 뜨는 것보다는 조금 기울어도 붙는 게 낫다.
+    """
+    uid = ctx["user"]["id"]
+    # 내 쪽 조건을 먼저 본다. 상대까지 골라 놓고 막히면 애먼 사람의
+    # 쿨다운만 태우게 된다.
+    why = pvp.can_start(uid)
+    if why:
+        raise HTTPException(409, why)
+    other = pvp.find_opponent(uid)
+    if other is None:
+        raise HTTPException(
+            404, "지금 붙을 상대가 없습니다. 조금 뒤에 다시 해주세요.")
+    return _fight(uid, other, "random")
+
+
+@router.post("/api/pvp/challenge/{other}")
+def challenge(other: int, ctx=Depends(deps.current)):
+    """친구를 지목해서 붙는다. 상대의 수락을 기다리지 않는다."""
+    uid = ctx["user"]["id"]
+    if not social.is_friend(uid, other):
+        raise HTTPException(403, "친구에게만 배틀을 걸 수 있습니다.")
+    return _fight(uid, other, "friend")
+
+
+@router.get("/api/pvp/pending")
+def pending(ctx=Depends(deps.current)):
+    """아직 안 본 대전. 켜자마자 한 번 보고, 그 뒤에는 sync 에 얹혀 온다."""
+    uid = ctx["user"]["id"]
+    return {"matches": pvp.unseen(uid), "fight": pvp.fight_status(uid)}
 
 
 @router.get("/api/pvp/match/{mid}")
