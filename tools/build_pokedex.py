@@ -403,6 +403,8 @@ def _branch(r, trigger, item_ident, move_ident, type_ident):
     happy = as_int(r["minimum_happiness"], 0)
     titem = as_int(r["trigger_item_id"], 0)
     hitem = as_int(r["held_item_id"], 0)
+    km = as_int(r["known_move_id"], 0)
+    kt = as_int(r["known_move_type_id"], 0)
 
     d = {"trigger": trig}
     if trig == "use-item" and titem:
@@ -419,8 +421,26 @@ def _branch(r, trigger, item_ident, move_ident, type_ident):
     elif trig in ("level-up", "other") and lvl:
         d["mode"] = MODE_LEVEL
         d["level"] = lvl
+    elif trig in ("level-up", "other") and (km or kt):
+        # '특정 기술을 알고 레벨업'. 레벨 조건이 따로 없어서 예전에는
+        # special 로 떨어졌고, 그러면 아무도 판정하지 않아 영영 진화하지
+        # 못했다. 기술은 우리가 확인할 수 있으므로 레벨업 진화로 다룬다.
+        d["mode"] = MODE_LEVEL
+        d["level"] = 1
+    elif trig in ("level-up", "other") and hitem:
+        # '무엇을 들고 레벨업'. 이 게임에는 지닌 물건이 없다. 교환진화를
+        # 도구 사용으로 대체한 것과 같은 방식으로, 그 물건을 쓰면 되게 한다.
+        d["mode"] = MODE_STONE
+        d["item"] = item_ident.get(hitem, TRADE_ITEM)
+        d["wasHeld"] = True
     else:
-        d["mode"] = MODE_SPECIAL
+        # 여기 남는 것들은 이 게임에 없는 장치가 필요하다 - 기술을 몇 번
+        # 썼는지, 특정 종을 몇 마리 쓰러뜨렸는지, 기기를 돌렸는지 같은 것들.
+        # 그대로 두면 그 종은 영영 진화하지 못하므로, 재현할 수 없는 조건은
+        # 교환과 마찬가지로 '연결의끈' 으로 대신한다.
+        d["mode"] = MODE_STONE
+        d["item"] = TRADE_ITEM
+        d["wasSpecial"] = trig
 
     # 부가 조건. 게임이 확인할 수 있는 것만 옮긴다.
     if lvl and d["mode"] != MODE_LEVEL:
@@ -435,10 +455,8 @@ def _branch(r, trigger, item_ident, move_ident, type_ident):
         d["stats"] = as_int(rel)              # 1 공>방 / -1 공<방 / 0 같음
     if hitem and trig != "trade":
         d["held"] = item_ident.get(hitem, "")
-    km = as_int(r["known_move_id"], 0)
     if km:
         d["move"] = move_ident.get(km, "")
-    kt = as_int(r["known_move_type_id"], 0)
     if kt:
         d["moveType"] = type_ident.get(kt, "")   # 번호 말고 이름으로 남긴다
     return d

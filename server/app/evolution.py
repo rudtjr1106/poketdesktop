@@ -67,6 +67,22 @@ def _move_type_ok(want, dex, mon):
     return False
 
 
+def _move_ok(want, mon):
+    """그 기술을 지금 알고 있는가.
+
+    가중치(_COND_WEIGHT)에는 'move' 가 있었는데 정작 판정이 없었다.
+    그래서 '기술을 알고 레벨업' 하는 열세 갈래가 조건을 무시한 채
+    통과하거나(레벨 조건이 있으면) 아예 죽어 있었다.
+    """
+    if not want:
+        return True
+    for mv in mon.get("moves", []):
+        key = mv["id"] if isinstance(mv, dict) else mv
+        if key == want:
+            return True
+    return False
+
+
 def _cond_ok(b, dex, mon, hour=None):
     """모드와 상관없이 붙는 부가 조건."""
     if not _time_ok(b.get("time"), hour):
@@ -75,6 +91,8 @@ def _cond_ok(b, dex, mon, hour=None):
     if g and mon.get("gender") != g:
         return False
     if not _stats_ok(b.get("stats"), dex, mon):
+        return False
+    if not _move_ok(b.get("move"), mon):
         return False
     if not _move_type_ok(b.get("moveType"), dex, mon):
         return False
