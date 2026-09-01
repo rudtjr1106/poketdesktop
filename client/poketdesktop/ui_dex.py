@@ -17,6 +17,7 @@ from PIL import Image, ImageTk
 
 from . import sprite_cache
 from . import ui_common as U
+from . import ui_loading
 from .ui_common import run_async
 
 W, H = 900, 660
@@ -141,8 +142,11 @@ class DexWindow(object):
             return
         self.busy = True
 
+        wait = ui_loading.Overlay(self.win, "도감을 불러오는 중")
+
         def done(r, err):
             self.busy = False
+            wait.close()
             if err:
                 return self.app.notify(getattr(err, "message", str(err)))
             self.seen = set(r.get("seen") or [])

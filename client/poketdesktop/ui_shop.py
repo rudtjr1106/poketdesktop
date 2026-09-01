@@ -26,6 +26,7 @@ from common.korean import natural
 
 from . import item_icons
 from . import ui_common as U
+from . import ui_loading
 
 ROW_H = 30
 CATS_W = 136
@@ -531,6 +532,7 @@ class ShopWindow(object):
         if api is None:
             return self.say("로그인이 필요합니다.", U.DANGER)
         self.say("상점을 불러오는 중...", U.FG_FAINT)
+        self._wait = ui_loading.Overlay(self.win, "상점을 불러오는 중")
 
         def work():
             data = api.shop()
@@ -542,6 +544,10 @@ class ShopWindow(object):
         U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, data, err):
+        w = getattr(self, "_wait", None)
+        if w:
+            w.close()
+            self._wait = None
         if err:
             return self.say(_err(err), U.DANGER)
         data = data or {}

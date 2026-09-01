@@ -14,6 +14,7 @@ Turso 는 왕복 하나가 곧 비용이라, 항상 도는 폴링은 꼭 필요�
 import tkinter as tk
 
 from . import ui_common as U
+from . import ui_loading
 from .ui_common import run_async
 
 W, H = 560, 620
@@ -96,17 +97,46 @@ class FriendsWindow(object):
         cv = tk.Canvas(wrap, bg=U.BG, highlightthickness=0, bd=0)
         sb = tk.Scrollbar(wrap, orient="vertical", command=cv.yview)
         self.list = tk.Frame(cv, bg=U.BG)
-        self.list.bind("<Configure>",
-                       lambda _e: cv.configure(scrollregion=cv.bbox("all")))
         self._win_id = cv.create_window((0, 0), window=self.list, anchor="nw")
-        cv.bind("<Configure>",
-                lambda e: cv.itemconfigure(self._win_id, width=e.width))
+        self.list.bind("<Configure>", lambda _e: self.fit_scroll())
+        cv.bind("<Configure>", lambda e: (
+            cv.itemconfigure(self._win_id, width=e.width), self.fit_scroll()))
         cv.configure(yscrollcommand=sb.set)
         cv.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
-        cv.bind_all("<MouseWheel>",
-                    lambda e: cv.yview_scroll(int(-e.delta / 120), "units"))
+        cv.bind_all("<MouseWheel>", self._wheel)
         self.cv = cv
+
+    def fit_scroll(self):
+        """내용이 화면보다 짧으면 스크롤할 게 없어야 한다."""
+        try:
+            self.cv.update_idletasks()
+            h = self.list.winfo_reqheight()
+            view = self.cv.winfo_height()
+            w = self.cv.winfo_width()
+            if h <= view:
+                self.cv.configure(scrollregion=(0, 0, w, view))
+                self.cv.yview_moveto(0)
+            else:
+                self.cv.configure(scrollregion=(0, 0, w, h))
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    def _wheel(self, e):
+        # bind_all 이라 창 전체의 휠이 온다. 정말 이 목록 위인지 본다.
+        try:
+            w = self.cv.winfo_containing(e.x_root, e.y_root)
+            while w is not None:
+                if w is self.cv or w is self.list:
+                    break
+                w = getattr(w, "master", None)
+            if w is None:
+                return
+            if self.list.winfo_reqheight() <= self.cv.winfo_height():
+                return
+            self.cv.yview_scroll(int(-e.delta / 120), "units")
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def _status(self):
         self.status = U.status_line(self.win, "")
@@ -120,9 +150,13 @@ class FriendsWindow(object):
         if self.busy:
             return
         self.busy = True
+        # 서버가 자고 있으면 깨는 데 1분까지 걸린다. 그동안 빈 창을
+        # 보여주면 고장으로 오해한다.
+        wait = ui_loading.Overlay(self.win, "친구 목록을 불러오는 중")
 
         def done(r, err):
             self.busy = False
+            wait.close()
             if err:
                 return self.say(getattr(err, "message", str(err)), U.DANGER)
             self.data = r
@@ -228,6 +262,8 @@ class FriendsWindow(object):
             self._title("차단 %d" % len(blk), U.FG_FAINT)
             for x in blk:
                 self._blocked_row(x)
+        # 목록이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게.
+        self.fit_scroll()
 
     def _title(self, text, color=U.FG_DIM):
         tk.Label(self.list, text=text, bg=U.BG, fg=color, font=U.FONT_S,

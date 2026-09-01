@@ -15,6 +15,7 @@ from common.korean import natural
 
 from . import sprite_cache, sprites
 from . import ui_common as U
+from . import ui_loading
 
 ROW_H = 30
 DETAIL_W = 340
@@ -232,18 +233,64 @@ class BoxWindow(object):
         self.inner = tk.Frame(self.canvas, bg=U.BG)
         self._win = self.canvas.create_window((0, 0), window=self.inner,
                                               anchor="nw")
-        self.inner.bind("<Configure>", lambda e: self.canvas.configure(
-            scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(
-            self._win, width=e.width))
+        self.scroller = sb
+        self.inner.bind("<Configure>", lambda _e: self.fit_scroll())
+        self.canvas.bind("<Configure>", lambda e: (
+            self.canvas.itemconfigure(self._win, width=e.width),
+            self.fit_scroll()))
         self.canvas.bind_all("<MouseWheel>", self._wheel)
+
+    def fit_scroll(self):
+        """스크롤 영역을 내용에 맞춘다.
+
+        내용이 화면보다 짧으면 **스크롤할 게 없어야 한다.** 예전에는
+        bbox 를 그대로 넣기만 해서, 목록이 줄어들어도 스크롤 위치가
+        남아 있었다. 그러면 두 마리밖에 없는데 빈 화면이 보이고 스크롤바가
+        움직인다.
+        """
+        try:
+            self.canvas.update_idletasks()
+            h = self.inner.winfo_reqheight()
+            view = self.canvas.winfo_height()
+            w = self.canvas.winfo_width()
+            if h <= view:
+                # 내용이 다 들어간다. 스크롤 영역을 화면 크기로 두면
+                # 스크롤바가 꽉 차서 움직이지 않는다.
+                self.canvas.configure(scrollregion=(0, 0, w, view))
+                self.canvas.yview_moveto(0)
+            else:
+                self.canvas.configure(scrollregion=(0, 0, w, h))
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    def _can_scroll(self):
+        try:
+            return self.inner.winfo_reqheight() > self.canvas.winfo_height()
+        except Exception:                                   # noqa: BLE001
+            return False
+
+    def _over_canvas(self, e):
+        """마우스가 정말 이 목록 위에 있나.
+
+        bind_all 이라 창 전체의 휠이 여기로 온다. winfo_containing 이
+        None 이 아니라는 것만 보면 다른 창 위에서 굴려도 목록이 움직인다.
+        """
+        try:
+            w = self.canvas.winfo_containing(e.x_root, e.y_root)
+        except Exception:                                   # noqa: BLE001
+            return False
+        while w is not None:
+            if w is self.canvas or w is self.inner:
+                return True
+            w = getattr(w, "master", None)
+        return False
 
     def _wheel(self, e):
         try:
-            if self.canvas.winfo_containing(e.x_root, e.y_root) is None:
+            if not self._over_canvas(e) or not self._can_scroll():
                 return
             self.canvas.yview_scroll(int(-e.delta / 60), "units")
-        except Exception:
+        except Exception:                                   # noqa: BLE001
             pass
 
     # ---------------- 상세 ----------------
@@ -357,6 +404,9 @@ class BoxWindow(object):
 
     def reload(self):
         self.say("불러오는 중...")
+        # 서버가 자고 있으면 깨는 데 1분까지 걸린다. 빈 창을 보여주면
+        # 고장으로 오해하고 다시 누르거나 닫아 버린다.
+        self._wait = ui_loading.Overlay(self.win, "포켓몬을 불러오는 중")
 
         def work():
             mons = self.app.api.pokemon()
@@ -367,6 +417,10 @@ class BoxWindow(object):
         U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, mons, err):
+        w = getattr(self, "_wait", None)
+        if w:
+            w.close()
+            self._wait = None
         if err:
             return self.say(getattr(err, "message", str(err)), U.DANGER)
         self.mons = mons or []
@@ -393,6 +447,9 @@ class BoxWindow(object):
                                          self.select).pack()
                 tk.Frame(self.inner, bg="#161a24", height=1).pack(fill="x")
 
+        # 행이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게
+        # 여기서 다시 맞춘다.
+        self.fit_scroll()
         self.count.configure(text="보유 %d마리  ·  데리고 다니는 중 %d마리"
                                   % (len(self.mons), len(party)))
         self.balls.configure(text=str(self.app.balls))
