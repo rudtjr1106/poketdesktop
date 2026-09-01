@@ -68,6 +68,8 @@ class Tray(object):
             MenuItem("가방...", lambda _i, _it: self.call(a.open_bag)),
             MenuItem("친구...", lambda _i, _it: self.call(a.open_friends)),
             MenuItem("랜덤 배틀", lambda _i, _it: self.call(a.pvp_random)),
+            MenuItem("받은 대전 보기",
+                     lambda _i, _it: self.call(a.watch_pending)),
             MenuItem("상점...", lambda _i, _it: self.call(a.open_shop)),
             MenuItem("풀숲 찾아보기", lambda _i, _it: self.call(a.encounter_now)),
             Menu.SEPARATOR,

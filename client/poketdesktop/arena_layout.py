@@ -17,20 +17,42 @@ import math
 RING_FLATTEN = 0.58        # 원을 눕히는 정도. 1.0 이면 벽에 붙인 동그라미
 ARC_SPREAD = 1.05          # 반원이 벌어지는 기본 각도 (약 ±60도)
 ARC_SPREAD_MAX = 1.48      # 화면이 좁으면 여기까지 벌린다 (약 ±85도)
-STAGE_PAD = 44
-R_MIN, R_MAX = 130, 340
+STAGE_PAD = 18
+R_MIN, R_MAX = 90, 220
 
 
-def stage_rect(work, pad=STAGE_PAD):
-    """투기장이 쓸 영역. work 는 (l, t, r, b) 작업 영역.
+# 배틀 동안 평소 활동 범위를 이만큼 넓힌다.
+# 크게 넓히면 무대가 화면을 다 차지해서 '구석에서 사는 애들' 이라는
+# 느낌이 없어진다. 열두 마리가 들어갈 만큼만 조금 넓힌다.
+GROW = 1.25
 
-    평소 활동 범위(기본 520x360, 오른쪽 아래)에 열두 마리를 욱여넣으면
-    도트가 겹쳐서 누가 누군지 모른다. 배틀 동안만 화면을 통째로 빌린다.
+
+def stage_rect(area, work, grow=GROW, pad=STAGE_PAD):
+    """투기장이 쓸 영역.
+
+    **포켓몬이 평소 걸어다니는 자리에서 싸운다.** 화면 한가운데로 끌어오면
+    작업하던 창을 가리고, '바탕화면 구석에서 사는 애들' 이라는 느낌이
+    깨진다.
+
+    다만 평소 범위(기본 520x360)에 열두 마리는 안 들어가므로 배틀 동안만
+    넓힌다. 넓힐 때 **오른쪽 아래 모서리는 붙박이로 두고** 왼쪽 위로만
+    자란다 - 그래야 무대가 옆으로 미끄러지지 않고 '그 자리가 넓어진' 것으로
+    보인다.
+
+    area 는 평소 활동 범위, work 는 작업 영역(넘어가면 안 되는 한계).
     """
-    l, t, r, b = work
-    # 화면이 아주 작으면 여백부터 줄인다. 여백 때문에 링이 사라지면 안 된다.
-    pad = min(pad, max(8, (r - l) // 12), max(8, (b - t) // 12))
-    return l + pad, t + pad, r - pad, b - pad
+    ax1, ay1, ax2, ay2 = area
+    wl, wt, wr, wb = work
+    w = (ax2 - ax1) * grow
+    h = (ay2 - ay1) * grow
+    x2, y2 = ax2, ay2
+    x1 = max(wl, x2 - w)
+    y1 = max(wt, y2 - h)
+    # 오른쪽 아래가 작업 영역을 넘지 않게(작업표시줄 위로)
+    x2 = min(wr, max(x2, x1 + 200))
+    y2 = min(wb, max(y2, y1 + 160))
+    pad = min(pad, max(8, int(x2 - x1) // 12), max(8, int(y2 - y1) // 12))
+    return x1 + pad, y1 + pad, x2 - pad, y2 - pad
 
 
 def fit_height(rect, sprite_h, n=6):
