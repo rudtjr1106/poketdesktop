@@ -76,7 +76,7 @@ jobs:
       - name: 서버 띄우기
         env:
           POKET_DB: /tmp/poket-test.db
-          POKET_POKEDEX: server/data/pokedex.json
+          POKET_POKEDEX: ${{ github.workspace }}/server/data/pokedex.json
           POKET_REQUIRE_IP: "0"
           # 검사에서만 여는 뒷문 둘. 이게 없으면 야생이 걸린 검사를
           # 돌릴 수가 없다(첫 조우까지 기다려야 한다).
@@ -107,7 +107,7 @@ jobs:
       - name: 서버 안에서 도는 검사
         env:
           POKET_DB: /tmp/poket-unit.db
-          POKET_POKEDEX: server/data/pokedex.json
+          POKET_POKEDEX: ${{ github.workspace }}/server/data/pokedex.json
         run: |
           cd server
           python test_pvp.py
