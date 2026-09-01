@@ -16,7 +16,14 @@
 #   4) 도메인이 이 IP 를 가리키게 한다 (공짜: https://www.duckdns.org)
 #
 # 그다음 SSH 로 들어와서:
-#   bash deploy/setup-aws.sh
+#   cd ~
+#   git clone https://github.com/rudtjr1106/poketdesktop.git
+#   bash poketdesktop/deploy/setup-aws.sh
+#
+# `curl ... | bash` 로 돌리지 마라. 이 스크립트는 도메인을 물어보는데,
+# 파이프로 넣으면 read 가 스크립트의 나머지 줄을 답으로 먹어 버린다.
+# 물어보는 게 싫으면 미리 넣어 주면 된다:
+#   POKET_DOMAIN=x.duckdns.org ACME_EMAIL=me@example.com bash deploy/setup-aws.sh
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -56,12 +63,37 @@ if ! command -v docker >/dev/null 2>&1; then
   say "도커 설치"
   curl -fsSL https://get.docker.com | sudo sh
   sudo usermod -aG docker "$USER"
-  ok "설치 완료 (그룹 반영을 위해 나중에 다시 로그인해야 할 수 있습니다)"
+  ok "설치 완료"
 else
   ok "도커가 이미 있음: $(docker --version)"
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
+# 도커 그룹은 **로그인할 때** 정해진다. 방금 usermod 로 넣었어도 지금 셸은
+# 모른다. 그래서 여기서 바로 docker 를 부르면 permission denied 로 죽는다.
+# sg 로 그룹을 바꿔 실행하면 다시 로그인하지 않고도 넘어갈 수 있다.
+SG=""
+if ! docker info >/dev/null 2>&1; then
+  if sg docker -c "docker info" >/dev/null 2>&1; then
+    SG="yes"
+    ok "도커 그룹을 이 실행에만 적용합니다 (다시 로그인 안 해도 됩니다)"
+  else
+    warn "아직 도커를 쓸 권한이 없습니다."
+    echo "   한 번 나갔다가 다시 들어온 뒤 이 스크립트를 다시 돌리세요."
+    echo "   (스크립트는 여러 번 돌려도 안전합니다 - 이미 된 것은 건너뜁니다)"
+    exit 1
+  fi
+fi
+
+# docker 를 부르는 유일한 통로. 그룹 문제를 한 군데서만 다룬다.
+d() {
+  if [ -n "$SG" ]; then
+    sg docker -c "cd '$PWD' && docker $*"
+  else
+    docker "$@"
+  fi
+}
+
+if ! d compose version >/dev/null 2>&1; then
   say "docker compose 플러그인 설치"
   if command -v apt-get >/dev/null 2>&1; then
     sudo apt-get update -qq && sudo apt-get install -y -qq docker-compose-plugin
@@ -114,8 +146,11 @@ if [ ! -f .env ]; then
   echo "   공짜로 만들려면 https://www.duckdns.org 에서 하나 만드세요."
   echo "   (예: poketdesktop.duckdns.org  ->  이 VM 의 공인 IP)"
   echo
-  read -rp "   도메인: " DOMAIN
-  read -rp "   이메일 (인증서 만료 알림용): " EMAIL
+  DOMAIN="${POKET_DOMAIN:-}"
+  EMAIL="${ACME_EMAIL:-}"
+  [ -n "$DOMAIN" ] || read -rp "   도메인: " DOMAIN
+  [ -n "$EMAIL" ] || read -rp "   이메일 (인증서 만료 알림용): " EMAIL
+  [ -n "$DOMAIN" ] || { warn "도메인 없이는 HTTPS 를 못 켭니다."; exit 1; }
   printf 'POKET_DOMAIN=%s\nACME_EMAIL=%s\n' "$DOMAIN" "$EMAIL" > .env
   ok ".env 저장"
 else
@@ -124,11 +159,11 @@ fi
 
 # ---------------------------------------------------------------- 6. 실행
 say "빌드하고 띄우기 (처음이면 몇 분 걸립니다)"
-docker compose -f docker-compose.prod.yml up -d --build
+d compose -f docker-compose.prod.yml up -d --build
 
 say "상태 확인"
 sleep 8
-docker compose -f docker-compose.prod.yml ps
+d compose -f docker-compose.prod.yml ps
 
 DOMAIN=$(grep POKET_DOMAIN .env | cut -d= -f2)
 echo
