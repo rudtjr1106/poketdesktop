@@ -648,7 +648,13 @@ def set_desktop(pid: int, body: DesktopIn, ctx=Depends(current)):
         used = set(r["slot"] for r in db.q(
             "SELECT slot FROM pokemon WHERE user_id=? AND on_desktop=1 AND id<>?",
             (uid, pid)))
-        slot = next(i for i in range(config.MAX_PARTY + 1) if i not in used)
+        # next() 는 빈 자리가 없으면 StopIteration 을 던진다. 그건 잡히지
+        # 않고 본문 없는 500 으로 나가서, 사용자는 "서버 응답을 이해할 수
+        # 없습니다" 만 본다. 자리 수가 어긋나 있어도 말이 되는 답을 준다.
+        slot = next((i for i in range(config.MAX_PARTY) if i not in used), None)
+        if slot is None:
+            raise HTTPException(409, "데리고 다닐 수 있는 건 최대 %d마리입니다."
+                                % config.MAX_PARTY)
         db.run("UPDATE pokemon SET on_desktop=1, slot=? WHERE id=?", (slot, pid))
     else:
         db.run("UPDATE pokemon SET on_desktop=0, slot=NULL WHERE id=?", (pid,))
@@ -925,6 +931,22 @@ def wild_flee(wid: int, ctx=Depends(current)):
                        else config.MISS_COOLDOWN)
     st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
     return {"ok": True, "nextAt": st["next_at"] if st else None}
+
+
+@app.exception_handler(Exception)
+def any_error(request: Request, exc: Exception):
+    """예상 못 한 오류.
+
+    그냥 두면 본문 없는 500 이 나가서 사용자는 "가끔 오류가 뜬다" 로만
+    겪고, 서버 로그에도 무슨 요청이었는지 안 남는다. 어디서 났는지
+    남기고, 사람이 읽을 수 있는 말로 돌려준다.
+    """
+    import traceback
+    print("[500] %s %s" % (request.method, request.url.path), flush=True)
+    print(traceback.format_exc(), flush=True)
+    return JSONResponse(
+        {"error": "서버에서 문제가 생겼습니다. 잠시 후 다시 시도해 주세요."},
+        status_code=500)
 
 
 @app.exception_handler(HTTPException)

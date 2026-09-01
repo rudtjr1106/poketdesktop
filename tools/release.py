@@ -147,13 +147,16 @@ def main():
         raise SystemExit("  태그 %s 가 이미 있습니다. 버전을 올려 주세요." % tag)
 
     # ---- 빌드 ----
-    exe = os.path.join(ROOT, "dist", "poketdesktop-v%s.exe" % new)
+    # zip(폴더형)만 낸다. 단일 exe 는 실행할 때 자기를 임시 폴더에 풀고
+    # 도는데, 그 동작이 악성코드 패커와 같아서 백신이 자주 지운다.
+    # 자동 업데이트도 zip 을 받도록 되어 있다.
+    zip_path = os.path.join(ROOT, "dist", "poketdesktop-v%s.zip" % new)
     if not a.skip_build:
         print("")
-        run([sys.executable, os.path.join(HERE, "build_exe.py")])
-    if not os.path.exists(exe):
-        raise SystemExit("  실행 파일이 없습니다: %s" % exe)
-    print("  exe %.1f MB" % (os.path.getsize(exe) / 1048576.0))
+        run([sys.executable, os.path.join(HERE, "build_exe.py"), "--onedir"])
+    if not os.path.exists(zip_path):
+        raise SystemExit("  배포 파일이 없습니다: %s" % zip_path)
+    print("  zip %.1f MB" % (os.path.getsize(zip_path) / 1048576.0))
 
     if a.dry_run:
         print("\n  --dry-run 이라 여기서 멈춥니다.")
@@ -175,7 +178,7 @@ def main():
     open(body_path, "w", encoding="utf-8").write(body)
 
     print("  GitHub 릴리스 생성")
-    run(["gh", "release", "create", tag, exe,
+    run(["gh", "release", "create", tag, zip_path,
          "--title", "포켓 데스크톱 %s" % tag,
          "--notes-file", body_path])
 

@@ -90,9 +90,12 @@
 
 ## 시작하기
 
-1. [릴리스](https://github.com/rudtjr1106/poketdesktop/releases/latest)에서 `poketdesktop-vX.Y.Z.exe` 를 받습니다
-2. 실행하고 **닉네임 + 숫자 4자리**로 가입합니다
-3. 1~9세대 스타팅 27마리 중 하나를 고릅니다
+1. [릴리스](https://github.com/rudtjr1106/poketdesktop/releases/latest)에서 `poketdesktop-vX.Y.Z.zip` 을 받습니다
+2. 압축을 풀고 안의 exe 를 실행합니다
+3. **닉네임 + 숫자 4자리**로 가입하고, 1~9세대 스타팅 27마리 중 하나를 고릅니다
+
+**한 번 받으면 그 다음부터는 신경 쓸 게 없습니다.** 새 버전이 나오면
+켤 때 알아서 받아서 다시 시작합니다.
 
 <div align="center">
 <img src="docs/images/login.png" width="330" alt="로그인">

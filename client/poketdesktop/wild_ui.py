@@ -288,6 +288,7 @@ class WildController(object):
         self.pet = None
         self.wild_id = None
         self.throwing = False
+        self.revealing = False    # 풀숲을 눌러 응답을 기다리는 중인가
         self.hint = None
         self._job = None
         self._expire_job = None
@@ -393,6 +394,9 @@ class WildController(object):
             self.pet.destroy()
             self.pet = None
         self.wild_id = None
+        # 야생이 사라졌으면 '보내는 중' 표시도 풀어야 한다.
+        # 안 그러면 다음 풀숲을 눌러도 반응하지 않는다.
+        self.revealing = False
 
     def hide_wild_sprite(self):
         """볼에 들어간 순간 포켓몬을 감춘다."""
@@ -458,6 +462,14 @@ class WildController(object):
             self.grass = None
         else:
             gx = gy = None
+        # 어떤 경로로 들어오든 야생은 한 마리만 있어야 한다.
+        # 그냥 덮어쓰면 옛 창이 주인 없이 화면에 남는다.
+        if self.pet:
+            try:
+                self.pet.destroy()
+            except Exception:                              # noqa: BLE001
+                pass
+            self.pet = None
         self.pet = WildPet(self, mon, anim)
         if gx is not None:
             self.pet.x, self.pet.y = gx, gy
@@ -472,12 +484,17 @@ class WildController(object):
 
     # ---------------- 조작 ----------------
     def on_grass_click(self):
-        if not self.wild_id or self.pet:
+        # 이 요청은 비동기다. 응답이 오기 전까지 self.pet 은 그대로 비어 있어서,
+        # 이 조건만으로는 연타를 막지 못한다. 실제로 다섯 번 누르면 야생이
+        # 다섯 마리 생겼다. 보내는 중인지도 같이 본다.
+        if not self.wild_id or self.pet or self.revealing:
             return
         wid = self.wild_id
+        self.revealing = True
         self.hide_hint()
 
         def done(r, err):
+            self.revealing = False
             if err:
                 self.clear()
                 self.check()
