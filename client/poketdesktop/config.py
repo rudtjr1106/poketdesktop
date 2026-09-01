@@ -71,7 +71,6 @@ DEFAULTS = {
     "areaMargin": 4,
     # --- 동작 ---
     "syncSeconds": 90,       # 서버와 목록을 맞추는 주기(초)
-    "notifyEncounter": True, # 야생이 나타나면 알림을 띄운다
     # 마지막에 던진 볼. 두 번 누르면 이걸로 바로 던진다.
     # 게임 상태가 아니라 취향이라 서버에 두지 않는다.
     "lastBall": "POKEBALL",
