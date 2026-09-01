@@ -27,6 +27,9 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
+# apt 가 설치 중에 물어보면 화면에 안 뜨고 그대로 멈춘다.
+export DEBIAN_FRONTEND=noninteractive
+
 REPO_URL="${REPO_URL:-https://github.com/rudtjr1106/poketdesktop.git}"
 APP_DIR="${APP_DIR:-$HOME/poketdesktop}"
 
@@ -103,28 +106,38 @@ if ! d compose version >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------- 3. 방화벽
-# Lightsail 은 콘솔 쪽 방화벽(Networking 탭)이 진짜 관문이다. 인스턴스
-# 안쪽 ufw 는 보통 꺼져 있지만, 켜져 있는 이미지도 있어서 같이 열어 둔다.
-say "인스턴스 방화벽에서 80, 443 열기"
-if command -v firewall-cmd >/dev/null 2>&1 && sudo firewall-cmd --state >/dev/null 2>&1; then
-  sudo firewall-cmd --permanent --add-port=80/tcp
-  sudo firewall-cmd --permanent --add-port=443/tcp
-  sudo firewall-cmd --reload
-  ok "firewalld 에 규칙 추가"
+# Lightsail 의 진짜 관문은 **콘솔의 IPv4 Firewall** 이다. 우분투 이미지는
+# 안쪽에서 80, 443 을 막지 않는다.
+#
+# 예전에는 여기서 iptables 규칙을 넣고 iptables-persistent 를 설치했다.
+# 그런데 그 패키지는 설치 중에 "지금 규칙을 저장할까요?" 를 **물어본다.**
+# 출력을 /dev/null 로 보내 두어서 화면에는 아무것도 안 뜨고 그대로 멈췄다.
+# Lightsail 에서는 애초에 필요 없는 일이라 아예 뺐다.
+say "인스턴스 안쪽 방화벽 확인"
+if command -v ufw >/dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -q "Status: active"; then
+  warn "ufw 가 켜져 있습니다. 80, 443 을 엽니다."
+  sudo ufw allow 80/tcp >/dev/null 2>&1 || true
+  sudo ufw allow 443/tcp >/dev/null 2>&1 || true
+  ok "ufw 에 규칙 추가"
 else
-  for port in 80 443; do
-    if ! sudo iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null; then
-      sudo iptables -I INPUT 1 -m state --state NEW -p tcp --dport "$port" -j ACCEPT
-    fi
-  done
-  if command -v netfilter-persistent >/dev/null 2>&1; then
-    sudo netfilter-persistent save >/dev/null
-  else
-    sudo apt-get install -y -qq iptables-persistent >/dev/null 2>&1 || true
-    sudo netfilter-persistent save >/dev/null 2>&1 || true
-  fi
-  ok "iptables 에 규칙 추가 (재부팅해도 남도록 저장)"
+  ok "안쪽에서 막고 있지 않습니다"
 fi
+
+# 80, 443 을 이미 누가 잡고 있으면 Caddy 가 못 뜬다. 먼저 알려준다.
+busy=""
+for port in 80 443; do
+  if sudo ss -lntp 2>/dev/null | grep -q ":$port "; then
+    busy="$busy $port"
+  fi
+done
+if [ -n "$busy" ]; then
+  warn "포트$busy 를 이미 누가 쓰고 있습니다. Caddy 가 못 뜹니다."
+  sudo ss -lntp 2>/dev/null | grep -E ":(80|443) " || true
+  echo "        도커 컨테이너면:  docker ps"
+  echo "        아파치/엔진엑스면:  sudo systemctl disable --now apache2 nginx"
+  exit 1
+fi
+
 warn "Lightsail 콘솔의 [인스턴스 > Networking > IPv4 Firewall] 에도 규칙이 있어야 합니다."
 echo "        HTTP(80) 과 HTTPS(443) 을 추가하세요. 기본은 22 만 열려 있습니다."
 
