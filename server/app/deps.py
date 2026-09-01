@@ -73,13 +73,21 @@ MAX_MOVES = 4
 
 
 def _learn(sp, moves, before, after):
-    """구간에서 배우는 기술을 넣는다. 넘치면 오래된 것부터 밀어낸다."""
+    """구간에서 배우는 기술을 넣는다.
+
+    본가는 네 개가 차면 '어떤 기술을 잊을까요?' 를 물어본다. 여기서는
+    바탕화면에서 자동으로 싸우는 중이라 창을 띄울 수 없어서 가장 오래된
+    것부터 밀어낸다. 대신 **무엇을 잊었는지 같이 돌려준다** —
+    말없이 사라지면 아끼던 기술이 없어진 걸 나중에야 알게 된다.
+    """
     learned = []
     for mlv, mv in sp.get("moves", []):
         if before < mlv <= after and mv not in moves:
             learned.append(mv)
             moves.append(mv)
-    return moves[-MAX_MOVES:], learned
+    kept = moves[-MAX_MOVES:]
+    forgot = [m for m in moves[:-MAX_MOVES]] if len(moves) > MAX_MOVES else []
+    return kept, learned, forgot
 
 
 def grant_exp(uid, mon_id, amount, hour=None):
@@ -101,8 +109,9 @@ def grant_exp(uid, mon_id, amount, hour=None):
     lv = P.level_from_exp(curve, exp)
     moves = json.loads(r["moves"])
     learned = []
+    forgot = []
     if lv > before:
-        moves, learned = _learn(sp, moves, before, lv)
+        moves, learned, forgot = _learn(sp, moves, before, lv)
     db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
            (exp, lv, json.dumps(moves), mon_id))
 
@@ -114,6 +123,7 @@ def grant_exp(uid, mon_id, amount, hour=None):
         "levelBefore": before,
         "leveledUp": lv > before,
         "learned": [d.move_name(m) for m in learned],
+        "forgot": [d.move_name(m) for m in forgot],
     }
     if lv > before:
         ev = try_evolve(uid, mon_id, hour)
@@ -135,12 +145,13 @@ def set_level(uid, mon_id, level, hour=None):
     before = r["level"]
     lv = max(1, min(P.LEVEL_MAX, int(level)))
     exp = P.exp_for_level(curve, lv)
-    moves, learned = _learn(sp, json.loads(r["moves"]), before, lv)
+    moves, learned, forgot = _learn(sp, json.loads(r["moves"]), before, lv)
     db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
            (exp, lv, json.dumps(moves), mon_id))
     out = {"id": mon_id, "level": lv, "levelBefore": before,
            "leveledUp": lv > before,
-           "learned": [d.move_name(m) for m in learned]}
+           "learned": [d.move_name(m) for m in learned],
+           "forgot": [d.move_name(m) for m in forgot]}
     if lv > before:
         ev = try_evolve(uid, mon_id, hour)
         if ev:
