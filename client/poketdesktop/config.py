@@ -29,8 +29,19 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 CLIENT_DIR = os.path.dirname(_HERE)
 REPO_DIR = os.path.dirname(CLIENT_DIR)
 
+# 실제로 돌고 있는 서버. 사용자가 주소를 칠 일이 없도록 여기에 박아 둔다.
+SERVER = "https://poketdesktop.onrender.com"
+
+# 예전에 기본값이었던 주소들. 저장된 설정이 이 중 하나면 새 주소로 옮긴다.
+# 사용자가 일부러 고쳐 넣은 주소는 건드리지 않는다.
+OLD_SERVERS = (
+    "http://127.0.0.1:8787",
+    "http://localhost:8787",
+    "https://desktop-kb3pg3b.taile9bd90.ts.net:10000",
+)
+
 DEFAULTS = {
-    "server": "http://127.0.0.1:8787",
+    "server": SERVER,
     # --- 화면 ---
     "targetHeight": 48,      # 어떤 포켓몬이든 이 높이에 맞춰 크기를 통일한다
     "minScale": 0.25,
@@ -61,6 +72,10 @@ def load_settings():
     # 예전 설정에 없던 키를 채워 넣는다
     for k, v in DEFAULTS.items():
         s.setdefault(k, v)
+    # 서버를 옮겼으면 옛 기본값을 쓰던 사람도 같이 데려간다.
+    # (직접 고쳐 넣은 주소는 그대로 둔다)
+    if (s.get("server") or "").rstrip("/") in [x.rstrip("/") for x in OLD_SERVERS]:
+        s["server"] = SERVER
     return s
 
 

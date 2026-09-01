@@ -189,12 +189,26 @@ class LoginWindow(object):
         body = tk.Frame(self.win, bg=U.BG)
         body.pack(fill="both", expand=True, padx=20, pady=(15, 0))
 
-        U.marker_label(body, "서버 주소").pack(anchor="w", pady=(0, 5))
+        # 서버 주소는 평소에 보일 필요가 없다. 어디에 붙는지만 작게 알려주고,
+        # 눌렀을 때만 고칠 수 있게 접어 둔다. (개발할 때 로컬 서버를 가리키거나,
+        # 나중에 서버를 옮겼을 때만 쓴다)
         self.server = tk.StringVar(value=settings.get("server", ""))
-        U.entry(body, self.server).pack(fill="x")
+        self.server_open = False
+
+        self.server_bar = tk.Frame(body, bg=U.BG)
+        self.server_bar.pack(fill="x", pady=(0, 2))
+        self.server_label = tk.Label(
+            self.server_bar, text=self._server_text(), bg=U.BG, fg=U.FG_FAINT,
+            font=U.FONT_XS, cursor="hand2", anchor="w")
+        self.server_label.pack(side="left")
+        self.server_label.bind("<Button-1>", lambda _e: self._toggle_server())
+
+        self.server_box = tk.Frame(body, bg=U.BG)
+        U.entry(self.server_box, self.server).pack(fill="x", pady=(4, 0))
+        self.server.trace_add("write", lambda *_a: self._server_changed())
 
         tabs = tk.Frame(body, bg=U.BG)
-        tabs.pack(fill="x", pady=(15, 0))
+        tabs.pack(fill="x", pady=(11, 0))
         self.tab_login = self._tab(tabs, "로그인", "login")
         self.tab_signup = self._tab(tabs, "회원가입", "signup")
         tk.Frame(body, bg=U.LINE, height=2).pack(fill="x")
@@ -210,6 +224,22 @@ class LoginWindow(object):
         self.win.bind("<Return>", lambda e: self._enter())
 
     # ---------------- 탭 ----------------
+    def _server_text(self):
+        """접속할 곳을 짧게. 주소 전체는 길어서 호스트만 보여준다."""
+        raw = (self.server.get() or "").strip()
+        host = raw.split("://")[-1].rstrip("/")
+        return "서버: %s  (누르면 바꿀 수 있어요)" % (host or "정해지지 않음")
+
+    def _server_changed(self):
+        self.server_label.configure(text=self._server_text())
+
+    def _toggle_server(self):
+        self.server_open = not self.server_open
+        if self.server_open:
+            self.server_box.pack(fill="x", after=self.server_bar)
+        else:
+            self.server_box.pack_forget()
+
     def _tab(self, parent, text, key):
         f = tk.Frame(parent, bg=U.BG, cursor="hand2", bd=0)
         f.pack(side="left")
