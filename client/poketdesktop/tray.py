@@ -18,22 +18,12 @@ AREA_PRESETS = [("좁게", 360, 240), ("보통", 520, 360),
 
 
 def make_icon_image(size=64):
-    """몬스터볼 모양 아이콘을 직접 그린다."""
-    im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    p = 2
-    box = (p, p, size - p, size - p)
-    d.ellipse(box, fill=(245, 245, 248, 255), outline=(24, 24, 28, 255), width=3)
-    d.pieslice(box, 180, 360, fill=(228, 62, 62, 255), outline=(24, 24, 28, 255),
-               width=3)
-    mid = size // 2
-    d.rectangle((p, mid - 3, size - p, mid + 3), fill=(24, 24, 28, 255))
-    r = size // 6
-    d.ellipse((mid - r, mid - r, mid + r, mid + r), fill=(245, 245, 248, 255),
-              outline=(24, 24, 28, 255), width=3)
-    r2 = size // 12
-    d.ellipse((mid - r2, mid - r2, mid + r2, mid + r2), fill=(190, 190, 200, 255))
-    return im
+    """트레이 아이콘 — 컴퓨터 화면 안의 몬스터볼.
+
+    작업표시줄·exe 와 같은 그림을 쓴다 (appicon 에서 한 번만 그린다).
+    """
+    from . import appicon
+    return appicon.make(size)
 
 
 class Tray(object):
@@ -96,6 +86,7 @@ class Tray(object):
             MenuItem(lambda _it: "소지금 %s원" % format(getattr(a, "money", 0), ","),
                      None, enabled=False),
             MenuItem("버전 %s" % VERSION, None, enabled=False),
+            MenuItem("만든 자료 출처", lambda _i, _it: self.call(a.open_credits)),
             MenuItem("서버 연결 확인", lambda _i, _it: self.call(a.check_server)),
             MenuItem("로그아웃", lambda _i, _it: self.call(a.logout)),
             MenuItem("회원탈퇴", lambda _i, _it: self.call(a.delete_account)),

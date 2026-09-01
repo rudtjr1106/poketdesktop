@@ -205,3 +205,102 @@ def probe_key_color(paths):
 
 def clear_cache():
     _cache.clear()
+
+
+# ---------------------------------------------------------------- 걷는 도트
+# 배틀 도트는 정면 고정이라 걷는 모습이 없다. 걸어다니게 하려면 4방향에
+# 걷기 프레임이 있는 오버월드 도트가 필요하다.
+#
+# 스프라이트시트는 **가로가 프레임, 세로가 8방향**이고 방향은 아래에서
+# 반시계로 돈다.
+#     0 아래   1 아래오른쪽  2 오른쪽  3 위오른쪽
+#     4 위(등) 5 위왼쪽      6 왼쪽    7 아래왼쪽
+# 우리는 네 방향만 쓴다 (아래/오른쪽/위/왼쪽).
+DOWN, UP = 2, 3          # RIGHT=0, LEFT=1 은 위에 이미 있다
+ROW_OF = {DOWN: 0, RIGHT: 2, UP: 4, LEFT: 6}
+DIRS = (DOWN, RIGHT, UP, LEFT)
+
+
+class WalkAnimation(object):
+    """4방향 걷기 애니메이션.
+
+    frames[방향] 은 그 방향으로 걸을 때의 프레임 목록이다.
+    좌우 반전이 아니라 방향마다 진짜 다른 그림이라, 위로 가면 등이 보인다.
+    """
+
+    def __init__(self, frames, durations, w, h, key):
+        self.frames = frames
+        self.durations = durations
+        self.w = w
+        self.h = h
+        self.key = key
+
+    def count(self):
+        return len(self.durations)
+
+
+def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
+              max_scale=3.0, key=None):
+    """스프라이트시트를 잘라 4방향 걷기 애니메이션으로 만든다.
+
+    meta 는 서버가 준 {frameW, frameH, durations} 다. 종마다 칸 크기가
+    제각각(24x32 ~ 104x120)이라 반드시 이 값을 보고 잘라야 한다.
+    """
+    ck = ("walk", sheet_path, key, target_height, min_scale, max_scale)
+    if ck in _cache:
+        return _cache[ck]
+
+    fw = int(meta["frameW"])
+    fh = int(meta["frameH"])
+    durs_ticks = list(meta["durations"]) or [8]
+    # 지속시간은 1/60초 단위 틱이다. 밀리초로 바꾼다.
+    durs = [max(30, int(round(t * 1000.0 / 60.0))) for t in durs_ticks]
+    n = len(durs_ticks)
+
+    sheet = Image.open(sheet_path).convert("RGBA")
+
+    # 먼저 쓸 칸을 전부 꺼내서 공통 여백을 잰다.
+    # 방향마다 따로 자르면 방향을 바꿀 때 몸이 튄다.
+    cut = {}
+    every = []
+    for d in DIRS:
+        row = ROW_OF[d]
+        cells = []
+        for i in range(n):
+            box = (i * fw, row * fh, (i + 1) * fw, (row + 1) * fh)
+            cells.append(sheet.crop(box))
+        cut[d] = cells
+        every.extend(cells)
+
+    if key is None:
+        key = pick_key_color(every)
+    l, t, r, b = union_bbox(every)
+    bw, bh = max(1, r - l), max(1, b - t)
+    scale = float(target_height) / bh if bh else 1.0
+    scale = max(min_scale, min(max_scale, scale))
+    ow = max(8, int(round(bw * scale)))
+    oh = max(8, int(round(bh * scale)))
+
+    frames = {}
+    for d in DIRS:
+        out = []
+        for c in cut[d]:
+            im = premultiply(c.crop((l, t, r, b)))
+            im = _resize(im, (ow, oh))
+            out.append(flatten_rgba(im, key))
+        frames[d] = out
+
+    anim = WalkAnimation(frames, durs, ow, oh, key)
+    _cache[ck] = anim
+    return anim
+
+
+def dir_from(vx, vy):
+    """움직이는 방향에서 네 방향 중 하나를 고른다.
+
+    가로와 세로 중 더 크게 움직이는 쪽을 따른다. 대각선으로 걸을 때
+    방향이 딸깍딸깍 바뀌지 않도록 가로를 조금 우대한다.
+    """
+    if abs(vx) * 1.15 >= abs(vy):
+        return RIGHT if vx >= 0 else LEFT
+    return DOWN if vy >= 0 else UP

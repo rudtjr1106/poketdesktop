@@ -43,3 +43,6 @@ Thumbs.db
 ui_*.png
 dlg_*.png
 tools/_cache/
+walk_*.png
+icon_preview.png
+shot_*.png
