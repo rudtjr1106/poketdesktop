@@ -52,6 +52,11 @@ services:
       - key: POKET_ALLOW_FORCE_WILD
         value: "0"
 
+      # /api/errors 로 오류 역추적을 볼 때 쓰는 열쇠. Render 가 만들어 준다.
+      # 비어 있으면 그 경로는 없는 것처럼 군다.
+      - key: POKET_ADMIN_KEY
+        generateValue: true
+
       # Render 가 앞에서 프록시를 하고 X-Forwarded-For 를 넣어 준다.
       - key: POKET_TRUST_PROXY
         value: "1"

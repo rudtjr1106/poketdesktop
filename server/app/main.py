@@ -9,6 +9,7 @@ GET /api/wild 이 불릴 때 시간이 됐으면 풀숲을 만들고, 지났으�
 """
 import datetime
 import gzip
+import hmac
 import json
 import os
 import random
@@ -173,6 +174,22 @@ def health(request: Request):
         # 자세한 내용은 넣지 않는다. 여기는 인증 없이 누구나 본다.
         "errors": errors.summary(60),
     }
+
+
+@app.get("/api/errors")
+def error_log(key: str = "", limit: int = 30):
+    """최근 오류를 역추적까지. **열쇠를 아는 사람만.**
+
+    개수는 /api/health 로 누구나 본다. 하지만 역추적은 파일 경로와 코드
+    구조를 그대로 드러내므로 아무나 보면 안 된다. 열쇠가 설정되어 있지
+    않으면 이 경로는 아예 없는 것처럼 군다.
+
+    비교는 hmac.compare_digest 로 한다. 글자 수가 다르면 바로 틀리는
+    보통 비교는 걸린 시간으로 앞자리를 하나씩 맞춰 볼 수 있다.
+    """
+    if not config.ADMIN_KEY or not hmac.compare_digest(key, config.ADMIN_KEY):
+        raise HTTPException(404, "Not Found")
+    return {"errors": errors.recent(max(1, min(200, limit)))}
 
 
 @app.get("/api/dexbook")

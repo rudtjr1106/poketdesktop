@@ -96,6 +96,11 @@ MISS_COOLDOWN = _int("POKET_MISS_COOLDOWN", 150)
 # 이런 건 기본이 잠겨 있고 필요한 쪽에서 여는 게 맞다.
 ALLOW_ADD_EXP = _bool("POKET_ALLOW_ADD_EXP", False)
 
+# 오류 기록을 읽을 수 있는 열쇠. 비어 있으면 그 경로가 아예 없다.
+# 개수는 /api/health 로 누구나 보지만, 역추적은 서버 안쪽 구조를 드러내므로
+# 이 열쇠를 아는 사람만 본다.
+ADMIN_KEY = os.environ.get("POKET_ADMIN_KEY", "")
+
 # 조우 간격을 무시하고 풀숲을 바로 돋울지. 테스트에서만 쓴다.
 # 이게 없으면 야생이 걸린 테스트를 돌릴 수가 없다(첫 조우까지 기다려야 한다).
 # 운영에서 열리면 5~7분 간격이 아무 의미가 없어진다.
