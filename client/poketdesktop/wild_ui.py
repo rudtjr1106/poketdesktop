@@ -400,6 +400,19 @@ class WildController(object):
             int(max(1.0, left + 1) * 1000), self.on_expired)
 
     def on_expired(self):
+        # 싸우는 중이면 만료시키지 않는다.
+        #
+        # 배틀을 시작하면 서버가 야생의 시간을 넉넉히 늘려 준다
+        # (battle_routes.py 의 start). 그런데 이 타이머는 배틀 전에
+        # 받아 둔 짧은 시각으로 이미 걸려 있어서, 그대로 두면 싸우는
+        # 도중에 터진다. 그러면 상대 도트만 사라지고 배틀은 계속 돌아서
+        # "도망갔다는데 계속 싸운다" 가 된다. 게다가 wild_flee 까지
+        # 불러서 서버의 야생을 지워 버린다.
+        b = self.app.battle
+        if b is not None and not getattr(b, "closed", False):
+            # 배틀이 끝나면 그쪽에서 다시 맞춰 준다. 그때까지만 미뤄 둔다.
+            self._expire_job = self.app.root.after(15000, self.on_expired)
+            return
         if self.wild_id and not self.throwing:
             was_wild = self.pet is not None
             wid = self.wild_id
@@ -414,6 +427,9 @@ class WildController(object):
     # ---------------- 화면 ----------------
     def clear(self):
         self.hide_hint()
+        # 만료 타이머도 같이 끈다. 안 끄면 이미 사라진 야생을 두고
+        # 나중에 한 번 더 깨어나 쓸데없이 서버를 부른다.
+        self.arm_expiry(None)
         if self.grass:
             self.grass.destroy()
             self.grass = None
