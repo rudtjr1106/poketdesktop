@@ -292,7 +292,17 @@ def item_sprite(item_id: str):
 #   sprite/0025/AnimData.xml    칸 크기와 프레임별 지속시간
 # 라이선스는 CC BY-NC 4.0 (비상업 + 출처표기).
 WALK_BASE = "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite"
+# SpriteCollab 에 없는 종을 메우는 두 번째 출처. HGSS 풍 32x32 라 그림체가
+# 다르지만, 걷지도 않는 정면 도트보다는 낫다.
+FOLLOW_BASE = ("https://raw.githubusercontent.com/baptiste-ro/"
+               "pokemon-followers-sprites/main/followsprites")
 WALK_DIR = os.environ.get("POKET_WALK_DIR", os.path.join(SPRITE_DIR, "walk"))
+
+# 방향 -> 시트의 몇 번째 행인지. 출처마다 배치가 다르다.
+#   SpriteCollab : 8행, 아래에서 반시계 (0 아래, 2 오른쪽, 4 위, 6 왼쪽)
+#   followers    : 4행 (0 아래, 1 왼쪽, 2 오른쪽, 3 위)
+ROWMAP_PMD = {"down": 0, "right": 2, "up": 4, "left": 6}
+ROWMAP_FOLLOW = {"down": 0, "left": 1, "right": 2, "up": 3}
 
 
 def _walk_paths(num):
@@ -334,7 +344,37 @@ def _walk_fetch(num):
         if not png:
             raise ValueError("빈 파일")
     except (urllib.error.URLError, OSError, ValueError, ET.ParseError, TypeError):
-        # 이 종은 걷는 도트가 없다. 다음부터 안 찾도록 표시만 남긴다.
+        # SpriteCollab 에 없다. 두 번째 출처를 본다.
+        return _walk_fetch_follow(num, png_path, meta_path)
+
+    tmp = png_path + ".part"
+    with open(tmp, "wb") as f:
+        f.write(png)
+    os.replace(tmp, png_path)
+    meta = {"ok": True, "frameW": fw, "frameH": fh,
+            "durations": durs, "frames": len(durs), "rows": 8,
+            "rowmap": ROWMAP_PMD, "src": "pmd"}
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f)
+    return meta
+
+
+def _walk_fetch_follow(num, png_path, meta_path):
+    """SpriteCollab 에 없는 종을 followers 저장소에서 찾는다.
+
+    128x128 한 장에 32x32 칸이 가로 4프레임 x 세로 4행으로 들어 있다.
+    모든 종이 같은 규격이라 메타를 받을 필요가 없다.
+    """
+    import urllib.error
+    import urllib.request
+    try:
+        url = "%s/%d-b-n.png" % (FOLLOW_BASE, num)
+        with urllib.request.urlopen(url, timeout=12) as r:
+            png = r.read()
+        if not png or len(png) < 100:
+            raise ValueError("빈 파일")
+    except (urllib.error.URLError, OSError, ValueError):
+        # 어느 쪽에도 없는 종이다. 다음부터 안 찾도록 표시만 남긴다.
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump({"ok": False}, f)
         return None
@@ -343,8 +383,9 @@ def _walk_fetch(num):
     with open(tmp, "wb") as f:
         f.write(png)
     os.replace(tmp, png_path)
-    meta = {"ok": True, "frameW": fw, "frameH": fh,
-            "durations": durs, "frames": len(durs), "dirs": 8}
+    meta = {"ok": True, "frameW": 32, "frameH": 32,
+            "durations": [9, 9, 9, 9], "frames": 4, "rows": 4,   # 1/60초 틱
+            "rowmap": ROWMAP_FOLLOW, "src": "follow"}
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f)
     return meta
