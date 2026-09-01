@@ -49,6 +49,19 @@ def decorate(mon):
     if sp:
         out["num"] = sp["num"]
         out["gen"] = sp.get("gen")
+        # 친밀도로 진화하는 종이면 얼마나 남았는지 같이 준다. 안 그러면
+        # 화면에 숫자만 뜨고 그게 뭘 향해 가는지 알 수가 없다.
+        want = min([b.get("happiness", 999) for b in (sp.get("evo") or [])
+                    if b.get("mode") == "friend"] or [0])
+        if want:
+            from . import walk
+            now = int(mon.get("happiness", 0))
+            out["friendship"] = {
+                "now": now, "need": want,
+                "hours": round(walk.hours_to(now, want,
+                                             bool(mon.get("luxury"))), 1),
+                "luxury": bool(mon.get("luxury")),
+            }
     return out
 
 

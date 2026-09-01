@@ -100,7 +100,11 @@ CREATE TABLE IF NOT EXISTS pokemon (
     -- 표시만 남긴다. 본가도 실제 개체값은 안 바꾼다.
     hyper          TEXT NOT NULL DEFAULT '{}',
     -- 변함없는돌을 쥐여준 것과 같은 상태. 레벨업 진화를 멈춘다.
-    no_evolve      INTEGER NOT NULL DEFAULT 0
+    no_evolve      INTEGER NOT NULL DEFAULT 0,
+    -- 럭셔리볼로 잡았나. 친밀도가 두 배로 오른다(본가와 같다).
+    -- 럭셔리볼은 그동안 happinessRate 를 돌려주기만 하고 읽는 쪽이
+    -- 없어서 아무 일도 안 하고 있었다.
+    luxury         INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_pokemon_user ON pokemon(user_id);
 
@@ -140,7 +144,12 @@ CREATE TABLE IF NOT EXISTS wild_state (
     caught      INTEGER NOT NULL DEFAULT 0,
     fled        INTEGER NOT NULL DEFAULT 0,
     battles     INTEGER NOT NULL DEFAULT 0,
-    wins        INTEGER NOT NULL DEFAULT 0
+    wins        INTEGER NOT NULL DEFAULT 0,
+    -- 친밀도를 어디까지 쳐줬는지. 이 시각부터 지금까지 흐른 만큼만 준다.
+    -- **앞으로만 간다.** 그래서 폴링을 아무리 자주 해도 벽시계보다 빨리
+    -- 오를 수 없다 - 걸은 시간을 클라이언트가 말하게 두면 얼마든지
+    -- 부풀릴 수 있는데, 서버가 아는 시각으로만 계산하면 그 여지가 없다.
+    walk_at     TEXT
 );
 
 -- 로그인 실패 기록.
@@ -307,6 +316,10 @@ MIGRATIONS = [
      "ALTER TABLE rank_stat ADD COLUMN fought_day TEXT NOT NULL DEFAULT ''"),
     ("rank_stat", "fought",
      "ALTER TABLE rank_stat ADD COLUMN fought INTEGER NOT NULL DEFAULT 0"),
+    ("wild_state", "walk_at",
+     "ALTER TABLE wild_state ADD COLUMN walk_at TEXT"),
+    ("pokemon", "luxury",
+     "ALTER TABLE pokemon ADD COLUMN luxury INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
@@ -487,6 +500,7 @@ def row_to_mon(r):
         # 옛 DB 행에는 없을 수 있어 keys() 로 확인하고 꺼낸다
         "hyper": json.loads(r["hyper"]) if "hyper" in r.keys() and r["hyper"] else {},
         "noEvolve": bool(r["no_evolve"]) if "no_evolve" in r.keys() else False,
+        "luxury": bool(r["luxury"]) if "luxury" in r.keys() else False,
     }
 
 
@@ -494,12 +508,13 @@ def insert_mon(user_id, mon, now):
     cur = run(
         "INSERT INTO pokemon (user_id, species, nickname, level, exp, nature, ability,"
         " hidden_ability, gender, shiny, happiness, ivs, evs, moves, on_desktop, slot,"
-        " met_level, caught_at, hyper, no_evolve)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " met_level, caught_at, hyper, no_evolve, luxury)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user_id, mon["species"], mon.get("nickname"), mon["level"], mon["exp"],
          mon["nature"], mon.get("ability"), int(bool(mon.get("hiddenAbility"))),
          mon.get("gender", "N"), int(bool(mon.get("shiny"))), mon.get("happiness", 70),
          json.dumps(mon["ivs"]), json.dumps(mon["evs"]), json.dumps(mon["moves"]),
          0, None, mon["level"], now,
-         json.dumps(mon.get("hyper") or {}), int(bool(mon.get("noEvolve")))))
+         json.dumps(mon.get("hyper") or {}), int(bool(mon.get("noEvolve"))),
+         int(bool(mon.get("luxury")))))
     return cur.lastrowid

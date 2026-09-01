@@ -27,7 +27,8 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from . import (auth, battle_routes, config, db, deps, item_routes,  # noqa: E402
-               items, migrations, pvp, pvp_routes, social_routes)
+               items, migrations, pvp, pvp_routes, social_routes,
+               walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
@@ -604,8 +605,12 @@ def me(ctx=Depends(current)):
     desk = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=? AND on_desktop=1",
                  (uid,))["c"]
     st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
+    # 걸어다닌 만큼 친밀도를 올린다. 이 라우트가 이미 wild_state 를 읽고
+    # 있어서 조회가 늘지 않고, 20분에 한 번만 쓰기 두 문장이 나간다.
+    walked = walk.settle(uid, st)
     return {
         "user": auth.user_public(u),
+        "walked": walked,
         "balls": u["balls"],
         "money": u["money"],
         "bag": items.bag_get(uid),
@@ -955,6 +960,10 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     extra = items.ball_extra(ball_id)
     if extra.get("happiness"):
         mon["happiness"] = extra["happiness"]
+    # 럭셔리볼은 친밀도가 두 배로 오른다. 그동안 happinessRate 를
+    # 돌려주기만 하고 읽는 쪽이 없어서 아무 일도 안 하고 있었다.
+    if extra.get("happinessRate", 1) > 1:
+        mon["luxury"] = True
     got, where = battle_routes.store_caught(uid, mon)
     db.run("DELETE FROM wild WHERE id=?", (wid,))
     _bump(uid, "caught")
