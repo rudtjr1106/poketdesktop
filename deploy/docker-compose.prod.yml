@@ -29,8 +29,8 @@ services:
       # Caddy 뒤에 있으므로 X-Forwarded-For 를 믿어도 된다
       POKET_TRUST_PROXY: "1"
       POKET_REQUIRE_IP: "1"
-      POKET_WILD_COOLDOWN_MIN: "600"
-      POKET_WILD_COOLDOWN_MAX: "900"
+      POKET_WILD_COOLDOWN_MIN: "300"
+      POKET_WILD_COOLDOWN_MAX: "420"
       POKET_GRASS_TTL: "90"
       POKET_WILD_TTL: "60"
       POKET_BALLS_START: "10"

@@ -55,11 +55,11 @@ services:
 
       # 야생 조우 주기 (실제 운영값)
       - key: POKET_WILD_COOLDOWN_MIN
-        value: "600"
-      - key: POKET_WILD_COOLDOWN_MAX
-        value: "900"
-      - key: POKET_MISS_COOLDOWN
         value: "300"
+      - key: POKET_WILD_COOLDOWN_MAX
+        value: "420"
+      - key: POKET_MISS_COOLDOWN
+        value: "150"
       - key: POKET_GRASS_TTL
         value: "90"
       - key: POKET_WILD_TTL
