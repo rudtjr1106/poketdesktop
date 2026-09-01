@@ -117,18 +117,22 @@ def main():
             (r.get("fight") or {}).get("left") is not None, r.get("fight"))
 
         print("\n=== 랜덤 배틀은 서로 점수를 주고받는다 ===")
-        s, rc = call("GET", "/api/pvp/records", None, ct)
-        last = rc["records"][0]
-        chk("랜덤은 점수가 움직인다", last["delta"] != 0, last)
-        foe_tok = bt if last["foe"] == bn else at
-        s, rf = call("GET", "/api/pvp/records", None, foe_tok)
-        fd = rf["records"][0]["delta"]
-        chk("한쪽이 얻으면 한쪽이 잃는다", last["delta"] * fd < 0,
-            (last["delta"], fd))
-        chk("주고받는 크기가 같다", abs(last["delta"] + fd) <= 1,
-            (last["delta"], fd))
-        chk("자던 쪽도 점수가 깎인다 (사용자가 정한 대로)",
-            rf["records"][0]["kind"] == "random", rf["records"][0])
+        # 응답에 양쪽 결과가 다 들어 있다. 상대의 전적을 따로 조회하면
+        # 안 된다 - 상대가 누구인지 모르고(서버가 고른다), 그 사람의
+        # 최근 전적이 이 판이라는 보장도 없다.
+        s, rb2 = call("POST", "/api/pvp/random", {}, bt)
+        if s != 200:
+            chk("랜덤 배틀 성사 (%s)" % s, False, rb2)
+        else:
+            da, dbv = rb2["a"]["delta"], rb2["b"]["delta"]
+            chk("랜덤은 점수가 움직인다", da != 0 or dbv != 0, (da, dbv))
+            chk("한쪽이 얻으면 한쪽이 잃는다", da * dbv < 0, (da, dbv))
+            chk("주고받는 크기가 같다", abs(da + dbv) <= 1, (da, dbv))
+            chk("건 쪽도 받은 쪽도 랜덤으로 기록된다",
+                rb2.get("kind") == "random", rb2.get("kind"))
+            chk("자던 쪽 점수도 깎인다 (사용자가 정한 대로)",
+                rb2["b"]["rating"] != 1000 or rb2["b"]["delta"] != 0,
+                rb2["b"])
 
         print("\n=== 차단하면 안 붙는다 ===")
         call("POST", "/api/friends/%d/block" % ID_C, {}, at)

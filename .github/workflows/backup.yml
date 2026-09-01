@@ -1,0 +1,111 @@
+# 하루에 한 번 DB 를 떠서 보관한다.
+#
+# Turso 무료 등급에는 시점 복구가 없다. 지금까지는 사고가 나면 되돌릴
+# 방법이 하나도 없었다.
+#
+# **백업에는 닉네임과 비밀번호 해시가 들어 있다.** 이 저장소는 공개라
+# Actions 아티팩트도 누구나 받아 갈 수 있다. 비밀번호가 숫자 네 자리라
+# 해시가 새어 나가면 오프라인에서 만 번만 돌려도 뚫린다. 그래서 올리기
+# 전에 반드시 암호로 잠근다.
+#
+# 잠그는 열쇠는 저장소 Secrets 의 POKET_BACKUP_KEY 다. 이 열쇠가 없으면
+# 백업을 만들지 않는다 - 잠그지 않은 채로 올리느니 아예 안 하는 게 낫다.
+#
+# 되살리기:
+#   gh run download <실행번호> -n backup
+#   openssl enc -d -aes-256-cbc -pbkdf2 -in backup.sql.enc -out backup.sql \
+#           -pass env:POKET_BACKUP_KEY
+#   python tools/restore_db.py --in backup.sql
+
+name: backup
+
+on:
+  schedule:
+    - cron: "17 18 * * *"     # 매일 한 번 (UTC 18:17 = 한국 새벽 3시 17분)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: libsql
+        run: pip install "libsql>=0.1.11,<1.0"
+
+      - name: 필요한 것이 다 있는지
+        env:
+          URL: ${{ secrets.POKET_TURSO_URL }}
+          TOKEN: ${{ secrets.POKET_TURSO_TOKEN }}
+          KEY: ${{ secrets.POKET_BACKUP_KEY }}
+        run: |
+          miss=""
+          [ -z "$URL" ]   && miss="$miss POKET_TURSO_URL"
+          [ -z "$TOKEN" ] && miss="$miss POKET_TURSO_TOKEN"
+          [ -z "$KEY" ]   && miss="$miss POKET_BACKUP_KEY"
+          if [ -n "$miss" ]; then
+            echo "::error::Secrets 가 없습니다:$miss"
+            echo "저장소 Settings > Secrets and variables > Actions > Secrets 에 넣어 주세요."
+            echo "POKET_BACKUP_KEY 는 아무 긴 문자열이면 됩니다. 되살릴 때 필요하니 따로 적어 두세요."
+            exit 1
+          fi
+
+      - name: 떠내기
+        env:
+          POKET_TURSO_URL: ${{ secrets.POKET_TURSO_URL }}
+          POKET_TURSO_TOKEN: ${{ secrets.POKET_TURSO_TOKEN }}
+        run: python tools/backup_db.py --out /tmp/backup.sql
+
+      - name: 잠그기
+        env:
+          POKET_BACKUP_KEY: ${{ secrets.POKET_BACKUP_KEY }}
+        run: |
+          # 잠그기 전에 크기를 본다. 0에 가까우면 뭔가 잘못된 것이다.
+          size=$(stat -c%s /tmp/backup.sql)
+          echo "떠낸 크기: $size 바이트"
+          if [ "$size" -lt 200 ]; then
+            echo "::error::백업이 너무 작습니다. DB 가 비었거나 떠내기가 실패했습니다."
+            head -20 /tmp/backup.sql
+            exit 1
+          fi
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+                  -in /tmp/backup.sql -out /tmp/backup.sql.enc \
+                  -pass env:POKET_BACKUP_KEY
+          # 잠그지 않은 것은 바로 지운다. 다음 단계로 새어 나가면 안 된다.
+          shred -u /tmp/backup.sql 2>/dev/null || rm -f /tmp/backup.sql
+          ls -la /tmp/backup.sql.enc
+
+      - name: 다시 열어 보기
+        env:
+          POKET_BACKUP_KEY: ${{ secrets.POKET_BACKUP_KEY }}
+        run: |
+          # 열리지 않는 백업은 백업이 아니다. 매번 확인한다.
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+                  -in /tmp/backup.sql.enc -out /tmp/check.sql \
+                  -pass env:POKET_BACKUP_KEY
+          n=$(grep -c '^INSERT INTO' /tmp/check.sql || echo 0)
+          echo "다시 열어 보니 INSERT $n 개"
+          if [ "$n" -lt 1 ]; then
+            echo "::error::다시 열었더니 내용이 없습니다."
+            exit 1
+          fi
+          rm -f /tmp/check.sql
+
+      - name: 보관
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_number }}
+          path: /tmp/backup.sql.enc
+          retention-days: 90
+          if-no-files-found: error

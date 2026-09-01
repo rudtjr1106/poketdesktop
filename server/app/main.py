@@ -27,8 +27,8 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from . import (auth, battle_routes, config, db, deps, item_routes,  # noqa: E402
-               items, migrations, pvp, pvp_routes, social_routes,
-               walk)
+               errors, items, migrations, pvp, pvp_routes,
+               social_routes, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
@@ -64,6 +64,7 @@ def _startup():
         pvp.prune()
     except Exception as e:                                  # noqa: BLE001
         print("[pvp] 오래된 로그 정리 실패: %s" % e)
+    errors.sweep()
     d = dex()
     n = sum(1 for s in d.species if s.get("spawnable"))
     print("[poketdesktop] 도감 %d종 (야생 등장 %d종) 준비 완료" % (len(d.species), n))
@@ -166,6 +167,11 @@ def health(request: Request):
         "account": {"pinDigits": config.PIN_DIGITS,
                     "minName": config.MIN_USERNAME,
                     "maxName": config.MAX_USERNAME},
+        # 최근 한 시간에 오류가 몇 번 났는지. 5분마다 도는 keepalive 가
+        # 이걸 보고 많으면 워크플로를 실패시킨다 - 그러면 GitHub 이
+        # 알아서 메일을 보낸다. 감시 장치를 새로 둘 필요가 없다.
+        # 자세한 내용은 넣지 않는다. 여기는 인증 없이 누구나 본다.
+        "errors": errors.summary(60),
     }
 
 
@@ -1051,8 +1057,11 @@ def any_error(request: Request, exc: Exception):
     남기고, 사람이 읽을 수 있는 말로 돌려준다.
     """
     import traceback
+    tb = traceback.format_exc()
     print("[500] %s %s" % (request.method, request.url.path), flush=True)
-    print(traceback.format_exc(), flush=True)
+    print(tb, flush=True)
+    # 표에도 남긴다. 그래야 대시보드를 열지 않아도 알 수 있다.
+    errors.record(request.method, request.url.path, exc, tb)
     return JSONResponse(
         {"error": "서버에서 문제가 생겼습니다. 잠시 후 다시 시도해 주세요."},
         status_code=500)
