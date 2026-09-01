@@ -91,10 +91,17 @@ def build(onedir=False):
     icon = make_icon()
     verfile = make_version_file()
 
-    for d in ("build/pyi", "dist"):
-        p = os.path.join(ROOT, d)
-        if os.path.exists(p):
-            shutil.rmtree(p, ignore_errors=True)
+    # dist 를 통째로 지우면 안 된다. 단일 exe 와 폴더형 zip 을 둘 다 내는데,
+    # 나중에 돌린 쪽이 앞서 만든 걸 지워버린다.
+    shutil.rmtree(os.path.join(ROOT, "build", "pyi"), ignore_errors=True)
+    dist = os.path.join(ROOT, "dist")
+    os.makedirs(dist, exist_ok=True)
+    if onedir:
+        shutil.rmtree(os.path.join(dist, NAME), ignore_errors=True)
+    else:
+        old = os.path.join(dist, NAME + ".exe")
+        if os.path.exists(old):
+            os.remove(old)
 
     cmd = [
         sys.executable, "-m", "PyInstaller",
