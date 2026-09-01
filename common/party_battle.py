@@ -1,0 +1,209 @@
+# -*- coding: utf-8 -*-
+"""파티 대 파티 전투 — 유저끼리 붙일 때 쓴다.
+
+battle.Battle 은 1:1 전용이다. 여기서는 그걸 **감싸기만** 한다. 고치지
+않는다 — 야생 배틀이 그 위에서 돌고 있고, 그게 깨지는 게 제일 나쁘다.
+
+진행은 본가의 배틀타워와 같다. 앞선 두 마리가 붙고, 쓰러진 쪽이 다음
+포켓몬을 내보낸다. 한쪽이 전멸하면 끝난다. 사람이 개입하지 않는다 —
+양쪽 다 기술을 알아서 고른다.
+
+**결과는 시드 하나로 정해진다.** 같은 팀, 같은 시드면 언제 몇 번을
+돌려도 같은 로그가 나온다. 그래서 서버가 매칭 순간 한 번만 계산해서
+로그로 저장하고, 양쪽 클라이언트는 그 로그를 재생하기만 하면 된다.
+턴마다 서버를 왕복할 필요가 없고, 재생 도중 앱이 꺼져도 승패는 이미
+확정되어 있다.
+
+로그에 담기는 이벤트는 Battle 이 내는 것 그대로에 세 가지를 더한다.
+
+    {"t": "round", "n": 1, "me": {...}, "foe": {...}}   라운드 시작(선수 소개)
+    {"t": "ko",    "side": "me"|"foe"|"both"}           라운드 끝
+    {"t": "match", "winner": "me"|"foe"|"draw", ...}    판 끝
+
+Battle 이 내는 "over" 는 1:1 기준이라(한 라운드가 끝날 때마다 나온다)
+여기서 걸러낸다. 재생기는 "over" 를 몰라야 한다.
+
+시점은 **항상 a 쪽 기준**이다. me = a, foe = b. b 쪽 화면에서는
+클라이언트가 재생 직전에 한 번 뒤집는다.
+"""
+import random
+
+from . import battle as B
+
+# 한 라운드(1:1)에 쓸 수 있는 턴 수. 야생의 80 보다 훨씬 짧다.
+# 6:6 이면 최대 여섯 라운드라, 라운드마다 80턴을 주면 한 판이 480턴까지
+# 늘어난다. 그걸 도트로 재생하면 몇 분이 걸린다. 30턴이면 웬만한 라운드는
+# 안에서 끝나고, 안 끝나면 양쪽 다 물러나는 것으로 친다.
+ROUND_TURNS = 30
+
+# 판 전체의 안전장치. 라운드 수 × ROUND_TURNS 를 넘길 일은 없지만,
+# 어딘가 잘못되어 라운드가 안 끝나면 여기서 멈춘다.
+MAX_ROUNDS = 16
+
+
+def _side_view(f):
+    """선수 소개에 쓸 정보."""
+    return {"name": f.name, "species": f.mon.get("species"),
+            "num": f.mon.get("num"), "level": f.mon.get("level"),
+            "shiny": bool(f.mon.get("shiny")), "hp": f.hp, "maxhp": f.maxhp}
+
+
+class PartyBattle(object):
+    """파티끼리 한 판.
+
+        pb = PartyBattle(dex, a_mons, b_mons, seed=12345)
+        out = pb.run()
+        out["winner"]   "me"(a 승) / "foe"(b 승) / "draw"
+        out["events"]   재생할 이벤트 목록
+        out["turns"]    총 턴 수
+    """
+
+    def __init__(self, dex, a_mons, b_mons, seed=None):
+        if not a_mons or not b_mons:
+            # 엔진이 정책을 갖지는 않지만, 여기서 안 막으면 아래에서
+            # team[0] 이 IndexError 를 내고 서버가 500 을 뱉는다.
+            raise ValueError("양쪽 다 최소 한 마리는 있어야 합니다.")
+        self.dex = dex
+        self.seed = random.randrange(1 << 30) if seed is None else int(seed)
+        self.rng = random.Random(self.seed)
+        self.a = [B.Fighter(dex, m) for m in a_mons]
+        self.b = [B.Fighter(dex, m) for m in b_mons]
+        self.ia = self.ib = 0          # 지금 나와 있는 선수의 자리
+        self.events = []
+        self.turns = 0
+        self.winner = None
+
+    # ---------------- 도구 ----------------
+    def _alive(self, team, start):
+        """start 부터 살아 있는 첫 자리. 없으면 None."""
+        for i in range(start, len(team)):
+            if team[i].alive():
+                return i
+        return None
+
+    def _round_battle(self):
+        """지금 선수 둘로 1:1 한 라운드를 만든다."""
+        # ai="trainer" 를 반드시 준다. 기본값은 "wild" 라 상대가 기술을
+        # 무작위로 고른다 - 내 쪽은 choose_mine 이 알아서 'trainer' 로
+        # 고르기 때문에, 빠뜨리면 a 가 머리를 쓰고 b 는 아무 기술이나
+        # 쓰는 판이 된다. 실제로 600판을 돌려 보니 a 가 69% 를 이겼다.
+        bt = B.Battle(self.dex, self.a[self.ia], self.b[self.ib], self.rng,
+                      ai="trainer")
+        # 상대가 야생이 아니다. 문구에서 '야생' 을 뗀다.
+        bt.foe_prefix = ""
+        bt.max_turns = ROUND_TURNS
+        return bt
+
+    # ---------------- 진행 ----------------
+    def run(self):
+        for n in range(1, MAX_ROUNDS + 1):
+            self.events.append({"t": "round", "n": n,
+                                "me": _side_view(self.a[self.ia]),
+                                "foe": _side_view(self.b[self.ib])})
+            side = self._one_round()
+            self.events.append({"t": "ko", "side": side})
+            if self._advance(side):
+                break
+        if self.winner is None:
+            # 라운드 상한까지 왔는데 양쪽 다 남아 있다. 머릿수로 가른다.
+            self.winner = self._by_headcount()
+        self.events.append({"t": "match", "winner": self.winner,
+                            "turns": self.turns, "rounds": n})
+        return {"winner": self.winner, "turns": self.turns,
+                "events": self.events, "seed": self.seed}
+
+    def _one_round(self):
+        """한 라운드를 끝까지. 누가 쓰러졌는지("me"/"foe"/"both") 돌려준다."""
+        bt = self._round_battle()
+        while not bt.over:
+            ev = bt.take_turn(bt.choose_mine())
+            self.turns += 1
+            # Battle 의 "over" 는 1:1 기준이라 라운드마다 나온다.
+            # 그대로 흘리면 재생기가 판이 끝난 줄 안다.
+            self.events.extend(e for e in ev if e.get("t") != "over")
+
+        a_down = not self.a[self.ia].alive()
+        b_down = not self.b[self.ib].alive()
+        if a_down and b_down:
+            return "both"
+        if a_down:
+            return "me"
+        if b_down:
+            return "foe"
+        # 아무도 안 쓰러졌는데 라운드가 끝났다 = 턴 상한(무승부).
+        # 양쪽 다 물러나는 것으로 친다. 한쪽만 물리면 화면에서 한 마리가
+        # 링에 남은 채로 다음 선수와 겹친다.
+        return "both"
+
+    def _advance(self, side):
+        """쓰러진 쪽의 다음 선수를 내보낸다. 판이 끝났으면 True.
+
+        양쪽을 다 본 뒤에 판정한다. 한쪽을 보고 바로 돌아가면 둘이 동시에
+        전멸했을 때 무승부가 아니라 한쪽 승리가 된다.
+        """
+        a_out = b_out = False
+        if side in ("me", "both"):
+            nxt = self._alive(self.a, 0)
+            if nxt is None:
+                a_out = True
+            else:
+                self.ia = nxt
+        if side in ("foe", "both"):
+            nxt = self._alive(self.b, 0)
+            if nxt is None:
+                b_out = True
+            else:
+                self.ib = nxt
+
+        if a_out and b_out:
+            self.winner = "draw"
+        elif a_out:
+            self.winner = "foe"
+        elif b_out:
+            self.winner = "me"
+        else:
+            return False
+        return True
+
+    def _by_headcount(self):
+        """상한까지 안 끝났을 때. 남은 마릿수 -> 남은 체력 비율 순으로."""
+        na = sum(1 for f in self.a if f.alive())
+        nb = sum(1 for f in self.b if f.alive())
+        if na != nb:
+            return "me" if na > nb else "foe"
+        ra = sum(f.hp / float(f.maxhp or 1) for f in self.a)
+        rb = sum(f.hp / float(f.maxhp or 1) for f in self.b)
+        if abs(ra - rb) < 1e-9:
+            return "draw"
+        return "me" if ra > rb else "foe"
+
+
+def simulate(dex, a_mons, b_mons, seed=None):
+    """한 줄로 쓰는 입구."""
+    return PartyBattle(dex, a_mons, b_mons, seed).run()
+
+
+# 시점 뒤집기 --------------------------------------------------------
+# 저장된 로그는 항상 a 시점이다. b 쪽 화면에서는 이걸 통과시켜 뒤집는다.
+# 뒤집을 것을 한 군데 모아 둔다 - 흩어 놓으면 하나를 빠뜨리고, 그러면
+# 진 쪽 화면에서만 체력바가 반대로 나오는 식으로 조용히 어긋난다.
+_FLIP = {"me": "foe", "foe": "me"}
+
+
+def flip(ev):
+    """이벤트 하나를 상대 시점으로."""
+    out = dict(ev)
+    for k in ("who", "side", "target", "winner"):
+        if out.get(k) in _FLIP:
+            out[k] = _FLIP[out[k]]
+    if "me" in out or "foe" in out:
+        me, foe = out.get("me"), out.get("foe")
+        if me is not None:
+            out["foe"] = me
+        if foe is not None:
+            out["me"] = foe
+    return out
+
+
+def flip_log(events):
+    return [flip(e) for e in events]

@@ -184,6 +184,12 @@ class Battle(object):
         # 야생 포켓몬은 본가에서도 기술을 거의 무작위로 쓴다.
         # 머리를 쓰는 쪽은 트레이너/체육관 관장이다.
         self.ai = ai
+        # 이 둘은 야생 배틀 기준값이다. 파티전(PartyBattle)은 한 판이
+        # 여러 라운드로 나뉘므로 상한을 라운드마다 다시 주고, 상대가
+        # 야생이 아니므로 이름 앞에 '야생' 을 붙이지 않는다.
+        # 저장해 두는 로그라 여기서 틀리면 나중에 다시 봐도 계속 틀린다.
+        self.max_turns = MAX_TURNS
+        self.foe_prefix = "야생 "
 
     # ---------------- 도구 ----------------
     def move_of(self, key):
@@ -323,12 +329,13 @@ class Battle(object):
 
         if not self.over:
             self._end_of_turn(ev)
-        if not self.over and self.turn_no >= MAX_TURNS:
+        if not self.over and self.turn_no >= self.max_turns:
             # 서로 결정타가 없어 끝나지 않는 상황. 야생이 흥미를 잃고 떠난다.
             self.over = True
             self.result = "fled"
             ev.append({"t": "flee", "who": "foe",
-                       "text": "야생 %s 은(는) 흥미를 잃고 떠나버렸다." % self.foe.name})
+                       "text": "%s%s 은(는) 흥미를 잃고 떠나버렸다."
+                               % (self.foe_prefix, self.foe.name)})
         return ev
 
     def _order(self, my_move, foe_move):
@@ -535,7 +542,8 @@ class Battle(object):
             self.over = True
             self.result = "won"
             ev.append({"t": "faint", "who": "foe",
-                       "text": "야생 %s 은(는) 쓰러졌다!" % self.foe.name})
+                       "text": "%s%s 은(는) 쓰러졌다!"
+                               % (self.foe_prefix, self.foe.name)})
         elif not self.me.alive():
             self.over = True
             self.result = "lost"
