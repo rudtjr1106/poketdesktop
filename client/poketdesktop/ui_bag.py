@@ -32,6 +32,7 @@ from . import sprite_cache, sprites
 from . import ui_box
 from . import item_icons
 from . import ui_common as U
+from . import ui_loading
 
 LIST_W = 292            # 왼쪽 도구 목록 폭
 ITEM_H = 28             # 도구 한 줄 높이
@@ -597,6 +598,7 @@ class BagWindow(object):
             return self.say("로그인이 필요합니다.", U.DANGER, U.DANGER)
         if not self._pending:
             self.say("가방을 여는 중...", U.FG_FAINT)
+            self._wait = ui_loading.Overlay(self.win, "가방을 여는 중")
         api = self.app.api
 
         def work():
@@ -627,6 +629,10 @@ class BagWindow(object):
         U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, r, err):
+        w = getattr(self, "_wait", None)
+        if w:
+            w.close()
+            self._wait = None
         if not self.alive:
             return
         if err:

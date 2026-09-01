@@ -16,6 +16,7 @@ import tkinter as tk
 from PIL import ImageTk
 
 from . import ball_menu, config, effects, sprite_cache, sprites
+from . import walk_cache
 from . import ui_common as U
 from .overlay import Pet
 from .ui_common import run_async
@@ -506,17 +507,32 @@ class WildController(object):
     def show_wild(self, mon):
         ov = self.app.overlay
         s = ov.settings
-        path = ov.path_for(mon)
-        if not path:
-            path = (sprite_cache.find_local(mon.get("num"), mon.get("shiny"))
-                    or sprite_cache.find_local(mon.get("num"), False))
-        if not path:
-            return
-        try:
-            anim = sprites.load_animation(path, s["targetHeight"],
-                                          s["minScale"], s["maxScale"])
-        except Exception:
-            return
+        # 걷는 도트를 먼저 쓴다. 내 포켓몬은 걸어다니는데 야생만 옛날
+        # 배틀 도트로 서 있으면 둘이 다른 게임에서 온 것처럼 보인다.
+        # (ov.make 가 하는 것과 같은 순서다)
+        anim = None
+        sheet, meta = ov.walks.get(mon.get("num")) or (None, None)
+        if sheet and meta:
+            try:
+                anim = sprites.load_walk(sheet, meta, s["targetHeight"],
+                                         s["minScale"],
+                                         max(2.5, s["maxScale"]))
+            except Exception:                              # noqa: BLE001
+                anim = None
+        if anim is None:
+            # 걷는 도트가 없는 종(43마리)은 배틀 도트로 대신한다.
+            path = ov.path_for(mon)
+            if not path:
+                path = (sprite_cache.find_local(mon.get("num"),
+                                                mon.get("shiny"))
+                        or sprite_cache.find_local(mon.get("num"), False))
+            if not path:
+                return
+            try:
+                anim = sprites.load_animation(path, s["targetHeight"],
+                                              s["minScale"], s["maxScale"])
+            except Exception:                              # noqa: BLE001
+                return
         if self.grass:
             gx, gy = self.grass.x, self.grass.y
             self.grass.destroy()
@@ -570,6 +586,9 @@ class WildController(object):
                 if path:
                     self.app.overlay.paths[(mon.get("num"),
                                             bool(mon.get("shiny")))] = path
+                sheet, meta = (r or {}).get("_walk") or (None, None)
+                if sheet and meta:
+                    self.app.overlay.walks[mon.get("num")] = (sheet, meta)
                 self.show_wild(mon)
                 self.arm_expiry(w.get("expiresAt"))
 
@@ -579,6 +598,13 @@ class WildController(object):
             if mon.get("num"):
                 r["_spritePath"] = sprite_cache.ensure(
                     self.app.api, mon["num"], mon.get("shiny"))
+                # 걷는 도트도 같이 받는다. overlay.walks 는 내 목록으로만
+                # 채워지기 때문에, 이걸 안 하면 야생만 옛날 배틀 도트로
+                # 서 있게 된다.
+                try:
+                    r["_walk"] = walk_cache.ensure(self.app.api, mon["num"])
+                except Exception:                          # noqa: BLE001
+                    r["_walk"] = (None, None)
             return r
         run_async(self.app.root, work, done)
 

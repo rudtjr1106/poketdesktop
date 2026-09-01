@@ -302,11 +302,6 @@ class App(object):
             return self.box_window.focus()
         self.box_window = BoxWindow(self.root, self)
 
-    def open_credits(self):
-        """쓰인 자료의 출처. 걷는 도트가 CC BY-NC 라 표기가 필요하다."""
-        import webbrowser
-        webbrowser.open("https://github.com/rudtjr1106/poketdesktop/blob/main/CREDITS.md")
-
     def open_shop(self):
         if self.shop_window:
             return self.shop_window.focus()
@@ -547,7 +542,6 @@ class App(object):
         m.add_command(label="박스로 거두기", command=lambda: self._recall(pet.id))
         m.add_separator()
         m.add_command(label="포켓몬 관리...", command=self.open_box)
-        m.add_command(label="풀숲 찾아보기", command=self.encounter_now)
         m.add_separator()
         m.add_command(label="종료", command=self.quit)
         try:
@@ -590,29 +584,6 @@ class App(object):
                 self.api, [(m.get("num"), m.get("shiny")) for m in picked])
         run_async(self.root, work, lambda r, e: self.request_sync())
 
-    def encounter_now(self):
-        """지금 풀숲이 돋았는지 본다."""
-        if self.arena:
-            return self.notify("배틀이 끝난 뒤에 해주세요.")
-        if self.wild:
-            self.wild.check(force=True)
-
-    def check_server(self):
-        # 로그아웃 상태에서는 self.api 가 None 이다. 그대로 두면
-        # self.api.health 를 꺼내다 터지는데, tkinter 가 after 콜백
-        # 예외를 삼켜서 눌러도 아무 반응이 없는 것으로만 보인다.
-        if not self.api:
-            return self.notify("로그인한 뒤에 확인할 수 있습니다.")
-
-        def done(r, err):
-            if err:
-                self.notify(getattr(err, "message", str(err)))
-            else:
-                self.notify("서버 정상 · 도감 %d종 · 야생 등장 %d종"
-                            % (r.get("species", 0), r.get("spawnable", 0)))
-        run_async(self.root, self.api.health, done)
-
-    # ---- 설정 ----
     def set_size(self, px):
         self.settings["targetHeight"] = int(px)
         config.save_settings(self.settings)

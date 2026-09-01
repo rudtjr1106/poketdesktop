@@ -77,7 +77,6 @@ class Tray(object):
                                   else "받은 대전 보기"),
                      lambda _i, _it: self.call(a.watch_pending)),
             MenuItem("상점...", lambda _i, _it: self.call(a.open_shop)),
-            MenuItem("풀숲 찾아보기", lambda _i, _it: self.call(a.encounter_now)),
             Menu.SEPARATOR,
             MenuItem("바탕화면", Menu(
                 MenuItem("모두 거두기", lambda _i, _it: self.call(a.recall_all)),
@@ -91,16 +90,9 @@ class Tray(object):
             MenuItem("포켓몬 크기", Menu(*size_items)),
             MenuItem("활동 범위", Menu(*area_items)),
             Menu.SEPARATOR,
-            MenuItem(lambda _it: "계정: %s" % (a.username or "-"), None,
-                     enabled=False),
-            MenuItem(lambda _it: "몬스터볼 %d개" % a.balls, None, enabled=False),
-            MenuItem(lambda _it: "소지금 %s원" % format(getattr(a, "money", 0), ","),
-                     None, enabled=False),
-            MenuItem(lambda _it: "최근: %s" % (
-                         (a.last_message or "-")[:44]), None, enabled=False),
+            # 볼과 소지금은 가방·상점 창에 이미 크게 떠 있다. 메뉴에
+            # 또 두면 길기만 하다. 여기는 버전 하나로 줄인다.
             MenuItem("버전 %s" % VERSION, None, enabled=False),
-            MenuItem("만든 자료 출처", lambda _i, _it: self.call(a.open_credits)),
-            MenuItem("서버 연결 확인", lambda _i, _it: self.call(a.check_server)),
             MenuItem("로그아웃", lambda _i, _it: self.call(a.logout)),
             MenuItem("회원탈퇴", lambda _i, _it: self.call(a.delete_account)),
             Menu.SEPARATOR,
