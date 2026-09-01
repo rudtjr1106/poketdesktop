@@ -603,7 +603,8 @@ def login(body: LoginIn, request: Request):
 @app.post("/api/auth/auto")
 def auto_login(body: AutoIn, request: Request):
     """저장된 토큰으로 자동 로그인. 기기가 같아야 하고, IP 를 알 수 있으면 IP 도 본다."""
-    sess = auth.lookup_session(body.token)
+    # 세션과 계정을 한 번에 읽는다 (왕복 2회 -> 1회).
+    sess, user = auth.lookup_session_with_user(body.token)
     if not sess:
         raise HTTPException(401, "저장된 로그인이 만료되었습니다.")
     # 세션에 기기가 적혀 있으면 **반드시** 같아야 한다.
@@ -618,9 +619,6 @@ def auto_login(body: AutoIn, request: Request):
     if config.REQUIRE_IP and sess["ip_real"] and now_real and sess["ip"] != ip:
         raise HTTPException(
             401, "접속 위치(IP)가 바뀌었습니다. 비밀번호로 다시 로그인해 주세요.")
-    user = db.q1("SELECT * FROM users WHERE id=?", (sess["user_id"],))
-    if not user:
-        raise HTTPException(401, "계정을 찾을 수 없습니다.")
     auth.touch_session(body.token, ip)
     db.run("UPDATE users SET last_login=?, last_ip=? WHERE id=?",
            (auth.now_iso(), ip, user["id"]))

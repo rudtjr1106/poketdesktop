@@ -71,9 +71,13 @@ def _wallet(uid):
 # ---------------------------------------------------------------- 가방
 @router.get("/api/bag")
 def bag(me=Depends(deps.current)):
-    uid = me["user"]["id"]
-    return {"bag": items.bag_get(uid), "money": items.money(uid),
-            "balls": me["user"]["balls"]}
+    # 돈도 볼도 사용자 행에 이미 들어 있다. 여기는 아무것도 바꾸지 않는
+    # 순수 조회라 다시 읽을 이유가 없다 - 왕복 두 번이 그냥 날아간다.
+    # (사고팔기 뒤에 쓰는 _wallet 은 다르다. 거기서는 값이 방금 바뀌었으므로
+    #  반드시 다시 읽어야 한다.)
+    u = me["user"]
+    return {"bag": items.bag_get(u["id"], u["balls"]), "money": u["money"],
+            "balls": u["balls"]}
 
 
 @router.get("/api/shop")
