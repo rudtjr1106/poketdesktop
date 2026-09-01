@@ -95,7 +95,13 @@ jobs:
         run: |
           mkdir -p /tmp/sprites /tmp/walk
           cd server
+          # --forwarded-allow-ips= 를 비워 둔다. uvicorn 은 기본으로
+          # 127.0.0.1 에서 온 요청의 X-Forwarded-For 를 믿고
+          # request.client.host 를 바꿔치기하는데, 그러면 'IP 위조
+          # 차단' 검사가 깨진다. 도커에서는 접속 주소가 172.17.0.1 이라
+          # 그 기본값에 안 걸려서 드러나지 않던 차이다.
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8788 \
+                --forwarded-allow-ips= \
                 --log-level warning > /tmp/server.log 2>&1 &
           for i in $(seq 1 40); do
             if curl -s --max-time 3 http://127.0.0.1:8788/api/health > /dev/null; then
