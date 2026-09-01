@@ -1,5 +1,20 @@
 # -*- coding: utf-8 -*-
-"""SQLite 저장소. 스키마 생성과 조회/갱신 헬퍼."""
+"""저장소. 스키마 생성과 조회/갱신 헬퍼.
+
+두 가지를 쓸 수 있다.
+
+    SQLite 파일   그냥 로컬 파일. 개발할 때와 도커로 직접 띄울 때.
+    Turso(libSQL) POKET_TURSO_URL 이 있으면 그쪽으로 붙는다.
+
+Render 같은 곳은 재시작하면 디스크가 날아가서 SQLite 파일을 못 쓴다.
+그래서 Turso 를 쓸 수 있게 해뒀다.
+
+libSQL 은 SQLite 와 SQL 은 같지만 **행을 튜플로 돌려준다.** 우리 코드는
+r["species"] 처럼 컬럼 이름으로 꺼내는 곳이 백 군데가 넘어서, 여기서
+dict 로 감싸 준다. 그래야 나머지 코드를 한 줄도 안 고쳐도 된다.
+(rowcount 는 libSQL 에서도 제대로 나온다 — 돈·가방을 깎을 때 이걸로
+성공 여부를 판단하므로 미리 확인해 뒀다.)
+"""
 import json
 import os
 import sqlite3
@@ -8,6 +23,29 @@ import threading
 from . import config
 
 _local = threading.local()
+
+
+class Row(dict):
+    """sqlite3.Row 처럼 쓸 수 있는 dict.
+
+    r["col"] 과 "col" in r.keys() 둘 다 되어야 한다.
+    (row_to_mon 이 옛 DB 행에 새 컬럼이 있는지 keys() 로 확인한다)
+    """
+
+    __slots__ = ()
+
+
+def _wrap_one(cur, row):
+    if row is None or cur.description is None:
+        return row
+    return Row(zip([d[0] for d in cur.description], row))
+
+
+def _wrap_all(cur, rows):
+    if not rows or cur.description is None:
+        return rows or []
+    cols = [d[0] for d in cur.description]
+    return [Row(zip(cols, r)) for r in rows]
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -105,6 +143,16 @@ CREATE TABLE IF NOT EXISTS wild_state (
     wins        INTEGER NOT NULL DEFAULT 0
 );
 
+-- 로그인 실패 기록.
+-- 예전에는 프로세스 메모리에 뒀는데, 무료 호스팅은 하루에도 몇 번씩
+-- 재시작해서 그때마다 카운터가 지워졌다. 비밀번호가 숫자 4자리(만 가지)라
+-- 시도 제한이 사실상 유일한 방어선인데 그게 계속 풀리면 안 된다.
+CREATE TABLE IF NOT EXISTS login_fail (
+    key    TEXT NOT NULL,
+    at     REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_login_fail ON login_fail(key, at);
+
 CREATE TABLE IF NOT EXISTS bag (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     item     TEXT NOT NULL,
@@ -140,16 +188,48 @@ MIGRATIONS = [
 ]
 
 
+def using_turso():
+    return bool(config.TURSO_URL)
+
+
+def _open():
+    """새 커넥션 하나. 스레드마다 따로 만든다."""
+    if using_turso():
+        import libsql
+        if config.TURSO_REPLICA:
+            # 붙박이 복제본: 읽기는 로컬 파일에서 하고 쓰기만 Turso 로 간다.
+            # 배틀은 한 턴에도 여러 번 읽으므로 이쪽이 훨씬 빠르다.
+            d = os.path.dirname(os.path.abspath(config.TURSO_REPLICA))
+            if d:
+                os.makedirs(d, exist_ok=True)
+            return libsql.connect(config.TURSO_REPLICA,
+                                  sync_url=config.TURSO_URL,
+                                  auth_token=config.TURSO_TOKEN)
+        # libsql:// 주소가 아니라 로컬 파일 경로를 준 경우(시험용)에는
+        # 폴더가 없으면 열리지 않으므로 먼저 만들어 준다.
+        if "://" not in config.TURSO_URL:
+            d = os.path.dirname(os.path.abspath(config.TURSO_URL))
+            if d:
+                os.makedirs(d, exist_ok=True)
+        return libsql.connect(config.TURSO_URL, auth_token=config.TURSO_TOKEN)
+
+    d = os.path.dirname(os.path.abspath(config.DB_PATH))
+    if d:
+        os.makedirs(d, exist_ok=True)
+    conn = sqlite3.connect(config.DB_PATH, timeout=15)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 def connect():
     """스레드마다 커넥션 하나."""
     conn = getattr(_local, "conn", None)
     if conn is None:
-        d = os.path.dirname(os.path.abspath(config.DB_PATH))
-        if d:
-            os.makedirs(d, exist_ok=True)
-        conn = sqlite3.connect(config.DB_PATH, timeout=15)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys=ON")
+        conn = _open()
+        try:
+            conn.execute("PRAGMA foreign_keys=ON")
+        except Exception:            # noqa: BLE001 — Turso 는 이미 켜져 있다
+            pass
         _local.conn = conn
     return conn
 
@@ -158,18 +238,26 @@ def init():
     conn = connect()
     conn.executescript(SCHEMA)
     for table, col, sql in MIGRATIONS:
-        have = set(r["name"] for r in conn.execute("PRAGMA table_info(%s)" % table))
+        cur = conn.execute("PRAGMA table_info(%s)" % table)
+        rows = cur.fetchall()
+        # PRAGMA 결과도 백엔드에 따라 모양이 다르다. 이름은 두 번째 칸이다.
+        have = set(r["name"] if isinstance(r, (dict, sqlite3.Row)) else r[1]
+                   for r in rows)
         if have and col not in have:
             conn.execute(sql)
     conn.commit()
 
 
 def q(sql, args=()):
-    return connect().execute(sql, args).fetchall()
+    cur = connect().execute(sql, args)
+    rows = cur.fetchall()
+    return _wrap_all(cur, rows) if using_turso() else rows
 
 
 def q1(sql, args=()):
-    return connect().execute(sql, args).fetchone()
+    cur = connect().execute(sql, args)
+    row = cur.fetchone()
+    return _wrap_one(cur, row) if using_turso() else row
 
 
 def run(sql, args=()):

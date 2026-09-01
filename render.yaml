@@ -1,0 +1,73 @@
+# Render 배포 설정 (Blueprint).
+#
+# Render 무료 등급은 **재시작하면 디스크가 날아간다.** 그래서 SQLite 파일을
+# 쓸 수 없고 DB 를 Turso 로 둔다. 도트 캐시도 마찬가지로 날아가는데,
+# 그건 다시 받으면 그만이라 그냥 둔다(도구 그림은 이미지에 들어 있다).
+#
+# 또 15분쯤 요청이 없으면 잠들고, 다시 깨는 데 30~60초가 걸린다.
+# .github/workflows/keepalive.yml 이 5분마다 두드려서 재우지 않는다.
+#
+# 배포 전에 Render 대시보드에서 넣어야 하는 값 (sync: false 인 것들):
+#   POKET_TURSO_URL    libsql://이름-계정.turso.io
+#   POKET_TURSO_TOKEN  turso db tokens create 로 만든 토큰
+#
+# 그리고 저장소 Settings > Secrets and variables > Actions > Variables 에
+#   POKET_SERVER = https://<서비스이름>.onrender.com
+
+services:
+  - type: web
+    name: poketdesktop
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore          # 한국에서 가장 가깝다
+    healthCheckPath: /api/health
+    envVars:
+      - key: POKET_TURSO_URL
+        sync: false            # 대시보드에서 직접 넣는다
+      - key: POKET_TURSO_TOKEN
+        sync: false
+
+      - key: POKET_POKEDEX
+        value: /app/data/pokedex.json
+      - key: POKET_ITEMS
+        value: /app/data/items.json
+
+      # 도트는 디스크가 없어서 컨테이너 안에 잠깐만 둔다.
+      # 재시작하면 사라지지만 다시 받으면 된다.
+      - key: POKET_SPRITE_DIR
+        value: /tmp/sprites
+      # 미리 받아두기는 끈다. 무료 등급은 메모리가 512MB 라 여유가 없고,
+      # 어차피 재시작하면 날아가서 받아둔 보람이 없다.
+      - key: POKET_WARM_SPRITES
+        value: "0"
+
+      # 인증만 통과하면 경험치를 마음대로 넣을 수 있는 경로. 반드시 막는다.
+      - key: POKET_ALLOW_ADD_EXP
+        value: "0"
+
+      # Render 가 앞에서 프록시를 하고 X-Forwarded-For 를 넣어 준다.
+      - key: POKET_TRUST_PROXY
+        value: "1"
+      - key: POKET_REQUIRE_IP
+        value: "1"
+
+      # 야생 조우 주기 (실제 운영값)
+      - key: POKET_WILD_COOLDOWN_MIN
+        value: "600"
+      - key: POKET_WILD_COOLDOWN_MAX
+        value: "900"
+      - key: POKET_MISS_COOLDOWN
+        value: "300"
+      - key: POKET_GRASS_TTL
+        value: "90"
+      - key: POKET_WILD_TTL
+        value: "60"
+
+      - key: POKET_BALLS_START
+        value: "10"
+      - key: POKET_MONEY_START
+        value: "3000"
+      - key: POKET_MAX_DESKTOP
+        value: "6"

@@ -324,8 +324,14 @@ def main():
     st, before = call("GET", "/api/pokemon", token=token)
     tgt = [m for m in before["pokemon"] if m["id"] == ids[0]][0]
     st, r = call("POST", "/api/pokemon/%d/exp" % ids[0], {"amount": 80000}, token)
-    chk("경험치 주면 레벨업", st == 200 and r["level"] > tgt["level"],
-        (tgt["level"], r.get("level")))
+    if st == 403:
+        # 운영 설정에서는 이 경로를 일부러 막는다(POKET_ALLOW_ADD_EXP=0).
+        # 인증만 통과하면 경험치를 마음대로 넣을 수 있어서, 진화·노력치·
+        # 드랍이 걸린 지금은 열어 두면 무한 획득 통로가 되기 때문이다.
+        chk("경험치 직접 주입이 막혀 있다(운영 설정)", True)
+    else:
+        chk("경험치 주면 레벨업", st == 200 and r["level"] > tgt["level"],
+            (tgt["level"], r.get("level")))
     st, r = call("DELETE", "/api/pokemon/%d" % ids[0], token=token)
     chk("놓아주기", st == 200, r)
     st, r = call("DELETE", "/api/pokemon/%d" % ids[0], token=token)

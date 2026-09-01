@@ -7,7 +7,6 @@
 야생 조우는 백그라운드 작업 없이 '물어볼 때 계산하는' 방식이다.
 GET /api/wild 이 불릴 때 시간이 됐으면 풀숲을 만들고, 지났으면 정리한다.
 """
-import collections
 import datetime
 import gzip
 import json
@@ -35,7 +34,8 @@ app.include_router(item_routes.router)
 
 RNG = deps.RNG
 
-_fails = collections.defaultdict(list)
+# 실패 기록은 DB 에 둔다 (db.py 의 login_fail).
+# 메모리에 두면 서버가 재시작할 때마다 초기화되어 방어가 풀린다.
 # 비밀번호가 숫자 4자리(만 가지)라 시도 제한이 사실상 유일한 방어선이다.
 # 5분에 5번까지만 틀릴 수 있다 — 전부 훑으려면 몇 년이 걸린다.
 FAIL_WINDOW = 300
@@ -71,19 +71,22 @@ def _fail_key(username, ip):
 
 
 def _fail_check(username, ip):
+    """최근 실패가 너무 많으면 막는다."""
     k = _fail_key(username, ip)
-    t = time.time()
-    _fails[k] = [x for x in _fails[k] if t - x < FAIL_WINDOW]
-    if len(_fails[k]) >= FAIL_LIMIT:
+    cut = time.time() - FAIL_WINDOW
+    db.run("DELETE FROM login_fail WHERE at < ?", (cut,))
+    r = db.q1("SELECT COUNT(*) c FROM login_fail WHERE key=? AND at >= ?", (k, cut))
+    if r and r["c"] >= FAIL_LIMIT:
         raise HTTPException(429, "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.")
 
 
 def _fail_add(username, ip):
-    _fails[_fail_key(username, ip)].append(time.time())
+    db.run("INSERT INTO login_fail (key, at) VALUES (?,?)",
+           (_fail_key(username, ip), time.time()))
 
 
 def _fail_clear(username, ip):
-    _fails.pop(_fail_key(username, ip), None)
+    db.run("DELETE FROM login_fail WHERE key=?", (_fail_key(username, ip),))
 
 
 # ---------------------------------------------------------------- 인증

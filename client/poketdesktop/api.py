@@ -8,6 +8,10 @@ import requests
 from . import config
 
 TIMEOUT = 15
+# 무료 호스팅(Render 등)은 한동안 요청이 없으면 서버를 재운다.
+# 다시 깨어나는 데 1분쯤 걸려서, 15초로는 로그인이 무조건 실패한다.
+# 처음 붙는 요청만 넉넉히 기다린다.
+WAKE_TIMEOUT = 90
 
 
 class ApiError(Exception):
@@ -57,11 +61,37 @@ class Api(object):
         return data
 
     # ---------------- 공개 ----------------
-    def health(self):
-        return self._call("GET", "/api/health", auth=False)
+    def health(self, wake=False):
+        """서버가 살아 있는지. wake=True 면 자고 있는 서버를 깨울 때까지 기다린다."""
+        return self._call("GET", "/api/health", auth=False,
+                          timeout=WAKE_TIMEOUT if wake else TIMEOUT)
+
+    def wake(self, on_progress=None):
+        """자고 있을지 모르는 서버를 깨운다.
+
+        무료 호스팅은 15분쯤 놀면 서버를 재우고, 다시 깨는 데 1분쯤 걸린다.
+        그동안 오는 요청은 그냥 실패하므로, 로그인 전에 한 번 두드려 둔다.
+        """
+        import time
+        deadline = time.time() + WAKE_TIMEOUT
+        last = None
+        tries = 0
+        while time.time() < deadline:
+            tries += 1
+            try:
+                return self._call("GET", "/api/health", auth=False, timeout=20)
+            except ApiError as e:
+                last = e
+                if on_progress:
+                    on_progress(tries)
+                time.sleep(2)
+        raise last or ApiError("서버가 응답하지 않습니다.")
 
     def pokedex_meta(self):
-        return self._call("GET", "/api/pokedex/meta", auth=False)
+        # 앱이 켜지고 가장 먼저 부르는 것 중 하나다. 서버가 자고 있으면
+        # 여기서 깨어난다.
+        return self._call("GET", "/api/pokedex/meta", auth=False,
+                          timeout=WAKE_TIMEOUT)
 
     def pokedex(self):
         """1MB 가 넘어서 requests 가 알아서 gzip 을 풀어준다."""
@@ -74,7 +104,8 @@ class Api(object):
                           urllib.parse.quote(name), auth=False, timeout=8)
 
     def starters(self):
-        return self._call("GET", "/api/starters", auth=False)
+        return self._call("GET", "/api/starters", auth=False,
+                          timeout=WAKE_TIMEOUT)
 
     def sprite(self, num, shiny=False):
         """정식 도트 원본 바이트. (내용, 확장자) 를 돌려준다."""
@@ -92,21 +123,24 @@ class Api(object):
 
     # ---------------- 계정 ----------------
     def register(self, username, password, starter=""):
-        d = self._call("POST", "/api/auth/register", auth=False, body={
+        d = self._call("POST", "/api/auth/register", auth=False,
+                       timeout=WAKE_TIMEOUT, body={
             "username": username, "password": password,
             "device": config.device_id(), "starter": starter})
         self.token = d["token"]
         return d
 
     def login(self, username, password):
-        d = self._call("POST", "/api/auth/login", auth=False, body={
+        d = self._call("POST", "/api/auth/login", auth=False,
+                       timeout=WAKE_TIMEOUT, body={
             "username": username, "password": password,
             "device": config.device_id()})
         self.token = d["token"]
         return d
 
     def auto_login(self, token):
-        d = self._call("POST", "/api/auth/auto", auth=False, body={
+        d = self._call("POST", "/api/auth/auto", auth=False,
+                       timeout=WAKE_TIMEOUT, body={
             "token": token, "device": config.device_id()})
         self.token = d["token"]
         return d

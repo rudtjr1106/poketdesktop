@@ -1,0 +1,75 @@
+# Tailscale Funnel 뒤에서 돌릴 때 쓰는 구성.
+#
+# Funnel 이 이미 HTTPS 와 인증서를 맡아 주므로 Caddy 가 필요 없다.
+# 서버 하나만 8787 로 띄우고 Funnel 이 그쪽으로 넘겨준다.
+#
+#   docker compose -f docker-compose.funnel.yml up -d --build
+#   tailscale funnel --bg --https=10000 http://127.0.0.1:8787
+#
+# 개발용(docker-compose.yml)과 다른 점은 딱 두 가지다.
+#
+#   - 야생이 10~15분에 한 번 (개발용은 시험하려고 1분)
+#   - 경험치를 직접 넣는 경로를 막았다 (POKET_ALLOW_ADD_EXP=0)
+#
+# 두 번째가 중요하다. 그 경로는 인증만 통과하면 경험치를 마음대로 넣을 수
+# 있는데, 이제 경험치에 진화·노력치·도구 드랍이 걸려 있어서 열어 두면
+# 무한 획득 통로가 된다. 나 혼자 쓸 때는 상관없지만 남이 붙는 순간
+# 이야기가 달라진다.
+#
+# IP 확인에 대해: 도커가 출발지 IP 를 게이트웨이(172.x.0.1)로 바꿔버려서
+# 실제 접속자 IP 를 알 수 없다. 그래서 자동 로그인은 IP 를 빼고 '토큰 +
+# 기기' 로만 확인한다(서버가 알아서 그렇게 한다). Funnel 이 넣어주는
+# 헤더를 믿게 만들 수도 있지만, 그러면 헤더를 위조해 남의 자동 로그인을
+# 노릴 여지가 생기므로 켜지 않는다.
+
+services:
+  poket-server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: poketdesktop-server:latest
+    container_name: poketdesktop-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8080"      # 바깥에 직접 열지 않는다. Funnel 만 통한다.
+    volumes:
+      - poketdata:/data
+    environment:
+      POKET_DB: /data/poket.db
+      POKET_POKEDEX: /app/data/pokedex.json
+      POKET_ITEMS: /app/data/items.json
+      POKET_SPRITE_DIR: /data/sprites
+
+      # 경험치 직접 주입 차단 (남이 붙는 순간 반드시 꺼야 한다)
+      POKET_ALLOW_ADD_EXP: "0"
+
+      # Funnel 뒤에서는 실제 IP 를 알 수 없다. 헤더를 믿지 않는다.
+      POKET_TRUST_PROXY: "0"
+      POKET_REQUIRE_IP: "1"
+
+      # 실제 운영 주기
+      POKET_WILD_COOLDOWN_MIN: "600"
+      POKET_WILD_COOLDOWN_MAX: "900"
+      POKET_MISS_COOLDOWN: "300"
+      POKET_GRASS_TTL: "90"
+      POKET_WILD_TTL: "60"
+
+      POKET_BALLS_START: "10"
+      POKET_MONEY_START: "3000"
+      POKET_MAX_DESKTOP: "6"
+      POKET_WARM_SPRITES: "1"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health')"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  poketdata:
