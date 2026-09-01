@@ -286,6 +286,9 @@ class BoxWindow(object):
         self.d_types = tk.Frame(p, bg=U.BG2)
         self.d_types.pack(anchor="w", pady=(8, 0))
 
+        # 친밀도 (친밀도로 진화하는 종에만 뜬다)
+        self.d_friend = tk.Frame(p, bg=U.BG2)
+
         # 능력치
         stats = tk.Frame(p, bg="#101623", highlightthickness=2,
                          highlightbackground=U.LINE)
@@ -414,6 +417,44 @@ class BoxWindow(object):
                 text="박스로 보내기" if m.get("onDesktop") else "데리고 다니기")
 
     # ---------------- 상세 그리기 ----------------
+    def _friendship(self, m):
+        """친밀도로 진화하는 종이면 얼마나 남았는지 보여준다.
+
+        숫자만 있으면 그게 뭘 향해 가는지 알 수가 없다. 하트로 대강을
+        보이고, 남은 시간을 함께 적는다 - 바탕화면에 데리고 다니는
+        시간으로 오르기 때문에 '얼마나 더 켜 두면 되는지' 가 곧 답이다.
+        """
+        box = getattr(self, "d_friend", None)
+        if box is None:
+            return
+        for w in box.winfo_children():
+            w.destroy()
+        f = m.get("friendship")
+        if not f:
+            box.pack_forget()
+            return
+        box.pack(fill="x", pady=(8, 0))
+        now, need = f["now"], f["need"]
+        hearts = int(round(5.0 * min(1.0, now / float(need or 1))))
+        line = tk.Frame(box, bg=U.BG2)
+        line.pack(fill="x")
+        tk.Label(line, text="친밀도", bg=U.BG2, fg=U.FG_DIM,
+                 font=U.FONT_XS).pack(side="left")
+        tk.Label(line, text="  " + "♥" * hearts + "♡" * (5 - hearts),
+                 bg=U.BG2, fg=U.PINK, font=U.FONT_S).pack(side="left")
+        tk.Label(line, text="  %d / %d" % (now, need), bg=U.BG2,
+                 fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left")
+        if now >= need:
+            msg = "곧 진화합니다"
+        elif f["hours"] >= 1:
+            msg = "%.0f시간쯤 더 데리고 다니면 진화합니다" % f["hours"]
+        else:
+            msg = "조금만 더 데리고 다니면 진화합니다"
+        if f.get("luxury"):
+            msg += "  (럭셔리볼 2배)"
+        tk.Label(box, text=msg, bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS,
+                 anchor="w").pack(fill="x", pady=(2, 0))
+
     def show_detail(self, m):
         info = m.get("info", {})
         dex = self.app.dex
@@ -454,6 +495,7 @@ class BoxWindow(object):
         self.d_ivsum.configure(
             text="개체값 %d / 186  ·  %.0f%%" % (info.get("ivTotal", 0),
                                               info.get("ivPercent", 0)))
+        self._friendship(m)
 
         for w in self.d_moves.winfo_children():
             w.destroy()

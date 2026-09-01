@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from common import battle as B
 from common import pokelogic as P
 
-from . import auth, config, db, deps, items
+from . import auth, config, db, deps, items, walk
 
 router = APIRouter()
 
@@ -360,6 +360,8 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
         db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
         reschedule(uid)
     elif bt.over and bt.result == "lost":
+        # 쓰러진 그 한 마리만 조금 깎인다. 본가와 같은 방향이되 훨씬 약하다.
+        walk.on_faint(uid, row["mine_id"])
         nxt = [m for m in _party(uid) if m["id"] != row["mine_id"]]
         out["canSwitch"] = bool(nxt)
         out["party"] = [deps.decorate(m) for m in nxt]
