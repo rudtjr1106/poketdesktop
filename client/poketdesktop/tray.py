@@ -69,7 +69,12 @@ class Tray(object):
             MenuItem("가방...", lambda _i, _it: self.call(a.open_bag)),
             MenuItem("친구...", lambda _i, _it: self.call(a.open_friends)),
             MenuItem("랜덤 배틀", lambda _i, _it: self.call(a.pvp_random)),
-            MenuItem("받은 대전 보기",
+            # 알림을 안 띄우기로 했으니, 놓치면 안 되는 것은 메뉴에
+            # 남는다. 상대가 걸어온 대전은 화면에 아무 자국도 없어서
+            # 여기 없으면 알 길이 없다.
+            MenuItem(lambda _it: ("받은 대전 보기  (%d)" % a.pvp_unseen
+                                  if getattr(a, "pvp_unseen", 0)
+                                  else "받은 대전 보기"),
                      lambda _i, _it: self.call(a.watch_pending)),
             MenuItem("상점...", lambda _i, _it: self.call(a.open_shop)),
             MenuItem("풀숲 찾아보기", lambda _i, _it: self.call(a.encounter_now)),
@@ -91,6 +96,8 @@ class Tray(object):
             MenuItem(lambda _it: "몬스터볼 %d개" % a.balls, None, enabled=False),
             MenuItem(lambda _it: "소지금 %s원" % format(getattr(a, "money", 0), ","),
                      None, enabled=False),
+            MenuItem(lambda _it: "최근: %s" % (
+                         (a.last_message or "-")[:44]), None, enabled=False),
             MenuItem("버전 %s" % VERSION, None, enabled=False),
             MenuItem("만든 자료 출처", lambda _i, _it: self.call(a.open_credits)),
             MenuItem("서버 연결 확인", lambda _i, _it: self.call(a.check_server)),
@@ -116,13 +123,9 @@ class Tray(object):
         except Exception:
             pass
 
-    def notify(self, message, title="포켓 데스크톱"):
-        if not self.icon:
-            return
-        try:
-            self.icon.notify(message, title)
-        except Exception:
-            pass
+    # 윈도우 알림(토스트)은 쓰지 않는다. 켜 두고 잊어버리는 프로그램이라
+    # 무슨 일이 있을 때마다 화면 구석에서 튀어나오면 하던 일을 방해한다.
+    # 무슨 일이 있었는지는 메뉴 안에 한 줄로 남고, 기록에도 남는다.
 
     def stop(self):
         if self.icon:

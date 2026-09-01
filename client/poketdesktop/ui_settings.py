@@ -103,12 +103,12 @@ class SettingsWindow(object):
         box = tk.Frame(p, bg=U.BG)
         box.pack(fill="x", pady=(16, 0))
         self.names = tk.BooleanVar(value=bool(s.get("showNames")))
-        self.notify = tk.BooleanVar(value=bool(s.get("notifyEncounter")))
+        # 윈도우 알림은 아예 안 띄운다. 켜 두고 잊어버리는 프로그램이라
+        # 무슨 일이 있을 때마다 튀어나오면 하던 일을 방해한다. 그래서
+        # 알림 관련 손잡이도 없앴다.
         for var, label, key, note in (
                 (self.names, "이름표 보이기", "showNames",
-                 "포켓몬 위에 이름과 레벨을 띄웁니다."),
-                (self.notify, "야생이 나타나면 알림", "notifyEncounter",
-                 "풀숲이 돋으면 윈도우 알림을 띄웁니다.")):
+                 "포켓몬 위에 이름과 레벨을 띄웁니다."),):
             c = tk.Checkbutton(
                 box, text=label, variable=var, bg=U.BG, fg=U.FG,
                 selectcolor=U.INK, activebackground=U.BG,

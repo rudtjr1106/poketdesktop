@@ -46,6 +46,10 @@ class App(object):
         self.friends_win = None
         self.dex_window = None
         self.settings_win = None
+        # 마지막으로 있었던 일. 트레이 메뉴에서 보여준다.
+        self.last_message = ""
+        # 상대가 걸어온, 아직 안 본 대전 수. 트레이에 표시한다.
+        self.pvp_unseen = 0
         self.arena = None
         self.battle = None
         self._quitting = False
@@ -184,11 +188,23 @@ class App(object):
 
     # ---------------------------------------------------------------- 알림
     def notify(self, message):
-        """알림 한 줄. 조사는 여기서 한 번에 자연스럽게 고친다."""
+        """무슨 일이 있었는지 한 줄.
+
+        **윈도우 알림은 띄우지 않는다.** 이건 켜 두고 잊어버리는
+        프로그램이다. 포켓몬을 잡을 때마다, 레벨이 오를 때마다 화면
+        구석에서 알림이 튀어나오면 하던 일을 방해한다. 게임 안에서
+        일어나는 일은 바탕화면에서 눈으로 보이는 것으로 충분하다 -
+        풀숲이 흔들리고, 도트가 싸우고, 진화 연출이 돈다.
+
+        대신 기록에는 남긴다. 나중에 "왜 그랬지" 를 따져볼 수 있어야 한다.
+        그리고 놓치면 안 되는 것(상대가 걸어온 대전 같은 것)은 트레이
+        메뉴에 표시로 남는다.
+
+        조사는 여기서 한 번에 자연스럽게 고친다.
+        """
         message = natural(message)
         config.log(message)
-        if self.tray:
-            self.tray.notify(message)
+        self.last_message = message
 
     def refresh_tray(self):
         if self.tray:
@@ -427,12 +443,19 @@ class App(object):
         self.sync()
 
     def announce_pvp(self, n):
-        """상대가 걸어온 대전이 있으면 알린다. sync 응답에 실려 온다."""
-        if not n or n == getattr(self, "_pvp_seen_n", 0):
+        """상대가 걸어온 대전이 몇 개인지. sync 응답에 실려 온다.
+
+        알림을 띄우지 않으므로 트레이 메뉴에 숫자로 남긴다. 대전은
+        화면에 아무 자국도 남기지 않아서, 여기 없으면 상대가 걸어온
+        것을 알 길이 없다.
+        """
+        n = int(n or 0)
+        if n == self.pvp_unseen:
             return
-        self._pvp_seen_n = n
-        self.notify("확인하지 않은 대전이 %d개 있습니다. "
-                    "트레이의 '받은 대전 보기' 로 볼 수 있습니다." % n)
+        self.pvp_unseen = n
+        if n:
+            config.log("확인하지 않은 대전 %d개" % n)
+        self.refresh_tray()
 
     def watch_pending(self):
         """상대가 걸어온 대전 중 가장 최근 것을 본다."""
