@@ -79,5 +79,7 @@ services:
         value: "10"
       - key: POKET_MONEY_START
         value: "3000"
-      - key: POKET_MAX_DESKTOP
+      # 바탕화면에 동시에 둘 수 있는 마리 수.
+      # POKET_MAX_DESKTOP 이라는 이름은 아무 데서도 읽지 않는다.
+      - key: POKET_MAX_PARTY
         value: "6"

@@ -1,0 +1,19 @@
+# 윈도우에서 작업하고 리눅스 서버에 올린다. core.autocrlf=true 라서
+# 그냥 두면 셸 스크립트가 CRLF 로 나가고, 리눅스에서 첫 줄이
+# `#!/usr/bin/env bash` 가 되어 "bad interpreter" 로 죽는다.
+#
+# 도커 안에서 도는 것들(Dockerfile, 엔트리포인트)도 같은 이유로 LF 여야 한다.
+
+* text=auto
+
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+Caddyfile   text eol=lf
+
+# 이미지는 손대지 않는다
+*.png       binary
+*.gif       binary
+*.ico       binary
+*.db        binary
