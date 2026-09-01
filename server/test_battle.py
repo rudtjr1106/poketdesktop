@@ -284,8 +284,13 @@ def main():
     box = [m for m in p["pokemon"] if not m["onDesktop"]]
     chk("파티가 6마리를 넘지 않음", len(party) <= 6, len(party))
     print("       파티 %d / 박스 %d" % (len(party), len(box)))
-    if len(party) == 6:
-        chk("넘친 포켓몬은 박스에 있음", len(box) >= 1, len(box))
+    # 7마리 넘게 가졌을 때만 '넘쳤다' 고 말할 수 있다.
+    # 딱 6마리면 넘친 게 없으니 박스가 비어 있는 게 맞다.
+    total = len(party) + len(box)
+    if total > 6:
+        chk("넘친 만큼 박스로 갔다", len(box) == total - 6, (total, len(box)))
+    else:
+        chk("아직 넘치지 않았다 (파티 %d마리)" % total, len(box) == 0, len(box))
 
     section("남의 배틀 차단")
     other = "b%06d" % random.randrange(1000000)

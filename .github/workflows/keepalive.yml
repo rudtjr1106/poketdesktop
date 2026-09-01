@@ -1,0 +1,64 @@
+# Render 무료 등급은 15분쯤 요청이 없으면 잠든다.
+# 다시 깨어나는 데 30~60초가 걸려서, 그동안 게임이 "서버에 연결할 수 없습니다" 를 띄운다.
+# 그래서 5분마다 한 번씩 두드려서 재워두지 않는다.
+#
+# 이 저장소가 **공개** 라서 Actions 분이 무료다. 비공개로 바꾸면 5분 주기는
+# 월 8,640분이 되어 무료 한도(2,000분)를 넘긴다. 그때는 이 파일을 지우고
+# UptimeRobot 같은 곳으로 옮겨야 한다.
+#
+# 주의: GitHub 의 cron 은 정확하지 않다. 사람이 몰리는 시간대에는 10~30분씩
+# 밀리기도 한다. 그래서 5분으로 잡아 두어도 실제로는 더 뜸할 수 있고,
+# 가끔 서버가 자는 걸 완전히 막지는 못한다. 확실히 하려면 UptimeRobot 을
+# 같이 걸어 두면 된다(무료, 5분 주기).
+#
+# 또 하나: 공개 저장소라도 **60일 동안 커밋이 없으면** 예약 실행이 자동으로
+# 꺼진다. 그때는 Actions 탭에서 다시 켜면 된다.
+
+name: keepalive
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:        # 손으로도 돌려볼 수 있게
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 서버 깨우기
+        env:
+          # 저장소 Settings > Secrets and variables > Actions > Variables 에
+          # POKET_SERVER 를 넣어 둔다. 예: https://poketdesktop.onrender.com
+          BASE: ${{ vars.POKET_SERVER }}
+        run: |
+          if [ -z "$BASE" ]; then
+            echo "::error::POKET_SERVER 변수가 없습니다. 저장소 Variables 에 서버 주소를 넣어 주세요."
+            exit 1
+          fi
+
+          # 자고 있으면 깨어나는 데 시간이 걸린다. 넉넉히 기다리고,
+          # 그래도 안 되면 몇 번 더 두드린다.
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /tmp/body -w '%{http_code}' \
+                        --max-time 90 "$BASE/api/health" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "깨어 있음 (시도 $attempt)"
+              cat /tmp/body
+              echo
+              exit 0
+            fi
+            echo "응답 $code — 다시 시도 ($attempt/3)"
+            sleep 20
+          done
+
+          echo "::error::서버가 응답하지 않습니다 ($BASE)"
+          cat /tmp/body || true
+          exit 1

@@ -33,6 +33,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 DB_PATH = os.environ.get("POKET_DB", "/data/poket.db")
+
+# ---- Turso (libSQL) ----
+# 이게 있으면 SQLite 파일 대신 Turso 를 쓴다.
+# Render 처럼 재시작하면 디스크가 날아가는 곳에서는 파일 DB 를 쓸 수 없다.
+#   POKET_TURSO_URL   libsql://이름-계정.turso.io
+#   POKET_TURSO_TOKEN turso db tokens create 로 만든 토큰
+TURSO_URL = os.environ.get("POKET_TURSO_URL", "")
+TURSO_TOKEN = os.environ.get("POKET_TURSO_TOKEN", "")
+# 붙박이 복제본을 둘 로컬 경로. 읽기가 로컬에서 끝나 훨씬 빠르다.
+# 비우면 매번 Turso 로 왕복한다(느리지만 디스크가 필요 없다).
+TURSO_REPLICA = os.environ.get("POKET_TURSO_REPLICA", "")
 POKEDEX_PATH = os.environ.get("POKET_POKEDEX", os.path.join(ROOT, "data", "pokedex.json"))
 
 # ---- 계정 ----
