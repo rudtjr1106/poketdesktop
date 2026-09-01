@@ -318,10 +318,18 @@ def starters():
 
 @app.get("/api/whoami")
 def whoami(request: Request):
-    return {"ip": auth.client_ip(request),
+    # 어느 헤더를 믿고 IP 를 골랐는지까지 보여준다.
+    # 프록시가 여러 겹인 곳(Render 는 Cloudflare 뒤에 있다)에서 잘못된
+    # 주소를 집으면 자동 로그인이 무작위로 풀리는데, 그때 원인을 바로
+    # 알 수 있어야 한다.
+    ip = auth.client_ip(request)
+    return {"ip": ip,
             "raw": request.client.host if request.client else None,
             "forwarded": request.headers.get("x-forwarded-for"),
-            "trustProxy": config.TRUST_PROXY}
+            "cfConnectingIp": request.headers.get("cf-connecting-ip"),
+            "realIp": request.headers.get("x-real-ip"),
+            "trustProxy": config.TRUST_PROXY,
+            "ipUsable": auth.ip_is_real(request)}
 
 
 # ---------------------------------------------------------------- 계정
