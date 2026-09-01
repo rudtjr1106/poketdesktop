@@ -272,7 +272,32 @@ def main():
                 catches += 1
                 if c.get("drop"):
                     drops += 1
+    # 한 번도 못 이기면 아래 노력치 검사가 통째로 무너진다. 야생이 안
+    # 돋거나(쿨다운) 연달아 지면 그럴 수 있는데, 그건 노력치 기능의
+    # 문제가 아니라 판이 안 선 것이다. 이길 때까지 조금 더 해본다.
+    for _ in range(30):
+        if wins:
+            break
+        wd = wild(token)
+        if not wd:
+            continue
+        st, b = call("POST", "/api/wild/%d/battle" % wd["id"], {}, token)
+        if st != 200:
+            continue
+        bid = b["battle"]["id"]
+        for _t in range(70):
+            st, mv = call("POST", "/api/battle/%d/move" % bid,
+                          {"move": "", "hour": 13}, token)
+            if st != 200:
+                break
+            if mv.get("drop"):
+                drops += 1
+            if mv.get("exp"):
+                wins += 1
+            if (mv.get("battle") or {}).get("over"):
+                break
     note("배틀 승 %d / 포획 %d / 드랍 %d개" % (wins, catches, drops))
+    chk("배틀을 한 번은 이겼다 (아래 검사의 전제)", wins > 0, wins)
     chk("잡거나 이기면 도구가 떨어진다", drops > 0, drops)
     chk("포획하면 반드시 떨어진다", catches == 0 or drops >= catches,
         (catches, drops))

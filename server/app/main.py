@@ -615,6 +615,10 @@ def me(ctx=Depends(current)):
         "stats": {"encounters": st["encounters"] if st else 0,
                   "caught": st["caught"] if st else 0,
                   "fled": st["fled"] if st else 0},
+        # 아직 안 본 대전 수. 상대가 걸어와서 생긴 것도 여기 들어온다.
+        # 이걸 위해 폴링을 새로 두지 않는다 - 어차피 90초마다 도는 sync 가
+        # 이 라우트를 부르므로 여기에 얹는다. 쿼리 한 번 는다.
+        "pvpUnseen": pvp.unseen_count(uid),
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 

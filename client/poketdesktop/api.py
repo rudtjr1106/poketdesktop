@@ -286,6 +286,17 @@ class Api(object):
     def pvp_seen(self, mid):
         return self._call("POST", "/api/pvp/match/%d/seen" % mid, {})
 
+    def pvp_random(self):
+        """아무나 골라 붙는다. 상대는 접속해 있지 않아도 된다."""
+        return self._call("POST", "/api/pvp/random", {})
+
+    def pvp_challenge(self, uid):
+        """친구를 지목해서 붙는다. 수락을 기다리지 않는다."""
+        return self._call("POST", "/api/pvp/challenge/%d" % uid, {})
+
+    def pvp_pending(self):
+        return self._call("GET", "/api/pvp/pending")
+
     # ---------------- 가방 · 상점 ----------------
     def bag(self):
         return self._call("GET", "/api/bag")

@@ -272,6 +272,10 @@ CREATE TABLE IF NOT EXISTS rank_stat (
     ranked      INTEGER NOT NULL DEFAULT 0,
     earned_day  TEXT NOT NULL DEFAULT '',
     earned      INTEGER NOT NULL DEFAULT 0,
+    -- 하루에 건 도전 횟수. 상대는 자고 있을 수도 있어서, 몇 번이고 걸 수
+    -- 있으면 아침에 점수가 바닥나 있게 된다.
+    fought_day  TEXT NOT NULL DEFAULT '',
+    fought      INTEGER NOT NULL DEFAULT 0,
     updated_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_rank_board ON rank_stat(ranked, rating DESC);
@@ -299,6 +303,10 @@ MIGRATIONS = [
      "ALTER TABLE pokemon ADD COLUMN hyper TEXT NOT NULL DEFAULT '{}'"),
     ("pokemon", "no_evolve",
      "ALTER TABLE pokemon ADD COLUMN no_evolve INTEGER NOT NULL DEFAULT 0"),
+    ("rank_stat", "fought_day",
+     "ALTER TABLE rank_stat ADD COLUMN fought_day TEXT NOT NULL DEFAULT ''"),
+    ("rank_stat", "fought",
+     "ALTER TABLE rank_stat ADD COLUMN fought INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
