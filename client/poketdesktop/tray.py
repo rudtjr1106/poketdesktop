@@ -66,6 +66,7 @@ class Tray(object):
             MenuItem("포켓몬 관리...", lambda _i, _it: self.call(a.open_box),
                      default=True),
             MenuItem("가방...", lambda _i, _it: self.call(a.open_bag)),
+            MenuItem("친구...", lambda _i, _it: self.call(a.open_friends)),
             MenuItem("상점...", lambda _i, _it: self.call(a.open_shop)),
             MenuItem("풀숲 찾아보기", lambda _i, _it: self.call(a.encounter_now)),
             Menu.SEPARATOR,
