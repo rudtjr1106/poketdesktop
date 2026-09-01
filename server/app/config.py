@@ -83,12 +83,12 @@ EXP_SHARE_RATE = _int("POKET_EXP_SHARE_RATE", 50)  # 참가 안 한 포켓몬이
 
 # ---- 야생 조우 ----
 # 풀숲이 돋아나기까지 걸리는 시간 (초). 이 사이에서 무작위로 정해진다.
-WILD_COOLDOWN_MIN = _int("POKET_WILD_COOLDOWN_MIN", 600)    # 10분
-WILD_COOLDOWN_MAX = _int("POKET_WILD_COOLDOWN_MAX", 900)    # 15분
+WILD_COOLDOWN_MIN = _int("POKET_WILD_COOLDOWN_MIN", 300)    # 5분
+WILD_COOLDOWN_MAX = _int("POKET_WILD_COOLDOWN_MAX", 420)    # 7분
 GRASS_TTL = _int("POKET_GRASS_TTL", 90)     # 풀숲이 저절로 사라지기까지 (초)
 WILD_TTL = _int("POKET_WILD_TTL", 60)       # 야생 포켓몬이 도망가기까지 (초)
 # 풀숲을 놓쳤을 때 다시 돋아나기까지 (조금 짧게)
-MISS_COOLDOWN = _int("POKET_MISS_COOLDOWN", 300)
+MISS_COOLDOWN = _int("POKET_MISS_COOLDOWN", 150)
 
 # 테스트용 경험치 주입 경로를 열어 둘지. 운영에서는 반드시 0.
 ALLOW_ADD_EXP = _bool("POKET_ALLOW_ADD_EXP", True)

@@ -8,7 +8,7 @@
 #
 # 개발용(docker-compose.yml)과 다른 점은 딱 두 가지다.
 #
-#   - 야생이 10~15분에 한 번 (개발용은 시험하려고 1분)
+#   - 야생이 5~7분에 한 번 (개발용은 시험하려고 1분)
 #   - 경험치를 직접 넣는 경로를 막았다 (POKET_ALLOW_ADD_EXP=0)
 #
 # 두 번째가 중요하다. 그 경로는 인증만 통과하면 경험치를 마음대로 넣을 수
@@ -48,9 +48,9 @@ services:
       POKET_REQUIRE_IP: "1"
 
       # 실제 운영 주기
-      POKET_WILD_COOLDOWN_MIN: "600"
-      POKET_WILD_COOLDOWN_MAX: "900"
-      POKET_MISS_COOLDOWN: "300"
+      POKET_WILD_COOLDOWN_MIN: "300"
+      POKET_WILD_COOLDOWN_MAX: "420"
+      POKET_MISS_COOLDOWN: "150"
       POKET_GRASS_TTL: "90"
       POKET_WILD_TTL: "60"
 
