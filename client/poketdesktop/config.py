@@ -43,7 +43,7 @@ REPO_DIR = os.path.dirname(CLIENT_DIR)
 # 실제로 돌고 있는 서버. 사용자가 주소를 칠 일이 없도록 여기에 박아 둔다.
 # 서버 주소는 박아 둔다. 사용자가 주소를 칠 일이 없어야 한다.
 # POKET_SERVER 는 시험용 문이다(배포판에는 이 변수가 없다).
-SERVER = os.environ.get("POKET_SERVER") or "https://poketdesktop.onrender.com"
+SERVER = os.environ.get("POKET_SERVER") or "https://posktop.duckdns.org"
 
 # 예전에 기본값이었던 주소들. 저장된 설정이 이 중 하나면 새 주소로 옮긴다.
 # 사용자가 일부러 고쳐 넣은 주소는 건드리지 않는다.
@@ -51,6 +51,9 @@ OLD_SERVERS = (
     "http://127.0.0.1:8787",
     "http://localhost:8787",
     "https://desktop-kb3pg3b.taile9bd90.ts.net:10000",
+    # Render(싱가포르) + Turso(도쿄) 시절. 쿼리마다 바다를 두 번 건너서
+    # 요청 하나가 400~1000ms 였다. 서울 한 대로 합치니 30ms 다.
+    "https://poketdesktop.onrender.com",
 )
 
 DEFAULTS = {
