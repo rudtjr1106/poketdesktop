@@ -174,7 +174,7 @@ def main():
                capture=True, check=False).stdout.strip()
     print("")
     print("  태그 %s 만들고 올리는 중" % tag)
-    run(["git", "tag", "-a", tag, "-m", "포켓 데스크톱 %s" % tag])
+    run(["git", "tag", "-a", tag, "-m", "포스크탑 %s" % tag])
     run(["git", "push", "-q", "origin", "HEAD"])
     run(["git", "push", "-q", "origin", tag])
 
@@ -186,7 +186,7 @@ def main():
 
     print("  GitHub 릴리스 생성")
     run(["gh", "release", "create", tag, zip_path,
-         "--title", "포켓 데스크톱 %s" % tag,
+         "--title", "포스크탑 %s" % tag,
          "--notes-file", body_path])
 
     url = run(["gh", "release", "view", tag, "--json", "url", "-q", ".url"],

@@ -1415,7 +1415,7 @@
   "PREMIERBALL": {
    "cat": "ball",
    "chance": 0.029691,
-   "cost": 20,
+   "cost": 200,
    "effect": {
     "kind": "ball",
     "mult": 1.0,
@@ -1426,7 +1426,7 @@
    "ident": "premier-ball",
    "kr": "프리미어볼",
    "rarity": "common",
-   "sell": 10,
+   "sell": 100,
    "weight": 100
   },
   "PRETTYWING": {

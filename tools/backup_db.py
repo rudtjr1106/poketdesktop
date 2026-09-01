@@ -75,7 +75,7 @@ def main():
 
     conn = libsql.connect(url, auth_token=token)
     with io.open(args.out, "w", encoding="utf-8", newline="\n") as f:
-        f.write("-- 포켓 데스크톱 백업\n")
+        f.write("-- 포스크탑 백업\n")
         f.write("-- 되살리기: python tools/restore_db.py --in <이 파일>\n")
         n = dump(conn, f)
     size = os.path.getsize(args.out)
