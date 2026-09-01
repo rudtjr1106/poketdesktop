@@ -93,9 +93,8 @@ else
   fi
   ok "iptables 에 규칙 추가 (재부팅해도 남도록 저장)"
 fi
-warn "Lightsail 콘솔의 [인스턴스 > Networking > IPv4 Firewall] 에도
-"
-     "        HTTP(80) 과 HTTPS(443) 규칙이 있어야 합니다. 기본은 22 만 열려 있습니다."
+warn "Lightsail 콘솔의 [인스턴스 > Networking > IPv4 Firewall] 에도 규칙이 있어야 합니다."
+echo "        HTTP(80) 과 HTTPS(443) 을 추가하세요. 기본은 22 만 열려 있습니다."
 
 # ---------------------------------------------------------------- 4. 코드
 if [ -d "$APP_DIR/.git" ]; then
