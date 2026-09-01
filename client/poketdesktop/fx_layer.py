@@ -127,3 +127,73 @@ class FloatText(object):
                 pass
         self.jobs = []
         self.done()
+
+
+# ---------------------------------------------------------------- 체력바
+class HpBar(object):
+    """배틀 중에 도트 위에 뜨는 작은 체력바.
+
+    캔버스에 사각형 몇 개로 그린다. 창을 따로 띄우지 않는 이유는,
+    포켓몬 창이 이미 '항상 위' 라서 바가 그 아래로 숨을 수 있기 때문이다.
+    이펙트 레이어는 배틀 동안 가장 위에 있으므로 여기 그리면 안 가린다.
+
+    체력이 줄면 색이 바뀐다 (초록 -> 노랑 -> 빨강). 본가와 같은 신호다.
+    """
+
+    W = 46
+    H = 5
+    PAD = 1
+
+    def __init__(self, layer, name="", lift=0):
+        self.layer = layer
+        self.name = name
+        self.lift = lift          # 위로 더 띄울 픽셀 (이름표와 안 겹치게)
+        self.items = []
+        self.ratio = 1.0
+        self.shown = 1.0          # 스르륵 줄어드는 표시용 값
+
+    def _color(self, r):
+        if r > 0.5:
+            return "#4cd964"
+        if r > 0.2:
+            return "#ffcc33"
+        return "#ff4d4d"
+
+    def draw(self, sx, sy):
+        """도트의 (가운데 x, 위쪽 y) 를 화면 좌표로 받는다."""
+        self.clear()
+        cv = self.layer.cv
+        x, y = self.layer.to_local(sx, sy)
+        w, h, p = self.W, self.H, self.PAD
+        x0 = x - w // 2
+        y0 = y - h - 8 - self.lift
+        # 테두리 겸 바탕
+        self.items.append(cv.create_rectangle(
+            x0 - p, y0 - p, x0 + w + p, y0 + h + p,
+            fill="#14161f", outline="#3a4055"))
+        fill = int(w * max(0.0, min(1.0, self.shown)))
+        if fill > 0:
+            self.items.append(cv.create_rectangle(
+                x0, y0, x0 + fill, y0 + h,
+                fill=self._color(self.shown), outline=""))
+
+    def set(self, hp, maxhp):
+        self.ratio = (float(hp) / maxhp) if maxhp else 0.0
+
+    def ease(self):
+        """표시값을 실제값 쪽으로 조금씩 옮긴다. 확 줄면 놀라니까."""
+        d = self.ratio - self.shown
+        if abs(d) < 0.005:
+            self.shown = self.ratio
+            return False
+        self.shown += d * 0.25
+        return True
+
+    def clear(self):
+        cv = self.layer.cv
+        for i in self.items:
+            try:
+                cv.delete(i)
+            except Exception:                              # noqa: BLE001
+                pass
+        self.items = []

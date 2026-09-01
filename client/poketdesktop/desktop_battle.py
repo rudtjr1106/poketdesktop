@@ -8,16 +8,16 @@
     야생 포켓몬 왼쪽 클릭   배틀을 건다
     야생 포켓몬 오른쪽 클릭  몬스터볼을 던진다
 
-체력바도 기술 버튼도 없다. 기술은 서버가 알아서 고른다.
-무슨 일이 벌어지는지는 도트의 움직임과 이펙트, 그리고 급소/효과 같은
-짧은 글씨로만 보여준다.
+기술 버튼은 없다. 무슨 기술을 쓸지는 서버가 알아서 고른다.
+도트 위에 작은 체력바만 띄우고, 나머지는 도트의 움직임과 이펙트,
+급소/효과 같은 짧은 글씨로 보여준다.
 """
 from common.korean import natural
 
 from . import battle_fx as FX
 from . import config
 from . import evolve_fx
-from .fx_layer import FloatText, FxLayer
+from .fx_layer import FloatText, FxLayer, HpBar
 from .ui_common import run_async
 
 APPROACH_GAP = 96          # 붙어 서는 간격 (가로)
@@ -41,6 +41,8 @@ class DesktopBattle(object):
         self.layer = None
         self.mine = None        # 내 도트 (Pet)
         self.foe = None         # 야생 도트 (WildPet)
+        self.bars = None        # 체력바 (내 것, 상대 것)
+        self.bar_job = None
         self.saved_home = None
 
         self.setup(intro)
@@ -78,8 +80,59 @@ class DesktopBattle(object):
         self.mine.battling = True
         self.foe.battling = True
         self.saved_home = (self.mine.x, self.mine.y)
+        # 야생 쪽은 '야생 OO Lv.5' 이름표가 도트 바로 위에 붙어 있어서
+        # 체력바를 그 위로 올려야 겹치지 않는다.
+        self.bars = (HpBar(self.layer), HpBar(self.layer, lift=18))
+        self.sync_bars(snap=True)
+        self.tick_bars()
         self.app.notify(intro or "배틀 시작!")
         self.approach()
+
+    # ---------------- 체력바 ----------------
+    def sync_bars(self, snap=False):
+        """서버가 알려준 체력을 바에 반영한다."""
+        if not self.bars:
+            return
+        for bar, side in zip(self.bars, ("me", "foe")):
+            d = (self.b or {}).get(side) or {}
+            bar.set(d.get("hp", 0), d.get("maxhp", 1))
+            if snap:
+                bar.shown = bar.ratio
+
+    def tick_bars(self):
+        """도트를 따라다니게 매 프레임 다시 그린다.
+
+        포켓몬이 걸어다니고 기술을 쓰며 움직이므로, 바도 같이 움직여야
+        누구 체력인지 헷갈리지 않는다.
+        """
+        if self.closed or not self.bars or not self.layer:
+            return
+        # 포켓몬 창도 '항상 위' 라서 그냥 두면 체력바가 그 뒤로 숨는다.
+        # 자주 올릴 필요는 없어서 몇 프레임에 한 번만 올린다.
+        self._bar_n = getattr(self, "_bar_n", 0) + 1
+        if self._bar_n % 15 == 1:
+            self.layer.raise_above()
+        for bar, pet in zip(self.bars, (self.mine, self.foe)):
+            bar.ease()
+            if pet is None:
+                bar.clear()
+                continue
+            try:
+                bar.draw(int(pet.x) + pet.fw // 2, int(pet.y))
+            except Exception:                              # noqa: BLE001
+                pass
+        self.bar_job = self.root.after(33, self.tick_bars)
+
+    def clear_bars(self):
+        if self.bar_job:
+            try:
+                self.root.after_cancel(self.bar_job)
+            except Exception:                              # noqa: BLE001
+                pass
+            self.bar_job = None
+        for bar in (self.bars or ()):
+            bar.clear()
+        self.bars = None
 
     def abort(self, msg):
         self.app.notify(msg)
@@ -190,6 +243,7 @@ class DesktopBattle(object):
         b = result.get("battle")
         if b:
             self.b = b
+            self.sync_bars()
         if not b or not b.get("over"):
             return self.after(TURN_GAP, self.next_turn)
         self.show_result(result)
@@ -203,6 +257,19 @@ class DesktopBattle(object):
             for e in (result.get("exp") or []):
                 if e.get("leveledUp"):
                     msgs.append("%s 레벨 %d!" % (e["name"], e["level"]))
+                # 기술을 배운 건 반드시 알린다. 네 개가 차면 오래된 것이
+                # 밀려나는데, 말없이 사라지면 아끼던 기술이 없어진 걸
+                # 한참 뒤에야 알게 된다.
+                learned = e.get("learned") or []
+                forgot = e.get("forgot") or []
+                if learned:
+                    line = "%s 은(는) %s 을(를) 배웠다!" % (
+                        e["name"], ", ".join(learned))
+                    if forgot:
+                        # 네 개가 차면 오래된 것이 밀려난다. 무엇이 사라졌는지
+                        # 같이 알려야 나중에 "왜 없지?" 가 되지 않는다.
+                        line += "  (%s 을(를) 잊었다)" % ", ".join(forgot)
+                    msgs.append(natural(line))
             main = next((e for e in (result.get("exp") or [])
                          if not e.get("shared")), None)
             if main and self.mine:
@@ -395,6 +462,7 @@ class DesktopBattle(object):
         if self.closed:
             return
         self.closed = True
+        self.clear_bars()
         evolves = getattr(self, "pending_evolve", None) or []
         if evolves:
             self.root.after(400, lambda: play_evolutions(self.app, evolves))
