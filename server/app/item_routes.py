@@ -79,9 +79,11 @@ def bag(me=Depends(deps.current)):
 @router.get("/api/shop")
 def shop(me=Depends(deps.current)):
     """상점에 뭐가 있고 얼마인지. 가격은 본가 프렌들리샵 값 그대로."""
-    uid = me["user"]["id"]
-    return {"items": items.public_list(), "money": items.money(uid),
-            "bag": items.bag_get(uid), "sellRate": config.SELL_RATE}
+    u = me["user"]
+    # 돈도 볼도 사용자 행에 이미 들어 있다. 다시 읽으면 왕복이 두 번 는다.
+    return {"items": items.public_list(), "money": u["money"],
+            "bag": items.bag_get(u["id"], u["balls"]),
+            "sellRate": config.SELL_RATE}
 
 
 # ---------------------------------------------------------------- 사고팔기
