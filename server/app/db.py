@@ -266,23 +266,78 @@ def init():
     conn.commit()
 
 
+# 네트워크 너머의 DB(Turso)는 가끔 그냥 끊긴다. 그때마다 500 이 나가면
+# 사용자는 "가끔 오류가 뜬다" 로만 겪는다. 몇 번 다시 해보고, 그래도 안 되면
+# 그때 올린다. 재시도해도 되는 건 '읽기' 와 '한 문장짜리 쓰기' 뿐이라
+# 여기서만 한다.
+RETRY = 3
+RETRY_WAIT = 0.25
+
+
+def _transient(e):
+    """다시 해보면 될 만한 오류인가."""
+    t = "%s %s" % (type(e).__name__, e)
+    t = t.lower()
+    for word in ("hrana", "stream", "connection", "timeout", "timed out",
+                 "temporarily", "reset", "broken pipe", "eof", "network",
+                 "unavailable", "502", "503", "504"):
+        if word in t:
+            return True
+    return False
+
+
+def _retry(fn):
+    """일시적인 실패면 잠깐 쉬었다 다시."""
+    import time
+    last = None
+    for i in range(RETRY):
+        try:
+            return fn()
+        except Exception as e:                              # noqa: BLE001
+            if not using_turso() or not _transient(e):
+                raise
+            last = e
+            # 끊긴 커넥션을 붙들고 있어봐야 소용없다. 버리고 새로 연다.
+            try:
+                conn = getattr(_local, "conn", None)
+                if conn is not None:
+                    conn.close()
+            except Exception:                               # noqa: BLE001
+                pass
+            _local.conn = None
+            if i < RETRY - 1:
+                time.sleep(RETRY_WAIT * (i + 1))
+    raise last
+
+
 def q(sql, args=()):
-    cur = connect().execute(sql, args)
-    rows = cur.fetchall()
-    return _wrap_all(cur, rows) if using_turso() else rows
+    def go():
+        cur = connect().execute(sql, args)
+        rows = cur.fetchall()
+        return _wrap_all(cur, rows) if using_turso() else rows
+    return _retry(go)
 
 
 def q1(sql, args=()):
-    cur = connect().execute(sql, args)
-    row = cur.fetchone()
-    return _wrap_one(cur, row) if using_turso() else row
+    def go():
+        cur = connect().execute(sql, args)
+        row = cur.fetchone()
+        return _wrap_one(cur, row) if using_turso() else row
+    return _retry(go)
 
 
 def run(sql, args=()):
-    conn = connect()
-    cur = conn.execute(sql, args)
-    conn.commit()
-    return cur
+    """한 문장 실행 + 커밋.
+
+    한 문장짜리라 다시 해도 안전하다(모두 조건이 붙은 UPDATE 이거나
+    INSERT ... ON CONFLICT 다). 그래서 일시적 실패면 다시 해본다.
+    """
+    def go():
+        conn = connect()
+        cur = conn.execute(sql, args)
+        conn.commit()
+        return cur
+    return _retry(go)
 
 
 # ---------------------------------------------------------------- 변환

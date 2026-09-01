@@ -10,7 +10,7 @@ from common.korean import natural              # noqa: E402
 from common.version import VERSION             # noqa: E402
 
 from . import api as apimod                    # noqa: E402
-from . import config, sprite_cache, walk_cache  # noqa: E402
+from . import config, sprite_cache, updater, walk_cache  # noqa: E402
 from . import ui_common as U                   # noqa: E402
 from .overlay import Overlay                   # noqa: E402
 from .tray import Tray                         # noqa: E402
@@ -20,6 +20,7 @@ from .ui_box import BoxWindow, confirm         # noqa: E402
 from .ui_shop import ShopWindow                # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
+from .ui_update import UpdateWindow             # noqa: E402
 from .wild_ui import WildController            # noqa: E402
 
 
@@ -53,7 +54,45 @@ class App(object):
         apply_theme(self.root)
 
     # ---------------------------------------------------------------- 시작
+    def check_update(self):
+        """새 버전이 있으면 받아서 갈아탄다.
+
+        갈아탔으면 True 를 돌려준다. 부르는 쪽은 그때 바로 끝내야 한다 —
+        새 exe 가 이미 떠 있는데 이쪽도 살아 있으면 두 개가 같이 돈다.
+
+        exe 로 묶여 있을 때만 한다. 개발 중(파이썬)에는 건드리지 않는다.
+        """
+        if not updater.is_frozen():
+            return False
+        # 지난 버전 폴더를 치운다. 새 버전으로 갈아탄 직후라면 여기서 지워진다.
+        try:
+            updater.cleanup_old()
+        except Exception:                                   # noqa: BLE001
+            pass
+        try:
+            info = updater.check()
+        except Exception as e:                              # noqa: BLE001
+            config.log("업데이트 확인 실패: %s" % e)
+            return False
+        if not info:
+            return False
+        config.log("새 버전 %s 발견" % info["version"])
+        try:
+            result, new_exe = UpdateWindow(self.root, info).show()
+        except Exception as e:                              # noqa: BLE001
+            config.log("업데이트 창 오류: %s" % e)
+            return False
+        if result == "updated" and new_exe:
+            try:
+                updater.relaunch(new_exe)
+                return True
+            except Exception as e:                          # noqa: BLE001
+                config.log("새 버전 실행 실패: %s" % e)
+        return False
+
     def boot(self):
+        if self.check_update():
+            return self.quit()
         session = config.load_session()
         token = session.get("token")
         if not token:
