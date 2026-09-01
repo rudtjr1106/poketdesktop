@@ -289,6 +289,8 @@ class WildController(object):
     def __init__(self, app):
         # 서버가 공개·던지기 응답에 실어 주는 볼 목록. 우클릭 메뉴가 이걸 쓴다.
         self.ball_options = []
+        # 박스가 찼다는 말을 한 번만 하려고. 폴링마다 뜨면 성가시다.
+        self._said_full = None
         self.app = app
         self.grass = None
         self.pet = None
@@ -364,6 +366,14 @@ class WildController(object):
         tell 이면 사용자가 직접 눌러서 온 응답이라 결과를 말로도 알려준다.
         """
         self.app.balls = r.get("balls", self.app.balls)
+        # 자리가 없어서 안 돋는 것이면 알려준다. 안 그러면 어느 날부터
+        # 풀숲이 영영 안 돋는 고장으로만 보인다.
+        full = r.get("boxFull")
+        if full and full.get("message") != self._said_full:
+            self._said_full = full.get("message")
+            self.app.notify(full["message"])
+        elif not full:
+            self._said_full = None
         w = r.get("wild")
         if not w:
             self.clear()

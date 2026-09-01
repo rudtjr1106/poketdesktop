@@ -90,6 +90,7 @@ class Arena(object):
         self.down = {"me": set(), "foe": set()}
         self.queue = []
         self.gap = EV_GAP
+        self.bar_job = None
 
     # ---------------- 도구 ----------------
     def after(self, ms, fn):
@@ -171,6 +172,8 @@ class Arena(object):
 
         self.queue = [e for e in evs if e.get("t") != "teams"]
         self._pace()
+        self.bar_job = None
+        self._tick_bars()
         self._gather()
 
     def _pace(self):
@@ -317,6 +320,38 @@ class Arena(object):
         except Exception as e:                              # noqa: BLE001
             config.log("투기장 재생 오류(%s): %s" % (ev.get("t"), e))
             self.after(self.gap, self._play)
+
+    def _tick_bars(self):
+        """체력바를 도트 위에 따라다니게 그린다.
+
+        만들고 값만 넣어서는 화면에 아무것도 안 나온다 - HpBar 는
+        draw() 를 불러야 그려진다. 싸우는 둘이 링 안에서 움직이므로
+        매 프레임 자리를 다시 잡아야 누구 체력인지 헷갈리지 않는다.
+        """
+        if self.closed or not self.layer:
+            return
+        # 포켓몬 창도 '항상 위' 라 그냥 두면 체력바가 그 뒤로 숨는다.
+        # 자주 올릴 필요는 없어서 몇 프레임에 한 번만 올린다.
+        self._bar_n = getattr(self, "_bar_n", 0) + 1
+        if self._bar_n % 15 == 1:
+            try:
+                self.layer.raise_above()
+            except Exception:                               # noqa: BLE001
+                pass
+        for side in ("me", "foe"):
+            bar = self.bars.get(side)
+            pet = self.active.get(side)
+            if bar is None:
+                continue
+            if pet is None or getattr(pet, "down", False):
+                bar.clear()
+                continue
+            bar.ease()
+            try:
+                bar.draw(int(pet.x) + pet.fw // 2, int(pet.y))
+            except Exception:                               # noqa: BLE001
+                pass
+        self.bar_job = self.root.after(33, self._tick_bars)
 
     def _bar_for(self, side):
         b = self.bars.get(side)
@@ -534,6 +569,12 @@ class Arena(object):
         if self.closed:
             return
         self.closed = True
+        if getattr(self, "bar_job", None):
+            try:
+                self.root.after_cancel(self.bar_job)
+            except Exception:                               # noqa: BLE001
+                pass
+            self.bar_job = None
         self._cancel_jobs()
 
         ov = self.app.overlay

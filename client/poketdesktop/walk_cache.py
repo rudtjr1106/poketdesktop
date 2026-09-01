@@ -86,6 +86,12 @@ def ensure(api, num):
         return None, None
 
     png_path, meta_path = _paths(num)
+    if meta and meta.get("retry"):
+        # 서버도 지금은 모른다고 한다. 영구 표시를 남기면 안 된다 -
+        # 저쪽이 잠깐 맛이 간 사이에 물어본 종이 영영 안 걷게 된다.
+        with _lock:
+            _failed[num] = time.time()
+        return None, None
     if not meta or not meta.get("ok"):
         # 없는 종이라는 사실을 남겨 둔다. 다음부터 안 물어본다.
         try:

@@ -82,6 +82,7 @@ class Tray(object):
                          lambda _i, _it: self.call(a.toggle_names),
                          checked=lambda _it: bool(s.get("showNames"))),
             )),
+            MenuItem("설정...", lambda _i, _it: self.call(a.open_settings)),
             MenuItem("포켓몬 크기", Menu(*size_items)),
             MenuItem("활동 범위", Menu(*area_items)),
             Menu.SEPARATOR,
