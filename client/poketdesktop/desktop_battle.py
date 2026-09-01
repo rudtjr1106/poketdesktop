@@ -123,6 +123,29 @@ class DesktopBattle(object):
                 pass
         self.bar_job = self.root.after(33, self.tick_bars)
 
+    def apply_hp(self, ev):
+        """이벤트에 담긴 체력을 그 자리에서 바에 반영한다.
+
+        예전에는 한 턴이 통째로 끝난 뒤에야 서버가 준 최종 체력으로
+        맞췄다. 그래서 내가 할퀴고 상대가 울음소리까지 쓴 다음에야 상대
+        체력이 줄어드는 것처럼 보였다. 맞는 순간 줄어야 무엇 때문에
+        줄었는지 알 수 있다.
+
+        누구 체력인지는 이벤트마다 다르다.
+          hit                맞은 쪽 = target
+          chip/heal/recoil   그걸 겪는 쪽 = who
+        """
+        if not self.bars or "hp" not in ev:
+            return
+        side = ev.get("target") if ev.get("t") == "hit" else ev.get("who")
+        if side == "me":
+            bar = self.bars[0]
+        elif side == "foe":
+            bar = self.bars[1]
+        else:
+            return
+        bar.set(ev["hp"], ev.get("maxhp") or 1)
+
     def clear_bars(self):
         if self.bar_job:
             try:
@@ -203,6 +226,7 @@ class DesktopBattle(object):
     def render(self, ev, done):
         t = ev.get("t")
         who = ev.get("who")
+        self.apply_hp(ev)
         src = self.mine if who == "me" else self.foe
         dst = self.foe if who == "me" else self.mine
 
