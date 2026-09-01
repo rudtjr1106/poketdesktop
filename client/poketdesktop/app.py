@@ -34,6 +34,7 @@ class App(object):
         self.overlay = None
         self.tray = None
         self.wild = None
+        self._syncing = False
         self.box_window = None
         self.shop_window = None
         self.bag_window = None
@@ -121,8 +122,8 @@ class App(object):
         """
         if self._quitting or not self.api or not self.overlay:
             return
-        if self.overlay.pets:
-            return
+        if self.overlay.pets or self._syncing:
+            return          # 이미 받아오는 중이면 그대로 둔다
         config.log("바탕화면이 비어 있어 다시 맞춥니다")
         self.sync()
 
@@ -167,6 +168,7 @@ class App(object):
         """
         if not self.api:
             return
+        self._syncing = True
 
         def work():
             mons = self.api.desktop()
@@ -183,6 +185,7 @@ class App(object):
             return mons, paths, me, walks
 
         def done(r, err):
+            self._syncing = False
             if err:
                 config.log("동기화 실패: %s" % err)
                 # 세션이 끊긴 거라면 조용히 실패만 하고 있으면 안 된다.
