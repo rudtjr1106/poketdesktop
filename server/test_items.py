@@ -444,6 +444,11 @@ def main():
         st, r = call("POST", "/api/shop/buy",
                      {"item": stone["id"], "count": 1}, tok5)
         chk("진화의 돌을 살 수 있다", st == 200, r.get("error"))
+        # 사기 전에도 갖고 있을 수 있다. 드랍 표에 진화의 돌이 38종
+        # 들어 있어서, 열네 마리 잡는 동안 같은 돌이 떨어지기도 한다.
+        # 그래서 '0이 되었나' 가 아니라 '하나 줄었나' 를 본다.
+        _st, _bag = call("GET", "/api/bag", token=tok5)
+        before_stone = _bag["bag"].get(stone["id"], 0)
         st, r = call("POST", "/api/bag/use",
                      {"item": stone["id"], "pokemon": target["id"]}, tok5)
         chk("%s 로 %s 이(가) 진화한다"
@@ -452,8 +457,9 @@ def main():
         if r.get("evolve"):
             note("%s -> %s" % (r["evolve"]["fromKr"], r["evolve"]["toKr"]))
             st, bag5 = call("GET", "/api/bag", token=tok5)
-            chk("쓴 돌은 가방에서 빠진다",
-                bag5["bag"].get(stone["id"], 0) == 0, bag5["bag"])
+            chk("쓴 돌은 가방에서 하나 빠진다",
+                bag5["bag"].get(stone["id"], 0) == before_stone - 1,
+                (before_stone, bag5["bag"].get(stone["id"], 0)))
 
     # 안 맞는 돌
     tok6, _ = signup("CHARMANDER")

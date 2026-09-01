@@ -849,11 +849,32 @@ def wild_reveal(wid: int, ctx=Depends(current)):
     if not row:
         raise HTTPException(404, "풀숲이 이미 사라졌습니다.")
     if row["state"] == "revealed":
-        return {"wild": _wild_public(row, True)}
+        return {"wild": _wild_public(row, True),
+                "ballOptions": _ball_options(uid, ctx["user"], row)}
     exp = iso(now() + datetime.timedelta(seconds=config.WILD_TTL))
     db.run("UPDATE wild SET state='revealed', expires_at=? WHERE id=?", (exp, wid))
     row = db.q1("SELECT * FROM wild WHERE id=?", (wid,))
-    return {"wild": _wild_public(row, True)}
+    return {"wild": _wild_public(row, True),
+            "ballOptions": _ball_options(uid, ctx["user"], row)}
+
+
+def _ball_options(uid, user_row, row, body=None):
+    """지금 이 야생에게 던질 볼 목록.
+
+    응답에 얹어 보낸다. 우클릭할 때마다 서버를 왕복하면 야생은 60초짜리라
+    그 시간을 깎아먹고, 서버가 자다 깨는 중이면 메뉴가 아예 안 뜬다.
+    배율이 바뀌는 순간(공개·던진 뒤)의 응답에만 실으면 늘 최신이다.
+    """
+    try:
+        mon = json.loads(row["data"])
+    except Exception:                                       # noqa: BLE001
+        return []
+    lead = db.q1("SELECT * FROM pokemon WHERE user_id=? AND on_desktop=1"
+                 " ORDER BY slot, id LIMIT 1", (uid,))
+    hour = getattr(body, "hour", None) if body else None
+    return items.ball_options(uid, dex(), mon, user_row["balls"],
+                              mine=db.row_to_mon(lead) if lead else None,
+                              turn=row["throws"] or 0, hour=hour)
 
 
 def _take_ball(uid, balls, want, mon, row, body):
@@ -865,8 +886,10 @@ def _take_ball(uid, balls, want, mon, row, body):
     want = (want or "POKEBALL").upper()
     it = items.get(want)
     if it is None or it.get("effect", {}).get("kind") != "ball":
-        want = "POKEBALL"
-        it = items.get("POKEBALL")
+        # 예전에는 조용히 몬스터볼로 바꿨다. 이제 메뉴에서 고르는 만큼
+        # '고른 것과 다른 볼이 나갔다' 가 되므로 거절한다. 옛 클라이언트는
+        # 늘 POKEBALL 을 보내므로 호환이 깨지지 않는다.
+        raise HTTPException(400, "그런 볼이 없습니다.")
 
     if not items.bag_take(uid, want, 1):
         raise HTTPException(409, "%s 이(가) 없습니다." % it["kr"])
@@ -916,8 +939,13 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
 
     if not caught:
         left = db.q1("SELECT * FROM wild WHERE id=?", (wid,))
+        user = db.q1("SELECT * FROM users WHERE id=?", (uid,))
         return {"caught": False, "shakes": shakes, "balls": balls,
                 "throws": left["throws"], "expiresAt": left["expires_at"],
+                # 개수도 턴도 방금 바뀌었다. 갱신된 목록을 같이 준다.
+                "ballOptions": _ball_options(uid, user, left, body),
+                "ball": {"id": ball_id,
+                         "kr": (items.get(ball_id) or {}).get("kr", ball_id)},
                 # 본가와 같은 순서: 적게 흔들릴수록 멀었다는 뜻
                 "message": ["앗! 포켓몬이 튀어나와버렸다!",
                             "이런! 포켓몬이 볼에서 나와버렸다!",
@@ -940,6 +968,8 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
         msg += "  %s 을(를) 주웠다!" % drop["kr"]
     return {"caught": True, "shakes": 4, "balls": balls, "where": where,
             "pokemon": got, "drop": drop, "money": items.money(uid),
+            "ball": {"id": ball_id,
+                     "kr": (items.get(ball_id) or {}).get("kr", ball_id)},
             "bag": items.bag_get(uid), "message": korean.natural(msg)}
 
 

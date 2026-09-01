@@ -265,6 +265,107 @@ def ball_bonus(item_id, dex, wild, mine=None, turn=0, uid=None, hour=None):
     return base
 
 
+_BALL_IDS = None
+
+
+def ball_ids():
+    """볼 도구 id 를 값싼 것부터. 메뉴에서 자리가 안 흔들리게 고정한다."""
+    global _BALL_IDS
+    if _BALL_IDS is None:
+        bs = [it for it in catalog().values()
+              if it.get("effect", {}).get("kind") == "ball"]
+        bs.sort(key=lambda x: (x.get("cost") or 99999, x["kr"]))
+        _BALL_IDS = [b["id"] for b in bs]
+    return _BALL_IDS
+
+
+def _ball_counts(uid, balls):
+    """가방에서 볼 개수만. 쿼리 한 번으로 끝낸다."""
+    ids = set(ball_ids())
+    out = {}
+    for r in db.q("SELECT item, count FROM bag WHERE user_id=? AND count>0",
+                  (uid,)):
+        if r["item"] in ids:
+            out[r["item"]] = r["count"]
+    if balls:
+        out[BALL_ITEM] = balls
+    return out
+
+
+def ball_why(item_id, dex, wild, mult, mine=None, turn=0, hour=None):
+    """배율이 왜 그 값인지 한 마디.
+
+    **판단한 쪽이 말까지 만든다.** 클라이언트가 조건을 다시 보면 화면에
+    쓰인 값과 실제 판정이 어긋난다 - 실제로 어긋날 수밖에 없는 것들이
+    있다. 물타입 판정은 내부 이름("WATER")을 보는데 클라이언트가 받는
+    types 는 한국어("물")이고, 리피트볼은 도감 기록을, 레벨볼은 파티
+    선두를 봐야 한다. 클라이언트에는 그 중 아무것도 없다.
+    """
+    it = get(item_id) or {}
+    cond = it.get("effect", {}).get("cond")
+    if not cond:
+        return ""
+    on = mult > 1.0
+    sp = dex.get(wild["species"]) or {}
+    lv = int(wild.get("level", 1))
+    if cond == "water_or_bug":
+        return "물·벌레라서" if on else "물·벌레가 아니라"
+    if cond == "low_level":
+        return "Lv.%d 라서" % lv
+    if cond == "many_turns":
+        return "%d번째 던지기라" % (turn + 1)
+    if cond == "first_turn":
+        return "첫 던지기라" if on else "이미 던져 봐서"
+    if cond == "night":
+        return "밤이라서" if on else "지금은 밤이 아니라"
+    if cond == "level_gap":
+        return "내 쪽이 훨씬 높아서" if on else "레벨 차가 모자라서"
+    if cond == "moon_family":
+        return "달의돌로 진화하는 종이라" if on else "달의돌과 무관해서"
+    if cond == "fast_species":
+        return "발이 빠른 종이라" if on else "그리 빠르지 않아서"
+    if cond == "heavy":
+        return "무게 %.1fkg" % (sp.get("weight", 0) / 10.0)
+    if cond == "same_species_other_gender":
+        return "같은 종 다른 성별이라" if on else "같은 종 다른 성별이 아니라"
+    if cond == "asleep":
+        return "잠들어 있어서" if on else "잠들지 않아서"
+    if cond == "already_caught":
+        return "이미 잡아본 종이라" if on else "처음 보는 종이라"
+    return ""
+
+
+def ball_options(uid, dex, wild, balls, mine=None, turn=0, hour=None):
+    """지금 이 상대에게 던질 볼 목록 - 개수·배율·이유까지.
+
+    쿼리는 둘뿐이다. 가방 한 번, 리피트볼이 도감을 보는 한 번.
+    나머지는 메모리에 있는 도감과 도구 자료로 끝난다.
+    """
+    counts = _ball_counts(uid, balls)
+    out = []
+    for iid in ball_ids():
+        it = get(iid) or {}
+        mult = ball_bonus(iid, dex, wild, mine=mine, turn=turn, uid=uid,
+                          hour=hour)
+        out.append({
+            "id": iid, "kr": it.get("kr", iid),
+            "count": int(counts.get(iid, 0)),
+            "mult": round(float(mult), 2),
+            "why": ball_why(iid, dex, wild, mult, mine, turn, hour),
+            "cost": it.get("cost") or 0,
+            "best": False,
+        })
+    # 추천 하나. 마스터볼은 뺀다 - 배율이 255라 언제나 1등이라 추천이
+    # 의미가 없고, 실수로 한 번 쓰면 돌이킬 수 없다.
+    owned = [o for o in out if o["count"] > 0 and o["mult"] < 100]
+    if owned:
+        # 배율이 같으면 싼 것을 권한다. 귀한 볼은 아껴야 한다.
+        best = max(owned, key=lambda o: (o["mult"], -o["cost"]))
+        if best["mult"] > 1.0:
+            best["best"] = True
+    return out
+
+
 def _server_hour():
     import datetime
     return datetime.datetime.now().hour
