@@ -20,6 +20,13 @@
 > 직접 그린 도트로 갈아야 한다.
 > (애초에 포켓몬 자체가 닌텐도 저작물이라 수익화는 별개로 어렵다.)
 
+SpriteCollab 에 없는 14종은
+[baptiste-ro/pokemon-followers-sprites](https://github.com/baptiste-ro/pokemon-followers-sprites)
+로 메웠다 (HGSS 풍 4방향 도트).
+
+어느 쪽에도 없는 43종(야생에 나오는 건 29종)은 배틀 도트로 대신한다.
+그 종들은 정면 고정이라 걷는 모습이 없다.
+
 ## 포켓몬
 포켓몬과 관련된 이름·그림의 저작권은 닌텐도 / Game Freak / 포켓몬 컴퍼니에 있다.
 이 프로젝트는 팬이 만든 비상업 프로젝트다.

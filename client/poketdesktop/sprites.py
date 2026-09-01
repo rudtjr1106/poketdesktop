@@ -252,6 +252,12 @@ def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
 
     fw = int(meta["frameW"])
     fh = int(meta["frameH"])
+    # 방향이 시트의 몇 번째 행인지는 출처마다 다르다. 서버가 알려준다.
+    rowmap = meta.get("rowmap") or {}
+    rows = {DOWN: rowmap.get("down", ROW_OF[DOWN]),
+            RIGHT: rowmap.get("right", ROW_OF[RIGHT]),
+            UP: rowmap.get("up", ROW_OF[UP]),
+            LEFT: rowmap.get("left", ROW_OF[LEFT])}
     durs_ticks = list(meta["durations"]) or [8]
     # 지속시간은 1/60초 단위 틱이다. 밀리초로 바꾼다.
     durs = [max(30, int(round(t * 1000.0 / 60.0))) for t in durs_ticks]
@@ -264,7 +270,7 @@ def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
     cut = {}
     every = []
     for d in DIRS:
-        row = ROW_OF[d]
+        row = rows[d]
         cells = []
         for i in range(n):
             box = (i * fw, row * fh, (i + 1) * fw, (row + 1) * fh)

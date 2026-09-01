@@ -73,6 +73,7 @@ class Pet(object):
         self.state = "idle"
         self.timer = random.randint(20, 80)
         self.vx = self.vy = 0.0
+        self.walked = 0.0            # 걸은 거리. 걸음 위상을 여기에 묶는다
         self.battling = False        # 배틀 중에는 스스로 돌아다니지 않는다
 
         self.label.bind("<Enter>", self.on_enter)
@@ -218,20 +219,41 @@ class Pet(object):
         row = self.row_for(self.facing)
         self.label.configure(image=row[self.frame % len(row)])
 
+    def stride(self):
+        """한 프레임 넘어가는 데 걸어야 하는 거리(px).
+
+        키에 비례한다. 큰 포켓몬은 보폭도 크다.
+        """
+        return max(3.5, self.fh * 0.14)
+
     def advance(self, ms):
         """프레임을 넘긴다.
 
-        걷는 도트는 **걸을 때만** 넘긴다. 서 있는데 발이 움직이면
-        제자리걸음처럼 보여서 오히려 어색하다. 서 있을 때는 첫 프레임으로
-        돌아가 가만히 선다.
-        배틀 도트로 대신하는 종은 원래 제자리 애니메이션이라 늘 돌린다.
+        걷는 도트는 **걸은 거리**에 맞춰 넘긴다. 시간으로 넘기면 느리게
+        움직일 때도 발은 같은 속도로 굴러서 빙판 위를 걷는 것처럼 보인다.
+        발이 땅을 짚는 속도와 실제로 나아가는 속도가 맞아야 걷는 것으로
+        읽힌다.
+
+        서 있을 때는 첫 프레임으로 돌아가 가만히 선다. 제자리에서 발만
+        움직이면 오히려 어색하다.
+
+        배틀 도트로 대신하는 종은 원래 제자리 애니메이션이라 시간으로 돌린다.
         """
-        if self.walking_sprite and self.state != "walk":
-            if self.frame != 0:
-                self.frame = 0
-                self.elapsed = 0
+        if self.walking_sprite:
+            if self.state != "walk":
+                if self.frame != 0:
+                    self.frame = 0
+                    self.walked = 0.0
+                    self.redraw()
+                return
+            step = self.stride()
+            if self.walked >= step:
+                n = int(self.walked / step)
+                self.walked -= n * step
+                self.frame = (self.frame + n) % self.anim.count()
                 self.redraw()
             return
+
         self.elapsed += ms
         d = self.anim.durations[self.frame % len(self.anim.durations)]
         if self.elapsed >= d:
@@ -302,6 +324,8 @@ class Pet(object):
         if bounced:
             self.turn_to(self.vx, self.vy)
             return
+        moved = ((nx - self.x) ** 2 + (ny - self.y) ** 2) ** 0.5
+        self.walked += moved
         self.x, self.y = nx, ny
         self.place()
 
