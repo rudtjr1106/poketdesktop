@@ -26,7 +26,8 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
 
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
-from . import auth, battle_routes, config, db, deps, item_routes, items   # noqa: E402
+from . import (auth, battle_routes, config, db, deps, item_routes,  # noqa: E402
+               items, migrations)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
@@ -52,6 +53,7 @@ def _startup():
         import threading
         threading.Thread(target=_warm_sprites, daemon=True).start()
     db.init()
+    migrations.run()
     auth.purge_expired()
     d = dex()
     n = sum(1 for s in d.species if s.get("spawnable"))
@@ -511,7 +513,10 @@ def register(body: RegisterIn, request: Request):
                  (name, h, salt, it, config.BALLS_START, config.MONEY_START,
                   ts, ts, ip))
     uid = cur.lastrowid
-    _schedule_next(uid, RNG.randint(60, 180))     # 첫 풀숲은 조금 빨리
+    # 첫 풀숲은 조금 빨리 — 다만 정해진 간격보다 늦지는 않게.
+    # min 이 없으면 간격을 짧게 잡아 둔 곳(테스트)에서도 첫 판만
+    # 60~180초를 기다려야 한다.
+    _schedule_next(uid, min(RNG.randint(60, 180), _cooldown()))
     _give_starter(uid, body.starter)
     token, exp = auth.issue_token(uid, ip, body.device, auth.ip_is_real(request))
     user = db.q1("SELECT * FROM users WHERE id=?", (uid,))
@@ -800,7 +805,14 @@ def wild_state(ctx=Depends(current), force: bool = False):
     next_at = st["next_at"] if st else None
 
     if row is None:
-        due = force or (next_at and auth.parse_iso(next_at) <= now()) or not next_at
+        # force 는 보통 '지금 돋우라' 가 아니라 '지금 다시 봐 달라' 다.
+        # 예전에는 force 가 맨 앞에 아무 조건 없이 있어서 뒤를 안 봤고,
+        # 그래서 트레이의 '풀숲 찾아보기' 를 누르는 만큼 야생이 나왔다.
+        # 5~7분 간격이 아무 의미가 없었다.
+        # 지금은 테스트에서 명시적으로 열었을 때만 통한다.
+        due = ((force and config.ALLOW_FORCE_WILD)
+               or (next_at and auth.parse_iso(next_at) <= now())
+               or not next_at)
         if due:
             n = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=?", (uid,))["c"]
             if n < config.MAX_BOX:

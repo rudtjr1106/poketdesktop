@@ -92,6 +92,28 @@ def as_int(v, default=0):
 
 
 # ---------------------------------------------------------------- 본작업
+# 능력 변화를 누구에게 거는가. 이걸 틀리면 자기를 강화하는 기술이
+# 상대를 강화한다.
+#
+# 위력이 있는 기술은 PokeAPI 의 분류가 대상을 그대로 알려준다.
+#   damage-raise  자기 자신에게 건다. 이름과 달리 '올린다' 는 뜻이 아니라
+#                 '자기에게 건다' 는 뜻이다 - 인파이트(방어/특방 하락)와
+#                 리프스톰(특공 하락)도 여기 들어간다.
+#   damage-lower  상대에게 건다. 깨물어부수기, 막말내뱉기 같은 것들.
+#
+# 위력이 없는 변화기는 분류가 net-good-stats 하나로 뭉뚱그려져 있어서
+# 울음소리(상대)와 칼춤(자기)이 구분되지 않는다. 대신 target 이 정확하다.
+# 저주처럼 올리기와 내리기가 섞인 기술도 target 으로만 제대로 갈린다.
+SELF_TARGETS = (5, 7, 13)          # 자신 / 자신이나 아군 / 자신과 아군
+
+
+def _stat_self(move_row, m, meta_cat):
+    cat = meta_cat.get(as_int(m.get("meta_category_id")), "")
+    if as_int(move_row["power"]):
+        return cat == "damage-raise"
+    return as_int(move_row["target_id"]) in SELF_TARGETS
+
+
 def build():
     restricted = set(norm(x) for x in EXTRA_RESTRICTED.split() if x.strip())
 
@@ -158,6 +180,8 @@ def build():
     ailment = dict((as_int(r["id"]), r["identifier"])
                    for r in rows("move_meta_ailments.csv"))
     meta = dict((as_int(r["move_id"]), r) for r in rows("move_meta.csv"))
+    meta_cat = dict((as_int(r["id"]), r["identifier"])
+                    for r in rows("move_meta_categories.csv"))
     stat_change = {}
     for r in rows("move_meta_stat_changes.csv"):
         st = MOVE_STAT_ID.get(as_int(r["stat_id"]))
@@ -201,6 +225,7 @@ def build():
                 "ail": None if ail in ("none", "unknown") else ail,
                 "ailChance": as_int(m.get("ailment_chance")),
                 "stat": stat_change.get(mid, []),
+                "statSelf": _stat_self(r, m, meta_cat),
                 "statChance": as_int(m.get("stat_chance")),
                 "drain": as_int(m.get("drain")),       # 양수=흡수, 음수=반동
                 "heal": as_int(m.get("healing")),

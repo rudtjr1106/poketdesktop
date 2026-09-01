@@ -1,16 +1,8 @@
 {
  "dropTable": [
   [
-   "ANTIDOTE",
-   100
-  ],
-  [
    "AUSPICIOUSARMOR",
    14
-  ],
-  [
-   "AWAKENING",
-   100
   ],
   [
    "BIGMUSHROOM",
@@ -31,10 +23,6 @@
   [
    "BOTTLECAP",
    34
-  ],
-  [
-   "BURNHEAL",
-   100
   ],
   [
    "CHIPPEDPOT",
@@ -89,10 +77,6 @@
    14
   ],
   [
-   "ETHER",
-   45
-  ],
-  [
    "EVERSTONE",
    45
   ],
@@ -107,14 +91,6 @@
   [
    "FRIENDBALL",
    45
-  ],
-  [
-   "FULLHEAL",
-   45
-  ],
-  [
-   "FULLRESTORE",
-   14
   ],
   [
    "GENIUSWING",
@@ -146,14 +122,6 @@
   ],
   [
    "HONDEWBERRY",
-   100
-  ],
-  [
-   "HYPERPOTION",
-   45
-  ],
-  [
-   "ICEHEAL",
    100
   ],
   [
@@ -205,14 +173,6 @@
    5
   ],
   [
-   "MAXPOTION",
-   14
-  ],
-  [
-   "MAXREVIVE",
-   14
-  ],
-  [
    "METALALLOY",
    14
   ],
@@ -245,10 +205,6 @@
    45
   ],
   [
-   "PARALYZEHEAL",
-   100
-  ],
-  [
    "PEARL",
    100
   ],
@@ -262,10 +218,6 @@
   ],
   [
    "POMEGBERRY",
-   100
-  ],
-  [
-   "POTION",
    100
   ],
   [
@@ -313,16 +265,8 @@
    100
   ],
   [
-   "REVIVE",
-   45
-  ],
-  [
    "SACHET",
    14
-  ],
-  [
-   "SACREDASH",
-   4
   ],
   [
    "SCROLLOFDARKNESS",
@@ -343,10 +287,6 @@
   [
    "SUNSTONE",
    14
-  ],
-  [
-   "SUPERPOTION",
-   100
   ],
   [
    "SWEETAPPLE",
@@ -401,26 +341,11 @@
    14
   ]
  ],
- "dropTotal": 4252,
+ "dropTotal": 3326,
  "items": {
-  "ANTIDOTE": {
-   "cat": "heal",
-   "chance": 0.023518,
-   "cost": 200,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Antidote",
-   "id": "ANTIDOTE",
-   "ident": "antidote",
-   "kr": "해독제",
-   "rarity": "common",
-   "sell": 100,
-   "weight": 100
-  },
   "AUSPICIOUSARMOR": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -436,24 +361,9 @@
    "sell": 1500,
    "weight": 14
   },
-  "AWAKENING": {
-   "cat": "heal",
-   "chance": 0.023518,
-   "cost": 200,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Awakening",
-   "id": "AWAKENING",
-   "ident": "awakening",
-   "kr": "잠깨는약",
-   "rarity": "common",
-   "sell": 100,
-   "weight": 100
-  },
   "BIGMUSHROOM": {
    "cat": "misc",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 5000,
    "effect": {
     "kind": "sell"
@@ -468,7 +378,7 @@
   },
   "BIGNUGGET": {
    "cat": "misc",
-   "chance": 0.001881,
+   "chance": 0.002405,
    "cost": 40000,
    "effect": {
     "kind": "sell"
@@ -483,7 +393,7 @@
   },
   "BIGPEARL": {
    "cat": "misc",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 8000,
    "effect": {
     "kind": "sell"
@@ -498,7 +408,7 @@
   },
   "BLACKAUGURITE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -516,7 +426,7 @@
   },
   "BOTTLECAP": {
    "cat": "iv",
-   "chance": 0.007996,
+   "chance": 0.010222,
    "cost": 5000,
    "effect": {
     "count": 1,
@@ -529,21 +439,6 @@
    "rarity": "epic",
    "sell": 2500,
    "weight": 34
-  },
-  "BURNHEAL": {
-   "cat": "heal",
-   "chance": 0.023518,
-   "cost": 200,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Burn Heal",
-   "id": "BURNHEAL",
-   "ident": "burn-heal",
-   "kr": "화상치료제",
-   "rarity": "common",
-   "sell": 100,
-   "weight": 100
   },
   "CALCIUM": {
    "cat": "ev",
@@ -575,7 +470,7 @@
   },
   "CHIPPEDPOT": {
    "cat": "stone",
-   "chance": 0.001176,
+   "chance": 0.001503,
    "cost": 38000,
    "effect": {
     "kind": "stone"
@@ -593,7 +488,7 @@
   },
   "CLEVERWING": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 300,
    "effect": {
     "amount": 1,
@@ -610,7 +505,7 @@
   },
   "COMETSHARD": {
    "cat": "misc",
-   "chance": 0.001411,
+   "chance": 0.001804,
    "cost": 25000,
    "effect": {
     "kind": "sell"
@@ -625,7 +520,7 @@
   },
   "CRACKEDPOT": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 1600,
    "effect": {
     "kind": "stone"
@@ -643,7 +538,7 @@
   },
   "DAWNSTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -662,7 +557,7 @@
   },
   "DEEPSEASCALE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -680,7 +575,7 @@
   },
   "DEEPSEATOOTH": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -698,7 +593,7 @@
   },
   "DRAGONSCALE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -716,7 +611,7 @@
   },
   "DREAMBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1500,
    "effect": {
     "cond": "asleep",
@@ -733,7 +628,7 @@
   },
   "DUBIOUSDISC": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -751,7 +646,7 @@
   },
   "DUSKBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "night",
@@ -768,7 +663,7 @@
   },
   "DUSKSTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -789,7 +684,7 @@
   },
   "ELECTIRIZER": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -805,24 +700,9 @@
    "sell": 1000,
    "weight": 14
   },
-  "ETHER": {
-   "cat": "heal",
-   "chance": 0.010583,
-   "cost": 1200,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Ether",
-   "id": "ETHER",
-   "ident": "ether",
-   "kr": "PP에이드",
-   "rarity": "uncommon",
-   "sell": 600,
-   "weight": 45
-  },
   "EVERSTONE": {
    "cat": "misc",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 3000,
    "effect": {
     "kind": "noevolve"
@@ -837,7 +717,7 @@
   },
   "FASTBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "fast_species",
@@ -854,7 +734,7 @@
   },
   "FIRESTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -876,7 +756,7 @@
   },
   "FRIENDBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "kind": "ball",
@@ -891,39 +771,9 @@
    "sell": 500,
    "weight": 45
   },
-  "FULLHEAL": {
-   "cat": "heal",
-   "chance": 0.010583,
-   "cost": 400,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Full Heal",
-   "id": "FULLHEAL",
-   "ident": "full-heal",
-   "kr": "만병통치제",
-   "rarity": "uncommon",
-   "sell": 200,
-   "weight": 45
-  },
-  "FULLRESTORE": {
-   "cat": "heal",
-   "chance": 0.003293,
-   "cost": 3000,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Full Restore",
-   "id": "FULLRESTORE",
-   "ident": "full-restore",
-   "kr": "회복약",
-   "rarity": "rare",
-   "sell": 1500,
-   "weight": 14
-  },
   "GENIUSWING": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 300,
    "effect": {
     "amount": 1,
@@ -941,7 +791,7 @@
   "GOLDBOTTLECAP": {
    "buyable": false,
    "cat": "iv",
-   "chance": 0.002117,
+   "chance": 0.002706,
    "cost": 10000,
    "effect": {
     "count": 6,
@@ -957,7 +807,7 @@
   },
   "GREATBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 600,
    "effect": {
     "kind": "ball",
@@ -973,7 +823,7 @@
   },
   "GREPABERRY": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 80,
    "effect": {
     "amount": -10,
@@ -990,7 +840,7 @@
   },
   "HEALBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 300,
    "effect": {
     "kind": "ball",
@@ -1007,7 +857,7 @@
   },
   "HEALTHWING": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 300,
    "effect": {
     "amount": 1,
@@ -1024,7 +874,7 @@
   },
   "HEAVYBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "heavy",
@@ -1041,7 +891,7 @@
   },
   "HONDEWBERRY": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 80,
    "effect": {
     "amount": -10,
@@ -1070,39 +920,9 @@
    "kr": "맥스업",
    "sell": 5000
   },
-  "HYPERPOTION": {
-   "cat": "heal",
-   "chance": 0.010583,
-   "cost": 1500,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Hyper Potion",
-   "id": "HYPERPOTION",
-   "ident": "hyper-potion",
-   "kr": "고급상처약",
-   "rarity": "uncommon",
-   "sell": 750,
-   "weight": 45
-  },
-  "ICEHEAL": {
-   "cat": "heal",
-   "chance": 0.023518,
-   "cost": 200,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Ice Heal",
-   "id": "ICEHEAL",
-   "ident": "ice-heal",
-   "kr": "얼음상태치료제",
-   "rarity": "common",
-   "sell": 100,
-   "weight": 100
-  },
   "ICESTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -1136,7 +956,7 @@
   },
   "KELPSYBERRY": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 80,
    "effect": {
     "amount": -10,
@@ -1153,7 +973,7 @@
   },
   "KINGSROCK": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 5000,
    "effect": {
     "kind": "stone"
@@ -1172,7 +992,7 @@
   },
   "LEAFSTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -1195,7 +1015,7 @@
   },
   "LEVELBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "level_gap",
@@ -1212,7 +1032,7 @@
   },
   "LINKINGCORD": {
    "cat": "stone",
-   "chance": 0.001176,
+   "chance": 0.001503,
    "cost": 8000,
    "effect": {
     "kind": "stone"
@@ -1239,7 +1059,7 @@
   },
   "LOVEBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "same_species_other_gender",
@@ -1256,7 +1076,7 @@
   },
   "LUXURYBALL": {
    "cat": "ball",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "ball",
@@ -1273,7 +1093,7 @@
   },
   "MAGMARIZER": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -1291,7 +1111,7 @@
   },
   "MALICIOUSARMOR": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 750,
    "effect": {
     "kind": "stone"
@@ -1310,7 +1130,7 @@
   "MASTERBALL": {
    "buyable": false,
    "cat": "ball",
-   "chance": 0.00047,
+   "chance": 0.000601,
    "cost": 0,
    "effect": {
     "kind": "ball",
@@ -1327,7 +1147,7 @@
   },
   "MASTERPIECETEACUP": {
    "cat": "stone",
-   "chance": 0.001176,
+   "chance": 0.001503,
    "cost": 9500,
    "effect": {
     "kind": "stone"
@@ -1343,39 +1163,9 @@
    "sell": 4750,
    "weight": 5
   },
-  "MAXPOTION": {
-   "cat": "heal",
-   "chance": 0.003293,
-   "cost": 2500,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Max Potion",
-   "id": "MAXPOTION",
-   "ident": "max-potion",
-   "kr": "풀회복약",
-   "rarity": "rare",
-   "sell": 1250,
-   "weight": 14
-  },
-  "MAXREVIVE": {
-   "cat": "heal",
-   "chance": 0.003293,
-   "cost": 4000,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Max Revive",
-   "id": "MAXREVIVE",
-   "ident": "max-revive",
-   "kr": "기력의덩어리",
-   "rarity": "rare",
-   "sell": 2000,
-   "weight": 14
-  },
   "METALALLOY": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -1393,7 +1183,7 @@
   },
   "METALCOAT": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -1412,7 +1202,7 @@
   },
   "MOONBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "moon_family",
@@ -1429,7 +1219,7 @@
   },
   "MOONSTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -1452,7 +1242,7 @@
   },
   "MUSCLEWING": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 300,
    "effect": {
     "amount": 1,
@@ -1469,7 +1259,7 @@
   },
   "NESTBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "low_level",
@@ -1486,7 +1276,7 @@
   },
   "NETBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "water_or_bug",
@@ -1503,7 +1293,7 @@
   },
   "NUGGET": {
    "cat": "misc",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 10000,
    "effect": {
     "kind": "sell"
@@ -1516,24 +1306,9 @@
    "sell": 5000,
    "weight": 45
   },
-  "PARALYZEHEAL": {
-   "cat": "heal",
-   "chance": 0.023518,
-   "cost": 200,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Paralyze Heal",
-   "id": "PARALYZEHEAL",
-   "ident": "paralyze-heal",
-   "kr": "마비치료제",
-   "rarity": "common",
-   "sell": 100,
-   "weight": 100
-  },
   "PEARL": {
    "cat": "misc",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 2000,
    "effect": {
     "kind": "sell"
@@ -1548,7 +1323,7 @@
   },
   "PEATBLOCK": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -1566,7 +1341,7 @@
   },
   "POKEBALL": {
    "cat": "ball",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 200,
    "effect": {
     "kind": "ball",
@@ -1582,7 +1357,7 @@
   },
   "POMEGBERRY": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 80,
    "effect": {
     "amount": -10,
@@ -1597,24 +1372,9 @@
    "sell": 40,
    "weight": 100
   },
-  "POTION": {
-   "cat": "heal",
-   "chance": 0.023518,
-   "cost": 200,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Potion",
-   "id": "POTION",
-   "ident": "potion",
-   "kr": "상처약",
-   "rarity": "common",
-   "sell": 100,
-   "weight": 100
-  },
   "PREMIERBALL": {
    "cat": "ball",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 20,
    "effect": {
     "kind": "ball",
@@ -1631,7 +1391,7 @@
   },
   "PRETTYWING": {
    "cat": "misc",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 1000,
    "effect": {
     "kind": "sell"
@@ -1646,7 +1406,7 @@
   },
   "PRISMSCALE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -1664,7 +1424,7 @@
   },
   "PROTECTOR": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -1696,7 +1456,7 @@
   },
   "QUALOTBERRY": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 80,
    "effect": {
     "amount": -10,
@@ -1713,7 +1473,7 @@
   },
   "QUICKBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "first_turn",
@@ -1730,7 +1490,7 @@
   },
   "RAREBONE": {
    "cat": "misc",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 5000,
    "effect": {
     "kind": "sell"
@@ -1745,7 +1505,7 @@
   },
   "RARECANDY": {
    "cat": "misc",
-   "chance": 0.004704,
+   "chance": 0.006013,
    "cost": 10000,
    "effect": {
     "amount": 1,
@@ -1761,7 +1521,7 @@
   },
   "REAPERCLOTH": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -1779,7 +1539,7 @@
   },
   "REPEATBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "already_caught",
@@ -1796,7 +1556,7 @@
   },
   "RESISTWING": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 300,
    "effect": {
     "amount": 1,
@@ -1811,24 +1571,9 @@
    "sell": 150,
    "weight": 100
   },
-  "REVIVE": {
-   "cat": "heal",
-   "chance": 0.010583,
-   "cost": 2000,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Revive",
-   "id": "REVIVE",
-   "ident": "revive",
-   "kr": "기력의조각",
-   "rarity": "uncommon",
-   "sell": 1000,
-   "weight": 45
-  },
   "SACHET": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -1844,24 +1589,9 @@
    "sell": 1000,
    "weight": 14
   },
-  "SACREDASH": {
-   "cat": "heal",
-   "chance": 0.000941,
-   "cost": 50000,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Sacred Ash",
-   "id": "SACREDASH",
-   "ident": "sacred-ash",
-   "kr": "성스러운분말",
-   "rarity": "legendary",
-   "sell": 25000,
-   "weight": 4
-  },
   "SCROLLOFDARKNESS": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 5000,
    "effect": {
     "kind": "stone"
@@ -1879,7 +1609,7 @@
   },
   "SHINYSTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -1900,7 +1630,7 @@
   },
   "STARDUST": {
    "cat": "misc",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 3000,
    "effect": {
     "kind": "sell"
@@ -1915,7 +1645,7 @@
   },
   "STARPIECE": {
    "cat": "misc",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 12000,
    "effect": {
     "kind": "sell"
@@ -1930,7 +1660,7 @@
   },
   "SUNSTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -1950,24 +1680,9 @@
    "sell": 1500,
    "weight": 14
   },
-  "SUPERPOTION": {
-   "cat": "heal",
-   "chance": 0.023518,
-   "cost": 700,
-   "effect": {
-    "kind": "sell"
-   },
-   "en": "Super Potion",
-   "id": "SUPERPOTION",
-   "ident": "super-potion",
-   "kr": "좋은상처약",
-   "rarity": "common",
-   "sell": 350,
-   "weight": 100
-  },
   "SWEETAPPLE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2200,
    "effect": {
     "kind": "stone"
@@ -1985,7 +1700,7 @@
   },
   "SWIFTWING": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 300,
    "effect": {
     "amount": 1,
@@ -2002,7 +1717,7 @@
   },
   "SYRUPYAPPLE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 500,
    "effect": {
     "kind": "stone"
@@ -2020,7 +1735,7 @@
   },
   "TAMATOBERRY": {
    "cat": "ev",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 80,
    "effect": {
     "amount": -10,
@@ -2037,7 +1752,7 @@
   },
   "TARTAPPLE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2200,
    "effect": {
     "kind": "stone"
@@ -2055,7 +1770,7 @@
   },
   "THUNDERSTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -2079,7 +1794,7 @@
   },
   "TIMERBALL": {
    "cat": "ball",
-   "chance": 0.010583,
+   "chance": 0.01353,
    "cost": 1000,
    "effect": {
     "cond": "many_turns",
@@ -2096,7 +1811,7 @@
   },
   "TINYMUSHROOM": {
    "cat": "misc",
-   "chance": 0.023518,
+   "chance": 0.030066,
    "cost": 500,
    "effect": {
     "kind": "sell"
@@ -2111,7 +1826,7 @@
   },
   "ULTRABALL": {
    "cat": "ball",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 800,
    "effect": {
     "kind": "ball",
@@ -2127,7 +1842,7 @@
   },
   "UNREMARKABLETEACUP": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 400,
    "effect": {
     "kind": "stone"
@@ -2145,7 +1860,7 @@
   },
   "UPGRADE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"
@@ -2163,7 +1878,7 @@
   },
   "WATERSTONE": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -2186,7 +1901,7 @@
   },
   "WHIPPEDDREAM": {
    "cat": "stone",
-   "chance": 0.003293,
+   "chance": 0.004209,
    "cost": 2000,
    "effect": {
     "kind": "stone"

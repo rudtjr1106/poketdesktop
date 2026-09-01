@@ -36,7 +36,7 @@ def current(request: Request, authorization: str = Header(default="")):
     user = db.q1("SELECT * FROM users WHERE id=?", (sess["user_id"],))
     if not user:
         raise HTTPException(401, "계정을 찾을 수 없습니다.")
-    auth.touch_session(token, auth.client_ip(request))
+    auth.touch_session(token, auth.client_ip(request), sess["last_seen"])
     return {"user": user, "session": sess, "token": token}
 
 

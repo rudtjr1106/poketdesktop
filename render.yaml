@@ -47,6 +47,11 @@ services:
       - key: POKET_ALLOW_ADD_EXP
         value: "0"
 
+      # 조우 간격을 무시하고 풀숲을 돋우는 테스트용 경로. 반드시 막는다.
+      # 열리면 5~7분 간격이 아무 의미가 없어진다.
+      - key: POKET_ALLOW_FORCE_WILD
+        value: "0"
+
       # Render 가 앞에서 프록시를 하고 X-Forwarded-For 를 넣어 준다.
       - key: POKET_TRUST_PROXY
         value: "1"

@@ -308,6 +308,12 @@ class WildController(object):
         self.clear()
 
     def check(self, force=False):
+        """서버에 지금 상태를 물어본다.
+
+        force 는 사용자가 '풀숲 찾아보기' 를 직접 눌렀다는 뜻이다.
+        직접 눌렀는데 아무 일도 안 일어나면 고장으로 보이므로,
+        그때는 얼마나 기다려야 하는지 알려준다.
+        """
         if not self.app.api:
             return
 
@@ -316,10 +322,26 @@ class WildController(object):
                 if getattr(err, "status", 0) == 401:
                     self.app.on_session_lost()
                     return
+                if force:
+                    self.app.notify("서버에 물어보지 못했습니다.")
                 self.schedule(POLL_SAFETY)
                 return
-            self.apply(r)
+            self.apply(r, tell=force)
         run_async(self.app.root, lambda: self.app.api.wild(force), done)
+
+    def _say_wait(self, r):
+        """아직 때가 아니면 얼마나 남았는지 알려준다."""
+        left = r.get("nextInSeconds")
+        if left is None:
+            return self.app.notify("아직 풀숲이 돋지 않았습니다.")
+        if left <= 0:
+            return self.app.notify("곧 풀숲이 돋습니다.")
+        if left < 60:
+            when = "%d초" % left
+        else:
+            when = "%d분" % ((left + 59) // 60)
+        self.app.notify("아직 풀숲이 돋지 않았습니다. %s 뒤에 다시 살펴보세요."
+                        % when)
 
     def schedule(self, seconds):
         if self._job:
@@ -330,12 +352,17 @@ class WildController(object):
         seconds = max(5, min(3600, int(seconds)))
         self._job = self.app.root.after(seconds * 1000, self.check)
 
-    def apply(self, r):
-        """서버가 알려준 상태대로 화면을 맞춘다."""
+    def apply(self, r, tell=False):
+        """서버가 알려준 상태대로 화면을 맞춘다.
+
+        tell 이면 사용자가 직접 눌러서 온 응답이라 결과를 말로도 알려준다.
+        """
         self.app.balls = r.get("balls", self.app.balls)
         w = r.get("wild")
         if not w:
             self.clear()
+            if tell:
+                self._say_wait(r)
             self.schedule(r.get("nextInSeconds") or POLL_SAFETY)
             return
 

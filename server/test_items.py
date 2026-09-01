@@ -177,7 +177,7 @@ def main():
     st, shop = call("GET", "/api/shop", token=token)
     chk("상점을 볼 수 있다", st == 200 and shop.get("items"), st)
     by = dict((i["id"], i) for i in shop.get("items", []))
-    chk("도구가 100종 넘는다", len(by) > 100, len(by))
+    chk("도구가 90종 넘는다", len(by) > 90, len(by))
     chk("몬스터볼 가격이 본가와 같다(200)", by["POKEBALL"]["cost"] == 200,
         by["POKEBALL"]["cost"])
     chk("파는 값은 사는 값의 절반", by["POKEBALL"]["sell"] == 100,

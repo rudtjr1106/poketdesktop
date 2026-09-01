@@ -113,7 +113,25 @@ def lookup_session(token):
     return row
 
 
-def touch_session(token, ip):
+# 마지막 접속 시각을 얼마나 자주 적을지(초).
+# 인증된 요청마다 적으면 폴링이 촘촘해지는 순간 이게 제일 비싼 쿼리가
+# 된다 - Turso 는 원격이라 쓰기 한 번이 왕복 한 번이다. 접속 여부를
+# 판정하는 여유는 이 간격보다 훨씬 크게 잡아야 판정이 흔들리지 않는다.
+TOUCH_EVERY = 30
+
+
+def touch_session(token, ip, seen=None):
+    """마지막으로 말을 건 시각을 갱신한다.
+
+    seen 은 부르는 쪽이 이미 읽어 둔 세션 행의 last_seen 이다.
+    넘겨주면 최근에 적었는지 조회 없이 판단해서, 대부분의 요청에서
+    쓰기를 아예 건너뛴다.
+    """
+    if seen:
+        last = parse_iso(seen)
+        if last and (datetime.datetime.now(datetime.timezone.utc)
+                     - last).total_seconds() < TOUCH_EVERY:
+            return
     db.run("UPDATE sessions SET last_seen=?, ip=? WHERE token_hash=?",
            (now_iso(), ip or "", token_hash(token)))
 
