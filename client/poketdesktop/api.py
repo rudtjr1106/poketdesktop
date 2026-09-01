@@ -242,6 +242,50 @@ class Api(object):
             return None
         return r.content if r.status_code == 200 and r.content else None
 
+    # ---------------- 친구 ----------------
+    # 전부 창을 열었을 때만 부른다. 폴링을 붙이지 않는다 - Turso 는
+    # 왕복 하나가 곧 비용이라, 항상 도는 폴링은 하나로 몰기로 했다.
+    def friends(self):
+        return self._call("GET", "/api/friends")
+
+    def friend_search(self, name):
+        import urllib.parse
+        return self._call("GET", "/api/friends/search?name="
+                          + urllib.parse.quote(name or ""))
+
+    def friend_request(self, username):
+        return self._call("POST", "/api/friends/request",
+                          {"username": username})
+
+    def friend_accept(self, uid):
+        return self._call("POST", "/api/friends/%d/accept" % uid, {})
+
+    def friend_remove(self, uid):
+        """거절 · 취소 · 삭제가 전부 이 하나다."""
+        return self._call("DELETE", "/api/friends/%d" % uid)
+
+    def friend_block(self, uid):
+        return self._call("POST", "/api/friends/%d/block" % uid, {})
+
+    def friend_unblock(self, uid):
+        return self._call("DELETE", "/api/friends/%d/block" % uid)
+
+    def profile(self, uid):
+        return self._call("GET", "/api/users/%d/profile" % uid)
+
+    # ---------------- 유저 배틀 ----------------
+    def pvp_records(self, limit=30):
+        return self._call("GET", "/api/pvp/records?limit=%d" % limit)
+
+    def pvp_ranking(self, limit=50):
+        return self._call("GET", "/api/pvp/ranking?limit=%d" % limit)
+
+    def pvp_match(self, mid):
+        return self._call("GET", "/api/pvp/match/%d" % mid)
+
+    def pvp_seen(self, mid):
+        return self._call("POST", "/api/pvp/match/%d/seen" % mid, {})
+
     # ---------------- 가방 · 상점 ----------------
     def bag(self):
         return self._call("GET", "/api/bag")

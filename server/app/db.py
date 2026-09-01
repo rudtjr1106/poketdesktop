@@ -169,6 +169,36 @@ CREATE TABLE IF NOT EXISTS seen (
     PRIMARY KEY (user_id, species)
 );
 
+-- 친구. 관계는 **대칭**이라 행을 하나만 두고 항상 작은 id 를 a_id 에 넣는다.
+-- 양쪽에 한 행씩 두면 수락/삭제 때 두 문장을 맞춰 써야 하는데, db.run 은
+-- 한 문장씩 커밋이라 중간에 끊기면 한쪽만 남는다. Turso 는 가끔 끊기는 게
+-- 전제인 환경이라(3회 재시도가 그래서 있다) 그 반쪽 상태를 풀 방법이 없다.
+--   asked_by  누가 신청했나. pending 의 방향이 이걸로 정해진다.
+--   rejected  거절도 남긴다. 바로 다시 신청하는 걸 막아야 해서다.
+CREATE TABLE IF NOT EXISTS friend (
+    a_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    b_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    state       TEXT NOT NULL,
+    asked_by    INTEGER NOT NULL,
+    created_at  TEXT NOT NULL,
+    decided_at  TEXT,
+    PRIMARY KEY (a_id, b_id)
+);
+-- a_id 는 기본키가 곧 인덱스다. b_id 로 들어오는 쪽은 따로 걸어 줘야
+-- '나에게 온 신청' 을 찾을 때 표를 통째로 훑지 않는다.
+CREATE INDEX IF NOT EXISTS idx_friend_b ON friend(b_id);
+
+-- 차단은 **비대칭**이다(내가 저 사람을 차단). friend.state 에 섞으면
+-- 서로 차단한 경우를 표현할 수 없고, 풀었을 때 원래 친구였는지도 잃는다.
+CREATE TABLE IF NOT EXISTS friend_block (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (user_id, target_id)
+);
+-- '나를 차단한 사람' 도 봐야 한다. 신청과 도전을 막을 때 양쪽을 다 본다.
+CREATE INDEX IF NOT EXISTS idx_block_target ON friend_block(target_id);
+
 -- 유저끼리 붙은 한 판. **여기 들어오는 순간 승패가 이미 끝나 있다.**
 -- 진행이 AI 자동이라 팀과 시드만 있으면 결과가 정해지므로, 서버가 매칭
 -- 순간 끝까지 계산해서 로그를 넣어 둔다. 양쪽 클라이언트는 그 같은

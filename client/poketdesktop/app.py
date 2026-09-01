@@ -17,6 +17,7 @@ from .tray import Tray                         # noqa: E402
 from .desktop_battle import DesktopBattle       # noqa: E402
 from .ui_bag import BagWindow                  # noqa: E402
 from .ui_box import BoxWindow, confirm         # noqa: E402
+from .ui_friends import FriendsWindow          # noqa: E402
 from .ui_shop import ShopWindow                # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
@@ -39,6 +40,7 @@ class App(object):
         self.box_window = None
         self.shop_window = None
         self.bag_window = None
+        self.friends_win = None
         self.battle = None
         self._quitting = False
         self._relogin = False
@@ -287,9 +289,15 @@ class App(object):
             return self.bag_window.focus()
         self.bag_window = BagWindow(self.root, self)
 
+    def open_friends(self):
+        if self.friends_win:
+            return self.friends_win.focus()
+        self.friends_win = FriendsWindow(self)
+
     def close_windows(self):
         """열려 있는 창을 전부 닫는다. 로그아웃·탈퇴·종료 때 부른다."""
-        for name in ("box_window", "shop_window", "bag_window"):
+        for name in ("box_window", "shop_window", "bag_window",
+                     "friends_win"):
             w = getattr(self, name, None)
             if w:
                 try:
