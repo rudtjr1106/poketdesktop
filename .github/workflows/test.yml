@@ -88,9 +88,10 @@ jobs:
           # 도트를 받아 두는 곳. 기본값 /data/sprites 는 도커 안에만 있다.
           POKET_SPRITE_DIR: /tmp/sprites
           POKET_WALK_DIR: /tmp/walk
-          # 검사가 X-Forwarded-For 로 IP 를 확인한다. 실서버는 Render 가
-          # 앞에 있어서 이걸 켜 둔다.
-          POKET_TRUST_PROXY: "1"
+          # 켜지 않는다. test_server 의 'IP 위조 차단' 검사가 '프록시를
+          # 안 믿는 상태에서 헤더가 무시되는가' 를 보는 것이라, 켜면
+          # 오히려 그 검사가 깨진다. 실서버(Render)에서만 켠다.
+          POKET_TRUST_PROXY: "0"
         run: |
           mkdir -p /tmp/sprites /tmp/walk
           cd server
