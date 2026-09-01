@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""DB 를 다른 Turso 로 옮긴다.
+r"""DB 를 다른 Turso 로 옮긴다.
 
     set POKET_FROM_URL=libsql://지금-쓰는-것...
     set POKET_FROM_TOKEN=...
@@ -7,9 +7,16 @@
     set POKET_TO_TOKEN=...
     python tools/move_db.py
 
-옮기는 이유는 대개 **거리**다. 서버(Render)와 DB(Turso)가 다른 지역에
-있으면 쿼리 하나마다 바다를 건넌다. 재보니 왕복 하나가 100~200ms 였다.
-같은 지역이면 5~15ms 다.
+받는 쪽은 Turso 여도 되고 **그냥 파일 경로여도 된다.** 서버 한 대에
+SQLite 로 내려앉힐 때 이걸 쓴다 - 뽑은 파일은 파이썬 기본 sqlite3 로
+그대로 열리고, 비밀번호 해시(BLOB)도 그대로 넘어간다.
+
+    set POKET_TO_URL=D:\poket.db
+    set POKET_TO_TOKEN=아무거나
+
+지역을 맞추려고 이걸 쓰지는 마라. **Turso 에는 싱가포르가 없다** -
+도쿄·뭄바이·아일랜드·버지니아·오하이오·오리건뿐이고, 무료 등급은
+group 이 하나라 위치를 바꿀 수도 없다. 자세한 건 docs/운영.md 를 보라.
 
 이 도구가 하는 일:
   1. 지금 DB 에서 전부 떠낸다
