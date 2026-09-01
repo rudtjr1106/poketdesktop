@@ -39,9 +39,57 @@ def make_icon():
     return ICON
 
 
-def build():
-    print("포켓 데스크톱 v%s 빌드" % VERSION)
+VERSION_TEMPLATE = """VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(%(nums)s), prodvers=(%(nums)s),
+    mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable('040904B0', [
+        StringStruct('CompanyName', 'rudtjr1106'),
+        StringStruct('FileDescription', 'Poket Desktop - a desktop Pokemon companion'),
+        StringStruct('FileVersion', '%(ver)s'),
+        StringStruct('InternalName', 'poketdesktop'),
+        StringStruct('LegalCopyright', 'Fan project. Pokemon is (c) Nintendo / Creatures / GAME FREAK.'),
+        StringStruct('OriginalFilename', '%(name)s.exe'),
+        StringStruct('ProductName', 'Poket Desktop'),
+        StringStruct('ProductVersion', '%(ver)s')])
+    ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+"""
+
+
+def make_version_file():
+    """exe 에 넣을 버전 정보.
+
+    이게 없으면 파일 속성이 텅 비어서 '어디서 왔는지 모를 프로그램' 으로
+    보인다. 백신과 SmartScreen 이 평판을 매길 때 불리하게 작용한다.
+    서명만큼은 아니지만 공짜로 할 수 있는 일이다.
+
+    설명은 영문으로 적는다. 버전 리소스는 인코딩이 까다로워서 한글을 넣으면
+    빌드 환경에 따라 깨지는 일이 있다.
+    """
+    v = (VERSION.split(".") + ["0", "0", "0", "0"])[:4]
+    nums = ", ".join(v)
+    path = os.path.join(ROOT, "build", "version.txt")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    text = VERSION_TEMPLATE % {
+        "nums": nums, "ver": VERSION, "name": NAME,
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return path
+
+
+def build(onedir=False):
+    print("포켓 데스크톱 v%s 빌드 (%s)"
+          % (VERSION, "폴더형" if onedir else "단일 파일"))
     icon = make_icon()
+    verfile = make_version_file()
 
     for d in ("build/pyi", "dist"):
         p = os.path.join(ROOT, d)
@@ -51,10 +99,16 @@ def build():
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm", "--clean",
-        "--onefile",                      # 파일 하나로
+        # 단일 파일(--onefile)은 실행할 때 자기를 임시 폴더에 풀고 돌린다.
+        # 그 동작이 악성코드 패커와 비슷해서 백신 오탐이 자주 난다.
+        # 폴더형(--onedir)은 풀어놓은 상태 그대로라 오탐이 훨씬 적다.
+        "--onedir" if onedir else "--onefile",
         "--windowed",                     # 콘솔 창 없이
         "--name", NAME,
         "--icon", icon,
+        # 파일 속성에 이름·버전·설명을 박는다. 속성이 비어 있으면
+        # '출처 모를 프로그램' 으로 취급받아 평판에 불리하다.
+        "--version-file", verfile,
         "--distpath", os.path.join(ROOT, "dist"),
         "--workpath", os.path.join(ROOT, "build", "pyi"),
         "--specpath", os.path.join(ROOT, "build"),
@@ -82,10 +136,25 @@ def build():
         print("  실패")
         return 1
 
-    exe = os.path.join(ROOT, "dist", NAME + ".exe")
+    if onedir:
+        folder = os.path.join(ROOT, "dist", NAME)
+        exe = os.path.join(folder, NAME + ".exe")
+    else:
+        folder = None
+        exe = os.path.join(ROOT, "dist", NAME + ".exe")
     if not os.path.exists(exe):
         print("  실행 파일이 안 만들어졌습니다")
         return 1
+    if onedir:
+        # 폴더째 zip 으로 묶는다. 받는 사람은 풀고 exe 를 누르면 된다.
+        zip_base = os.path.join(ROOT, "dist", NAME)
+        made = shutil.make_archive(zip_base, "zip",
+                                   os.path.join(ROOT, "dist"), NAME)
+        mb = os.path.getsize(made) / 1048576.0
+        print("")
+        print("  완성: %s" % made)
+        print("  크기: %.1f MB" % mb)
+        return 0
     mb = os.path.getsize(exe) / 1048576.0
     print("")
     print("  완성: %s" % exe)
@@ -94,4 +163,9 @@ def build():
 
 
 if __name__ == "__main__":
-    sys.exit(build())
+    import argparse
+    _ap = argparse.ArgumentParser()
+    _ap.add_argument("--onedir", action="store_true",
+                     help="폴더형으로 빌드해 zip 으로 묶는다 (백신 오탐이 적다)")
+    _a = _ap.parse_args()
+    sys.exit(build(onedir=_a.onedir))
