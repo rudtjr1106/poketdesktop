@@ -245,6 +245,10 @@ class Api(object):
     # ---------------- 친구 ----------------
     # 전부 창을 열었을 때만 부른다. 폴링을 붙이지 않는다 - Turso 는
     # 왕복 하나가 곧 비용이라, 항상 도는 폴링은 하나로 몰기로 했다.
+    def dexbook(self):
+        """내 도감 현황. 창을 열 때만 부른다."""
+        return self._call("GET", "/api/dexbook")
+
     def friends(self):
         return self._call("GET", "/api/friends")
 

@@ -185,6 +185,40 @@ def mark_seen(uid, species, caught, now):
            (uid, species, int(bool(caught)), now, int(bool(caught))))
 
 
+def dexbook(uid, dex):
+    """도감 현황. 번호 목록 두 개로만 준다.
+
+    1025종의 이름과 타입을 여기서 또 내려보낼 이유가 없다 - 그건
+    클라이언트가 이미 도감 파일로 들고 있다. 서버만 아는 것은
+    '내가 무엇을 봤고 무엇을 잡았는가' 뿐이라 그것만 준다.
+    번호 목록이면 1025종이 다 차도 응답이 10KB 를 안 넘는다.
+    """
+    seen, caught = [], []
+    num_of = {}
+    for sp in dex.raw["species"]:
+        num_of[sp["internal"]] = sp["num"]
+    for r in db.q("SELECT species, caught FROM seen WHERE user_id=?", (uid,)):
+        n = num_of.get(r["species"])
+        if not n:
+            continue
+        seen.append(n)
+        if r["caught"]:
+            caught.append(n)
+    seen.sort()
+    caught.sort()
+    total = len(dex.raw["species"])
+    # 세대별로도 세어 준다. '몇 세대를 얼마나 채웠나' 가 도감의 재미다.
+    gens = {}
+    cs = set(caught)
+    for sp in dex.raw["species"]:
+        g = str(sp.get("gen") or 0)
+        row = gens.setdefault(g, {"total": 0, "caught": 0})
+        row["total"] += 1
+        if sp["num"] in cs:
+            row["caught"] += 1
+    return {"seen": seen, "caught": caught, "total": total, "gens": gens}
+
+
 def has_caught(uid, species):
     r = db.q1("SELECT caught FROM seen WHERE user_id=? AND species=?", (uid, species))
     return bool(r and r["caught"])

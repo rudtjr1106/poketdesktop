@@ -162,6 +162,12 @@ def health(request: Request):
     }
 
 
+@app.get("/api/dexbook")
+def dexbook(ctx=Depends(current)):
+    """내 도감 현황. 창을 열 때만 부른다(폴링하지 않는다)."""
+    return items.dexbook(ctx["user"]["id"], dex())
+
+
 @app.get("/api/pokedex/meta")
 def pokedex_meta():
     d = dex()
@@ -500,6 +506,7 @@ def _give_starter(user_id, which):
     mon = P.make_pokemon(sp, config.STARTER_LEVEL, RNG, shiny_rate=config.SHINY_RATE)
     mid = db.insert_mon(user_id, mon, auth.now_iso())
     db.run("UPDATE pokemon SET on_desktop=1, slot=0 WHERE id=?", (mid,))
+    items.mark_seen(user_id, pick, True, auth.now_iso())
     return mid
 
 
@@ -858,6 +865,13 @@ def wild_reveal(wid: int, ctx=Depends(current)):
                 "ballOptions": _ball_options(uid, ctx["user"], row)}
     exp = iso(now() + datetime.timedelta(seconds=config.WILD_TTL))
     db.run("UPDATE wild SET state='revealed', expires_at=? WHERE id=?", (exp, wid))
+    # 도감에 '봤다' 로 남긴다. 예전에는 이겼거나 잡았을 때만 남아서,
+    # 눈앞에서 도망간 포켓몬은 만난 적이 없는 것이 됐다.
+    try:
+        items.mark_seen(uid, json.loads(row["data"])["species"], False,
+                        auth.now_iso())
+    except Exception:                                       # noqa: BLE001
+        pass
     row = db.q1("SELECT * FROM wild WHERE id=?", (wid,))
     return {"wild": _wild_public(row, True),
             "ballOptions": _ball_options(uid, ctx["user"], row)}
