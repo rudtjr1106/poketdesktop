@@ -30,12 +30,11 @@ def current(request: Request, authorization: str = Header(default="")):
     if not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "로그인이 필요합니다.")
     token = authorization[7:].strip()
-    sess = auth.lookup_session(token)
+    # 세션과 사용자를 한 번에 읽는다. 나눠 물으면 왕복이 두 번이고,
+    # 인증 요청은 전부 여기를 지나므로 요청마다 100~200ms 를 더 쓴다.
+    sess, user = auth.lookup_session_with_user(token)
     if not sess:
         raise HTTPException(401, "세션이 만료되었습니다. 다시 로그인해 주세요.")
-    user = db.q1("SELECT * FROM users WHERE id=?", (sess["user_id"],))
-    if not user:
-        raise HTTPException(401, "계정을 찾을 수 없습니다.")
     auth.touch_session(token, auth.client_ip(request), sess["last_seen"])
     return {"user": user, "session": sess, "token": token}
 

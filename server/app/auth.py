@@ -99,19 +99,49 @@ def purge_expired():
     db.run("DELETE FROM sessions WHERE expires_at < ?", (now_iso(),))
 
 
-def lookup_session(token):
-    """토큰으로 세션 행을 찾는다. 만료면 지우고 None."""
-    if not token:
-        return None
-    row = db.q1("SELECT * FROM sessions WHERE token_hash=?", (token_hash(token),))
-    if not row:
-        return None
-    exp = parse_iso(row["expires_at"])
-    if exp and exp < datetime.datetime.now(datetime.timezone.utc):
-        db.run("DELETE FROM sessions WHERE token_hash=?", (row["token_hash"],))
-        return None
-    return row
 
+# sessions 의 칸 이름. users 와 겹치는 것(created_at)이 있어서 JOIN 할 때는
+# 별명을 붙여야 한다. db.Row 는 이름이 겹치면 **뒤엣것이 조용히 덮어쓴다** -
+# 오류도 안 나고 세션의 created_at 이 계정 가입 시각으로 바뀌어 버린다.
+_SESS_COLS = ("token_hash", "user_id", "ip", "ip_real", "device",
+              "created_at", "last_seen", "expires_at")
+
+_SESS_SELECT = ", ".join("s.%s AS sess__%s" % (c, c) for c in _SESS_COLS)
+
+
+def lookup_session_with_user(token):
+    """세션과 사용자를 **한 번에** 읽는다. (세션, 사용자) 또는 (None, None).
+
+    인증이 필요한 요청은 전부 이 길을 지난다. 세션 따로 사용자 따로 물으면
+    원격 DB 로는 왕복이 두 번이고, 재보니 왕복 하나가 100~200ms 다.
+    엔드포인트가 일을 시작하기도 전에 그만큼을 쓴다.
+
+    별명은 sessions 쪽에만 붙인다. users 는 칸이 나중에 늘어나서
+    (db.MIGRATIONS 가 balls, money 를 나중에 더했다) u.* 로 두어야 새 칸이
+    저절로 따라온다. sessions 는 반대로 칸이 고정이라 적어 두어도 안전하다.
+
+    JOIN 이라 계정이 없는 세션은 아예 안 나온다. 계정을 지우면 세션도 같이
+    지워지므로(ON DELETE CASCADE) 원래 있을 수 없는 상태다.
+    """
+    if not token:
+        return None, None
+    row = db.q1("SELECT u.*, " + _SESS_SELECT +
+                " FROM sessions s JOIN users u ON u.id = s.user_id"
+                " WHERE s.token_hash=?", (token_hash(token),))
+    if not row:
+        return None, None
+    sess = {}
+    user = {}
+    for k in row.keys():
+        if k.startswith("sess__"):
+            sess[k[6:]] = row[k]
+        else:
+            user[k] = row[k]
+    exp = parse_iso(sess["expires_at"])
+    if exp and exp < datetime.datetime.now(datetime.timezone.utc):
+        db.run("DELETE FROM sessions WHERE token_hash=?", (sess["token_hash"],))
+        return None, None
+    return sess, user
 
 # 마지막 접속 시각을 얼마나 자주 적을지(초).
 # 인증된 요청마다 적으면 폴링이 촘촘해지는 순간 이게 제일 비싼 쿼리가
