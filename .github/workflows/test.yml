@@ -85,7 +85,14 @@ jobs:
           POKET_WILD_COOLDOWN_MIN: "60"
           POKET_WILD_COOLDOWN_MAX: "60"
           POKET_MISS_COOLDOWN: "60"
+          # 도트를 받아 두는 곳. 기본값 /data/sprites 는 도커 안에만 있다.
+          POKET_SPRITE_DIR: /tmp/sprites
+          POKET_WALK_DIR: /tmp/walk
+          # 검사가 X-Forwarded-For 로 IP 를 확인한다. 실서버는 Render 가
+          # 앞에 있어서 이걸 켜 둔다.
+          POKET_TRUST_PROXY: "1"
         run: |
+          mkdir -p /tmp/sprites /tmp/walk
           cd server
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8788 \
                 --log-level warning > /tmp/server.log 2>&1 &
