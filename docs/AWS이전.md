@@ -230,7 +230,7 @@ HTTPS 에는 도메인이 필요하다. 비밀번호가 오가므로 선택이 �
 
 1. `https://www.duckdns.org/` 접속
 2. **Google** 또는 **GitHub** 로 로그인 (Persona 는 오래전에 없어진 서비스다)
-3. 원하는 이름을 추가한다 (예: `poketdesktop` → `poketdesktop.duckdns.org`).
+3. 원하는 이름을 추가한다 (이 프로젝트는 `posktop` 을 써서 `posktop.duckdns.org` 가 됐다).
    같은 화면의 **token** 을 복사해 둔다.
    *(이 화면은 로그인이 필요해 직접 확인하지 못했다. 도메인 입력칸과 추가
    버튼을 찾으면 된다.)*
@@ -238,7 +238,7 @@ HTTPS 에는 도메인이 필요하다. 비밀번호가 오가므로 선택이 �
    열어도 된다:
 
 ```
-https://www.duckdns.org/update?domains=poketdesktop&token=토큰&ip=고정IP&verbose=true
+https://www.duckdns.org/update?domains=posktop&token=토큰&ip=고정IP&verbose=true
 ```
 
 `domains` 에는 `.duckdns.org` 를 빼고 이름만 넣는다. 성공하면 `OK` 가 뜬다.
@@ -246,7 +246,7 @@ https://www.duckdns.org/update?domains=poketdesktop&token=토큰&ip=고정IP&ver
 ### 확인 (건너뛰지 마라)
 
 ```powershell
-nslookup poketdesktop.duckdns.org 8.8.8.8
+nslookup posktop.duckdns.org 8.8.8.8
 ```
 
 **✅ 확인:** 나오는 IP 가 6단계의 고정 IP 와 **정확히 같다.**
@@ -322,7 +322,7 @@ bash poketdesktop/deploy/setup-aws.sh
 **✅ 확인:**
 
 ```bash
-curl https://poketdesktop.duckdns.org/api/health
+curl https://posktop.duckdns.org/api/health
 ```
 
 그리고 브라우저로 열어서 **자물쇠**를 본다.
@@ -427,7 +427,7 @@ docker ps
 `client/poketdesktop/config.py`:
 
 ```python
-SERVER = os.environ.get("POKET_SERVER") or "https://poketdesktop.duckdns.org"
+SERVER = os.environ.get("POKET_SERVER") or "https://posktop.duckdns.org"
 
 OLD_SERVERS = (
     "http://127.0.0.1:8787",
