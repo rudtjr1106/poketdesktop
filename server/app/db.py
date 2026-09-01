@@ -168,6 +168,13 @@ CREATE TABLE IF NOT EXISTS seen (
     first_at TEXT NOT NULL,
     PRIMARY KEY (user_id, species)
 );
+
+-- 서버가 스스로 기억해야 하는 잡다한 것. 지금은 '어떤 자료 손질까지
+-- 끝냈는가' 를 적는 데 쓴다.
+CREATE TABLE IF NOT EXISTS meta (
+    k  TEXT PRIMARY KEY,
+    v  TEXT NOT NULL
+);
 """
 
 MIGRATIONS = [

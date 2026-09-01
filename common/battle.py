@@ -423,9 +423,12 @@ class Battle(object):
         if stats:
             chance = move.get("statChance") or 0
             if chance == 0 or self.rng.uniform(0, 100) < chance:
-                # 위력이 없는 변화기는 대개 자기 자신에게 건다
-                to_self = not move.get("power") and all(c > 0 for _s, c in stats)
-                dst = user if to_self else target
+                # 누구에게 거는지는 도감을 만들 때 이미 판정해 두었다
+                # (build_pokedex._stat_self). 여기서 짐작하면 안 된다 -
+                # 예전에는 '올려주는 기술이면 자기 자신' 으로 짐작했는데,
+                # 그러면 메탈클로처럼 때리면서 자기 공격이 오르는 기술이
+                # 전부 상대를 강화해 버렸다.
+                dst = user if move.get("statSelf") else target
                 for stat, change in stats:
                     self._change_stat(dst, stat, change, ev,
                                       "me" if dst is self.me else "foe")

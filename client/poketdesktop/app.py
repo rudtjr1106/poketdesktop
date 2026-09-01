@@ -451,9 +451,11 @@ class App(object):
         self.balls = 0
         self.money = 0
         self.refresh_tray()
+        # show_login() 이 로그인에 성공하면 그 안에서 after_login() 까지
+        # 부른다. 여기서 한 번 더 부르면 폴링 예약과 컨트롤러가 두 벌씩
+        # 생긴다. 지금은 각 컨트롤러에 'is None' 가드가 있어 증상이 안
+        # 보이지만, 가드 없는 것을 하나라도 추가하는 순간 드러난다.
         self.show_login()
-        if self.api:
-            self.after_login()
 
     def delete_account(self):
         if not confirm(self.root, "회원탈퇴",

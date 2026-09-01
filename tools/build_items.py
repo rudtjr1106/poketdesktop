@@ -141,26 +141,6 @@ CATALOG = [
     ("rare-candy", "misc", "epic", {"kind": "level", "amount": 1}),
     ("everstone", "misc", "uncommon", {"kind": "noevolve"}),
 
-    # ---- 회복약: 지금은 파는 용도 ----
-    # 이 게임에는 배틀 밖에서 체력이 남지 않는다(배틀이 끝나면 원래대로).
-    # 그래서 회복약은 아직 쓸 데가 없고, 팔아서 돈으로 바꾸는 물건이다.
-    # 나중에 체력이 이어지거나 트레이너전이 생기면 그때 살아난다.
-    ("potion", "heal", "common", {"kind": "sell"}),
-    ("super-potion", "heal", "common", {"kind": "sell"}),
-    ("antidote", "heal", "common", {"kind": "sell"}),
-    ("burn-heal", "heal", "common", {"kind": "sell"}),
-    ("ice-heal", "heal", "common", {"kind": "sell"}),
-    ("awakening", "heal", "common", {"kind": "sell"}),
-    ("paralyze-heal", "heal", "common", {"kind": "sell"}),
-    ("hyper-potion", "heal", "uncommon", {"kind": "sell"}),
-    ("revive", "heal", "uncommon", {"kind": "sell"}),
-    ("full-heal", "heal", "uncommon", {"kind": "sell"}),
-    ("ether", "heal", "uncommon", {"kind": "sell"}),
-    ("max-potion", "heal", "rare", {"kind": "sell"}),
-    ("full-restore", "heal", "rare", {"kind": "sell"}),
-    ("max-revive", "heal", "rare", {"kind": "sell"}),
-    ("sacred-ash", "heal", "legendary", {"kind": "sell"}),
-
     # ---- 팔려고 있는 것 ----
     ("tiny-mushroom", "misc", "common", {"kind": "sell"}),
     ("pretty-wing", "misc", "common", {"kind": "sell"}),

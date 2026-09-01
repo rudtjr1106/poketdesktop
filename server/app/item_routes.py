@@ -161,7 +161,10 @@ def use(body: UseIn, me=Depends(deps.current)):
     else:
         raise HTTPException(400, "%s은(는) 아직 쓸 수 없습니다." % it["kr"])
 
-    if not items.bag_take(uid, it["id"], 1):
+    # keep 이면 쓰고도 없어지지 않는다. 변함없는돌은 진화 잠금을 껐다
+    # 켰다 하는 표시라서, 잠글 때도 풀 때도 돌이 남아 있어야 한다.
+    # 예전에는 이 검사가 없어서 한 번 잠갔다 푸는 데 돌 두 개가 사라졌다.
+    if not out.get("keep") and not items.bag_take(uid, it["id"], 1):
         raise HTTPException(400, "%s이(가) 없습니다." % it["kr"])
     fresh = _mon(uid, mon["id"])
     out.update(_wallet(uid))

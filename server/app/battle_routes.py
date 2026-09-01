@@ -378,12 +378,31 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
 
 @router.post("/api/battle/{bid}/switch")
 def switch(bid: int, body: SwitchIn, ctx=Depends(deps.current)):
-    """쓰러졌을 때 다음 포켓몬을 내보낸다."""
+    """쓰러졌을 때 다음 포켓몬을 내보낸다.
+
+    이 게임에는 자유 교체가 없다. 내 포켓몬이 쓰러졌을 때만 다음 애가
+    나온다. 그래서 여기서 되살려도 되는 배틀은 'lost' 로 끝난 것뿐이다.
+
+    예전에는 이 검사가 없어서 도망쳤거나(fled) 잡고 끝난(caught) 배틀도
+    되살아났다. 그때는 야생이 이미 지워진 뒤라, 되살려 다시 이기면
+    경험치와 노력치와 도구를 한 번 더 받을 수 있었다. 아직 안 끝난
+    배틀(active)도 마찬가지로 막는다 - 그걸 허용하면 턴을 쓰지 않고
+    체력만 가득 채우는 수가 된다.
+    """
     uid = ctx["user"]["id"]
     d = deps.dex()
     row = db.q1("SELECT * FROM battle WHERE id=? AND user_id=?", (bid, uid))
     if not row:
         raise HTTPException(404, "그런 배틀이 없습니다.")
+    if row["state"] != "done" or row["result"] != "lost":
+        raise HTTPException(409, "지금은 교체할 수 없습니다.")
+    exp = auth.parse_iso(row["expires_at"])
+    if exp and exp < _now():
+        raise HTTPException(410, "배틀이 시간 초과로 끝났습니다.")
+    if not db.q1("SELECT id FROM wild WHERE id=?", (row["wild_id"],)):
+        raise HTTPException(410, "야생 포켓몬은 이미 떠났습니다.")
+    if body.pokemon == row["mine_id"]:
+        raise HTTPException(409, "방금 쓰러진 포켓몬입니다.")
     mine = db.q1("SELECT * FROM pokemon WHERE id=? AND user_id=? AND on_desktop=1",
                  (body.pokemon, uid))
     if not mine:
