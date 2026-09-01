@@ -95,6 +95,48 @@ class Overlay(object):
             pass
 
 
+class Popup(object):
+    """덮을 창이 없을 때 쓰는 기다림 표시.
+
+    트레이 메뉴에서 부르는 것들(랜덤 배틀 같은)은 붙일 창이 없다.
+    그렇다고 아무것도 안 보여주면, 상대를 찾는 몇 초 동안 화면에 변화가
+    없어서 눌린 건지 아닌지를 알 수가 없다. 작은 창을 하나 띄운다.
+
+    닫기 단추로는 못 닫는다. 일이 끝나면 스스로 사라진다 - 기다리는 중에
+    닫아 봐야 서버 쪽 일이 멈추지 않으니 닫을 수 있게 두면 오해만 생긴다.
+    """
+
+    W, H = 340, 210
+
+    def __init__(self, root, text="불러오는 중"):
+        self.win = tk.Toplevel(root)
+        U.style_window(self.win, text, self.W, self.H)
+        U.apply_theme(self.win)
+        self.win.configure(bg=U.BG, highlightthickness=2,
+                           highlightbackground=U.LINE2)
+        self.win.resizable(False, False)
+        self.win.protocol("WM_DELETE_WINDOW", lambda: None)
+        self.body = Overlay(self.win, text)
+        try:
+            self.win.transient(root)
+            self.win.lift()
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    def say(self, text):
+        self.body.say(text)
+
+    def close(self):
+        try:
+            self.body.close()
+        except Exception:                                   # noqa: BLE001
+            pass
+        try:
+            self.win.destroy()
+        except Exception:                                   # noqa: BLE001
+            pass
+
+
 def wrap(parent, text="불러오는 중"):
     """with 로 쓸 수 있게. 다 쓰면 알아서 걷힌다."""
     return Overlay(parent, text)

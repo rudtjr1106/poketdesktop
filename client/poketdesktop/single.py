@@ -102,7 +102,7 @@ def tell_user():
         r = tk.Tk()
         r.withdraw()
         messagebox.showinfo(
-            "포켓 데스크톱",
+            "포스크탑",
             "이미 실행 중입니다.\n\n"
             "작업표시줄 오른쪽 끝의 '숨겨진 아이콘 표시'(^) 를 눌러\n"
             "몬스터볼 아이콘을 찾아보세요.")

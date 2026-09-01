@@ -12,7 +12,9 @@ from pystray import Menu, MenuItem
 
 from common.version import VERSION
 
-SIZE_PRESETS = [("작게", 36), ("보통", 48), ("크게", 64), ("아주 크게", 84)]
+# 84px 짜리 "아주 크게" 는 뺐다. 바탕화면을 너무 가린다.
+# 그래도 크게 하고 싶으면 설정 창의 슬라이더로 120 까지 올릴 수 있다.
+SIZE_PRESETS = [("작게", 36), ("보통", 48), ("크게", 64)]
 AREA_PRESETS = [("좁게", 360, 240), ("보통", 520, 360),
                 ("넓게", 760, 520), ("화면 전체", 0, 0)]
 
@@ -39,7 +41,7 @@ class Tray(object):
     def _title(self):
         u = self.app.username or "로그인 안 됨"
         n = len(self.app.overlay.pets) if self.app.overlay else 0
-        return "포켓 데스크톱 — %s   바탕화면 %d마리   몬스터볼 %d개" % (
+        return "포스크탑 — %s   바탕화면 %d마리   몬스터볼 %d개" % (
             u, n, self.app.balls)
 
     # ---- 메뉴 ----

@@ -58,7 +58,7 @@ class SettingsWindow(object):
         s = app.settings
 
         self.win = tk.Toplevel(self.root)
-        U.style_window(self.win, "포켓 데스크톱 — 설정", W, H)
+        U.style_window(self.win, "포스크탑 — 설정", W, H)
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)

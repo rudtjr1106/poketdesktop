@@ -281,8 +281,13 @@ class Effect(object):
         step(0)
 
     def _sound(self):
-        """음파가 겹겹이 퍼진다."""
+        """음파가 상대 쪽으로 겹겹이 퍼진다."""
         sx, sy = self.src
+        tx, _ty = self.dst
+        # tkinter 의 0도는 **오른쪽**이다. 각도를 고정해 두면 누가 쓰든
+        # 음파가 오른쪽으로만 나가서, 오른쪽에 선 상대가 울음소리를 쓰면
+        # 나를 등지고 퍼진다. 부채꼴의 기준을 목표 방향으로 잡는다.
+        base = 0 if tx >= sx else 180
         light, dark = colors(self.type)
 
         def wave(k):
@@ -301,8 +306,8 @@ class Effect(object):
                 if r[0]:
                     self.cv.delete(r[0])
                 r[0] = self.cv.create_arc(sx - rr, sy - rr, sx + rr, sy + rr,
-                                          start=-50, extent=100, style="arc",
-                                          outline=light, width=3)
+                                          start=base - 50, extent=100,
+                                          style="arc", outline=light, width=3)
                 self.items.append(r[0])
                 self.after(34, lambda: grow(i + 1))
             grow(0)

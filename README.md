@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/images/icon.png" width="96" alt="포켓 데스크톱">
+<img src="docs/images/icon.png" width="96" alt="포스크탑">
 
-# 포켓 데스크톱
+# 포스크탑
 
 **바탕화면에서 포켓몬을 만나고 키웁니다.**
 

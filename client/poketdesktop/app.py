@@ -10,7 +10,7 @@ from common.korean import natural              # noqa: E402
 from common.version import VERSION             # noqa: E402
 
 from . import api as apimod                    # noqa: E402
-from . import config, single, sprite_cache, updater, walk_cache  # noqa: E402
+from . import config, single, sprite_cache, ui_loading, updater, walk_cache  # noqa: E402
 from . import ui_common as U                   # noqa: E402
 from .overlay import Overlay                   # noqa: E402
 from .tray import Tray                         # noqa: E402
@@ -163,7 +163,7 @@ class App(object):
         self.wild.start()
         self.resume_battle()
         self._schedule_sync()
-        self.notify("%s 님, 포켓 데스크톱을 시작했습니다." % self.username)
+        self.notify("%s 님, 포스크탑을 시작했습니다." % self.username)
 
     def _first_sync_retry(self):
         """바탕화면이 아직 비어 있으면 다시 맞춘다.
@@ -181,7 +181,7 @@ class App(object):
     def _fatal(self, msg):
         try:
             import tkinter.messagebox as mb
-            mb.showerror("포켓 데스크톱", msg)
+            mb.showerror("포스크탑", msg)
         except Exception:
             pass
         self.quit()
@@ -343,10 +343,13 @@ class App(object):
         if self.battle:
             return self.notify("야생 배틀이 끝난 뒤에 해주세요.")
         self._pvp_busy = True
-        self.notify("상대를 찾고 있습니다...")
+        # 상대를 찾고 판을 다 계산해서 받기까지 몇 초 걸린다. 그동안
+        # 화면에 아무 변화가 없으면 눌린 건지 아닌지를 알 수가 없다.
+        wait = ui_loading.Popup(self.root, "상대를 찾는 중")
 
         def done(r, err):
             self._pvp_busy = False
+            wait.close()
             if err:
                 return self.notify(getattr(err, "message", str(err)))
             self.show_pvp_result(r)

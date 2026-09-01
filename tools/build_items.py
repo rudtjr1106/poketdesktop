@@ -59,6 +59,10 @@ SELL_RATE = 0.5
 
 # 비매품(cost 0)이라 값을 우리가 정해야 하는 것들
 PRICE_OVERRIDE = {
+    # 프리미어볼은 본가에서 덤으로 주는 물건이라 정가가 20 원이다. 그런데
+    # 성능이 몬스터볼과 **완전히 같아서**(mult 1.0), 그대로 두면 200 원짜리
+    # 몬스터볼을 살 이유가 없어진다. 같은 성능이면 같은 값이어야 한다.
+    "premier-ball": 200,
     "level-ball": 1000, "moon-ball": 1000, "fast-ball": 1000,
     "heavy-ball": 1000, "love-ball": 1000, "friend-ball": 1000,
     "dream-ball": 1500, "master-ball": 0,          # 마스터볼은 상점 판매 금지

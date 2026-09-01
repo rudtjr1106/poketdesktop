@@ -172,14 +172,14 @@ class LoginWindow(object):
         self._anim_job = None
 
         self.win = tk.Toplevel(root)
-        U.style_window(self.win, "포켓 데스크톱", 460, 748)
+        U.style_window(self.win, "포스크탑", 460, 748)
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
         self.win.protocol("WM_DELETE_WINDOW", self.cancel)
         self.win.resizable(False, False)
 
-        U.ball_header(self.win, 460, 96, "포켓 데스크톱",
+        U.ball_header(self.win, 460, 96, "포스크탑",
                       "바탕화면에서 포켓몬을 만나고 키웁니다",
                       "v" + VERSION).pack(fill="x")
         tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")

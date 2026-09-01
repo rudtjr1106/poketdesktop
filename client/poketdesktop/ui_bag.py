@@ -162,6 +162,15 @@ def unusable_note(item):
     return "이 도구는 아직 쓸 수 없다."
 
 
+def _scrollable(cv):
+    """이 캔버스가 실제로 굴러갈 데가 있나."""
+    try:
+        lo, hi = cv.yview()
+        return (hi - lo) < 0.999
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 # ---------------------------------------------------------------- 조각 위젯
 def _scroller(parent, bg):
     """세로로 굴러가는 빈 영역을 만든다. (canvas, inner) 를 돌려준다."""
@@ -174,9 +183,33 @@ def _scroller(parent, bg):
     cv.pack(side="left", fill="both", expand=True)
     inner = tk.Frame(cv, bg=bg)
     wid = cv.create_window((0, 0), window=inner, anchor="nw")
-    inner.bind("<Configure>",
-               lambda e: cv.configure(scrollregion=cv.bbox("all")))
-    cv.bind("<Configure>", lambda e: cv.itemconfigure(wid, width=e.width))
+
+    def resize(_e=None):
+        """내용이 화면보다 짧으면 **스크롤할 게 없어야 한다.**
+
+        bbox 를 그대로 넣으면, 도구가 두 개뿐인데도 스크롤바가 움직이고
+        빈 화면이 보인다. 포켓몬 관리 창에서 이미 같은 것을 고쳤다.
+        """
+        try:
+            cv.update_idletasks()
+            h = inner.winfo_reqheight()
+            view = cv.winfo_height()
+            w = cv.winfo_width()
+            if h <= view:
+                cv.configure(scrollregion=(0, 0, w, view))
+                cv.yview_moveto(0)
+            else:
+                cv.configure(scrollregion=(0, 0, w, h))
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    inner.bind("<Configure>", resize)
+
+    def on_cv(e):
+        cv.itemconfigure(wid, width=e.width)
+        resize()
+
+    cv.bind("<Configure>", on_cv)
     return cv, inner
 
 
@@ -387,7 +420,7 @@ class BagWindow(object):
         self._pending = None     # 다시 불러온 뒤에 띄울 말
 
         self.win = tk.Toplevel(root)
-        U.style_window(self.win, "포켓 데스크톱 — 가방", 1000, 664)
+        U.style_window(self.win, "포스크탑 — 가방", 1000, 664)
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
@@ -582,7 +615,10 @@ class BagWindow(object):
             return
         while w is not None:
             if w is self.item_canvas or w is self.mon_canvas:
-                w.yview_scroll(int(-e.delta / 60), "units")
+                # 다 들어가 있으면 굴리지 않는다. 안 그러면 목록이 짧아도
+                # 휠에 반응해서 빈 화면이 스쳐 지나간다.
+                if _scrollable(w):
+                    w.yview_scroll(int(-e.delta / 60), "units")
                 return
             w = w.master
 

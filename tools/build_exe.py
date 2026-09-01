@@ -86,7 +86,7 @@ def make_version_file():
 
 
 def build(onedir=False):
-    print("포켓 데스크톱 v%s 빌드 (%s)"
+    print("포스크탑 v%s 빌드 (%s)"
           % (VERSION, "폴더형" if onedir else "단일 파일"))
     icon = make_icon()
     verfile = make_version_file()
