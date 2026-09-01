@@ -397,7 +397,10 @@ def auto_login(body: AutoIn, request: Request):
     sess = auth.lookup_session(body.token)
     if not sess:
         raise HTTPException(401, "저장된 로그인이 만료되었습니다.")
-    if sess["device"] and body.device and sess["device"] != body.device:
+    # 세션에 기기가 적혀 있으면 **반드시** 같아야 한다.
+    # 예전에는 `and body.device` 가 붙어 있어서, 기기를 빈 값으로 보내면
+    # 검사를 통째로 건너뛰었다. 토큰만 있으면 아무 데서나 들어올 수 있었다.
+    if sess["device"] and sess["device"] != (body.device or ""):
         raise HTTPException(401, "다른 기기입니다. 비밀번호로 로그인해 주세요.")
     # IP 비교는 양쪽 다 진짜 IP 를 알 수 있을 때만 한다.
     # 도커 포트포워딩 뒤에서는 모두가 게이트웨이 IP 로 보여서 비교가 무의미하다.
