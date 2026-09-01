@@ -256,8 +256,12 @@ def main():
             break
     chk("볼이 실제로 줄어듦", throws > 0, throws)
     st, meinfo = call("GET", "/api/me", token=token)
-    chk("남은 볼 = 10 - 던진 횟수", meinfo.get("balls") == balls_before - throws,
-        (meinfo.get("balls"), throws))
+    # 잡으면 도구가 떨어지는데 그게 몬스터볼일 수 있다(3% 남짓). 그러면
+    # 던진 만큼 줄지 않는다 - 게임이 그렇게 도는 것이지 잘못이 아니다.
+    back = 1 if (caught or {}).get("drop", {}).get("id") == "POKEBALL" else 0
+    chk("남은 볼 = 10 - 던진 횟수 (+드랍으로 돌아온 것)",
+        meinfo.get("balls") == balls_before - throws + back,
+        (meinfo.get("balls"), throws, back))
     if caught:
         print("       %s (%d번 던져서 잡음)" % (caught.get("message"), throws))
         chk("잡은 포켓몬이 내 목록에 들어감",
