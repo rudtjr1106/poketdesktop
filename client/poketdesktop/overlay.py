@@ -348,6 +348,14 @@ class Overlay(object):
         # 풀숲·몬스터볼처럼 직접 그리는 그림에만 쓰는 고정 투명색
         self.key = (255, 0, 255)
         self.pets = {}
+        # 서버 목록에 없는, 화면에만 있는 도트들. 투기장에서 상대편 여섯
+        # 마리를 여기 넣는다. sync() 는 여기를 건드리지 않으므로 서버가
+        # 준 목록과 섞이지 않고, _tick 은 여기도 같이 움직여 준다.
+        self.extra = []
+        # 투기장이 화면을 쥐고 있는 동안 켠다. 켜져 있으면 sync() 가
+        # 도트를 새로 배치하지 않는다 - 싸우는 중에 서버 목록이 와서
+        # 자리를 흐트러뜨리면 안 된다.
+        self.locked = False
         self.paths = {}
         self.walks = {}          # {번호: (시트경로, meta)} — 걷는 도트
         self._menu_cb = on_pet_menu
@@ -386,6 +394,9 @@ class Overlay(object):
         self.paths.update(paths or {})
         if walks:
             self.walks.update(walks)
+        if self.locked:
+            # 투기장 중. 받아둔 도트 경로만 챙기고 배치는 건드리지 않는다.
+            return []
         want = dict((m["id"], m) for m in mons)
         for pid in list(self.pets):
             if pid not in want:
@@ -438,9 +449,22 @@ class Overlay(object):
         return (cls or Pet)(self, mon, anim)
 
     def clear(self):
+        """화면의 도트를 전부 없앤다.
+
+        extra 도 같이 비운다. 로그아웃/세션만료 때 여기만 부르고 마는
+        경로가 여럿이라, 투기장이 남긴 상대편 도트가 여기서 안 지워지면
+        주인 없는 창이 바탕화면에 그대로 떠 있게 된다.
+        """
         for p in self.pets.values():
             p.destroy()
         self.pets.clear()
+        for p in self.extra:
+            try:
+                p.destroy()
+            except Exception:                            # noqa: BLE001
+                pass
+        self.extra = []
+        self.locked = False
 
     def set_hidden(self, hidden):
         """배틀 중처럼 잠깐 치워야 할 때. 목록은 그대로 두고 창만 감춘다."""
@@ -476,7 +500,7 @@ class Overlay(object):
         if not self._running:
             return
         ms = int(1000 / max(1, self.settings["fps"]))
-        for p in list(self.pets.values()):
+        for p in list(self.pets.values()) + list(self.extra):
             try:
                 p.update(ms)
             except Exception as e:                       # noqa: BLE001
