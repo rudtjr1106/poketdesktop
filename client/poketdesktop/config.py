@@ -14,6 +14,17 @@ APP_NAME = "poketdesktop"
 
 
 def data_dir():
+    """설정과 도트를 두는 곳.
+
+    POKET_HOME 으로 다른 데를 가리킬 수 있다. 만들고 있는 것을 실제
+    계정과 섞지 않고 시험해 보려고 둔 문이다 - 그게 없으면 시험 한 번에
+    쓰던 설정과 로그인이 덮여 버린다. 배포된 프로그램에서는 이 변수가
+    없으므로 늘 원래 자리를 쓴다.
+    """
+    home = os.environ.get("POKET_HOME")
+    if home:
+        os.makedirs(home, exist_ok=True)
+        return home
     base = os.environ.get("APPDATA") or os.path.expanduser("~")
     d = os.path.join(base, APP_NAME)
     os.makedirs(d, exist_ok=True)
@@ -30,7 +41,9 @@ CLIENT_DIR = os.path.dirname(_HERE)
 REPO_DIR = os.path.dirname(CLIENT_DIR)
 
 # 실제로 돌고 있는 서버. 사용자가 주소를 칠 일이 없도록 여기에 박아 둔다.
-SERVER = "https://poketdesktop.onrender.com"
+# 서버 주소는 박아 둔다. 사용자가 주소를 칠 일이 없어야 한다.
+# POKET_SERVER 는 시험용 문이다(배포판에는 이 변수가 없다).
+SERVER = os.environ.get("POKET_SERVER") or "https://poketdesktop.onrender.com"
 
 # 예전에 기본값이었던 주소들. 저장된 설정이 이 중 하나면 새 주소로 옮긴다.
 # 사용자가 일부러 고쳐 넣은 주소는 건드리지 않는다.
