@@ -234,9 +234,27 @@ def connect():
     return conn
 
 
+def _schema_for(conn):
+    """이 백엔드에 맞는 스키마 문장들.
+
+    원격 Turso 는 스크립트 안에 PRAGMA 가 하나라도 있으면 **스크립트 전체를
+    조용히 건너뛴다.** 오류도 안 난다. 그래서 테이블이 하나도 안 생긴 채로
+    서버가 뜨고, 첫 요청에서 "no such table" 로 죽는다.
+    Turso 는 어차피 WAL 과 외래키를 알아서 하므로 PRAGMA 를 빼고 보낸다.
+    """
+    if not using_turso():
+        return SCHEMA
+    keep = []
+    for stmt in SCHEMA.split(";"):
+        t = stmt.strip()
+        if t and not t.upper().startswith("PRAGMA"):
+            keep.append(t)
+    return ";\n".join(keep) + ";"
+
+
 def init():
     conn = connect()
-    conn.executescript(SCHEMA)
+    conn.executescript(_schema_for(conn))
     for table, col, sql in MIGRATIONS:
         cur = conn.execute("PRAGMA table_info(%s)" % table)
         rows = cur.fetchall()

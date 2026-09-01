@@ -132,15 +132,39 @@ def client_ip(request):
     (마지막 값 = 우리와 가장 가까운 프록시가 본 주소)
     """
     if config.TRUST_PROXY:
+        # Cloudflare 가 앞에 있으면 이게 가장 믿을 만하다. 클라이언트가 무엇을
+        # 보내든 Cloudflare 가 덮어쓰기 때문이다. (Render 가 Cloudflare 뒤에 있다)
+        cf = request.headers.get("cf-connecting-ip")
+        if cf:
+            return cf.strip()
         real = request.headers.get("x-real-ip")
         if real:
             return real.strip()
         fwd = request.headers.get("x-forwarded-for")
         if fwd:
             parts = [p.strip() for p in fwd.split(",") if p.strip()]
+            # 맨 뒤는 '우리와 가장 가까운 프록시' 다. 우리 Caddy 처럼 헤더를
+            # 덮어쓰는 구조에서는 그게 진짜 접속자다.
+            # 그런데 Render 처럼 프록시가 여러 겹이면 맨 뒤가 내부 주소
+            # (10.x) 라서 쓸모가 없다. 그럴 때는 사설 대역이 아닌 마지막
+            # 값을 고른다 — 클라이언트가 앞에 끼워 넣은 가짜는 그 뒤의
+            # 프록시들이 붙인 값에 밀려나므로 여기까지 오지 못한다.
+            for part in reversed(parts):
+                if not _is_private(part):
+                    return part
             if parts:
                 return parts[-1]
     return request.client.host if request.client else ""
+
+
+def _is_private(raw):
+    """사설/특수 대역인지. 진짜 접속자 주소일 리 없는 것들."""
+    try:
+        addr = ipaddress.ip_address((raw or "").strip())
+    except ValueError:
+        return True
+    return (addr.is_private or addr.is_loopback or addr.is_link_local
+            or addr.is_reserved or addr.is_unspecified)
 
 
 def ip_is_real(request):
@@ -154,22 +178,12 @@ def ip_is_real(request):
     - 도커/루프백 대역이 아니다 (도커 없이 직접 띄운 경우)                -> 진짜
     - 그 외                                                            -> 가짜
     """
-    if config.TRUST_PROXY and (request.headers.get("x-real-ip")
-                               or request.headers.get("x-forwarded-for")):
-        return True
-    raw = request.client.host if request.client else ""
-    if not raw:
-        return False
-    try:
-        addr = ipaddress.ip_address(raw)
-    except ValueError:
-        return False
-    if addr.is_loopback:
-        return False
-    # 도커 기본 브리지 대역(172.16.0.0/12)의 .1 게이트웨이 주소는 위장된 값이다
-    if addr.version == 4 and addr in ipaddress.ip_network("172.16.0.0/12"):
-        return not str(addr).endswith(".0.1")
-    return True
+    # 헤더가 왔다는 것만으로 '진짜 IP' 라고 볼 수 없다.
+    # Render 는 프록시를 여러 겹 두는데 우리가 집어 든 값이 내부 주소
+    # (10.24.x / 10.25.x) 일 수 있고, 그건 **요청마다 바뀐다.**
+    # 그걸 세션에 묶으면 자동 로그인이 무작위로 풀린다.
+    # 그래서 실제로 고른 주소를 보고 판단한다.
+    return not _is_private(client_ip(request))
 
 
 def user_public(row, extra=None):
