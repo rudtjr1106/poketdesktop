@@ -10,7 +10,7 @@ from common.korean import natural              # noqa: E402
 from common.version import VERSION             # noqa: E402
 
 from . import api as apimod                    # noqa: E402
-from . import config, sprite_cache             # noqa: E402
+from . import config, sprite_cache, walk_cache  # noqa: E402
 from . import ui_common as U                   # noqa: E402
 from .overlay import Overlay                   # noqa: E402
 from .tray import Tray                         # noqa: E402
@@ -104,10 +104,27 @@ class App(object):
         if self.wild is None:
             self.wild = WildController(self)
         self.sync()
+        # 첫 동기화가 실패하거나(서버가 깨는 중이라 느릴 수 있다) 도트를
+        # 아직 못 받았으면 바탕화면이 비어 보인다. 잠시 뒤 한 번 더 맞춘다.
+        self.root.after(2500, self._first_sync_retry)
+        self.root.after(7000, self._first_sync_retry)
         self.wild.start()
         self.resume_battle()
         self._schedule_sync()
         self.notify("%s 님, 포켓 데스크톱을 시작했습니다." % self.username)
+
+    def _first_sync_retry(self):
+        """바탕화면이 아직 비어 있으면 다시 맞춘다.
+
+        가입 직후에는 서버가 자다 깨는 중이라 첫 요청이 느리거나 실패할 수
+        있다. 그러면 포켓몬이 안 뜬 채로 다음 주기(90초)까지 기다리게 된다.
+        """
+        if self._quitting or not self.api or not self.overlay:
+            return
+        if self.overlay.pets:
+            return
+        config.log("바탕화면이 비어 있어 다시 맞춥니다")
+        self.sync()
 
     def _fatal(self, msg):
         try:
@@ -155,12 +172,15 @@ class App(object):
             mons = self.api.desktop()
             paths = sprite_cache.ensure_many(
                 self.api, [(m.get("num"), m.get("shiny")) for m in mons])
+            # 걷는 도트도 같이 받아 둔다. 없는 종은 알아서 건너뛴다.
+            walks = walk_cache.ensure_many(
+                self.api, [m.get("num") for m in mons])
             me = None
             try:
                 me = self.api.me()
             except Exception:
                 pass
-            return mons, paths, me
+            return mons, paths, me, walks
 
         def done(r, err):
             if err:
@@ -170,12 +190,12 @@ class App(object):
                 if getattr(err, "status", 0) == 401:
                     self.on_session_lost()
                 return
-            mons, paths, me = r
+            mons, paths, me, walks = r
             if me:
                 self.balls = me.get("balls", self.balls)
                 self.money = me.get("money", self.money)
             if self.overlay:
-                self.overlay.sync(mons or [], paths or {})
+                self.overlay.sync(mons or [], paths or {}, walks or {})
             self.refresh_tray()
         run_async(self.root, work, done)
 
@@ -209,6 +229,11 @@ class App(object):
         if self.box_window:
             return self.box_window.focus()
         self.box_window = BoxWindow(self.root, self)
+
+    def open_credits(self):
+        """쓰인 자료의 출처. 걷는 도트가 CC BY-NC 라 표기가 필요하다."""
+        import webbrowser
+        webbrowser.open("https://github.com/rudtjr1106/poketdesktop/blob/main/CREDITS.md")
 
     def open_shop(self):
         if self.shop_window:

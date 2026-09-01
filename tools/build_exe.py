@@ -29,27 +29,12 @@ ICON = os.path.join(ROOT, "build", "icon.ico")
 
 
 def make_icon():
-    """몬스터볼 아이콘을 직접 그려서 .ico 로 저장한다."""
+    """작업표시줄과 exe 에 쓸 아이콘. 트레이와 같은 그림이다."""
     sys.path.insert(0, os.path.join(ROOT, "client"))
-    from PIL import Image
-    from poketdesktop import effects
+    from poketdesktop import appicon
 
     os.makedirs(os.path.dirname(ICON), exist_ok=True)
-    key = (0, 255, 0)
-    imgs = []
-    for size in (16, 24, 32, 48, 64, 128, 256):
-        flat = effects.ball_image(size, key)
-        # 투명색으로 칠한 배경을 실제 투명으로 되돌린다
-        px = flat.tobytes()
-        mask = bytearray(size * size)
-        for i in range(0, len(px), 3):
-            if (px[i], px[i + 1], px[i + 2]) != key:
-                mask[i // 3] = 255
-        rgba = flat.convert("RGBA")
-        rgba.putalpha(Image.frombytes("L", flat.size, bytes(mask)))
-        imgs.append(rgba)
-    imgs[-1].save(ICON, format="ICO",
-                  sizes=[(im.width, im.height) for im in imgs])
+    appicon.save_ico(ICON)
     print("  아이콘: %s" % ICON)
     return ICON
 

@@ -14,8 +14,9 @@ import tkinter as tk
 
 from PIL import ImageTk
 
+from . import config
 from . import sprites
-from .sprites import LEFT, RIGHT
+from .sprites import DOWN, LEFT, RIGHT, UP
 from . import ui_common as U
 
 
@@ -48,10 +49,11 @@ class Pet(object):
         key = anim.key                    # 투명색은 그림마다 다르다
         hexkey = "#%02x%02x%02x" % key
 
-        self.photos = {
-            RIGHT: [ImageTk.PhotoImage(f) for f in anim.frames[RIGHT]],
-            LEFT: [ImageTk.PhotoImage(f) for f in anim.frames[LEFT]],
-        }
+        # 걷는 도트면 방향이 4개, 배틀 도트면 좌우 2개다.
+        self.walking_sprite = isinstance(anim, sprites.WalkAnimation)
+        self.photos = dict(
+            (d, [ImageTk.PhotoImage(f) for f in frames])
+            for d, frames in anim.frames.items())
 
         self.win = tk.Toplevel(overlay.root)
         self.win.overrideredirect(True)
@@ -65,19 +67,20 @@ class Pet(object):
         m = overlay.settings["areaMargin"]
         self.x = random.randint(x1 + m, max(x1 + m, x2 - self.fw - m))
         self.y = random.randint(y1 + m, max(y1 + m, y2 - self.fh - m))
-        self.facing = random.choice([LEFT, RIGHT])
+        self.facing = random.choice(list(self.photos.keys()))
         self.frame = random.randrange(anim.count())
         self.elapsed = 0
         self.state = "idle"
         self.timer = random.randint(20, 80)
         self.vx = self.vy = 0.0
-        self.drag = None
         self.battling = False        # 배틀 중에는 스스로 돌아다니지 않는다
 
         self.label.bind("<Enter>", self.on_enter)
         self.label.bind("<Leave>", self.on_leave)
+        # 끌어서 옮기는 기능은 뺐다. 쓰다 보면 쓰다듬으려다 실수로 끌려가서
+        # 오히려 불편했다. 누르고 떼는 것만 남긴다 —
+        # 야생 포켓몬을 왼쪽 클릭해 배틀을 걸 때 이게 필요하다.
         self.label.bind("<Button-1>", self.on_press)
-        self.label.bind("<B1-Motion>", self.on_drag)
         self.label.bind("<ButtonRelease-1>", self.on_release)
         self.label.bind("<Button-3>", self.on_menu)
         self.label.bind("<Double-Button-1>", self.on_double)
@@ -171,20 +174,11 @@ class Pet(object):
 
     # ---------------- 입력 ----------------
     def on_press(self, e):
-        self.drag = (e.x, e.y)
+        # 누르고 있는 동안만 잠깐 멈춘다. 위치는 건드리지 않는다.
         self.state = "held"
         self.hide_tip()
 
-    def on_drag(self, e):
-        if not self.drag:
-            return
-        self.x += e.x - self.drag[0]
-        self.y += e.y - self.drag[1]
-        self.clamp()
-        self.place()
-
     def on_release(self, e):
-        self.drag = None
         self.state = "idle"
         self.timer = random.randint(20, 60)
 
@@ -208,12 +202,36 @@ class Pet(object):
         if self.tip_win:
             self.hide_tip()
 
+    def row_for(self, facing):
+        """이 방향 그림이 없으면 있는 것 중에서 고른다.
+
+        배틀 도트로 대신하는 종(걷는 도트가 없는 57마리)은 좌우 두 벌뿐이라
+        위/아래로 갈 때도 좌우 중 하나를 써야 한다.
+        """
+        if facing in self.photos:
+            return self.photos[facing]
+        if facing == UP:
+            return self.photos.get(LEFT) or self.photos[RIGHT]
+        return self.photos.get(RIGHT) or list(self.photos.values())[0]
+
     def redraw(self):
-        row = self.photos[self.facing]
+        row = self.row_for(self.facing)
         self.label.configure(image=row[self.frame % len(row)])
 
     def advance(self, ms):
-        """GIF 가 들고 있던 프레임 간격 그대로 넘긴다."""
+        """프레임을 넘긴다.
+
+        걷는 도트는 **걸을 때만** 넘긴다. 서 있는데 발이 움직이면
+        제자리걸음처럼 보여서 오히려 어색하다. 서 있을 때는 첫 프레임으로
+        돌아가 가만히 선다.
+        배틀 도트로 대신하는 종은 원래 제자리 애니메이션이라 늘 돌린다.
+        """
+        if self.walking_sprite and self.state != "walk":
+            if self.frame != 0:
+                self.frame = 0
+                self.elapsed = 0
+                self.redraw()
+            return
         self.elapsed += ms
         d = self.anim.durations[self.frame % len(self.anim.durations)]
         if self.elapsed >= d:
@@ -227,15 +245,29 @@ class Pet(object):
         ang = random.uniform(0, 2 * math.pi)
         self.vx = math.cos(ang)
         self.vy = math.sin(ang) * 0.65        # 세로로는 덜 움직이게
-        if abs(self.vx) > 0.15:
-            self.facing = RIGHT if self.vx > 0 else LEFT
-            self.redraw()
+        want = (sprites.dir_from(self.vx, self.vy) if self.walking_sprite
+                else (RIGHT if self.vx > 0 else LEFT))
+        if want != self.facing:
+            self.facing = want
+            self.frame = 0
+            self.elapsed = 0
+        self.redraw()
 
     def face_towards(self, x):
         """저쪽을 바라보게 방향을 돌린다."""
         want = RIGHT if x > self.x else LEFT
         if want != self.facing:
             self.facing = want
+            self.redraw()
+
+    def turn_to(self, vx, vy):
+        """움직이는 방향에 맞춰 몸을 돌린다."""
+        want = (sprites.dir_from(vx, vy) if self.walking_sprite
+                else (RIGHT if vx >= 0 else LEFT))
+        if want != self.facing:
+            self.facing = want
+            self.frame = 0
+            self.elapsed = 0
             self.redraw()
 
     def update(self, ms):
@@ -263,13 +295,12 @@ class Pet(object):
         bounced = False
         if nx < x1 + m or nx > x2 - self.fw - m:
             self.vx = -self.vx
-            self.facing = RIGHT if self.vx > 0 else LEFT
             bounced = True
         if ny < y1 + m or ny > y2 - self.fh - m:
             self.vy = -self.vy
             bounced = True
         if bounced:
-            self.redraw()
+            self.turn_to(self.vx, self.vy)
             return
         self.x, self.y = nx, ny
         self.place()
@@ -294,6 +325,7 @@ class Overlay(object):
         self.key = (255, 0, 255)
         self.pets = {}
         self.paths = {}
+        self.walks = {}          # {번호: (시트경로, meta)} — 걷는 도트
         self._menu_cb = on_pet_menu
         self._open_cb = on_pet_open
         self._running = False
@@ -321,12 +353,15 @@ class Overlay(object):
             self._open_cb(pet)
 
     # ---------------- 목록 맞추기 ----------------
-    def sync(self, mons, paths):
+    def sync(self, mons, paths, walks=None):
         """서버가 알려준 '바탕화면에 있어야 할 목록' 과 화면을 일치시킨다.
 
-        paths 는 {(번호, 이로치): 파일경로} — 미리 받아둔 도트.
+        paths 는 {(번호, 이로치): 파일경로} — 미리 받아둔 배틀 도트.
+        walks 는 {번호: (시트경로, meta)} — 걷는 도트가 있는 종만.
         """
         self.paths.update(paths or {})
+        if walks:
+            self.walks.update(walks)
         want = dict((m["id"], m) for m in mons)
         for pid in list(self.pets):
             if pid not in want:
@@ -352,15 +387,30 @@ class Overlay(object):
         return self.paths.get(k) or self.paths.get((mon.get("num"), False))
 
     def make(self, mon, cls=None):
-        path = self.path_for(mon)
-        if not path:
-            return None
         s = self.settings
-        try:
-            anim = sprites.load_animation(path, s["targetHeight"],
-                                          s["minScale"], s["maxScale"])
-        except Exception:
-            return None
+        anim = None
+
+        # 걷는 도트가 있으면 그걸 먼저 쓴다. 4방향에 걷기 프레임이 있어서
+        # 위로 가면 등이 보이고 걸을 때 발이 바뀐다.
+        sheet, meta = self.walks.get(mon.get("num")) or (None, None)
+        if sheet and meta:
+            try:
+                anim = sprites.load_walk(sheet, meta, s["targetHeight"],
+                                         s["minScale"], max(2.5, s["maxScale"]))
+            except Exception:                              # noqa: BLE001
+                anim = None
+
+        # 없는 종(1025 중 57마리)은 배틀 도트로 대신한다. 정면 고정이지만
+        # 아무것도 안 뜨는 것보다는 낫다.
+        if anim is None:
+            path = self.path_for(mon)
+            if not path:
+                return None
+            try:
+                anim = sprites.load_animation(path, s["targetHeight"],
+                                              s["minScale"], s["maxScale"])
+            except Exception:                              # noqa: BLE001
+                return None
         return (cls or Pet)(self, mon, anim)
 
     def clear(self):
@@ -405,6 +455,13 @@ class Overlay(object):
         for p in list(self.pets.values()):
             try:
                 p.update(ms)
-            except Exception:
-                pass
+            except Exception as e:                       # noqa: BLE001
+                # 예전에는 그냥 pass 였다. 그러면 매 틱마다 터져도 아무도
+                # 모르고, 화면에서는 "포켓몬이 가만히 있다" 로만 보인다.
+                # 한 마리당 한 번만 남긴다(초당 30번 로그를 쌓지 않게).
+                if not getattr(p, "_logged_error", False):
+                    p._logged_error = True
+                    import traceback
+                    config.log("포켓몬 %s 움직임 오류: %s\n%s"
+                               % (p.id, e, traceback.format_exc()))
         self.root.after(ms, self._tick)

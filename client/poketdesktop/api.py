@@ -228,6 +228,20 @@ class Api(object):
             return None
         return r.content if r.status_code == 200 and r.content else None
 
+    def walk_meta(self, num):
+        """걷는 도트가 있는지, 있으면 어떻게 잘라야 하는지."""
+        return self._call("GET", "/api/walk/%d.json" % int(num), auth=False,
+                          timeout=30)
+
+    def walk_sheet(self, num):
+        """걷기 스프라이트시트 원본 바이트. 없으면 None."""
+        url = "%s/api/walk/%d.png" % (self.base, int(num))
+        try:
+            r = self.session.get(url, timeout=40)
+        except requests.RequestException:
+            return None
+        return r.content if r.status_code == 200 and r.content else None
+
     # ---------------- 가방 · 상점 ----------------
     def bag(self):
         return self._call("GET", "/api/bag")

@@ -316,9 +316,30 @@ def set_status(box, text, color=GOOD, fg=None):
     box._label.configure(text=text, fg=fg or FG_DIM)
 
 
+_icon_photo = None
+
+
+def window_icon(win):
+    """창(작업표시줄)에 프로그램 아이콘을 붙인다.
+
+    tk 는 이미지를 참조하지 않으면 지워버리므로 한 장을 만들어 두고
+    모든 창이 같이 쓴다.
+    """
+    global _icon_photo
+    try:
+        from PIL import ImageTk
+        from . import appicon
+        if _icon_photo is None:
+            _icon_photo = ImageTk.PhotoImage(appicon.make(64))
+        win.iconphoto(False, _icon_photo)
+    except Exception:                                   # noqa: BLE001
+        pass
+
+
 def style_window(win, title, w=None, h=None):
     win.title(title)
     win.configure(bg=BG)
+    window_icon(win)
     if w and h:
         sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
         win.geometry("%dx%d+%d+%d" % (w, h, (sw - w) // 2, max(0, (sh - h) // 3)))

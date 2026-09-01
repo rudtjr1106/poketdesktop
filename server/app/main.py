@@ -284,6 +284,111 @@ def item_sprite(item_id: str):
                     headers={"Cache-Control": "public, max-age=2592000"})
 
 
+# ---------------------------------------------------------------- 걷는 도트
+# 배틀 도트(showdown)는 정면 고정이라 걷는 모습이 없다. 걸어다니게 하려면
+# 4방향 × 걷기 프레임이 있는 '오버월드' 도트가 필요하다.
+# PMDCollab/SpriteCollab 가 그걸 1025종 중 968종에 대해 갖고 있다.
+#   sprite/0025/Walk-Anim.png   가로=프레임, 세로=8방향 스프라이트시트
+#   sprite/0025/AnimData.xml    칸 크기와 프레임별 지속시간
+# 라이선스는 CC BY-NC 4.0 (비상업 + 출처표기).
+WALK_BASE = "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite"
+WALK_DIR = os.environ.get("POKET_WALK_DIR", os.path.join(SPRITE_DIR, "walk"))
+
+
+def _walk_paths(num):
+    d = os.path.join(WALK_DIR, "%04d" % num)
+    return os.path.join(d, "sheet.png"), os.path.join(d, "anim.json")
+
+
+def _walk_fetch(num):
+    """스프라이트시트와 메타를 한 번만 받아 디스크에 남긴다.
+
+    없는 종(57마리)은 빈 메타를 남겨서 매번 다시 받지 않게 한다.
+    """
+    import urllib.error
+    import urllib.request
+    import xml.etree.ElementTree as ET
+
+    png_path, meta_path = _walk_paths(num)
+    os.makedirs(os.path.dirname(png_path), exist_ok=True)
+    base = "%s/%04d/" % (WALK_BASE, num)
+
+    def grab(name):
+        with urllib.request.urlopen(base + name, timeout=12) as r:
+            return r.read()
+
+    try:
+        xml = grab("AnimData.xml").decode("utf-8")
+        root = ET.fromstring(xml)
+        walk = None
+        for a in root.iter("Anim"):
+            if (a.findtext("Name") or "") == "Walk":
+                walk = a
+                break
+        if walk is None:
+            raise ValueError("Walk 없음")
+        fw = int(walk.findtext("FrameWidth"))
+        fh = int(walk.findtext("FrameHeight"))
+        durs = [int(x.text) for x in walk.find("Durations")]
+        png = grab("Walk-Anim.png")
+        if not png:
+            raise ValueError("빈 파일")
+    except (urllib.error.URLError, OSError, ValueError, ET.ParseError, TypeError):
+        # 이 종은 걷는 도트가 없다. 다음부터 안 찾도록 표시만 남긴다.
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump({"ok": False}, f)
+        return None
+
+    tmp = png_path + ".part"
+    with open(tmp, "wb") as f:
+        f.write(png)
+    os.replace(tmp, png_path)
+    meta = {"ok": True, "frameW": fw, "frameH": fh,
+            "durations": durs, "frames": len(durs), "dirs": 8}
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f)
+    return meta
+
+
+def _walk_meta(num):
+    _png, meta_path = _walk_paths(num)
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            pass
+    return _walk_fetch(num)
+
+
+@app.get("/api/walk/{num}.json")
+def walk_meta(num: int):
+    """이 종에 걷는 도트가 있는지, 있으면 어떻게 잘라야 하는지."""
+    if not 1 <= num <= 1025:
+        raise HTTPException(404, "그런 도감 번호가 없습니다.")
+    meta = _walk_meta(num)
+    if not meta or not meta.get("ok"):
+        return {"ok": False}
+    return meta
+
+
+@app.get("/api/walk/{num}.png")
+def walk_sheet(num: int):
+    """걷기 스프라이트시트."""
+    if not 1 <= num <= 1025:
+        raise HTTPException(404, "그런 도감 번호가 없습니다.")
+    png_path, _m = _walk_paths(num)
+    if not os.path.exists(png_path):
+        if not (_walk_meta(num) or {}).get("ok"):
+            raise HTTPException(404, "걷는 도트가 없는 종입니다.")
+    if not os.path.exists(png_path):
+        raise HTTPException(404, "걷는 도트를 받지 못했습니다.")
+    with open(png_path, "rb") as f:
+        data = f.read()
+    return Response(data, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=604800"})
+
+
 @app.get("/api/auth/check")
 def check_name(name: str = ""):
     """닉네임을 쓸 수 있는지. 회원가입 화면이 타이핑 중에 물어본다."""

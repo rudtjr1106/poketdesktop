@@ -411,7 +411,51 @@ class LoginWindow(object):
             if self.tab == "signup":
                 self.build_genbar()
                 self.show_gen(1)
+            self.prefetch_starters()
         U.run_async(self.root, api.starters, done)
+
+    def prefetch_starters(self):
+        """9세대 27마리 도트를 한 번에 받아 둔다.
+
+        예전에는 세대를 넘길 때마다 그 세대 3마리를 그때 받았다. 그래서
+        세대를 바꿀 때마다 카드가 비어 있다가 뒤늦게 채워졌다.
+        어차피 다 둘러볼 거라 처음에 한 번에 받아두는 편이 낫다.
+        """
+        if getattr(self, "_prefetched", False) or not self.gens:
+            return
+        self._prefetched = True
+        want = []
+        for g in self.gens:
+            for m in g.get("pokemon", []):
+                if m.get("num"):
+                    want.append((m["num"], False))
+        if not want:
+            return
+        api = Api(self.server.get().strip())
+        total = len(want)
+
+        def work():
+            got = 0
+            for pair in want:
+                if sprite_cache.ensure(api, pair[0], pair[1]):
+                    got += 1
+                # 몇 마리까지 받았는지 화면에 알린다 (로딩 중인 티를 낸다)
+                self.root.after(0, self._prefetch_progress, got, total)
+            return got
+
+        def done(got, err):
+            if self.tab == "signup":
+                self.say("")
+            config.log("스타팅 도트 미리 받기: %s/%s" % (got, total))
+        U.run_async(self.root, work, done)
+
+    def _prefetch_progress(self, got, total):
+        try:
+            if self.tab == "signup" and got < total:
+                self.say("스타팅 포켓몬을 준비하는 중... %d/%d" % (got, total),
+                         U.FG_FAINT)
+        except Exception:                                  # noqa: BLE001
+            pass
 
     def build_genbar(self):
         for w in self.genbar.winfo_children():
