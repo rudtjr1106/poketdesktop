@@ -169,6 +169,83 @@ CREATE TABLE IF NOT EXISTS seen (
     PRIMARY KEY (user_id, species)
 );
 
+-- 유저끼리 붙은 한 판. **여기 들어오는 순간 승패가 이미 끝나 있다.**
+-- 진행이 AI 자동이라 팀과 시드만 있으면 결과가 정해지므로, 서버가 매칭
+-- 순간 끝까지 계산해서 로그를 넣어 둔다. 양쪽 클라이언트는 그 같은
+-- 로그를 재생하기만 한다.
+--   log   gzip + base64 한 이벤트 목록. 서버는 풀지 않고 그대로 흘린다.
+--   seed  같은 판을 나중에 다시 돌려볼 수 있게 남긴다.
+-- 보고 나면 값이 없어지는 자료라 오래된 것은 치운다. 영구 기록은
+-- battle_record 쪽이다.
+CREATE TABLE IF NOT EXISTS pvp_match (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT NOT NULL,
+    a_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    b_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    a_name      TEXT NOT NULL,
+    b_name      TEXT NOT NULL,
+    winner      INTEGER,
+    turns       INTEGER NOT NULL DEFAULT 0,
+    seed        INTEGER NOT NULL,
+    engine      TEXT NOT NULL DEFAULT '',
+    log         TEXT NOT NULL,
+    a_reward    INTEGER NOT NULL DEFAULT 0,
+    b_reward    INTEGER NOT NULL DEFAULT 0,
+    a_seen      INTEGER NOT NULL DEFAULT 0,
+    b_seen      INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pvp_match_a ON pvp_match(a_id, id);
+CREATE INDEX IF NOT EXISTS idx_pvp_match_b ON pvp_match(b_id, id);
+
+-- 전적. 한 경기에 **사람마다 한 행**을 남긴다. 한 행만 두고
+-- (a=? OR b=?) 로 찾으면 목록을 뽑을 때마다 승패를 뒤집어 계산해야 하고
+-- 인덱스도 두 개가 필요하다.
+--
+-- 상대에는 외래키를 걸지 않는다. 걸면 상대가 탈퇴할 때 **내 전적까지**
+-- 함께 지워진다. 그래서 그때의 닉네임을 베껴 둔다.
+CREATE TABLE IF NOT EXISTS battle_record (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    foe_id      INTEGER,
+    foe_name    TEXT NOT NULL,
+    kind        TEXT NOT NULL,
+    result      TEXT NOT NULL,
+    rating      INTEGER NOT NULL DEFAULT 0,
+    delta       INTEGER NOT NULL DEFAULT 0,
+    reward      INTEGER NOT NULL DEFAULT 0,
+    turns       INTEGER NOT NULL DEFAULT 0,
+    my_left     INTEGER NOT NULL DEFAULT 0,
+    foe_left    INTEGER NOT NULL DEFAULT 0,
+    lead        TEXT NOT NULL DEFAULT '',
+    foe_lead    TEXT NOT NULL DEFAULT '',
+    match_id    INTEGER,
+    ended_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_record_user ON battle_record(user_id, id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_record_once ON battle_record(match_id, user_id);
+
+-- 랭킹판. 경기가 끝날 때 갱신해 두고 랭킹 조회는 이 표만 읽는다.
+-- battle_record 를 GROUP BY 로 집계하면 경기가 쌓일수록 느려진다.
+CREATE TABLE IF NOT EXISTS rank_stat (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    rating      INTEGER NOT NULL DEFAULT 1000,
+    games       INTEGER NOT NULL DEFAULT 0,
+    wins        INTEGER NOT NULL DEFAULT 0,
+    losses      INTEGER NOT NULL DEFAULT 0,
+    draws       INTEGER NOT NULL DEFAULT 0,
+    fr_wins     INTEGER NOT NULL DEFAULT 0,
+    fr_losses   INTEGER NOT NULL DEFAULT 0,
+    fr_draws    INTEGER NOT NULL DEFAULT 0,
+    streak      INTEGER NOT NULL DEFAULT 0,
+    best        INTEGER NOT NULL DEFAULT 1000,
+    ranked      INTEGER NOT NULL DEFAULT 0,
+    earned_day  TEXT NOT NULL DEFAULT '',
+    earned      INTEGER NOT NULL DEFAULT 0,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rank_board ON rank_stat(ranked, rating DESC);
+
 -- 서버가 스스로 기억해야 하는 잡다한 것. 지금은 '어떤 자료 손질까지
 -- 끝냈는가' 를 적는 데 쓴다.
 CREATE TABLE IF NOT EXISTS meta (

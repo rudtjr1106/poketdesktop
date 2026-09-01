@@ -27,11 +27,12 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from . import (auth, battle_routes, config, db, deps, item_routes,  # noqa: E402
-               items, migrations)
+               items, migrations, pvp, pvp_routes)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
 app.include_router(item_routes.router)
+app.include_router(pvp_routes.router)
 
 RNG = deps.RNG
 
@@ -55,6 +56,12 @@ def _startup():
     db.init()
     migrations.run()
     auth.purge_expired()
+    # 양쪽이 다 본 오래된 대전 로그를 치운다. 한 판에 수십 KB 라
+    # 그냥 두면 Turso 용량을 제일 먼저 먹는다. 전적은 그대로 남는다.
+    try:
+        pvp.prune()
+    except Exception as e:                                  # noqa: BLE001
+        print("[pvp] 오래된 로그 정리 실패: %s" % e)
     d = dex()
     n = sum(1 for s in d.species if s.get("spawnable"))
     print("[poketdesktop] 도감 %d종 (야생 등장 %d종) 준비 완료" % (len(d.species), n))
