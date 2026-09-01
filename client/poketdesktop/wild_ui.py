@@ -15,7 +15,7 @@ import tkinter as tk
 
 from PIL import ImageTk
 
-from . import effects, sprite_cache, sprites
+from . import ball_menu, config, effects, sprite_cache, sprites
 from . import ui_common as U
 from .overlay import Pet
 from .ui_common import run_async
@@ -166,10 +166,14 @@ class WildPet(Pet):
         # 배틀 중이면 배틀 쪽으로 넘긴다 (체력이 깎여 있어 잘 잡힌다)
         if self.ctl.app.battle:
             return self.ctl.app.battle.throw_ball()
-        self.ctl.throw_ball()
+        self.ctl.ball_menu(e)
 
     def on_double(self, e):
-        self.on_menu(e)
+        # 두 번 누르면 곧바로 마지막에 쓴 볼로 던진다. 한 마리씩 잡을 때
+        # 메뉴를 매번 여는 건 번거롭다.
+        if self.ctl.app.battle:
+            return self.ctl.app.battle.throw_ball()
+        self.ctl.throw_ball()
 
     def destroy(self):
         if self._blink:
@@ -283,6 +287,8 @@ class WildController(object):
     """야생 조우 전체를 맡는다."""
 
     def __init__(self, app):
+        # 서버가 공개·던지기 응답에 실어 주는 볼 목록. 우클릭 메뉴가 이걸 쓴다.
+        self.ball_options = []
         self.app = app
         self.grass = None
         self.pet = None
@@ -376,6 +382,8 @@ class WildController(object):
                 self.app.notify("풀숲이 흔들리고 있습니다. 눌러보세요!")
         elif w.get("pokemon") and not self.pet:
             self.show_wild(w["pokemon"])
+        if r.get("ballOptions"):
+            self.ball_options = r["ballOptions"]
 
         self.arm_expiry(w.get("expiresAt"))
         self.schedule(POLL_SAFETY)
@@ -542,6 +550,9 @@ class WildController(object):
                 self.clear()
                 self.check()
                 return
+            # 던질 볼 목록. 배율이 여기서 처음 정해진다.
+            if (r or {}).get("ballOptions"):
+                self.ball_options = r["ballOptions"]
             w = (r or {}).get("wild") or {}
             mon = w.get("pokemon")
             if mon:
@@ -581,15 +592,44 @@ class WildController(object):
             self.app.open_battle(r.get("battle"), r.get("intro"))
         run_async(self.app.root, lambda: self.app.api.battle_start(wid), done)
 
-    def throw_ball(self):
+    def ball_menu(self, e):
+        """어떤 볼을 던질지 고른다.
+
+        목록은 서버가 공개·던지기 응답에 실어 준 것을 그대로 쓴다.
+        누를 때마다 서버를 왕복하면 야생은 60초짜리라 그 시간을 깎아먹고,
+        서버가 자다 깨는 중이면 메뉴가 아예 안 뜬다.
+        """
         if self.throwing or not self.pet or not self.wild_id:
             return
-        if self.app.balls <= 0:
+        opts = self.ball_options
+        if not opts:
+            return self.throw_ball()          # 목록이 아직이면 예전처럼
+        self.hide_hint()
+        ball_menu.popup(self.app.root, e, opts, self.throw_ball,
+                        on_shop=self.app.open_shop)
+
+    def last_ball(self):
+        """마지막에 쓴 볼. 없으면 몬스터볼."""
+        want = (self.app.settings.get("lastBall") or "POKEBALL")
+        for o in self.ball_options or ():
+            if o["id"] == want and o["count"] > 0:
+                return want
+        return "POKEBALL"
+
+    def throw_ball(self, ball=None):
+        if self.throwing or not self.pet or not self.wild_id:
+            return
+        ball = ball or self.last_ball()
+        if ball == "POKEBALL" and self.app.balls <= 0:
             self.app.notify("몬스터볼이 없습니다.")
             return
         self.throwing = True
         self.hide_hint()
         wid = self.wild_id
+        # 어떤 볼을 썼는지 기억해 둔다. 게임 상태가 아니라 취향이라
+        # 서버에 둘 이유가 없다.
+        self.app.settings["lastBall"] = ball
+        config.save_settings(self.app.settings)
 
         def done(r, err):
             if err:
@@ -598,9 +638,12 @@ class WildController(object):
                 self.check()
                 return
             self.app.balls = r.get("balls", self.app.balls)
+            if r.get("ballOptions"):
+                self.ball_options = r["ballOptions"]
             self.app.refresh_tray()
             self.play_throw(r)
-        run_async(self.app.root, lambda: self.app.api.wild_catch(wid), done)
+        run_async(self.app.root,
+                  lambda: self.app.api.wild_catch(wid, ball), done)
 
     def play_catch(self, r, on_done=None):
         """볼 던지는 연출만 재생한다. 결과 처리는 부르는 쪽에서.
