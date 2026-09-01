@@ -38,6 +38,8 @@ jobs:
           # 저장소 Settings > Secrets and variables > Actions > Variables 에
           # POKET_SERVER 를 넣어 둔다. 예: https://poketdesktop.onrender.com
           BASE: ${{ vars.POKET_SERVER }}
+          # 한 시간에 이만큼 넘게 나면 알린다. Variables 에서 바꿀 수 있다.
+          ERROR_LIMIT: ${{ vars.POKET_ERROR_LIMIT || 10 }}
         run: |
           if [ -z "$BASE" ]; then
             echo "::error::POKET_SERVER 변수가 없습니다. 저장소 Variables 에 서버 주소를 넣어 주세요."
@@ -46,6 +48,7 @@ jobs:
 
           # 자고 있으면 깨어나는 데 시간이 걸린다. 넉넉히 기다리고,
           # 그래도 안 되면 몇 번 더 두드린다.
+          ok=0
           for attempt in 1 2 3; do
             code=$(curl -s -o /tmp/body -w '%{http_code}' \
                         --max-time 90 "$BASE/api/health" || echo 000)
@@ -53,12 +56,26 @@ jobs:
               echo "깨어 있음 (시도 $attempt)"
               cat /tmp/body
               echo
-              exit 0
+              ok=1
+              break
             fi
             echo "응답 $code — 다시 시도 ($attempt/3)"
             sleep 20
           done
 
-          echo "::error::서버가 응답하지 않습니다 ($BASE)"
-          cat /tmp/body || true
-          exit 1
+          if [ "$ok" != "1" ]; then
+            echo "::error::서버가 응답하지 않습니다 ($BASE)"
+            cat /tmp/body || true
+            exit 1
+          fi
+
+          # 깨우는 김에 오류도 본다. 감시 장치를 따로 두지 않는 이유는
+          # 이게 이미 5분마다 돌기 때문이다. 많이 나면 이 워크플로가
+          # 실패하고, 그러면 GitHub 이 알아서 메일을 보낸다.
+          n=$(python3 -c "import json;d=json.load(open('/tmp/body'));print((d.get('errors') or {}).get('count',0))" 2>/dev/null || echo 0)
+          echo "최근 1시간 오류: $n 건"
+          if [ "$n" -ge "${ERROR_LIMIT:-10}" ]; then
+            echo "::error::최근 한 시간에 오류가 $n 건 났습니다. Render 로그를 봐 주세요."
+            python3 -c "import json;d=json.load(open('/tmp/body'));print(json.dumps(d.get('errors'),ensure_ascii=False,indent=2))" 2>/dev/null || true
+            exit 1
+          fi

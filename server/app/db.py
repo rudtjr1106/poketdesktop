@@ -289,6 +289,23 @@ CREATE TABLE IF NOT EXISTS rank_stat (
 );
 CREATE INDEX IF NOT EXISTS idx_rank_board ON rank_stat(ranked, rating DESC);
 
+-- 서버에서 난 예상 못 한 오류.
+--
+-- 예전에는 print 로만 남겨서 Render 대시보드를 직접 열어 봐야 알 수 있었다.
+-- 사용자는 "가끔 오류가 뜬다" 고만 말할 수 있고, 그 사이 무슨 일이 있었는지
+-- 아무도 모른다. 여기 남겨 두면 5분마다 도는 keepalive 가 대신 봐 준다.
+--
+-- 오래된 것은 지운다. 이건 진단용이지 보관용이 아니다.
+CREATE TABLE IF NOT EXISTS server_error (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    at      TEXT NOT NULL,
+    path    TEXT NOT NULL,
+    method  TEXT NOT NULL,
+    kind    TEXT NOT NULL,
+    detail  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_error_at ON server_error(at);
+
 -- 서버가 스스로 기억해야 하는 잡다한 것. 지금은 '어떤 자료 손질까지
 -- 끝냈는가' 를 적는 데 쓴다.
 CREATE TABLE IF NOT EXISTS meta (

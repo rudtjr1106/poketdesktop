@@ -173,7 +173,9 @@ python tools/build_exe.py                                      # exe 빌드
 ```
 
 서버는 [Render](https://render.com) + [Turso](https://turso.tech) 에서 돌아갑니다.
-설정은 [`render.yaml`](render.yaml) 에 있습니다.
+설정은 [`render.yaml`](render.yaml), 운영 방법은 [`docs/운영.md`](docs/운영.md) 에 있습니다.
+
+백업·오류 감시·검사는 전부 GitHub Actions 가 자동으로 합니다.
 
 ## 앞으로
 

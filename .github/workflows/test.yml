@@ -1,0 +1,126 @@
+# 밀어 넣을 때마다 검사를 돌린다.
+#
+# 그동안은 검사가 있어도 사람이 기억해서 돌려야 했고, 그마저도 실서버를
+# 두드리는 것들이라 함부로 못 돌렸다. 여기서는 워크플로 안에 서버를
+# 띄우고 그쪽으로 붙는다 - 실서버와 친구들 데이터는 건드리지 않는다.
+#
+# 공개 저장소라 Actions 분이 무료다.
+
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 서버가 필요 없는 것들. 빠르니까 먼저 돌려서 일찍 실패하게 한다.
+  pure:
+    name: 계산만 하는 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 파티전 엔진
+        run: python tools/sim_party.py 300
+
+      - name: 투기장 좌표
+        run: python client/test_layout.py
+
+      - name: 문법
+        run: |
+          python - <<'EOF'
+          import ast, glob, io, sys
+          bad = []
+          for f in (glob.glob("client/**/*.py", recursive=True)
+                    + glob.glob("server/**/*.py", recursive=True)
+                    + glob.glob("common/*.py") + glob.glob("tools/*.py")):
+              if "__pycache__" in f or "/_cache/" in f:
+                  continue
+              try:
+                  ast.parse(io.open(f, encoding="utf-8").read())
+              except SyntaxError as e:
+                  bad.append("%s:%s %s" % (f, e.lineno, e.msg))
+          if bad:
+              print("\n".join(bad))
+              sys.exit(1)
+          print("문법 오류 없음")
+          EOF
+
+  # 서버를 띄우고 HTTP 로 두드리는 것들.
+  server:
+    name: 서버 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성
+        run: pip install -r server/requirements.txt
+
+      - name: 서버 띄우기
+        env:
+          POKET_DB: /tmp/poket-test.db
+          POKET_POKEDEX: server/data/pokedex.json
+          POKET_REQUIRE_IP: "0"
+          # 검사에서만 여는 뒷문 둘. 이게 없으면 야생이 걸린 검사를
+          # 돌릴 수가 없다(첫 조우까지 기다려야 한다).
+          POKET_ALLOW_FORCE_WILD: "1"
+          POKET_ALLOW_ADD_EXP: "1"
+          POKET_WILD_COOLDOWN_MIN: "60"
+          POKET_WILD_COOLDOWN_MAX: "60"
+          POKET_MISS_COOLDOWN: "60"
+        run: |
+          cd server
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8788 \
+                --log-level warning > /tmp/server.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -s --max-time 3 http://127.0.0.1:8788/api/health > /dev/null; then
+              echo "떴다"
+              curl -s http://127.0.0.1:8788/api/health
+              echo
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::서버가 안 떴습니다"
+          cat /tmp/server.log
+          exit 1
+
+      # 서버가 붙잡고 있는 DB 를 다른 프로세스가 같이 쓰면 SQLite 가
+      # 잠근다. 이 둘은 자기 DB 를 따로 쓴다.
+      - name: 서버 안에서 도는 검사
+        env:
+          POKET_DB: /tmp/poket-unit.db
+          POKET_POKEDEX: server/data/pokedex.json
+        run: |
+          cd server
+          python test_pvp.py
+          python test_walk.py
+
+      - name: HTTP 로 두드리는 검사
+        run: |
+          python server/test_server.py  http://127.0.0.1:8788
+          python server/test_battle.py  http://127.0.0.1:8788
+          python server/test_items.py   http://127.0.0.1:8788
+          python server/test_social.py  http://127.0.0.1:8788
+          python server/test_arena.py   http://127.0.0.1:8788
+
+      - name: 서버 로그 (실패했을 때만)
+        if: failure()
+        run: tail -100 /tmp/server.log
