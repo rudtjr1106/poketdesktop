@@ -109,6 +109,9 @@ jobs:
           POKET_DB: /tmp/poket-unit.db
           POKET_POKEDEX: ${{ github.workspace }}/server/data/pokedex.json
         run: |
+          # server/ 안에서 돌지만 common 은 저장소 루트에 있다.
+          # 도커에서는 둘이 /app 아래 나란히 놓여서 문제가 없었다.
+          export PYTHONPATH="${{ github.workspace }}"
           cd server
           python test_pvp.py
           python test_walk.py
