@@ -42,10 +42,16 @@ MAX_ROUNDS = 16
 
 
 def _side_view(f):
-    """선수 소개에 쓸 정보."""
+    """선수 소개에 쓸 정보. 화면이 도트를 띄우는 데 필요한 것까지 담는다."""
+    # 도감 번호는 mon 에 없을 수 있다(야생으로 뽑은 개체에는 없다).
+    # Fighter 가 이미 도감 항목을 들고 있으니 거기서 가져온다 - 화면이
+    # 도트를 찾을 때 쓰는 값이라 비면 아무것도 안 뜬다.
+    sp = f.species or {}
     return {"name": f.name, "species": f.mon.get("species"),
-            "num": f.mon.get("num"), "level": f.mon.get("level"),
-            "shiny": bool(f.mon.get("shiny")), "hp": f.hp, "maxhp": f.maxhp}
+            "num": f.mon.get("num") or sp.get("num"),
+            "level": f.mon.get("level"),
+            "shiny": bool(f.mon.get("shiny")), "hp": f.hp, "maxhp": f.maxhp,
+            "gender": f.mon.get("gender")}
 
 
 class PartyBattle(object):
@@ -96,6 +102,13 @@ class PartyBattle(object):
 
     # ---------------- 진행 ----------------
     def run(self):
+        # 명단을 맨 앞에 넣는다. 화면은 시작하자마자 양쪽 여섯 마리를
+        # 다 세워야 하는데, 라운드 이벤트에는 실제로 링에 나온 애들만
+        # 담긴다 - 일찍 끝나면 뒤쪽 선수는 로그에 아예 안 나온다.
+        # me/foe 키라서 시점 뒤집기(flip)가 그대로 처리해 준다.
+        self.events.append({"t": "teams",
+                            "me": [_side_view(f) for f in self.a],
+                            "foe": [_side_view(f) for f in self.b]})
         for n in range(1, MAX_ROUNDS + 1):
             self.events.append({"t": "round", "n": n,
                                 "me": _side_view(self.a[self.ia]),

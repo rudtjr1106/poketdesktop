@@ -48,7 +48,11 @@ def main():
                                      "어긋냄", "최소간격"))
     for name, w, h in SCREENS:
         for sh in HEIGHTS:
-            rect = L.stage_rect((0, 0, w, h - 48))       # 작업표시줄 48px 가정
+            # 평소 활동 범위(오른쪽 아래 520x360)에서 배틀 동안만 넓힌다
+            work = (0, 0, w, h - 48)                     # 작업표시줄 48px 가정
+            area = (max(0, w - 4 - 520), max(0, h - 48 - 4 - 360),
+                    w - 4, h - 48 - 4)
+            rect = L.stage_rect(area, work)
             ring = L.ring_of(rect, sh)
             for n in (1, 2, 3, 6):
                 seats = [(s, i, L.seat_point(ring, s, i, n))
@@ -91,7 +95,7 @@ def main():
             chk("%s h=%d 링 두 자리 간격" % (name, sh),
                 b[0] - a[0] >= max(96, sh * 2.0), round(b[0] - a[0]))
             e = L.entry_point(ring, "foe", 0, 6)
-            chk("%s 등장 지점은 화면 밖" % name, e[0] > rect[2], e)
+            chk("%s 등장 지점은 무대 밖" % name, e[0] > rect[2], e)
             if sh == 72:
                 col = [L.seat_point(ring, "me", i, 6) for i in range(6)]
                 d = min(math.hypot(col[i + 1][0] - col[i][0],

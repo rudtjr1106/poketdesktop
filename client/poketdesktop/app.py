@@ -18,6 +18,7 @@ from .desktop_battle import DesktopBattle       # noqa: E402
 from .ui_bag import BagWindow                  # noqa: E402
 from .ui_box import BoxWindow, confirm         # noqa: E402
 from .ui_friends import FriendsWindow          # noqa: E402
+from .arena import Arena                       # noqa: E402
 from .ui_shop import ShopWindow                # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
@@ -41,6 +42,7 @@ class App(object):
         self.shop_window = None
         self.bag_window = None
         self.friends_win = None
+        self.arena = None
         self.battle = None
         self._quitting = False
         self._relogin = False
@@ -254,6 +256,9 @@ class App(object):
         config.log("세션이 끊겨서 다시 로그인을 요청합니다")
         self.notify("로그인이 만료되었습니다. 다시 로그인해 주세요.")
         config.clear_session()
+        # 투기장을 먼저 접는다. overlay.clear() 만 하면 locked 가 남아서
+        # 다시 로그인해도 바탕화면이 영영 빈 채로 있는다.
+        self.close_arena()
         if self.wild:
             self.wild.stop()
         if self.overlay:
@@ -308,8 +313,10 @@ class App(object):
         self._pvp(lambda: self.api.pvp_challenge(uid))
 
     def _pvp(self, fn):
-        if getattr(self, "_pvp_busy", False):
+        if getattr(self, "_pvp_busy", False) or self.arena:
             return
+        if self.battle:
+            return self.notify("야생 배틀이 끝난 뒤에 해주세요.")
         self._pvp_busy = True
         self.notify("상대를 찾고 있습니다...")
 
@@ -320,12 +327,76 @@ class App(object):
             self.show_pvp_result(r)
         run_async(self.root, fn, done)
 
-    def show_pvp_result(self, r):
-        """대전 결과를 알린다.
+    def watch_match(self, mid):
+        """대전 한 판을 투기장에서 재생한다.
 
-        지금은 글로만 알린다. 투기장 연출이 붙으면 여기서 그쪽으로
-        넘긴다 - 로그는 이미 서버에 저장되어 있어서 언제 재생하든 된다.
+        로그는 이미 서버에 있어서 언제 재생하든 같은 판이 나온다.
+        재생 중에 꺼도 승패와 보상은 이미 확정되어 있다.
         """
+        if self.arena or not self.api:
+            return
+        def work():
+            view = self.api.pvp_match(mid)
+            # 상대 팀 도트를 여기서 받아 둔다. overlay.walks 에는 내 팀
+            # 것만 들어 있어서(sync 가 내 목록으로만 채운다), 이걸 안 하면
+            # 상대만 걷지 않는 옛날 배틀 도트로 나온다.
+            nums = []
+            for e in view.get("events") or []:
+                if e.get("t") == "teams":
+                    nums = [x.get("num") for x in
+                            (e.get("me") or []) + (e.get("foe") or [])]
+                    break
+            paths = sprite_cache.ensure_many(
+                self.api, [(n, False) for n in nums if n])
+            walks = walk_cache.ensure_many(self.api, [n for n in nums if n])
+            return view, paths, walks
+
+        def done(r, err):
+            if err or not r:
+                return self.notify(
+                    getattr(err, "message", "대전을 불러오지 못했습니다."))
+            if self.arena:
+                return
+            view, paths, walks = r
+            if self.overlay:
+                self.overlay.paths.update(paths or {})
+                self.overlay.walks.update(walks or {})
+            self.wild.stop()
+            self.arena = Arena(self, view, on_done=self.close_arena)
+            self.arena.start()
+            # 다 봤다고 표시. 재생을 끝까지 안 봐도 결과는 이미 정해져 있다.
+            run_async(self.root, lambda: self.api.pvp_seen(mid),
+                      lambda _r, _e: None)
+        run_async(self.root, work, done)
+
+    def close_arena(self):
+        """투기장을 끝내고 바탕화면을 원래대로.
+
+        **몇 번을 불러도 안전해야 한다.** 로그아웃·종료·세션만료·정상
+        종료가 전부 여기로 온다. 하나라도 빠지면 바탕화면이 잠긴 채
+        남고, 사용자는 재시작 말고는 푸는 방법이 없다.
+        """
+        ar, self.arena = self.arena, None
+        if ar:
+            try:
+                ar.cleanup()
+            except Exception:                               # noqa: BLE001
+                pass
+        if self.overlay:
+            self.overlay.locked = False
+        # 종료·로그아웃 중이면 되살리지 않는다. 그 길로도 여기를 지나는데,
+        # 그때 폴링을 다시 켜면 죽은 세션으로 서버를 두드리게 된다.
+        if self._quitting or self._relogin or not self.api:
+            return
+        if self.wild:
+            self.wild.start()
+        self.sync()
+
+    def show_pvp_result(self, r):
+        """대전이 끝났다. 투기장에서 보여준다."""
+        mid = (r or {}).get("matchId")
+        if mid:
+            return self.watch_match(mid)
         mine = (r or {}).get("a") or {}
         res = mine.get("result")
         head = {"win": "이겼습니다!", "lose": "졌습니다...",
@@ -346,11 +417,29 @@ class App(object):
         if not n or n == getattr(self, "_pvp_seen_n", 0):
             return
         self._pvp_seen_n = n
-        self.notify("확인하지 않은 대전이 %d개 있습니다. 친구 창에서 볼 수 있습니다."
-                    % n)
+        self.notify("확인하지 않은 대전이 %d개 있습니다. "
+                    "트레이의 '받은 대전 보기' 로 볼 수 있습니다." % n)
+
+    def watch_pending(self):
+        """상대가 걸어온 대전 중 가장 최근 것을 본다."""
+        if self.arena:
+            return
+        if not self.api:
+            return self.notify("로그인이 필요합니다.")
+
+        def done(r, err):
+            if err:
+                return self.notify(getattr(err, "message", str(err)))
+            got = [m for m in (r or {}).get("matches") or []
+                   if not m.get("attacked")]
+            if not got:
+                return self.notify("새로 받은 대전이 없습니다.")
+            self.watch_match(got[0]["id"])
+        run_async(self.root, lambda: self.api.pvp_pending(), done)
 
     def close_windows(self):
         """열려 있는 창을 전부 닫는다. 로그아웃·탈퇴·종료 때 부른다."""
+        self.close_arena()
         for name in ("box_window", "shop_window", "bag_window",
                      "friends_win"):
             w = getattr(self, name, None)
@@ -363,7 +452,7 @@ class App(object):
 
     def open_battle(self, battle, intro=None):
         """바탕화면에서 배틀을 시작한다. 창은 안 뜬다."""
-        if not battle or self.battle:
+        if not battle or self.battle or self.arena:
             return
         self.battle = DesktopBattle(self, battle, intro)
 
@@ -389,6 +478,11 @@ class App(object):
             self.box_window.tree.selection_set(str(pet.id))
 
     def pet_menu(self, pet, event):
+        # 투기장 중에는 우클릭 메뉴를 아예 안 연다. 트레이만 막으면
+        # 이 경로가 열려 있어서, 싸우는 도중에 파티를 바꾸거나 풀숲을
+        # 돋울 수 있다.
+        if self.arena:
+            return
         info = pet.mon.get("info", {})
         m = tk.Menu(self.root, tearoff=0, bg=U.BG2, fg=U.FG,
                     activebackground=U.BG4, activeforeground=U.FG,
@@ -445,7 +539,9 @@ class App(object):
         run_async(self.root, work, lambda r, e: self.request_sync())
 
     def encounter_now(self):
-        """지금 바로 풀숲을 돋운다."""
+        """지금 풀숲이 돋았는지 본다."""
+        if self.arena:
+            return self.notify("배틀이 끝난 뒤에 해주세요.")
         if self.wild:
             self.wild.check(force=True)
 
@@ -502,6 +598,7 @@ class App(object):
         run_async(self.root, work, lambda r, e: self._restart_login())
 
     def _restart_login(self):
+        self.close_arena()
         if self.wild:
             self.wild.stop()
         if self.overlay:
