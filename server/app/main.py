@@ -78,7 +78,14 @@ def iso(dt):
 
 
 def _fail_key(username, ip):
-    return "%s|%s" % ((username or "").lower(), ip)
+    """실패 횟수를 세는 열쇠.
+
+    계정을 찾을 때는 strip() 을 하는데 여기서 안 하면, 아이디 뒤에
+    공백만 붙여 보내도 매번 새 열쇠가 되어 시도 제한이 풀린다.
+    비밀번호가 숫자 네 자리(만 가지)라 이 제한이 사실상 유일한
+    방어선이므로 같은 방식으로 다듬어야 한다.
+    """
+    return "%s|%s" % ((username or "").strip().lower(), ip)
 
 
 def _fail_check(username, ip):
@@ -390,10 +397,18 @@ def _walk_fetch_follow(num, png_path, meta_path):
             png = r.read()
         if not png or len(png) < 100:
             raise ValueError("빈 파일")
-    except (urllib.error.URLError, OSError, ValueError):
-        # 어느 쪽에도 없는 종이다. 다음부터 안 찾도록 표시만 남긴다.
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            # 저쪽이 잠깐 맛이 간 것이다. 표시를 남기면 안 된다 -
+            # 한 번 실패한 종이 영영 안 걷게 된다.
+            return None
+        # 404 라야 '어느 쪽에도 없는 종' 이다. 그때만 남긴다.
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump({"ok": False}, f)
+        return None
+    except (urllib.error.URLError, OSError, ValueError):
+        # network 오류·시간초과·깨진 파일. 없는 종인지 알 수 없으므로
+        # 아무것도 남기지 않고 다음에 다시 물어본다.
         return None
 
     tmp = png_path + ".part"
@@ -425,7 +440,11 @@ def walk_meta(num: int):
     if not 1 <= num <= 1025:
         raise HTTPException(404, "그런 도감 번호가 없습니다.")
     meta = _walk_meta(num)
-    if not meta or not meta.get("ok"):
+    if meta is None:
+        # 지금은 알 수 없다(저쪽이 잠깐 안 된다). 클라이언트가 '없는 종'
+        # 으로 굳혀 버리지 않게 구분해서 알려준다.
+        return {"ok": False, "retry": True}
+    if not meta.get("ok"):
         return {"ok": False}
     return meta
 
@@ -828,6 +847,7 @@ def wild_state(ctx=Depends(current), force: bool = False):
     st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
     next_at = st["next_at"] if st else None
 
+    full = False
     if row is None:
         # force 는 보통 '지금 돋우라' 가 아니라 '지금 다시 봐 달라' 다.
         # 예전에는 force 가 맨 앞에 아무 조건 없이 있어서 뒤를 안 봤고,
@@ -843,9 +863,21 @@ def wild_state(ctx=Depends(current), force: bool = False):
                 row = _make_grass(uid)
                 st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
                 next_at = st["next_at"] if st else None
+            else:
+                # 자리가 없어서 안 돋는다. 예전에는 여기서 그냥 지나가고
+                # next_at 도 그대로 둬서, 사용자 눈에는 어느 날부터 풀숲이
+                # 영영 안 돋는 고장으로만 보였다. 이유를 알려주고 시각도
+                # 다시 잡는다(안 그러면 지난 시각에 멈춰 있는다).
+                full = True
+                next_at = _schedule_next(uid, _cooldown())
 
     out = {"wild": _wild_public(row, row["state"] == "revealed") if row else None,
            "nextAt": next_at, "balls": ctx["user"]["balls"], "expired": expired}
+    if full:
+        out["boxFull"] = {"max": config.MAX_BOX,
+                          "message": "포켓몬이 %d마리로 가득 차서 풀숲이 돋지"
+                                     " 않습니다. 관리 창에서 놓아주거나"
+                                     " 정리해 주세요." % config.MAX_BOX}
     if next_at:
         out["nextInSeconds"] = max(
             0, int((auth.parse_iso(next_at) - now()).total_seconds()))

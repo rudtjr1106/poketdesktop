@@ -201,10 +201,18 @@ def main():
     ar.start()
     foe_pets, stage_rect, walked = [], None, 0
 
+    bars_drawn = [0]
+
     def peek():
         # 재생 도중에 한 번 들여다본다. 끝나면 다 정리돼서 못 본다.
         if ar.foes and not foe_pets:
             foe_pets.extend(ar.foes)
+        # 체력바가 실제로 캔버스에 그려졌나. 만들고 값만 넣어서는
+        # 화면에 아무것도 안 나온다 - draw() 를 불러야 그려진다.
+        drawn = sum(len(b.items) for b in ar.bars.values())
+        bars_drawn[0] = max(bars_drawn[0], drawn)
+        if not ar.closed:
+            root.after(700, peek)
     root.after(4000, peek)
     run_until(root, 150, stop=lambda: ar.closed)
     stage_rect = ar.ring["rect"] if getattr(ar, "ring", None) else None
@@ -221,6 +229,8 @@ def main():
         all(p.win.state() == "normal" for p in ov.pets.values()),
         [p.win.state() for p in ov.pets.values()])
     chk("기술 이펙트가 실제로 돌았다 (%d회)" % FX_RUNS[0], FX_RUNS[0] > 0)
+    chk("체력바가 화면에 그려졌다 (조각 %d개)" % bars_drawn[0],
+        bars_drawn[0] > 0)
     chk("상대가 걷는 도트로 나왔다 (%d/%d)" % (walked, len(foe_pets)),
         len(foe_pets) > 0 and walked == len(foe_pets),
         [p.walking_sprite for p in foe_pets])

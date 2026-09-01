@@ -10,7 +10,7 @@ from common.korean import natural              # noqa: E402
 from common.version import VERSION             # noqa: E402
 
 from . import api as apimod                    # noqa: E402
-from . import config, sprite_cache, updater, walk_cache  # noqa: E402
+from . import config, single, sprite_cache, updater, walk_cache  # noqa: E402
 from . import ui_common as U                   # noqa: E402
 from .overlay import Overlay                   # noqa: E402
 from .tray import Tray                         # noqa: E402
@@ -19,6 +19,7 @@ from .ui_bag import BagWindow                  # noqa: E402
 from .ui_box import BoxWindow, confirm         # noqa: E402
 from .ui_dex import DexWindow                  # noqa: E402
 from .ui_friends import FriendsWindow          # noqa: E402
+from .ui_settings import SettingsWindow        # noqa: E402
 from .arena import Arena                       # noqa: E402
 from .ui_shop import ShopWindow                # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
@@ -44,6 +45,7 @@ class App(object):
         self.bag_window = None
         self.friends_win = None
         self.dex_window = None
+        self.settings_win = None
         self.arena = None
         self.battle = None
         self._quitting = False
@@ -309,6 +311,11 @@ class App(object):
             return self.dex_window.focus()
         self.dex_window = DexWindow(self)
 
+    def open_settings(self):
+        if self.settings_win:
+            return self.settings_win.focus()
+        self.settings_win = SettingsWindow(self)
+
     # ---------------- 유저 배틀 ----------------
     # 대전은 비동기다. 상대가 켜져 있지 않아도 그 사람의 지금 파티를
     # 가져와 붙인다. 그래서 누르면 그 자리에서 끝나고, 상대는 다음에
@@ -448,7 +455,7 @@ class App(object):
         """열려 있는 창을 전부 닫는다. 로그아웃·탈퇴·종료 때 부른다."""
         self.close_arena()
         for name in ("box_window", "shop_window", "bag_window",
-                     "friends_win", "dex_window"):
+                     "friends_win", "dex_window", "settings_win"):
             w = getattr(self, name, None)
             if w:
                 try:
@@ -480,9 +487,24 @@ class App(object):
         run_async(self.root, self.api.battle_current, done)
 
     def pet_open(self, pet):
+        """도트를 두 번 누르면 관리 창에서 그 포켓몬을 보여준다.
+
+        예전에는 BoxWindow.tree 를 찾았는데 그런 게 없다(목록을 직접
+        그린다). 예외가 나서 선택이 안 옮겨졌고, tkinter 가 예외를
+        삼켜서 '창은 뜨는데 엉뚱한 애가 골라져 있다' 로만 보였다.
+        """
         self.open_box()
-        if self.box_window and self.box_window.tree.exists(str(pet.id)):
-            self.box_window.tree.selection_set(str(pet.id))
+        w = self.box_window
+        if not w:
+            return
+        # 목록을 아직 못 받았을 수 있다. 받은 뒤에 고른다.
+        def pick():
+            try:
+                w.select(pet.id)
+            except Exception:                               # noqa: BLE001
+                pass
+        pick()
+        self.root.after(400, pick)
 
     def pet_menu(self, pet, event):
         # 투기장 중에는 우클릭 메뉴를 아예 안 연다. 트레이만 막으면
@@ -553,6 +575,12 @@ class App(object):
             self.wild.check(force=True)
 
     def check_server(self):
+        # 로그아웃 상태에서는 self.api 가 None 이다. 그대로 두면
+        # self.api.health 를 꺼내다 터지는데, tkinter 가 after 콜백
+        # 예외를 삼켜서 눌러도 아무 반응이 없는 것으로만 보인다.
+        if not self.api:
+            return self.notify("로그인한 뒤에 확인할 수 있습니다.")
+
         def done(r, err):
             if err:
                 self.notify(getattr(err, "message", str(err)))
@@ -671,9 +699,20 @@ class App(object):
 
 def main():
     config.log("=== 시작 ===")
+    # 두 개가 같이 돌면 포켓몬이 겹쳐 그려지고 서버도 두 번씩 두드린다.
+    # 트레이 아이콘이 '숨겨진 아이콘' 안에 들어가 있어서, 이미 켜져
+    # 있는 걸 못 보고 다시 누르기가 아주 쉽다.
+    _lock, running = single.acquire(config.data_dir())
+    if running:
+        config.log("이미 실행 중이라 새로 켜지 않습니다")
+        single.tell_user()
+        return
     try:
         App().run()
     except Exception as e:                     # noqa: BLE001
         import traceback
-        config.log("치명적 오류: %s\n%s" % (e, traceback.format_exc()))
+        config.log("치명적 오류: %s\n%s"
+                   % (e, traceback.format_exc()))
         raise
+    finally:
+        single.release()
