@@ -359,6 +359,8 @@ def unseen(uid, limit=10):
         out.append({
             "id": m["id"], "kind": m["kind"],
             "foe": m["b_name"] if mine_is_a else m["a_name"],
+            # 상대 id 도 준다. 목록에서 바로 다시 걸 수 있어야 한다.
+            "foeId": m["b_id"] if mine_is_a else m["a_id"],
             # 내가 건 판인가, 상대가 걸어온 판인가. 알림 문구가 달라진다.
             "attacked": mine_is_a,
             "result": ("draw" if m["winner"] is None else
@@ -413,13 +415,31 @@ def mark_seen(uid, mid):
 
 
 def records(uid, limit=30):
+    """내 전적. 화면에서 목록으로 보고 다시 붙을 수 있게 만든다.
+
+    상대 id 와 **지금 다시 걸 수 있는지**를 같이 준다. 화면이 조건을
+    다시 따지면(쿨다운·하루 상한·차단) 서버 판정과 어긋난다.
+    """
     rows = db.q("SELECT * FROM battle_record WHERE user_id=?"
                 " ORDER BY id DESC LIMIT ?", (uid, limit))
-    return [{"foe": r["foe_name"], "kind": r["kind"], "result": r["result"],
-             "rating": r["rating"], "delta": r["delta"], "reward": r["reward"],
-             "turns": r["turns"], "myLeft": r["my_left"],
-             "foeLeft": r["foe_left"], "matchId": r["match_id"],
-             "at": r["ended_at"]} for r in rows]
+    # 같은 상대가 여러 번 나오므로 판정을 한 번만 하고 돌려 쓴다.
+    why = {}
+    out = []
+    for r in rows:
+        fid = r["foe_id"]
+        if fid is not None and fid not in why:
+            why[fid] = can_fight(uid, fid)
+        out.append({"foe": r["foe_name"], "foeId": fid,
+                    "kind": r["kind"], "result": r["result"],
+                    "rating": r["rating"], "delta": r["delta"],
+                    "reward": r["reward"], "turns": r["turns"],
+                    "myLeft": r["my_left"], "foeLeft": r["foe_left"],
+                    "matchId": r["match_id"], "at": r["ended_at"],
+                    "lead": r["lead"], "foeLead": r["foe_lead"],
+                    "canFight": (fid is not None and why.get(fid) is None),
+                    "whyNot": why.get(fid) if fid is not None
+                              else "상대가 누구인지 남아 있지 않습니다."})
+    return out
 
 
 def summary(uid):
