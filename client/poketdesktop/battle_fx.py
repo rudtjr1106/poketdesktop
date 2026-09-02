@@ -50,13 +50,105 @@ def colors(mtype):
     return TYPE_FX.get(mtype, DEFAULT_FX)
 
 
+# 이름에 든 낱말로 고르는 연출. **위에서부터 먼저 걸린다** -
+# "불꽃날개" 처럼 두 낱말이 겹칠 때 어느 쪽을 쓸지 순서가 정한다.
+# 919종 중 낱말로 덮이는 건 220종쯤이고, 나머지는 아래 자료·타입으로 간다.
+NAME_STYLES = [
+    ("bone", ("뼈",)),
+    ("quake", ("지진", "땅고르기", "균열", "지살")),
+    ("boom", ("폭발", "폭탄", "자폭", "대폭발")),
+    ("sleepz", ("잠자기", "재우기", "최면")),
+    ("dance", ("춤",)),
+    # "참" 은 참기·참방참방서핑이 걸려서 뺐다.
+    ("slash", ("칼", "베기", "자르기", "할퀴", "가위", "썰기", "검")),
+    # "발" 은 넣지 않는다 - 도발·묵사발·대폭발·분발이 전부 걸린다.
+    ("kick", ("킥", "차기", "밟기", "짓밟", "발꿈치", "발구르기")),
+    ("punch", ("펀치", "주먹", "치기", "박치기", "찌르기", "당수")),
+    ("bite", ("물기", "이빨", "깨물")),
+    ("throw", ("던지기", "투척", "뿌리기")),
+    # "돌" 만으로는 돌진·돌려차기·돌림노래가 걸린다.
+    ("rock", ("바위", "스톤", "암석", "돌떨", "돌맹", "락")),
+    # "풀" 은 화풀이·분풀이·파워풀에지까지 데려온다.
+    ("leaf", ("잎", "덩굴", "씨", "꽃", "풀베기", "풀묶기", "풀피리")),
+    ("ice", ("얼음", "냉동", "눈보라", "블리자드", "서리")),
+    ("wind", ("바람", "날개", "공중", "폭풍", "회오리")),
+    ("flash", ("빛", "섬광", "플래시", "번쩍")),
+    ("sound", ("노래", "울음", "소리", "음파", "외침", "함성")),
+    ("beam", ("빔", "광선", "레이저")),
+    # "볼트" 는 전기라 공이 아니다. 앞에서 걸러낸다.
+    ("ball", ("구슬", "탄", "볼")),
+    ("pulse", ("파동", "물결", "웨이브")),
+]
+
+
+# 낱말이 들어 있어도 그 연출이 아닌 것들. 낱말만 보면 놓친다.
+NAME_SKIP = {
+    "ball": ("볼트",),          # 볼트태클·10만볼트는 공이 아니라 전기다
+}
+
+
+def _by_name(kr):
+    for style, words in NAME_STYLES:
+        skip = NAME_SKIP.get(style) or ()
+        if any(x in kr for x in skip):
+            continue
+        for w in words:
+            if w in kr:
+                return style
+    return None
+
+
 def style_of(move):
-    """기술 하나가 어떤 연출을 쓸지 고른다."""
+    """기술 하나가 어떤 연출을 쓸지 고른다.
+
+    세 겹으로 고른다. 위에서 걸리면 아래는 안 본다.
+      1. **이름의 낱말** - 칼춤이면 칼, 뼈다귀면 뼈. 눈에 띄는 기술들이
+         여기서 자기 모양을 갖는다.
+      2. **하는 일** - 회복·흡수·랭크변화처럼 자료에 적힌 것.
+      3. **타입과 분류** - 나머지 전부. 예전부터 쓰던 갈래다.
+
+    예전에는 3번만 있어서 919종 중 350종(38%)이 전부 같은 'beam' 이었다.
+    뼈다귀치기와 냉동빔과 파괴광선이 구분이 안 됐다.
+    """
     flags = set(move.get("flags") or [])
     cat = move.get("cat") or "status"
     target = move.get("target") or 10
-    # 7 = 자기 자신, 6/12 = 자기 편
-    if target in (7, 6, 12) or "dance" in flags or "heal" in flags:
+    kr = move.get("kr") or ""
+    on_self = target in (7, 6, 12)
+
+    # --- 1. 이름 ---
+    named = _by_name(kr)
+    if named:
+        # 자기에게 쓰는 기술인데 날아가는 연출이면 어색하다.
+        # 칼춤·검무처럼 자기 강화인 것은 그대로 두고, 나머지만 되돌린다.
+        if on_self and named in ("bone", "throw", "rock", "beam", "ball",
+                                 "quake", "boom", "ice", "leaf"):
+            pass
+        else:
+            return named
+
+    # --- 2. 하는 일 ---
+    if move.get("heal"):
+        return "heal"
+    drain = move.get("drain") or 0
+    if drain > 0:
+        return "drain"
+    if drain < 0:
+        return "recoil"
+    stats = move.get("stat") or []
+    if stats and cat == "status":
+        up = any(c > 0 for _s, c in stats)
+        if move.get("statSelf"):
+            return "buff" if up else "selfdown"
+        return "debuff"
+    hits = move.get("hits") or [1, 1]
+    if len(hits) > 1 and hits[1] > 1:
+        return "multi"
+    if move.get("ail") and cat == "status":
+        return "hex"
+
+    # --- 3. 타입과 분류 ---
+    if on_self or "dance" in flags or "heal" in flags:
         return "self"
     if "powder" in flags:
         return "powder"
@@ -79,7 +171,7 @@ def style_of(move):
 
 def contact_style(style):
     """때리는 쪽이 달려들어야 하는 연출인지."""
-    return style in ("contact", "punch", "bite")
+    return style in ("contact", "punch", "bite", "kick", "slash", "multi")
 
 
 # ---------------------------------------------------------------- 도형 조각
@@ -110,6 +202,19 @@ def _bolt(cv, x, y, r, light, dark):
     return cv.create_line(x - r, y - r, x + r * 0.3, y - r * 0.2,
                           x - r * 0.3, y + r * 0.2, x + r, y + r,
                           fill=light, width=max(2, int(r * 0.5)))
+
+
+def _leaf_shape(cv, x, y, r, light, dark, ang=0.0):
+    """잎 하나. ang 을 주면 그만큼 돌린다.
+
+    Canvas 는 도형을 돌리는 기능이 없다. 좌표를 직접 돌려서 다각형을 만든다.
+    """
+    a = math.radians(ang)
+    c, s_ = math.cos(a), math.sin(a)
+    pts = []
+    for dx, dy in ((-r, 0), (0, -r * 0.7), (r, 0), (0, r * 0.7)):
+        pts += [x + dx * c - dy * s_, y + dx * s_ + dy * c]
+    return cv.create_polygon(*pts, fill=light, outline=dark, width=2)
 
 
 def _leaf(cv, x, y, r, light, dark):
@@ -388,6 +493,333 @@ class Effect(object):
         step(0)
 
     # ---- 접촉기: 때리는 쪽이 달려든 뒤 자국이 남는다 ----
+    # ------------------------------------------------------------------
+    # 아래는 이름으로 갈라진 연출들. 예전에는 919종 중 350종이 전부
+    # 같은 'beam' 이라 뼈다귀치기와 냉동빔이 구분되지 않았다.
+    # ------------------------------------------------------------------
+    def _fly(self, shape, n=14, spin=0, arc=0):
+        """무언가를 상대에게 날린다.
+
+        shape(x, y, t) 가 한 프레임의 도형을 만들어 돌려준다. t 는 0~1.
+        spin 을 주면 돌면서 가고, arc 를 주면 곡선을 그린다.
+        """
+        sx, sy = self.src
+        tx, ty = self.dst
+        cur = [None]
+
+        def step(i):
+            if self.dead:
+                return
+            if i > n:
+                if cur[0]:
+                    self.cv.delete(cur[0])
+                return self.burst()
+            t = i / float(n)
+            x = sx + (tx - sx) * t
+            y = sy + (ty - sy) * t - arc * (t - t * t) * 4
+            if cur[0]:
+                self.cv.delete(cur[0])
+            cur[0] = shape(x, y, t)
+            self.items.append(cur[0])
+            self.after(26, lambda: step(i + 1))
+        step(0)
+
+    def _marks(self, at, maker, n=3, gap=90, done_after=260):
+        """제자리에서 표시가 하나씩 뜬다 (칼자국, 화살표 같은)."""
+        x, y = at
+
+        def one(i):
+            if self.dead:
+                return
+            if i >= n:
+                return self.after(done_after, self.burst)
+            it = maker(x, y, i)
+            if it is not None:
+                self.items.append(it)
+                self.after(360, lambda v=it: self.cv.delete(v))
+            self.after(gap, lambda: one(i + 1))
+        one(0)
+
+    def _bone(self):
+        """뼈가 빙글빙글 돌면서 날아간다."""
+        def shape(x, y, t):
+            a = t * 720.0
+            r = 13
+            dx = r * math.cos(math.radians(a))
+            dy = r * math.sin(math.radians(a)) * 0.6
+            return self.cv.create_line(x - dx, y - dy, x + dx, y + dy,
+                                       fill="#f0ece0", width=5,
+                                       capstyle="round")
+        self._fly(shape, n=16, arc=18)
+
+    def _slash(self):
+        """칼자국 세 줄이 비스듬히 그어진다."""
+        def maker(x, y, i):
+            o = -18 + i * 16
+            return self.cv.create_line(x - 26 + o, y - 24, x + 22 + o, y + 24,
+                                       fill="#ffffff", width=5, capstyle="round")
+        self._marks(self.dst, maker, n=3, gap=80)
+
+    def _kick(self):
+        """발차기 - 호를 그리며 차고 충격이 튄다."""
+        light, dark = colors(self.type)
+
+        def maker(x, y, i):
+            r = 20 + i * 9
+            return self.cv.create_arc(x - r, y - r, x + r, y + r,
+                                      start=200 + i * 20, extent=110,
+                                      style="arc", outline=light, width=5)
+        self._marks(self.dst, maker, n=3, gap=70)
+
+    def _quake(self):
+        """땅이 갈라진다."""
+        light, dark = colors(self.type)
+
+        def maker(x, y, i):
+            w = 40 + i * 26
+            pts = []
+            for k in range(7):
+                pts += [x - w + (2 * w) * k / 6.0,
+                        y + 22 + (6 if k % 2 else -6)]
+            return self.cv.create_line(*pts, fill=dark, width=5)
+        self._marks(self.dst, maker, n=4, gap=90)
+
+    def _boom(self):
+        """한가운데서 터진다."""
+        light, dark = colors(self.type)
+        tx, ty = self.dst
+
+        def one(i):
+            if self.dead:
+                return
+            if i > 8:
+                return self.burst()
+            r = 12 + i * 11
+            it = self.add(self.cv.create_oval(tx - r, ty - r, tx + r, ty + r,
+                                              outline=light if i % 2 else dark,
+                                              width=4))
+            self.after(200, lambda v=it: self.cv.delete(v))
+            self.after(34, lambda: one(i + 1))
+        one(0)
+
+    def _rock(self):
+        """돌덩이가 여러 개 날아간다."""
+        light, dark = colors(self.type)
+
+        def one(k):
+            if self.dead:
+                return
+            if k >= 4:
+                return self.after(180, self.burst)
+            off = random.uniform(-22, 22)
+
+            def shape(x, y, t, o=off):
+                r = 8
+                return self.cv.create_polygon(
+                    x - r, y + o, x, y - r + o, x + r, y + o * 0.6,
+                    x + r * 0.4, y + r + o, fill=dark, outline=light, width=2)
+            self._fly(shape, n=10, arc=14)
+            self.after(70, lambda: one(k + 1))
+        one(0)
+
+    def _leaf(self):
+        """잎이 흩날리며 날아간다."""
+        light, dark = colors(self.type)
+
+        def shape(x, y, t):
+            return _leaf_shape(self.cv, x, y, 9, light, dark, t * 360)
+        self._fly(shape, n=15, arc=22)
+
+    def _ice(self):
+        """얼음 조각이 박힌다."""
+        light, dark = colors(self.type)
+
+        def maker(x, y, i):
+            a = -50 + i * 50
+            r = 26
+            dx = r * math.cos(math.radians(a))
+            dy = r * math.sin(math.radians(a))
+            return self.cv.create_polygon(x + dx, y + dy,
+                                          x + dx * 0.3 - 7, y + dy * 0.3,
+                                          x + dx * 0.3 + 7, y + dy * 0.3 + 5,
+                                          fill=light, outline=dark, width=2)
+        self._marks(self.dst, maker, n=4, gap=70)
+
+    def _wind(self):
+        """바람 줄기가 지나간다."""
+        light, dark = colors(self.type)
+        sx, sy = self.src
+        tx, ty = self.dst
+
+        def maker(x, y, i):
+            o = -20 + i * 14
+            return self.cv.create_line(sx, sy + o, tx, ty + o,
+                                       fill=light, width=3, dash=(14, 9))
+        self._marks(self.dst, maker, n=4, gap=60)
+
+    def _flash(self):
+        """화면이 번쩍인다."""
+        light, dark = colors(self.type)
+        tx, ty = self.dst
+
+        def one(i):
+            if self.dead:
+                return
+            if i > 5:
+                return self.burst()
+            r = 60 - i * 9
+            it = self.add(_blob(self.cv, tx, ty, r, light))
+            self.after(90, lambda v=it: self.cv.delete(v))
+            self.after(60, lambda: one(i + 1))
+        one(0)
+
+    def _dance(self):
+        """자기 둘레를 돈다. 칼춤 계열은 칼이 돈다."""
+        light, dark = colors(self.type)
+        sx, sy = self.src
+        kr = self.move.get("kr") or ""
+        sword = ("칼" in kr) or ("검" in kr)
+        items = []
+
+        def spin(i):
+            if self.dead:
+                return
+            for it in items:
+                self.cv.delete(it)
+            items[:] = []
+            if i > 16:
+                return self.burst()
+            for k in range(3):
+                a = math.radians(i * 22 + k * 120)
+                x = sx + 30 * math.cos(a)
+                y = sy - 26 + 12 * math.sin(a)
+                if sword:
+                    items.append(self.cv.create_line(x, y - 11, x, y + 11,
+                                                     fill="#e8ecff", width=4,
+                                                     capstyle="round"))
+                    items.append(self.cv.create_line(x - 6, y + 5, x + 6, y + 5,
+                                                     fill=light, width=3))
+                else:
+                    items.append(_star(self.cv, x, y, 8, light, dark))
+            self.items.extend(items)
+            self.after(45, lambda: spin(i + 1))
+        spin(0)
+
+    def _sleepz(self):
+        """Z 가 떠오른다."""
+        light, dark = colors(self.type)
+        sx, sy = self.src
+
+        def one(i):
+            if self.dead:
+                return
+            if i >= 3:
+                return self.after(320, self.burst)
+            it = self.add(self.cv.create_text(sx + 16 + i * 9, sy - 26 - i * 12,
+                                              text="Z", fill=light,
+                                              font=("Malgun Gothic",
+                                                    13 + i * 4, "bold")))
+            self.after(520, lambda v=it: self.cv.delete(v))
+            self.after(150, lambda: one(i + 1))
+        one(0)
+
+    def _throw(self):
+        """무언가를 던진다."""
+        light, dark = colors(self.type)
+
+        def shape(x, y, t):
+            return _blob(self.cv, x, y, 8, light, dark)
+        self._fly(shape, n=13, arc=26)
+
+    def _heal(self):
+        """반짝임이 떠오른다."""
+        light, dark = colors(self.type)
+        sx, sy = self.src
+
+        def one(i):
+            if self.dead:
+                return
+            if i >= 8:
+                return self.after(220, self.burst)
+            x = sx + random.uniform(-22, 22)
+            it = self.add(_star(self.cv, x, sy + 14 - i * 5, 7, "#9dffc0", light))
+            self.after(420, lambda v=it: self.cv.delete(v))
+            self.after(60, lambda: one(i + 1))
+        one(0)
+
+    def _drain(self):
+        """상대에게서 빨아온다. 방향이 반대다."""
+        light, dark = colors(self.type)
+        sx, sy = self.src
+        tx, ty = self.dst
+
+        def one(k):
+            if self.dead:
+                return
+            if k >= 7:
+                return self.after(160, self.burst)
+            cur = [None]
+
+            def step(i):
+                if self.dead:
+                    return
+                if i > 9:
+                    if cur[0]:
+                        self.cv.delete(cur[0])
+                    return
+                t = i / 9.0
+                x = tx + (sx - tx) * t
+                y = ty + (sy - ty) * t - 16 * (t - t * t) * 4
+                if cur[0]:
+                    self.cv.delete(cur[0])
+                cur[0] = _blob(self.cv, x, y, 5, light)
+                self.items.append(cur[0])
+                self.after(26, lambda: step(i + 1))
+            step(0)
+            self.after(55, lambda: one(k + 1))
+        one(0)
+
+    def _recoil(self):
+        """때리고 나도 아프다. 부딪히고 터진다."""
+        self.st.lunge(self.src_side(), self._boom)
+
+    def _multi(self):
+        """여러 번 때린다."""
+        light, dark = colors(self.type)
+
+        def maker(x, y, i):
+            o = random.uniform(-16, 16)
+            return self.cv.create_line(x - 20 + o, y - 16, x + 20 + o, y + 16,
+                                       fill=light, width=4, capstyle="round")
+        self._marks(self.dst, maker, n=5, gap=55, done_after=180)
+
+    def _arrows(self, at, up, color):
+        """화살표가 위/아래로 흐른다. 랭크 변화 표시."""
+        x, y = at
+
+        def one(i):
+            if self.dead:
+                return
+            if i >= 4:
+                return self.after(220, self.burst)
+            slide = i * 9
+            base = y + (10 - slide if up else -10 + slide)
+            tip = base + (-16 if up else 16)
+            it = self.add(self.cv.create_polygon(
+                x - 9, base, x + 9, base, x, tip, fill=color, outline=""))
+            self.after(360, lambda v=it: self.cv.delete(v))
+            self.after(80, lambda: one(i + 1))
+        one(0)
+
+    def _buff(self):
+        self._arrows(self.src, True, "#7bffa0")
+
+    def _selfdown(self):
+        self._arrows(self.src, False, "#ff9d9d")
+
+    def _debuff(self):
+        self._arrows(self.dst, False, "#ff9d9d")
+
     def _contact(self):
         self.st.lunge(self.src_side(), lambda: self.slash())
 
