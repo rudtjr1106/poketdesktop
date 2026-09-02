@@ -20,6 +20,7 @@
 저작권 있는 그림을 쓰지 않는다.
 """
 import math
+import re
 import random
 
 # 타입별 색 (밝은색, 어두운색)
@@ -50,51 +51,78 @@ def colors(mtype):
     return TYPE_FX.get(mtype, DEFAULT_FX)
 
 
-# 이름에 든 낱말로 고르는 연출. **위에서부터 먼저 걸린다** -
-# "불꽃날개" 처럼 두 낱말이 겹칠 때 어느 쪽을 쓸지 순서가 정한다.
-# 919종 중 낱말로 덮이는 건 220종쯤이고, 나머지는 아래 자료·타입으로 간다.
+# 이름으로 고르는 연출. **영문 이름의 낱말**을 먼저 본다.
+#
+# 한글은 부분문자열로만 볼 수 있어서 사고가 난다 - "꽃" 이 "불꽃" 에 걸려
+# 불꽃 기술 9종이 잎으로 갔다. "풀" 은 화풀이·분풀이를, "발" 은 도발·묵사발을
+# 데려왔다. 영문은 낱말로 끊을 수 있어서 그런 일이 없다.
+#
+# 919종 전부 영문 이름이 있다. 한글은 영문으로 못 잡은 것만 보조로 쓴다.
+#
+# **위에서부터 먼저 걸린다.** "Fire Fang" 처럼 두 갈래에 걸리는 이름이
+# 있어서 순서가 곧 우선순위다.
 NAME_STYLES = [
-    ("bone", ("뼈",)),
-    ("quake", ("지진", "땅고르기", "균열", "지살")),
-    ("boom", ("폭발", "폭탄", "자폭", "대폭발")),
-    ("sleepz", ("잠자기", "재우기", "최면")),
-    ("dance", ("춤",)),
-    # "참" 은 참기·참방참방서핑이 걸려서 뺐다.
-    ("slash", ("칼", "베기", "자르기", "할퀴", "가위", "썰기", "검")),
-    # "발" 은 넣지 않는다 - 도발·묵사발·대폭발·분발이 전부 걸린다.
-    ("kick", ("킥", "차기", "밟기", "짓밟", "발꿈치", "발구르기")),
-    ("punch", ("펀치", "주먹", "치기", "박치기", "찌르기", "당수")),
-    ("bite", ("물기", "이빨", "깨물")),
-    ("throw", ("던지기", "투척", "뿌리기")),
-    # "돌" 만으로는 돌진·돌려차기·돌림노래가 걸린다.
-    ("rock", ("바위", "스톤", "암석", "돌떨", "돌맹", "락")),
-    # "풀" 은 화풀이·분풀이·파워풀에지까지 데려온다.
-    ("leaf", ("잎", "덩굴", "씨", "꽃", "풀베기", "풀묶기", "풀피리")),
-    ("ice", ("얼음", "냉동", "눈보라", "블리자드", "서리")),
-    ("wind", ("바람", "날개", "공중", "폭풍", "회오리")),
-    ("flash", ("빛", "섬광", "플래시", "번쩍")),
-    ("sound", ("노래", "울음", "소리", "음파", "외침", "함성")),
-    ("beam", ("빔", "광선", "레이저")),
-    # "볼트" 는 전기라 공이 아니다. 앞에서 걸러낸다.
-    ("ball", ("구슬", "탄", "볼")),
-    ("pulse", ("파동", "물결", "웨이브")),
+    # (갈래, 영문 낱말 앞부분, 한글 부분문자열, 안 걸릴 영문 낱말)
+    ("quake", ("earthquake", "fissure", "magnitude", "bulldoze", "dig"),
+     ("지진", "땅가르기", "구멍파기"), ()),
+    ("bone", ("bone",), ("뼈",), ()),
+    ("sleepz", ("rest", "hypnosis", "yawn"), ("잠자기", "최면"), ()),
+    ("boom", ("explosion", "burst", "eruption", "blast", "bomb", "cannon"),
+     ("폭발", "폭탄", "자폭", "분화"), ()),
+    ("dance", ("dance",), ("춤",), ()),
+    ("slash", ("sword", "blade", "cut", "slash", "slice", "razor", "guillotine",
+               "knife", "scissor", "cleave", "sever"),
+     ("칼", "베기", "자르기", "가위", "썰기"), ()),
+    ("claw", ("claw", "scratch", "rake", "swipe", "shred"), ("할퀴", "발톱"), ()),
+    ("bite", ("bite", "fang", "crunch", "chomp"), ("물기", "이빨", "깨물"), ()),
+    ("punch", ("punch", "fist", "chop"), ("펀치", "주먹", "당수"), ()),
+    ("kick", ("kick", "stomp", "trample", "stamp"), ("킥", "차기", "밟기"), ()),
+    ("stab", ("horn", "drill", "peck", "spear", "lance"),
+     ("뿔", "드릴", "쪼기", "찌르기"), ()),
+    ("throw", ("throw", "fling", "toss", "present"),
+     ("던지기", "투척", "뿌리기"), ()),
+    ("rock", ("rock", "stone", "boulder"), ("바위", "스톤", "암석", "돌떨"), ()),
+    ("leaf", ("leaf", "petal", "bloom", "flower", "vine", "seed", "grass"),
+     ("잎", "덩굴", "새싹"), ()),
+    ("ice", ("freeze", "frost", "blizzard", "glaciate", "avalanche", "icicle",
+             "ice", "hail"), ("냉동", "눈보라", "서리", "고드름"), ("petal",)),
+    ("wind", ("wing", "gust", "hurricane", "tornado", "twister", "air",
+              "aeroblast", "whirlwind", "feather", "storm", "bounce", "fly"),
+     ("날개", "회오리", "공중", "깃털", "폭풍"), ("throw",)),
+    ("flash", ("flash", "shine", "dazzling", "glitter", "sparkle", "swift",
+               "gleam", "luster", "star"), ("섬광", "플래시", "반짝"), ()),
+    ("sound", ("song", "sing", "roar", "howl", "cry", "screech", "noise",
+               "echo", "chatter", "voice", "shout", "boomburst", "snore",
+               "uproar", "growl"), ("노래", "울음", "음파", "외침", "함성"),
+     ("poisongas",)),
+    ("powder", ("powder", "dust", "spore"), ("가루", "포자", "분진"), ()),
+    ("beam", ("beam", "laser", "ray", "breath"), ("광선", "레이저", "숨결"), ()),
+    ("ball", ("ball", "orb", "sphere", "shot"), ("구슬",), ("weather",)),
+    ("pulse", ("pulse", "wave"), ("파동", "물결"), ("terrain",)),
 ]
 
 
-# 낱말이 들어 있어도 그 연출이 아닌 것들. 낱말만 보면 놓친다.
-NAME_SKIP = {
-    "ball": ("볼트",),          # 볼트태클·10만볼트는 공이 아니라 전기다
-}
+def _toks(en):
+    return re.findall(r"[a-z]+", (en or "").lower())
 
 
-def _by_name(kr):
-    for style, words in NAME_STYLES:
-        skip = NAME_SKIP.get(style) or ()
-        if any(x in kr for x in skip):
+def _by_name(move):
+    """이름으로 갈래를 고른다. 못 고르면 None.
+
+    영문은 **낱말 앞부분**으로 본다 ("punching" 도 "punch" 로 잡힌다).
+    한글은 부분문자열이라 두 글자 이상만 쓴다.
+    """
+    en = move.get("en") or ""
+    kr = move.get("kr") or ""
+    ts = _toks(en)
+    flat = en.lower().replace(" ", "")
+    for style, words, krw, skip in NAME_STYLES:
+        if skip and any(x in flat for x in skip):
             continue
-        for w in words:
-            if w in kr:
-                return style
+        if any(t.startswith(w) for t in ts for w in words):
+            return style
+        if any(w in kr for w in krw):
+            return style
     return None
 
 
@@ -114,10 +142,12 @@ def style_of(move):
     cat = move.get("cat") or "status"
     target = move.get("target") or 10
     kr = move.get("kr") or ""
-    on_self = target in (7, 6, 12)
+    # target 6 은 **상대 진영**이다(압정뿌리기·스텔스록). 자기 쪽으로
+    # 치면 자기 발밑에서 터진다.
+    on_self = target in (7, 5, 3, 13, 15, 4)
 
     # --- 1. 이름 ---
-    named = _by_name(kr)
+    named = _by_name(move)
     if named:
         # 자기에게 쓰는 기술인데 날아가는 연출이면 어색하다.
         # 칼춤·검무처럼 자기 강화인 것은 그대로 두고, 나머지만 되돌린다.
@@ -539,6 +569,32 @@ class Effect(object):
                 self.after(360, lambda v=it: self.cv.delete(v))
             self.after(gap, lambda: one(i + 1))
         one(0)
+
+    def _claw(self):
+        """발톱 자국 - 나란한 사선 세 줄, 끝으로 갈수록 가늘어진다."""
+        light, dark = colors(self.type)
+
+        def maker(x, y, i):
+            o = -14 + i * 14
+            return self.cv.create_line(x - 22 + o, y - 20, x + 16 + o, y + 20,
+                                       fill=light, width=6 - i, capstyle="round")
+        self._marks(self.dst, maker, n=3, gap=70)
+
+    def _stab(self):
+        """뾰족한 것이 돌면서 파고든다."""
+        light, dark = colors(self.type)
+
+        def shape(x, y, t):
+            a = t * 900.0
+            r = 12
+            pts = []
+            for k in range(3):
+                ang = math.radians(a + k * 120)
+                rr = r if k == 0 else r * 0.55
+                pts += [x + rr * math.cos(ang), y + rr * math.sin(ang)]
+            return self.cv.create_polygon(*pts, fill=light, outline=dark,
+                                          width=2)
+        self._fly(shape, n=14)
 
     def _bone(self):
         """뼈가 빙글빙글 돌면서 날아간다."""
