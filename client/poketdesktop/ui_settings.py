@@ -52,17 +52,19 @@ class Row(object):
 
 class SettingsWindow(object):
 
-    def __init__(self, app):
+    def __init__(self, app, parent=None):
         self.app = app
         self.root = app.root
         s = app.settings
 
-        self.win = tk.Toplevel(self.root)
-        U.style_window(self.win, "포스크탑 — 설정", W, H)
-        U.apply_theme(self.win)
+        # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
+        self.win = U.panel(parent, self.root, "포스크탑 — 설정",
+                           W, H, None, None, self.close)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.protocol("WM_DELETE_WINDOW", self.close)
+        if not U.is_embedded(self.win):
+            # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
+            U.install_wheel(self.win)
 
         head = tk.Frame(self.win, bg=U.BG2, height=56)
         head.pack(fill="x")
@@ -152,6 +154,8 @@ class SettingsWindow(object):
 
     # ---------------- 끝 ----------------
     def focus(self):
+        if U.is_embedded(self.win):
+            return          # 탭이면 허브가 앞으로 꺼내 준다
         try:
             self.win.deiconify()
             self.win.lift()

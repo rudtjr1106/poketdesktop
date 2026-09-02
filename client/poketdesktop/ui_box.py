@@ -154,7 +154,7 @@ class Row(object):
 
 
 class BoxWindow(object):
-    def __init__(self, root, app):
+    def __init__(self, root, app, parent=None):
         self.root = root
         self.app = app
         self.mons = []
@@ -171,13 +171,14 @@ class BoxWindow(object):
         self.anim_i = 0
         self.anim_job = None
 
-        self.win = tk.Toplevel(root)
-        U.style_window(self.win, "포스크탑 — 포켓몬 관리", 990, 668)
-        U.apply_theme(self.win)
+        # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
+        self.win = U.panel(parent, root, "포스크탑 — 포켓몬 관리",
+                           990, 668, 950, 620, self.close)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.minsize(950, 620)
-        self.win.protocol("WM_DELETE_WINDOW", self.close)
+        if not U.is_embedded(self.win):
+            # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
+            U.install_wheel(self.win)
 
         self._header()
         self._bottom()
@@ -257,7 +258,7 @@ class BoxWindow(object):
         self.canvas.bind("<Configure>", lambda e: (
             self.canvas.itemconfigure(self._win, width=e.width),
             self.fit_scroll()))
-        self.canvas.bind_all("<MouseWheel>", self._wheel)
+        U.scrollable(self.canvas, 60)
 
     def fit_scroll(self):
         """스크롤 영역을 내용에 맞춘다.
@@ -282,37 +283,6 @@ class BoxWindow(object):
         except Exception:                                   # noqa: BLE001
             pass
 
-    def _can_scroll(self):
-        try:
-            return self.inner.winfo_reqheight() > self.canvas.winfo_height()
-        except Exception:                                   # noqa: BLE001
-            return False
-
-    def _over_canvas(self, e):
-        """마우스가 정말 이 목록 위에 있나.
-
-        bind_all 이라 창 전체의 휠이 여기로 온다. winfo_containing 이
-        None 이 아니라는 것만 보면 다른 창 위에서 굴려도 목록이 움직인다.
-        """
-        try:
-            w = self.canvas.winfo_containing(e.x_root, e.y_root)
-        except Exception:                                   # noqa: BLE001
-            return False
-        while w is not None:
-            if w is self.canvas or w is self.inner:
-                return True
-            w = getattr(w, "master", None)
-        return False
-
-    def _wheel(self, e):
-        try:
-            if not self._over_canvas(e) or not self._can_scroll():
-                return
-            self.canvas.yview_scroll(int(-e.delta / 60), "units")
-        except Exception:                                   # noqa: BLE001
-            pass
-
-    # ---------------- 상세 ----------------
     def _detail(self, parent):
         d = tk.Frame(parent, bg=U.BG2, width=DETAIL_W, highlightthickness=0)
         d.pack(side="right", fill="y")
@@ -824,15 +794,18 @@ class BoxWindow(object):
                     self._after("%s 을(를) 보내주었습니다." % name))
 
     def close(self):
+        # 휠은 이제 창 하나가 받아서 나눠 준다(U.install_wheel). 예전에는
+        # 여기서 unbind_all 을 불렀는데, 그건 **다른 창의 휠까지 지웠다.**
         self.stop_anim()
-        try:
-            self.canvas.unbind_all("<MouseWheel>")
-        except Exception:
-            pass
         self.app.box_window = None
-        self.win.destroy()
+        try:
+            self.win.destroy()
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def focus(self):
+        if U.is_embedded(self.win):
+            return          # 탭이면 허브가 앞으로 꺼내 준다
         self.win.deiconify()
         self.win.lift()
         self.win.focus_force()

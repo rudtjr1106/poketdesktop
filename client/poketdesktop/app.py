@@ -22,6 +22,7 @@ from .ui_friends import FriendsWindow          # noqa: E402
 from .ui_settings import SettingsWindow        # noqa: E402
 from .arena import Arena                       # noqa: E402
 from .ui_shop import ShopWindow                # noqa: E402
+from .ui_hub import HubWindow                  # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
 from .ui_update import UpdateWindow             # noqa: E402
@@ -40,6 +41,7 @@ class App(object):
         self.tray = None
         self.wild = None
         self._syncing = False
+        self.hub = None            # 탭 창 하나
         self.box_window = None
         self.shop_window = None
         self.bag_window = None
@@ -297,35 +299,37 @@ class App(object):
             self._relogin = False
 
     # ---------------------------------------------------------------- 메뉴 동작
+    def _tab(self, key):
+        """창 하나를 띄우고 그 탭으로 간다.
+
+        예전에는 메뉴마다 창을 따로 띄웠다. 가방을 보다가 상점에 가려면
+        트레이로 돌아가야 했고 창이 여섯 개까지 겹쳤다.
+
+        탭 내용은 예전 창 클래스를 그대로 쓴다 - 다른 코드가 아직
+        self.box_window 같은 이름으로 찾으므로 여기서 채워 준다.
+        """
+        if not self.hub:
+            self.hub = HubWindow(self)
+        self.hub.show(key)
+        return self.hub.panes.get(key)
+
     def open_box(self):
-        if self.box_window:
-            return self.box_window.focus()
-        self.box_window = BoxWindow(self.root, self)
+        self.box_window = self._tab("box")
 
     def open_shop(self):
-        if self.shop_window:
-            return self.shop_window.focus()
-        self.shop_window = ShopWindow(self.root, self)
+        self.shop_window = self._tab("shop")
 
     def open_bag(self):
-        if self.bag_window:
-            return self.bag_window.focus()
-        self.bag_window = BagWindow(self.root, self)
+        self.bag_window = self._tab("bag")
 
     def open_friends(self):
-        if self.friends_win:
-            return self.friends_win.focus()
-        self.friends_win = FriendsWindow(self)
+        self.friends_win = self._tab("friends")
 
     def open_dex(self):
-        if self.dex_window:
-            return self.dex_window.focus()
-        self.dex_window = DexWindow(self)
+        self.dex_window = self._tab("dex")
 
     def open_settings(self):
-        if self.settings_win:
-            return self.settings_win.focus()
-        self.settings_win = SettingsWindow(self)
+        self.settings_win = self._tab("settings")
 
     # ---------------- 유저 배틀 ----------------
     # 대전은 비동기다. 상대가 켜져 있지 않아도 그 사람의 지금 파티를
@@ -475,6 +479,12 @@ class App(object):
     def close_windows(self):
         """열려 있는 창을 전부 닫는다. 로그아웃·탈퇴·종료 때 부른다."""
         self.close_arena()
+        if self.hub:
+            try:
+                self.hub.close()
+            except Exception:                               # noqa: BLE001
+                pass
+            self.hub = None
         for name in ("box_window", "shop_window", "bag_window",
                      "friends_win", "dex_window", "settings_win"):
             w = getattr(self, name, None)

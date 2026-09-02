@@ -16,8 +16,8 @@
   만드는 데 픽셀을 파이썬으로 훑기 때문에(sprites.flatten_rgba) 마릿수만큼
   tk 스레드에서 돌리면 창이 눈에 띄게 멈춘다. tk 스레드에서는 PhotoImage 로
   감싸는 일만 한다.
-* 휠은 창(Toplevel)에만 묶는다. ui_box 처럼 bind_all 로 묶으면 목록이 둘인
-  이 창에서 어느 쪽을 굴릴지 알 수 없고, 열려 있는 다른 창의 휠까지 뺏는다.
+* 휠은 창 하나가 받아서 포인터 밑의 목록으로 보낸다(U.install_wheel).
+  이 창은 목록이 둘이라 어느 쪽을 굴릴지 그때그때 정해야 한다.
 """
 import datetime
 import tkinter as tk
@@ -401,7 +401,7 @@ class MonRow(object):
 
 # ---------------------------------------------------------------- 가방 창
 class BagWindow(object):
-    def __init__(self, root, app):
+    def __init__(self, root, app, parent=None):
         self.root = root
         self.app = app
         self.alive = True
@@ -419,13 +419,14 @@ class BagWindow(object):
         self.stat_needed = False
         self._pending = None     # 다시 불러온 뒤에 띄울 말
 
-        self.win = tk.Toplevel(root)
-        U.style_window(self.win, "포스크탑 — 가방", 1000, 664)
-        U.apply_theme(self.win)
+        # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
+        self.win = U.panel(parent, root, "포스크탑 — 가방",
+                           1000, 664, 950, 600, self.close)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.minsize(950, 600)
-        self.win.protocol("WM_DELETE_WINDOW", self.close)
+        if not U.is_embedded(self.win):
+            # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
+            U.install_wheel(self.win)
 
         self._header()
         self._bottom()
@@ -434,7 +435,8 @@ class BagWindow(object):
         self._items_pane(body)
         self._detail_pane(body)
 
-        self.win.bind("<MouseWheel>", self._wheel)
+        U.scrollable(self.item_canvas, 60)
+        U.scrollable(self.mon_canvas, 60)
         self.reload()
 
     # ---------------- 머리 ----------------
@@ -606,21 +608,6 @@ class BagWindow(object):
             U.set_status(self.status, natural(text or ""), color, fg)
         except tk.TclError:
             pass
-
-    def _wheel(self, e):
-        """포인터가 올라가 있는 목록만 굴린다. (목록이 둘이다)"""
-        try:
-            w = self.win.winfo_containing(e.x_root, e.y_root)
-        except tk.TclError:
-            return
-        while w is not None:
-            if w is self.item_canvas or w is self.mon_canvas:
-                # 다 들어가 있으면 굴리지 않는다. 안 그러면 목록이 짧아도
-                # 휠에 반응해서 빈 화면이 스쳐 지나간다.
-                if _scrollable(w):
-                    w.yview_scroll(int(-e.delta / 60), "units")
-                return
-            w = w.master
 
     def current_item(self):
         return next((i for i in self.items if i["id"] == self.item_id), None)
@@ -1053,6 +1040,8 @@ class BagWindow(object):
             pass
 
     def focus(self):
+        if U.is_embedded(self.win):
+            return          # 탭이면 허브가 앞으로 꺼내 준다
         self.win.deiconify()
         self.win.lift()
         self.win.focus_force()
