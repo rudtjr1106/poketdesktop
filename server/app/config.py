@@ -114,7 +114,11 @@ WARM_SPRITES = _bool("POKET_WARM_SPRITES", True)
 ITEMS_PATH = os.environ.get("POKET_ITEMS", os.path.join(ROOT, "data", "items.json"))
 MONEY_START = _int("POKET_MONEY_START", 3000)     # 처음 주는 돈
 # 야생을 **잡으면** 도구가 하나 떨어진다.
-DROP_ON_CATCH = _float("POKET_DROP_ON_CATCH", 1.0)
+# 잡을 때마다 무조건 주면 도구가 너무 쉽게 쌓인다. 재보니 조우가 시간당
+# 열 번쯤이고 드랍 하나의 평균 판매가가 855원이라, 잡기만 해도 시간당
+# 8,500원(몬스터볼 42개어치)이 들어왔다.
+# 잡으면 포켓몬이라는 보상이 이미 있으므로, 이기는 쪽(0.45)보다 낮게 둔다.
+DROP_ON_CATCH = _float("POKET_DROP_ON_CATCH", 0.30)
 # 배틀에서 **쓰러뜨려도** 떨어진다. 볼이 떨어져 아무것도 못 하는 상황을
 # 막으려고 둔다 — 볼이 0개여도 배틀로는 다시 일어설 수 있어야 한다.
 DROP_ON_WIN = _float("POKET_DROP_ON_WIN", 0.45)

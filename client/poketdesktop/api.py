@@ -166,12 +166,13 @@ class Api(object):
     def desktop(self):
         return self._call("GET", "/api/pokemon/desktop")["pokemon"]
 
-    def spawn(self, force=False):
-        q = "?force=true" if force else ""
-        return self._call("POST", "/api/pokemon/spawn" + q)["pokemon"]
-
     def set_desktop(self, pid, on):
         return self._call("POST", "/api/pokemon/%d/desktop" % pid, {"on": bool(on)})
+
+    def set_order(self, ids):
+        """데리고 다니는 순서. 화면에 보이는 차례대로 넘긴다."""
+        return self._call("POST", "/api/pokemon/order",
+                          {"ids": [int(i) for i in ids]})
 
     def set_nickname(self, pid, nickname):
         return self._call("PATCH", "/api/pokemon/%d" % pid, {"nickname": nickname})
