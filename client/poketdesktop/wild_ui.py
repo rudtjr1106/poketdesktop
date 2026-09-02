@@ -149,7 +149,9 @@ class WildPet(Pet):
             t += "\n" + types
         if self.mon.get("shiny"):
             t = "★ 색이 다른 개체!\n" + t
-        return t + "\n\n왼쪽 클릭 = 배틀\n오른쪽 클릭 = 바로 몬스터볼"
+        return (t + "\n\n왼쪽 클릭 = 배틀"
+                "\n오른쪽 클릭 = 볼 고르기"
+                "\n두 번 클릭 = 바로 던지기")
 
     def on_press(self, e):
         Pet.on_press(self, e)
@@ -161,7 +163,27 @@ class WildPet(Pet):
         Pet.on_release(self, e)
         if moved or self.ctl.app.battle:   # 끌었거나 이미 싸우는 중이면 무시
             return
-        self.ctl.start_battle()
+        # **바로 배틀을 열면 두 번 클릭이 죽는다.** 첫 클릭이 배틀을
+        # 시작하면서 throwing 을 잠그는데, 두 번째 클릭은 그때 도착해서
+        # "이미 뭔가 하는 중" 으로 걸러진다. 아무 일도 안 일어나고
+        # 배틀만 시작된 것처럼 보인다.
+        # 두 번째 클릭이 올 만큼만 기다렸다가 연다.
+        self._cancel_battle_job()
+        self._battle_job = self.ctl.app.root.after(_double_ms(), self._go_battle)
+
+    def _cancel_battle_job(self):
+        job = getattr(self, "_battle_job", None)
+        if job:
+            try:
+                self.ctl.app.root.after_cancel(job)
+            except Exception:                               # noqa: BLE001
+                pass
+        self._battle_job = None
+
+    def _go_battle(self):
+        self._battle_job = None
+        if not self.ctl.app.battle:
+            self.ctl.start_battle()
 
     def on_menu(self, e):
         # 배틀 중이면 배틀 쪽으로 넘긴다 (체력이 깎여 있어 잘 잡힌다).
@@ -173,11 +195,14 @@ class WildPet(Pet):
     def on_double(self, e):
         # 두 번 누르면 곧바로 마지막에 쓴 볼로 던진다. 한 마리씩 잡을 때
         # 메뉴를 매번 여는 건 번거롭다.
+        # 첫 클릭이 예약해 둔 배틀 열기를 먼저 취소한다.
+        self._cancel_battle_job()
         if self.ctl.app.battle:
             return self.ctl.app.battle.throw_ball()
         self.ctl.throw_ball()
 
     def destroy(self):
+        self._cancel_battle_job()
         if self._blink:
             try:
                 self.ov.root.after_cancel(self._blink)
@@ -190,6 +215,20 @@ class WildPet(Pet):
                 pass
             self.badge_win = None
         Pet.destroy(self)
+
+
+def _double_ms():
+    """이 PC 에서 두 번 클릭으로 치는 간격(ms).
+
+    사람마다 다르게 맞춰 쓴다. 우리가 임의로 정하면 느리게 누르는 사람은
+    두 번 클릭이 안 먹고, 빠르게 누르는 사람은 배틀이 늦게 열린다.
+    """
+    try:
+        import ctypes
+        v = int(ctypes.windll.user32.GetDoubleClickTime())
+        return max(160, min(600, v))
+    except Exception:                                       # noqa: BLE001
+        return 350
 
 
 class BallThrow(object):
