@@ -75,6 +75,7 @@ class Tray(object):
                 MenuItem("도감", lambda _i, _it: self.call(a.open_dex)),
                 MenuItem("친구", lambda _i, _it: self.call(a.open_friends)),
                 MenuItem("설정", lambda _i, _it: self.call(a.open_settings)),
+                MenuItem("대전", lambda _i, _it: self.call(a.open_pvp)),
             )),
             MenuItem("랜덤 배틀", lambda _i, _it: self.call(a.pvp_random)),
             # 알림을 안 띄우기로 했으니, 놓치면 안 되는 것은 메뉴에
@@ -83,7 +84,7 @@ class Tray(object):
             MenuItem(lambda _it: ("받은 대전 보기  (%d)" % a.pvp_unseen
                                   if getattr(a, "pvp_unseen", 0)
                                   else "받은 대전 보기"),
-                     lambda _i, _it: self.call(a.watch_pending)),
+                     lambda _i, _it: self.call(a.open_pvp)),
             Menu.SEPARATOR,
             MenuItem("바탕화면", Menu(
                 MenuItem("모두 거두기", lambda _i, _it: self.call(a.recall_all)),

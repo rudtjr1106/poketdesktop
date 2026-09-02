@@ -48,6 +48,7 @@ class App(object):
         self.friends_win = None
         self.dex_window = None
         self.settings_win = None
+        self.pvp_window = None
         # 마지막으로 있었던 일. 트레이 메뉴에서 보여준다.
         self.last_message = ""
         # 상대가 걸어온, 아직 안 본 대전 수. 트레이에 표시한다.
@@ -331,6 +332,9 @@ class App(object):
     def open_settings(self):
         self.settings_win = self._tab("settings")
 
+    def open_pvp(self):
+        self.pvp_window = self._tab("pvp")
+
     # ---------------- 유저 배틀 ----------------
     # 대전은 비동기다. 상대가 켜져 있지 않아도 그 사람의 지금 파티를
     # 가져와 붙인다. 그래서 누르면 그 자리에서 끝나고, 상대는 다음에
@@ -486,7 +490,8 @@ class App(object):
                 pass
             self.hub = None
         for name in ("box_window", "shop_window", "bag_window",
-                     "friends_win", "dex_window", "settings_win"):
+                     "friends_win", "dex_window", "settings_win",
+                     "pvp_window"):
             w = getattr(self, name, None)
             if w:
                 try:
