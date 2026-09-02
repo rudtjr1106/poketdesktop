@@ -35,6 +35,9 @@ from . import battle as B
 # 늘어난다. 그걸 도트로 재생하면 몇 분이 걸린다. 30턴이면 웬만한 라운드는
 # 안에서 끝나고, 안 끝나면 양쪽 다 물러나는 것으로 친다.
 ROUND_TURNS = 30
+# 이미 나와 있는 선수에게 주는 웃돈. 이만큼 차이가 안 나면 안 바꾼다.
+# 교체에도 한 턴이 드는 셈이라 조금 유리한 정도로는 바꾸지 않는다.
+SWITCH_MARGIN = 1.5
 
 # 판 전체의 안전장치. 라운드 수 × ROUND_TURNS 를 넘길 일은 없지만,
 # 어딘가 잘못되어 라운드가 안 끝나면 여기서 멈춘다.
@@ -87,6 +90,65 @@ class PartyBattle(object):
                 return i
         return None
 
+    def _matchup(self, mine, foe):
+        """이 조합이 나에게 얼마나 유리한가. 클수록 좋다.
+
+        공격 쪽 - 내 기술이 상대 타입에 얼마나 잘 박히나 (제일 잘 박히는 것)
+        수비 쪽 - 상대 타입이 나를 얼마나 잘 때리나 (제일 아픈 것)
+        둘을 나눈다. 2배로 때리고 0.5배로 맞으면 4, 반대면 0.25.
+
+        기술을 실제로 보고 판단한다. 타입만 보면 '불꽃이 풀에게 유리' 인데
+        정작 불꽃 기술이 하나도 없는 경우를 놓친다.
+        """
+        foe_types = (foe.species or {}).get("types", []) or []
+        my_types = (mine.species or {}).get("types", []) or []
+
+        atk = 0.0
+        for key in mine.moves:
+            md = self.dex.move(key) or {}
+            if not md.get("power"):
+                continue                       # 변화기는 상성과 무관하다
+            e = B.effectiveness(self.dex, md.get("type"), foe_types)
+            if e > atk:
+                atk = e
+        if atk <= 0:
+            atk = 0.25                         # 때릴 수단이 없다시피 하다
+
+        dfn = 0.0
+        for key in foe.moves:
+            md = self.dex.move(key) or {}
+            if not md.get("power"):
+                continue
+            e = B.effectiveness(self.dex, md.get("type"), my_types)
+            if e > dfn:
+                dfn = e
+        if dfn <= 0:
+            dfn = 0.25
+
+        # 체력이 많이 남은 쪽을 조금 더 쳐준다. 상성이 같으면 성한 애가 낫다.
+        health = 0.6 + 0.4 * (mine.hp / float(mine.maxhp or 1))
+        return (atk / dfn) * health
+
+    def _pick_against(self, team, foe, cur=None):
+        """상대에게 제일 잘 맞는 선수의 자리.
+
+        같은 점수면 **앞자리를 고른다.** 무작위를 쓰지 않는다 - PVP 는
+        서버가 계산한 로그를 그대로 재생하는 구조라, 여기에 rng 를 넣으면
+        나중에 조건 하나만 고쳐도 이전 판들과 어긋난다.
+        """
+        best, best_score = None, None
+        for i, f in enumerate(team):
+            if not f.alive():
+                continue
+            sc = self._matchup(f, foe)
+            # 이미 나와 있는 애는 조금 더 쳐준다. 점수가 비슷한데 굳이
+            # 바꾸면 한 턴을 버리는 셈이다(교체에도 턴이 든다).
+            if cur is not None and i == cur:
+                sc *= SWITCH_MARGIN
+            if best_score is None or sc > best_score:
+                best, best_score = i, sc
+        return best
+
     def _round_battle(self):
         """지금 선수 둘로 1:1 한 라운드를 만든다."""
         # ai="trainer" 를 반드시 준다. 기본값은 "wild" 라 상대가 기술을
@@ -110,7 +172,11 @@ class PartyBattle(object):
                             "me": [_side_view(f) for f in self.a],
                             "foe": [_side_view(f) for f in self.b]})
         for n in range(1, MAX_ROUNDS + 1):
+            # **자리 번호를 같이 보낸다.** 예전에는 화면이 "쓰러지지 않은
+            # 첫 자리" 로 스스로 계산했는데, 그러면 서버가 순서를 바꿔
+            # 내보내는 순간 다른 포켓몬이 나온다. 오류도 안 난다.
             self.events.append({"t": "round", "n": n,
+                                "mi": self.ia, "fi": self.ib,
                                 "me": _side_view(self.a[self.ia]),
                                 "foe": _side_view(self.b[self.ib])})
             side = self._one_round()
@@ -155,14 +221,22 @@ class PartyBattle(object):
         전멸했을 때 무승부가 아니라 한쪽 승리가 된다.
         """
         a_out = b_out = False
+        # **상성이 유리한 쪽을 내보낸다.** 예전에는 무조건 살아 있는
+        # 첫 자리였다. 순서대로 나가서 물 타입 앞에 불 타입이 계속
+        # 나가는 일이 벌어졌다.
+        #
+        # 상대를 보고 고르므로 순서가 중요하다. 양쪽이 같이 쓰러졌을 때는
+        # a 가 먼저 (지금 b 를 보고) 고르고, 그다음 b 가 (새 a 를 보고)
+        # 고른다. 완전히 공평하진 않지만 **결정적**이고, 서로를 보고
+        # 무한히 다시 고르는 것을 피한다.
         if side in ("me", "both"):
-            nxt = self._alive(self.a, 0)
+            nxt = self._pick_against(self.a, self.b[self.ib])
             if nxt is None:
                 a_out = True
             else:
                 self.ia = nxt
         if side in ("foe", "both"):
-            nxt = self._alive(self.b, 0)
+            nxt = self._pick_against(self.b, self.a[self.ia])
             if nxt is None:
                 b_out = True
             else:
@@ -215,6 +289,14 @@ def flip(ev):
             out["foe"] = me
         if foe is not None:
             out["me"] = foe
+    # 자리 번호도 같이 뒤집는다. 안 그러면 상대 화면에서 엉뚱한 자리의
+    # 포켓몬이 링으로 나온다.
+    if "mi" in out or "fi" in out:
+        mi, fi = out.get("mi"), out.get("fi")
+        if mi is not None:
+            out["fi"] = mi
+        if fi is not None:
+            out["mi"] = fi
     return out
 
 

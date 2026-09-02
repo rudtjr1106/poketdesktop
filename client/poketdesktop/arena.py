@@ -192,20 +192,18 @@ class Arena(object):
         """
         # 로그인 전이거나 시험용 앱이면 username 이 아예 없을 수 있다.
         # 이름표 때문에 재생 전체가 접히면 안 된다.
-        me = getattr(self.app, "username", None) or "나"
+        # 내 이름은 안 적는다. 내가 누군지는 이미 알고 있다.
         foe = (self.view.get("foe") or {}).get("name") or "상대"
-        x1, y1, x2, _y2 = self.ring["rect"]
-        top = y1 + 14
-        self._plate(x1 + (x2 - x1) * 0.22, top, me, "#8fd3ff")
-        self._plate(x1 + (x2 - x1) * 0.78, top, foe, "#ffb0b0")
+        _x1, _y1, x2, y2 = self.ring["rect"]
+        self._plate(x2 - 10, y2 - 10, foe, "#ffb0b0", anchor="se")
 
-    def _plate(self, sx, sy, text, color):
+    def _plate(self, sx, sy, text, color, anchor="center"):
         cv = self.cv
         if cv is None:
             return
         x, y = self.to_local(sx, sy)
         # 글자만 그리면 도트와 겹쳐 안 보인다. 뒤에 판을 깔고 그 위에 쓴다.
-        t = cv.create_text(x, y, text=text, fill=color,
+        t = cv.create_text(x, y, text=text, fill=color, anchor=anchor,
                            font=("맑은 고딕", 10, "bold"))
         bx = cv.bbox(t)
         if bx:
@@ -471,10 +469,21 @@ class Arena(object):
         need = []
         for side in ("me", "foe"):
             cur = self.active.get(side)
-            if cur is None or getattr(cur, "down", False):
-                nxt = self._next_slot(side)
-                if nxt is not None:
-                    need.append((side, nxt))
+            # **서버가 알려준 자리를 그대로 쓴다.** 예전에는 화면이
+            # "쓰러지지 않은 첫 자리" 로 스스로 계산했는데, 서버가 상성을
+            # 보고 순서를 바꿔 내보내면 다른 포켓몬이 나왔다. 오류도 안 났다.
+            want = ev.get("mi" if side == "me" else "fi")
+            if want is None:                    # 옛 로그에는 번호가 없다
+                want = self._next_slot(side)
+            elif not (0 <= want < len(self.roster[side])):
+                want = self._next_slot(side)
+            if want is None:
+                continue
+            # 이미 그 자리가 링에 서 있으면 그대로 둔다(연전).
+            if cur is not None and not getattr(cur, "down", False)                     and self._pet_at(side, want) is cur:
+                continue
+            if cur is None or getattr(cur, "down", False)                     or self._pet_at(side, want) is not cur:
+                need.append((side, want))
         if not need:
             return done()
         left = [len(need)]
@@ -484,6 +493,9 @@ class Arena(object):
             if left[0] <= 0:
                 self.after(int(GREET_MS * 0.6), done)
         for side, i in need:
+            # 살아 있는데 바뀌는 경우(상성 교체)에는 먼저 자기 자리로
+            # 물러난다. 쓰러졌으면 _step_out 이 알아서 아무것도 안 한다.
+            self._step_out(side)
             self._step_in(side, i, one)
 
     def _next_slot(self, side):
