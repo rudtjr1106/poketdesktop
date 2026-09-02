@@ -11,6 +11,7 @@
 """
 import tkinter as tk
 
+from . import autostart
 from . import config
 from . import ui_common as U
 
@@ -120,6 +121,44 @@ class SettingsWindow(object):
             c.pack(fill="x")
             tk.Label(box, text=note, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS,
                      anchor="w").pack(fill="x", padx=(22, 0), pady=(0, 6))
+        self._autostart_row(box)
+
+    def _autostart_row(self, box):
+        """컴퓨터 켤 때 같이 시작.
+
+        다른 손잡이와 다르게 이건 **설정 파일 밖(레지스트리)** 을 건드린다.
+        그래서 실패할 수도 있고, 우리가 켜 둔 것을 사용자가 작업 관리자에서
+        꺼 버릴 수도 있다. 켜고 끄는 표시만 두면 "켰는데 왜 안 되지" 로
+        끝나므로, **지금 진짜 어떤 상태인지**를 한 줄로 같이 보여준다.
+        """
+        st, msg = autostart.state()
+        self.boot_var = tk.BooleanVar(value=st in ("on", "blocked"))
+        tk.Checkbutton(
+            box, text="컴퓨터 켤 때 같이 시작", variable=self.boot_var,
+            bg=U.BG, fg=U.FG, selectcolor=U.INK, activebackground=U.BG,
+            activeforeground=U.FG, font=U.FONT_S, anchor="w",
+            highlightthickness=0, bd=0,
+            state=("normal" if autostart.supported() else "disabled"),
+            command=self._toggle_autostart).pack(fill="x")
+        self.boot_note = tk.Label(box, text="", bg=U.BG, fg=U.FG_FAINT,
+                                  font=U.FONT_XS, anchor="w", justify="left",
+                                  wraplength=W - 60)
+        self.boot_note.pack(fill="x", padx=(22, 0), pady=(0, 6))
+        self._paint_autostart(st, msg)
+
+    def _paint_autostart(self, st, msg):
+        # 막힌 것은 눈에 띄어야 한다. 나머지는 조용한 설명이면 된다.
+        self.boot_note.configure(
+            text=msg, fg=(U.DANGER if st == "blocked" else U.FG_FAINT))
+
+    def _toggle_autostart(self):
+        ok, msg = self.app.set_autostart(self.boot_var.get())
+        st, note = autostart.state()
+        # 실패했으면 표시를 되돌린다. 화면과 실제가 어긋나면 안 된다.
+        self.boot_var.set(st in ("on", "blocked"))
+        self._paint_autostart(st, note if ok else msg)
+        U.set_status(self.status, msg.replace(chr(10), " "),
+                     U.GOOD if ok else U.DANGER)
 
     # ---------------- 적용 ----------------
     def _save(self):
@@ -141,7 +180,11 @@ class SettingsWindow(object):
         self.app.refresh_tray()
 
     def reset(self):
-        keep = {k: self.app.settings[k] for k in ("server", "lastBall")
+        # autostart 는 화면 취향이 아니라 **윈도우에 걸어 둔 등록**이다.
+        # "기본값으로" 를 눌렀다고 부팅 목록에서 조용히 빠지면(혹은 조용히
+        # 끼어들면) 어리둥절하다. 여기서는 건드리지 않는다.
+        keep = {k: self.app.settings[k]
+                for k in ("server", "lastBall", "autostart")
                 if k in self.app.settings}
         self.app.settings.clear()
         self.app.settings.update(dict(config.DEFAULTS))
