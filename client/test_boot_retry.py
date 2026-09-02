@@ -26,7 +26,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
 from poketdesktop.api import ApiError                      # noqa: E402
-from poketdesktop.app import App, BOOT_LOGIN_TRIES, MANUAL_LOGIN_TRIES  # noqa: E402
+from poketdesktop.app import App, MANUAL_LOGIN_TRIES, RETRY_MAX_WAIT  # noqa: E402
 
 OK = FAIL = 0
 
@@ -89,20 +89,26 @@ def t_못닿으면_다시_해_본다():
     chk("첫 재시도는 3초 뒤", a.root.calls[0][0] == 3000, a.root.calls[0][0])
 
 
-def t_점점_길게_기다린다():
-    """3 6 12 24 48 - 붙자마자 붙고, 안 붙으면 조용해진다."""
+def t_부팅이면_포기하지_않는다():
+    """포기하고 로그인 창을 띄우면, 컴퓨터를 켠 지 한참 뒤에 창이
+    튀어나와 포커스를 뺏고 그걸 닫는 순간 프로그램이 죽는다.
+    노트북은 뚜껑을 열고 몇 분 뒤에야 와이파이가 붙는 일이 흔하다."""
     a = FakeApp(autostarted=True)
     waits = []
-    while a.retry(못닿음()):
+    for _ in range(40):
+        chk_once = a.retry(못닿음())
+        if not chk_once:
+            break
         waits.append(a.root.calls[-1][0] // 1000)
-    chk("부팅이면 %d번 해 본다" % BOOT_LOGIN_TRIES,
-        len(waits) == BOOT_LOGIN_TRIES, waits)
-    chk("기다리는 시간이 점점 는다",
-        all(waits[i] < waits[i + 1] for i in range(len(waits) - 1)), waits)
-    chk("한 번에 48초를 넘기지 않는다", max(waits) <= 48, waits)
-    chk("다 합쳐 1분은 넘게 기다려 준다", sum(waits) >= 60, sum(waits))
-    # 여기가 없으면 와이파이가 늦게 붙는 PC 에서 영원히 다시 시도한다
-    chk("끝나면 멈춘다", a.retry(못닿음()) is False)
+    chk("40번을 해도 포기하지 않는다", len(waits) == 40, len(waits))
+    chk("처음 다섯 번은 3·6·12·24·48초", waits[:5] == [3, 6, 12, 24, 48],
+        waits[:5])
+    chk("점점 길어진다",
+        all(waits[i] <= waits[i + 1] for i in range(len(waits) - 1)))
+    # 상한이 없으면 2의 거듭제곱이라 나중엔 며칠에 한 번 시도하게 된다
+    chk("한 번에 %d초를 넘기지 않는다" % RETRY_MAX_WAIT,
+        max(waits) == RETRY_MAX_WAIT, max(waits))
+    chk("오래 지나도 1분마다 계속 본다", waits[-1] == RETRY_MAX_WAIT)
 
 
 def t_손으로_켰으면_오래_안_끈다():
@@ -113,7 +119,8 @@ def t_손으로_켰으면_오래_안_끈다():
         n += 1
     chk("손으로 켰으면 %d번만" % MANUAL_LOGIN_TRIES,
         n == MANUAL_LOGIN_TRIES, n)
-    chk("부팅 때보다 확실히 짧다", MANUAL_LOGIN_TRIES < BOOT_LOGIN_TRIES)
+    chk("그 뒤에는 로그인 창을 준다 (사람이 기다리고 있으니까)",
+        a.retry(못닿음()) is False)
 
 
 def t_status가_없는_예외도_넘긴다():
@@ -125,7 +132,7 @@ def t_status가_없는_예외도_넘긴다():
 
 def main():
     for fn in (t_거절은_다시_해도_같다, t_못닿으면_다시_해_본다,
-               t_점점_길게_기다린다, t_손으로_켰으면_오래_안_끈다,
+               t_부팅이면_포기하지_않는다, t_손으로_켰으면_오래_안_끈다,
                t_status가_없는_예외도_넘긴다):
         print("-- %s" % fn.__name__[2:])
         fn()

@@ -30,11 +30,16 @@ from .ui_update import UpdateWindow             # noqa: E402
 from .wild_ui import WildController            # noqa: E402
 
 
-# 부팅 직후에는 인터넷이 아직 안 붙어 있을 수 있다. 3·6·12·24·48초로
-# 물러나며 다시 해 본다 - 다 합쳐 약 1분 반.
-BOOT_LOGIN_TRIES = 5
-# 손으로 켰다면 사람이 화면을 보고 있다. 오래 끌지 않고 로그인 창을 준다.
+# 손으로 켰다면 사람이 화면을 보고 있다. 한 번만 더 해 보고 로그인 창을 준다.
 MANUAL_LOGIN_TRIES = 1
+# 부팅으로 켜졌으면 **포기하지 않는다.** 3·6·12·24·48초로 물러났다가
+# 그 뒤로는 1분마다 조용히 다시 해 본다.
+#
+# 포기하고 로그인 창을 띄우면 최악이다. 컴퓨터를 켠 지 한참 지나 다른
+# 일을 하고 있는데 창이 튀어나와 포커스를 뺏고, 그걸 닫으면 프로그램이
+# 그냥 죽는다. 노트북은 뚜껑을 열고 몇 분 뒤에야 와이파이가 붙는 일이
+# 흔하다. 그때까지 조용히 기다리는 편이 낫다.
+RETRY_MAX_WAIT = 60
 
 
 class App(object):
@@ -65,6 +70,7 @@ class App(object):
         self.battle = None
         self._quitting = False
         self._relogin = False
+        self._sync_job = None
         # 부팅 때 켜진 것인지 손으로 켠 것인지. 인터넷이 아직 안 붙었을
         # 때 얼마나 기다려 줄지가 달라진다 (_retry_login).
         self.autostarted = autostart.started_by_autostart()
@@ -111,7 +117,11 @@ class App(object):
             return False
         if result == "updated" and new_exe:
             try:
-                updater.relaunch(new_exe)
+                # 부팅으로 켜진 것이었다면 새 프로세스도 그렇게 알아야
+                # 한다. 안 넘기면 갓 갈아탄 판이 '손으로 켠 것' 이 되어
+                # 인터넷이 늦게 붙을 때 로그인 창을 띄워 버린다.
+                updater.relaunch(new_exe,
+                                 [autostart.FLAG] if self.autostarted else [])
                 return True
             except Exception as e:                          # noqa: BLE001
                 config.log("새 버전 실행 실패: %s" % e)
@@ -120,10 +130,6 @@ class App(object):
     def boot(self):
         if self.check_update():
             return self.quit()
-        # 등록해 둔 경로가 지금 돌고 있는 파일과 맞는지 본다. 버전이
-        # 오르면 파일 이름이 바뀌어서, 그냥 두면 다음 부팅 때 없는
-        # 파일을 가리킨 채 조용히 아무 일도 안 일어난다.
-        autostart.sync(self.settings.get("autostart"))
         self._login_try = 0
         self._auto_login()
 
@@ -166,13 +172,13 @@ class App(object):
         """
         if not isinstance(err, apimod.ApiError) or err.status != 0:
             return False
-        limit = BOOT_LOGIN_TRIES if self.autostarted else MANUAL_LOGIN_TRIES
-        if self._login_try >= limit:
+        if not self.autostarted and self._login_try >= MANUAL_LOGIN_TRIES:
             return False
         self._login_try += 1
-        wait = min(48, 3 * (2 ** (self._login_try - 1)))
-        config.log("서버에 못 닿았습니다. %d초 뒤 다시 (%d/%d)"
-                   % (wait, self._login_try, limit))
+        wait = min(RETRY_MAX_WAIT, 3 * (2 ** (self._login_try - 1)))
+        config.log("서버에 못 닿았습니다. %d초 뒤 다시 (%d번째%s)"
+                   % (wait, self._login_try,
+                      ", 부팅이라 계속" if self.autostarted else ""))
         self.root.after(wait * 1000, self._auto_login)
         return True
 
@@ -213,6 +219,16 @@ class App(object):
         # 아직 못 받았으면 바탕화면이 비어 보인다. 잠시 뒤 한 번 더 맞춘다.
         self.root.after(2500, self._first_sync_retry)
         self.root.after(7000, self._first_sync_retry)
+        # **로그인에 성공한 뒤에** 부팅 등록을 맞춘다.
+        #
+        # 예전에는 boot() 에서 했는데, 그러면 받아서 열어만 보고 가입은
+        # 안 한 사람까지 부팅 목록에 들어간다. 그 사람은 다음부터 컴퓨터를
+        # 켤 때마다 쓰지도 않는 프로그램의 로그인 창을 닫아야 하고, 그걸
+        # 멈추려면 오히려 가입부터 해야 하는 처지가 된다.
+        #
+        # 여기서 하면 등록해 둔 경로가 지금 파일과 맞는지도 같이 고쳐진다.
+        # 버전이 오르면 파일 이름이 바뀌기 때문에 필요한 일이다.
+        autostart.sync(self.settings.get("autostart"))
         self.wild.start()
         self.resume_battle()
         self._schedule_sync()
@@ -267,7 +283,16 @@ class App(object):
     def _schedule_sync(self):
         if self._quitting:
             return
-        self.root.after(max(15, self.settings["syncSeconds"]) * 1000, self._tick)
+        # 로그아웃하고 다시 로그인하면 start_ui 가 한 번 더 돌아서 예약이
+        # 한 벌 더 생긴다. 그대로 두면 로그인을 반복할 때마다 90초마다
+        # 나가는 요청이 한 벌씩 늘어난다. 앞의 예약을 지우고 새로 건다.
+        if self._sync_job is not None:
+            try:
+                self.root.after_cancel(self._sync_job)
+            except Exception:                               # noqa: BLE001
+                pass
+        self._sync_job = self.root.after(
+            max(15, self.settings["syncSeconds"]) * 1000, self._tick)
 
     def _tick(self):
         self.sync()
@@ -700,10 +725,35 @@ class App(object):
             config.save_settings(self.settings)
         self.notify(msg)
         self.refresh_tray()
+        self._refresh_autostart_ui()
         return ok, msg
 
+    def _refresh_autostart_ui(self):
+        """열려 있는 설정 화면의 표시를 다시 맞춘다.
+
+        트레이에서 껐는데 설정 탭은 켜진 채로 남아 있으면, 거기서 다시
+        누를 때 tk 가 먼저 체크를 뒤집어 놓기 때문에 정반대로 동작한다.
+        """
+        pane = None
+        if getattr(self, "hub", None):
+            pane = self.hub.panes.get("settings")
+        pane = pane or getattr(self, "settings_win", None)
+        if pane is not None and hasattr(pane, "show_autostart"):
+            try:
+                pane.show_autostart()
+            except Exception:                               # noqa: BLE001
+                pass
+
     def toggle_autostart(self):
-        self.set_autostart(not self.settings.get("autostart"))
+        ok, msg = self.set_autostart(not self.settings.get("autostart"))
+        # 트레이에서 누른 것은 화면에 아무 자국도 안 남는다. 잘못되면
+        # 체크만 안 켜지고 끝이라 왜 안 되는지 알 길이 없다.
+        if not ok or "작업 관리자" in msg:
+            try:
+                import tkinter.messagebox as mb
+                mb.showwarning("포스크탑", msg)
+            except Exception:                               # noqa: BLE001
+                pass
 
     # ---- 계정 ----
     def logout(self):
@@ -732,6 +782,11 @@ class App(object):
         self.username = None
         self.balls = 0
         self.money = 0
+        # 로그인을 지웠으면 부팅 등록도 뗀다. 안 그러면 컴퓨터를 켤 때마다
+        # 로그인 창만 뜨고, 그걸 멈추려면 오히려 게임에 로그인부터 해야
+        # 하는 처지가 된다. 다시 로그인하면 start_ui 에서 다시 붙는다.
+        # (세션 만료는 다르다 - 계정은 살아 있으니 거기서는 떼지 않는다)
+        autostart.disable()
         self.refresh_tray()
         # show_login() 이 로그인에 성공하면 그 안에서 after_login() 까지
         # 부른다. 여기서 한 번 더 부르면 폴링 예약과 컨트롤러가 두 벌씩
@@ -754,6 +809,10 @@ class App(object):
             if err:
                 return self.notify(getattr(err, "message", str(err)))
             config.clear_session()
+            # 계정이 없어졌다. 이걸 안 떼면 다음 부팅부터 **없는 계정으로
+            # 로그인하라는 창**이 뜨고, 그걸 멈출 방법이 프로그램 안에
+            # 없다. 지우고 나가는 사람에게 남겨서는 안 되는 흔적이다.
+            autostart.disable()
             self.notify(r.get("message", "탈퇴가 완료되었습니다."))
             self.root.after(1500, self.quit)
         run_async(self.root, lambda: self.api.delete_account(pw), done)

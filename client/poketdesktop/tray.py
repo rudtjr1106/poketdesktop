@@ -101,11 +101,14 @@ class Tray(object):
             # 하면 그냥 안 켜게 된다. 여기에 둬야 손이 닿는다.
             # 켜져 있다고 표시되는데 실제로는 안 켜지는 상황(작업
             # 관리자에서 껐을 때)은 이름에 그대로 적는다.
+            # 표시는 **레지스트리**를 보고 정한다. 설정 파일을 보면,
+            # 등록이 실패했을 때 여기는 켜짐인데 설정 창은 꺼짐인
+            # 정반대 화면이 나온다. 진실은 한 곳이어야 한다.
             MenuItem(lambda _it: ("컴퓨터 켤 때 같이 시작  (작업 관리자에서 꺼짐)"
-                                  if s.get("autostart") and autostart.blocked()
+                                  if autostart.state()[0] == "blocked"
                                   else "컴퓨터 켤 때 같이 시작"),
                      lambda _i, _it: self.call(a.toggle_autostart),
-                     checked=lambda _it: bool(s.get("autostart")),
+                     checked=lambda _it: autostart.state()[0] in ("on", "blocked"),
                      enabled=autostart.supported()),
             Menu.SEPARATOR,
             # 볼과 소지금은 가방·상점 창에 이미 크게 떠 있다. 메뉴에

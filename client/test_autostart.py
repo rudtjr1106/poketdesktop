@@ -29,9 +29,25 @@ OK = FAIL = 0
 SCRATCH = r"Software\poketdesktop-test\Run"
 SCRATCH_APPROVED = r"Software\poketdesktop-test\StartupApproved"
 REAL_RUN = autostart.RUN_KEY
+REAL_TARGET = autostart._target
+
+# **바꿔치기는 여기서 한다.** main() 안에서 하면, 디버깅한다고 t_ 하나만
+# 직접 불렀을 때(또는 나중에 pytest 로 옮겼을 때) 진짜 Run 키에 쓴다.
+autostart.RUN_KEY = SCRATCH
+autostart.APPROVED_KEY = SCRATCH_APPROVED
 EXE_A = r"C:\p\game-v1.0.6.exe"
 EXE_B = r"C:\p\game-v1.0.7.exe"
 SPACED = r"C:\Program Files\포스크탑\game.exe"
+
+
+def real_value():
+    """진짜 Run 키에 들어 있는 우리 값. 없으면 None."""
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REAL_RUN) as k:
+            return winreg.QueryValueEx(k, autostart.VALUE)[0]
+    except OSError:
+        return None
 
 
 def chk(name, cond, got=""):
@@ -112,7 +128,11 @@ def t_켜고_끄기():
 
 
 def t_작업관리자():
-    # 이 PC 의 실제 값: 카카오톡·원드라이브 02, 도커·엣지 03
+    # 02 와 03 은 이 PC 에서 실제로 본 값이다 (카카오톡·원드라이브가 02,
+    # 도커·엣지가 03). **06 과 07 은 실측이 아니라 "홀수면 꺼짐" 규칙에서
+    # 따라온 것이다** - 구현과 같은 규칙을 되풀이하는 것뿐이라, 규칙 자체가
+    # 틀렸다면 이 검사도 같이 틀린다. 그래서 모르는 값이 왔을 때 "꺼졌다"
+    # 고 단정하지 않도록 해 두었다 (바로 아래 검사).
     for first, 막혔나 in ((0x02, False), (0x03, True),
                           (0x06, False), (0x07, True)):
         wipe()
@@ -140,6 +160,75 @@ def t_작업관리자():
     chk("켤 때도 막힌 것을 알려 준다", ok and "작업 관리자" in msg, msg)
     # 사용자가 작업 관리자에서 내린 결정을 프로그램이 뒤집으면 안 된다.
     chk("막힌 것을 우리가 다시 켜지 않는다", autostart.blocked() is True)
+
+
+def t_첫_설치에서_등록된다():
+    """목표 그 자체다. 이게 없으면 sync 를 'cur 가 있을 때만 고쳐 쓴다'
+    로 바꿔도 검사가 그대로 통과하고, 새로 설치한 PC 는 영영 등록되지
+    않는다."""
+    frozen(True)
+    target(EXE_B)
+    chk("아직 아무것도 없다", autostart.registered() is None)
+    autostart.sync(True)
+    chk("첫 설치에서 등록된다", autostart.registered() == autostart.command(),
+        autostart.registered())
+    frozen(False)
+
+
+def t_끌_때_작업관리자_기록은_안_건드린다():
+    """'우리 흔적은 우리가 치운다' 며 StartupApproved 까지 지우면, 사용자가
+    작업 관리자에서 껐던 기록이 조용히 사라진다. 그 다음에 껐다 켜면 우리가
+    사용자의 결정을 뒤집은 셈이 된다."""
+    import winreg
+    autostart.enable()
+    approve(0x03)
+    autostart.disable()
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, SCRATCH_APPROVED) as k:
+        data = winreg.QueryValueEx(k, autostart.VALUE)[0]
+    chk("끈 기록이 그대로 남아 있다", data[0] == 0x03, data[:1])
+    chk("Run 값만 지워졌다", autostart.registered() is None)
+
+
+def t_실패하면_설정을_바꾸지_않는다():
+    """레지스트리가 진실이고 설정 파일은 그 사본이다.
+
+    등록에 실패했는데 설정만 True 로 바꾸면, 화면에는 '켜짐' 인데 실제로는
+    부팅 때 안 뜨는 상태가 된다 - 회사 PC 처럼 정책으로 Run 키가 잠긴
+    곳에서 실제로 일어난다.
+    """
+    from poketdesktop.app import App
+
+    class 가짜(object):
+        def __init__(self):
+            self.settings = {"autostart": False}
+            self.말 = []
+
+        def notify(self, m):
+            self.말.append(m)
+
+        def refresh_tray(self):
+            pass
+
+        def _refresh_autostart_ui(self):
+            pass
+
+        켜기 = App.set_autostart
+
+    a = 가짜()
+    ok, _ = a.켜기(True)
+    chk("되면 설정도 켜진다", ok and a.settings["autostart"] is True)
+
+    막힌다 = lambda: (False, "등록하지 못했습니다")
+    real = autostart.enable
+    autostart.enable = 막힌다
+    b = 가짜()
+    try:
+        ok, msg = b.켜기(True)
+    finally:
+        autostart.enable = real
+    chk("실패하면 설정을 안 바꾼다",
+        ok is False and b.settings["autostart"] is False, b.settings)
+    chk("실패한 이유를 돌려준다", "등록하지 못했습니다" in msg, msg)
 
 
 def t_맞추기():
@@ -199,17 +288,25 @@ def main():
         print("윈도우에서만 하는 검사입니다.")
         return 0
 
-    # 진짜 Run 키를 건드리면 안 된다. 바꿔치기가 됐는지 먼저 확인한다.
-    autostart.RUN_KEY = SCRATCH
-    autostart.APPROVED_KEY = SCRATCH_APPROVED
     if autostart.RUN_KEY == REAL_RUN or "test" not in autostart.RUN_KEY:
         print("가짜 레지스트리 자리를 못 잡았습니다. 그만둡니다.")
         return 1
 
+    # 검사 전 진짜 키의 우리 값을 적어 둔다. **자동 시작을 켜 둔 PC 에서는
+    # 원래 값이 있는 게 정상이다** - 그걸 "검사가 더럽혔다" 고 읽으면
+    # 멀쩡한 PC 에서 거짓 실패가 난다. 전후를 견줘야 한다.
+    before = real_value()
+
     real_target = autostart._target
     try:
-        for fn in (t_명령줄, t_켜고_끄기, t_작업관리자, t_맞추기):
+        for fn in (t_명령줄, t_켜고_끄기, t_작업관리자,
+                   t_첫_설치에서_등록된다, t_끌_때_작업관리자_기록은_안_건드린다,
+                   t_실패하면_설정을_바꾸지_않는다, t_맞추기):
             wipe()
+            # 검사끼리 새지 않게 매번 되돌린다. 안 그러면 순서를 바꾸는
+            # 것만으로 검사가 무엇을 보장하는지가 조용히 달라진다.
+            autostart._target = REAL_TARGET
+            frozen(False)
             print("-- %s" % fn.__name__[2:])
             fn()
     finally:
@@ -217,14 +314,9 @@ def main():
         autostart._target = real_target
         frozen(False)
 
-    # 검사가 진짜 키에 뭔가 남기지 않았는지 마지막으로 확인한다.
-    import winreg
-    try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REAL_RUN) as k:
-            winreg.QueryValueEx(k, autostart.VALUE)
-        chk("진짜 Run 키를 건드리지 않았다", False, "우리 값이 남아 있다")
-    except OSError:
-        chk("진짜 Run 키를 건드리지 않았다", True)
+    after = real_value()
+    chk("진짜 Run 키를 건드리지 않았다", after == before,
+        "%r -> %r" % (before, after))
 
     print()
     print("======================================================")
