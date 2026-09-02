@@ -16,7 +16,7 @@ set -euo pipefail
 
 HOST="${POKET_HOST:-ubuntu@13.124.198.66}"
 KEY="${POKET_KEY:-$HOME/.ssh/LightsailDefaultKey-ap-northeast-2.pem}"
-APP="${POKET_APP:-~/poketdesktop}"
+APP="${POKET_APP:-$HOME/poketdesktop}"
 URL="${POKET_URL:-https://posktop.duckdns.org}"
 
 say()  { printf '\n\033[1;33m== %s\033[0m\n' "$*"; }
@@ -60,7 +60,7 @@ fi
 
 say "서버로 들어가서 올립니다  ($HOST)"
 ssh -i "$KEY" -o StrictHostKeyChecking=no "$HOST" \
-    "cd $APP && git fetch -q origin && git checkout -q -- . && git pull -q && bash deploy/update.sh --here"
+    'cd ~/poketdesktop && git fetch -q origin && git checkout -q -- . && git pull -q && bash deploy/update.sh --here'
 
 say "바깥에서 확인"
 ver=$(curl -fsS --max-time 20 "$URL/api/health" 2>/dev/null \
