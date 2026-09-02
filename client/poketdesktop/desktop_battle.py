@@ -354,6 +354,15 @@ class DesktopBattle(object):
                 return self.abort("다음 포켓몬을 화면에서 찾지 못했습니다.")
             self.mine.battling = True
             self.saved_home = (self.mine.x, self.mine.y)
+            # **체력바를 새 포켓몬 것으로 바꾼다.**
+            #
+            # 바는 쓰러진 포켓몬의 0 을 그대로 들고 있다. 여기서 안 맞춰
+            # 주면 멀쩡한 포켓몬이 체력 0 인 채로 걸어 나오고, 다음 턴이
+            # 끝나고 turn_done 의 sync_bars 가 돌 때까지 그대로다.
+            #
+            # snap 으로 곧바로 맞춘다. 스르륵 차오르게 두면 새로 나온
+            # 포켓몬이 회복하는 것처럼 보인다.
+            self.sync_bars(snap=True)
             self.after(300, self.approach)
         run_async(self.root,
                   lambda: self.app.api.battle_switch(self.b["id"], mon["id"]), done)
