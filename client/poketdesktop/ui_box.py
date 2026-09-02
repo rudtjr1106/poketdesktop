@@ -32,9 +32,13 @@ STAT_ROWS = [("hp", "HP"), ("atk", "공격"), ("def", "방어"),
 class Row(object):
     """목록 한 줄."""
 
-    def __init__(self, parent, mon, dex, on_pick):
+    def __init__(self, parent, mon, dex, on_pick, dnd=None):
         self.mon = mon
         self.on_pick = on_pick
+        # 끌어서 옮기기. 창이 넘겨준 세 가지를 그대로 부른다.
+        # 누르자마자 고르지 않고 **놓을 때** 고른다 - 그래야 끌기 시작한
+        # 것인지 그냥 누른 것인지 구분할 수 있다.
+        self.dnd = dnd or {}
         self.selected = False
         info = mon.get("info", {})
         self.party = bool(mon.get("onDesktop"))
@@ -91,8 +95,17 @@ class Row(object):
         self._cell("따라다님" if self.party else "박스", COLS[6],
                    U.GOOD if self.party else U.FG_FAINT, U.FONT_XS)
 
+        pid = self.mon["id"]
+        press = self.dnd.get("press")
+        move = self.dnd.get("move")
+        release = self.dnd.get("release")
         for w in [self.f] + self.cells:
-            w.bind("<Button-1>", lambda e: self.on_pick(self.mon["id"]))
+            if press:
+                w.bind("<ButtonPress-1>", lambda e, i=pid: press(i, e))
+                w.bind("<B1-Motion>", lambda e: move(e))
+                w.bind("<ButtonRelease-1>", lambda e: release(e))
+            else:
+                w.bind("<Button-1>", lambda e, i=pid: self.on_pick(i))
             w.bind("<Enter>", self._hover_in)
             w.bind("<Leave>", self._hover_out)
 
@@ -147,6 +160,12 @@ class BoxWindow(object):
         self.mons = []
         self.rows = {}
         self.sel = None
+        # 끌어서 옮기기 상태. Row 가 이 세 가지를 부른다.
+        self._drag = None
+        self._line = None
+        self._dnd = {"press": self._drag_press,
+                     "move": self._drag_move,
+                     "release": self._drag_release}
         self.photos = []
         self.anim = None
         self.anim_i = 0
@@ -433,7 +452,7 @@ class BoxWindow(object):
         box = [m for m in self.mons if not m.get("onDesktop")]
         for m in party:
             self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
-                                     self.select).pack()
+                                     self.select, self._dnd).pack()
             tk.Frame(self.inner, bg="#1a1f2e", height=1).pack(fill="x")
         if box:
             sep = tk.Frame(self.inner, bg=U.INK, height=28)
@@ -444,7 +463,7 @@ class BoxWindow(object):
             tk.Frame(self.inner, bg=U.LINE, height=2).pack(fill="x")
             for m in box:
                 self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
-                                         self.select).pack()
+                                         self.select, self._dnd).pack()
                 tk.Frame(self.inner, bg="#161a24", height=1).pack(fill="x")
 
         # 행이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게
@@ -458,6 +477,145 @@ class BoxWindow(object):
             self.select(keep)
         elif self.mons:
             self.select(self.mons[0]["id"])
+
+    # ---------------- 끌어서 옮기기 ----------------
+    # 누른 채로 이만큼 움직여야 '끄는 것' 으로 본다. 이게 없으면 클릭할 때
+    # 손이 조금만 떨려도 순서가 바뀐다.
+    DRAG_SLOP = 6
+
+    def _drag_press(self, pid, e):
+        self._drag = {"pid": pid, "y": e.y_root, "moved": False}
+
+    def _drag_move(self, e):
+        d = getattr(self, "_drag", None)
+        if not d:
+            return
+        if not d["moved"]:
+            if abs(e.y_root - d["y"]) < self.DRAG_SLOP:
+                return
+            d["moved"] = True
+            try:
+                self.win.configure(cursor="hand2")
+            except Exception:                               # noqa: BLE001
+                pass
+        self._show_line(self._row_at(e))
+
+    def _drag_release(self, e):
+        d = getattr(self, "_drag", None)
+        self._drag = None
+        self._hide_line()
+        try:
+            self.win.configure(cursor="")
+        except Exception:                                   # noqa: BLE001
+            pass
+        if not d:
+            return
+        if not d["moved"]:
+            # 그냥 누른 것이다. 예전처럼 고르기만 한다.
+            return self.select(d["pid"])
+        dst = self._row_at(e)
+        if dst is None or dst == d["pid"]:
+            return
+        self._apply_drop(d["pid"], dst)
+
+    def _row_at(self, e):
+        """지금 손가락이 올라가 있는 줄의 id. 없으면 None."""
+        try:
+            w = self.win.winfo_containing(e.x_root, e.y_root)
+        except Exception:                                   # noqa: BLE001
+            return None
+        while w is not None:
+            for pid, row in self.rows.items():
+                if w is row.f or w in row.cells:
+                    return pid
+            w = getattr(w, "master", None)
+        return None
+
+    def _show_line(self, pid):
+        """놓을 자리에 줄을 하나 긋는다. 어디에 떨어질지 보여야 한다."""
+        self._hide_line()
+        row = self.rows.get(pid)
+        if not row:
+            return
+        try:
+            self._line = tk.Frame(row.f, bg=U.ACCENT, height=3)
+            self._line.place(x=0, rely=1.0, relwidth=1.0, anchor="sw")
+        except Exception:                                   # noqa: BLE001
+            self._line = None
+
+    def _hide_line(self):
+        ln = getattr(self, "_line", None)
+        if ln is not None:
+            try:
+                ln.destroy()
+            except Exception:                               # noqa: BLE001
+                pass
+        self._line = None
+
+    def _apply_drop(self, src, dst):
+        """src 를 dst 자리에 놓는다.
+
+        규칙은 하나다 - **놓인 줄의 자리를 물려받는다.**
+          박스 것을 파티 줄에 놓으면  -> 둘이 자리를 바꾼다 (스왑)
+          파티 것을 박스 줄에 놓으면  -> 파티에서 내려온다
+          파티 안에서 옮기면          -> 순서만 바뀐다
+        """
+        a = next((m for m in self.mons if m["id"] == src), None)
+        b = next((m for m in self.mons if m["id"] == dst), None)
+        if not a or not b:
+            return
+        a_party = bool(a.get("onDesktop"))
+        b_party = bool(b.get("onDesktop"))
+        party = [m["id"] for m in self.mons if m.get("onDesktop")]
+
+        if a_party and b_party:
+            # 순서만 바꾼다
+            party.remove(src)
+            party.insert(party.index(dst) if dst in party else len(party), src)
+            calls = [("order", party)]
+            msg = "순서를 바꿨습니다."
+        elif not a_party and b_party:
+            # 스왑. **내리고 나서 올려야** 한다 - 파티가 꽉 차 있으면
+            # 먼저 올리려다 "최대 6마리" 로 막힌다.
+            calls = [("down", dst), ("up", src), ("order", None)]
+            msg = "자리를 바꿨습니다."
+        elif a_party and not b_party:
+            calls = [("down", src)]
+            msg = "박스로 보냈습니다."
+        else:
+            return                       # 박스끼리는 순서가 없다
+
+        self.say("옮기는 중...")
+
+        def work():
+            api = self.app.api
+            new_party = None
+            for kind, arg in calls:
+                if kind == "down":
+                    api.set_desktop(arg, False)
+                elif kind == "up":
+                    api.set_desktop(arg, True)
+                elif kind == "order":
+                    if arg is not None:
+                        api.set_order(arg)
+                    else:
+                        # 스왑은 서버가 빈 자리에 넣어 준다. 화면에서 보이던
+                        # 자리에 맞추려면 지금 목록을 다시 받아 순서를 준다.
+                        cur = [m["id"] for m in api.desktop()]
+                        if src in cur and dst not in cur:
+                            cur.remove(src)
+                            idx = self._party_index(dst)
+                            cur.insert(min(idx, len(cur)), src)
+                            api.set_order(cur)
+                            new_party = cur
+            return new_party
+
+        U.run_async(self.root, work, self._after(msg))
+
+    def _party_index(self, pid):
+        """옮기기 전 화면에서 그 마리가 몇 번째였나."""
+        party = [m["id"] for m in self.mons if m.get("onDesktop")]
+        return party.index(pid) if pid in party else len(party)
 
     def current(self):
         return next((m for m in self.mons if m["id"] == self.sel), None)

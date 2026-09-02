@@ -144,6 +144,11 @@ class DesktopIn(BaseModel):
     on: bool
 
 
+class OrderIn(BaseModel):
+    # 데리고 다니는 마리 수만큼만 받는다. 그보다 길면 자리 수가 어긋난다.
+    ids: list[int] = Field(default_factory=list, max_length=12)
+
+
 class ExpIn(BaseModel):
     amount: int = Field(ge=0, le=1000000)
 
@@ -732,6 +737,38 @@ def set_desktop(pid: int, body: DesktopIn, ctx=Depends(current)):
     else:
         db.run("UPDATE pokemon SET on_desktop=0, slot=NULL WHERE id=?", (pid,))
     return {"ok": True, "pokemon": _decorate(db.row_to_mon(_own(uid, pid)))}
+
+
+@app.post("/api/pokemon/order")
+def set_order(body: OrderIn, ctx=Depends(current)):
+    """데리고 다니는 순서를 바꾼다.
+
+    화면에서 끌어다 놓은 순서를 그대로 받는다. 자리(slot)는 0부터 다시
+    매긴다 - 빈 번호를 남기면 나중에 한 마리를 넣고 뺄 때 순서가 튄다.
+
+    보내온 목록에 없는 마리는 건드리지 않는다. 목록이 낡았을 수 있어서
+    (다른 창에서 방금 바꿨다든지) 없는 것을 지우거나 내리면 안 된다.
+    """
+    uid = ctx["user"]["id"]
+    ids = []
+    for pid in body.ids:
+        if pid in ids:
+            continue                      # 같은 것이 두 번 오면 뒤엣것은 버린다
+        ids.append(pid)
+    if not ids:
+        return {"ok": True, "moved": 0}
+    if len(ids) > config.MAX_PARTY:
+        raise HTTPException(400, "데리고 다닐 수 있는 건 최대 %d마리입니다."
+                            % config.MAX_PARTY)
+
+    # 내 것이고 지금 데리고 다니는 것만 자리를 준다. 남의 것을 섞어 보내도
+    # 조용히 무시된다(조건이 WHERE 에 들어 있다).
+    moved = 0
+    for i, pid in enumerate(ids):
+        cur = db.run("UPDATE pokemon SET slot=? WHERE id=? AND user_id=?"
+                     " AND on_desktop=1", (i, pid, uid))
+        moved += cur.rowcount
+    return {"ok": True, "moved": moved}
 
 
 @app.patch("/api/pokemon/{pid}")

@@ -299,8 +299,11 @@ def main():
     note("배틀 승 %d / 포획 %d / 드랍 %d개" % (wins, catches, drops))
     chk("배틀을 한 번은 이겼다 (아래 검사의 전제)", wins > 0, wins)
     chk("잡거나 이기면 도구가 떨어진다", drops > 0, drops)
-    chk("포획하면 반드시 떨어진다", catches == 0 or drops >= catches,
-        (catches, drops))
+    # 예전에는 "포획하면 반드시 떨어진다" 를 봤다. 이제 잡아도 확률이라
+    # 그 검사는 성립하지 않는다. 대신 **기회보다 많이 떨어지지는 않는다** 를
+    # 본다 - 이건 확률과 무관하게 언제나 참이어야 하는 것이다.
+    chk("기회보다 많이 떨어지지는 않는다", drops <= catches + wins,
+        (drops, catches, wins))
 
     st, me = call("GET", "/api/me", token=token)
     chk("가방에 쌓인다", sum(me["bag"].values()) > 0, me["bag"])
