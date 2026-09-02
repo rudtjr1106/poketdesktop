@@ -136,6 +136,22 @@ def _side(dex, f, reveal_pp=True):
     return out
 
 
+def ball_options(uid, user_row, bt, row, hour=None):
+    """배틀 중에 던질 수 있는 볼과, 지금 그 볼이 얼마나 잘 통하는지.
+
+    야생 화면에는 있었는데 배틀 중에는 없어서, 배틀에 들어가면 무조건
+    마지막에 쓴 볼로만 던져야 했다. 체력을 깎아 둔 상태가 제일 잘 잡히는데
+    거기서 볼을 못 고르는 건 아깝다.
+
+    배율은 **지금 이 순간** 기준이다. 타이머볼은 던진 횟수를, 다크볼은
+    시각을 보므로 배틀이 진행되면 값이 달라진다.
+    """
+    view = dict(bt.foe.mon)
+    view["status"] = "SLP" if bt.foe.status == "sleep" else (bt.foe.status or "")
+    return items.ball_options(uid, deps.dex(), view, user_row["balls"],
+                              mine=bt.me.mon, turn=row["turn"], hour=hour)
+
+
 def _view(dex, row, bt):
     return {
         "id": row["id"],
@@ -310,6 +326,7 @@ def start(wid: int, ctx=Depends(deps.current)):
     row = db.q1("SELECT * FROM battle WHERE id=?", (cur.lastrowid,))
     bt = B.Battle(d, me, foe)
     return {"battle": _view(d, row, bt), "resumed": False,
+            "ballOptions": ball_options(uid, ctx["user"], bt, row),
             "intro": "앗! 야생 %s 이(가) 튀어나왔다!" % foe.name}
 
 
@@ -324,7 +341,8 @@ def current_battle(ctx=Depends(deps.current)):
     me, foe = _fighters(d, row)
     bt = B.Battle(d, me, foe)
     bt.turn_no = row["turn"]
-    return {"battle": _view(d, row, bt)}
+    return {"battle": _view(d, row, bt),
+            "ballOptions": ball_options(uid, ctx["user"], bt, row)}
 
 
 @router.post("/api/battle/{bid}/move")
@@ -336,6 +354,9 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
     me, foe = _fighters(d, row)
     bt = B.Battle(d, me, foe, deps.RNG)
     bt.turn_no = row["turn"]
+    # 예전에는 이 값을 아래 조건문 안에서만 만들었다. 볼 목록에도 필요해서
+    # 위로 올린다 (다크볼은 밤인지를 본다).
+    hour = body.hour if 0 <= body.hour <= 23 else None
 
     # 기술을 안 보내면(자동 전투) 서버가 골라준다.
     pick = body.move
@@ -347,7 +368,6 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
     if bt.over and bt.result == "won":
         db.run("INSERT INTO wild_state (user_id, wins) VALUES (?,1)"
                " ON CONFLICT(user_id) DO UPDATE SET wins=wins+1", (uid,))
-        hour = body.hour if 0 <= body.hour <= 23 else None
         out["exp"] = award(d, uid, foe, row["mine_id"], hour)
         items.mark_seen(uid, foe.mon["species"], False, auth.now_iso())
         # 쓰러뜨려도 도구가 떨어진다. 포획보다는 덜 나온다.
@@ -375,6 +395,7 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
     _save(row["id"], bt)
     row = db.q1("SELECT * FROM battle WHERE id=?", (row["id"],))
     out["battle"] = _view(d, row, bt)
+    out["ballOptions"] = ball_options(uid, ctx["user"], bt, row, hour)
     return out
 
 
@@ -448,6 +469,7 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
                                      hp_ratio, status_bonus)
 
     out = {"caught": caught, "shakes": shakes, "balls": balls,
+           "ball": ball,
            "hpRatio": round(hp_ratio, 3)}
     if not caught:
         out["message"] = ["앗! 포켓몬이 튀어나와버렸다!",
@@ -466,6 +488,9 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
         _save(row["id"], bt)
         row = db.q1("SELECT * FROM battle WHERE id=?", (row["id"],))
         out["battle"] = _view(d, row, bt)
+        # 볼을 던진 뒤에도 목록을 새로 준다. 타이머볼처럼 던진 횟수를
+        # 보는 볼이 있어서 배율이 그때그때 달라진다.
+        out["ballOptions"] = ball_options(uid, ctx["user"], bt, row, hour)
         return out
 
     extra = items.ball_extra(ball)

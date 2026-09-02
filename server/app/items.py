@@ -76,6 +76,9 @@ def public_list():
             "rarity": it.get("rarity"),
             "effect": it["effect"],
             "evolves": it.get("evolves", []),
+            # 볼은 종류마다 쓸모가 다른데 설명이 전부 같았다.
+            # 조건을 아는 쪽(서버)이 말까지 만들어 보낸다.
+            "note": ball_note(it["id"]),
         })
     out.sort(key=lambda x: (x["cat"], x["cost"], x["kr"]))
     return out
@@ -331,6 +334,54 @@ def _ball_counts(uid, balls):
     if balls:
         out[BALL_ITEM] = balls
     return out
+
+
+# 볼마다 "언제 잘 통하는지" 한 줄. 가방·상점에서 그대로 보여준다.
+# ball_why 는 **지금 눈앞의 야생**을 보고 말하는 것이라 가방에서는 쓸 수 없다
+# (가방을 열 때는 상대가 없다). 여기는 조건 자체를 설명한다.
+BALL_NOTE = {
+    "water_or_bug": "물·벌레 타입에게 잘 통한다",
+    "low_level": "레벨이 낮은 상대에게 잘 통한다",
+    "many_turns": "오래 끌수록 잘 통한다. 던진 횟수만큼 올라간다",
+    "first_turn": "만나자마자 첫 번째로 던질 때 잘 통한다",
+    "night": "밤에 잘 통한다",
+    "level_gap": "내 선두가 상대보다 훨씬 높을 때 잘 통한다",
+    "moon_family": "달의돌로 진화하는 종에게 잘 통한다",
+    "fast_species": "발이 빠른 종에게 잘 통한다",
+    "heavy": "무거운 종일수록 잘 통한다. 가벼우면 오히려 잘 안 잡힌다",
+    "same_species_other_gender": "같은 종 다른 성별에게 잘 통한다",
+    "asleep": "잠든 상대에게 잘 통한다",
+    "already_caught": "이미 잡아본 종에게 잘 통한다",
+}
+
+
+def ball_note(item_id):
+    """이 볼이 언제 좋은지 한 줄. 조건이 없으면 배율만 말한다."""
+    it = get(item_id) or {}
+    eff = it.get("effect") or {}
+    if eff.get("kind") != "ball":
+        return ""
+    bits = []
+    cond = eff.get("cond")
+    mult = eff.get("mult", 1.0)
+    if cond:
+        why = BALL_NOTE.get(cond, "특정 상대에게 잘 통한다")
+        # 헤비볼처럼 mult 를 안 쓰고 따로 계산하는 것이 있다(무게로 정한다).
+        # 그런 것에 "최대 1배" 라고 적으면 거짓말이 된다.
+        if mult > 1.0:
+            why += " (최대 %g배)" % mult
+        bits.append(why)
+    elif mult >= 255:
+        bits.append("반드시 잡는다")
+    elif mult > 1.0:
+        bits.append("어떤 상대에게든 %g배로 잘 잡힌다" % mult)
+    else:
+        bits.append("가장 기본이 되는 볼이다")
+    note = eff.get("note")
+    # 마스터볼은 배율로도 "반드시 잡는다", note 로도 같은 말이라 두 번 나왔다.
+    if note and note not in bits:
+        bits.append(note)
+    return ". ".join(bits) + "."
 
 
 def ball_why(item_id, dex, wild, mult, mine=None, turn=0, hour=None):

@@ -164,9 +164,10 @@ class WildPet(Pet):
         self.ctl.start_battle()
 
     def on_menu(self, e):
-        # 배틀 중이면 배틀 쪽으로 넘긴다 (체력이 깎여 있어 잘 잡힌다)
+        # 배틀 중이면 배틀 쪽으로 넘긴다 (체력이 깎여 있어 잘 잡힌다).
+        # 이벤트를 같이 넘겨야 거기서도 볼 고르는 메뉴가 뜬다.
         if self.ctl.app.battle:
-            return self.ctl.app.battle.throw_ball()
+            return self.ctl.app.battle.throw_ball(e)
         self.ctl.ball_menu(e)
 
     def on_double(self, e):
@@ -194,15 +195,18 @@ class WildPet(Pet):
 class BallThrow(object):
     """볼이 날아가서 흔들리는 연출. 결과는 서버가 이미 정해서 넘겨준다."""
 
-    def __init__(self, ctl, start, target, shakes, caught, on_done):
+    def __init__(self, ctl, start, target, shakes, caught, on_done,
+                 ball="POKEBALL"):
         self.ctl = ctl
         ov = ctl.app.overlay
         key = ov.key
         hexkey = "#%02x%02x%02x" % key
+        # 던진 볼에 따라 그림이 달라진다. 스무 가지를 던지는데 전부 같은
+        # 빨간 볼이면 뭘 던졌는지 알 수가 없다.
         self.shake_frames = [ImageTk.PhotoImage(f)
-                             for f in effects.ball_shake_frames(26, key)]
+                             for f in effects.ball_shake_frames(26, key, ball)]
         self.open_photo = ImageTk.PhotoImage(
-            effects.ball_image(26, key, open_top=True))
+            effects.ball_image(26, key, open_top=True, ball=ball))
         self.sparkles = [ImageTk.PhotoImage(f)
                          for f in effects.sparkle_frames(52, 6, key)]
 
@@ -625,7 +629,8 @@ class WildController(object):
                 self.check()
                 return
             # 바탕화면에서 그대로 싸우므로 야생 도트는 그 자리에 그대로 둔다
-            self.app.open_battle(r.get("battle"), r.get("intro"))
+            self.app.open_battle(r.get("battle"), r.get("intro"),
+                                 r.get("ballOptions"))
         run_async(self.app.root, lambda: self.app.api.battle_start(wid), done)
 
     def ball_menu(self, e):
@@ -651,6 +656,14 @@ class WildController(object):
             if o["id"] == want and o["count"] > 0:
                 return want
         return "POKEBALL"
+
+    def _thrown(self, r):
+        """방금 던진 볼. 서버가 실어 보낸 것을 먼저 믿는다.
+
+        설정의 lastBall 은 야생에서 던질 때만 갱신된다. 배틀 중에 던지면
+        어긋날 수 있어서, 서버가 알려준 값이 있으면 그쪽을 쓴다.
+        """
+        return (r or {}).get("ball") or self.last_ball()
 
     def throw_ball(self, ball=None):
         if self.throwing or not self.pet or not self.wild_id:
@@ -703,7 +716,7 @@ class WildController(object):
             if on_done:
                 on_done()
         BallThrow(self, start, target, r.get("shakes", 1),
-                  bool(r.get("caught")), after)
+                  bool(r.get("caught")), after, self._thrown(r))
 
     def play_throw(self, r):
         pet = self.pet
@@ -732,4 +745,4 @@ class WildController(object):
                     self.app.notify("몬스터볼이 다 떨어졌습니다.")
 
         BallThrow(self, start, target, r.get("shakes", 1),
-                  bool(r.get("caught")), after)
+                  bool(r.get("caught")), after, self._thrown(r))
