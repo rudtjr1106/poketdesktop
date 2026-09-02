@@ -27,6 +27,22 @@ TURN_GAP = 620             # 한 턴 끝나고 다음 턴까지
 RESULT_MS = 1100
 
 
+def on_screen(pet):
+    """도트가 지금 화면에 떠 있는가.
+
+    볼에 들어가거나(hide_wild_sprite) 쓰러지면(faint) **창만 숨고 Pet
+    객체는 그대로 남는다.** 좌표도 멀쩡하게 남아 있어서, 이걸 안 보면
+    체력바만 아무것도 없는 자리에 떠 있는다 - 볼을 던지는 1~2초 동안
+    흔들리는 볼 위 허공에 남고, 쓰러진 자리에는 0 짜리 바가 남는다.
+
+    창을 이미 없앴으면 TclError 가 난다. 그것도 "안 보인다" 다.
+    """
+    try:
+        return bool(pet.win.winfo_viewable())
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 class DesktopBattle(object):
     """배틀 한 판을 바탕화면 위에서 진행한다."""
 
@@ -118,7 +134,7 @@ class DesktopBattle(object):
             self.layer.raise_above()
         for bar, pet in zip(self.bars, (self.mine, self.foe)):
             bar.ease()
-            if pet is None:
+            if pet is None or not on_screen(pet):
                 bar.clear()
                 continue
             try:
