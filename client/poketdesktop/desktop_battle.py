@@ -14,6 +14,7 @@
 """
 from common.korean import natural
 
+from . import ball_menu
 from . import battle_fx as FX
 from . import config
 from . import evolve_fx
@@ -29,10 +30,13 @@ RESULT_MS = 1100
 class DesktopBattle(object):
     """배틀 한 판을 바탕화면 위에서 진행한다."""
 
-    def __init__(self, app, battle, intro=None):
+    def __init__(self, app, battle, intro=None, options=None):
         self.app = app
         self.root = app.root
         self.b = battle
+        # 배틀 중에 던질 수 있는 볼과 지금의 배율. 서버가 응답마다 새로
+        # 준다(타이머볼처럼 던진 횟수를 보는 볼이 있다).
+        self.ball_opts = options or []
         self.closed = False
         self.busy = False
         self.jobs = []
@@ -268,6 +272,8 @@ class DesktopBattle(object):
         if b:
             self.b = b
             self.sync_bars()
+        if result.get("ballOptions") is not None:
+            self.ball_opts = result["ballOptions"]
         if not b or not b.get("over"):
             return self.after(TURN_GAP, self.next_turn)
         self.show_result(result)
@@ -353,13 +359,29 @@ class DesktopBattle(object):
                   lambda: self.app.api.battle_switch(self.b["id"], mon["id"]), done)
 
     # ---------------- 몬스터볼 ----------------
-    def throw_ball(self):
-        """배틀 중에 오른쪽 클릭. 체력을 깎아뒀으면 훨씬 잘 잡힌다."""
+    def throw_ball(self, e=None):
+        """배틀 중에 오른쪽 클릭. 체력을 깎아뒀으면 훨씬 잘 잡힌다.
+
+        어떤 볼을 던질지 고를 수 있다. 야생 화면에는 있던 것이 배틀에는
+        없어서, 정작 제일 잘 잡히는 상황에서 마지막에 쓴 볼만 던져야 했다.
+        """
         if self.closed or self.busy:
             return
-        if self.app.balls <= 0:
+        opts = self.ball_opts
+        if e is not None and opts:
+            return ball_menu.popup(self.root, e, opts, self._do_throw,
+                                   on_shop=self.app.open_shop)
+        self._do_throw(None)
+
+    def _do_throw(self, ball=None):
+        if self.closed or self.busy:
+            return
+        ball = ball or (self.app.settings.get("lastBall") or "POKEBALL")
+        if ball == "POKEBALL" and self.app.balls <= 0:
             return self.app.notify("몬스터볼이 없습니다.")
         self.busy = True
+        self.app.settings["lastBall"] = ball
+        config.save_settings(self.app.settings)
 
         def done(r, err):
             self.busy = False
@@ -368,9 +390,12 @@ class DesktopBattle(object):
             if err:
                 return self.app.notify(getattr(err, "message", str(err)))
             self.app.balls = r.get("balls", self.app.balls)
+            if r.get("ballOptions") is not None:
+                self.ball_opts = r["ballOptions"]
             self.app.refresh_tray()
             self.app.wild.play_catch(r, on_done=lambda: self.after_ball(r))
-        run_async(self.root, lambda: self.app.api.battle_ball(self.b["id"]), done)
+        run_async(self.root,
+                  lambda: self.app.api.battle_ball(self.b["id"], ball), done)
 
     def after_ball(self, r):
         if self.closed:

@@ -100,7 +100,14 @@ def use_item(api, item_id, pid, stat, hour):
 
 # ---------------------------------------------------------------- 설명 만들기
 def item_desc(item):
-    """도구 설명 한 줄. items.json 에 설명 문구가 없어서 effect 로 만든다."""
+    """도구 설명 한 줄. items.json 에 설명 문구가 없어서 effect 로 만든다.
+
+    볼은 서버가 만들어 보낸 note 를 그대로 쓴다. 조건(밤인지, 무게가 얼마인지,
+    이미 잡아본 종인지)을 아는 쪽은 서버뿐이라, 여기서 다시 만들면 화면에
+    쓰인 말과 실제 판정이 어긋난다.
+    """
+    if item.get("note"):
+        return item["note"]
     eff = item.get("effect") or {}
     kind = eff.get("kind")
     if kind == "ev":

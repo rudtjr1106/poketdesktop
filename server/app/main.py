@@ -1054,6 +1054,7 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
         left = db.q1("SELECT * FROM wild WHERE id=?", (wid,))
         user = db.q1("SELECT * FROM users WHERE id=?", (uid,))
         return {"caught": False, "shakes": shakes, "balls": balls,
+                "ball": ball_id,
                 "throws": left["throws"], "expiresAt": left["expires_at"],
                 # 개수도 턴도 방금 바뀌었다. 갱신된 목록을 같이 준다.
                 "ballOptions": _ball_options(uid, user, left, body),
@@ -1084,6 +1085,7 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     if drop:
         msg += "  %s 을(를) 주웠다!" % drop["kr"]
     return {"caught": True, "shakes": 4, "balls": balls, "where": where,
+            "ball": ball_id,
             "pokemon": got, "drop": drop, "money": items.money(uid),
             "ball": {"id": ball_id,
                      "kr": (items.get(ball_id) or {}).get("kr", ball_id)},

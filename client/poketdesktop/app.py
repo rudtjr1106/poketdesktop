@@ -495,11 +495,15 @@ class App(object):
                     pass
             setattr(self, name, None)
 
-    def open_battle(self, battle, intro=None):
-        """바탕화면에서 배틀을 시작한다. 창은 안 뜬다."""
+    def open_battle(self, battle, intro=None, options=None):
+        """바탕화면에서 배틀을 시작한다. 창은 안 뜬다.
+
+        options 는 배틀 중에 던질 수 있는 볼 목록이다. 없으면 배틀 안에서
+        볼을 못 고르고 마지막에 쓴 볼로만 던지게 된다.
+        """
         if not battle or self.battle or self.arena:
             return
-        self.battle = DesktopBattle(self, battle, intro)
+        self.battle = DesktopBattle(self, battle, intro, options)
 
     def resume_battle(self):
         """프로그램을 껐다 켰는데 배틀이 진행 중이었다면 이어서 연다."""

@@ -141,6 +141,10 @@ def effect_note(it):
     """설명 아래에 작게 붙는 덧말. 없으면 빈 글자."""
     eff = (it or {}).get("effect") or {}
     kind = eff.get("kind")
+    if kind == "ball" and (it or {}).get("note"):
+        # 볼은 종류마다 쓸모가 다르다. 조건을 아는 서버가 만들어 보낸
+        # 한 줄을 그대로 쓴다("밤에 잘 통한다" 같은).
+        return it["note"]
     note = eff.get("note") or ""
     if kind == "iv":
         note = note or "레벨이 어느 정도 오른 포켓몬만 단련할 수 있다"
