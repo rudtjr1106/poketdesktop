@@ -522,7 +522,9 @@ class Battle(object):
     def _can_move(self, who, user, ev):
         """상태이상 때문에 못 움직이는지."""
         if user.flinched:
-            ev.append({"t": "msg", "text": "%s 은(는) 풀이 죽어 움직이지 못했다!" % user.name})
+            # who 를 같이 실어야 화면이 **누구 머리 위에** 띄울지 안다.
+            ev.append({"t": "msg", "who": who,
+                       "text": "%s 은(는) 풀이 죽어 움직이지 못했다!" % user.name})
             return False
         if user.status == "sleep":
             if user.sleep_turns > 0:
