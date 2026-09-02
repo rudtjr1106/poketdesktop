@@ -146,6 +146,16 @@ class SettingsWindow(object):
         self.boot_note.pack(fill="x", padx=(22, 0), pady=(0, 6))
         self._paint_autostart(st, msg)
 
+    def show_autostart(self):
+        """지금 상태를 다시 읽어 화면에 맞춘다.
+
+        트레이에서 껐다 켰을 때 app 이 불러 준다. 이게 없으면 설정 탭이
+        옛 표시를 그대로 들고 있다가, 거기서 누를 때 정반대로 동작한다.
+        """
+        st, msg = autostart.state()
+        self.boot_var.set(st in ("on", "blocked"))
+        self._paint_autostart(st, msg)
+
     def _paint_autostart(self, st, msg):
         # 막힌 것은 눈에 띄어야 한다. 나머지는 조용한 설명이면 된다.
         self.boot_note.configure(
@@ -153,10 +163,8 @@ class SettingsWindow(object):
 
     def _toggle_autostart(self):
         ok, msg = self.app.set_autostart(self.boot_var.get())
-        st, note = autostart.state()
         # 실패했으면 표시를 되돌린다. 화면과 실제가 어긋나면 안 된다.
-        self.boot_var.set(st in ("on", "blocked"))
-        self._paint_autostart(st, note if ok else msg)
+        self.show_autostart()
         U.set_status(self.status, msg.replace(chr(10), " "),
                      U.GOOD if ok else U.DANGER)
 

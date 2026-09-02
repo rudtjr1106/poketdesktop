@@ -217,14 +217,19 @@ def cleanup_old(parent=None, keep=VERSION):
     return gone
 
 
-def relaunch(exe):
-    """새 exe 를 띄운다. 이쪽은 부르는 쪽에서 끝내면 된다."""
+def relaunch(exe, args=()):
+    """새 exe 를 띄운다. 이쪽은 부르는 쪽에서 끝내면 된다.
+
+    args 는 그대로 넘긴다. 부팅으로 켜졌다는 표시(--autostart)를 이어
+    주지 않으면, 갓 갈아탄 판이 '손으로 켠 것' 으로 보여서 인터넷이
+    늦게 붙을 때 로그인 창을 띄워 버린다.
+    """
     flags = 0
     if os.name == "nt":
         flags = getattr(subprocess, "DETACHED_PROCESS", 0) | \
             getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    subprocess.Popen([exe], cwd=os.path.dirname(exe), close_fds=True,
-                     creationflags=flags)
+    subprocess.Popen([exe] + list(args), cwd=os.path.dirname(exe),
+                     close_fds=True, creationflags=flags)
 
 
 def temp_zip(version):
