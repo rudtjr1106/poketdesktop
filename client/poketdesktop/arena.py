@@ -75,6 +75,7 @@ class Arena(object):
         self.app = app
         self.root = app.root
         self.view = view or {}
+        self.plates = []          # 링 위에 적어 둔 이름표
         self.on_done = on_done
         self.closed = False
         self.jobs = []
@@ -170,11 +171,51 @@ class Arena(object):
             p.battling = True
         self.roster = {"me": teams.get("me") or [], "foe": teams.get("foe") or []}
 
+        try:
+            self._name_plates()
+        except Exception as e:                              # noqa: BLE001
+            config.log("투기장 이름표를 못 그렸습니다: %s" % e)
         self.queue = [e for e in evs if e.get("t") != "teams"]
         self._pace()
         self.bar_job = None
         self._tick_bars()
         self._gather()
+
+    def _name_plates(self):
+        """누구와 싸우는지 링 위에 적어 둔다.
+
+        예전에는 끝난 뒤 알림에만 상대 이름이 떴다. 재생은 30초쯤 가는데
+        그동안 누구랑 싸우는지 알 수가 없었다.
+
+        투기장은 오른쪽 아래 활동 영역 안에서 벌어지고, 내 팀이 왼쪽·상대가
+        오른쪽에 선다. 이름도 각자 자기 쪽 위에 둔다.
+        """
+        # 로그인 전이거나 시험용 앱이면 username 이 아예 없을 수 있다.
+        # 이름표 때문에 재생 전체가 접히면 안 된다.
+        me = getattr(self.app, "username", None) or "나"
+        foe = (self.view.get("foe") or {}).get("name") or "상대"
+        x1, y1, x2, _y2 = self.ring["rect"]
+        top = y1 + 14
+        self._plate(x1 + (x2 - x1) * 0.22, top, me, "#8fd3ff")
+        self._plate(x1 + (x2 - x1) * 0.78, top, foe, "#ffb0b0")
+
+    def _plate(self, sx, sy, text, color):
+        cv = self.cv
+        if cv is None:
+            return
+        x, y = self.to_local(sx, sy)
+        # 글자만 그리면 도트와 겹쳐 안 보인다. 뒤에 판을 깔고 그 위에 쓴다.
+        t = cv.create_text(x, y, text=text, fill=color,
+                           font=("맑은 고딕", 10, "bold"))
+        bx = cv.bbox(t)
+        if bx:
+            pad = 6
+            r = cv.create_rectangle(bx[0] - pad, bx[1] - 3, bx[2] + pad,
+                                    bx[3] + 3, fill="#11141c", outline="#2a3040")
+            cv.tag_lower(r, t)
+            self.plates.extend([r, t])
+        else:
+            self.plates.append(t)
 
     def _pace(self):
         """판이 길면 간격을 줄인다. 짧으면 그대로 둔다.
