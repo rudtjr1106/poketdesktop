@@ -10,6 +10,7 @@ from common.korean import natural              # noqa: E402
 from common.version import VERSION             # noqa: E402
 
 from . import api as apimod                    # noqa: E402
+from . import autostart                     # noqa: E402
 from . import config, single, sprite_cache, ui_loading, updater, walk_cache  # noqa: E402
 from . import ui_common as U                   # noqa: E402
 from .overlay import Overlay                   # noqa: E402
@@ -27,6 +28,13 @@ from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
 from .ui_update import UpdateWindow             # noqa: E402
 from .wild_ui import WildController            # noqa: E402
+
+
+# 부팅 직후에는 인터넷이 아직 안 붙어 있을 수 있다. 3·6·12·24·48초로
+# 물러나며 다시 해 본다 - 다 합쳐 약 1분 반.
+BOOT_LOGIN_TRIES = 5
+# 손으로 켰다면 사람이 화면을 보고 있다. 오래 끌지 않고 로그인 창을 준다.
+MANUAL_LOGIN_TRIES = 1
 
 
 class App(object):
@@ -57,6 +65,10 @@ class App(object):
         self.battle = None
         self._quitting = False
         self._relogin = False
+        # 부팅 때 켜진 것인지 손으로 켠 것인지. 인터넷이 아직 안 붙었을
+        # 때 얼마나 기다려 줄지가 달라진다 (_retry_login).
+        self.autostarted = autostart.started_by_autostart()
+        self._login_try = 0
 
         self.root = tk.Tk()
         self.root.withdraw()
@@ -108,6 +120,16 @@ class App(object):
     def boot(self):
         if self.check_update():
             return self.quit()
+        # 등록해 둔 경로가 지금 돌고 있는 파일과 맞는지 본다. 버전이
+        # 오르면 파일 이름이 바뀌어서, 그냥 두면 다음 부팅 때 없는
+        # 파일을 가리킨 채 조용히 아무 일도 안 일어난다.
+        autostart.sync(self.settings.get("autostart"))
+        self._login_try = 0
+        self._auto_login()
+
+    def _auto_login(self):
+        if self._quitting:
+            return
         session = config.load_session()
         token = session.get("token")
         if not token:
@@ -116,6 +138,8 @@ class App(object):
 
         def done(r, err):
             if err:
+                if self._retry_login(err):
+                    return
                 config.log("자동 로그인 실패: %s" % err)
                 return self.show_login()
             self.api = api
@@ -125,6 +149,32 @@ class App(object):
             config.log("자동 로그인 성공: %s" % self.username)
             self.after_login()
         run_async(self.root, lambda: api.auto_login(token), done)
+
+    def _retry_login(self, err):
+        """서버가 아예 답을 안 했으면 잠시 뒤 다시 해 본다.
+
+        **부팅 직후에는 인터넷이 아직 안 붙어 있다.** 그때 곧바로 로그인
+        창을 띄우면, 사용자는 컴퓨터를 켜자마자 영문 모를 창부터 보고
+        손으로 다시 켜야 한다.
+
+        서버가 **거절한 것**(토큰 만료 같은 것)은 다시 해도 결과가 같다.
+        그건 status 가 붙어서 온다. 아예 못 닿은 것만 status 가 0 이다.
+
+        **ApiError 가 아닌 것은 다시 하지 않는다.** status 가 없다고 0 으로
+        치면(getattr 의 기본값) 엉뚱한 오류까지 "인터넷이 없구나" 로 읽혀서,
+        고쳐지지도 않을 일로 1분 반을 기다리게 된다.
+        """
+        if not isinstance(err, apimod.ApiError) or err.status != 0:
+            return False
+        limit = BOOT_LOGIN_TRIES if self.autostarted else MANUAL_LOGIN_TRIES
+        if self._login_try >= limit:
+            return False
+        self._login_try += 1
+        wait = min(48, 3 * (2 ** (self._login_try - 1)))
+        config.log("서버에 못 닿았습니다. %d초 뒤 다시 (%d/%d)"
+                   % (wait, self._login_try, limit))
+        self.root.after(wait * 1000, self._auto_login)
+        return True
 
     def show_login(self):
         res = LoginWindow(self.root, self.settings).show()
@@ -633,6 +683,27 @@ class App(object):
         if self.overlay:
             self.overlay.refresh_visuals()
         self.refresh_tray()
+
+    def set_autostart(self, want):
+        """컴퓨터를 켤 때 같이 시작할지 정한다.
+
+        **레지스트리가 진실이고 설정 파일은 그 사본이다.** 그래서 등록에
+        실패하면 설정도 바꾸지 않는다 - 화면에는 "켜짐" 인데 실제로는
+        안 켜지는 상태를 만들지 않으려는 것이다.
+
+        돌려주는 한 줄은 사용자에게 그대로 보여줘도 되는 말이다.
+        """
+        want = bool(want)
+        ok, msg = autostart.enable() if want else autostart.disable()
+        if ok:
+            self.settings["autostart"] = want
+            config.save_settings(self.settings)
+        self.notify(msg)
+        self.refresh_tray()
+        return ok, msg
+
+    def toggle_autostart(self):
+        self.set_autostart(not self.settings.get("autostart"))
 
     # ---- 계정 ----
     def logout(self):

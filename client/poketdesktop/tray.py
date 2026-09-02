@@ -10,6 +10,7 @@ import pystray
 from PIL import Image, ImageDraw
 from pystray import Menu, MenuItem
 
+from . import autostart
 from common.version import VERSION
 
 # 84px 짜리 "아주 크게" 는 뺐다. 바탕화면을 너무 가린다.
@@ -96,6 +97,16 @@ class Tray(object):
             )),
             MenuItem("포켓몬 크기", Menu(*size_items)),
             MenuItem("활동 범위", Menu(*area_items)),
+            # 켜 두고 잊어버리는 프로그램이라, 켤 때마다 손으로 켜야
+            # 하면 그냥 안 켜게 된다. 여기에 둬야 손이 닿는다.
+            # 켜져 있다고 표시되는데 실제로는 안 켜지는 상황(작업
+            # 관리자에서 껐을 때)은 이름에 그대로 적는다.
+            MenuItem(lambda _it: ("컴퓨터 켤 때 같이 시작  (작업 관리자에서 꺼짐)"
+                                  if s.get("autostart") and autostart.blocked()
+                                  else "컴퓨터 켤 때 같이 시작"),
+                     lambda _i, _it: self.call(a.toggle_autostart),
+                     checked=lambda _it: bool(s.get("autostart")),
+                     enabled=autostart.supported()),
             Menu.SEPARATOR,
             # 볼과 소지금은 가방·상점 창에 이미 크게 떠 있다. 메뉴에
             # 또 두면 길기만 하다. 여기는 버전 하나로 줄인다.
