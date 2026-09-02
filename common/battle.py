@@ -38,6 +38,28 @@ HANDLED_STATUS = ("burn", "paralysis", "poison", "sleep", "freeze")
 
 # 연속기 횟수 분포 (2~5회 기술의 본가 확률)
 MULTI_HIT = [2, 2, 2, 3, 3, 3, 4, 5]
+# MULTI_HIT 의 평균. 연속기의 기대 타수다.
+HITS_AVG = sum(MULTI_HIT) / float(len(MULTI_HIT))
+
+
+class _EstRng(object):
+    """점수를 매길 때 damage() 에 넘기는 가짜 rng.
+
+    지금까지는 기술마다 random.Random(0) 을 새로 만들어 넘겼다. 값은
+    맞지만 객체를 만드는 값이 damage() 본체보다 비싸다. 상태를 갖지
+    않는 것으로 바꾼다 - **진짜 Random 을 재사용하면 안 된다.** 상태가
+    전진해서 부를 때마다 값이 달라지고, 그러면 점수가 흔들린다.
+
+    Random(0).random() 이 0.8444218515250481 이고 uniform(a,b) 는
+    a + (b-a)*random() 이라, 아래 식이 예전과 완전히 같은 값을 준다.
+    """
+
+    @staticmethod
+    def uniform(a, b):
+        return a + (b - a) * 0.8444218515250481
+
+
+EST_RNG = _EstRng()
 
 # 쓸 기술이 하나도 없을 때 쓰는 몸부림.
 # 이게 없으면 양쪽 다 PP 가 떨어졌을 때 아무도 못 때려서 배틀이 안 끝난다.
@@ -257,11 +279,29 @@ class Battle(object):
             acc = (md.get("acc") or 100) / 100.0
             if md.get("power"):
                 d, _c, _e = damage(self.dex, md, user, target,
-                                   random.Random(0), crit=False)
+                                   EST_RNG, crit=False)
+                # 연속기는 한 번 때리는 게 아니다. 씨앗기관총(위력 25)이
+                # 위력 25 짜리로 평가되어 늘 뒷전으로 밀렸다.
+                hits = md.get("hits") or [1, 1]
+                lo, hi = (hits + [1, 1])[:2]
+                if hi > 1:
+                    d *= HITS_AVG if (lo, hi) == (2, 5) else (lo + hi) / 2.0
                 score = d * acc
+                # 반동기(drain 이 음수)는 그만큼 내 체력을 깎는다.
+                # 체력이 얼마 안 남았는데 이판사판으로 쓰면 자멸한다.
+                back = md.get("drain") or 0
+                if back < 0:
+                    hurt = d * (abs(back) / 100.0)
+                    if hurt >= user.hp:     # 이 기술로 내가 먼저 쓰러진다
+                        score *= 0.25
+                    else:
+                        score -= hurt * 0.5
+                # **끝낼 수 있는지는 배수를 곱하기 전 값으로 본다.**
+                # best_dmg 에 3배가 섞이면 아래 변화기 기준선이 부풀어서
+                # 변화기를 실제보다 덜 쓰게 된다.
+                best_dmg = max(best_dmg, score)
                 if d >= target.hp:          # 이걸로 끝낼 수 있으면 최우선
                     score *= 3
-                best_dmg = max(best_dmg, score)
             else:
                 score = -1                  # 변화기는 아래에서 다시 매긴다
             scored.append([m, score, md])
@@ -289,8 +329,19 @@ class Battle(object):
             if target.status:               # 이미 상태이상이면 소용없다
                 return 0.0
             useful = True
+        # **누구한테 걸리는지는 도감이 정한다.** 예전에는 "올려주는
+        # 기술이면 자기 자신" 으로 짐작했는데, 그러면 재주넘기(SWAGGER)
+        # 처럼 **상대의** 공격을 올려 주는 기술을 "내 공격이 오른다" 로
+        # 잘못 세어 스스로 지는 수를 뒀다. 실행부(_use)는 이미 statSelf 를
+        # 본다 - 점수부만 어긋나 있었다.
+        self_target = bool(md.get("statSelf"))
         for stat, change in (md.get("stat") or []):
-            who = user if change > 0 else target
+            who = user if self_target else target
+            # 상대를 깎는 것도, 나를 올리는 것도 이득이다.
+            # 나를 깎거나 상대를 올리는 것은 손해라 세지 않는다.
+            good = (change > 0) if self_target else (change < 0)
+            if not good:
+                continue
             cur = who.stages.get(stat, 0)
             if (change > 0 and cur < STAGE_MAX) or (change < 0 and cur > STAGE_MIN):
                 useful = True
@@ -299,7 +350,21 @@ class Battle(object):
         if not useful:
             return 0.0
         # 때릴 수 있으면 때리는 쪽이 우선. 변화기는 그 절반 정도 값어치.
-        return max(1.0, best_dmg * 0.45) * ((md.get("acc") or 100) / 100.0)
+        score = max(1.0, best_dmg * 0.45) * ((md.get("acc") or 100) / 100.0)
+
+        # **판이 얼마나 남았는지**를 본다. 변화기는 뒤가 길어야 값을 한다.
+        # 예전에는 이걸 안 봐서, 상대 체력이 한 대 남았는데 랭크를 올리다가
+        # 역전당하거나, 내가 죽기 직전에 최면술을 걸었다.
+        if target.maxhp:
+            left = target.hp / float(target.maxhp)
+            # 상대가 얼마 안 남았으면 때려서 끝내는 게 낫다
+            score *= 0.25 + 0.75 * min(1.0, left * 1.4)
+        if user.maxhp:
+            mine = user.hp / float(user.maxhp)
+            # 내가 위태로우면 랭크를 올릴 때가 아니다. 회복기는 반대로 급하다.
+            if not md.get("heal"):
+                score *= 0.3 + 0.7 * min(1.0, mine * 1.6)
+        return score
 
     # ---------------- 한 턴 ----------------
     def take_turn(self, my_move):
