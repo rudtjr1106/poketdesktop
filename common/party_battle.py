@@ -127,6 +127,9 @@ class PartyBattle(object):
 
         # 체력이 많이 남은 쪽을 조금 더 쳐준다. 상성이 같으면 성한 애가 낫다.
         health = 0.6 + 0.4 * (mine.hp / float(mine.maxhp or 1))
+
+        # 힘 차이(능력치 합)도 보게 해 봤지만 600판을 붙여 50.8% 였다.
+        # 재보고 이득이 없어서 넣지 않는다 - 안 쓰는 복잡함은 빚이다.
         return (atk / dfn) * health
 
     def _pick_against(self, team, foe, cur=None):

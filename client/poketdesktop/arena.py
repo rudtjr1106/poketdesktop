@@ -69,6 +69,21 @@ class ArenaPet(Pet):
             pass
 
 
+# 못 움직인 이유를 머리 위에 짧게 띄운다. 원문은 문장이라 그대로 쓰면
+# 도트를 다 가린다.
+SKIP_TEXT = {
+    "sleep": "쿨쿨...",
+    "freeze": "얼었다!",
+    "paralysis": "몸이 저리다!",
+}
+
+
+def _short(text):
+    """'○○ 은(는) ...' 에서 뒷부분만. 이름은 도트를 보면 안다."""
+    t = (text or "").split(" 은(는) ")[-1]
+    return t[:14] if len(t) > 14 else t
+
+
 class Arena(object):
 
     def __init__(self, app, view, on_done=None):
@@ -448,6 +463,14 @@ class Arena(object):
                                           or ev.get("amount") or 0), "#ff8a8a")
         if t == "heal" and src:
             self.float_over(src, "+%d" % (ev.get("amount") or 0), "#7bffa0")
+        # **못 움직인 턴을 보여준다.** 예전에는 이 셋을 그리지 않아서,
+        # 잠들거나 마비돼서 한 턴을 쉬면 화면에는 아무것도 안 뜨고
+        # 상대만 연달아 때리는 것처럼 보였다.
+        if t in ("status", "msg") and src:
+            self.float_over(src, SKIP_TEXT.get(ev.get("status"))
+                            or _short(ev.get("text")), "#c9a0ff")
+        if t == "cure" and src:
+            self.float_over(src, _short(ev.get("text")), "#7bffa0")
         if t == "immune":
             side = self.active.get(who)
             if side:
