@@ -502,14 +502,24 @@ class BoxWindow(object):
         return None
 
     def _show_line(self, pid):
-        """놓을 자리에 줄을 하나 긋는다. 어디에 떨어질지 보여야 한다."""
+        """바꿀 상대를 짚어 준다.
+
+        예전에는 줄 아래에 선을 그었는데, 그건 "여기 끼워 넣는다" 는
+        뜻이다. 지금은 **맞바꾸기**라 그 줄 전체를 테두리로 감싼다 -
+        누구와 바꾸는지가 보여야 한다.
+        """
         self._hide_line()
         row = self.rows.get(pid)
-        if not row:
-            return
+        if not row or (self._drag or {}).get("pid") == pid:
+            return                         # 자기 자신에게는 표시하지 않는다
         try:
-            self._line = tk.Frame(row.f, bg=U.ACCENT, height=3)
-            self._line.place(x=0, rely=1.0, relwidth=1.0, anchor="sw")
+            f = tk.Frame(row.f, bg=U.ACCENT)
+            f.place(x=0, y=0, relwidth=1.0, relheight=1.0)
+            f.lower()                      # 글자를 가리지 않게 뒤로
+            inner = tk.Frame(f, bg=row.base)
+            inner.place(x=2, y=2, relwidth=1.0, relheight=1.0,
+                        width=-4, height=-4)
+            self._line = f
         except Exception:                                   # noqa: BLE001
             self._line = None
 
@@ -523,69 +533,57 @@ class BoxWindow(object):
         self._line = None
 
     def _apply_drop(self, src, dst):
-        """src 를 dst 자리에 놓는다.
+        """src 와 dst 가 **자리를 맞바꾼다.**
 
-        규칙은 하나다 - **놓인 줄의 자리를 물려받는다.**
-          박스 것을 파티 줄에 놓으면  -> 둘이 자리를 바꾼다 (스왑)
-          파티 것을 박스 줄에 놓으면  -> 파티에서 내려온다
-          파티 안에서 옮기면          -> 순서만 바뀐다
+        끼워 넣기가 아니라 맞바꾸기다. 두 마리를 집어서 서로 바꿔 든다고
+        생각하면 된다.
+
+          파티 안에서    -> 둘의 순서가 서로 바뀐다
+          박스 것 -> 파티 -> 박스 것이 그 자리로, 파티에 있던 것이 박스로
+          파티 것 -> 박스 -> 파티 것이 박스로, 박스에 있던 것이 그 자리로
+          박스 안에서    -> 아무 일도 없다 (박스에는 순서가 없다)
         """
         a = next((m for m in self.mons if m["id"] == src), None)
         b = next((m for m in self.mons if m["id"] == dst), None)
-        if not a or not b:
+        if not a or not b or src == dst:
             return
         a_party = bool(a.get("onDesktop"))
         b_party = bool(b.get("onDesktop"))
         party = [m["id"] for m in self.mons if m.get("onDesktop")]
 
         if a_party and b_party:
-            # 순서만 바꾼다
-            party.remove(src)
-            party.insert(party.index(dst) if dst in party else len(party), src)
-            calls = [("order", party)]
-            msg = "순서를 바꿨습니다."
-        elif not a_party and b_party:
-            # 스왑. **내리고 나서 올려야** 한다 - 파티가 꽉 차 있으면
-            # 먼저 올리려다 "최대 6마리" 로 막힌다.
-            calls = [("down", dst), ("up", src), ("order", None)]
+            # 둘 다 파티. 자리를 맞바꾼다.
+            ia, ib = party.index(src), party.index(dst)
+            party[ia], party[ib] = party[ib], party[ia]
+            plan = [("order", party)]
             msg = "자리를 바꿨습니다."
-        elif a_party and not b_party:
-            calls = [("down", src)]
-            msg = "박스로 보냈습니다."
+        elif a_party != b_party:
+            # 하나는 파티, 하나는 박스. 파티에 있던 것이 내려가고 그 자리로
+            # 박스에 있던 것이 올라온다.
+            # **내리고 나서 올려야** 한다 - 파티가 꽉 차 있으면 먼저
+            # 올리려다 "최대 6마리" 로 막힌다.
+            up, down = (src, dst) if b_party else (dst, src)
+            at = party.index(down)
+            order = list(party)
+            order[at] = up                 # 내려간 자리에 올라온 것을 넣는다
+            plan = [("down", down), ("up", up), ("order", order)]
+            msg = "자리를 바꿨습니다."
         else:
-            return                       # 박스끼리는 순서가 없다
+            return                         # 박스끼리는 순서가 없다
 
         self.say("옮기는 중...")
 
         def work():
             api = self.app.api
-            new_party = None
-            for kind, arg in calls:
+            for kind, arg in plan:
                 if kind == "down":
                     api.set_desktop(arg, False)
                 elif kind == "up":
                     api.set_desktop(arg, True)
                 elif kind == "order":
-                    if arg is not None:
-                        api.set_order(arg)
-                    else:
-                        # 스왑은 서버가 빈 자리에 넣어 준다. 화면에서 보이던
-                        # 자리에 맞추려면 지금 목록을 다시 받아 순서를 준다.
-                        cur = [m["id"] for m in api.desktop()]
-                        if src in cur and dst not in cur:
-                            cur.remove(src)
-                            idx = self._party_index(dst)
-                            cur.insert(min(idx, len(cur)), src)
-                            api.set_order(cur)
-                            new_party = cur
-            return new_party
+                    api.set_order(arg)
 
         U.run_async(self.root, work, self._after(msg))
-
-    def _party_index(self, pid):
-        """옮기기 전 화면에서 그 마리가 몇 번째였나."""
-        party = [m["id"] for m in self.mons if m.get("onDesktop")]
-        return party.index(pid) if pid in party else len(party)
 
     def current(self):
         return next((m for m in self.mons if m["id"] == self.sel), None)
@@ -677,9 +675,15 @@ class BoxWindow(object):
                                 fill=col, outline="")
             ivl.configure(text="개체 %d" % iv,
                           fg=U.GOOD if iv == 31 else U.FG_DIM)
+        # 종족값 합계를 같이 보여준다. 이게 없으면 "600족" 인지 아닌지
+        # 화면에서 알 수가 없다 - 개체값(0~31 씩 굴리는 것)과 종족값(종마다
+        # 정해진 것)은 다른 값인데, 능력치가 낮으면 둘 다 뭉뚱그려
+        # "개체값이 낮다" 로 보인다.
+        bst = sum((sp or {}).get("base", {}).get(k, 0)
+                  for k in ("hp", "atk", "def", "spa", "spd", "spe"))
         self.d_ivsum.configure(
-            text="개체값 %d / 186  ·  %.0f%%" % (info.get("ivTotal", 0),
-                                              info.get("ivPercent", 0)))
+            text="종족값 %d  ·  개체값 %d / 186  (%.0f%%)"
+                 % (bst, info.get("ivTotal", 0), info.get("ivPercent", 0)))
         self._friendship(m)
 
         for w in self.d_moves.winfo_children():
