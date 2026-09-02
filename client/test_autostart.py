@@ -231,6 +231,106 @@ def t_실패하면_설정을_바꾸지_않는다():
     chk("실패한 이유를 돌려준다", "등록하지 못했습니다" in msg, msg)
 
 
+def t_지우기보다_고치기가_먼저다():
+    """cleanup_old() 는 지난 버전 폴더를 통째로 지운다.
+
+    갈아탄 직후 첫 실행에서는 Run 키가 아직 그 폴더의 exe 를 가리킨다.
+    지운 다음에 고치려다 그 사이에 프로세스가 죽으면(백신 격리, 강제 종료)
+    Run 키는 없는 파일을 가리킨 채 남는다. 윈도우는 그때 아무 소리 없이
+    넘어가므로 **다음 부팅부터 아무것도 안 뜨고, 안 뜨니 스스로 고칠
+    기회도 영영 없다.**
+    """
+    from poketdesktop import app as appmod
+
+    순서 = []
+
+    class 가짜업데이터(object):
+        @staticmethod
+        def is_frozen():
+            return True
+
+        @staticmethod
+        def cleanup_old():
+            순서.append("지움")
+
+        @staticmethod
+        def check():
+            순서.append("확인")
+            return None
+
+    class 가짜자동시작(object):
+        FLAG = autostart.FLAG
+        등록됨 = [None]
+
+        @classmethod
+        def registered(cls):
+            return cls.등록됨[0]
+
+        @staticmethod
+        def sync(_want):
+            순서.append("고침")
+
+    class 가짜앱(object):
+        settings = {"autostart": True}
+        autostarted = False
+        확인 = App_check = appmod.App.check_update
+
+    real_u, real_a = appmod.updater, appmod.autostart
+    appmod.updater, appmod.autostart = 가짜업데이터, 가짜자동시작
+    try:
+        # 이미 등록돼 있으면 -> 지우기 **전에** 고쳐야 한다
+        가짜자동시작.등록됨[0] = "C:" + chr(92) + "옛것.exe --autostart"
+        del 순서[:]
+        가짜앱().확인()
+        chk("등록이 있으면 지우기 전에 고친다",
+            순서[:2] == ["고침", "지움"], 순서)
+
+        # 등록이 없으면 -> 손대지 않는다 (로그인 전 등록 방지)
+        가짜자동시작.등록됨[0] = None
+        del 순서[:]
+        가짜앱().확인()
+        chk("등록이 없으면 여기서 새로 만들지 않는다",
+            "고침" not in 순서, 순서)
+    finally:
+        appmod.updater, appmod.autostart = real_u, real_a
+
+
+def t_한_번만_알린다():
+    """기본으로 켜지는 기능이라 한 번은 말해야 한다. 다만 한 번만."""
+    from poketdesktop import app as appmod
+
+    본다 = []
+
+    class 가짜앱(object):
+        def __init__(self, autostarted=False):
+            self.settings = {"autostartTold": False}
+            self.autostarted = autostarted
+
+        말하기 = appmod.App._tell_autostart_once
+
+    real_state, real_save = autostart.state, appmod.config.save_settings
+    autostart.state = lambda: ("on", "")
+    appmod.config.save_settings = lambda _s: None
+    import tkinter.messagebox as mb
+    real_info = mb.showinfo
+    mb.showinfo = lambda *a, **k: 본다.append(a)
+    try:
+        a = 가짜앱()
+        a.말하기()
+        chk("처음엔 알린다", len(본다) == 1, 본다)
+        a.말하기()
+        chk("두 번은 안 알린다", len(본다) == 1, 본다)
+
+        del 본다[:]
+        b = 가짜앱(autostarted=True)
+        b.말하기()
+        # 컴퓨터를 켜자마자 창이 튀어나오면 그것대로 방해다
+        chk("부팅으로 켜진 판에서는 안 띄운다", 본다 == [], 본다)
+    finally:
+        autostart.state, appmod.config.save_settings = real_state, real_save
+        mb.showinfo = real_info
+
+
 def t_맞추기():
     frozen(True)
 
@@ -301,7 +401,9 @@ def main():
     try:
         for fn in (t_명령줄, t_켜고_끄기, t_작업관리자,
                    t_첫_설치에서_등록된다, t_끌_때_작업관리자_기록은_안_건드린다,
-                   t_실패하면_설정을_바꾸지_않는다, t_맞추기):
+                   t_실패하면_설정을_바꾸지_않는다,
+                   t_지우기보다_고치기가_먼저다, t_한_번만_알린다,
+                   t_맞추기):
             wipe()
             # 검사끼리 새지 않게 매번 되돌린다. 안 그러면 순서를 바꾸는
             # 것만으로 검사가 무엇을 보장하는지가 조용히 달라진다.

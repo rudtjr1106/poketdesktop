@@ -97,6 +97,19 @@ class App(object):
         """
         if not updater.is_frozen():
             return False
+        # **옛 폴더를 지우기 전에** 등록해 둔 경로부터 지금 파일로 맞춘다.
+        #
+        # 바로 아래 cleanup_old() 가 지난 버전 폴더를 지우는데, 갈아탄 직후
+        # 첫 실행에서는 Run 키가 아직 그 폴더의 exe 를 가리키고 있다. 지운
+        # 다음에 고치려다 그 사이에 프로세스가 죽으면(백신 격리, 강제 종료,
+        # 노트북 덮개) Run 키는 없는 파일을 가리킨 채 남는다. 윈도우는 그때
+        # 아무 소리 없이 넘어가므로 다음 부팅부터 아무것도 안 뜨고, 안 뜨니
+        # 스스로 고칠 기회도 영영 없다.
+        #
+        # **이미 등록돼 있을 때만** 손댄다. 여기서 새로 등록하면 아직
+        # 로그인도 안 한 사람이 부팅 목록에 들어간다.
+        if autostart.registered() is not None:
+            autostart.sync(self.settings.get("autostart"))
         # 지난 버전 폴더를 치운다. 새 버전으로 갈아탄 직후라면 여기서 지워진다.
         try:
             updater.cleanup_old()
@@ -111,7 +124,8 @@ class App(object):
             return False
         config.log("새 버전 %s 발견" % info["version"])
         try:
-            result, new_exe = UpdateWindow(self.root, info).show()
+            result, new_exe = UpdateWindow(self.root, info).show(
+                quiet=self.autostarted)
         except Exception as e:                              # noqa: BLE001
             config.log("업데이트 창 오류: %s" % e)
             return False
@@ -130,8 +144,25 @@ class App(object):
     def boot(self):
         if self.check_update():
             return self.quit()
+        if self.autostarted:
+            self._early_tray()
         self._login_try = 0
         self._auto_login()
+
+    def _early_tray(self):
+        """로그인 전이라도 트레이 아이콘은 띄운다 (부팅으로 켜졌을 때).
+
+        인터넷이 늦게 붙는 PC 에서는 여기서부터 몇 분 동안 화면에 아무것도
+        없다 - 창도, 트레이 아이콘도. 사용자에게는 "자동 시작이 안 됐다" 와
+        구분이 안 된다. 게다가 그때 바탕화면 아이콘을 다시 누르면 "이미
+        실행 중입니다, 숨겨진 아이콘에서 몬스터볼을 찾으세요" 가 뜨는데,
+        찾으라는 그 아이콘이 없다.
+        """
+        if self._quitting:
+            return
+        if self.tray is None:
+            self.tray = Tray(self)
+            self.tray.start()
 
     def _auto_login(self):
         if self._quitting:
@@ -212,6 +243,8 @@ class App(object):
         if self.tray is None:
             self.tray = Tray(self)
             self.tray.start()
+        else:
+            self.refresh_tray()     # 로그인 전 메뉴를 제대로 된 것으로 바꾼다
         if self.wild is None:
             self.wild = WildController(self)
         self.sync()
@@ -229,6 +262,7 @@ class App(object):
         # 여기서 하면 등록해 둔 경로가 지금 파일과 맞는지도 같이 고쳐진다.
         # 버전이 오르면 파일 이름이 바뀌기 때문에 필요한 일이다.
         autostart.sync(self.settings.get("autostart"))
+        self._tell_autostart_once()
         self.wild.start()
         self.resume_battle()
         self._schedule_sync()
@@ -708,6 +742,34 @@ class App(object):
         if self.overlay:
             self.overlay.refresh_visuals()
         self.refresh_tray()
+
+    def _tell_autostart_once(self):
+        """부팅 등록을 했다는 것을 딱 한 번 알린다.
+
+        기본으로 켜지는 기능이다. 쓰던 사람은 업데이트만 했는데 부팅
+        목록에 이름이 생긴다. 나중에 작업 관리자에서 그걸 발견했을 때의
+        반응은 "언제 이게 들어갔지" 이고, 거기서부터는 악성코드를 보는
+        눈이 된다. 한 번은 말해야 한다.
+
+        부팅으로 켜진 판에서는 띄우지 않는다 - 컴퓨터를 켜자마자 창이
+        튀어나오면 그것대로 방해다. (부팅으로 켜졌다는 건 이미 등록돼
+        있었다는 뜻이라, 첫 등록이 여기로 올 일은 원래 없다)
+        """
+        if self.settings.get("autostartTold") or self.autostarted:
+            return
+        if autostart.state()[0] != "on":
+            return
+        self.settings["autostartTold"] = True
+        config.save_settings(self.settings)
+        try:
+            import tkinter.messagebox as mb
+            mb.showinfo("포스크탑",
+                        "이제 컴퓨터를 켜면 포스크탑도 같이 시작합니다."
+                        + chr(10) + chr(10) +
+                        "끄고 싶으면 트레이 아이콘을 우클릭해서" + chr(10) +
+                        "'컴퓨터 켤 때 같이 시작' 의 체크를 풀면 됩니다.")
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def set_autostart(self, want):
         """컴퓨터를 켤 때 같이 시작할지 정한다.
