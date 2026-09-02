@@ -322,6 +322,28 @@ def main():
     st, r = call("POST", "/api/pokemon/%d/desktop" % ids[0], {"on": False}, token)
     chk("거두기 성공", st == 200 and r["pokemon"]["onDesktop"] is False, r)
 
+    section("파티 순서 바꾸기")
+    # **반드시 HTTP 로 두드린다.** 예전에 이 기능을 함수만 직접 불러서
+    # 검사했더니, /api/pokemon/{pid} 가 먼저 걸려서 405 가 나는 것을
+    # 못 잡았다. 경로가 제대로 뚫렸는지는 경로로만 알 수 있다.
+    st, d = call("GET", "/api/pokemon/desktop", token=token)
+    party = [m["id"] for m in d["pokemon"]]
+    rev = list(reversed(party))
+    # 경로가 뚫렸는지는 한 마리로도 알 수 있다. 405 가 나오면 그건
+    # /api/pokemon/{pid} 가 먼저 걸려서 POST 를 못 찾은 것이다.
+    st, r = call("POST", "/api/pokemon/order", {"ids": rev}, token)
+    chk("순서 바꾸기 경로가 뚫려 있다 (%s)" % st, st == 200, r)
+    if len(party) >= 2:
+        st, d2 = call("GET", "/api/pokemon/desktop", token=token)
+        chk("뒤집은 순서가 그대로 반영된다",
+            [m["id"] for m in d2["pokemon"]] == rev,
+            [m["id"] for m in d2["pokemon"]])
+    # 7개. 12개를 넘기면 Pydantic 이 먼저 422 로 막아서 우리 검사가 안 걸린다.
+    st, r = call("POST", "/api/pokemon/order", {"ids": list(range(1, 8))}, token)
+    chk("파티 상한을 넘기면 막는다(400)", st == 400, (st, r))
+    st, r = call("POST", "/api/pokemon/order", {"ids": rev})
+    chk("로그인 없이는 못 바꾼다(401)", st == 401, (st, r))
+
     section("별명 / 경험치 / 놓아주기")
     st, r = call("PATCH", "/api/pokemon/%d" % ids[0], {"nickname": "테스트"}, token)
     chk("별명 설정", st == 200 and r["pokemon"]["nickname"] == "테스트", r)
