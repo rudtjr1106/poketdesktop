@@ -96,6 +96,25 @@ def is_online(uid):
     return bool(m.get(uid, ("", False))[1])
 
 
+def _ago(seen):
+    """마지막 접속이 몇 초 전인지. 모르면 None.
+
+    **시각이 아니라 초를 보낸다.** 시각을 보내면 받는 쪽이 자기 시계로
+    빼야 하는데, 사람들 PC 시계는 생각보다 잘 틀어져 있다. 몇 분 틀어진
+    PC 에서는 방금 접속한 친구가 "3시간 전" 으로 보이거나 미래로 나온다.
+    센 쪽이 시계를 하나만 쓰면 그럴 일이 없다.
+    """
+    if not seen:
+        return None
+    try:
+        t = datetime.datetime.fromisoformat(seen.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+    if t.tzinfo is None:                    # 옛 행에는 시간대가 없을 수 있다
+        t = t.replace(tzinfo=datetime.timezone.utc)
+    return max(0, int((_now() - t).total_seconds()))
+
+
 def _names(ids):
     if not ids:
         return {}
@@ -141,7 +160,8 @@ def listing(uid):
         st = stats.get(other)
         seen, on = online.get(other, (None, False))
         out = {"id": other, "name": names.get(other, "?"), "online": on,
-               "lastSeen": seen, "since": r["decided_at"] or r["created_at"]}
+               "lastSeen": seen, "lastSeenAgo": _ago(seen),
+               "since": r["decided_at"] or r["created_at"]}
         if st:
             out.update({"rating": st["rating"], "ranked": bool(st["ranked"]),
                         "wins": st["wins"], "losses": st["losses"],
@@ -151,8 +171,16 @@ def listing(uid):
         return out
 
     return {
+        # 접속 중이 맨 위, 그 다음은 **최근에 본 순서**다. 이름순으로 두면
+        # 1년 전에 마지막으로 온 사람이 2분 전 사람보다 위에 오는데, 마지막
+        # 접속을 화면에 보여주기 시작한 뒤로는 그게 뒤죽박죽으로 보인다.
+        # 한 번도 접속 기록이 없는 사람(None)은 맨 뒤로.
         "friends": sorted([brief(o, r) for o, r in friends],
-                          key=lambda x: (not x["online"], x["name"])),
+                          key=lambda x: (not x["online"],
+                                         x["lastSeenAgo"] if
+                                         x["lastSeenAgo"] is not None
+                                         else float("inf"),
+                                         x["name"])),
         "incoming": [{"id": o, "name": names.get(o, "?"), "at": r["created_at"]}
                      for o, r in incoming],
         "outgoing": [{"id": o, "name": names.get(o, "?"), "at": r["created_at"]}
@@ -315,17 +343,21 @@ def profile(uid, other):
         raise HTTPException(404, "그런 트레이너가 없습니다.")
     rel = relation(uid, other)
     st = _stats([other]).get(other)
-    out = {"id": other, "name": u["username"], "relation": rel,
-           "online": is_online(other)}
+    seen, on = _online_map([other]).get(other, (None, False))
+    out = {"id": other, "name": u["username"], "relation": rel, "online": on}
     if st:
         out.update({"rating": st["rating"], "ranked": bool(st["ranked"]),
                     "wins": st["wins"], "losses": st["losses"],
                     "draws": st["draws"], "streak": st["streak"],
                     "best": st["best"]})
-    # 최근 전적은 나 자신이나 친구에게만 보여준다. 모르는 사람의 기록을
-    # 마음대로 볼 수 있으면 그것도 정보 수집이 된다.
+    # 최근 전적과 **마지막 접속 시각**은 나 자신이나 친구에게만 보여준다.
+    # 모르는 사람의 기록을 마음대로 볼 수 있으면 그것도 정보 수집이 된다.
+    # 특히 "언제 컴퓨터 앞에 있었나" 는 접속 중 표시(초 단위가 아닌 3분
+    # 창)보다 훨씬 많은 것을 말해 준다 - 생활 시간표가 그대로 드러난다.
     out["recent"] = []
     if rel in ("self", "friend"):
+        out["lastSeen"] = seen
+        out["lastSeenAgo"] = _ago(seen)
         out["recent"] = [r["result"] for r in db.q(
             "SELECT result FROM battle_record WHERE user_id=?"
             " ORDER BY id DESC LIMIT 10", (other,))]

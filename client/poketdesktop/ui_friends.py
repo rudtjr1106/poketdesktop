@@ -13,6 +13,8 @@ Turso 는 왕복 하나가 곧 비용이라, 항상 도는 폴링은 꼭 필요�
 """
 import tkinter as tk
 
+from common.korean import ago
+
 from . import ui_common as U
 from . import ui_loading
 from .ui_common import run_async
@@ -259,6 +261,23 @@ class FriendsWindow(object):
                  anchor="w", justify="left", wraplength=W - 70).pack(
             fill="x", pady=6)
 
+    def _seen_text(self, f):
+        """마지막 접속을 사람 말로.
+
+        **서버가 센 초(lastSeenAgo)를 받아 쓴다.** 시각을 받아 내 시계로
+        빼면, 몇 분 틀어진 PC 에서 방금 접속한 친구가 "3시간 전" 으로
+        보이거나 미래로 나온다. 사람들 PC 시계는 생각보다 잘 틀어져 있다.
+
+        서버가 그 값을 안 보내면(옛 서버) 아무것도 안 쓴다. 틀린 시각을
+        보여주느니 비워 두는 편이 낫다.
+        """
+        if f.get("online"):
+            return "접속 중", U.GOOD
+        sec = f.get("lastSeenAgo")
+        if sec is None:
+            return "", U.FG_FAINT
+        return ago(sec), U.FG_FAINT
+
     def _dot(self, parent, online):
         cv = tk.Canvas(parent, width=10, height=10, bg=parent["bg"],
                        highlightthickness=0, bd=0)
@@ -278,6 +297,10 @@ class FriendsWindow(object):
         self._dot(row, f.get("online"))
         tk.Label(row, text=f["name"], bg=U.BG3, fg=U.FG,
                  font=U.FONT_B).pack(side="left", padx=(8, 8))
+        text, color = self._seen_text(f)
+        if text:
+            tk.Label(row, text=text, bg=U.BG3, fg=color,
+                     font=U.FONT_XS).pack(side="left", padx=(0, 8))
         if f.get("ranked"):
             tk.Label(row, text="%d점" % f.get("rating", 0), bg=U.BG3,
                      fg=U.ACCENT, font=U.FONT_S).pack(side="left")

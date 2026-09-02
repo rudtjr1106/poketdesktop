@@ -109,8 +109,24 @@ def main():
         s, r = call("GET", "/api/friends", None, at)
         chk("양쪽 다 친구 목록에 뜬다", len(r.get("friends") or []) == 1, r)
         chk("보낸 신청은 비었다", not r.get("outgoing"), r.get("outgoing"))
-        chk("접속 중으로 보인다", r["friends"][0]["online"] is True,
-            r["friends"][0])
+        f0 = r["friends"][0]
+        chk("접속 중으로 보인다", f0["online"] is True, f0)
+        # **시각이 아니라 초를 보낸다.** 시각을 보내면 받는 쪽이 자기 시계로
+        # 빼는데, 몇 분 틀어진 PC 에서는 방금 접속한 친구가 "3시간 전" 으로
+        # 보이거나 미래로 나온다. 센 쪽이 시계를 하나만 쓰면 그럴 일이 없다.
+        chk("마지막 접속을 초로 보낸다", isinstance(f0.get("lastSeenAgo"), int),
+            f0.get("lastSeenAgo"))
+        # `x or -1` 로 쓰면 안 된다 - 0 초는 falsy 라 -1 이 되어 방금
+        # 접속한 경우에만 검사가 실패한다.
+        _sec = f0.get("lastSeenAgo")
+        chk("방금 접속했으니 작은 값",
+            _sec is not None and 0 <= _sec < 120, _sec)
+        # 접속 중이 위, 그 다음은 최근에 본 순서. 한 번도 안 온 사람은 맨 뒤.
+        _key = [(not x["online"],
+                 x["lastSeenAgo"] if x["lastSeenAgo"] is not None
+                 else float("inf")) for x in r["friends"]]
+        chk("접속 중이 먼저, 그 다음 최근 순",
+            _key == sorted(_key), _key)
         s, r = call("POST", "/api/friends/request", {"username": bn}, at)
         chk("이미 친구면 409", s == 409, (s, r))
 
@@ -126,8 +142,13 @@ def main():
         chk("친구 프로필이 보인다", s == 200 and r.get("relation") == "friend",
             (s, r))
         chk("친구는 최근 전적도 보인다", "recent" in r, r)
+        chk("친구는 마지막 접속도 보인다",
+            isinstance(r.get("lastSeenAgo"), int), r.get("lastSeenAgo"))
         s, r = call("GET", "/api/users/%d/profile" % ID_B, None, ct)
         chk("남의 최근 전적은 안 보인다", r.get("recent") == [], r)
+        # "언제 컴퓨터 앞에 있었나" 는 접속 중 표시(3분 창)보다 훨씬 많은
+        # 것을 말해 준다 - 생활 시간표가 그대로 드러난다.
+        chk("남의 마지막 접속은 안 보인다", "lastSeenAgo" not in r, r)
 
         print("\n=== 거절 ===")
         s, r = call("POST", "/api/friends/request", {"username": cn}, bt)
