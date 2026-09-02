@@ -22,19 +22,20 @@ W, H = 560, 620
 
 class FriendsWindow(object):
 
-    def __init__(self, app):
+    def __init__(self, app, parent=None):
         self.app = app
         self.root = app.root
         self.data = None
         self.busy = False
 
-        self.win = tk.Toplevel(self.root)
-        U.style_window(self.win, "포스크탑 — 친구", W, H)
-        U.apply_theme(self.win)
+        # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
+        self.win = U.panel(parent, self.root, "포스크탑 — 친구",
+                           W, H, 500, 480, self.close)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.minsize(500, 480)
-        self.win.protocol("WM_DELETE_WINDOW", self.close)
+        if not U.is_embedded(self.win):
+            # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
+            U.install_wheel(self.win)
 
         self._header()
         self._search()
@@ -104,7 +105,7 @@ class FriendsWindow(object):
         cv.configure(yscrollcommand=sb.set)
         cv.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
-        cv.bind_all("<MouseWheel>", self._wheel)
+        U.scrollable(cv, 120)
         self.cv = cv
 
     def fit_scroll(self):
@@ -119,22 +120,6 @@ class FriendsWindow(object):
                 self.cv.yview_moveto(0)
             else:
                 self.cv.configure(scrollregion=(0, 0, w, h))
-        except Exception:                                   # noqa: BLE001
-            pass
-
-    def _wheel(self, e):
-        # bind_all 이라 창 전체의 휠이 온다. 정말 이 목록 위인지 본다.
-        try:
-            w = self.cv.winfo_containing(e.x_root, e.y_root)
-            while w is not None:
-                if w is self.cv or w is self.list:
-                    break
-                w = getattr(w, "master", None)
-            if w is None:
-                return
-            if self.list.winfo_reqheight() <= self.cv.winfo_height():
-                return
-            self.cv.yview_scroll(int(-e.delta / 120), "units")
         except Exception:                                   # noqa: BLE001
             pass
 
@@ -353,6 +338,8 @@ class FriendsWindow(object):
 
     # ---------------- 끝 ----------------
     def focus(self):
+        if U.is_embedded(self.win):
+            return          # 탭이면 허브가 앞으로 꺼내 준다
         try:
             self.win.deiconify()
             self.win.lift()
@@ -361,10 +348,6 @@ class FriendsWindow(object):
             pass
 
     def close(self):
-        try:
-            self.cv.unbind_all("<MouseWheel>")
-        except Exception:                                   # noqa: BLE001
-            pass
         try:
             self.win.destroy()
         except Exception:                                   # noqa: BLE001

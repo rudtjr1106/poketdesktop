@@ -346,6 +346,86 @@ def style_window(win, title, w=None, h=None):
     return win
 
 
+def panel(parent, root, title, w=None, h=None,
+          minw=None, minh=None, on_close=None):
+    """창 하나, 또는 탭 안의 한 칸을 만들어 준다.
+
+    parent 가 없으면 지금까지처럼 **창**을 띄운다.
+    parent 가 있으면 그 안에 **Frame** 을 만든다 (탭 하나로 쓰인다).
+
+    창에만 있는 것 - 제목, 크기, 닫기 단추, 최소 크기 - 은 창일 때만 부른다.
+    Frame 에는 title() 도 protocol() 도 없어서 그냥 부르면 AttributeError 로
+    즉사한다. 여섯 창이 전부 같은 네 가지에 걸려 있어서 여기 한 군데로 모았다.
+
+    돌려주는 위젯에 `embedded` 를 붙여 둔다. 부르는 쪽에서 창일 때만 해야
+    하는 일(띄우기, 포커스 주기)을 가려낼 때 쓴다.
+    """
+    if parent is None:
+        win = tk.Toplevel(root)
+        style_window(win, title, w, h)
+        apply_theme(win)
+        if minw and minh:
+            win.minsize(minw, minh)
+        if on_close:
+            win.protocol("WM_DELETE_WINDOW", on_close)
+        win.embedded = False
+        return win
+    f = tk.Frame(parent, bg=BG)
+    f.embedded = True
+    return f
+
+
+def is_embedded(w):
+    """이 위젯이 탭 안에 들어 있나. 창이면 False."""
+    return bool(getattr(w, "embedded", False))
+
+
+def install_wheel(top):
+    """이 창의 휠을 **한 군데서** 받아서 알맞은 목록으로 보낸다.
+
+    예전에는 창마다 제각각이었다. 어떤 창은 bind_all 로 걸고(창 전체를
+    가로챈다), 어떤 창은 자기 창에 걸었다. 문제가 둘이었다:
+
+      1. 닫을 때 부르던 unbind_all 이 **다른 창의 휠까지 통째로 지웠다.**
+         포켓몬 관리 창을 열었다 닫으면 도감의 휠이 죽었다.
+      2. 창에 건 바인딩은 탭(Frame) 안에서는 오지 않는다. tk 는 이벤트를
+         위젯 -> 클래스 -> 창 -> all 순으로만 올려보내는데, 중간 Frame 은
+         그 길에 없다. 그래서 탭으로 합치면 가방·상점 휠이 조용히 멎는다.
+
+    그래서 창 하나에 하나만 건다. 목록 쪽은 캔버스에 `wheel_div` 만 붙여
+    두면 된다 - 굴릴 게 없으면 굴리지 않는 것도 여기서 한 번에 처리한다.
+    """
+    def on_wheel(e):
+        try:
+            w = top.winfo_containing(e.x_root, e.y_root)
+        except Exception:                                   # noqa: BLE001
+            return None
+        while w is not None:
+            div = getattr(w, "wheel_div", 0)
+            if div:
+                try:
+                    lo, hi = w.yview()
+                    if (hi - lo) < 0.999:      # 다 보이면 굴릴 게 없다
+                        w.yview_scroll(int(-e.delta / div), "units")
+                    after = getattr(w, "wheel_after", None)
+                    if after:
+                        after()
+                except Exception:                           # noqa: BLE001
+                    pass
+                return "break"
+            w = getattr(w, "master", None)
+        return None
+    top.bind("<MouseWheel>", on_wheel)
+
+
+def scrollable(canvas, div=60, after=None):
+    """이 캔버스를 휠로 굴릴 수 있다고 표시한다. install_wheel 이 찾아 쓴다."""
+    canvas.wheel_div = div
+    if after:
+        canvas.wheel_after = after
+    return canvas
+
+
 def apply_theme(root):
     s = ttk.Style(root)
     try:
@@ -403,7 +483,15 @@ def run_async(root, fn, on_done):
         if t.is_alive():
             root.after(60, poll)
             return
-        on_done(box.get("r"), box.get("e"))
+        try:
+            on_done(box.get("r"), box.get("e"))
+        except tk.TclError as e:
+            # 답이 오기 전에 창을 닫으면, 그리려던 위젯이 이미 없다.
+            # ("invalid command name ...") 고칠 것이 없는 상황이라 조용히
+            # 넘긴다 - 다만 무엇이었는지는 남긴다. 탭으로 합치면서 여섯
+            # 화면이 한꺼번에 닫히다 보니 더 자주 만난다.
+            from . import config
+            config.log("창이 닫힌 뒤 도착한 응답을 버립니다: %s" % e)
 
     root.after(50, poll)
 

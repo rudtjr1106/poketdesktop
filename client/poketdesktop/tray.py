@@ -65,11 +65,17 @@ class Tray(object):
             for label, w, h in AREA_PRESETS]
 
         return Menu(
-            MenuItem("포켓몬 관리...", lambda _i, _it: self.call(a.open_box),
+            # 이제 창이 하나다. 메뉴는 어느 탭으로 열지만 고른다.
+            MenuItem("열기...", lambda _i, _it: self.call(a.open_box),
                      default=True),
-            MenuItem("도감...", lambda _i, _it: self.call(a.open_dex)),
-            MenuItem("가방...", lambda _i, _it: self.call(a.open_bag)),
-            MenuItem("친구...", lambda _i, _it: self.call(a.open_friends)),
+            MenuItem("바로 가기", Menu(
+                MenuItem("포켓몬 관리", lambda _i, _it: self.call(a.open_box)),
+                MenuItem("가방", lambda _i, _it: self.call(a.open_bag)),
+                MenuItem("상점", lambda _i, _it: self.call(a.open_shop)),
+                MenuItem("도감", lambda _i, _it: self.call(a.open_dex)),
+                MenuItem("친구", lambda _i, _it: self.call(a.open_friends)),
+                MenuItem("설정", lambda _i, _it: self.call(a.open_settings)),
+            )),
             MenuItem("랜덤 배틀", lambda _i, _it: self.call(a.pvp_random)),
             # 알림을 안 띄우기로 했으니, 놓치면 안 되는 것은 메뉴에
             # 남는다. 상대가 걸어온 대전은 화면에 아무 자국도 없어서
@@ -78,7 +84,6 @@ class Tray(object):
                                   if getattr(a, "pvp_unseen", 0)
                                   else "받은 대전 보기"),
                      lambda _i, _it: self.call(a.watch_pending)),
-            MenuItem("상점...", lambda _i, _it: self.call(a.open_shop)),
             Menu.SEPARATOR,
             MenuItem("바탕화면", Menu(
                 MenuItem("모두 거두기", lambda _i, _it: self.call(a.recall_all)),
@@ -88,7 +93,6 @@ class Tray(object):
                          lambda _i, _it: self.call(a.toggle_names),
                          checked=lambda _it: bool(s.get("showNames"))),
             )),
-            MenuItem("설정...", lambda _i, _it: self.call(a.open_settings)),
             MenuItem("포켓몬 크기", Menu(*size_items)),
             MenuItem("활동 범위", Menu(*area_items)),
             Menu.SEPARATOR,

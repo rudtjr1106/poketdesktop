@@ -33,7 +33,7 @@ MODES = [("all", "전부"), ("caught", "잡은 것"), ("miss", "아직")]
 
 class DexWindow(object):
 
-    def __init__(self, app):
+    def __init__(self, app, parent=None):
         self.app = app
         self.root = app.root
         self.gen = 0
@@ -42,6 +42,9 @@ class DexWindow(object):
         self.seen = set()
         self.caught = set()
         self.gens = {}
+        # 응답이 오기 전에 그릴 수도 있다(탭을 열자마자 세대 단추를 누르면).
+        # reload() 의 콜백에서만 만들면 그때 AttributeError 로 터진다.
+        self.total = 0
         self.rows = []             # 지금 보여줄 종 목록
         self.icons = {}            # num -> PhotoImage
         self.silhouettes = {}
@@ -49,13 +52,14 @@ class DexWindow(object):
         self.cols = COLS
         self.busy = False
 
-        self.win = tk.Toplevel(self.root)
-        U.style_window(self.win, "포스크탑 — 도감", W, H)
-        U.apply_theme(self.win)
+        # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
+        self.win = U.panel(parent, self.root, "포스크탑 — 도감",
+                           W, H, 560, 460, self.close)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.minsize(560, 460)
-        self.win.protocol("WM_DELETE_WINDOW", self.close)
+        if not U.is_embedded(self.win):
+            # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
+            U.install_wheel(self.win)
 
         self._header()
         self._filters()
@@ -120,7 +124,8 @@ class DexWindow(object):
         self.cv.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
         self.cv.bind("<Configure>", self._on_resize)
-        self.cv.bind("<MouseWheel>", self._on_wheel)
+        U.scrollable(self.cv, 120,
+                     lambda: self.root.after_idle(self.fetch_visible))
         self.cv.bind("<Motion>", self._on_hover)
 
     def _on_wheel(self, e):
@@ -312,6 +317,8 @@ class DexWindow(object):
 
     # ---------------- 끝 ----------------
     def focus(self):
+        if U.is_embedded(self.win):
+            return          # 탭이면 허브가 앞으로 꺼내 준다
         try:
             self.win.deiconify()
             self.win.lift()

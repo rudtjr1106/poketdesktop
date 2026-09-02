@@ -253,7 +253,7 @@ class Row(object):
 
 # ---------------------------------------------------------------- 창
 class ShopWindow(object):
-    def __init__(self, root, app):
+    def __init__(self, root, app, parent=None):
         self.root = root
         self.app = app
         self.items = []
@@ -267,13 +267,14 @@ class ShopWindow(object):
         self.qty = 1
         self.busy = False
 
-        self.win = tk.Toplevel(root)
-        U.style_window(self.win, "포스크탑 — 프렌들리샵", 1020, 664)
-        U.apply_theme(self.win)
+        # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
+        self.win = U.panel(parent, root, "포스크탑 — 프렌들리샵",
+                           1020, 664, 980, 600, self.close)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.minsize(980, 600)
-        self.win.protocol("WM_DELETE_WINDOW", self.close)
+        if not U.is_embedded(self.win):
+            # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
+            U.install_wheel(self.win)
 
         self._header()
         self._bottom()
@@ -284,8 +285,7 @@ class ShopWindow(object):
         self._detail(body)      # 오른쪽을 먼저 잡아야 가운데가 남은 폭을 다 먹는다
         self._list(body)
 
-        # 휠은 창에 건다. bind_all 로 걸면 포켓몬 관리 창의 휠까지 빼앗는다.
-        self.win.bind("<MouseWheel>", self._wheel)
+        U.scrollable(self.canvas, 60)
         self.reload()
 
     # ---------------- 머리 ----------------
@@ -425,23 +425,6 @@ class ShopWindow(object):
             scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(
             self._win, width=e.width))
-
-    def _wheel(self, e):
-        """마우스가 목록 위에 있을 때만 굴린다. 상세 패널에서는 아무 일도 없다.
-
-        e.widget 을 보면 안 된다. 윈도우에서 휠은 **포커스를 가진 위젯**에게
-        가기 때문에, 검색칸을 한 번 누른 뒤에는 목록 위에서 굴려도 e.widget 이
-        검색칸이라 목록이 안 움직인다. 포인터 밑에 뭐가 있는지로 판단한다.
-        """
-        try:
-            w = self.win.winfo_containing(e.x_root, e.y_root)
-        except tk.TclError:
-            return
-        while w is not None:
-            if w is self.canvas or w is self.inner:
-                self.canvas.yview_scroll(int(-e.delta / 60), "units")
-                return
-            w = getattr(w, "master", None)
 
     # ---------------- 상세 ----------------
     def _detail(self, parent):
@@ -769,6 +752,8 @@ class ShopWindow(object):
             pass
 
     def focus(self):
+        if U.is_embedded(self.win):
+            return          # 탭이면 허브가 앞으로 꺼내 준다
         self.win.deiconify()
         self.win.lift()
         self.win.focus_force()
