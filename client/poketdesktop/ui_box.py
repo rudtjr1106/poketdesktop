@@ -322,6 +322,25 @@ class BoxWindow(object):
         self.d_types = tk.Frame(p, bg=U.BG2)
         self.d_types.pack(anchor="w", pady=(8, 0))
 
+        # 경험치. 레벨 숫자만 있으면 방금 올랐는지 다음 레벨이 코앞인지
+        # 알 수가 없다. 바로 한눈에, 숫자로 정확히, %로 그 둘을 잇는다.
+        exp = tk.Frame(p, bg=U.BG2)
+        exp.pack(fill="x", pady=(10, 0))
+        er = tk.Frame(exp, bg=U.BG2)
+        er.pack(fill="x")
+        tk.Label(er, text="경험치", bg=U.BG2, fg=U.FG_DIM,
+                 font=U.FONT_XS).pack(side="left")
+        self.d_exp_num = tk.Label(er, text="", bg=U.BG2, fg=U.FG_FAINT,
+                                  font=U.FONT_XS)
+        self.d_exp_num.pack(side="right")
+        self._exp_ratio = 0.0
+        self.d_exp_bar = tk.Canvas(exp, height=8, bg="#232b3d",
+                                   highlightthickness=0, bd=0)
+        self.d_exp_bar.pack(fill="x", pady=(3, 0))
+        # 너비가 fill="x" 로 정해지므로 처음 그릴 때는 아직 1px 이다.
+        # 자리가 잡힐 때 다시 그린다.
+        self.d_exp_bar.bind("<Configure>", lambda _e: self._draw_exp_bar())
+
         # 친밀도 (친밀도로 진화하는 종에만 뜬다)
         self.d_friend = tk.Frame(p, bg=U.BG2)
 
@@ -600,6 +619,41 @@ class BoxWindow(object):
                 text="박스로 보내기" if m.get("onDesktop") else "데리고 다니기")
 
     # ---------------- 상세 그리기 ----------------
+    def _draw_exp_bar(self):
+        cv = getattr(self, "d_exp_bar", None)
+        if cv is None:
+            return
+        try:
+            cv.delete("all")
+            w = cv.winfo_width()
+            if w <= 1:
+                return              # 아직 자리가 안 잡혔다. Configure 때 다시.
+            fill = int(w * self._exp_ratio)
+            if fill > 0:
+                cv.create_rectangle(0, 0, fill, 8, fill=U.ACCENT, outline="")
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    def _exp(self, info):
+        """다음 레벨까지 얼마나 남았는지."""
+        got, need = info.get("expInLevel"), info.get("expToNext")
+        if got is None or need is None:
+            # 옛 서버는 이 값을 안 보낸다. 0/0 으로 그리면 "다 찼다" 처럼
+            # 보이므로 아예 비운다 - 틀린 것을 보여주느니 낫다.
+            self._exp_ratio = 0.0
+            self.d_exp_num.configure(text="")
+        elif not need:
+            # 최대 레벨. 0/0 으로 두면 "0%" 가 되어 다 잃은 것처럼 보인다.
+            self._exp_ratio = 1.0
+            self.d_exp_num.configure(text="최대 레벨")
+        else:
+            self._exp_ratio = max(0.0, min(1.0, got / float(need)))
+            self.d_exp_num.configure(
+                text="%s / %s  ·  다음까지 %s  (%.0f%%)"
+                     % (format(got, ","), format(need, ","),
+                        format(max(0, need - got), ","), 100.0 * got / need))
+        self._draw_exp_bar()
+
     def _friendship(self, m):
         """친밀도로 진화하는 종이면 얼마나 남았는지 보여준다.
 
@@ -660,6 +714,8 @@ class BoxWindow(object):
         for t in (sp or {}).get("types", []):
             U.chip(self.d_types, dex.type_name(t), U.TYPE_COLOR.get(t, U.BG3),
                    font=U.FONT_S, padx=10, pady=2).pack(side="left", padx=(0, 4))
+
+        self._exp(info)
 
         stats = info.get("stats", {})
         ivs = m.get("ivs", {})
