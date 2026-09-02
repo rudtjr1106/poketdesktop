@@ -87,6 +87,9 @@ DEFAULTS = {
     # 거기서 끄면 우리는 다시 켜지 않는다 (autostart.py 의 blocked()).
     # 설정 창과 트레이 메뉴에도 끄는 자리가 있다.
     "autostart": True,
+    # 부팅 등록을 했다고 한 번 알렸는가. 기본으로 켜지는 기능이라
+    # 최소한 한 번은 말해야 한다 (app._tell_autostart_once).
+    "autostartTold": False,
 }
 
 

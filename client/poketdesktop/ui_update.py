@@ -188,14 +188,20 @@ class UpdateWindow(object):
 
         U.run_async(self.root, work, done)
 
-    def show(self):
+    def show(self, quiet=False):
+        """quiet 는 부팅으로 켜졌을 때. **포커스를 뺏지 않는다.**
+
+        컴퓨터를 켜자마자 다른 일을 시작한 사람의 타이핑을 가로채면 안 된다.
+        받는 것은 그대로 하고 창도 그대로 보이되, 앞으로 끌어내지 않는다.
+        """
         self.win.transient(self.root)
-        try:
-            self.win.grab_set()
-        except Exception:                                   # noqa: BLE001
-            pass
-        self.win.lift()
-        self.win.focus_force()
+        if not quiet:
+            try:
+                self.win.grab_set()
+            except Exception:                               # noqa: BLE001
+                pass
+            self.win.lift()
+            self.win.focus_force()
         self.root.after(400, self.start)
         self.root.wait_window(self.win)
         return self.result, self.new_exe

@@ -50,6 +50,18 @@ class Tray(object):
         a = self.app
         s = a.settings
 
+        if a.api is None:
+            # 아직 로그인 전이다(대개 부팅 직후 인터넷을 기다리는 중).
+            # 아래 항목들은 전부 서버가 있어야 하는 일이라 눌러도 실패한다.
+            # 그래도 아이콘은 떠 있어야 한다 - 아무것도 없으면 사용자는
+            # "자동 시작이 안 됐다" 고 여기고 바탕화면 아이콘을 다시 누른다.
+            return Menu(
+                MenuItem("서버에 연결하는 중입니다...", None, enabled=False),
+                MenuItem("버전 %s" % VERSION, None, enabled=False),
+                Menu.SEPARATOR,
+                MenuItem("종료", lambda _i, _it: self.call(a.quit)),
+            )
+
         size_items = [
             MenuItem(label, (lambda v: lambda _i, _it: self.call(a.set_size, v))(v),
                      checked=(lambda v: lambda _it: s["targetHeight"] == v)(v),
@@ -132,6 +144,9 @@ class Tray(object):
             return
         try:
             self.icon.title = self._title()
+            # 메뉴도 다시 만든다. 로그인 전에 띄운 줄인 메뉴가 그대로 남아
+            # 있으면 로그인한 뒤에도 "연결하는 중" 만 보인다.
+            self.icon.menu = self.build_menu()
             self.icon.update_menu()
         except Exception:
             pass
