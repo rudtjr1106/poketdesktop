@@ -106,3 +106,41 @@ def fmt(template, word, **kw):
         values[k] = josa(word, k)
     values.update(kw)
     return template.format(**values)
+
+
+# ---------------------------------------------------------------- 지난 시간
+def ago(seconds):
+    """몇 초 전인지를 사람 말로. "방금" · "12분 전" · "3주 전".
+
+    **이 값은 센 쪽에서 받아야 한다.** 시각을 받아 내 시계로 빼면, 몇 분
+    틀어진 PC 에서 방금 접속한 사람이 "3시간 전" 으로 보이거나 아예 미래로
+    나온다. 사람들 PC 시계는 생각보다 잘 틀어져 있다.
+
+    모르면(None) 빈 문자열이다. 틀린 값을 보여주느니 비워 둔다.
+
+    며칠·몇 달을 딱 잘라 세지 않는다. "3주 전" 이 "21일 전" 보다 읽기 쉽고,
+    이 화면에서 하루 이틀 차이는 아무 의미가 없다.
+    """
+    if seconds is None:
+        return ""
+    try:
+        s = int(seconds)
+    except (TypeError, ValueError):
+        return ""
+    if s < 60:
+        return "방금"               # 음수(시계가 앞선 경우)도 여기로 온다
+    m = s // 60
+    if m < 60:
+        return "%d분 전" % m
+    h = m // 60
+    if h < 24:
+        return "%d시간 전" % h
+    d = h // 24
+    if d < 7:
+        return "%d일 전" % d
+    if d < 30:
+        return "%d주 전" % (d // 7)
+    if d < 365:
+        return "%d달 전" % (d // 30)
+    y = d // 365
+    return "%d년 전" % y if y < 10 else "오래전"
