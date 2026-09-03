@@ -3,7 +3,7 @@
 
     python tools/build_app.py
 
-결과: dist/포스크탑.app  와  dist/poketdesktop-vX.Y.Z-mac.zip
+결과: dist/포스크탑.app  와  dist/poketdesktop-vX.Y.Z-mac.dmg
 
 **크로스 빌드는 안 된다.** 맥용 .app 은 맥에서만 만들어진다.
 윈도우용은 tools/build_exe.py 가 따로 만든다 - 한 파일에 if 를 치면
@@ -14,9 +14,15 @@
   · `--onefile` 을 안 쓴다. 맥에서 배포하는 단위는 파일 하나가 아니라
     **번들 폴더**다. `--windowed` 가 그 번들을 만들어 준다.
   · 아이콘이 .ico 가 아니라 .icns 다. iconutil 로 만든다.
-  · zip 은 `shutil.make_archive` 로 만들지 않는다. 번들 안의 심볼릭
-    링크를 따라가서 실체로 복제해 버린다 (그러면 크기가 몇 배가 되고
-    프레임워크가 깨진다). 맥에는 `ditto` 가 있다.
+  · **`.zip` 이 아니라 `.dmg` 로 낸다.** 맥에서 익숙한 형태이기도 하지만,
+    그보다 중요한 이유가 있다 - 윈도우 클라이언트의 자동 업데이트가
+    릴리스 자산에서 **`.zip` 으로 끝나는 첫 번째**를 운영체제도 안 보고
+    집는다(`updater.check`). 같은 릴리스에 맥 zip 을 같이 올리면, 옛
+    버전을 쓰던 윈도우 사용자가 그걸 받아서 "실행 파일을 찾지 못했습니다"
+    로 끝날 수 있다. 이미 나가 있는 클라이언트는 고칠 수 없으니, **자산
+    이름이 .zip 이 아니게** 두는 것이 확실하다.
+  · dmg 안에는 `/Applications` 로 가는 바로가기를 같이 넣는다. 받는 사람이
+    끌어다 놓기만 하면 된다.
   · pystray 를 안 쓰므로 그 hidden-import 도 없다. 대신 pyobjc 가
     필요하다.
 
@@ -44,6 +50,8 @@ from common.version import VERSION            # noqa: E402
 # 번들 이름은 사람이 보는 이름이라 한글로 둔다. zip 파일 이름은 ASCII 다 -
 # GitHub 릴리스가 첨부파일 이름의 한글을 지워 버린다.
 APP_NAME = "포스크탑"
+# 자산 이름. **.zip 으로 끝내지 마라** - 윈도우 자동 업데이트가 집어간다
+# (make_dmg 의 설명을 보라).
 ZIP_NAME = "poketdesktop-v%s-mac" % VERSION
 BUNDLE_ID = "com.poketdesktop.app"
 ENTRY = os.path.join(ROOT, "client", "run.pyw")
@@ -108,6 +116,39 @@ def set_info_plist(app_path):
         print("  Info.plist 를 못 썼습니다: %s" % e)
         return
     print("  Info.plist: LSUIElement (Dock 에 안 뜸), 버전 %s" % VERSION)
+
+
+def make_dmg(app_path, dist):
+    """받는 사람이 열어서 끌어다 놓는 dmg 하나.
+
+    안에 `/Applications` 바로가기를 같이 넣어서 끌어다 놓기만 하면 되게
+    한다. 압축(UDZO)까지 hdiutil 이 한다.
+    """
+    stage = os.path.join(ROOT, "build", "dmg")
+    shutil.rmtree(stage, ignore_errors=True)
+    os.makedirs(stage, exist_ok=True)
+    # **ditto 로 복사한다.** cp -R 이나 shutil 은 번들 안의 심볼릭 링크를
+    # 실체로 복제해서 크기가 몇 배가 되고 프레임워크가 깨진다.
+    r = subprocess.run(["ditto", app_path,
+                        os.path.join(stage, os.path.basename(app_path))],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        print("  번들을 옮기지 못했습니다: %s" % (r.stderr or "").strip())
+        return None
+    os.symlink("/Applications", os.path.join(stage, "Applications"))
+
+    dmg_path = os.path.join(dist, ZIP_NAME + ".dmg")
+    if os.path.exists(dmg_path):
+        os.remove(dmg_path)
+    r = subprocess.run(["hdiutil", "create", "-quiet",
+                        "-volname", APP_NAME, "-srcfolder", stage,
+                        "-ov", "-format", "UDZO", dmg_path],
+                       capture_output=True, text=True)
+    shutil.rmtree(stage, ignore_errors=True)
+    if r.returncode != 0:
+        print("  dmg 를 못 만들었습니다: %s" % (r.stderr or "").strip())
+        return None
+    return dmg_path
 
 
 def check_signature(app_path):
@@ -220,23 +261,14 @@ def build():
     set_info_plist(app_path)
     check_signature(app_path)
 
-    zip_path = os.path.join(dist, ZIP_NAME + ".zip")
-    if os.path.exists(zip_path):
-        os.remove(zip_path)
-    # **ditto 로 묶는다.** zip 유틸리티나 shutil.make_archive 로 묶으면
-    # 번들 안의 심볼릭 링크가 실체로 복제되어 크기가 몇 배가 되고,
-    # 푸는 쪽에서 실행 권한도 날아간다.
-    r = subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc",
-                        "--keepParent", app_path, zip_path],
-                       capture_output=True, text=True)
-    if r.returncode != 0:
-        print("  zip 으로 못 묶었습니다: %s" % (r.stderr or "").strip())
+    dmg_path = make_dmg(app_path, dist)
+    if not dmg_path:
         return 1
 
-    mb = os.path.getsize(zip_path) / 1048576.0
+    mb = os.path.getsize(dmg_path) / 1048576.0
     print("")
     print("  완성: %s" % app_path)
-    print("        %s  (%.1f MB)" % (zip_path, mb))
+    print("        %s  (%.1f MB)" % (dmg_path, mb))
     print("")
     print("  개발자 서명은 없습니다. 받는 사람은 처음 한 번")
     print("  우클릭 > 열기 로 열어야 합니다.")
