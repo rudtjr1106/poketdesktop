@@ -58,6 +58,12 @@ jobs:
     name: 윈도우 빌드
     needs: check
     runs-on: windows-latest
+    # **러너의 콘솔이 cp1252 다.** 우리 검사와 빌드 스크립트는 한글을
+    # 찍으므로 그대로 두면 UnicodeEncodeError 로 죽는다. 진짜 윈도우
+    # PC 는 코드페이지가 949 라 멀쩡해서, 여기서만 나는 일이다.
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -98,6 +104,9 @@ jobs:
     needs: check
     # macos-14 부터 애플 실리콘이다. 우리 번들도 arm64 다.
     runs-on: macos-latest
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
