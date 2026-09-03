@@ -167,8 +167,13 @@ def raise_above(win):
 
 
 def bind_right(widget, fn):
-    for seq in RIGHT_CLICK:
-        widget.bind(seq, fn)
+    """맥에서는 **걸지 않는다.**
+
+    앱이 활성일 때만 오면 반쪽이고, 감시자(watch_right_click)와 둘 다
+    걸리면 한 번 누른 것이 두 번 처리된다 - 볼이 두 개 날아간다.
+    받는 곳을 하나로 둔다.
+    """
+    return
 
 
 def show_again(win):
@@ -266,6 +271,21 @@ def _no_layer(why):
         pass
 
 
+# 커서에서 이만큼 안에 몸이 있으면 클릭을 안 통과시킨다. 도트 가장자리에서
+# 클릭이 새어 나가지 않게 두는 여유다.
+HIT_MARGIN = 4
+
+
+def _near_solid(mask, w, h, x, y, r=HIT_MARGIN):
+    """커서 둘레 r 픽셀 안에 몸이 있는가."""
+    for yy in range(max(0, y - r), min(h, y + r + 1)):
+        row = yy * w
+        for xx in range(max(0, x - r), min(w, x + r + 1)):
+            if mask[row + xx]:
+                return True
+    return False
+
+
 class Frame(object):
     """CALayer 에 올릴 그림 한 장.
 
@@ -320,6 +340,9 @@ class SpriteView(object):
         self.layer = None
         self._cur = None            # 지금 그려져 있는 그림
         self._ignoring = False      # 지금 클릭을 통과시키고 있는가
+        self.win_number = None      # 이 창의 NSWindow 번호
+        self._acc = {}              # {(w,h): 알파를 전부 합친 것}
+        self._solid = {}            # {(w,h): 그 바이트}
         if not _ok:
             # pyobjc 가 없다. 투명도 CALayer 도 못 쓰니 평범한 Label 에
             # 평범하게 그린다 - 네모난 판 위에 뜨겠지만 게임은 된다.
@@ -327,6 +350,7 @@ class SpriteView(object):
                                    **kw)
             self.widget.pack()
             return
+        accept_first_click()                 # 아직 안 걸렸으면 지금 건다
         kw.pop("image", None)                # Frame 은 그림을 받지 않는다
         self.widget = tk.Frame(win, width=w, height=h, bg=bg, **kw)
         self.widget.pack()
@@ -345,6 +369,7 @@ class SpriteView(object):
             lay.setMinificationFilter_("nearest")
             cv.layer().addSublayer_(lay)
             self.layer = lay
+            self.win_number = nsw.windowNumber()
         except Exception as e:                              # noqa: BLE001
             _no_layer(e)
             self.layer = None
@@ -364,13 +389,22 @@ class SpriteView(object):
             # 부르는 쪽(진화 연출)이 width()/height() 를 물어보기 때문에,
             # 맨 PIL 이미지를 돌려주면 거기서 TypeError 로 터진다.
             return [Frame(None, f.width, f.height) for f in pil_frames]
+        from PIL import ImageChops
         from . import sprites
         out = []
         for f in pil_frames:
             rgba = sprites.to_rgba(f, key) if f.mode != "RGBA" else f
+            alpha = rgba.split()[3]
+            key_wh = (f.width, f.height)
+            # **프레임을 전부 합쳐 둔다.** 클릭을 통과시킬지 정할 때
+            # 지금 프레임 하나만 보면, 도트가 움직이는 자리에서 같은
+            # 점이 몸이었다 빈칸이었다 해서 클릭이 씹혔다 말았다 한다.
+            acc = self._acc.get(key_wh)
+            self._acc[key_wh] = (alpha if acc is None
+                                 else ImageChops.lighter(acc, alpha))
+            self._solid[key_wh] = self._acc[key_wh].tobytes()
             out.append(Frame(_cgimage(sprites.premultiply(rgba)),
-                             f.width, f.height,
-                             rgba.split()[3].tobytes()))
+                             f.width, f.height, alpha.tobytes()))
         return out
 
     def show(self, frame):
@@ -412,10 +446,11 @@ class SpriteView(object):
             return
         want = False
         fr = self._cur
-        if lx is not None and fr is not None and fr.mask is not None:
+        if lx is not None and fr is not None:
             w, h = fr.width(), fr.height()
-            if 0 <= lx < w and 0 <= ly < h:
-                want = fr.mask[ly * w + lx] == 0     # 비었으면 통과
+            m = self._solid.get((w, h)) or fr.mask
+            if m is not None and 0 <= lx < w and 0 <= ly < h:
+                want = not _near_solid(m, w, h, lx, ly)
         if want == self._ignoring:
             return
         nsw = getattr(self.win, "_poket_nswindow", None)
@@ -503,6 +538,32 @@ def _work_area_now(fallback_w, fallback_h):
     except Exception:                                       # noqa: BLE001
         pass
     return 0, 0, fallback_w, fallback_h
+
+
+def screens(fallback_w, fallback_h):
+    """모든 화면을 Tk 좌표로. 첫 번째가 주 화면.
+
+    AppKit 은 **주 화면 왼쪽 아래**가 원점이고 y 가 위로 간다. Tk 은
+    주 화면 왼쪽 위가 원점이고 y 가 아래로 간다. 두 번째 화면은 x 가
+    음수일 수도 있다(주 화면 왼쪽에 두면).
+    """
+    if not _ok:
+        return [(0, 0, fallback_w, fallback_h)]
+    try:
+        scrs = AppKit.NSScreen.screens()
+        if not scrs:
+            return [(0, 0, fallback_w, fallback_h)]
+        h0 = scrs[0].frame().size.height
+        out = []
+        for s in scrs:
+            f = s.frame()
+            out.append((int(round(f.origin.x)),
+                        int(round(h0 - (f.origin.y + f.size.height))),
+                        int(round(f.origin.x + f.size.width)),
+                        int(round(h0 - f.origin.y))))
+        return out
+    except Exception:                                       # noqa: BLE001
+        return [(0, 0, fallback_w, fallback_h)]
 
 
 def double_click_ms():
@@ -665,6 +726,119 @@ def hide_from_dock():
         app.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
     except Exception:                                       # noqa: BLE001
         pass
+    # Dock 에서 숨기면 앱이 거의 늘 비활성이 된다. 그러면 창을 처음
+    # 누르는 클릭을 맥이 가로채므로 같이 손봐 둔다.
+    accept_first_click()
+
+
+_first_mouse = None            # None=아직, True=걸었음, False=못 걸었음
+
+
+def accept_first_click():
+    """앱이 앞에 나와 있지 않아도 **첫 클릭을 그대로 받는다.**
+
+    맥은 활성 상태가 아닌 앱의 창을 처음 누르면 그 클릭을 "앱을 앞으로
+    꺼내는 것" 에만 쓰고 창에는 주지 않는다. 이 게임은 Dock 에 안 뜨는
+    앱이라 거의 항상 비활성이다. 그래서 포켓몬을 한 번 눌러 앱을 깨우기
+    전에는 **오른쪽 클릭이 통째로 안 먹었다.** 사용자 눈에는 "어쩔 때만
+    메뉴가 나온다" 로 보인다.
+
+    바탕화면에 떠 있는 도트를 누르는 것은 늘 '그냥 누르는 것' 이어야
+    한다. 앱을 앞으로 꺼내려고 한 번 헛클릭을 시키면 안 된다.
+
+    NSView 의 acceptsFirstMouse: 가 그걸 정하는데 Tk 에서는 못 건드린다.
+    Tk 이 쓰는 뷰 클래스(TKContentView)에 그 메서드를 직접 붙인다.
+    """
+    global _first_mouse
+    if _first_mouse is not None:
+        return _first_mouse
+    _first_mouse = False
+    if not _ok:
+        return False
+    try:
+        view = objc.lookUpClass("TKContentView")
+    except Exception:                                       # noqa: BLE001
+        _first_mouse = None     # 아직 창이 하나도 없다. 다음에 다시 한다.
+        return False
+
+    # **respondsToSelector 로 확인하면 안 된다.** NSView 에서 물려받은
+    # 것도 True 라, 이미 걸렸다고 착각하고 그냥 넘어간다. 물려받은 것은
+    # False 를 돌려주므로 우리가 덮어써야 한다.
+    def acceptsFirstMouse_(self, event):
+        return True
+
+    for sig in (b"B@:@", b"c@:@"):
+        try:
+            objc.classAddMethods(view, [objc.selector(
+                acceptsFirstMouse_, selector=b"acceptsFirstMouse:",
+                signature=sig)])
+            _first_mouse = True
+            return True
+        except Exception:                                   # noqa: BLE001
+            continue
+    return False
+
+
+_rclick = []
+_rclick_mon = None
+
+
+def watch_right_click():
+    """오른쪽 클릭을 Cocoa 단계에서 직접 받는다.
+
+    **Tk 은 앱이 활성이 아닐 때 온 오른쪽 클릭을 위젯에 전달하지 않는다.**
+    맥이 우리 앱에 주기는 하는데(로컬 감시자에는 찍힌다) 거기서 멎는다.
+    이 게임은 Dock 에 안 뜨는 앱이라 거의 늘 비활성이므로, 그대로 두면
+    **포켓몬을 한 번 왼쪽 클릭해 앱을 깨우기 전에는 우클릭이 통째로 안
+    먹는다.** 실제로 그랬고, 그게 이 감시자를 두는 이유다.
+
+    감시자는 **우리 앱에 전달된 것만** 본다. 도트 창이 클릭을 통과시키고
+    있으면(빈 자리) 맥이 애초에 우리에게 안 주므로 여기도 안 걸린다 -
+    그래서 따로 걸러낼 필요가 없다.
+
+    Cocoa 콜백이라 **여기서 tkinter 를 부르면 안 된다.** 적어만 두고
+    꺼내 쓰는 것은 Tk 쪽이 한다 (App._mac_clicks).
+    """
+    global _rclick_mon
+    if not _ok or _rclick_mon is not None:
+        return
+
+    def handler(ev):
+        try:
+            p = AppKit.NSEvent.mouseLocation()
+            _rclick.append((float(p.x), float(p.y), int(ev.windowNumber())))
+        except Exception:                                   # noqa: BLE001
+            pass
+        return ev
+
+    _rclick_mon = AppKit.NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
+        AppKit.NSEventMaskRightMouseDown, handler)
+
+
+def mouse_buttons_down():
+    """지금 눌려 있는 마우스 단추 (없으면 0).
+
+    Tk 이 '뗐다' 를 못 받는 일이 있어서(앱이 비활성일 때) 그것 없이도
+    확인할 수 있는 길을 둔다. 안 그러면 도트가 눌린 채로 굳는다.
+    """
+    if not _ok:
+        return 0
+    try:
+        return int(AppKit.NSEvent.pressedMouseButtons())
+    except Exception:                                       # noqa: BLE001
+        return 0
+
+
+def take_right_clicks():
+    """쌓인 오른쪽 클릭을 Tk 화면 좌표로 꺼낸다. [(x, y, 창번호), ...]"""
+    out, _rclick[:] = list(_rclick), []
+    if not out or not _ok:
+        return []
+    try:
+        h0 = AppKit.NSScreen.screens()[0].frame().size.height
+    except Exception:                                       # noqa: BLE001
+        return []
+    return [(int(round(x)), int(round(h0 - y)), n) for x, y, n in out]
 
 
 def activate():

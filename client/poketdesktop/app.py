@@ -48,6 +48,15 @@ MANUAL_LOGIN_TRIES = 1
 RETRY_MAX_WAIT = 60
 
 
+class _FakeEvent(object):
+    """감시자가 받은 오른쪽 클릭을 tk 이벤트인 척 넘긴다."""
+
+    __slots__ = ("x_root", "y_root", "num")
+
+    def __init__(self, x, y):
+        self.x_root, self.y_root, self.num = x, y, 2
+
+
 class App(object):
     def __init__(self):
         self.settings = config.load_settings()
@@ -259,6 +268,7 @@ class App(object):
             self.refresh_tray()     # 로그인 전 메뉴를 제대로 된 것으로 바꾼다
         if self.wild is None:
             self.wild = WildController(self)
+        self._watch_right_click()
         self.sync()
         # 첫 동기화가 실패하거나(서버가 깨는 중이라 느릴 수 있다) 도트를
         # 아직 못 받았으면 바탕화면이 비어 보인다. 잠시 뒤 한 번 더 맞춘다.
@@ -302,6 +312,82 @@ class App(object):
         self.quit()
 
     # ---------------------------------------------------------------- 알림
+    def _watch_right_click(self):
+        """맥 전용 - 오른쪽 클릭을 Cocoa 쪽에서 받아 알맞은 곳으로 보낸다.
+
+        Tk 은 앱이 활성이 아닐 때 온 오른쪽 클릭을 위젯에 전달하지
+        않는다. Dock 에 안 뜨는 앱이라 거의 늘 비활성이므로, 그대로 두면
+        포켓몬을 한 번 왼쪽 클릭해 앱을 깨우기 전에는 우클릭이 안 먹는다
+        (platform_mac.watch_right_click 을 보라).
+        """
+        if not PLAT.NEEDS_HIT_TRACKING:      # 맥에서만 할 일이 있다
+            return
+        PLAT.watch_right_click()
+
+        def pump():
+            try:
+                for x, y, num in PLAT.take_right_clicks():
+                    self._right_click_at(x, y, num)
+                self._unstick()
+            except Exception:                               # noqa: BLE001
+                import traceback
+                config.log("우클릭 처리 실패\n" + traceback.format_exc())
+            self.root.after(60, pump)
+        self.root.after(60, pump)
+
+    def _unstick(self):
+        """마우스를 뗐는데 눌린 채로 굳은 도트를 풀어 준다.
+
+        Tk 은 앱이 비활성일 때 '뗐다'(ButtonRelease)를 못 받는 일이 있다.
+        그러면 도트가 누른 그 자리에 영영 서 있게 된다. 눌린 단추가
+        하나도 없다고 맥이 말하면 풀어 준다.
+        """
+        if PLAT.mouse_buttons_down():
+            return
+        for pet in self._pets():
+            if getattr(pet, "state", None) == "held":
+                try:
+                    pet.on_release(None)
+                except Exception:                           # noqa: BLE001
+                    pass
+
+    def _pets(self):
+        """지금 화면에 있는 도트 전부. 야생이 먼저다 (위에 있다)."""
+        out = []
+        if self.wild is not None and self.wild.pet is not None:
+            out.append(self.wild.pet)
+        if self.overlay is not None:
+            out.extend(self.overlay.pets.values())
+            out.extend(self.overlay.extra)
+        return out
+
+    def _right_click_at(self, x, y, num):
+        """그 자리에 있는 것에게 오른쪽 클릭을 넘긴다.
+
+        창 번호로 먼저 찾고, 못 찾으면 좌표로 찾는다. 창 번호가 확실한데,
+        도트를 갈아끼우는 동안(진화)에는 잠깐 어긋날 수 있다.
+        """
+        wild = self.wild
+        if wild is not None and wild.grass is not None:
+            if self._hit(wild.grass, x, y, num):
+                return wild.on_grass_click()
+        for pet in self._pets():
+            if self._hit(pet, x, y, num):
+                # **도트가 스스로 정하게 둔다.** 야생 포켓몬은 우클릭이
+                # 볼 던지기라 WildPet 이 on_menu 를 따로 갖고 있다.
+                return pet.on_menu(_FakeEvent(x, y))
+
+    @staticmethod
+    def _hit(obj, x, y, num):
+        view = getattr(obj, "view", None)
+        if view is not None and getattr(view, "win_number", None) == num:
+            return True
+        try:
+            return (obj.x <= x < obj.x + obj.fw
+                    and obj.y <= y < obj.y + obj.fh)
+        except Exception:                                   # noqa: BLE001
+            return False
+
     def notify(self, message):
         """무슨 일이 있었는지 한 줄.
 

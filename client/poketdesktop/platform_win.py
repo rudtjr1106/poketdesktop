@@ -17,8 +17,11 @@
 import ctypes
 
 from .platform_base import (NATIVE_MENU, RIGHT_CLICK,   # noqa: F401
-                            SpriteView, activate, bind_right, data_dir,
-                            hide_from_dock, raise_above, show_again)
+                            SpriteView, accept_first_click, activate,
+                            bind_right, data_dir, mouse_buttons_down,
+                            take_right_clicks, watch_right_click,
+                            hide_from_dock, raise_above, screens,
+                            show_again)
 
 NAME = "poketdesktop-single-instance"
 

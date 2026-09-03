@@ -147,6 +147,15 @@ def double_click_ms():
     return 350
 
 
+def screens(fallback_w, fallback_h):
+    """모든 화면을 Tk 좌표 (x1, y1, x2, y2) 로. **첫 번째가 주 화면.**
+
+    모니터가 두 대일 때 메뉴를 어느 화면 안에 가둘지 정하는 데 쓴다.
+    한 대뿐이면 화면 하나가 전부다.
+    """
+    return [(0, 0, fallback_w, fallback_h)]
+
+
 # ---------------------------------------------------------------- 프로세스
 def single_lock(data_dir):
     """(잠금, 이미돌고있음). 잠금을 못 걸었다고 게임을 막지는 않는다."""
@@ -215,6 +224,25 @@ def hide_from_dock():
 def activate():
     """우리 창을 앞으로 꺼낸다. Dock 에 없는 앱은 이게 필요하다."""
     pass
+
+
+def accept_first_click():
+    """앱이 앞에 없어도 첫 클릭을 그대로 받는다. 윈도우는 원래 그렇다."""
+    return True
+
+
+def watch_right_click():
+    """오른쪽 클릭을 따로 받아 둘 필요가 있는가. 윈도우는 없다."""
+    pass
+
+
+def take_right_clicks():
+    return []
+
+
+def mouse_buttons_down():
+    """지금 눌려 있는 마우스 단추. 모르면 0 (윈도우는 Tk 이 알아서 준다)."""
+    return 0
 
 
 def missing_requirement():
