@@ -18,6 +18,7 @@ pystray 의 맥 백엔드는 `NSApplication.run()` 을 부른다. 그걸 별도
 import threading
 
 from . import autostart
+from common import patchnotes
 from common.version import VERSION
 
 # ---------------------------------------------------------------- 메뉴 서술
@@ -75,6 +76,21 @@ class TrayBase(object):
     def call(self, fn, *a):
         self.app.root.after(0, lambda: fn(*a))
 
+    # ---- 알림 ----
+    def toast(self, title, message):
+        """운영체제 알림을 한 번 띄운다. 띄웠으면 True.
+
+        **여기로 오는 것은 화면에 아무 자국도 남지 않는 일뿐이다** -
+        새 버전과 친구 요청. 게임 안에서 벌어지는 일(잡았다, 레벨이
+        올랐다)은 절대 여기로 보내지 않는다. 켜 두고 잊어버리는
+        프로그램이라, 그런 것까지 구석에서 튀어나오면 하던 일을
+        방해하고 결국 프로그램을 끄게 된다.
+
+        띄울 수 없는 환경이면 조용히 False. 알림은 있으면 좋은 것이고,
+        없다고 해서 하던 일이 멈춰서는 안 된다.
+        """
+        return False
+
     def _title(self):
         u = self.app.username or "로그인 안 됨"
         n = len(self.app.overlay.pets) if self.app.overlay else 0
@@ -127,6 +143,12 @@ class TrayBase(object):
                           if getattr(a, "pvp_unseen", 0)
                           else "받은 대전 보기"),
                  lambda: self.call(a.open_pvp)),
+            # 친구 요청도 화면에 자국이 없다. 알림을 껐거나 놓쳤을 때
+            # 여기 숫자가 유일한 단서다.
+            Item(lambda: ("친구 요청 보기  (%d)" % a.friend_unseen
+                          if getattr(a, "friend_unseen", 0)
+                          else "친구 요청 보기"),
+                 lambda: self.call(a.open_friends)),
             SEP,
             Item("바탕화면", submenu=[
                 Item("모두 거두기", lambda: self.call(a.recall_all)),
@@ -134,6 +156,11 @@ class TrayBase(object):
                 SEP,
                 Item("이름표 보이기", lambda: self.call(a.toggle_names),
                      checked=lambda: bool(s.get("showNames"))),
+                # 걸어다니는 것만 보고 싶은 사람이 있다. 야생을 끄는
+                # 자리가 메뉴에도 있어야 한다 - 설정 창까지 들어가야
+                # 하면 있는 줄도 모른다.
+                Item("풀숲 띄우기", lambda: self.call(a.toggle_grass),
+                     checked=lambda: bool(s.get("showGrass", True))),
             ]),
             Item("포켓몬 크기", submenu=size_items),
             Item("활동 범위", submenu=area_items),
@@ -154,6 +181,8 @@ class TrayBase(object):
             # 볼과 소지금은 가방·상점 창에 이미 크게 떠 있다. 메뉴에
             # 또 두면 길기만 하다. 여기는 버전 하나로 줄인다.
             Item("버전 %s" % VERSION, enabled=False),
+            Item("이번 버전 새로운 기능", lambda: self.call(a.show_patchnotes),
+                 enabled=bool(patchnotes.entry(VERSION))),
             Item("로그아웃", lambda: self.call(a.logout)),
             Item("회원탈퇴", lambda: self.call(a.delete_account)),
             SEP,
@@ -213,9 +242,21 @@ class Tray(TrayBase):
         except Exception:                                   # noqa: BLE001
             pass
 
-    # 윈도우 알림(토스트)은 쓰지 않는다. 켜 두고 잊어버리는 프로그램이라
-    # 무슨 일이 있을 때마다 화면 구석에서 튀어나오면 하던 일을 방해한다.
-    # 무슨 일이 있었는지는 메뉴 안에 한 줄로 남고, 기록에도 남는다.
+    def toast(self, title, message):
+        """윈도우 알림. pystray 가 트레이 아이콘으로 띄워 준다.
+
+        아이콘이 아직 안 떴거나(로그인 전) 이 백엔드가 알림을 못 하면
+        (리눅스 일부) 조용히 넘어간다. HAS_NOTIFICATION 을 먼저 보는
+        이유가 그것이다 - 없는데 부르면 NotImplementedError 가 난다.
+        """
+        icon = self.icon
+        if icon is None or not getattr(icon, "HAS_NOTIFICATION", False):
+            return False
+        try:
+            icon.notify(message, title)
+            return True
+        except Exception:                                   # noqa: BLE001
+            return False
 
     def stop(self):
         if self.icon:

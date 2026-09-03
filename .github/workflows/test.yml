@@ -61,10 +61,57 @@ jobs:
       - name: 휠 한 칸
         run: python client/test_wheel.py
 
+      - name: 진화 뒤 도트
+        run: python client/test_evolve_sprite.py
+
+      - name: 풀숲 끄기·알림·패치노트
+        run: python client/test_new_settings.py
+
+      # 바뀐 것을 두 곳에 적으면 갈라진다. 앱 안의 '새로운 기능' 창과
+      # 릴리스 본문이 어긋난 채로 나가면, 받은 사람은 자기가 받은 판에
+      # 무엇이 들어 있는지 알 수 없다.
+      - name: 릴리스 본문이 패치노트와 같은가
+        run: python tools/make_release_notes.py --check
+
       - name: 문법
         run: |
           python - <<'EOF'
-          import ast, glob, io, sys
+          import ast, builtins, glob, io, sys
+
+          def free_names(tree):
+              """정의도 임포트도 없이 읽기만 하는 이름을 모은다.
+
+              문법은 멀쩡한데 그 줄을 밟는 순간 NameError 로 죽는 것을
+              잡는다. 진화 연출이 walk_cache 를 안 들여온 채로 부르다
+              그렇게 죽었고, 예외는 작업 스레드에서 삼켜져 화면에는
+              "도트를 못 받았다" 로만 보였다.
+              """
+              d = set(dir(builtins)) | {"__file__", "__name__", "__doc__"}
+              for n in ast.walk(tree):
+                  if isinstance(n, ast.Import):
+                      for a in n.names:
+                          d.add(a.asname or a.name.split(".")[0])
+                  elif isinstance(n, ast.ImportFrom):
+                      for a in n.names:
+                          d.add(a.asname or a.name)
+                  elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                      ast.ClassDef)):
+                      d.add(n.name)
+                  elif isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
+                      d.add(n.id)
+                  elif isinstance(n, ast.arg):
+                      d.add(n.arg)
+                  elif isinstance(n, ast.ExceptHandler) and n.name:
+                      d.add(n.name)
+                  elif isinstance(n, (ast.Global, ast.Nonlocal)):
+                      d.update(n.names)
+              out = {}
+              for n in ast.walk(tree):
+                  if (isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
+                          and n.id not in d):
+                      out.setdefault(n.id, n.lineno)
+              return out
+
           bad = []
           for f in (glob.glob("client/**/*.py", recursive=True)
                     + glob.glob("server/**/*.py", recursive=True)
@@ -72,9 +119,13 @@ jobs:
               if "__pycache__" in f or "/_cache/" in f:
                   continue
               try:
-                  ast.parse(io.open(f, encoding="utf-8").read())
+                  tree = ast.parse(io.open(f, encoding="utf-8").read())
               except SyntaxError as e:
                   bad.append("%s:%s %s" % (f, e.lineno, e.msg))
+                  continue
+              for nm, ln in sorted(free_names(tree).items(),
+                                   key=lambda x: x[1]):
+                  bad.append("%s:%s 이런 이름이 없다: %s" % (f, ln, nm))
           if bad:
               print("\n".join(bad))
               sys.exit(1)
@@ -110,6 +161,10 @@ jobs:
         run: python client/smoke_autostart.py
       - name: 테두리 없는 창이 제자리에 뜨는가
         run: python client/smoke_window.py
+      # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
+      # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
+      - name: 설정·패치노트·새버전 창 높이
+        run: python client/smoke_new_windows.py
 
   mac:
     name: 맥 전용
@@ -134,6 +189,8 @@ jobs:
         run: python client/test_update_mac.py
       - name: 테두리 없는 창이 제자리에 뜨는가
         run: python client/smoke_window.py
+      - name: 설정·패치노트·새버전 창 높이
+        run: python client/smoke_new_windows.py
       # 이건 메뉴 막대에 아이콘을 잠깐 올렸다 내린다 - **화면이 필요하다.**
       # 러너에 로그인 세션이 없어서 NSStatusBar 가 안 되면 이 줄만 지워라.
       # (맥 없이 적은 것이라 첫 실행에서 확인이 필요하다)

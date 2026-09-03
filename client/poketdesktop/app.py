@@ -5,6 +5,7 @@ import random
 import sys
 import tkinter as tk
 
+from common import patchnotes                  # noqa: E402
 from common import pokelogic as P              # noqa: E402
 from common.korean import natural              # noqa: E402
 from common.version import VERSION             # noqa: E402
@@ -32,9 +33,17 @@ from .ui_shop import ShopWindow                # noqa: E402
 from .ui_hub import HubWindow                  # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
-from .ui_update import UpdateWindow             # noqa: E402
+from .ui_update import NewVersionAsk, PatchNotes, UpdateWindow  # noqa: E402
 from .wild_ui import WildController            # noqa: E402
 
+
+# 켜 둔 동안 새 버전을 몇 시간마다 살펴볼지.
+#
+# 이 프로그램은 한 번 켜면 몇 주씩 그대로 돈다(부팅 때 저절로 켜지고,
+# 트레이에만 있다). 켤 때 한 번만 보면 새 판이 나와도 컴퓨터를 다시 켤
+# 때까지 모른다. 그렇다고 자주 볼 것도 아니다 - 깃허브 API 는 로그인
+# 없이 시간당 60번이고, 급한 소식도 아니다.
+UPDATE_EVERY_HOURS = 6
 
 # 손으로 켰다면 사람이 화면을 보고 있다. 한 번만 더 해 보고 로그인 창을 준다.
 MANUAL_LOGIN_TRIES = 1
@@ -81,6 +90,16 @@ class App(object):
         self.last_message = ""
         # 상대가 걸어온, 아직 안 본 대전 수. 트레이에 표시한다.
         self.pvp_unseen = 0
+        # 받아 놓고 아직 안 받아준 친구 요청 수. 대전과 같은 이유로
+        # 트레이에 숫자로 남긴다 - 화면에 아무 자국이 없다.
+        self.friend_unseen = 0
+        # 이미 알린 요청. 폴링마다 같은 것을 또 띄우지 않기 위해서다.
+        self._friend_seen = set()
+        self._friend_first = True
+        # 켜 둔 동안의 새 버전 확인.
+        self._update_job = None
+        self._update_asking = False
+        self.notes_win = None
         self.arena = None
         self.battle = None
         self._quitting = False
@@ -269,6 +288,11 @@ class App(object):
         if self.wild is None:
             self.wild = WildController(self)
         self._watch_right_click()
+        # 다시 로그인했으면 알림 기록을 비운다. 다른 계정의 요청을
+        # "이미 알렸다" 고 여기면 새 계정의 첫 요청을 놓친다.
+        self._friend_seen = set()
+        self._friend_first = True
+        self.friend_unseen = 0
         self.sync()
         # 첫 동기화가 실패하거나(서버가 깨는 중이라 느릴 수 있다) 도트를
         # 아직 못 받았으면 바탕화면이 비어 보인다. 잠시 뒤 한 번 더 맞춘다.
@@ -288,7 +312,9 @@ class App(object):
         self.wild.start()
         self.resume_battle()
         self._schedule_sync()
+        self._schedule_update_check()
         self.notify("%s 님, 포스크탑을 시작했습니다." % self.username)
+        self._tell_patchnotes_once()
 
     def _first_sync_retry(self):
         """바탕화면이 아직 비어 있으면 다시 맞춘다.
@@ -407,6 +433,33 @@ class App(object):
         config.log(message)
         self.last_message = message
 
+    def toast(self, title, message, kind="update"):
+        """운영체제 알림 한 번. 띄웠으면 True.
+
+        **아무 일에나 쓰면 안 된다.** notify() 의 주석에 적힌 대로, 게임
+        안에서 일어나는 일은 알림으로 띄우지 않는다. 잡을 때마다 화면
+        구석에서 튀어나오면 하던 일을 방해하고, 결국 프로그램을 끄게 된다.
+
+        여기로 올 수 있는 것은 **화면에 아무 자국도 남지 않는 일**뿐이다.
+        새 버전과 친구 요청 둘이고, 목록은 patchnotes.TOAST_KINDS 에 있다.
+        엉뚱한 kind 로 부르면 조용히 안 띄운다 - 나중에 누가 잡았다는
+        알림을 여기로 보내려 할 때 그 자리에서 막히도록 둔 문이다.
+
+        사용자가 설정에서 껐으면 안 띄운다. 그래도 기록에는 남기고,
+        놓치면 안 되는 것은 트레이 메뉴에 숫자로 남아 있다.
+        """
+        config.log("[알림:%s] %s / %s" % (kind, title, message))
+        if kind not in patchnotes.TOAST_KINDS:
+            return False
+        if not self.settings.get("notifyImportant", True):
+            return False
+        if self.tray is None:
+            return False
+        try:
+            return bool(self.tray.toast(title, message))
+        except Exception:                                   # noqa: BLE001
+            return False
+
     def refresh_tray(self):
         if self.tray:
             self.tray.refresh()
@@ -455,7 +508,16 @@ class App(object):
                 me = self.api.me()
             except Exception:
                 pass
-            return mons, paths, me, walks
+            # 친구 요청은 바탕화면에 아무 자국도 남지 않는다. 여기에
+            # 얹어서 같이 받아 온다 - 이걸 위해 폴링을 새로 두지 않는다.
+            # 실패해도 동기화 전체를 망치지 않는다(알림은 있으면 좋은
+            # 것이고, 없다고 포켓몬이 안 걸어다녀서는 안 된다).
+            friends = None
+            try:
+                friends = self.api.friends()
+            except Exception:                               # noqa: BLE001
+                pass
+            return mons, paths, me, walks, friends
 
         def done(r, err):
             self._syncing = False
@@ -466,7 +528,7 @@ class App(object):
                 if getattr(err, "status", 0) == 401:
                     self.on_session_lost()
                 return
-            mons, paths, me, walks = r
+            mons, paths, me, walks, friends = r
             if me:
                 self.balls = me.get("balls", self.balls)
                 self.money = me.get("money", self.money)
@@ -475,6 +537,7 @@ class App(object):
                 self.announce_pvp(me.get("pvpUnseen", 0))
             if self.overlay:
                 self.overlay.sync(mons or [], paths or {}, walks or {})
+            self.announce_friends(friends)
             self.refresh_tray()
         run_async(self.root, work, done)
 
@@ -673,6 +736,41 @@ class App(object):
             config.log("확인하지 않은 대전 %d개" % n)
         self.refresh_tray()
 
+    def announce_friends(self, listing):
+        """친구 요청이 새로 왔는지 본다. sync 응답에 실려 온다.
+
+        **켤 때 이미 쌓여 있던 것은 개수만 한 번 알린다.** 한 사람씩
+        알림을 띄우면 오래 안 켠 사람은 켜자마자 화면 구석이 알림으로
+        덮인다. 그 뒤에 새로 오는 것은 누가 보냈는지까지 알려준다.
+        """
+        if not listing:
+            return          # 못 받아왔다. 다음 폴링에 다시 본다.
+        inc = [x for x in (listing.get("incoming") or [])
+               if x.get("id") is not None]
+        ids = set(x["id"] for x in inc)
+        if len(inc) != self.friend_unseen:
+            self.friend_unseen = len(inc)
+            self.refresh_tray()
+        fresh = ids - self._friend_seen
+        self._friend_seen = ids
+        first, self._friend_first = self._friend_first, False
+        if not fresh:
+            return
+        where = "트레이 메뉴의 '친구 요청 보기' 에서 받을 수 있습니다."
+        if first:
+            self.toast("친구 요청 %d건이 와 있습니다" % len(inc), where,
+                       kind="friend")
+            config.log("친구 요청 %d건" % len(inc))
+            return
+        names = [x.get("name") or "?" for x in inc if x["id"] in fresh]
+        if len(names) == 1:
+            self.toast("%s 님이 친구 요청을 보냈습니다" % names[0], where,
+                       kind="friend")
+        else:
+            self.toast("친구 요청 %d건이 새로 왔습니다" % len(names),
+                       ", ".join(names[:4]), kind="friend")
+        self.notify("친구 요청이 왔습니다 - " + ", ".join(names))
+
     def watch_pending(self):
         """상대가 걸어온 대전 중 가장 최근 것을 본다."""
         if self.arena:
@@ -701,7 +799,7 @@ class App(object):
             self.hub = None
         for name in ("box_window", "shop_window", "bag_window",
                      "friends_win", "dex_window", "settings_win",
-                     "pvp_window"):
+                     "pvp_window", "notes_win"):
             w = getattr(self, name, None)
             if w:
                 try:
@@ -849,6 +947,164 @@ class App(object):
                 p.clamp()
                 p.place()
         self.refresh_tray()
+
+    def set_show_grass(self, on):
+        """풀숲(야생 조우)을 켜거나 끈다.
+
+        끄면 화면에서 사라지는 것으로 끝나지 않고 서버에 물어보는 것도
+        멈춘다 (WildController.enabled). 이미 데려온 포켓몬은 그대로
+        걸어다닌다 - 끈 사람이 없애려는 것은 야생이지 포켓몬이 아니다.
+        """
+        on = bool(on)
+        if on == bool(self.settings.get("showGrass", True)):
+            return on
+        self.settings["showGrass"] = on
+        config.save_settings(self.settings)
+        if self.wild:
+            self.wild.set_enabled(on)
+        self.refresh_tray()
+        self.notify("풀숲을 켰습니다." if on else
+                    "풀숲을 껐습니다. 데려온 포켓몬은 그대로 걸어다닙니다.")
+        return on
+
+    def toggle_grass(self):
+        """트레이 메뉴에서 부른다. 설정 창이 열려 있으면 표시도 맞춘다."""
+        on = self.set_show_grass(not self.settings.get("showGrass", True))
+        if self.settings_win:
+            try:
+                self.settings_win.show_grass()
+            except Exception:                               # noqa: BLE001
+                pass
+        return on
+
+    # ---------------------------------------------------------------- 패치노트
+    def show_patchnotes(self, greet=False):
+        """이번 판에 무엇이 들어왔는지 보여준다.
+
+        갈아탄 뒤 처음 켤 때 한 번 저절로 뜨고, 그 뒤로는 트레이 메뉴에서
+        언제든 다시 열 수 있다.
+        """
+        entry = patchnotes.entry(VERSION)
+        if not entry:
+            return self.notify("이 버전에는 적어 둔 변경 내역이 없습니다.")
+        w = self.notes_win
+        if w is not None:
+            try:
+                if w.win.winfo_exists():
+                    return w.show()
+            except Exception:                               # noqa: BLE001
+                pass
+            self.notes_win = None
+        try:
+            self.notes_win = PatchNotes(self.root, entry, greet=greet)
+            self.notes_win.show()
+        except Exception as e:                              # noqa: BLE001
+            config.log("새로운 기능 창 오류: %s" % e)
+            self.notes_win = None
+
+    def _tell_patchnotes_once(self):
+        """갈아탄 뒤 처음 켰을 때 한 번만 띄운다.
+
+        **처음 켠 사람에게는 띄우지 않는다.** 아직 써보지도 않은 프로그램의
+        변경 내역은 읽을 이유가 없다. 대신 지금 버전을 적어 둬서, 다음에
+        갈아탄 뒤에는 보게 한다.
+
+        버전을 적는 것은 창을 띄우든 말든 먼저 한다. 창 쪽에서 무슨 일이
+        나도 다음 실행마다 같은 안내가 또 뜨는 일은 없어야 한다.
+        """
+        last = self.settings.get("lastRunVersion") or ""
+        if last == VERSION:
+            return
+        self.settings["lastRunVersion"] = VERSION
+        config.save_settings(self.settings)
+        if not last or not patchnotes.entry(VERSION):
+            return
+        # 부팅으로 켜졌으면 한참 미룬다. 컴퓨터를 켜자마자 창이 튀어나와
+        # 포커스를 뺏으면, 그때 타이핑하던 것이 엉뚱한 데로 들어간다.
+        self.root.after(12000 if self.autostarted else 2200,
+                        lambda: self.show_patchnotes(greet=True))
+
+    # ------------------------------------------------ 켜 둔 동안의 새 버전
+    def _schedule_update_check(self):
+        """켜 둔 동안에도 새 버전을 살펴본다.
+
+        예전에는 켤 때 한 번만 봤다(check_update). 이 프로그램은 한 번
+        켜면 몇 주씩 그대로 도는 종류라, 그러면 새 판이 나와도 컴퓨터를
+        다시 켤 때까지 모른다.
+        """
+        if self._quitting:
+            return
+        if not updater.is_frozen() or not updater.supported():
+            return          # 개발 중(파이썬)에는 건드리지 않는다
+        if self._update_job is not None:
+            try:
+                self.root.after_cancel(self._update_job)
+            except Exception:                               # noqa: BLE001
+                pass
+        self._update_job = self.root.after(
+            int(UPDATE_EVERY_HOURS * 3600 * 1000), self._update_tick)
+
+    def _update_tick(self):
+        self._look_for_update()
+        self._schedule_update_check()
+
+    def _look_for_update(self):
+        """깃허브에 새 판이 있는지 물어본다. 있으면 물어보는 창까지.
+
+        확인은 작업 스레드에서 한다. tk 스레드에서 하면 답이 올 때까지
+        포켓몬이 얼어붙는다.
+        """
+        if self._quitting or self._update_asking:
+            return
+        self._update_asking = True
+
+        def done(info, err):
+            # **창을 다 닫은 뒤에 내린다.** 창이 떠 있는 동안에도 예약된
+            # 확인은 계속 깨어나므로, 먼저 내리면 물어보는 창이 둘 뜬다.
+            try:
+                if err:
+                    return config.log("업데이트 확인 실패: %s" % err)
+                if not info or self._quitting:
+                    return
+                if info.get("version") == (self.settings.get("updateSkipped")
+                                           or ""):
+                    return      # 이 판은 나중에 하겠다고 했다
+                self._offer_update(info)
+            finally:
+                self._update_asking = False
+        run_async(self.root, updater.check, done)
+
+    def _offer_update(self, info):
+        """새 판을 찾았다. 알림을 띄우고 물어본다."""
+        ver = info.get("version") or "?"
+        config.log("새 버전 %s 발견 (켜 둔 동안)" % ver)
+        self.toast("포스크탑 v%s 이(가) 나왔습니다" % ver,
+                   "지금 받을지 묻는 창을 열었습니다. 나중에 받아도 됩니다.",
+                   kind="update")
+        try:
+            want = NewVersionAsk(self.root, info).show()
+        except Exception as e:                              # noqa: BLE001
+            config.log("새 버전 안내 창 오류: %s" % e)
+            return
+        if want != "now":
+            # 같은 판을 여섯 시간마다 다시 물어보면 그게 방해다.
+            # 다음에 새로 켤 때 다시 묻는다.
+            self.settings["updateSkipped"] = ver
+            config.save_settings(self.settings)
+            return self.notify("새 버전은 나중에 받습니다.")
+        try:
+            result, new_exe = UpdateWindow(self.root, info).show()
+        except Exception as e:                              # noqa: BLE001
+            config.log("업데이트 창 오류: %s" % e)
+            return
+        if result != "updated" or not new_exe:
+            return
+        try:
+            updater.relaunch(new_exe,
+                             [autostart.FLAG] if self.autostarted else [])
+        except Exception as e:                              # noqa: BLE001
+            return config.log("새 버전 실행 실패: %s" % e)
+        self.quit()
 
     def toggle_names(self):
         self.settings["showNames"] = not self.settings.get("showNames")
@@ -998,6 +1254,12 @@ class App(object):
         if self._quitting:
             return
         self._quitting = True
+        if self._update_job is not None:
+            try:
+                self.root.after_cancel(self._update_job)
+            except Exception:                               # noqa: BLE001
+                pass
+            self._update_job = None
         self.close_windows()
         if self.wild:
             self.wild.stop()

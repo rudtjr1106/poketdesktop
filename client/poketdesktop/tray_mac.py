@@ -123,6 +123,40 @@ class Tray(TrayBase):
         except Exception:                                   # noqa: BLE001
             config.log("트레이 갱신 실패\n" + traceback.format_exc())
 
+    # ---------------------------------------------------------- 알림
+    def toast(self, title, message):
+        """맥 알림 센터에 한 줄 띄운다.
+
+        **NSUserNotification 을 쓰지 않는다.** 그건 오래전에 폐기됐고,
+        요즘 맥에서는 서명·번들 사정에 따라 아무 말 없이 안 뜬다.
+        `osascript` 는 어느 판에서나 뜨고, 안 되면 종료 코드로 알려준다.
+
+        사용자가 시스템 설정에서 알림을 껐으면 그냥 안 뜬다. 그건 우리가
+        고칠 일이 아니고, 여기서 실패로 볼 일도 아니다 - 트레이 메뉴에
+        숫자로도 남아 있다.
+        """
+        import subprocess
+
+        # AppleScript 문자열 안에 그대로 넣을 것이라 두 글자를
+        # 다듬어야 한다. 역슬래시를 먼저 바꾼다 - 순서를 바꾸면
+        # 우리가 넣은 역슬래시까지 다시 감싸서 두 배가 된다.
+        BS = chr(92)
+
+        def esc(t):
+            t = (t or "").replace(BS, BS + BS)
+            t = t.replace(chr(34), BS + chr(34))
+            # 한 줄 알림이라 줄바꿈이 들어갈 자리가 없다. 눕힌다.
+            return " ".join(t.split())
+
+        script = 'display notification "%s" with title "%s"' % (
+            esc(message), esc(title))
+        try:
+            r = subprocess.run(["osascript", "-e", script],
+                               capture_output=True, timeout=6)
+            return r.returncode == 0
+        except Exception:                                   # noqa: BLE001
+            return False
+
     def stop(self):
         self.close()
         if self._pump_job is not None:

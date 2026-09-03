@@ -15,7 +15,7 @@ from . import autostart
 from . import config
 from . import ui_common as U
 
-W, H = 460, 560
+W, H = 460, 690
 
 
 class Row(object):
@@ -106,22 +106,46 @@ class SettingsWindow(object):
         box = tk.Frame(p, bg=U.BG)
         box.pack(fill="x", pady=(16, 0))
         self.names = tk.BooleanVar(value=bool(s.get("showNames")))
-        # 윈도우 알림은 아예 안 띄운다. 켜 두고 잊어버리는 프로그램이라
-        # 무슨 일이 있을 때마다 튀어나오면 하던 일을 방해한다. 그래서
-        # 알림 관련 손잡이도 없앴다.
-        for var, label, key, note in (
+        self.grass = tk.BooleanVar(value=bool(s.get("showGrass", True)))
+        self.notif = tk.BooleanVar(value=bool(s.get("notifyImportant", True)))
+        # **알림은 둘만 띄운다** - 새 버전과 친구 요청. 게임 안에서
+        # 벌어지는 일(잡았다, 레벨이 올랐다)은 이걸 켜도 안 띄운다.
+        # 바탕화면에서 눈으로 보이는 것으로 충분하고, 그런 것까지 화면
+        # 구석에서 튀어나오면 하던 일을 방해한다 (app.toast 를 보라).
+        #
+        # 손잡이마다 하는 일이 다르다. 이름표는 도트를 다시 만들어야
+        # 하고, 풀숲은 야생 폴링을 켜고 끄고, 알림은 저장만 하면 된다.
+        # 그래서 누를 때 무엇을 부를지도 같이 적는다.
+        for var, label, key, note, how in (
                 (self.names, "이름표 보이기", "showNames",
-                 "포켓몬 위에 이름과 레벨을 띄웁니다."),):
+                 "포켓몬 위에 이름과 레벨을 띄웁니다.", self._toggle),
+                (self.grass, "풀숲 띄우기", "showGrass",
+                 "끄면 야생이 돋지 않습니다. 데려온 포켓몬은 그대로"
+                 " 걸어다닙니다.", self._toggle_grass),
+                (self.notif, "새 버전·친구 요청 알림", "notifyImportant",
+                 "화면에 자국이 안 남는 이 둘만 알립니다. 잡았다·레벨업"
+                 " 같은 것은 띄우지 않습니다.", self._toggle_plain)):
             c = tk.Checkbutton(
                 box, text=label, variable=var, bg=U.BG, fg=U.FG,
                 selectcolor=U.INK, activebackground=U.BG,
                 activeforeground=U.FG, font=U.FONT_S, anchor="w",
                 highlightthickness=0, bd=0,
-                command=(lambda k=key, v=var: self._toggle(k, v)))
+                command=(lambda k=key, v=var, f=how: f(k, v)))
             c.pack(fill="x")
             tk.Label(box, text=note, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS,
-                     anchor="w").pack(fill="x", padx=(22, 0), pady=(0, 6))
+                     anchor="w", justify="left",
+                     wraplength=W - 60).pack(fill="x", padx=(22, 0),
+                                             pady=(0, 6))
         self._autostart_row(box)
+
+    def show_grass(self):
+        """지금 설정대로 표시를 맞춘다.
+
+        트레이 메뉴에서 껐다 켰을 때 app 이 불러 준다. 이게 없으면 설정
+        탭이 옛 표시를 들고 있다가, 거기서 누를 때 정반대로 동작한다
+        (부팅 손잡이도 같은 이유로 show_autostart 를 둔다).
+        """
+        self.grass.set(bool(self.app.settings.get("showGrass", True)))
 
     def _autostart_row(self, box):
         """컴퓨터 켤 때 같이 시작.
@@ -187,12 +211,32 @@ class SettingsWindow(object):
             self.app.overlay.refresh_visuals()
         self.app.refresh_tray()
 
+    def _toggle_plain(self, key, var):
+        """설정 파일만 바꾸면 끝나는 것. 도트를 다시 만들지 않는다.
+
+        refresh_visuals() 는 바탕화면의 도트를 전부 지우고 다시 만든다.
+        알림 손잡이를 눌렀다고 포켓몬들이 한 번 깜빡일 이유가 없다.
+        """
+        self.app.settings[key] = bool(var.get())
+        self._save()
+        self.app.refresh_tray()
+
+    def _toggle_grass(self, _key, var):
+        # 저장과 야생 폴링을 app 쪽에서 한 번에 한다. 여기서 설정만
+        # 바꾸면 이미 돋아 있는 풀숲이 그대로 남고, 껐는데도 90초마다
+        # 서버를 계속 두드린다.
+        self.app.set_show_grass(var.get())
+
     def reset(self):
         # autostart 는 화면 취향이 아니라 **윈도우에 걸어 둔 등록**이다.
         # "기본값으로" 를 눌렀다고 부팅 목록에서 조용히 빠지면(혹은 조용히
         # 끼어들면) 어리둥절하다. 여기서는 건드리지 않는다.
+        # lastRunVersion·updateSkipped 는 취향이 아니라 **기록**이다.
+        # 지우면 "새로운 기능" 창이 다음 실행에 또 뜨고, 나중에 하겠다고
+        # 한 판을 다시 물어본다.
         keep = {k: self.app.settings[k]
-                for k in ("server", "lastBall", "autostart")
+                for k in ("server", "lastBall", "autostart",
+                          "lastRunVersion", "updateSkipped")
                 if k in self.app.settings}
         self.app.settings.clear()
         self.app.settings.update(dict(config.DEFAULTS))
@@ -201,6 +245,11 @@ class SettingsWindow(object):
         U.set_status(self.status, "기본값으로 되돌렸습니다. 창을 다시 열면"
                                   " 값이 보입니다.")
         self.app.set_size(self.app.settings["targetHeight"])
+        # 풀숲은 **무조건 다시 맞춘다.** 위에서 설정 값이 이미 기본값으로
+        # 바뀌어 있어서, set_show_grass 로 가면 "안 바뀌었다" 며 그냥
+        # 돌아온다. 그러면 껐던 사람은 되돌렸는데도 풀숲이 안 돋는다.
+        if self.app.wild:
+            self.app.wild.set_enabled(self.app.settings.get("showGrass", True))
         self.app.refresh_tray()
 
     # ---------------- 끝 ----------------
