@@ -127,6 +127,9 @@ def build(onedir=False):
         # pystray 는 실행할 때 백엔드를 고르므로 직접 알려줘야 한다
         "--hidden-import", "pystray._win32",
         "--hidden-import", "PIL._tkinter_finder",
+        # 인증서 꾸러미. 없으면 업데이트 확인이 SSL 에서 조용히 실패한다.
+        "--hidden-import", "certifi",
+        "--collect-data", "certifi",
         # 안 쓰는 무거운 것들은 뺀다
         "--exclude-module", "numpy",
         "--exclude-module", "scipy",

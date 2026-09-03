@@ -100,7 +100,8 @@ def check(timeout=TIMEOUT):
         "User-Agent": "poketdesktop/%s" % VERSION,
     })
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout,
+                                    context=ssl_context()) as r:
             data = json.loads(r.read().decode("utf-8"))
     except Exception as e:                                  # noqa: BLE001
         config.log("업데이트 확인 실패: %s" % e)
@@ -122,6 +123,38 @@ def check(timeout=TIMEOUT):
         "name": asset["name"],
         "notes": (data.get("body") or "").strip(),
     }
+
+
+_SSL = None
+
+
+def ssl_context():
+    """인증서를 확인할 때 쓸 것.
+
+    **묶어 놓은 앱에는 인증서 꾸러미가 안 들어 있다.** 그래서 파이썬
+    기본값으로 https 를 열면 이렇게 끝난다.
+
+        [SSL: CERTIFICATE_VERIFY_FAILED] unable to get local issuer
+        certificate
+
+    게임 서버 쪽은 멀쩡한데(requests 가 certifi 를 들고 다닌다) 업데이트
+    확인만 조용히 실패한다. 새 버전이 나와도 영영 안 받는 것이라 알아채기
+    어렵다. 맥 번들에서 실제로 그랬다.
+
+    같은 certifi 를 여기서도 쓴다. 없으면 기본값으로 간다 - 인증서를
+    아예 안 보는 쪽으로는 절대 가지 않는다. 남이 준 파일을 받아 실행하는
+    자리다.
+    """
+    global _SSL
+    if _SSL is not None:
+        return _SSL
+    import ssl
+    try:
+        import certifi
+        _SSL = ssl.create_default_context(cafile=certifi.where())
+    except Exception:                                       # noqa: BLE001
+        _SSL = ssl.create_default_context()
+    return _SSL
 
 
 def pick_asset(assets):
@@ -154,7 +187,8 @@ def download(url, dest, on_progress=None, timeout=60):
         "User-Agent": "poketdesktop/%s" % VERSION})
     tmp = dest + ".part"
     got = 0
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with urllib.request.urlopen(req, timeout=timeout,
+                                context=ssl_context()) as r:
         total = int(r.headers.get("Content-Length") or 0)
         with io.open(tmp, "wb") as f:
             while True:
