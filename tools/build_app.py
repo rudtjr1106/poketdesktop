@@ -48,6 +48,7 @@
 그래서 만드는 쪽에서는 이 문제가 안 보인다. 실제로 받아서 열어 본
 사람에게서 알았다. 릴리스 노트와 리드미에 적어 두었다.
 """
+import glob
 import os
 import shutil
 import subprocess
@@ -62,6 +63,16 @@ from common.version import VERSION            # noqa: E402
 # 번들 이름은 사람이 보는 이름이라 한글로 둔다. zip 파일 이름은 ASCII 다 -
 # GitHub 릴리스가 첨부파일 이름의 한글을 지워 버린다.
 APP_NAME = "포스크탑"
+# 번들 **안의 실행 파일** 이름. 사람 눈에는 안 보인다 (Finder·독·메뉴막대에
+# 뜨는 이름은 .app 폴더 이름과 Info.plist 가 정한다).
+#
+# **한글이면 안 된다.** 맥은 파일 이름을 NFC(조합형)로 저장하는데 codesign 은
+# 번들에서 NFD(분해형)로 경로를 얻는다. 둘이 문자열로 안 맞으면 codesign 이
+# 이 파일을 '주 실행 파일' 로 못 알아보고, 빼야 할 것을 자원 봉인 목록에
+# 넣은 뒤 곧바로 거기에 서명을 써서 자기가 박은 해시를 스스로 무효화한다.
+# 그 결과가 `a sealed resource is missing or invalid` 이고, 공증이 거부된다.
+# 서명 순서를 어떻게 바꿔도 안 고쳐진다 - 이름을 바꿔야 한다.
+EXEC_NAME = "poketdesktop"
 # 자산 이름. **.zip 으로 끝내지 마라** - 윈도우 자동 업데이트가 집어간다
 # (make_dmg 의 설명을 보라).
 ZIP_NAME = "poketdesktop-v%s-mac" % VERSION
@@ -127,28 +138,36 @@ def find_identity():
 
 
 def sign_app(app_path, identity):
-    """개발자 서명 + hardened runtime.
+    """번들 껍데기를 다시 봉인한다.
 
-    안쪽부터 서명한다. 바깥 번들을 먼저 서명하면 그 뒤에 안쪽을 건드리는
-    셈이 되어 봉인이 깨진다.
+    안쪽은 PyInstaller 가 만들면서 이미 서명했다. 여기서는 Info.plist 를
+    손댄 뒤라 **바깥 봉인만** 다시 한다. 안쪽까지 다시 건드리면 오히려
+    `a sealed resource is missing or invalid` 가 난다.
 
     공증을 받으려면 **hardened runtime(--options runtime)이 필수**다.
-    그러면 기본으로 막히는 것들이 있어서 entitlements 로 필요한 것만 연다
+    그래서 막히는 것은 entitlements 로 필요한 것만 연다
     (deploy/mac/entitlements.plist).
     """
-    inner = []
-    for base, _dirs, files in os.walk(app_path):
-        for f in files:
-            p = os.path.join(base, f)
-            if os.path.islink(p):
-                continue
-            if f.endswith((".dylib", ".so")) or ".framework/" in p:
-                inner.append(p)
-    print("  안쪽 %d개부터 서명합니다..." % len(inner))
-    for p in inner:
-        subprocess.run(["codesign", "--force", "--timestamp",
-                        "--options", "runtime", "--sign", identity, p],
-                       capture_output=True)
+    # **프레임워크는 버전 디렉터리로 서명해야 한다.**
+    # PyInstaller 가 붙여 둔 서명은 `Sealed Resources=none` 인데 서명은
+    # 자원이 있다고 말해서, 애플이 "The signature of the binary is
+    # invalid" 로 공증을 거부한다. X.framework 가 아니라
+    # X.framework/Versions/<버전> 을 서명해야 제대로 봉인된다.
+    fwdir = os.path.join(app_path, "Contents", "Frameworks")
+    for fw in sorted(glob.glob(os.path.join(fwdir, "*.framework"))):
+        for ver in sorted(glob.glob(os.path.join(fw, "Versions", "*"))):
+            if os.path.islink(ver) or not os.path.isdir(ver):
+                continue          # Versions/Current 같은 링크는 건너뛴다
+            subprocess.run(["codesign", "--force", "--timestamp",
+                            "--options", "runtime", "--sign", identity, ver],
+                           capture_output=True)
+        v = subprocess.run(["codesign", "--verify", "--strict", fw],
+                           capture_output=True, text=True)
+        if v.returncode != 0:
+            print("  %s 서명이 안 됩니다: %s"
+                  % (os.path.basename(fw), (v.stderr or "").strip()[:90]))
+            return False
+
     r = subprocess.run(["codesign", "--force", "--timestamp",
                         "--options", "runtime",
                         "--entitlements", ENTITLEMENTS,
@@ -221,6 +240,7 @@ def set_info_plist(app_path):
     except Exception as e:                                  # noqa: BLE001
         print("  Info.plist 를 못 읽었습니다: %s" % e)
         return
+    d["CFBundleExecutable"] = EXEC_NAME     # 아래에서 바꾼 이름과 맞춘다
     d["LSUIElement"] = True                 # Dock 에 안 뜬다
     d["CFBundleName"] = APP_NAME
     d["CFBundleDisplayName"] = APP_NAME
@@ -288,7 +308,8 @@ def check_signature(app_path):
     r = subprocess.run(["codesign", "-dv", app_path],
                        capture_output=True, text=True)
     out = (r.stdout or "") + (r.stderr or "")
-    if "Signature=adhoc" in out or "Authority=" in out:
+    if ("Signature=adhoc" in out or "Authority=" in out
+            or "TeamIdentifier=" in out):
         # 붙어 있다고 봉인까지 맞는 것은 아니다. 있는 그대로 알려준다.
         v = subprocess.run(["codesign", "--verify", "--strict", app_path],
                            capture_output=True, text=True)
@@ -336,6 +357,11 @@ def build():
     icon = make_icns()
     if not icon:
         return 1
+    ident = find_identity()
+    if ident:
+        print("  서명: %s" % ident)
+    else:
+        print("  Developer ID 인증서가 없어 임시 서명으로 냅니다.")
 
     shutil.rmtree(os.path.join(ROOT, "build", "pyi"), ignore_errors=True)
     dist = os.path.join(ROOT, "dist")
@@ -384,6 +410,14 @@ def build():
         "--exclude-module", "pystray",
         ENTRY,
     ]
+    if ident:
+        # **PyInstaller 가 만들면서 서명하게 한다.** 다 만든 뒤에 우리가
+        # 서명하면 `a sealed resource is missing or invalid` 가 난다 -
+        # Contents/Resources 와 Contents/Frameworks 양쪽에 같은 것을 두는
+        # 구조라, 바깥을 서명한 뒤에 안쪽을 건드리는 셈이 되기 때문이다.
+        # PyInstaller 는 번들을 짓는 도중에 알맞은 순서로 서명한다.
+        cmd[-1:-1] = ["--codesign-identity", ident,
+                      "--osx-entitlements-file", ENTITLEMENTS]
     print("  PyInstaller 실행...")
     r = subprocess.run(cmd, cwd=ROOT)
     if r.returncode != 0:
@@ -397,15 +431,20 @@ def build():
     if not os.path.exists(exe):
         print("  번들 안에 실행 파일이 없습니다: %s" % exe)
         return 1
+    # 서명하기 전에 이름을 ASCII 로 바꾼다 (EXEC_NAME 의 설명을 보라).
+    ascii_exe = os.path.join(app_path, "Contents", "MacOS", EXEC_NAME)
+    if exe != ascii_exe:
+        os.replace(exe, ascii_exe)
+        print("  실행 파일 이름: %s -> %s (서명이 되려면 ASCII 여야 한다)"
+              % (APP_NAME, EXEC_NAME))
 
     set_info_plist(app_path)
 
-    # 배포용 인증서가 있으면 제대로 서명하고 공증까지 받는다.
-    # 없으면 PyInstaller 가 붙여 둔 임시 서명 그대로 나간다.
-    ident = find_identity()
-    signed = sign_app(app_path, ident) if ident else False
-    if not ident:
-        print("  Developer ID 인증서가 없어 임시 서명으로 냅니다.")
+    # Info.plist 를 손댔으니 번들을 다시 봉인해야 한다. 안 그러면
+    # 서명이 깨진 것으로 나온다.
+    signed = False
+    if ident:
+        signed = sign_app(app_path, ident)
     check_signature(app_path)
 
     dmg_path = make_dmg(app_path, dist)
