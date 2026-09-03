@@ -18,6 +18,10 @@ on:
       tag:
         description: "올릴 태그 (예: v1.0.9). 이미 있어야 한다"
         required: true
+      dry_run:
+        description: "시험 실행 — 만들고 서명·공증까지 하되 릴리스에는 안 올린다"
+        type: boolean
+        default: false
 
 permissions:
   contents: write        # 릴리스를 만들고 파일을 올리려면 필요하다
@@ -36,6 +40,7 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
       tag: ${{ steps.v.outputs.tag }}
+      dry: ${{ github.event.inputs.dry_run || 'false' }}
     steps:
       - uses: actions/checkout@v4
       - id: v
@@ -180,7 +185,23 @@ jobs:
           POKET_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
           POKET_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
           POKET_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          # **인증서를 넣었으면 서명·공증이 빠진 판은 아예 안 낸다.**
+          # 이게 없으면 인증서를 못 찾아도 빌드가 초록불로 끝나고,
+          # 서명 없는 dmg 가 릴리스에 올라간다. 그 판은 받는 사람이 못 연다.
+          POKET_REQUIRE_NOTARIZED: ${{ env.CERT != '' && '1' || '0' }}
         run: python tools/build_app.py
+
+      # 만든 자리에서 보는 것이라 격리 표시가 없다. 그래도 서명·공증이
+      # 붙었는지는 여기서 확실히 확인된다.
+      - name: 공증 확인
+        if: env.CERT != ''
+        run: |
+          set -e
+          D=dist/poketdesktop-v${{ needs.check.outputs.version }}-mac.dmg
+          xcrun stapler validate "$D"
+          spctl -a -vvv -t open --context context:primary-signature "$D" 2>&1 | tee /tmp/s.txt
+          grep -q "source=Notarized Developer ID" /tmp/s.txt \
+            || { echo "::error::공증이 안 붙었습니다"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
@@ -191,6 +212,9 @@ jobs:
   publish:
     name: 릴리스에 올리기
     needs: [check, windows, mac]
+    # 시험 실행이면 여기까지 안 온다. 만들어진 것은 Actions 의
+    # artifact 로만 남으니, 받아서 확인해 보고 진짜 태그를 밀면 된다.
+    if: needs.check.outputs.dry != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
