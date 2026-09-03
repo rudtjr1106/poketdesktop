@@ -1058,8 +1058,6 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
                 "throws": left["throws"], "expiresAt": left["expires_at"],
                 # 개수도 턴도 방금 바뀌었다. 갱신된 목록을 같이 준다.
                 "ballOptions": _ball_options(uid, user, left, body),
-                "ball": {"id": ball_id,
-                         "kr": (items.get(ball_id) or {}).get("kr", ball_id)},
                 # 본가와 같은 순서: 적게 흔들릴수록 멀었다는 뜻
                 "message": ["앗! 포켓몬이 튀어나와버렸다!",
                             "이런! 포켓몬이 볼에서 나와버렸다!",
@@ -1087,8 +1085,6 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     return {"caught": True, "shakes": 4, "balls": balls, "where": where,
             "ball": ball_id,
             "pokemon": got, "drop": drop, "money": items.money(uid),
-            "ball": {"id": ball_id,
-                     "kr": (items.get(ball_id) or {}).get("kr", ball_id)},
             "bag": items.bag_get(uid), "message": korean.natural(msg)}
 
 

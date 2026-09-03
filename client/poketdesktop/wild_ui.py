@@ -695,12 +695,21 @@ class WildController(object):
         return "POKEBALL"
 
     def _thrown(self, r):
-        """방금 던진 볼. 서버가 실어 보낸 것을 먼저 믿는다.
+        """방금 던진 볼의 **id 문자열**. 서버가 실어 보낸 것을 먼저 믿는다.
 
         설정의 lastBall 은 야생에서 던질 때만 갱신된다. 배틀 중에 던지면
         어긋날 수 있어서, 서버가 알려준 값이 있으면 그쪽을 쓴다.
+
+        **문자열로 올 때도 있고 {"id":..,"kr":..} 로 올 때도 있다.**
+        서버가 한동안 두 형태를 다 내보냈다(응답 dict 에 "ball" 키가 두 번
+        들어가 있었다). 그대로 넘기면 그림을 고르는 자리에서
+        `unhashable type: 'dict'` 로 볼 연출이 통째로 터진다.
+        서버를 고쳤어도 옛 서버에 붙는 클라이언트가 있으니 여기서 버틴다.
         """
-        return (r or {}).get("ball") or self.last_ball()
+        got = (r or {}).get("ball")
+        if isinstance(got, dict):
+            got = got.get("id")
+        return got or self.last_ball()
 
     def throw_ball(self, ball=None):
         if self.throwing or not self.pet or not self.wild_id:
