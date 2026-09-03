@@ -48,6 +48,7 @@ gui_ready = getattr(_M, "gui_ready", lambda: True)
 hide_from_dock = _M.hide_from_dock
 activate = _M.activate
 accept_first_click = _M.accept_first_click
+keep_focus = _M.keep_focus
 watch_right_click = _M.watch_right_click
 take_right_clicks = _M.take_right_clicks
 mouse_buttons_down = _M.mouse_buttons_down

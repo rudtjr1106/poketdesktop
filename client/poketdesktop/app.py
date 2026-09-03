@@ -516,6 +516,9 @@ class App(object):
         탭 내용은 예전 창 클래스를 그대로 쓴다 - 다른 코드가 아직
         self.box_window 같은 이름으로 찾으므로 여기서 채워 준다.
         """
+        # 창을 열 때는 앞으로 나온다. Tk 의 자동 활성화를 막아 두었으므로
+        # (platform_mac.keep_focus) 여기서 직접 불러야 한다.
+        PLAT.activate()
         if not self.hub:
             self.hub = HubWindow(self)
         self.hub.show(key)
