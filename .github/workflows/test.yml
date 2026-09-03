@@ -39,6 +39,22 @@ jobs:
       - name: 투기장 좌표
         run: python client/test_layout.py
 
+      # 창을 안 만드는 것들. 어느 OS 에서나 그대로 돈다.
+      - name: 지난 시간 표기
+        run: python common/test_korean.py
+
+      - name: 배틀 화면 (체력바)
+        run: python client/test_battle_ui.py
+
+      - name: 부팅 직후 로그인 재시도
+        run: python client/test_boot_retry.py
+
+      - name: 걷는 범위
+        run: python client/test_walk_bounds.py
+
+      - name: 휠 한 칸
+        run: python client/test_wheel.py
+
       - name: 문법
         run: |
           python - <<'EOF'
@@ -58,6 +74,51 @@ jobs:
               sys.exit(1)
           print("문법 오류 없음")
           EOF
+
+  # OS 에 매인 것들. **여기가 없어서 실제로 한 번 놓쳤다** - 맥 작업으로
+  # tray.build_menu() 가 없어졌는데, 그걸 부르던 smoke_autostart.py 가
+  # 아무 데서도 안 돌아서 한참 뒤에야 드러났다.
+  #
+  # 러너에는 화면이 있어서 tkinter 창도 만들어진다. 공개 저장소라 무료다.
+  windows:
+    name: 윈도우 전용
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 준비물
+        run: pip install -r client/requirements.txt
+      - name: 자동 시작 (레지스트리)
+        run: python client/test_autostart.py
+      - name: 설정 창·트레이 (창을 실제로 만든다)
+        run: python client/smoke_autostart.py
+
+  mac:
+    name: 맥 전용
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 준비물
+        run: pip install -r client/requirements.txt
+      # 아래 셋은 창을 안 띄운다. 러너에서 그대로 돈다.
+      - name: 자동 시작 (LaunchAgent)
+        run: python client/test_autostart_mac.py
+      - name: 입력 (오른쪽 클릭·휠)
+        run: python client/test_mac_input.py
+      - name: 업데이트 (dmg)
+        run: python client/test_update_mac.py
+      # 이건 메뉴 막대에 아이콘을 잠깐 올렸다 내린다 - **화면이 필요하다.**
+      # 러너에 로그인 세션이 없어서 NSStatusBar 가 안 되면 이 줄만 지워라.
+      # (맥 없이 적은 것이라 첫 실행에서 확인이 필요하다)
+      - name: 트레이 (NSStatusItem)
+        run: python client/test_tray_mac.py
 
   # 서버를 띄우고 HTTP 로 두드리는 것들.
   server:
