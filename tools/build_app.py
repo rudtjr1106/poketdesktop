@@ -92,6 +92,13 @@ NOTARY_PROFILE = os.environ.get("POKET_NOTARY_PROFILE") or ""
 NOTARY_ID = os.environ.get("POKET_NOTARY_APPLE_ID") or ""
 NOTARY_PW = os.environ.get("POKET_NOTARY_PASSWORD") or ""
 NOTARY_TEAM = os.environ.get("POKET_NOTARY_TEAM_ID") or ""
+#   POKET_REQUIRE_NOTARIZED=1  서명이나 공증이 빠지면 빌드를 실패시킨다
+#
+# **CI 는 이걸 켜야 한다.** 안 켜면 인증서를 못 찾아도 빌드가 0 으로
+# 끝나고, 서명 없는 dmg 가 초록불을 달고 릴리스에 올라간다. 만든
+# 사람은 아무것도 못 느끼고 받는 사람만 "손상되었습니다" 를 본다.
+# 내 맥에서 그냥 굴려 볼 때는 꺼 둔다 (인증서 없이도 돌아야 하므로).
+REQUIRE = os.environ.get("POKET_REQUIRE_NOTARIZED") == "1"
 
 ICONSET = os.path.join(ROOT, "build", "poket.iconset")
 ICNS = os.path.join(ROOT, "build", "icon.icns")
@@ -446,6 +453,12 @@ def build():
     if ident:
         signed = sign_app(app_path, ident)
     check_signature(app_path)
+    if REQUIRE and not signed:
+        print("")
+        print("  서명이 안 됐는데 POKET_REQUIRE_NOTARIZED=1 입니다. 멈춥니다.")
+        print("  키체인에 Developer ID Application 인증서가 있는지 보세요:")
+        print("    security find-identity -v -p codesigning")
+        return 1
 
     dmg_path = make_dmg(app_path, dist)
     if not dmg_path:
@@ -466,6 +479,10 @@ def build():
     if stapled:
         print("")
         print("  공증까지 됐습니다. 받는 사람은 그냥 두 번 눌러 열면 됩니다.")
+    elif REQUIRE:
+        print("")
+        print("  공증이 안 됐는데 POKET_REQUIRE_NOTARIZED=1 입니다. 멈춥니다.")
+        return 1
     return 0
 
 
