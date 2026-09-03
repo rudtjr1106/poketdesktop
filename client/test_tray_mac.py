@@ -195,6 +195,69 @@ def main():
         "%d -> %d" % (len(before), len(after)))
     chk("갱신 뒤에도 '종료' 가 있다", any(x.strip() == "종료" for x in after))
 
+    section("아무도 안 눌렀는데 메뉴가 저절로 열리면 안 된다")
+    # 메뉴는 스스로도 닫힌다 - 항목을 누르거나, 바깥을 누르거나, 다른
+    # 메뉴가 열릴 때. 그때 죽은 참조를 '열려 있다' 로 읽으면 다음
+    # refresh() 가 메뉴를 다시 연다. 설정을 바꿀 때마다 그랬다.
+    t.close()
+    root.update()
+    chk("닫힌 상태에서 시작", not t.is_open())
+    for _ in range(3):
+        t.refresh()
+        root.update()
+    chk("갱신해도 안 열린다", not t.is_open())
+    chk("갱신해도 창이 안 생긴다", t.popup is None, t.popup)
+
+    # 항목을 눌러서 닫힌 뒤 (메뉴가 스스로 닫는 길)
+    t.open()
+    root.update()
+    row = find_row(t.popup.win, "종료")
+    if row is not None:
+        row.event_generate("<Button-1>")
+        root.update()
+    chk("항목을 누르면 닫힌다", not t.is_open())
+    for _ in range(3):
+        t.refresh()
+        root.update()
+    chk("그 뒤 갱신해도 저절로 안 열린다", not t.is_open())
+
+    # 바깥을 눌러서 닫힌 뒤
+    t.open()
+    root.update()
+    if t.popup is not None and t.popup.catcher is not None:
+        t.popup.catcher.event_generate("<Button-1>")
+        root.update()
+    chk("바깥을 누르면 닫힌다", not t.is_open())
+    t.refresh()
+    root.update()
+    chk("그 뒤 갱신해도 저절로 안 열린다", not t.is_open())
+
+    # 다른 메뉴가 열려서 닫힌 뒤 (ui_common.close_all)
+    t.open()
+    root.update()
+    U.PopupMenu(root, [{"text": "딴 메뉴", "enabled": False}], 100, 100)
+    root.update()
+    chk("다른 메뉴가 열리면 닫힌다", not t.is_open())
+    t.refresh()
+    root.update()
+    chk("그 뒤 갱신해도 저절로 안 열린다", not t.is_open())
+    U.close_all()
+    root.update()
+
+    section("열려 있을 때는 갱신이 내용을 새로 그린다")
+    t.open()
+    root.update()
+    chk("열려 있다", t.is_open())
+    app.pvp_unseen = 7
+    t.refresh()
+    root.update()
+    chk("갱신 뒤에도 열려 있다", t.is_open())
+    chk("바뀐 값이 반영된다",
+        any("받은 대전" in x and "7" in x for x in rows(t.popup.win)),
+        rows(t.popup.win))
+    app.pvp_unseen = 2
+    t.close()
+
     section("메뉴를 만들다 터져도 앱이 안 죽는다")
     boom = [0]
 

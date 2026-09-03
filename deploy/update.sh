@@ -63,8 +63,20 @@ ssh -i "$KEY" -o StrictHostKeyChecking=no "$HOST" \
     'cd ~/poketdesktop && git fetch -q origin && git checkout -q -- . && git pull -q && bash deploy/update.sh --here'
 
 say "바깥에서 확인"
-ver=$(curl -fsS --max-time 20 "$URL/api/health" 2>/dev/null \
-      | python -c "import json,sys; print(json.load(sys.stdin)['version'])" 2>/dev/null || echo "?")
+# **컨테이너가 뜰 때까지 기다린다.** 다시 빌드한 직후에는 아직
+# health: starting 이라 곧바로 물으면 답이 없다. 그걸 "버전이 다르다" 로
+# 읽고 헛경보를 냈다.
+#
+# `python` 이 아니라 `python3` 을 쓴다. 맥에는 `python` 이라는 이름이 없다
+# (셸 별칭은 스크립트에서 안 보인다). 그래서 값이 늘 "?" 로 나왔다.
+PY=$(command -v python3 || command -v python)
+ver="?"
+for _i in $(seq 1 20); do
+  ver=$(curl -fsS --max-time 20 "$URL/api/health" 2>/dev/null \
+        | "$PY" -c "import json,sys; print(json.load(sys.stdin)['version'])" 2>/dev/null || echo "?")
+  [ "$ver" != "?" ] && break
+  sleep 3
+done
 want=$(grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' common/version.py | head -1 | tr -d '"')
 echo "   서버 $ver  ·  저장소 $want"
 if [ "$ver" = "$want" ]; then
