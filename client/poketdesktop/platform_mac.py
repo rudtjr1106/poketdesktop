@@ -351,6 +351,7 @@ class SpriteView(object):
             self.widget.pack()
             return
         accept_first_click()                 # 아직 안 걸렸으면 지금 건다
+        keep_focus()                         # 포커스를 뺏지 않게
         kw.pop("image", None)                # Frame 은 그림을 받지 않는다
         self.widget = tk.Frame(win, width=w, height=h, bg=bg, **kw)
         self.widget.pack()
@@ -729,6 +730,8 @@ def hide_from_dock():
     # Dock 에서 숨기면 앱이 거의 늘 비활성이 된다. 그러면 창을 처음
     # 누르는 클릭을 맥이 가로채므로 같이 손봐 둔다.
     accept_first_click()
+    # 그리고 제멋대로 앞으로 나오지 못하게 막는다.
+    keep_focus()
 
 
 _first_mouse = None            # None=아직, True=걸었음, False=못 걸었음
@@ -841,13 +844,68 @@ def take_right_clicks():
     return [(int(round(x)), int(round(h0 - y)), n) for x, y, n in out]
 
 
+_guard = None
+
+
+def keep_focus():
+    """**Tk 이 제멋대로 앞으로 나오지 못하게 막는다.**
+
+    창을 새로 만들어 화면에 올릴 때 Tk 이 `activateIgnoringOtherApps:` 를
+    부른다. 그래서 풀숲이 돋거나 야생 포켓몬이 나올 때마다 쓰던 앱의
+    포커스가 풀렸다. 글을 쓰다가 갑자기 커서가 사라지는 식이다.
+
+    바탕화면에서 도트가 걸어다니는 프로그램은 **스스로 앞으로 나오면
+    안 된다.** 그래서 그 메서드를 통째로 막는다.
+
+    막고 나면 우리도 못 나오게 되므로, 정말 앞으로 나와야 할 때는
+    `activate()` 가 **다른 선택자**로 부른다 (아래를 보라).
+
+    (원래 구현을 살려 두고 문지기만 세우려고 메서드 맞바꾸기도 해
+     봤지만 안 먹었다. 통째로 막고 다른 문을 내는 편이 확실하다.)
+    """
+    global _guard
+    if _guard is not None or not _ok:
+        return _guard
+    try:
+        cls = objc.lookUpClass("TKApplication")
+    except Exception:                                       # noqa: BLE001
+        return None        # 아직 Tk 이 안 떴다. 다음에 다시.
+    _guard = False
+
+    def activateIgnoringOtherApps_(self, flag):
+        return             # Tk 이 저 혼자 부르는 것. 아무것도 안 한다.
+
+    for sig in (b"v@:B", b"v@:c"):
+        try:
+            objc.classAddMethods(cls, [objc.selector(
+                activateIgnoringOtherApps_,
+                selector=b"activateIgnoringOtherApps:", signature=sig)])
+            _guard = True
+            return True
+        except Exception:                                   # noqa: BLE001
+            continue
+    return False
+
+
 def activate():
-    """우리 창을 앞으로 꺼낸다."""
+    """우리 창을 앞으로 꺼낸다. **여기서만** 앞으로 나온다.
+
+    `activateIgnoringOtherApps:` 는 keep_focus 가 막아 두었다. 다행히
+    맥에는 인자 없는 `activate` 가 따로 있어서(macOS 14 부터), 그쪽은
+    막힌 문을 지나간다. 없는 맥에서는 NSRunningApplication 으로 간다.
+    """
     if not _ok:
         return
+    app = AppKit.NSApplication.sharedApplication()
+    if app.respondsToSelector_(b"activate"):
+        try:
+            app.activate()
+            return
+        except Exception:                                   # noqa: BLE001
+            pass
     try:
-        AppKit.NSApplication.sharedApplication(
-            ).activateIgnoringOtherApps_(True)
+        AppKit.NSRunningApplication.currentApplication().activateWithOptions_(
+            AppKit.NSApplicationActivateIgnoringOtherApps)
     except Exception:                                       # noqa: BLE001
         pass
 

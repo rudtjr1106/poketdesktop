@@ -231,6 +231,11 @@ def accept_first_click():
     return True
 
 
+def keep_focus():
+    """창을 띄울 때 쓰던 앱의 포커스를 뺏지 않게. 윈도우는 원래 안 뺏는다."""
+    return True
+
+
 def watch_right_click():
     """오른쪽 클릭을 따로 받아 둘 필요가 있는가. 윈도우는 없다."""
     pass
