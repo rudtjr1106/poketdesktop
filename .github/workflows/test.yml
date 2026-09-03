@@ -33,6 +33,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      # 계산만 하는 검사라도 poketdesktop 모듈을 불러오면 딸려 오는 것이
+      # 있다 (test_battle_ui -> desktop_battle -> evolve_fx -> PIL).
+      # 트레이(pystray)는 여기서 필요 없고 리눅스에서는 X 도 없다.
+      - name: 준비물
+        run: pip install pillow requests
+
       - name: 파티전 엔진
         run: python tools/sim_party.py 300
 
@@ -84,6 +90,13 @@ jobs:
     name: 윈도우 전용
     runs-on: windows-latest
     timeout-minutes: 15
+    # **러너의 콘솔이 cp1252 다.** 검사는 진행 상황을 한글로 찍으므로
+    # 그대로 두면 UnicodeEncodeError 로 죽는다. 진짜 윈도우 PC 는
+    # 코드페이지가 949 라 멀쩡해서, 여기서만 나는 일이다.
+    # (release.yml 도 같은 이유로 같은 것을 잡아 둔다)
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -102,6 +115,9 @@ jobs:
     name: 맥 전용
     runs-on: macos-latest
     timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
