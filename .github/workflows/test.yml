@@ -95,6 +95,8 @@ jobs:
         run: python client/test_autostart.py
       - name: 설정 창·트레이 (창을 실제로 만든다)
         run: python client/smoke_autostart.py
+      - name: 테두리 없는 창이 제자리에 뜨는가
+        run: python client/smoke_window.py
 
   mac:
     name: 맥 전용
@@ -114,6 +116,8 @@ jobs:
         run: python client/test_mac_input.py
       - name: 업데이트 (dmg)
         run: python client/test_update_mac.py
+      - name: 테두리 없는 창이 제자리에 뜨는가
+        run: python client/smoke_window.py
       # 이건 메뉴 막대에 아이콘을 잠깐 올렸다 내린다 - **화면이 필요하다.**
       # 러너에 로그인 세션이 없어서 NSStatusBar 가 안 되면 이 줄만 지워라.
       # (맥 없이 적은 것이라 첫 실행에서 확인이 필요하다)

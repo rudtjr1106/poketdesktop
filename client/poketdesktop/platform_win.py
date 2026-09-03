@@ -20,8 +20,32 @@ from .platform_base import (NATIVE_MENU, RIGHT_CLICK,   # noqa: F401
                             SpriteView, accept_first_click, activate, keep_focus,
                             bind_right, data_dir, mouse_buttons_down,
                             take_right_clicks, watch_right_click,
-                            hide_from_dock, raise_above, screens,
-                            show_again)
+                            hide_from_dock, screens, show_again)
+
+
+def raise_above(win):
+    """항상 위로. **자리를 지켜 준다.**
+
+    윈도우에서 테두리 없는 창(overrideredirect)에 -topmost 를 걸면 창이
+    왼쪽 위 (0, 0) 으로 튄다. 그래서 마우스를 올렸을 때 뜨는 설명이
+    포켓몬 위가 아니라 화면 구석에 나타났다.
+
+    맥은 정반대로 **창이 뜬 뒤에** 걸어야 먹는다(platform_mac.raise_above).
+    그래서 부르는 쪽에서 순서를 맞추는 대신 여기서 자리를 되돌린다 -
+    호출부가 열 군데라 하나씩 고치면 다음에 또 빠진다.
+
+    튀지 않았으면 아무것도 안 한다. 아직 자리를 안 잡은 창(만들자마자
+    부르고 나중에 place 하는 것들)을 엉뚱한 데 붙박지 않으려는 것이다.
+    """
+    try:
+        win.update_idletasks()
+        before = (win.winfo_x(), win.winfo_y())
+        win.attributes("-topmost", True)
+        win.update_idletasks()
+        if (win.winfo_x(), win.winfo_y()) != before:
+            win.geometry("+%d+%d" % before)
+    except Exception:                                       # noqa: BLE001
+        pass
 
 NAME = "poketdesktop-single-instance"
 

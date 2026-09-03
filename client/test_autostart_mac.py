@@ -209,6 +209,33 @@ def t_started_flag():
             os.environ["XPC_SERVICE_NAME"] = old2
 
 
+def t_first_install():
+    """**첫 설치에서 등록되는가.** 이게 목표 그 자체다.
+
+    기본값이 켜짐(config.DEFAULTS["autostart"])이라, 받아서 처음 로그인한
+    사람은 아무것도 안 해도 다음 로그인부터 같이 떠야 한다. 이 검사가
+    없으면 sync 를 "이미 있는 것만 고쳐 쓴다" 로 바꿔도 아무도 못 잡는다.
+    """
+    section("첫 설치에서 등록된다")
+    clean()
+    frozen(True)
+    try:
+        chk("아직 아무것도 없다", autostart.registered() is None)
+        autostart.sync(True)
+        chk("등록된다", autostart.registered() == autostart.command(),
+            autostart.registered())
+        chk("상태가 켜짐", autostart.state()[0] in ("on", "blocked"),
+            autostart.state())
+        # 기본값이 실제로 켜짐인지도 여기서 같이 본다. 여기가 False 로
+        # 바뀌면 위의 sync(True) 가 애초에 안 불린다.
+        from poketdesktop import config as C
+        chk("새로 받으면 기본이 켜짐", C.DEFAULTS["autostart"] is True,
+            C.DEFAULTS["autostart"])
+    finally:
+        frozen(False)
+        clean()
+
+
 def t_sync_dev():
     section("개발 중(파이썬)에는 sync 가 아무것도 안 한다")
     clean()
@@ -290,7 +317,7 @@ def main():
     os.makedirs(SCRATCH_DIR, exist_ok=True)
 
     for fn in (t_supported, t_command, t_plist_shape, t_roundtrip,
-               t_no_bootout, t_started_flag, t_sync_dev, t_sync_moves,
+               t_no_bootout, t_started_flag, t_first_install, t_sync_dev, t_sync_moves,
                t_launchd_accepts):
         fn()
 
