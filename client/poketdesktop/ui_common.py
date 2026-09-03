@@ -412,6 +412,8 @@ def install_wheel(top):
 
     그래서 창 하나에 하나만 건다. 목록 쪽은 캔버스에 `wheel_div` 만 붙여
     두면 된다 - 굴릴 게 없으면 굴리지 않는 것도 여기서 한 번에 처리한다.
+
+    **한 칸이 얼마로 오는지는 OS 마다 다르다.** wheel_units 를 보라.
     """
     def on_wheel(e):
         try:
@@ -424,7 +426,7 @@ def install_wheel(top):
                 try:
                     lo, hi = w.yview()
                     if (hi - lo) < 0.999:      # 다 보이면 굴릴 게 없다
-                        w.yview_scroll(int(-e.delta / div), "units")
+                        w.yview_scroll(wheel_units(e.delta, div), "units")
                     after = getattr(w, "wheel_after", None)
                     if after:
                         after()
@@ -434,6 +436,36 @@ def install_wheel(top):
             w = getattr(w, "master", None)
         return None
     top.bind("<MouseWheel>", on_wheel)
+
+
+def wheel_units(delta, div):
+    """휠 이벤트 하나가 몇 줄인가.
+
+    **한 칸이 얼마로 오는지가 OS 마다 다르다.** 윈도우는 120 으로 오는데,
+    맥은 1~3 정도로 온다. 예전 코드는 `int(-delta / 60)` 이라 맥에서는
+    몫이 0 이 되어 **휠이 아예 안 먹었다.** 화면은 멀쩡해 보이는데 굴러가지만
+    않아서, 스크롤바를 손으로 끌기 전까지는 목록이 다인 줄 안다.
+
+    그래서 먼저 '몇 칸인가' 로 바꾼 다음에 div 를 적용한다. 120 언저리로
+    오면 윈도우 관례로 보고 나누고, 작게 오면 그대로 칸수로 친다.
+    div 는 예전 그대로라 윈도우에서 굴러가는 정도가 안 바뀐다
+    (120 / 60 = 2줄).
+
+    트랙패드는 한 번에 잘게 여러 번 오는데, 그때도 **최소 한 줄은
+    움직인다.** 0 으로 깎여서 아무 일도 안 일어나느니 조금 빠른 편이 낫다.
+    """
+    try:
+        d = float(delta)
+    except (TypeError, ValueError):
+        return 0
+    if d == 0:
+        return 0
+    notches = d / 120.0 if abs(d) >= 30 else d
+    units = -notches * (120.0 / max(1, div))
+    n = int(units)
+    if n == 0:                       # 깎여서 0 이 되면 한 줄이라도 움직인다
+        n = 1 if units > 0 else -1
+    return n
 
 
 def scrollable(canvas, div=60, after=None):
@@ -562,8 +594,10 @@ class PopupMenu(object):
         # 바깥을 누르면 닫히게 화면을 덮는다. 거의 안 보이지만 클릭은 받는다.
         cat.attributes("-alpha", 0.01)
         cat.configure(bg="#000000")
-        cat.geometry("%dx%d+0+0" % (self.root.winfo_screenwidth(),
-                                    self.root.winfo_screenheight()))
+        # **모니터 전체를 덮는다.** 주 화면만 덮으면 다른 모니터를 눌렀을
+        # 때 메뉴가 안 닫힌다.
+        bx1, by1, bx2, by2 = all_screens(self.root)
+        cat.geometry("%dx%d+%d+%d" % (bx2 - bx1, by2 - by1, bx1, by1))
         cat.bind("<Button-1>", lambda e: self.close())
         for seq in ("<Button-2>", "<Button-3>"):
             cat.bind(seq, lambda e: self.close())
@@ -621,14 +655,16 @@ class PopupMenu(object):
         win.update_idletasks()
         w = self.width + 2
         h = win.winfo_reqheight()
-        sw = self.root.winfo_screenwidth()
-        sh = self.root.winfo_screenheight()
+        # **누른 그 화면 안에 가둔다.** 주 화면 크기로만 자르면, 모니터가
+        # 두 대일 때 두 번째 화면에서 부른 메뉴가 첫 화면으로 끌려간다 -
+        # 사용자 눈에는 "눌렀는데 아무 일도 안 일어난다" 로 보인다.
+        sx1, sy1, sx2, sy2 = screen_at(self.root, x, y)
         if "e" in anchor:
             x -= w
         if "s" in anchor:
             y -= h
-        x = max(4, min(int(x), sw - w - 4))
-        y = max(2, min(int(y), sh - h - 8))
+        x = max(sx1 + 4, min(int(x), sx2 - w - 4))
+        y = max(sy1 + 2, min(int(y), sy2 - h - 8))
         win.geometry("%dx%d+%d+%d" % (w, h, x, y))
         win.attributes("-topmost", True)
         win.lift()
@@ -655,3 +691,24 @@ def close_all():
     """떠 있는 메뉴를 전부 닫는다."""
     for m in list(PopupMenu._open):
         m.close()
+
+
+def screen_at(root, x, y):
+    """그 점이 있는 화면의 Tk 좌표 (x1, y1, x2, y2).
+
+    어느 화면에도 안 들어가면 주 화면을 준다.
+    """
+    from . import platform_os as PLAT
+    got = PLAT.screens(root.winfo_screenwidth(), root.winfo_screenheight())
+    for s in got:
+        if s[0] <= x < s[2] and s[1] <= y < s[3]:
+            return s
+    return got[0]
+
+
+def all_screens(root):
+    """모든 화면을 덮는 사각형."""
+    from . import platform_os as PLAT
+    got = PLAT.screens(root.winfo_screenwidth(), root.winfo_screenheight())
+    return (min(s[0] for s in got), min(s[1] for s in got),
+            max(s[2] for s in got), max(s[3] for s in got))

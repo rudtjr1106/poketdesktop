@@ -129,7 +129,7 @@ class DexWindow(object):
         self.cv.bind("<Motion>", self._on_hover)
 
     def _on_wheel(self, e):
-        self.cv.yview_scroll(int(-e.delta / 120), "units")
+        self.cv.yview_scroll(U.wheel_units(e.delta, 120), "units")
         # 스크롤한 뒤에 화면에 들어온 칸의 도트를 받기 시작한다
         self.root.after_idle(self.fetch_visible)
 

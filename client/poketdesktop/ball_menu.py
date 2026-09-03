@@ -74,7 +74,57 @@ def build(root, options, on_pick, on_shop=None):
     return m
 
 
+def rows(options, on_pick, on_shop=None):
+    """`build` 와 같은 내용을 ui_common.PopupMenu 가 받는 줄 목록으로.
+
+    맥에서는 `tk.Menu` 를 쓸 수 없다. aqua 에서 그것은 NSMenu 이고,
+    NSMenu 가 열리면 중첩 런루프가 돌면서 Tk 의 after 타이머와 부딪혀
+    앱이 통째로 죽는다 (tray_mac 의 첫 주석을 보라).
+
+    tk.Menu 의 accelerator(오른쪽 끝에 붙는 작은 글씨)는 없으므로 배율과
+    이유를 라벨 뒤에 이어 붙인다.
+    """
+    def line(left, right):
+        return left + ("   " + right if right else "")
+
+    have = [o for o in options if o["count"] > 0 and o["id"] != MASTER]
+    best = next((o for o in have if o.get("best")), None)
+    out = []
+    if best:
+        out.append({"text": "추천   " + line(*_label(best)), "bold": True,
+                    "command": (lambda i=best["id"]: on_pick(i))})
+        out.append(None)
+    if not have:
+        out.append({"text": "던질 볼이 없습니다", "enabled": False})
+    for o in have:
+        out.append({"text": line(*_label(o)),
+                    "command": (lambda i=o["id"]: on_pick(i))})
+
+    mb = next((o for o in options if o["id"] == MASTER and o["count"] > 0),
+              None)
+    if mb:
+        out.append(None)
+        out.append({"text": "마스터볼  %d개  (반드시 잡힘)" % mb["count"],
+                    "command": lambda: on_pick(MASTER)})
+
+    want = [o for o in options
+            if o["count"] == 0 and o["mult"] > 1.5 and o["id"] != MASTER]
+    if want:
+        top = max(want, key=lambda o: o["mult"])
+        out.append(None)
+        out.append({"text": "지금은 %s 이(가) 잘 듣습니다 (없음)" % top["kr"],
+                    "enabled": False})
+        if on_shop:
+            out.append({"text": "상점 열기...", "command": on_shop})
+    return out
+
+
 def popup(root, event, options, on_pick, on_shop=None):
+    from . import platform_os as PLAT
+    if not PLAT.NATIVE_MENU:
+        # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
+        return U.PopupMenu(root, rows(options, on_pick, on_shop),
+                           event.x_root, event.y_root, width=290)
     m = build(root, options, on_pick, on_shop)
     try:
         m.tk_popup(event.x_root, event.y_root)
