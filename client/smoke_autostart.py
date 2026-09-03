@@ -21,7 +21,7 @@ import tkinter as tk                                        # noqa: E402
 
 from poketdesktop import autostart, config                  # noqa: E402
 from poketdesktop import ui_common as U                     # noqa: E402
-from poketdesktop.tray import Tray                          # noqa: E402
+from poketdesktop.tray import SEP, Tray, val                 # noqa: E402
 from poketdesktop.ui_settings import SettingsWindow         # noqa: E402
 
 SCRATCH = r"Software\poketdesktop-smoke\Run"
@@ -71,15 +71,23 @@ def labels(w, out=None):
     return out
 
 
-def menu_labels(menu, out=None):
+def menu_labels(spec, out=None):
+    """트레이 메뉴에 실제로 뜨는 글자들.
+
+    tray.spec() 은 어느 트레이 라이브러리에도 안 매인 Item 목록이다
+    (윈도우는 pystray, 맥은 NSStatusItem 으로 각각 옮겨진다).
+    text 는 값일 수도 함수일 수도 있어서 val() 로 풀어야 한다.
+    """
     out = [] if out is None else out
-    for it in menu:
+    for it in spec:
+        if it is SEP:
+            continue
         try:
-            out.append(str(it.text))
+            out.append(str(val(it.text)))
         except Exception:                                   # noqa: BLE001
             pass
         if getattr(it, "submenu", None):
-            menu_labels(it.submenu, out)
+            menu_labels(val(it.submenu), out)
     return out
 
 
@@ -165,7 +173,7 @@ def main():
 
         print("-- 트레이")
         tray = Tray(app)
-        got = menu_labels(tray.build_menu())
+        got = menu_labels(tray.spec())
         # 로그인 전(api=None)에는 줄인 메뉴여야 한다. 서버가 있어야 하는
         # 항목을 눌러도 실패하기 때문이다.
         chk("로그인 전에는 연결 중이라고 알린다",
@@ -174,11 +182,13 @@ def main():
             not any("포켓몬 관리" in x for x in got), got)
 
         app.api = object()          # 로그인했다고 치고
-        got = menu_labels(tray.build_menu())
+        got = menu_labels(tray.spec())
         hit = [x for x in got if "컴퓨터 켤 때" in x]
         chk("로그인 뒤에는 손잡이가 나온다", bool(hit), got[:6])
+        # 어디서 꺼야 하는지는 OS 마다 다르다 (윈도우는 작업 관리자,
+        # 맥은 로그인 항목). autostart 가 그 말을 정한다.
         chk("막힌 것을 이름에 적는다",
-            any("작업 관리자에서 꺼짐" in x for x in hit), hit)
+            any(autostart.blocked_where() in x for x in hit), hit)
     finally:
         wipe()
         try:
