@@ -1,0 +1,188 @@
+# 태그를 밀면 윈도우와 맥을 각자 빌드해서 릴리스에 올린다.
+#
+#   git tag v1.0.9 && git push origin v1.0.9
+#
+# **크로스 빌드는 안 된다.** 윈도우 exe 는 윈도우에서, 맥 .app 은 맥에서만
+# 만들어진다. 그래서 러너를 둘 쓴다. 손으로 하던 때는 맥에서 낸 판과
+# 윈도우에서 낸 판의 시점이 달라서, 같은 버전인데 내용이 다른 일이 있었다.
+#
+# 공개 저장소라 Actions 분이 무료다.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "올릴 태그 (예: v1.0.9). 이미 있어야 한다"
+        required: true
+
+permissions:
+  contents: write        # 릴리스를 만들고 파일을 올리려면 필요하다
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # 태그와 common/version.py 가 어긋나면 여기서 멈춘다. 어긋난 채로
+  # 빌드하면 파일 이름과 태그가 달라져서, 자동 업데이트가 새 버전을
+  # 못 찾거나 엉뚱한 것을 받는다.
+  check:
+    name: 버전 확인
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        shell: bash
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          ver=$(python3 -c "
+          import re, io
+          s = io.open('common/version.py', encoding='utf-8').read()
+          print(re.search(r'\"([0-9]+\.[0-9]+\.[0-9]+)\"', s).group(1))")
+          echo "  태그 $tag  ·  common/version.py $ver"
+          if [ "$tag" != "v$ver" ]; then
+            echo "::error::태그($tag)와 버전(v$ver)이 다릅니다."
+            exit 1
+          fi
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  windows:
+    name: 윈도우 빌드
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r client/requirements.txt pyinstaller
+
+      - name: 검사
+        env:
+          POKET_HOME: ${{ runner.temp }}/poket
+        run: |
+          python client/test_layout.py
+          python common/test_korean.py
+          python client/test_wheel.py
+          python client/test_battle_ui.py
+          python client/test_boot_retry.py
+          python client/test_walk_bounds.py
+          python client/test_autostart.py
+
+      # 폴더형(--onedir)으로 낸다. 단일 exe 는 실행할 때 자기를 임시
+      # 폴더에 풀고 돌리는데, 그 동작이 악성코드 패커와 비슷해서 백신
+      # 오탐이 잦다.
+      - name: 빌드
+        run: python tools/build_exe.py --onedir
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/poketdesktop-v${{ needs.check.outputs.version }}.zip
+          if-no-files-found: error
+
+  mac:
+    name: 맥 빌드
+    needs: check
+    # macos-14 부터 애플 실리콘이다. 우리 번들도 arm64 다.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r client/requirements.txt pyinstaller
+
+      - name: tkinter 가 붙어 있나
+        run: |
+          python -c "
+          import tkinter
+          print('Tk', tkinter.TkVersion)
+          assert tkinter.TkVersion >= 8.6, 'Tk 8.6 이상이 필요합니다'"
+
+      - name: 검사
+        env:
+          POKET_HOME: ${{ runner.temp }}/poket
+        run: |
+          python client/test_layout.py
+          python common/test_korean.py
+          python client/test_wheel.py
+          python client/test_mac_input.py
+          python client/test_walk_bounds.py
+          python client/test_battle_ui.py
+          python client/test_boot_retry.py
+          python client/test_autostart_mac.py
+          python client/test_update_mac.py
+
+      - name: 빌드
+        run: python tools/build_app.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: dist/poketdesktop-v${{ needs.check.outputs.version }}-mac.dmg
+          if-no-files-found: error
+
+  publish:
+    name: 릴리스에 올리기
+    needs: [check, windows, mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+
+      - name: 받은 것 보기
+        run: find art -type f -exec ls -la {} +
+
+      # 릴리스가 없으면 만들고, 있으면 파일만 갈아 끼운다.
+      # **본문은 덮어쓰지 않는다.** 손으로 다듬어 둔 것을 지우면 안 된다.
+      - name: 올리기
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.check.outputs.tag }}
+          VER: ${{ needs.check.outputs.version }}
+        run: |
+          set -e
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "릴리스를 새로 만듭니다"
+            gh release create "$TAG" --title "포스크탑 $TAG" --notes-file .github/release-notes.md
+          else
+            echo "이미 있는 릴리스에 파일만 올립니다"
+          fi
+          gh release upload "$TAG" \
+            "art/windows/poketdesktop-v$VER.zip" \
+            "art/mac/poketdesktop-v$VER-mac.dmg" --clobber
+
+      - name: 확인
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.check.outputs.tag }}
+        run: |
+          gh release view "$TAG" --json assets \
+            --jq '.assets[] | "  \(.name)  \(.size/1048576|floor)MB"'
+          # 옛 윈도우 클라이언트는 자산에서 .zip 으로 끝나는 첫 번째를
+          # 그냥 집는다. 그게 맥 것이 되면 업데이트가 깨진다.
+          first=$(gh release view "$TAG" --json assets \
+                  --jq '[.assets[] | select(.name|endswith(".zip"))][0].name')
+          echo "  옛 클라이언트가 고를 첫 zip: $first"
+          case "$first" in
+            *-mac*) echo "::error::맥 파일이 먼저 잡힙니다. 자산 이름을 고치세요."; exit 1;;
+          esac
