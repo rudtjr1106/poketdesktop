@@ -53,6 +53,34 @@ def is_frozen():
     return bool(getattr(sys, "frozen", False))
 
 
+def supported():
+    """자동 업데이트를 해도 되는 운영체제인가.
+
+    **맥에서는 하면 안 된다.** 릴리스에 올라가는 것은 윈도우 zip 하나뿐인데,
+    check() 는 자산 목록에서 `.zip` 으로 끝나는 첫 번째를 그냥 집는다 -
+    어느 운영체제 것인지 안 본다. extract() 는 그 안에서 `.exe` 를 찾고,
+    relaunch() 는 그걸 실행한다.
+
+    맥 `.app` 도 `sys.frozen` 이 True 라 is_frozen() 만으로는 못 막는다.
+    막지 않으면 맥에서 켤 때마다 이 일이 벌어진다.
+
+        윈도우 zip 을 내려받는다 -> .app 번들 **안**에 푼다
+        -> .exe 를 실행하려다 실패 -> "새 버전으로 다시 시작합니다" 라고
+        말해 놓고 같은 구버전이 뜬다. 매번 반복된다.
+
+    나중에 맥에도 자동 업데이트를 넣으려면 세 곳을 **같이** 고쳐야 한다.
+      · check() 가 운영체제별로 자산 이름을 고른다 (-win.zip / -mac.zip)
+      · extract() 가 .exe 대신 .app 을 찾는다. 그리고 zipfile 로 풀면
+        안 된다 - .app 안의 심볼릭 링크와 실행 권한이 날아간다.
+        맥에서는 `ditto -x -k` 로 풀어야 한다.
+      · relaunch() 가 `open -n <app>` 을 쓴다
+    그리고 그 릴리스 **전에** 자산 이름 규칙이 들어가야 한다. 안 그러면
+    맥 zip 이 먼저 걸린 윈도우 사용자가 "실행 파일을 찾지 못했습니다" 로
+    끝난다.
+    """
+    return sys.platform == "win32"
+
+
 def exe_path():
     return os.path.abspath(sys.executable)
 

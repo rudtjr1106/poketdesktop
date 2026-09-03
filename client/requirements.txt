@@ -1,3 +1,12 @@
 pillow>=10.0
 requests>=2.28
-pystray>=0.19
+
+# 트레이 아이콘. 맥에서는 안 쓴다 - pystray 의 맥 백엔드가
+# NSApplication.run() 을 부르는데, tkinter 와 스레드가 부딪혀서
+# 프로세스가 그대로 죽는다. 맥은 tray_mac.py 가 대신한다.
+pystray>=0.19; sys_platform != "darwin"
+
+# 맥 전용. 없으면 창이 투명해지지 않고(도트가 네모난 판 위에 뜬다)
+# 메뉴 막대에 아이콘도 안 올라간다 - 그러면 게임을 조작할 수 없다.
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+pyobjc-framework-Quartz>=10.0; sys_platform == "darwin"

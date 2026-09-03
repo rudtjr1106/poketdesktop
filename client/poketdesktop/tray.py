@@ -3,15 +3,51 @@
 
 pystray 는 자기 스레드에서 도는데 tkinter 는 다른 스레드에서 만지면 안 된다.
 그래서 메뉴를 누르면 무조건 root.after 로 tk 스레드에 넘겨서 실행한다.
+
+## 맥은 pystray 를 못 쓴다
+
+pystray 의 맥 백엔드는 `NSApplication.run()` 을 부른다. 그걸 별도
+스레드에서 부르면 파이썬 예외도 못 남기고 프로세스가 그 자리에서 죽는다
+(SIGTRAP). tkinter 도 메인 스레드를 쓰므로 자리를 비켜 줄 수도 없다.
+그래서 맥은 `tray_mac.py` 가 NSStatusItem 을 직접 만든다.
+
+**메뉴에 무엇이 들어가는지는 여기 한 곳에만 적는다** (`TrayBase.spec`).
+양쪽에 따로 적어 두면 한쪽만 고치는 날이 반드시 온다. 백엔드는 그
+목록을 자기 방식으로 그리기만 한다.
 """
 import threading
 
-import pystray
-from PIL import Image, ImageDraw
-from pystray import Menu, MenuItem
-
 from . import autostart
 from common.version import VERSION
+
+# ---------------------------------------------------------------- 메뉴 서술
+SEP = object()          # 구분선
+
+
+class Item(object):
+    """메뉴 한 줄. 어느 트레이 라이브러리에도 안 매인 형태로 적는다.
+
+    text/checked/enabled 는 값이어도 되고 인자 없는 함수여도 된다.
+    함수로 주면 메뉴를 열 때마다 다시 물어본다 (받은 대전 개수처럼
+    수시로 바뀌는 것).
+    """
+
+    __slots__ = ("text", "action", "submenu", "checked", "enabled",
+                 "default", "radio")
+
+    def __init__(self, text, action=None, submenu=None, checked=None,
+                 enabled=True, default=False, radio=False):
+        self.text = text
+        self.action = action
+        self.submenu = submenu
+        self.checked = checked
+        self.enabled = enabled
+        self.default = default
+        self.radio = radio
+
+
+def val(v):
+    return v() if callable(v) else v
 
 # 84px 짜리 "아주 크게" 는 뺐다. 바탕화면을 너무 가린다.
 # 그래도 크게 하고 싶으면 설정 창의 슬라이더로 120 까지 올릴 수 있다.
@@ -29,11 +65,11 @@ def make_icon_image(size=64):
     return appicon.make(size)
 
 
-class Tray(object):
+class TrayBase(object):
+    """양쪽 트레이가 같이 쓰는 것 — 제목과 메뉴 내용."""
+
     def __init__(self, app):
         self.app = app
-        self.icon = None
-        self._thread = None
 
     # ---- tk 스레드로 넘기기 ----
     def call(self, fn, *a):
@@ -46,7 +82,7 @@ class Tray(object):
             u, n, self.app.balls)
 
     # ---- 메뉴 ----
-    def build_menu(self):
+    def spec(self):
         a = self.app
         s = a.settings
 
@@ -55,60 +91,52 @@ class Tray(object):
             # 아래 항목들은 전부 서버가 있어야 하는 일이라 눌러도 실패한다.
             # 그래도 아이콘은 떠 있어야 한다 - 아무것도 없으면 사용자는
             # "자동 시작이 안 됐다" 고 여기고 바탕화면 아이콘을 다시 누른다.
-            return Menu(
-                MenuItem("서버에 연결하는 중입니다...", None, enabled=False),
-                MenuItem("버전 %s" % VERSION, None, enabled=False),
-                Menu.SEPARATOR,
-                MenuItem("종료", lambda _i, _it: self.call(a.quit)),
-            )
+            return [
+                Item("서버에 연결하는 중입니다...", enabled=False),
+                Item("버전 %s" % VERSION, enabled=False),
+                SEP,
+                Item("종료", lambda: self.call(a.quit)),
+            ]
 
         size_items = [
-            MenuItem(label, (lambda v: lambda _i, _it: self.call(a.set_size, v))(v),
-                     checked=(lambda v: lambda _it: s["targetHeight"] == v)(v),
-                     radio=True)
+            Item(label, (lambda v: lambda: self.call(a.set_size, v))(v),
+                 checked=(lambda v: lambda: s["targetHeight"] == v)(v),
+                 radio=True)
             for label, v in SIZE_PRESETS]
 
         area_items = [
-            MenuItem(label,
-                     (lambda w, h: lambda _i, _it: self.call(a.set_area, w, h))(w, h),
-                     checked=(lambda w, h: lambda _it: (
-                         (s["areaW"], s["areaH"]) == (w, h) if w else s["areaW"] > 1200
-                     ))(w, h),
-                     radio=True)
+            Item(label,
+                 (lambda w, h: lambda: self.call(a.set_area, w, h))(w, h),
+                 checked=(lambda w, h: lambda: (
+                     (s["areaW"], s["areaH"]) == (w, h) if w else s["areaW"] > 1200
+                 ))(w, h),
+                 radio=True)
             for label, w, h in AREA_PRESETS]
 
-        return Menu(
+        return [
             # 이제 창이 하나다. 메뉴는 어느 탭으로 열지만 고른다.
-            MenuItem("열기...", lambda _i, _it: self.call(a.open_box),
-                     default=True),
-            MenuItem("바로 가기", Menu(
-                MenuItem("포켓몬 관리", lambda _i, _it: self.call(a.open_box)),
-                MenuItem("가방", lambda _i, _it: self.call(a.open_bag)),
-                MenuItem("상점", lambda _i, _it: self.call(a.open_shop)),
-                MenuItem("도감", lambda _i, _it: self.call(a.open_dex)),
-                MenuItem("친구", lambda _i, _it: self.call(a.open_friends)),
-                MenuItem("설정", lambda _i, _it: self.call(a.open_settings)),
-                MenuItem("대전", lambda _i, _it: self.call(a.open_pvp)),
-            )),
-            MenuItem("랜덤 배틀", lambda _i, _it: self.call(a.pvp_random)),
+            Item("열기...", lambda: self.call(a.open_box), default=True),
+            # '바로 가기' 하위 메뉴는 뺐다. 창이 하나로 합쳐진 뒤로는
+            # '열기...' 로 들어가서 탭을 고르면 되는데, 메뉴에 같은 것이
+            # 일곱 줄 더 있으면 길기만 하다.
+            Item("랜덤 배틀", lambda: self.call(a.pvp_random)),
             # 알림을 안 띄우기로 했으니, 놓치면 안 되는 것은 메뉴에
             # 남는다. 상대가 걸어온 대전은 화면에 아무 자국도 없어서
             # 여기 없으면 알 길이 없다.
-            MenuItem(lambda _it: ("받은 대전 보기  (%d)" % a.pvp_unseen
-                                  if getattr(a, "pvp_unseen", 0)
-                                  else "받은 대전 보기"),
-                     lambda _i, _it: self.call(a.open_pvp)),
-            Menu.SEPARATOR,
-            MenuItem("바탕화면", Menu(
-                MenuItem("모두 거두기", lambda _i, _it: self.call(a.recall_all)),
-                MenuItem("무작위로 내보내기", lambda _i, _it: self.call(a.send_random)),
-                Menu.SEPARATOR,
-                MenuItem("이름표 보이기",
-                         lambda _i, _it: self.call(a.toggle_names),
-                         checked=lambda _it: bool(s.get("showNames"))),
-            )),
-            MenuItem("포켓몬 크기", Menu(*size_items)),
-            MenuItem("활동 범위", Menu(*area_items)),
+            Item(lambda: ("받은 대전 보기  (%d)" % a.pvp_unseen
+                          if getattr(a, "pvp_unseen", 0)
+                          else "받은 대전 보기"),
+                 lambda: self.call(a.open_pvp)),
+            SEP,
+            Item("바탕화면", submenu=[
+                Item("모두 거두기", lambda: self.call(a.recall_all)),
+                Item("무작위로 내보내기", lambda: self.call(a.send_random)),
+                SEP,
+                Item("이름표 보이기", lambda: self.call(a.toggle_names),
+                     checked=lambda: bool(s.get("showNames"))),
+            ]),
+            Item("포켓몬 크기", submenu=size_items),
+            Item("활동 범위", submenu=area_items),
             # 켜 두고 잊어버리는 프로그램이라, 켤 때마다 손으로 켜야
             # 하면 그냥 안 켜게 된다. 여기에 둬야 손이 닿는다.
             # 켜져 있다고 표시되는데 실제로는 안 켜지는 상황(작업
@@ -116,26 +144,60 @@ class Tray(object):
             # 표시는 **레지스트리**를 보고 정한다. 설정 파일을 보면,
             # 등록이 실패했을 때 여기는 켜짐인데 설정 창은 꺼짐인
             # 정반대 화면이 나온다. 진실은 한 곳이어야 한다.
-            MenuItem(lambda _it: ("컴퓨터 켤 때 같이 시작  (작업 관리자에서 꺼짐)"
-                                  if autostart.state()[0] == "blocked"
-                                  else "컴퓨터 켤 때 같이 시작"),
-                     lambda _i, _it: self.call(a.toggle_autostart),
-                     checked=lambda _it: autostart.state()[0] in ("on", "blocked"),
-                     enabled=autostart.supported()),
-            Menu.SEPARATOR,
+            Item(lambda: ("컴퓨터 켤 때 같이 시작  (%s)" % autostart.blocked_where()
+                          if autostart.state()[0] == "blocked"
+                          else "컴퓨터 켤 때 같이 시작"),
+                 lambda: self.call(a.toggle_autostart),
+                 checked=lambda: autostart.state()[0] in ("on", "blocked"),
+                 enabled=autostart.supported()),
+            SEP,
             # 볼과 소지금은 가방·상점 창에 이미 크게 떠 있다. 메뉴에
             # 또 두면 길기만 하다. 여기는 버전 하나로 줄인다.
-            MenuItem("버전 %s" % VERSION, None, enabled=False),
-            MenuItem("로그아웃", lambda _i, _it: self.call(a.logout)),
-            MenuItem("회원탈퇴", lambda _i, _it: self.call(a.delete_account)),
-            Menu.SEPARATOR,
-            MenuItem("종료", lambda _i, _it: self.call(a.quit)),
-        )
+            Item("버전 %s" % VERSION, enabled=False),
+            Item("로그아웃", lambda: self.call(a.logout)),
+            Item("회원탈퇴", lambda: self.call(a.delete_account)),
+            SEP,
+            Item("종료", lambda: self.call(a.quit)),
+        ]
+
+
+# ---------------------------------------------------------------- pystray 판
+class Tray(TrayBase):
+    """윈도우(와 리눅스) 트레이. pystray 를 자기 스레드에서 돌린다."""
+
+    def __init__(self, app):
+        TrayBase.__init__(self, app)
+        self.icon = None
+        self._thread = None
+
+    def _menu(self):
+        import pystray
+        from pystray import Menu, MenuItem
+
+        def one(it):
+            if it is SEP:
+                return Menu.SEPARATOR
+            text = it.text
+            if callable(text):
+                text = (lambda f: lambda _it: f())(text)
+            checked = it.checked
+            if checked is not None:
+                checked = (lambda f: lambda _it: bool(val(f)))(checked)
+            if it.submenu is not None:
+                return MenuItem(text, Menu(*[one(x) for x in it.submenu]))
+            action = None
+            if it.action is not None:
+                action = (lambda f: lambda _i, _it: f())(it.action)
+            return MenuItem(text, action, checked=checked, radio=it.radio,
+                            default=it.default, enabled=bool(val(it.enabled)))
+
+        return Menu(*[one(x) for x in self.spec()])
 
     # ---- 수명 ----
     def start(self):
+        import pystray
         self.icon = pystray.Icon("poketdesktop", make_icon_image(),
-                                 self._title(), self.build_menu())
+                                 self._title(), self._menu())
         self._thread = threading.Thread(target=self.icon.run, daemon=True)
         self._thread.start()
 
@@ -146,9 +208,9 @@ class Tray(object):
             self.icon.title = self._title()
             # 메뉴도 다시 만든다. 로그인 전에 띄운 줄인 메뉴가 그대로 남아
             # 있으면 로그인한 뒤에도 "연결하는 중" 만 보인다.
-            self.icon.menu = self.build_menu()
+            self.icon.menu = self._menu()
             self.icon.update_menu()
-        except Exception:
+        except Exception:                                   # noqa: BLE001
             pass
 
     # 윈도우 알림(토스트)은 쓰지 않는다. 켜 두고 잊어버리는 프로그램이라
@@ -159,6 +221,6 @@ class Tray(object):
         if self.icon:
             try:
                 self.icon.stop()
-            except Exception:
+            except Exception:                               # noqa: BLE001
                 pass
             self.icon = None

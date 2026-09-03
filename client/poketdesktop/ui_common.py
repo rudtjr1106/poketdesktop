@@ -13,6 +13,8 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 
+from . import platform_os as PLAT
+
 # ---------------------------------------------------------------- 색
 INK = "#0d1017"          # 가장 어두운 바닥 (입력칸, 액자 안)
 BG = "#131722"           # 창 바탕
@@ -51,8 +53,12 @@ TIP_FG = "#f2f4fb"
 TIP_SHINY = SHINY
 
 # ---------------------------------------------------------------- 글꼴
-_FAMILY_CANDIDATES = ["Noto Sans KR", "Pretendard", "SUIT", "IBM Plex Sans KR",
-                      "나눔고딕", "맑은 고딕", "Malgun Gothic", "TkDefaultFont"]
+# 이 OS 의 기본 한글 글꼴은 platform_os 가 뒤에 붙여 준다. 앞쪽은 어느
+# OS 에서든 깔아 두면 더 나은 것들이라 순서를 안 바꾼다 - 윈도우에서
+# 뽑히는 글꼴이 예전과 같아야 한다.
+_FAMILY_CANDIDATES = (["Noto Sans KR", "Pretendard", "SUIT", "IBM Plex Sans KR",
+                       "나눔고딕"]
+                      + PLAT.font_candidates())
 _LIGHT_CANDIDATES = ["Noto Sans KR DemiLight", "Noto Sans KR Light",
                      "맑은 고딕 Semilight"]
 _BLACK_CANDIDATES = ["Noto Sans KR Black", "Black Han Sans"]
@@ -75,6 +81,15 @@ FONT_BTN = (FAMILY, 11, "bold")
 FONT_LABEL = (FAMILY, 8)
 
 
+def _system_family(root):
+    """아무 후보도 없을 때 쓸, 이 OS 가 실제로 쓰는 글꼴 이름."""
+    try:
+        import tkinter.font as tkfont
+        return tkfont.nametofont("TkDefaultFont", root).actual("family")
+    except Exception:                                       # noqa: BLE001
+        return FAMILY
+
+
 def init_fonts(root):
     """설치된 글꼴 중 가장 나은 것을 골라 전역 글꼴을 정한다."""
     global FAMILY, FAMILY_LIGHT, FAMILY_MEDIUM, FAMILY_BLACK
@@ -92,7 +107,10 @@ def init_fonts(root):
                 return c
         return default
 
-    FAMILY = pick(_FAMILY_CANDIDATES, "맑은 고딕")
+    # 후보를 하나도 못 찾으면 Tk 이 실제로 쓰는 글꼴을 그대로 쓴다.
+    # 없는 이름을 주면 Tk 은 예외 없이 조용히 대체하는데, 그러면
+    # "되는 것처럼 보이지만 못생긴" 상태가 되고 알아채기 어렵다.
+    FAMILY = pick(_FAMILY_CANDIDATES, _system_family(root))
     FAMILY_LIGHT = pick(_LIGHT_CANDIDATES, FAMILY)
     FAMILY_MEDIUM = pick(_MEDIUM_CANDIDATES, FAMILY)
     FAMILY_BLACK = pick(_BLACK_CANDIDATES, FAMILY)
@@ -502,3 +520,138 @@ def gender_mark(g):
 
 def gender_color(g):
     return {"M": INFO, "F": PINK}.get(g, FG_DIM)
+
+
+# ---------------------------------------------------------------- 뜨는 메뉴
+class PopupMenu(object):
+    """tkinter 로 직접 그리는 메뉴.
+
+    맥에서는 `tk.Menu` 를 쓸 수 없다. aqua 에서 그것은 NSMenu 이고, NSMenu 가
+    열리면 macOS 가 중첩 런루프를 돌리는데 그 동안 Tk 의 `after` 타이머가
+    발화하면서 파이썬이 통째로 죽는다(GIL 오류). 이 게임은 도트를 움직이려고
+    `after` 를 쉬지 않고 도니 메뉴를 여는 순간이 곧 마지막이다.
+
+    그래서 창으로 직접 그린다. 생김새는 이 게임의 다른 창과 같다.
+
+    rows 는 이렇게 준다. None 은 구분선이다.
+
+        [None,
+         {"text": "정보 보기", "command": fn},
+         {"text": "이름표 보이기", "command": fn, "checked": True},
+         {"text": "버전 1.0.8", "enabled": False},
+         {"text": "바로 가기", "header": True},
+         {"text": "가방", "command": fn, "indent": 1}]
+    """
+
+    W = 250
+    _open = []          # 지금 떠 있는 것들. 새로 열 때 먼저 닫는다.
+
+    def __init__(self, root, rows, x, y, width=None, anchor="nw"):
+        self.root = root
+        self.win = self.catcher = None
+        self.width = width or self.W
+        close_all()
+        self._build(rows)
+        self._place(x, y, anchor)
+        PopupMenu._open.append(self)
+
+    # ---------------- 만들기 ----------------
+    def _build(self, rows):
+        cat = tk.Toplevel(self.root)
+        cat.overrideredirect(True)
+        # 바깥을 누르면 닫히게 화면을 덮는다. 거의 안 보이지만 클릭은 받는다.
+        cat.attributes("-alpha", 0.01)
+        cat.configure(bg="#000000")
+        cat.geometry("%dx%d+0+0" % (self.root.winfo_screenwidth(),
+                                    self.root.winfo_screenheight()))
+        cat.bind("<Button-1>", lambda e: self.close())
+        for seq in ("<Button-2>", "<Button-3>"):
+            cat.bind(seq, lambda e: self.close())
+        cat.attributes("-topmost", True)
+        self.catcher = cat
+
+        win = tk.Toplevel(self.root)
+        win.overrideredirect(True)
+        win.configure(bg=BG2, highlightthickness=1, highlightbackground=LINE2)
+        win.bind("<Escape>", lambda e: self.close())
+        self.win = win
+
+        body = tk.Frame(win, bg=BG2)
+        body.pack(fill="both", expand=True, padx=1, pady=6)
+        for row in rows:
+            if row is None:
+                tk.Frame(body, bg=LINE, height=1).pack(fill="x", padx=8, pady=4)
+                continue
+            self._row(body, row)
+
+    def _row(self, body, row):
+        text = row.get("text", "")
+        indent = row.get("indent", 0)
+        if row.get("header"):
+            tk.Label(body, text=text, bg=BG2, fg=FG_FAINT, anchor="w",
+                     font=(FAMILY, 8), bd=0, highlightthickness=0,
+                     width=1).pack(fill="x", padx=10 + indent * 12,
+                                   pady=(4, 0))
+            return
+        enabled = row.get("enabled", True) and row.get("command") is not None
+        checked = row.get("checked")
+        mark = "" if checked is None else ("✓ " if checked else "    ")
+        lab = tk.Label(body, text=mark + text, bg=BG2, anchor="w",
+                       fg=FG if row.get("enabled", True) else DISABLED_FG,
+                       font=(FAMILY, 10, "bold") if row.get("bold")
+                       else (FAMILY, 10),
+                       bd=0, highlightthickness=0, width=1)
+        lab.pack(fill="x", padx=8 + indent * 12, ipady=2)
+        if not enabled:
+            return
+        lab.configure(cursor="pointinghand")
+        lab.bind("<Enter>", lambda e, w=lab: w.configure(bg=BG4))
+        lab.bind("<Leave>", lambda e, w=lab: w.configure(bg=BG2))
+
+        def click(_e, fn=row["command"]):
+            # 메뉴를 먼저 닫는다. 창이 메뉴 뒤로 들어가면 안 보인다.
+            self.close()
+            fn()
+
+        lab.bind("<Button-1>", click)
+
+    def _place(self, x, y, anchor):
+        win = self.win
+        win.geometry("%dx10+0+0" % (self.width + 2))   # 너비를 먼저 못박는다
+        win.update_idletasks()
+        w = self.width + 2
+        h = win.winfo_reqheight()
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        if "e" in anchor:
+            x -= w
+        if "s" in anchor:
+            y -= h
+        x = max(4, min(int(x), sw - w - 4))
+        y = max(2, min(int(y), sh - h - 8))
+        win.geometry("%dx%d+%d+%d" % (w, h, x, y))
+        win.attributes("-topmost", True)
+        win.lift()
+
+    # ---------------- 닫기 ----------------
+    def close(self):
+        for w in (self.win, self.catcher):
+            try:
+                if w is not None:
+                    w.destroy()
+            except Exception:                               # noqa: BLE001
+                pass
+        self.win = self.catcher = None
+        try:
+            PopupMenu._open.remove(self)
+        except ValueError:
+            pass
+
+    def alive(self):
+        return self.win is not None
+
+
+def close_all():
+    """떠 있는 메뉴를 전부 닫는다."""
+    for m in list(PopupMenu._open):
+        m.close()

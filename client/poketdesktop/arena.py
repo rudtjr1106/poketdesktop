@@ -25,6 +25,8 @@ from . import arena_layout as L
 from . import battle_fx as FX
 from . import config
 from . import fx_layer as FL
+from . import platform_os as PLAT
+from . import ui_common as U
 from .overlay import Pet, work_area
 
 # 단계별 시간(ms)
@@ -63,10 +65,7 @@ class ArenaPet(Pet):
         self.battling = True          # 혼자 돌아다니지 않게
         self.state = "idle"
         self.down = False
-        try:
-            self.win.attributes("-topmost", True)
-        except Exception:                                   # noqa: BLE001
-            pass
+        PLAT.raise_above(self.win)
 
 
 # 못 움직인 이유를 머리 위에 짧게 띄운다. 원문은 문장이라 그대로 쓰면
@@ -177,7 +176,9 @@ class Arena(object):
         # 평소 걸어다니는 자리에서 싸운다. 화면 한가운데로 끌어오지 않는다.
         rect = L.stage_rect(ov.area(), self.work)
         self.ring = L.ring_of(rect, ov.settings["targetHeight"])
-        self.layer = FL.FxLayer(self.root, rect)
+        # 클릭 통과를 못 걸면 레이어 없이 싸운다. 아래는 전부
+        # self.layer 가 None 이어도 도는 길이 있다.
+        self.layer = FL.open_layer(self.root, rect)
 
         # 내 팀 = 이미 걸어다니던 도트. 자리만 기억해 두면 복귀가 끝난다.
         self.mine = list(ov.pets.values())[:len(teams.get("me") or [])]
@@ -219,7 +220,7 @@ class Arena(object):
         x, y = self.to_local(sx, sy)
         # 글자만 그리면 도트와 겹쳐 안 보인다. 뒤에 판을 깔고 그 위에 쓴다.
         t = cv.create_text(x, y, text=text, fill=color, anchor=anchor,
-                           font=("맑은 고딕", 10, "bold"))
+                           font=(U.FAMILY, 10, "bold"))
         bx = cv.bbox(t)
         if bx:
             pad = 6
@@ -438,7 +439,7 @@ class Arena(object):
 
         src = self.active.get(who)
         dst = self.active.get("foe" if who == "me" else "me")
-        if t == "move" and src and dst:
+        if t == "move" and src and dst and self.layer:
             move = self.find_move(ev)
             self.fx = FX.Effect(self, move, self.center(src), self.center(dst),
                                 lambda: self.after(int(140 * self.scale), done),
@@ -670,10 +671,10 @@ class Arena(object):
                 p.down = False
                 hx, hy = self.home.get(id(p), (p.x, p.y))
                 p.x, p.y = hx, hy
-                p.win.deiconify()
+                PLAT.show_again(p.win)
                 if getattr(p, "name_win", None) and ov and not ov.hidden:
                     if ov.settings.get("showNames"):
-                        p.name_win.deiconify()
+                        PLAT.show_again(p.name_win)
                 p.place()
             except Exception:                               # noqa: BLE001
                 pass

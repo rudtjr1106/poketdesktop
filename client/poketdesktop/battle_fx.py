@@ -23,6 +23,8 @@ import math
 import re
 import random
 
+from . import ui_common as U
+
 # 타입별 색 (밝은색, 어두운색)
 TYPE_FX = {
     "NORMAL":   ("#f2f0e4", "#b9b5a0"),
@@ -773,7 +775,7 @@ class Effect(object):
                 return self.after(320, self.burst)
             it = self.add(self.cv.create_text(sx + 16 + i * 9, sy - 26 - i * 12,
                                               text="Z", fill=light,
-                                              font=("Malgun Gothic",
+                                              font=(U.FAMILY,
                                                     13 + i * 4, "bold")))
             self.after(520, lambda v=it: self.cv.delete(v))
             self.after(150, lambda: one(i + 1))

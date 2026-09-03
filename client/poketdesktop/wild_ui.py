@@ -13,9 +13,8 @@
 import random
 import tkinter as tk
 
-from PIL import ImageTk
-
 from . import ball_menu, config, effects, sprite_cache, sprites
+from . import platform_os as PLAT
 from . import walk_cache
 from . import ui_common as U
 from .overlay import Pet
@@ -37,20 +36,17 @@ class GrassPatch(object):
 
         size = max(28, int(ov.settings["targetHeight"]))
         frames, w, h = effects.grass_frames(size, 6, key)
-        self.photos = [ImageTk.PhotoImage(f) for f in frames]
         self.fw, self.fh = w, h
         self.frame = 0
 
         self.win = tk.Toplevel(ov.root)
         self.win.overrideredirect(True)
-        self.win.attributes("-topmost", True)
-        self.win.attributes("-transparentcolor", hexkey)
-        self.win.configure(bg=hexkey)
-        self.label = tk.Label(self.win, bd=0, highlightthickness=0, bg=hexkey,
-                              cursor="hand2")
-        self.label.pack()
+        bg = PLAT.transparent_window(self.win, hexkey)
+        self.view = PLAT.SpriteView(self.win, bg, w, h, cursor="hand2")
+        self.label = self.view.widget
+        self.photos = self.view.frames(frames, key)
         self.label.bind("<Button-1>", lambda e: ctl.on_grass_click())
-        self.label.bind("<Button-3>", lambda e: ctl.on_grass_click())
+        PLAT.bind_right(self.label, lambda e: ctl.on_grass_click())
         self.label.bind("<Enter>", lambda e: ctl.show_hint(
             self, "풀숲이 흔들린다!\n눌러서 살펴보기"))
         self.label.bind("<Leave>", lambda e: ctl.hide_hint())
@@ -60,13 +56,22 @@ class GrassPatch(object):
         self.x = random.randint(x1 + m, max(x1 + m, x2 - w - m))
         self.y = random.randint(y1 + m, max(y1 + m, y2 - h - m))
         self.win.geometry("+%d+%d" % (self.x, self.y))
-        self.label.configure(image=self.photos[0])
+        self.view.show(self.photos[0])
+        PLAT.raise_above(self.win)
         self._job = None
         self.animate()
 
     def animate(self):
         self.frame = (self.frame + 1) % len(self.photos)
-        self.label.configure(image=self.photos[self.frame])
+        self.view.show(self.photos[self.frame])
+        if PLAT.NEEDS_HIT_TRACKING:
+            # 풀숲 창은 절반 넘게 비어 있다. 그 자리가 바탕화면 클릭을
+            # 먹지 않도록 커서를 좇는다 (맥에서만 할 일이 있다).
+            try:
+                cx, cy = self.ctl.app.root.winfo_pointerxy()
+                self.view.update_hit(cx - int(self.x), cy - int(self.y))
+            except Exception:                               # noqa: BLE001
+                pass
         self._job = self.ctl.app.root.after(110, self.animate)
 
     def center(self):
@@ -105,12 +110,12 @@ class WildPet(Pet):
         bg = "#d6a828" if shiny else "#e24e4e"
         w = tk.Toplevel(self.ov.root)
         w.overrideredirect(True)
-        w.attributes("-topmost", True)
         w.configure(bg=bg)
         tk.Label(w, text="%s  %s Lv.%s" % (text, info.get("species", "?"),
                                            info.get("level", "?")),
                  bg=bg, fg="#ffffff", font=U.FONT_XS,
                  padx=6, pady=1).pack()
+        PLAT.raise_above(w)
         self.badge_win = w
         self.place_badge()
 
@@ -223,12 +228,7 @@ def _double_ms():
     사람마다 다르게 맞춰 쓴다. 우리가 임의로 정하면 느리게 누르는 사람은
     두 번 클릭이 안 먹고, 빠르게 누르는 사람은 배틀이 늦게 열린다.
     """
-    try:
-        import ctypes
-        v = int(ctypes.windll.user32.GetDoubleClickTime())
-        return max(160, min(600, v))
-    except Exception:                                       # noqa: BLE001
-        return 350
+    return PLAT.double_click_ms()
 
 
 class BallThrow(object):
@@ -242,21 +242,19 @@ class BallThrow(object):
         hexkey = "#%02x%02x%02x" % key
         # 던진 볼에 따라 그림이 달라진다. 스무 가지를 던지는데 전부 같은
         # 빨간 볼이면 뭘 던졌는지 알 수가 없다.
-        self.shake_frames = [ImageTk.PhotoImage(f)
-                             for f in effects.ball_shake_frames(26, key, ball)]
-        self.open_photo = ImageTk.PhotoImage(
-            effects.ball_image(26, key, open_top=True, ball=ball))
-        self.sparkles = [ImageTk.PhotoImage(f)
-                         for f in effects.sparkle_frames(52, 6, key)]
-
         self.win = tk.Toplevel(ov.root)
         self.win.overrideredirect(True)
-        self.win.attributes("-topmost", True)
-        self.win.attributes("-transparentcolor", hexkey)
-        self.win.configure(bg=hexkey)
-        self.label = tk.Label(self.win, bd=0, highlightthickness=0, bg=hexkey,
-                              image=self.shake_frames[0])
-        self.label.pack()
+        bg = PLAT.transparent_window(self.win, hexkey)
+        self.view = PLAT.SpriteView(self.win, bg, 26, 26)
+        self.label = self.view.widget
+        self.shake_frames = self.view.frames(
+            effects.ball_shake_frames(26, key, ball), key)
+        self.open_photo = self.view.frames(
+            [effects.ball_image(26, key, open_top=True, ball=ball)], key)[0]
+        # 반짝임은 볼보다 크다(52px). show() 가 창 크기를 알아서 맞춘다.
+        self.sparkles = self.view.frames(effects.sparkle_frames(52, 6, key), key)
+        self.view.show(self.shake_frames[0])
+        PLAT.raise_above(self.win)
 
         self.sx, self.sy = start
         self.tx, self.ty = target
@@ -285,7 +283,7 @@ class BallThrow(object):
         x = self.sx + (self.tx - self.sx) * t
         y = self.sy + (self.ty - self.sy) * t - 70 * (t - t * t) * 4
         self.move(x, y)
-        self.label.configure(image=self.shake_frames[self.step % len(self.shake_frames)])
+        self.view.show(self.shake_frames[self.step % len(self.shake_frames)])
         self.step += 1
         self._after(22, self.fly)
 
@@ -296,20 +294,20 @@ class BallThrow(object):
             self.ctl.hide_wild_sprite()
         if i >= max(1, self.shakes) * len(self.shake_frames):
             return self.finish()
-        self.label.configure(image=self.shake_frames[i % len(self.shake_frames)])
+        self.view.show(self.shake_frames[i % len(self.shake_frames)])
         self._after(90, lambda: self.shake(i + 1))
 
     def finish(self):
         if self.caught:
             self.sparkle(0)
         else:
-            self.label.configure(image=self.open_photo)
+            self.view.show(self.open_photo)
             self._after(260, self.close)
 
     def sparkle(self, i):
         if i >= len(self.sparkles):
             return self.close()
-        self.label.configure(image=self.sparkles[i])
+        self.view.show(self.sparkles[i])
         self._after(70, lambda: self.sparkle(i + 1))
 
     def close(self):
@@ -516,9 +514,9 @@ class WildController(object):
     def show_wild_sprite(self):
         if self.pet:
             try:
-                self.pet.win.deiconify()
+                PLAT.show_again(self.pet.win)
                 if self.pet.badge_win:
-                    self.pet.badge_win.deiconify()
+                    PLAT.show_again(self.pet.badge_win)
             except Exception:
                 pass
 
@@ -527,7 +525,6 @@ class WildController(object):
         try:
             w = tk.Toplevel(self.app.root)
             w.overrideredirect(True)
-            w.attributes("-topmost", True)
             w.configure(bg=U.TIP_BG)
             tk.Label(w, text=text, bg=U.TIP_BG, fg=U.GOOD,
                      font=U.FONT_TIP, justify="center",
@@ -535,6 +532,7 @@ class WildController(object):
             w.update_idletasks()
             w.geometry("+%d+%d" % (near.x + near.fw // 2 - w.winfo_width() // 2,
                                    near.y - w.winfo_height() - 4))
+            PLAT.raise_above(w)
             self.hint = w
         except Exception:
             self.hint = None

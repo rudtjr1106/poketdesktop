@@ -10,6 +10,50 @@ import math
 
 from PIL import Image, ImageDraw
 
+from . import platform_os as PLAT
+
+_FONT_CACHE = {}
+
+
+def pil_font(size, bold=False):
+    """한글이 실제로 그려지는 PIL 글꼴 하나.
+
+    PIL 은 Tk 과 다르다. Tk 은 글꼴 **이름**("맑은 고딕")을 받고 없으면
+    조용히 딴 것으로 바꿔 주지만, PIL 은 글꼴 **파일**("malgun.ttf")을
+    찾고 없으면 OSError 를 낸다. 그걸 그냥 넘기면 load_default() 로
+    떨어지는데, 그 글꼴에는 한글이 없어서 글자가 통째로 두부(□)가 된다.
+
+    맥 기본 글꼴은 .ttc 라 굵기 여러 벌이 한 파일에 들어 있다. 몇 번째가
+    Bold 인지는 OS 판마다 다르므로 번호를 박지 않고 이름으로 찾는다.
+    """
+    size = max(1, int(size))
+    ck = (size, bool(bold))
+    if ck in _FONT_CACHE:
+        return _FONT_CACHE[ck]
+    from PIL import ImageFont
+    got = None
+    for name in PLAT.pil_font_files(bold):
+        try:
+            f = ImageFont.truetype(name, size)
+        except Exception:                                   # noqa: BLE001
+            continue
+        if bold and f.getname()[1] != "Bold":
+            for i in range(1, 20):
+                try:
+                    g = ImageFont.truetype(name, size, index=i)
+                except Exception:                           # noqa: BLE001
+                    break                    # 범위를 넘으면 여기서 끝난다
+                fam, sty = g.getname()
+                if sty == "Bold" and not fam.startswith("."):
+                    f = g                    # '.' 로 시작하면 내부용이다
+                    break
+        got = f
+        break
+    if got is None:
+        got = ImageFont.load_default()       # 여기까지 오면 한글은 두부다
+    _FONT_CACHE[ck] = got
+    return got
+
 GRASS_DARK = (34, 102, 46)
 GRASS_MID = (58, 148, 62)
 GRASS_LIGHT = (108, 194, 88)
@@ -166,9 +210,8 @@ def badge_image(text="야생", w=42, h=16, key=(255, 0, 255),
     d = ImageDraw.Draw(im)
     d.rounded_rectangle((0, 0, w - 1, h - 1), radius=h // 2, fill=bg)
     try:
-        from PIL import ImageFont
-        f = ImageFont.truetype("malgun.ttf", int(h * 0.62))
-    except Exception:
+        f = pil_font(h * 0.62)
+    except Exception:                                       # noqa: BLE001
         f = None
     tw = d.textlength(text, font=f) if f else len(text) * 6
     d.text(((w - tw) / 2.0, h * 0.16), text, fill=fg, font=f)

@@ -12,29 +12,16 @@
 import random
 import tkinter as tk
 
-from PIL import ImageTk
-
 from . import config
+from . import platform_os as PLAT
 from . import sprites
 from .sprites import DOWN, LEFT, RIGHT, UP
 from . import ui_common as U
 
 
 def work_area(fallback_w, fallback_h):
-    """작업표시줄을 뺀 화면 영역."""
-    try:
-        import ctypes
-
-        class RECT(ctypes.Structure):
-            _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long),
-                        ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
-
-        r = RECT()
-        if ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(r), 0):
-            return r.left, r.top, r.right, r.bottom
-    except Exception:
-        pass
-    return 0, 0, fallback_w, fallback_h
+    """작업표시줄(맥은 메뉴 막대와 독)을 뺀 화면 영역."""
+    return PLAT.work_area(fallback_w, fallback_h)
 
 
 class Pet(object):
@@ -51,22 +38,28 @@ class Pet(object):
 
         # 걷는 도트면 방향이 4개, 배틀 도트면 좌우 2개다.
         self.walking_sprite = isinstance(anim, sprites.WalkAnimation)
-        self.photos = dict(
-            (d, [ImageTk.PhotoImage(f) for f in frames])
-            for d, frames in anim.frames.items())
 
-        self.win = tk.Toplevel(overlay.root)
-        self.win.overrideredirect(True)
-        self.win.attributes("-topmost", True)
-        self.win.attributes("-transparentcolor", hexkey)
-        self.win.configure(bg=hexkey)
-        self.label = tk.Label(self.win, bd=0, highlightthickness=0, bg=hexkey)
-        self.label.pack()
-
+        # **자리를 먼저 정한다.** 창을 만들면 그 순간 화면에 올라가는데
+        # (맥은 '항상 위' 를 걸려고 update_idletasks 를 부른다), 자리를
+        # 나중에 정하면 엉뚱한 곳에 한 번 떴다가 옮겨가는 것이 보인다.
         x1, y1, x2, y2 = overlay.area()
         m = overlay.settings["areaMargin"]
         self.x = random.randint(x1 + m, max(x1 + m, x2 - self.fw - m))
         self.y = random.randint(y1 + m, max(y1 + m, y2 - self.fh - m))
+
+        self.win = tk.Toplevel(overlay.root)
+        self.win.overrideredirect(True)
+        self.win.geometry("+%d+%d" % (int(self.x), int(self.y)))
+        # 창을 뚫는 방법은 OS 마다 다르다. 윈도우는 투명색을 지정하고,
+        # 맥은 창 배경 자체를 투명하게 한다 - platform_os 가 고른다.
+        bg = PLAT.transparent_window(self.win, hexkey)
+        self.view = PLAT.SpriteView(self.win, bg, self.fw, self.fh)
+        self.label = self.view.widget      # 마우스는 이 위젯이 받는다
+        self.photos = dict(
+            (d, self.view.frames(frames, key))
+            for d, frames in anim.frames.items())
+        PLAT.raise_above(self.win)
+
         self.facing = random.choice(list(self.photos.keys()))
         self.frame = random.randrange(anim.count())
         self.elapsed = 0
@@ -83,7 +76,7 @@ class Pet(object):
         # 야생 포켓몬을 왼쪽 클릭해 배틀을 걸 때 이게 필요하다.
         self.label.bind("<Button-1>", self.on_press)
         self.label.bind("<ButtonRelease-1>", self.on_release)
-        self.label.bind("<Button-3>", self.on_menu)
+        PLAT.bind_right(self.label, self.on_menu)
         self.label.bind("<Double-Button-1>", self.on_double)
 
         self.name_win = None
@@ -103,12 +96,14 @@ class Pet(object):
             text = "★ " + text
         w = tk.Toplevel(self.ov.root)
         w.overrideredirect(True)
-        w.attributes("-topmost", True)
         w.attributes("-alpha", 0.88)
         w.configure(bg=U.TIP_BG)
         tk.Label(w, text=text, bg=U.TIP_BG,
                  fg=U.TIP_SHINY if self.mon.get("shiny") else U.TIP_FG,
                  font=U.FONT_TIP).pack(padx=5, pady=1)
+        # 맥에서는 창이 화면에 올라간 뒤에 걸어야 '항상 위' 가 먹는다.
+        # 그냥 두면 이름표만 다른 창 뒤로 숨는다.
+        PLAT.raise_above(w)
         self.name_win = w
 
     # ---------------- 마우스를 올리면 이름 ----------------
@@ -148,7 +143,6 @@ class Pet(object):
         try:
             w = tk.Toplevel(self.ov.root)
             w.overrideredirect(True)
-            w.attributes("-topmost", True)
             w.configure(bg=U.TIP_BG)
             tk.Label(w, text=self.tip_text(), bg=U.TIP_BG,
                      fg=U.TIP_SHINY if self.mon.get("shiny") else U.TIP_FG,
@@ -161,6 +155,7 @@ class Pet(object):
             if y < y1:
                 y = int(self.y) + self.fh + 5
             w.geometry("+%d+%d" % (x, y))
+            PLAT.raise_above(w)
             self.tip_win = w
         except Exception:
             self.tip_win = None
@@ -217,7 +212,7 @@ class Pet(object):
 
     def redraw(self):
         row = self.row_for(self.facing)
-        self.label.configure(image=row[self.frame % len(row)])
+        self.view.show(row[self.frame % len(row)])
 
     def stride(self):
         """한 프레임 넘어가는 데 걸어야 하는 거리(px).
@@ -331,6 +326,10 @@ class Pet(object):
 
     def destroy(self):
         self.cancel_tip()
+        try:
+            self.view.destroy()
+        except Exception:                                   # noqa: BLE001
+            pass
         for w in (self.tip_win, self.name_win, self.win):
             try:
                 if w:
@@ -474,7 +473,7 @@ class Overlay(object):
                 if not w:
                     continue
                 try:
-                    w.withdraw() if hidden else w.deiconify()
+                    w.withdraw() if hidden else PLAT.show_again(w)
                 except Exception:
                     pass
             p.hide_tip()
@@ -500,9 +499,19 @@ class Overlay(object):
         if not self._running:
             return
         ms = int(1000 / max(1, self.settings["fps"]))
+        cx = cy = None
+        if PLAT.NEEDS_HIT_TRACKING:
+            # 맥은 도트가 없는 자리도 창이 클릭을 먹는다. 커서가 어디
+            # 있는지 봐서 빈 자리면 통과시켜 준다 (SpriteView.update_hit).
+            try:
+                cx, cy = self.root.winfo_pointerxy()
+            except Exception:                               # noqa: BLE001
+                cx = cy = None
         for p in list(self.pets.values()) + list(self.extra):
             try:
                 p.update(ms)
+                if cx is not None:
+                    p.view.update_hit(cx - int(p.x), cy - int(p.y))
             except Exception as e:                       # noqa: BLE001
                 # 예전에는 그냥 pass 였다. 그러면 매 틱마다 터져도 아무도
                 # 모르고, 화면에서는 "포켓몬이 가만히 있다" 로만 보인다.
