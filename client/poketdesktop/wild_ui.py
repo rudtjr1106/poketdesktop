@@ -343,8 +343,52 @@ class WildController(object):
         self._job = None
         self._expire_job = None
 
+    # ---------------- 켜짐/꺼짐 ----------------
+    def enabled(self):
+        """야생을 띄워도 되는가 (설정 '풀숲 띄우기').
+
+        끈 사람은 바탕화면에서 포켓몬이 걸어다니는 것만 보려는 사람이다.
+        그 사람에게 풀숲은 하던 일을 끊는 방해다. 그래서 화면에 안 띄우는
+        데서 그치지 않고 **서버에 물어보지도 않는다** - 안 쓸 답을 받으려고
+        90초마다 남의 서버를 두드릴 이유가 없다.
+        """
+        return bool(self.app.settings.get("showGrass", True))
+
+    def _busy(self):
+        """지금 야생을 걷어내면 안 되는 상황인가 (배틀 중).
+
+        배틀 도중에 걷어내면 상대 도트만 사라지고 배틀은 계속 돈다.
+        설정을 끄는 것은 급한 일이 아니니 배틀이 끝난 뒤에 반영한다.
+        """
+        b = self.app.battle
+        return b is not None and not getattr(b, "closed", False)
+
+    def set_enabled(self, on):
+        """설정이 바뀌었다. 지금 화면에 바로 반영한다.
+
+        다음 폴링을 기다리게 하면 껐는데도 풀숲이 한참 남아 있고, 켰는데도
+        한참 아무 일이 없다. 둘 다 고장으로 보인다.
+        """
+        if on:
+            return self.check(force=False)
+        if self._busy():
+            return          # 배틀이 끝나면 desktop_battle 이 check() 를 부른다
+        self.stop_polling()
+        self.clear()
+
+    def stop_polling(self):
+        """다음 확인 예약만 끈다 (화면은 그대로 둔다)."""
+        if self._job:
+            try:
+                self.app.root.after_cancel(self._job)
+            except Exception:                                # noqa: BLE001
+                pass
+            self._job = None
+
     # ---------------- 서버와 맞추기 ----------------
     def start(self):
+        if not self.enabled():
+            return
         self.check(force=False)
 
     def stop(self):
@@ -365,6 +409,14 @@ class WildController(object):
         그때는 얼마나 기다려야 하는지 알려준다.
         """
         if not self.app.api:
+            return
+        if not self.enabled():
+            # 껐다. 여기서 예약을 다시 걸지 않는 것이 중요하다 - 걸면
+            # 꺼 놓은 채로도 90초마다 서버를 계속 두드린다.
+            if not self._busy():
+                self.clear()
+            if force:
+                self.app.notify("풀숲을 껐습니다. 설정에서 다시 켤 수 있습니다.")
             return
 
         def done(r, err):
@@ -408,6 +460,12 @@ class WildController(object):
         tell 이면 사용자가 직접 눌러서 온 응답이라 결과를 말로도 알려준다.
         """
         self.app.balls = r.get("balls", self.app.balls)
+        # 물어본 뒤 답이 오는 사이에 껐을 수 있다. 볼 개수만 챙기고
+        # 화면은 건드리지 않는다.
+        if not self.enabled():
+            if not self._busy():
+                self.clear()
+            return
         # 자리가 없어서 안 돋는 것이면 알려준다. 안 그러면 어느 날부터
         # 풀숲이 영영 안 돋는 고장으로만 보인다.
         full = r.get("boxFull")
