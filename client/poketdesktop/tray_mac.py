@@ -99,13 +99,27 @@ class Tray(TrayBase):
             if self.item is not None:
                 self._pump_job = self.app.root.after(60, self._pump)
 
+    def is_open(self):
+        """메뉴가 지금 실제로 떠 있는가.
+
+        **`self.popup is not None` 으로 보면 안 된다.** 메뉴는 스스로도
+        닫힌다 - 항목을 누르거나, 바깥을 누르거나, 다른 메뉴가 열릴 때
+        (`ui_common.close_all`). 그때 이쪽 참조는 죽은 객체를 그대로
+        붙들고 있다. 그걸 '열려 있다' 로 읽으면 다음 refresh() 가
+        **아무도 안 눌렀는데 메뉴를 다시 연다.** 설정을 바꿀 때마다
+        메뉴가 저절로 튀어나오던 것이 이것이었다.
+        """
+        if self.popup is not None and not self.popup.alive():
+            self.popup = None            # 죽은 것은 여기서 놓는다
+        return self.popup is not None
+
     def refresh(self):
         if not self.item:
             return
         try:
             self.item.button().setToolTip_(self._title())
-            if self.popup is not None:
-                self.open()          # 열려 있으면 내용을 새로 그린다
+            if self.is_open():
+                self.open()          # 열려 있을 때만 내용을 새로 그린다
         except Exception:                                   # noqa: BLE001
             config.log("트레이 갱신 실패\n" + traceback.format_exc())
 
@@ -152,7 +166,7 @@ class Tray(TrayBase):
 
     # ---------------------------------------------------------- 메뉴
     def toggle(self):
-        if self.popup is not None and self.popup.alive():
+        if self.is_open():
             self.close()
         else:
             self.open()
