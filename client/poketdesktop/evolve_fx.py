@@ -56,7 +56,7 @@ from PIL import Image
 from common.korean import josa
 
 from . import platform_os as PLAT
-from . import sprite_cache, sprites
+from . import sprite_cache, sprites, walk_cache
 from . import ui_common as U
 from .fx_layer import FloatText, open_layer as open_fx_layer
 from .sprites import LEFT, RIGHT
@@ -142,10 +142,17 @@ def swap_sprite(pet, anim):
     except Exception:                                       # noqa: BLE001
         pass
     pet.view.resize(pet.fw, pet.fh)
-    pet.photos = {
-        RIGHT: pet.view.frames(anim.frames[RIGHT], anim.key),
-        LEFT: pet.view.frames(anim.frames[LEFT], anim.key),
-    }
+    # **새 도트가 가진 방향을 그대로 옮긴다.** 좌우 둘만 챙기면, 걷는
+    # 도트로 진화해도 위아래가 없어서 Pet 이 방향을 못 바꾼다.
+    pet.photos = dict(
+        (d, pet.view.frames(frames, anim.key))
+        for d, frames in anim.frames.items())
+    # 걷는 도트인지도 같이 바뀐다. 이걸 안 고치면 4방향을 들고도
+    # 좌우로만 돌아서(overlay.Pet 이 이 값으로 방향을 고른다) 위로 갈 때
+    # 등이 안 보인다.
+    pet.walking_sprite = isinstance(anim, sprites.WalkAnimation)
+    if pet.facing not in pet.photos:
+        pet.facing = next(iter(pet.photos))
 
     pet.frame = 0
     pet.elapsed = 0
@@ -224,23 +231,43 @@ class Evolution(object):
             old = [scaled(silhouette(base, base_key, base_key), f)
                    for f in SCALES]
             path = anim = None
+            walk = None
             new = []
             if num:
                 path = sprite_cache.ensure(api, num, shiny)
-                if path:
+                # **걷는 도트를 먼저 본다.** overlay.make 와 같은 순서다.
+                # 여기서 배틀 도트만 받으면 진화한 그 순간부터 그 포켓몬만
+                # 정면으로 굳어서 혼자 안 걷는다 - 다른 애들은 걸어다니는데.
+                sheet, meta = walk_cache.ensure(api, num)
+                if sheet and meta:
+                    try:
+                        anim = sprites.load_walk(
+                            sheet, meta, s["targetHeight"], s["minScale"],
+                            max(2.5, s["maxScale"]))
+                        walk = (sheet, meta)
+                    except Exception:                       # noqa: BLE001
+                        anim = None
+                if anim is None and path:
                     anim = sprites.load_animation(
                         path, s["targetHeight"], s["minScale"], s["maxScale"])
-                    src = anim.frames[facing][0]
-                    base_new = silhouette(src, anim.key, base_key)
+                if anim is not None:
+                    # 진화 전이 걷는 도트(4방향)였는데 진화 후가 배틀
+                    # 도트(좌우 2방향)일 수 있다. 그 반대도 된다.
+                    # 없는 방향을 그대로 집으면 KeyError 로 연출이 통째로
+                    # 날아간다 - 있는 것 중에서 고른다.
+                    row = anim.frames.get(facing)
+                    if row is None:
+                        row = next(iter(anim.frames.values()))
+                    base_new = silhouette(row[0], anim.key, base_key)
                     new = [scaled(base_new, f) for f in SCALES]
-            return path, anim, old, new
+            return path, anim, old, new, walk
 
         def done(r, err):
             if not self.alive():
                 return self.finish()
             if err or not r:
                 return self.reveal()          # 못 받았어도 축하는 해준다
-            self.path_new, self.anim_new, old, new = r
+            self.path_new, self.anim_new, old, new, walk_new = r
             # ImageTk 는 tk 스레드에서만 만들 수 있다
             try:
                 # 실루엣은 원래 도트의 투명색 위에 만들어 두었다.
@@ -253,6 +280,11 @@ class Evolution(object):
             # 포켓몬이 화면에서 사라진다.
             if self.path_new and self.app.overlay is not None:
                 self.app.overlay.paths[(num, shiny)] = self.path_new
+            if walk_new and self.app.overlay is not None:
+                # Overlay.make 는 self.walks 만 본다. 여기 넣어두지 않으면
+                # 설정을 한 번 건드리는 순간 걷던 진화체가 배틀 도트로
+                # 되돌아간다 - 다음 폴링이 채워줄 때까지.
+                self.app.overlay.walks[num] = walk_new
             self.open_layer()
             self.after(HOLD_MS, lambda: self.blink(0))
 
