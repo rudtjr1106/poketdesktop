@@ -226,6 +226,21 @@ def activate():
     pass
 
 
+def own_dialog(win, root):
+    """대화창을 앱에 딸린 창으로 표시한다. 윈도우에서는 작업 표시줄에 따로
+    안 뜨게 하는 효과다. **맥은 이걸 부르면 창이 사라진다**(platform_mac)."""
+    try:
+        win.transient(root)
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
+def surface(win):
+    """포커스를 못 가져와도 창이 보이게 한다. 여기서는 할 일이 없다 -
+    윈도우와 리눅스는 lift/focus_force 로 창이 앞에 온다."""
+    pass
+
+
 def accept_first_click():
     """앱이 앞에 없어도 첫 클릭을 그대로 받는다. 윈도우는 원래 그렇다."""
     return True

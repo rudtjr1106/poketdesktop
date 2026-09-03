@@ -12,6 +12,7 @@ import tkinter as tk
 from common.version import VERSION
 
 from . import config
+from . import platform_os as PLAT
 from . import ui_common as U
 from . import updater
 
@@ -194,7 +195,7 @@ class UpdateWindow(object):
         컴퓨터를 켜자마자 다른 일을 시작한 사람의 타이핑을 가로채면 안 된다.
         받는 것은 그대로 하고 창도 그대로 보이되, 앞으로 끌어내지 않는다.
         """
-        self.win.transient(self.root)
+        PLAT.own_dialog(self.win, self.root)   # 맥: transient 는 창을 없앤다
         if not quiet:
             try:
                 self.win.grab_set()
@@ -202,6 +203,7 @@ class UpdateWindow(object):
                 pass
             self.win.lift()
             self.win.focus_force()
+            PLAT.surface(self.win)     # 맥: 안 그러면 쓰던 앱 뒤에서 뜬다
         self.root.after(400, self.start)
         self.root.wait_window(self.win)
         return self.result, self.new_exe
@@ -364,7 +366,7 @@ class NewVersionAsk(object):
             pass
 
     def show(self):
-        self.win.transient(self.root)
+        PLAT.own_dialog(self.win, self.root)   # 맥: transient 는 창을 없앤다
         # **화면을 잠그지 않는다(grab_set 안 함).** 배틀 중일 수도 있는데,
         # 물어보는 창 하나가 다른 창을 전부 못 쓰게 만들 이유가 없다.
         self.win.lift()
@@ -372,6 +374,7 @@ class NewVersionAsk(object):
             self.win.focus_force()
         except Exception:                                   # noqa: BLE001
             pass
+        PLAT.surface(self.win)         # 맥: 안 그러면 쓰던 앱 뒤에서 뜬다
         self.root.wait_window(self.win)
         return self.result
 
@@ -448,11 +451,12 @@ class PatchNotes(object):
             pass
 
     def show(self, modal=False):
-        self.win.transient(self.root)
+        PLAT.own_dialog(self.win, self.root)   # 맥: transient 는 창을 없앤다
         self.win.lift()
         try:
             self.win.focus_force()
         except Exception:                                   # noqa: BLE001
             pass
+        PLAT.surface(self.win)         # 맥: 안 그러면 쓰던 앱 뒤에서 뜬다
         if modal:
             self.root.wait_window(self.win)

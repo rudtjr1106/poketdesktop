@@ -13,6 +13,7 @@
 import time
 import tkinter as tk
 
+from . import platform_os as PLAT
 from . import ui_common as U
 
 # 이만큼 지나면 "자고 있어서 그렇다" 고 알려준다.
@@ -117,8 +118,8 @@ class Popup(object):
         self.win.resizable(False, False)
         self.win.protocol("WM_DELETE_WINDOW", lambda: None)
         self.body = Overlay(self.win, text)
+        PLAT.own_dialog(self.win, root)   # 맥: transient 는 창을 없앤다
         try:
-            self.win.transient(root)
             self.win.lift()
         except Exception:                                   # noqa: BLE001
             pass

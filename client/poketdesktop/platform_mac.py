@@ -166,6 +166,40 @@ def raise_above(win):
         pass
 
 
+def own_dialog(win, root):
+    """**맥에서는 transient 를 걸지 않는다.**
+
+    우리 root 는 withdraw 돼 있다(창은 전부 Toplevel 이다). 맥 Tk 은
+    withdraw 된 창의 transient 를 **같이 withdraw 한다** - 걸자마자
+    사라지고, 풀어도 그대로다. 그래서 '새로운 기능' 창, 새 버전을 묻는 창,
+    받는 창이 맥에서 한 번도 안 떴다. 묻는 창은 답을 기다리느라 갈아타는
+    일까지 조용히 멈췄다. 직접 재 본 것:
+
+        만든 직후                 normal   viewable=1
+        transient(withdrawn root) withdrawn viewable=0
+        그 뒤 deiconify           normal   viewable=1
+        transient 없이            normal   viewable=1
+
+    transient 가 주는 것(작업 표시줄에 안 뜸)은 맥에 애초에 없다.
+    """
+    return
+
+
+def surface(win):
+    """대화창을 앞으로 꺼낸다.
+
+    맥 14 부터 앱이 스스로 앞으로 나오는 것은 **부탁**이다(cooperative
+    activation). 사용자가 방금 우리를 눌렀으면(트레이 메뉴) 들어주고,
+    타이머가 띄운 창이면 거절한다. 거절돼도 창은 화면에 뜬다 - 새로 연
+    창은 앞에 오고, 키보드만 쓰던 앱에 남는다. 그 정도면 된다.
+
+    `-topmost` 는 일부러 안 건다. 도트와 설명은 바탕화면 장식이라 늘 위에
+    있어야 하지만, 글 읽는 창이 닫을 때까지 브라우저 위에 떠 있으면
+    그게 방해다.
+    """
+    activate()
+
+
 def bind_right(widget, fn):
     """맥에서는 **걸지 않는다.**
 

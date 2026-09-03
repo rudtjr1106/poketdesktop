@@ -38,6 +38,7 @@ import Foundation
 import objc
 
 from . import config
+from . import platform_os as PLAT
 from . import ui_common as U
 from .tray import SEP, TrayBase, make_icon_image, val
 
@@ -269,11 +270,12 @@ class Tray(TrayBase):
         def run():
             # 창을 앞으로 꺼내 준다. Dock 에 안 뜨는 앱이라 그냥 열면
             # 다른 프로그램 뒤에서 뜰 수 있다.
-            try:
-                AppKit.NSApplication.sharedApplication(
-                    ).activateIgnoringOtherApps_(True)
-            except Exception:                               # noqa: BLE001
-                pass
+            #
+            # **activateIgnoringOtherApps: 를 직접 부르면 안 된다.** 그건
+            # keep_focus 가 통째로 막아 둔 선택자라 아무 일도 안 한다.
+            # 실제로 그랬다 - 메뉴에서 '새로운 기능' 을 눌러도 창이
+            # 파인더 뒤에서 떴다. 열린 문은 PLAT.activate() 하나다.
+            PLAT.activate()
             fn()
         return run
 
