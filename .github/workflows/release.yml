@@ -107,6 +107,8 @@ jobs:
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: "utf-8"
+      # 비어 있으면 서명 단계를 건너뛴다 (조건에서 본다)
+      CERT: ${{ secrets.MACOS_CERT_P12 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -139,7 +141,38 @@ jobs:
           python client/test_autostart_mac.py
           python client/test_update_mac.py
 
+      # 배포용 인증서가 Secrets 에 있으면 서명하고 공증까지 받는다.
+      # 없으면 그냥 넘어가고, 임시 서명 판이 나온다 (받는 사람이
+      # xattr 로 격리를 떼야 한다).
+      - name: 서명 준비
+        if: env.CERT != ''
+        env:
+          CERT: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PW: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -e
+          # 이 실행에서만 쓰는 키체인을 따로 만든다. 러너의 기본 키체인을
+          # 건드리지 않고, 실행이 끝나면 통째로 사라진다.
+          KEY_PW=$(python3 -c "import secrets;print(secrets.token_hex(24))")
+          security create-keychain -p "$KEY_PW" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEY_PW" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          echo "$CERT" | base64 --decode > /tmp/cert.p12
+          security import /tmp/cert.p12 -k build.keychain -P "$CERT_PW" \
+                   -T /usr/bin/codesign
+          rm -f /tmp/cert.p12
+          # codesign 이 물어보지 않게 접근을 열어 준다
+          security set-key-partition-list -S apple-tool:,apple: \
+                   -s -k "$KEY_PW" build.keychain >/dev/null
+          security find-identity -v -p codesigning | grep "Developer ID" \
+            || { echo "::error::Developer ID 인증서가 안 들어갔습니다"; exit 1; }
+
       - name: 빌드
+        env:
+          POKET_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          POKET_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
+          POKET_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
         run: python tools/build_app.py
 
       - uses: actions/upload-artifact@v4

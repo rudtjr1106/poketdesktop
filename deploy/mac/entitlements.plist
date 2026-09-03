@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- 공증을 받으려면 hardened runtime 을 켜야 하는데, 그러면 기본으로
+       막히는 것들이 있다. 파이썬 앱에 실제로 필요한 것만 연다.
+
+       allow-unsigned-executable-memory
+         ctypes/libffi 가 함수를 부를 때 실행 가능한 메모리를 만든다.
+         이 게임은 ctypes 로 Tk 내부와 맥 API 를 부르므로 꼭 필요하다.
+
+       disable-library-validation
+         한 번들 안에 서명 주체가 다른 라이브러리가 섞여 있을 수 있다
+         (PyInstaller 가 끌어온 것들). 없으면 로딩에서 막힌다. -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>
