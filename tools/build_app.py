@@ -30,11 +30,23 @@
 
 애플 실리콘에서는 **서명이 아예 없는 실행 파일은 실행 자체가 막힌다.**
 그래서 임시 서명(ad-hoc)은 반드시 붙어 있어야 하고, PyInstaller 가
-만들면서 붙여 준다. 이 스크립트는 끝에 그게 붙었는지 확인한다.
+만들면서 붙여 준다.
 
-개발자 서명(연 $99)과 공증(notarization)은 안 한다. 그래서 받는 사람은
-처음 한 번 "확인되지 않은 개발자" 경고를 만나고, 우클릭 > 열기 로
-넘어가야 한다. 윈도우의 SmartScreen 과 같은 종류의 마찰이다.
+개발자 서명(연 $99)과 공증(notarization)은 안 한다.
+
+**그래서 받는 사람은 이 앱을 그냥 못 연다.** 인터넷에서 받은 파일에는
+맥이 격리 표시를 붙이는데, 개발자 서명이 없으면 이렇게 막는다.
+
+    "포스크탑"은(는) 손상되었기 때문에 열 수 없습니다.
+
+**"확인되지 않은 개발자" 경고가 아니라 아예 막는 것이라, 우클릭 > 열기
+로도 안 넘어간다.** 받는 사람이 한 줄을 쳐야 한다.
+
+    xattr -dr com.apple.quarantine /Applications/포스크탑.app
+
+직접 만든 판을 그 자리에서 실행할 때는 격리 표시가 없어서 잘 된다 -
+그래서 만드는 쪽에서는 이 문제가 안 보인다. 실제로 받아서 열어 본
+사람에게서 알았다. 릴리스 노트와 리드미에 적어 두었다.
 """
 import os
 import shutil
@@ -168,7 +180,20 @@ def check_signature(app_path):
                        capture_output=True, text=True)
     out = (r.stdout or "") + (r.stderr or "")
     if "Signature=adhoc" in out or "Authority=" in out:
-        print("  서명: 임시 서명(ad-hoc) 붙음")
+        # 붙어 있다고 봉인까지 맞는 것은 아니다. 있는 그대로 알려준다.
+        v = subprocess.run(["codesign", "--verify", "--strict", app_path],
+                           capture_output=True, text=True)
+        if v.returncode == 0:
+            print("  서명: 임시 서명(ad-hoc), 검증 통과")
+        else:
+            print("  서명: 임시 서명(ad-hoc) — 다만 검증은 실패한다")
+            print("        %s" % (v.stderr or "").strip()[:90])
+            print("        공증이 없으면 어차피 받는 쪽에서 격리를 떼야 하므로")
+            print("        지금은 그대로 낸다. 릴리스 노트에 적어 두었다.")
+        print("")
+        print("  받는 사람은 끌어다 놓은 뒤 이 한 줄이 필요하다:")
+        print("    xattr -dr com.apple.quarantine /Applications/%s.app"
+              % APP_NAME)
         return True
     print("")
     print("  ** 서명이 안 붙었습니다. 애플 실리콘에서는 안 뜰 수 있습니다. **")
@@ -272,9 +297,6 @@ def build():
     print("")
     print("  완성: %s" % app_path)
     print("        %s  (%.1f MB)" % (dmg_path, mb))
-    print("")
-    print("  개발자 서명은 없습니다. 받는 사람은 처음 한 번")
-    print("  우클릭 > 열기 로 열어야 합니다.")
     return 0
 
 
