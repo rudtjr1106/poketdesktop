@@ -20,7 +20,8 @@ from .platform_base import (NATIVE_MENU, RIGHT_CLICK,   # noqa: F401
                             SpriteView, accept_first_click, activate, keep_focus,
                             bind_right, data_dir, mouse_buttons_down,
                             take_right_clicks, watch_right_click,
-                            hide_from_dock, screens, show_again)
+                            hide_from_dock, screens, show_again,
+                            own_dialog, surface)
 
 
 def raise_above(win):

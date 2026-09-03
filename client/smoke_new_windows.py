@@ -37,6 +37,7 @@ from common import patchnotes                              # noqa: E402
 from common.version import VERSION                         # noqa: E402
 from poketdesktop import config, ui_settings, ui_update    # noqa: E402
 from poketdesktop import ui_common as U                    # noqa: E402
+from poketdesktop import platform_os as PLAT               # noqa: E402
 
 OK = FAIL = 0
 
@@ -95,6 +96,11 @@ def height_of(win):
 
 
 def main():
+    # **맥에서는 이게 없으면 tk.Tk() 가 영영 안 끝날 수 있다.** 전에
+    # 죽은 Tk 가 남긴 '창을 복구할까요?' 대화상자가 초기화 안에서
+    # 뜨는데, 이 검사는 창을 안 보여 주니 답할 길이 없다. 실제로
+    # 그렇게 5분을 서 있었다. 새 러너에서는 죽은 흔적이 없어 안 걸린다.
+    PLAT.before_tk()
     root = tk.Tk()
     root.withdraw()
     U.init_fonts(root)
@@ -157,6 +163,34 @@ def main():
         chk("%s - 단추가 잘리지 않는다" % label, got >= need,
             "%dpx 모자란다" % (need - got))
         ask.finish()
+
+    # ---------------- 창이 실제로 보이는가 ----------------
+    # 위 검사는 크기만 잰다. 창이 아예 안 뜨면 크기는 맞아도 소용없다.
+    # 실제로 그랬다 - 맥 Tk 은 withdraw 된 root 의 transient 를 같이
+    # withdraw 해서, 여기 세 창이 맥에서 한 번도 안 떴다. 이 러너의 root
+    # 도 withdraw 돼 있으니, 앱과 같은 조건이다.
+    print("창이 보이는가")
+    shown = ui_update.PatchNotes(root, entry)
+    shown.show()
+    root.update_idletasks()
+    chk("새로운 기능 창이 화면에 있다",
+        shown.win.state() == "normal" and shown.win.winfo_viewable() == 1,
+        "state=%s viewable=%s" % (shown.win.state(), shown.win.winfo_viewable()))
+    shown.close()
+
+    ask = ui_update.NewVersionAsk(root, {"version": "9.9.9", "size": 0,
+                                         "notes": ""})
+    seen = {}
+
+    def look():
+        seen["state"] = ask.win.state()
+        seen["viewable"] = ask.win.winfo_viewable()
+        ask.finish()                     # wait_window 를 풀어 준다
+    root.after(250, look)
+    ask.show()                           # 답이 올 때까지 기다린다 (look 이 준다)
+    chk("새 버전 묻는 창이 화면에 있다",
+        seen.get("state") == "normal" and seen.get("viewable") == 1,
+        "state=%s viewable=%s" % (seen.get("state"), seen.get("viewable")))
 
     root.destroy()
     print()

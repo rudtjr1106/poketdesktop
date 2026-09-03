@@ -75,6 +75,7 @@ def tip_and_raise(root, x, y):
 
 
 def main():
+    PLAT.before_tk()          # 맥: 죽은 Tk 의 복구 대화상자에 안 막히게
     root = tk.Tk()
     root.withdraw()
     try:
