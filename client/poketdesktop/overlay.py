@@ -307,13 +307,31 @@ class Pet(object):
         x1, y1, x2, y2 = self.ov.area()
         m = s["areaMargin"]
         speed = s["walkSpeed"]
+
+        # **영역 밖에 나가 있으면 먼저 데려온다.**
+        #
+        # 활동 영역은 화면이 바뀌면 같이 바뀐다 - 노트북을 닫았다 열거나
+        # 모니터를 뺐다 꽂으면 그렇다. 그때 도트가 새 영역 밖에 남는데,
+        # 아래 튕기기만으로는 영영 못 돌아온다. vx 를 뒤집어도 여전히
+        # 밖이라 다음 틱에 또 튕기고, 그게 끝없이 반복되면서 **제자리에서
+        # 좌우로 고개만 흔든다.** 실제로 그랬다.
+        if not (x1 + m <= self.x <= x2 - self.fw - m
+                and y1 + m <= self.y <= y2 - self.fh - m):
+            self.clamp()
+            self.place()
+            return
+
         nx = self.x + self.vx * speed
         ny = self.y + self.vy * speed
         bounced = False
-        if nx < x1 + m or nx > x2 - self.fw - m:
+        # **나가는 쪽으로 갈 때만** 튕긴다. 방향까지 보지 않으면, 가장자리에
+        # 딱 붙었을 때 안으로 들어오려는 걸음까지 되돌려서 그 자리에 갇힌다.
+        if ((nx < x1 + m and self.vx < 0)
+                or (nx > x2 - self.fw - m and self.vx > 0)):
             self.vx = -self.vx
             bounced = True
-        if ny < y1 + m or ny > y2 - self.fh - m:
+        if ((ny < y1 + m and self.vy < 0)
+                or (ny > y2 - self.fh - m and self.vy > 0)):
             self.vy = -self.vy
             bounced = True
         if bounced:
