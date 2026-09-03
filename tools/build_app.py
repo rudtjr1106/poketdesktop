@@ -67,6 +67,21 @@ APP_NAME = "포스크탑"
 ZIP_NAME = "poketdesktop-v%s-mac" % VERSION
 BUNDLE_ID = "com.poketdesktop.app"
 ENTRY = os.path.join(ROOT, "client", "run.pyw")
+ENTITLEMENTS = os.path.join(ROOT, "deploy", "mac", "entitlements.plist")
+
+# 배포용 서명. 환경변수로 골라 쓸 수 있게 둔다.
+#   POKET_SIGN_ID       "Developer ID Application: 이름 (팀ID)"
+#                       안 주면 키체인에서 Developer ID 를 찾아 쓴다.
+#   POKET_NOTARY_PROFILE  notarytool store-credentials 로 저장해 둔 이름
+#
+# CI 처럼 키체인에 프로필을 못 만드는 데서는 셋을 직접 준다.
+#   POKET_NOTARY_APPLE_ID / POKET_NOTARY_PASSWORD / POKET_NOTARY_TEAM_ID
+SIGN_ID = os.environ.get("POKET_SIGN_ID") or ""
+NOTARY_PROFILE = os.environ.get("POKET_NOTARY_PROFILE") or ""
+NOTARY_ID = os.environ.get("POKET_NOTARY_APPLE_ID") or ""
+NOTARY_PW = os.environ.get("POKET_NOTARY_PASSWORD") or ""
+NOTARY_TEAM = os.environ.get("POKET_NOTARY_TEAM_ID") or ""
+
 ICONSET = os.path.join(ROOT, "build", "poket.iconset")
 ICNS = os.path.join(ROOT, "build", "icon.icns")
 
@@ -92,6 +107,100 @@ def make_icns():
         return None
     print("  아이콘: %s" % ICNS)
     return ICNS
+
+
+def find_identity():
+    """배포용 서명 인증서를 찾는다. 없으면 None.
+
+    **Apple Development 는 안 된다.** 그건 Xcode 로 내 기기에서 돌릴 때
+    쓰는 것이라, 남에게 준 앱은 그대로 막힌다. 배포에 필요한 것은
+    `Developer ID Application` 이다.
+    """
+    if SIGN_ID:
+        return SIGN_ID
+    r = subprocess.run(["security", "find-identity", "-v", "-p", "codesigning"],
+                       capture_output=True, text=True)
+    for line in (r.stdout or "").splitlines():
+        if "Developer ID Application" in line and '"' in line:
+            return line.split('"')[1]
+    return None
+
+
+def sign_app(app_path, identity):
+    """개발자 서명 + hardened runtime.
+
+    안쪽부터 서명한다. 바깥 번들을 먼저 서명하면 그 뒤에 안쪽을 건드리는
+    셈이 되어 봉인이 깨진다.
+
+    공증을 받으려면 **hardened runtime(--options runtime)이 필수**다.
+    그러면 기본으로 막히는 것들이 있어서 entitlements 로 필요한 것만 연다
+    (deploy/mac/entitlements.plist).
+    """
+    inner = []
+    for base, _dirs, files in os.walk(app_path):
+        for f in files:
+            p = os.path.join(base, f)
+            if os.path.islink(p):
+                continue
+            if f.endswith((".dylib", ".so")) or ".framework/" in p:
+                inner.append(p)
+    print("  안쪽 %d개부터 서명합니다..." % len(inner))
+    for p in inner:
+        subprocess.run(["codesign", "--force", "--timestamp",
+                        "--options", "runtime", "--sign", identity, p],
+                       capture_output=True)
+    r = subprocess.run(["codesign", "--force", "--timestamp",
+                        "--options", "runtime",
+                        "--entitlements", ENTITLEMENTS,
+                        "--sign", identity, app_path],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        print("  서명 실패: %s" % (r.stderr or "").strip()[:200])
+        return False
+    v = subprocess.run(["codesign", "--verify", "--strict", app_path],
+                       capture_output=True, text=True)
+    if v.returncode != 0:
+        print("  서명은 됐는데 검증이 안 됩니다: %s"
+              % (v.stderr or "").strip()[:160])
+        return False
+    print("  서명: %s" % identity)
+    return True
+
+
+def notarize(path):
+    """애플에 보내서 공증을 받고, 결과를 파일에 박아 둔다(staple).
+
+    **이걸 해야 받는 사람이 그냥 두 번 눌러 열 수 있다.** 서명만 하고
+    공증을 안 하면 여전히 경고가 뜬다.
+
+    박아 두면(staple) 인터넷이 없어도 확인된다.
+    """
+    if NOTARY_PROFILE:
+        who = ["--keychain-profile", NOTARY_PROFILE]
+    elif NOTARY_ID and NOTARY_PW and NOTARY_TEAM:
+        who = ["--apple-id", NOTARY_ID, "--password", NOTARY_PW,
+               "--team-id", NOTARY_TEAM]
+    else:
+        print("  공증을 건너뜁니다 (자격증명이 없습니다)")
+        return False
+    print("  애플에 공증을 맡깁니다. 몇 분 걸립니다...")
+    r = subprocess.run(["xcrun", "notarytool", "submit", path, "--wait"] + who,
+                       capture_output=True, text=True)
+    out = (r.stdout or "") + (r.stderr or "")
+    if r.returncode != 0 or "status: Accepted" not in out:
+        print("  공증 실패:")
+        for line in out.strip().splitlines()[-8:]:
+            print("    %s" % line)
+        print("  자세히 보려면: xcrun notarytool log <submission-id> ...")
+        return False
+    st = subprocess.run(["xcrun", "stapler", "staple", path],
+                        capture_output=True, text=True)
+    if st.returncode != 0:
+        print("  공증은 됐는데 박아 넣지 못했습니다: %s"
+              % (st.stdout or st.stderr or "").strip()[:160])
+        return False
+    print("  공증 완료")
+    return True
 
 
 def set_info_plist(app_path):
@@ -190,10 +299,13 @@ def check_signature(app_path):
             print("        %s" % (v.stderr or "").strip()[:90])
             print("        공증이 없으면 어차피 받는 쪽에서 격리를 떼야 하므로")
             print("        지금은 그대로 낸다. 릴리스 노트에 적어 두었다.")
-        print("")
-        print("  받는 사람은 끌어다 놓은 뒤 이 한 줄이 필요하다:")
-        print("    xattr -dr com.apple.quarantine /Applications/%s.app"
-              % APP_NAME)
+        if "Signature=adhoc" in out:
+            print("")
+            print("  받는 사람은 끌어다 놓은 뒤 이 한 줄이 필요합니다:")
+            print("    xattr -dr com.apple.quarantine /Applications/%s.app"
+                  % APP_NAME)
+            print("  없애려면 Developer ID 인증서와 공증이 필요합니다"
+                  " (docs/맥에서-개발하기.md 5장).")
         return True
     print("")
     print("  ** 서명이 안 붙었습니다. 애플 실리콘에서는 안 뜰 수 있습니다. **")
@@ -287,16 +399,34 @@ def build():
         return 1
 
     set_info_plist(app_path)
+
+    # 배포용 인증서가 있으면 제대로 서명하고 공증까지 받는다.
+    # 없으면 PyInstaller 가 붙여 둔 임시 서명 그대로 나간다.
+    ident = find_identity()
+    signed = sign_app(app_path, ident) if ident else False
+    if not ident:
+        print("  Developer ID 인증서가 없어 임시 서명으로 냅니다.")
     check_signature(app_path)
 
     dmg_path = make_dmg(app_path, dist)
     if not dmg_path:
         return 1
 
+    stapled = False
+    if signed:
+        # dmg 도 같이 서명하고, 공증은 dmg 째로 받는다. 그래야 받는
+        # 사람이 dmg 를 열 때부터 아무 말이 안 나온다.
+        subprocess.run(["codesign", "--force", "--timestamp",
+                        "--sign", ident, dmg_path], capture_output=True)
+        stapled = notarize(dmg_path)
+
     mb = os.path.getsize(dmg_path) / 1048576.0
     print("")
     print("  완성: %s" % app_path)
     print("        %s  (%.1f MB)" % (dmg_path, mb))
+    if stapled:
+        print("")
+        print("  공증까지 됐습니다. 받는 사람은 그냥 두 번 눌러 열면 됩니다.")
     return 0
 
 
