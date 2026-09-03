@@ -228,9 +228,20 @@ def activate():
 
 def own_dialog(win, root):
     """대화창을 앱에 딸린 창으로 표시한다. 윈도우에서는 작업 표시줄에 따로
-    안 뜨게 하는 효과다. **맥은 이걸 부르면 창이 사라진다**(platform_mac)."""
+    안 뜨게 하는 효과다.
+
+    **transient 를 건 뒤에 deiconify 를 해야 한다.** 우리 root 는 withdraw
+    돼 있는데, Tk 은 withdraw 된 창의 transient 를 같이 withdraw 한다 -
+    맥만 그런 줄 알았더니 윈도우 러너에서도 똑같이 나왔다
+    (state=withdrawn viewable=0). 걸자마자 사라진 창을 도로 꺼내는
+    것이 deiconify 다. 딸린 창이라는 관계는 그대로 남는다.
+    """
     try:
         win.transient(root)
+    except Exception:                                       # noqa: BLE001
+        pass
+    try:
+        win.deiconify()
     except Exception:                                       # noqa: BLE001
         pass
 
