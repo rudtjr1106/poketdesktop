@@ -20,6 +20,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageGrab       # noqa: E402
 
 from common import pokelogic as P                             # noqa: E402
 from poketdesktop import config, sprite_cache                 # noqa: E402
+from poketdesktop import platform_os as PLAT                  # noqa: E402
 from poketdesktop import ui_common as U                       # noqa: E402
 from poketdesktop.api import Api, load_pokedex                # noqa: E402
 from poketdesktop.desktop_battle import DesktopBattle         # noqa: E402
@@ -69,13 +70,10 @@ def main():
     dexdata, _ = load_pokedex(api)
     dex = P.Pokedex(dexdata)
 
+    PLAT.before_tk()
     root = tk.Tk()
     root.withdraw()
-    try:
-        import ctypes
-        ctypes.windll.shcore.SetProcessDpiAwareness(1)
-    except Exception:
-        pass
+    PLAT.dpi_aware()
     U.init_fonts(root)
     U.apply_theme(root)
 
@@ -139,9 +137,10 @@ def main():
             sheet = Image.new("RGB", (cols * (fw + pad) + pad,
                                       rows * (fh + lab + pad) + pad), (18, 18, 24))
             d = ImageDraw.Draw(sheet)
+            from poketdesktop.effects import pil_font
             try:
-                font = ImageFont.truetype("malgun.ttf", 12)
-            except Exception:
+                font = pil_font(12)
+            except Exception:                               # noqa: BLE001
                 font = None
             for i, im in enumerate(frames):
                 cx = pad + (i % cols) * (fw + pad)

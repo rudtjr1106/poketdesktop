@@ -21,11 +21,14 @@ Pet 의 도트를 그대로 붙잡아서, 그 자리에서 흰 실루엣으로 �
 픽셀만 흰색으로 칠하면 된다. sprites.to_rgba 로 알파(모양)를 얻고, 그
 모양대로 흰색을 찍는다. 900종에 실루엣 그림을 따로 둘 수는 없다.
 
-**투명색은 처음부터 끝까지 원래 도트의 것 하나로 통일한다.** Pet 의 창은
-`-transparentcolor` 방식이라 창마다 투명색이 하나뿐이다. 새 종의 도트는
-투명색이 다를 수 있으므로, 연출 중에 쓰는 실루엣은 전부 **원래 도트의
-투명색** 위에 만든다. 진짜 새 도트로 갈아끼우는 마지막 순간에만 창의
-투명색까지 같이 바꾼다.
+**투명색은 처음부터 끝까지 원래 도트의 것 하나로 통일한다.** 윈도우에서
+Pet 의 창은 `-transparentcolor` 방식이라 창마다 투명색이 하나뿐이다. 새
+종의 도트는 투명색이 다를 수 있으므로, 연출 중에 쓰는 실루엣은 전부
+**원래 도트의 투명색** 위에 만든다. 진짜 새 도트로 갈아끼우는 마지막
+순간에만 창의 투명색까지 같이 바꾼다.
+
+(맥은 색을 뚫는 방식이 아니라 이 제약이 없다. 그래도 같은 코드를 쓴다 —
+연출이 양쪽에서 똑같이 보이는 편이 낫고, 갈라 두면 한쪽만 깨진다.)
 
 **새 종의 도트는 반드시 미리 받아둔다.** 연출 도중에 내려받으면 그 동안
 tk 가 멈춰서 애써 만든 애니메이션이 뚝 끊긴다. run_async 로 먼저 받고,
@@ -48,13 +51,14 @@ PIL 로 실루엣까지 다 만들어 둔 뒤에야 연출을 시작한다. 받�
 import math
 import random
 
-from PIL import Image, ImageTk
+from PIL import Image
 
 from common.korean import josa
 
+from . import platform_os as PLAT
 from . import sprite_cache, sprites
 from . import ui_common as U
-from .fx_layer import FloatText, FxLayer
+from .fx_layer import FloatText, open_layer as open_fx_layer
 from .sprites import LEFT, RIGHT
 
 # ---------------------------------------------------------------- 박자
@@ -128,22 +132,20 @@ def swap_sprite(pet, anim):
 
     pet.anim = anim
     pet.fw, pet.fh = anim.w, anim.h
-    pet.photos = {
-        RIGHT: [ImageTk.PhotoImage(f) for f in anim.frames[RIGHT]],
-        LEFT: [ImageTk.PhotoImage(f) for f in anim.frames[LEFT]],
-    }
     # 투명색은 그림마다 다르다. 창까지 같이 바꿔주지 않으면 새 도트 배경이
-    # 그대로 남아 네모난 판이 하나 떠다닌다.
+    # 그대로 남아 네모난 판이 하나 떠다닌다. (맥은 색으로 뚫는 방식이
+    # 아니라서 이 문제가 없지만, 같은 자리에서 부르면 된다.)
     hexkey = "#%02x%02x%02x" % anim.key
     try:
-        pet.win.attributes("-transparentcolor", hexkey)
-    except Exception:
+        bg = PLAT.transparent_window(pet.win, hexkey)
+        pet.label.configure(bg=bg)
+    except Exception:                                       # noqa: BLE001
         pass
-    try:
-        pet.win.configure(bg=hexkey)
-        pet.label.configure(bg=hexkey)
-    except Exception:
-        pass
+    pet.view.resize(pet.fw, pet.fh)
+    pet.photos = {
+        RIGHT: pet.view.frames(anim.frames[RIGHT], anim.key),
+        LEFT: pet.view.frames(anim.frames[LEFT], anim.key),
+    }
 
     pet.frame = 0
     pet.elapsed = 0
@@ -241,8 +243,9 @@ class Evolution(object):
             self.path_new, self.anim_new, old, new = r
             # ImageTk 는 tk 스레드에서만 만들 수 있다
             try:
-                self.sil_old = [ImageTk.PhotoImage(i) for i in old]
-                self.sil_new = [ImageTk.PhotoImage(i) for i in new]
+                # 실루엣은 원래 도트의 투명색 위에 만들어 두었다.
+                self.sil_old = self.pet.view.frames(old, base_key)
+                self.sil_new = self.pet.view.frames(new, base_key)
             except Exception:
                 return self.reveal()
             # 나중에 설정이 바뀌어 도트를 다시 만들 때를 대비해 경로를 등록해 둔다.
@@ -269,10 +272,7 @@ class Evolution(object):
         except Exception:
             area = (self.pet.x - 200, self.pet.y - 200,
                     self.pet.x + 200, self.pet.y + 200)
-        try:
-            self.layer = FxLayer(self.root, area)
-        except Exception:
-            self.layer = None
+        self.layer = open_fx_layer(self.root, area)
 
     # ---------------- 멈춰 세우기 ----------------
     def freeze(self):
@@ -366,8 +366,8 @@ class Evolution(object):
         self.keep = None
         if self.pet.name_win:
             try:
-                self.pet.name_win.deiconify()
-            except Exception:
+                PLAT.show_again(self.pet.name_win)
+            except Exception:                               # noqa: BLE001
                 pass
         self.flash(0)
 
@@ -449,8 +449,8 @@ class Evolution(object):
         """
         pet = self.pet
         try:
-            pet.label.configure(image=photo)
-        except Exception:
+            pet.view.show(photo)
+        except Exception:                                   # noqa: BLE001
             return
         self.keep = photo                      # 참조를 놓으면 그림이 지워진다
         w, h = photo.width(), photo.height()
@@ -637,7 +637,7 @@ class Evolution(object):
         self.thaw()
         try:
             if self.pet.name_win:
-                self.pet.name_win.deiconify()
+                PLAT.show_again(self.pet.name_win)
             self.pet.place()
         except Exception:
             pass

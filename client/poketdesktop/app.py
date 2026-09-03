@@ -12,9 +12,15 @@ from common.version import VERSION             # noqa: E402
 from . import api as apimod                    # noqa: E402
 from . import autostart                     # noqa: E402
 from . import config, single, sprite_cache, ui_loading, updater, walk_cache  # noqa: E402
+from . import platform_os as PLAT              # noqa: E402
 from . import ui_common as U                   # noqa: E402
 from .overlay import Overlay                   # noqa: E402
 from .tray import Tray                         # noqa: E402
+if sys.platform == "darwin" and PLAT.gui_ready():   # noqa: E402
+    # 맥은 pystray 를 못 쓴다 (tray_mac 의 첫 주석을 보라).
+    # pyobjc 가 없으면 여기서 ImportError 가 나서 앱이 아예 안 뜬다.
+    # 그래서 먼저 물어보고, 없으면 main() 이 사람에게 말해 준다.
+    from .tray_mac import Tray                 # noqa: E402,F811
 from .desktop_battle import DesktopBattle       # noqa: E402
 from .ui_bag import BagWindow                  # noqa: E402
 from .ui_box import BoxWindow, confirm         # noqa: E402
@@ -76,13 +82,14 @@ class App(object):
         self.autostarted = autostart.started_by_autostart()
         self._login_try = 0
 
+        # tk.Tk() 보다 **먼저** 해야 하는 것이 있다 (맥의 창 복구 대화상자).
+        PLAT.before_tk()
         self.root = tk.Tk()
         self.root.withdraw()
-        try:
-            import ctypes
-            ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        except Exception:
-            pass
+        # Dock/작업표시줄에는 안 뜨고 트레이 아이콘만 남는다.
+        # tk.Tk() **뒤에** 불러야 한다 (Tk 이 정책을 되돌려 놓는다).
+        PLAT.hide_from_dock()
+        PLAT.dpi_aware()
         U.init_fonts(self.root)
         apply_theme(self.root)
 
@@ -94,8 +101,10 @@ class App(object):
         새 exe 가 이미 떠 있는데 이쪽도 살아 있으면 두 개가 같이 돈다.
 
         exe 로 묶여 있을 때만 한다. 개발 중(파이썬)에는 건드리지 않는다.
+        맥에서는 아예 안 한다 - 릴리스에 올라간 것이 윈도우 zip 뿐이라
+        받아 봐야 못 쓴다 (updater.supported 를 보라).
         """
-        if not updater.is_frozen():
+        if not updater.is_frozen() or not updater.supported():
             return False
         # **옛 폴더를 지우기 전에** 등록해 둔 경로부터 지금 파일로 맞춘다.
         #
@@ -214,6 +223,9 @@ class App(object):
         return True
 
     def show_login(self):
+        # Dock 에 없는 앱이라 그냥 띄우면 다른 프로그램 뒤에서 뜬다.
+        # 그러면 비밀번호를 칠 수가 없다.
+        PLAT.activate()
         res = LoginWindow(self.root, self.settings).show()
         if not res:
             return self.quit()
@@ -662,12 +674,25 @@ class App(object):
         if self.arena:
             return
         info = pet.mon.get("info", {})
+        title = "%s   Lv.%s" % (info.get("name", "?"), info.get("level", "?"))
+        if not PLAT.NATIVE_MENU:
+            # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
+            U.PopupMenu(self.root, [
+                {"text": title, "enabled": False},
+                None,
+                {"text": "정보 보기", "command": lambda: self.pet_open(pet)},
+                {"text": "박스로 거두기",
+                 "command": lambda: self._recall(pet.id)},
+                None,
+                {"text": "포켓몬 관리...", "command": self.open_box},
+                None,
+                {"text": "종료", "command": self.quit},
+            ], event.x_root, event.y_root, width=190)
+            return
         m = tk.Menu(self.root, tearoff=0, bg=U.BG2, fg=U.FG,
                     activebackground=U.BG4, activeforeground=U.FG,
                     bd=0, font=U.FONT_S)
-        m.add_command(label="%s   Lv.%s" % (info.get("name", "?"),
-                                            info.get("level", "?")),
-                      state="disabled")
+        m.add_command(label=title, state="disabled")
         m.add_separator()
         m.add_command(label="정보 보기", command=lambda: self.pet_open(pet))
         m.add_command(label="박스로 거두기", command=lambda: self._recall(pet.id))
@@ -907,6 +932,13 @@ class App(object):
 
 def main():
     config.log("=== 시작 ===")
+    missing = PLAT.missing_requirement()
+    if missing:
+        # 여기서 조용히 죽으면 "눌렀는데 아무 일도 안 난다" 가 된다.
+        # 무엇이 없는지, 무엇을 치면 되는지까지 말해 준다.
+        config.log("필요한 것이 없습니다: %s" % missing)
+        _tell_missing(missing)
+        return
     # 두 개가 같이 돌면 포켓몬이 겹쳐 그려지고 서버도 두 번씩 두드린다.
     # 트레이 아이콘이 '숨겨진 아이콘' 안에 들어가 있어서, 이미 켜져
     # 있는 걸 못 보고 다시 누르기가 아주 쉽다.
@@ -924,3 +956,16 @@ def main():
         raise
     finally:
         single.release()
+
+
+def _tell_missing(msg):
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+        PLAT.before_tk()
+        r = tk.Tk()
+        r.withdraw()
+        messagebox.showerror("포스크탑", msg)
+        r.destroy()
+    except Exception:                                       # noqa: BLE001
+        print(msg)

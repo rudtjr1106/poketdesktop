@@ -19,9 +19,11 @@ import os
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _ROOT)
+sys.path.insert(0, os.path.join(_ROOT, "client"))     # poketdesktop 패키지 자리
 
-from PIL import Image, ImageDraw, ImageFont, ImageGrab   # noqa: E402
+from PIL import Image, ImageDraw, ImageGrab               # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -45,14 +47,13 @@ LINES = [
 
 
 def font(size, bold=False):
-    for name in (("malgunbd.ttf", "malgun.ttf") if bold else ("malgun.ttf",)):
-        p = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", name)
-        if os.path.exists(p):
-            try:
-                return ImageFont.truetype(p, size)
-            except OSError:
-                pass
-    return ImageFont.load_default()
+    """자막 글꼴. 못 찾으면 자막이 통째로 두부(□)가 된다.
+
+    윈도우 글꼴 폴더를 손으로 조립하던 것을 effects 의 공용 헬퍼로
+    옮겼다. 맥에서도 한글이 그려진다.
+    """
+    from poketdesktop.effects import pil_font
+    return pil_font(size, bold)
 
 
 def rounded(im, r):

@@ -18,7 +18,8 @@ from . import ball_menu
 from . import battle_fx as FX
 from . import config
 from . import evolve_fx
-from .fx_layer import FloatText, FxLayer, HpBar
+from .fx_layer import FloatText, HpBar, open_layer
+from . import platform_os as PLAT
 from .ui_common import run_async
 
 APPROACH_GAP = 96          # 붙어 서는 간격 (가로)
@@ -96,13 +97,16 @@ class DesktopBattle(object):
         self.after(500, again)
 
     def begin(self, intro):
-        self.layer = FxLayer(self.root, self.app.overlay.area())
+        # 클릭 통과를 못 걸면 레이어 없이 싸운다 (이펙트와 체력바가 빠진다).
+        # 통과하지 않는 투명 레이어로 화면을 덮는 것보다 낫다.
+        self.layer = open_layer(self.root, self.app.overlay.area())
         self.mine.battling = True
         self.foe.battling = True
         self.saved_home = (self.mine.x, self.mine.y)
         # 야생 쪽은 '야생 OO Lv.5' 이름표가 도트 바로 위에 붙어 있어서
         # 체력바를 그 위로 올려야 겹치지 않는다.
-        self.bars = (HpBar(self.layer), HpBar(self.layer, lift=18))
+        self.bars = ((HpBar(self.layer), HpBar(self.layer, lift=18))
+                     if self.layer else None)
         self.sync_bars(snap=True)
         self.tick_bars()
         self.app.notify(intro or "배틀 시작!")
@@ -250,7 +254,7 @@ class DesktopBattle(object):
         src = self.mine if who == "me" else self.foe
         dst = self.foe if who == "me" else self.mine
 
-        if t == "move" and src and dst:
+        if t == "move" and src and dst and self.layer:
             move = self.find_move(ev)
             self.fx = FX.Effect(self, move, self.center(src), self.center(dst),
                                 lambda: self.after(140, done), who=who)
@@ -361,7 +365,7 @@ class DesktopBattle(object):
             # 쓰러진 도트는 원래 자리로, 새 포켓몬이 앞으로 나선다
             if self.mine:
                 self.mine.battling = False
-                self.mine.win.deiconify()
+                PLAT.show_again(self.mine.win)
                 if self.saved_home:
                     self.mine.x, self.mine.y = self.saved_home
                     self.mine.place()
@@ -558,8 +562,8 @@ class DesktopBattle(object):
         if self.mine:
             self.mine.battling = False
             try:
-                self.mine.win.deiconify()
-            except Exception:
+                PLAT.show_again(self.mine.win)
+            except Exception:                               # noqa: BLE001
                 pass
             if self.saved_home:
                 self.mine.x, self.mine.y = self.saved_home

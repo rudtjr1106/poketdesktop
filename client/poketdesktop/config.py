@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """클라이언트 설정과 저장 위치.
 
-설정/세션/도감 캐시는 전부 %APPDATA%\\poketdesktop 아래에 둔다.
+설정/세션/도감 캐시는 윈도우면 %APPDATA%\\poketdesktop,
+맥이면 ~/Library/Application Support/poketdesktop 아래에 둔다.
 프로그램 폴더에는 아무것도 쓰지 않아서 어디에 두고 실행해도 된다.
 """
 import hashlib
@@ -25,6 +26,10 @@ def data_dir():
     if home:
         os.makedirs(home, exist_ok=True)
         return home
+    from . import platform_os as PLAT
+    d = PLAT.data_dir(APP_NAME)          # 맥은 ~/Library/Application Support
+    if d:
+        return d
     base = os.environ.get("APPDATA") or os.path.expanduser("~")
     d = os.path.join(base, APP_NAME)
     os.makedirs(d, exist_ok=True)
@@ -142,23 +147,27 @@ def clear_session():
 def device_id():
     """이 PC 를 가리키는 고정 문자열.
 
-    윈도우 설치마다 고유한 MachineGuid 를 쓰고, 없으면 MAC 주소로 대체한다.
-    원본을 그대로 보내지 않고 해시해서 보낸다.
+    윈도우는 설치마다 고유한 MachineGuid, 맥은 메인보드의 IOPlatformUUID
+    를 쓰고, 없으면 MAC 주소로 대체한다. 원본을 그대로 보내지 않고
+    해시해서 보낸다.
+
+    **여기서 나오는 값이 바뀌면 그 기기의 자동 로그인이 한 번 깨진다.**
+    맥에서 uuid.getnode() 로 가면 안 되는 이유가 이것이다 - 요즘 맥은
+    고정 MAC 이 없어서 그 값이 실행할 때마다 바뀔 수 있다.
     """
-    raw = None
-    if sys.platform == "win32":
-        try:
-            import winreg
-            k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                               r"SOFTWARE\Microsoft\Cryptography", 0,
-                               winreg.KEY_READ | winreg.KEY_WOW64_64KEY)
-            raw = winreg.QueryValueEx(k, "MachineGuid")[0]
-            winreg.CloseKey(k)
-        except OSError:
-            raw = None
+    from . import platform_os as PLAT
+    raw = PLAT.machine_raw()
     if not raw:
         raw = "%012x" % uuid.getnode()
-    raw += "|" + (os.environ.get("USERNAME") or "")
+    # USERNAME 은 윈도우 변수다. 맥에서는 늘 비어 있어서, 그대로 두면
+    # 한 맥의 두 계정이 같은 기기 ID 를 갖는다.
+    #
+    # **맥에서만** USER 를 덧댄다. 리눅스에도 덧대면 지금 쓰고 있는
+    # 리눅스 사용자의 기기 ID 가 바뀌어서 한 번씩 로그아웃된다.
+    who = os.environ.get("USERNAME") or ""
+    if not who and sys.platform == "darwin":
+        who = os.environ.get("USER") or ""
+    raw += "|" + who
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
 

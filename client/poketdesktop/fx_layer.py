@@ -4,35 +4,41 @@
 바탕화면 위에 아무것도 안 보이는 창을 하나 깔고, 그 위에 기술 이펙트를 그린다.
 포켓몬 도트는 각자 자기 창에 있으므로 이펙트만 이 레이어에 올라간다.
 
-이 창은 **클릭이 그대로 통과한다.** 그냥 투명색만 지정하면 그려진 부분은
+이 창은 **클릭이 그대로 통과한다.** 그냥 투명하게만 만들면 그려진 부분은
 클릭을 먹어버려서, 이펙트가 야생 포켓몬 위를 지나갈 때 오른쪽 클릭이 씹힌다.
-그래서 WS_EX_TRANSPARENT 를 걸어 창 전체를 통과시킨다.
+그래서 창 전체를 통과시킨다 (윈도우는 WS_EX_TRANSPARENT, 맥은 NSWindow 의
+ignoresMouseEvents — platform_os 가 고른다).
+
+**통과시키지 못하면 레이어를 아예 안 만든다.** 통과하지 않는 투명 레이어는
+화면 전체를 덮는 보이지 않는 벽이라, 바탕화면 아이콘도 다른 프로그램도
+못 누르게 된다. 이펙트가 안 보이는 것보다 훨씬 나쁘다. 그래서
+`open_layer()` 가 None 을 돌려주고, 부르는 쪽은 이펙트 없이 진행한다.
 """
 import tkinter as tk
+
+from . import config
+from . import platform_os as PLAT
+from . import ui_common as U
 
 KEY = "#fe01fe"
 
 
 def make_click_through(win):
-    """창 전체를 클릭이 통과하도록 만든다 (윈도우 전용)."""
+    """창 전체를 클릭이 통과하도록 만든다. 실제 방법은 platform_os 가 안다."""
+    return PLAT.make_click_through(win)
+
+
+def open_layer(root, area):
+    """이펙트 레이어를 연다. 클릭이 통과하지 않으면 None 을 돌려준다."""
     try:
-        import ctypes
-        from ctypes import wintypes
-        GWL_EXSTYLE = -20
-        WS_EX_LAYERED = 0x00080000
-        WS_EX_TRANSPARENT = 0x00000020
-        WS_EX_TOOLWINDOW = 0x00000080
-        win.update_idletasks()
-        hwnd = ctypes.windll.user32.GetParent(win.winfo_id()) or win.winfo_id()
-        u = ctypes.windll.user32
-        u.GetWindowLongW.restype = ctypes.c_long
-        style = u.GetWindowLongW(wintypes.HWND(hwnd), GWL_EXSTYLE)
-        u.SetWindowLongW(wintypes.HWND(hwnd), GWL_EXSTYLE,
-                         style | WS_EX_LAYERED | WS_EX_TRANSPARENT
-                         | WS_EX_TOOLWINDOW)
-        return True
-    except Exception:
-        return False
+        layer = FxLayer(root, area)
+    except Exception:                                       # noqa: BLE001
+        return None
+    if not layer.click_through:
+        config.log("이펙트 레이어: 클릭 통과를 못 걸어서 띄우지 않습니다")
+        layer.destroy()
+        return None
+    return layer
 
 
 class FxLayer(object):
@@ -50,13 +56,14 @@ class FxLayer(object):
 
         self.win = tk.Toplevel(root)
         self.win.overrideredirect(True)
-        self.win.attributes("-topmost", True)
-        self.win.attributes("-transparentcolor", KEY)
-        self.win.configure(bg=KEY)
+        bg = PLAT.transparent_window(self.win, KEY)
         self.win.geometry("%dx%d+%d+%d" % (w, h, self.x, self.y))
-        self.cv = tk.Canvas(self.win, width=w, height=h, bg=KEY,
+        # 여기는 도트(그림)가 아니라 선과 글자만 그린다. 맥에서도 캔버스
+        # 벡터는 투명 배경 위에 그대로 그려지므로 Canvas 를 그냥 쓴다.
+        self.cv = tk.Canvas(self.win, width=w, height=h, bg=bg,
                             highlightthickness=0, bd=0)
         self.cv.pack()
+        PLAT.raise_above(self.win)
         self.click_through = make_click_through(self.win)
 
     def to_local(self, sx, sy):
@@ -65,8 +72,11 @@ class FxLayer(object):
 
     def raise_above(self):
         try:
-            self.win.attributes("-topmost", True)
+            PLAT.raise_above(self.win)
             self.win.lift()
+            # 맥은 창을 다시 올리거나 숨겼다 켜면 클릭 통과가 풀린다.
+            # 매 프레임 부르는 곳이 아니라 몇 프레임에 한 번이라 싸다.
+            PLAT.keep_click_through(self.win)
         except Exception:
             pass
 
@@ -91,9 +101,9 @@ class FloatText(object):
         x, y = layer.to_local(sx, sy)
         self.items = [
             layer.cv.create_text(x + 1, y + 1, text=text, fill="#101014",
-                                 font=("맑은 고딕", 10, "bold")),
+                                 font=(U.FAMILY, 10, "bold")),
             layer.cv.create_text(x, y, text=text, fill=color,
-                                 font=("맑은 고딕", 10, "bold")),
+                                 font=(U.FAMILY, 10, "bold")),
         ]
         self.step = 0
         self.jobs = []

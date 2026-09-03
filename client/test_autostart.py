@@ -250,6 +250,13 @@ def t_지우기보다_고치기가_먼저다():
             return True
 
         @staticmethod
+        def supported():
+            # 이 운영체제에서 자동 업데이트를 해도 되는가. 맥에서는
+            # False 다 (릴리스에 윈도우 zip 만 있다). 여기는 윈도우 검사라
+            # True 로 둔다.
+            return True
+
+        @staticmethod
         def cleanup_old():
             순서.append("지움")
 
