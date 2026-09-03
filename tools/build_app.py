@@ -224,6 +224,9 @@ def build():
         "--hidden-import", "common.pokelogic",
         "--hidden-import", "common.version",
         "--hidden-import", "PIL._tkinter_finder",
+        # 인증서 꾸러미. 없으면 업데이트 확인이 SSL 에서 조용히 실패한다.
+        "--hidden-import", "certifi",
+        "--collect-data", "certifi",
         # 맥 전용. 이것들이 빠지면 창이 투명해지지 않고 메뉴 막대에
         # 아이콘이 안 올라간다 - 둘 다 없으면 게임을 조작할 수 없다.
         "--hidden-import", "poketdesktop.platform_mac",
