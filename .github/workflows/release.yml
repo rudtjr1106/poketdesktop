@@ -156,8 +156,15 @@ jobs:
           KEY_PW=$(python3 -c "import secrets;print(secrets.token_hex(24))")
           security create-keychain -p "$KEY_PW" build.keychain
           security default-keychain -s build.keychain
+          # **이 줄이 빠지면 인증서를 넣어도 codesign 이 못 찾는다.**
+          # 기본 키체인으로 정하는 것과 "찾아보는 목록"에 넣는 것은
+          # 다른 일이다. 목록에 없으면 find-identity 도 빈손으로 온다.
+          security list-keychains -d user -s build.keychain \
+                   $(security list-keychains -d user | tr -d '"')
           security unlock-keychain -p "$KEY_PW" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
+          # 잠금 시간을 두지 않는다. 공증을 기다리는 동안 잠기면
+          # 그 뒤 codesign 이 암호를 물으며 멈춰 선다.
+          security set-keychain-settings build.keychain
           echo "$CERT" | base64 --decode > /tmp/cert.p12
           security import /tmp/cert.p12 -k build.keychain -P "$CERT_PW" \
                    -T /usr/bin/codesign
