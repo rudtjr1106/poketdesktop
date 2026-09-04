@@ -64,6 +64,12 @@ jobs:
       - name: 대전 목록 시각 (UTC -> 내 시간대)
         run: python client/test_pvp_when.py
 
+      - name: 기술 설명 (본가 문장)
+        run: python client/test_move_desc.py
+
+      - name: 던지는 몬스터볼 그림
+        run: python client/test_ball_sprite.py
+
       - name: 진화 뒤 도트
         run: python client/test_evolve_sprite.py
 

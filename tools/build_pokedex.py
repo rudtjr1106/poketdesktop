@@ -30,7 +30,7 @@ NEEDED = [
     "growth_rates.csv", "egg_groups.csv", "pokemon_egg_groups.csv",
     "pokemon_moves.csv", "pokemon_evolution.csv", "evolution_triggers.csv",
     "move_meta.csv", "move_meta_stat_changes.csv", "move_meta_ailments.csv",
-    "move_flags.csv", "move_flag_map.csv",
+    "move_flags.csv", "move_flag_map.csv", "move_flavor_text.csv",
     "items.csv", "item_names.csv", "item_categories.csv",
 ]
 
@@ -176,6 +176,26 @@ def build():
     for r in rows("move_names.csv"):
         if as_int(r["local_language_id"]) == KO:
             move_kr[as_int(r["move_id"])] = r["name"]
+
+    # 기술 설명. **본가에 실제로 나오는 문장**을 그대로 쓴다
+    # (move_flavor_text.csv 는 각 판에 실린 설명문이다).
+    #
+    # 같은 기술이라도 판마다 문장이 조금씩 달라서 **가장 최근 판**을 고른다.
+    # 한국어는 6세대(X·Y)부터 있고, 소드·실드까지 826개가 있다. 그 뒤에
+    # 나온 기술(레전드 아르세우스·9세대)은 한국어가 아직 없어서 영어로
+    # 대신한다 - 빈칸으로 두는 것보다는 낫다.
+    move_desc = {}
+    for r in rows("move_flavor_text.csv"):
+        # 이 표만 칸 이름이 language_id 다 (다른 표는 local_language_id).
+        lang = as_int(r["language_id"])
+        if lang not in (KO, EN):
+            continue
+        mid, vg = as_int(r["move_id"]), as_int(r["version_group_id"])
+        # (한국어인가, 판 번호) 로 견준다. 한국어면 무조건 영어를 이긴다.
+        rank = (1 if lang == KO else 0, vg)
+        if mid not in move_desc or rank > move_desc[mid][0]:
+            # 게임 글상자에 맞춘 줄바꿈이라 화면에서는 방해만 된다.
+            move_desc[mid] = (rank, " ".join(r["flavor_text"].split()))
     # 기술 효과 (상태이상, 능력변화, 흡수, 풀죽음, 연속타)
     ailment = dict((as_int(r["id"]), r["identifier"])
                    for r in rows("move_meta_ailments.csv"))
@@ -217,6 +237,7 @@ def build():
             "eff": as_int(r["effect_chance"]),
             "target": as_int(r["target_id"]),
             "flags": sorted(move_flags.get(mid, [])),
+            "desc": (move_desc.get(mid) or (None, ""))[1],
         }
         m = meta.get(mid)
         if m:
