@@ -285,6 +285,10 @@ class Api(object):
     def pvp_ranking(self, limit=50):
         return self._call("GET", "/api/pvp/ranking?limit=%d" % limit)
 
+    def pvp_clear_records(self):
+        """전적을 통째로 지운다. 점수와 승패는 서버에 그대로 남는다."""
+        return self._call("DELETE", "/api/pvp/records")
+
     def pvp_match(self, mid):
         return self._call("GET", "/api/pvp/match/%d" % mid)
 

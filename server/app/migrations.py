@@ -64,8 +64,32 @@ def _refund_heals(conn):
 
 # 순서대로 돈다. 이름은 한 번 정하면 바꾸지 않는다 — 이름이 곧 '이미
 # 돌았다' 는 표시라서, 바꾸면 다시 돈다.
+def _season1_reset(conn):
+    """시즌 1 을 연다. 점수와 랜덤 배틀 승패를 처음으로 되돌린다.
+
+    이 판에서 규칙이 바뀌었다 - 이제 **내가 건 판만** 점수와 승패에
+    들어간다(pvp._settle). 그전 점수는 걸려온 판까지 섞여 있어서 새 규칙과
+    같은 자로 잰 값이 아니다. 그대로 두면 자는 동안 많이 걸린 사람이
+    불리한 채로 시즌 1 을 시작한다.
+
+    **건드리지 않는 것 셋.**
+      · 친구 배틀 전적(fr_*) - 애초에 점수에 안 들어가는 값이다
+      · earned/earned_day - 하루 상금 상한이다. 여기서 지우면 오늘 이미
+        받은 사람이 상한을 한 번 더 받는다
+      · battle_record - 지난 판 목록은 기록이라 남긴다. 지우고 싶은
+        사람은 대전 탭에서 직접 지울 수 있다
+    """
+    n = conn.execute("SELECT COUNT(*) FROM rank_stat").fetchone()[0]
+    conn.execute(
+        "UPDATE rank_stat SET rating=1000, best=1000, games=0, wins=0,"
+        " losses=0, draws=0, streak=0, ranked=0, updated_at=?",
+        (datetime.datetime.now(datetime.timezone.utc).isoformat(),))
+    return "%d명 점수 초기화" % n
+
+
 ONCE = [
     ("0140-refund-heals", _refund_heals),
+    ("0190-season1-reset", _season1_reset),
 ]
 
 

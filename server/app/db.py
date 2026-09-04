@@ -259,6 +259,10 @@ CREATE TABLE IF NOT EXISTS battle_record (
     lead        TEXT NOT NULL DEFAULT '',
     foe_lead    TEXT NOT NULL DEFAULT '',
     match_id    INTEGER,
+    -- 내가 건 판인가. 걸려온 판은 전적에 남기기만 하고 점수·승패·돈을
+    -- 세지 않는다(pvp._settle). 남이 자는 나에게 몇 번 걸었느냐로 내
+    -- 등수가 정해지면 안 된다.
+    started     INTEGER NOT NULL DEFAULT 1,
     ended_at    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_record_user ON battle_record(user_id, id DESC);
@@ -449,6 +453,10 @@ MIGRATIONS = [
      "ALTER TABLE wild_state ADD COLUMN walk_at TEXT"),
     ("pokemon", "luxury",
      "ALTER TABLE pokemon ADD COLUMN luxury INTEGER NOT NULL DEFAULT 0"),
+    # 옛 행은 전부 1 로 둔다. 그때는 걸려온 판도 점수에 들어갔으니
+    # '내가 건 것' 과 구분이 없었다. 어차피 시즌 1 로 점수를 초기화한다.
+    ("battle_record", "started",
+     "ALTER TABLE battle_record ADD COLUMN started INTEGER NOT NULL DEFAULT 1"),
 ]
 
 

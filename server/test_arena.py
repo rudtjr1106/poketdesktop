@@ -116,7 +116,7 @@ def main():
         chk("남은 도전 횟수를 알려준다",
             (r.get("fight") or {}).get("left") is not None, r.get("fight"))
 
-        print("\n=== 랜덤 배틀은 서로 점수를 주고받는다 ===")
+        print("\n=== 랜덤 배틀 점수는 건 쪽만 움직인다 ===")
         # **여기서 계정을 하나 더 만든다.** 계정이 셋뿐이면 b 가 앞에서
         # a·c 둘 다와 붙어 버리는 경우가 생기고, 그러면 짝 쿨다운(30분)에
         # 걸려 "붙을 상대가 없습니다" 로 끝난다. 앞의 랜덤 배틀이 누구를
@@ -131,14 +131,24 @@ def main():
             chk("랜덤 배틀 성사 (%s)" % s, False, rb2)
         else:
             da, dbv = rb2["a"]["delta"], rb2["b"]["delta"]
-            chk("랜덤은 점수가 움직인다", da != 0 or dbv != 0, (da, dbv))
-            chk("한쪽이 얻으면 한쪽이 잃는다", da * dbv < 0, (da, dbv))
-            chk("주고받는 크기가 같다", abs(da + dbv) <= 1, (da, dbv))
+            chk("건 쪽은 점수가 움직인다", da != 0, da)
+            # **걸려온 쪽은 그대로 둔다.** 상대는 접속해 있지 않아도 붙는
+            # 구조라(자는 사람의 파티를 가져와 돌린다), 걸려온 판까지
+            # 점수에 넣으면 남이 나에게 몇 번 걸었느냐로 내 등수가 정해진다.
+            chk("걸려온 쪽은 점수가 안 움직인다", dbv == 0, (da, dbv))
+            chk("걸려온 쪽 점수는 그대로", rb2["b"]["rating"] == 1000, rb2["b"])
             chk("건 쪽도 받은 쪽도 랜덤으로 기록된다",
                 rb2.get("kind") == "random", rb2.get("kind"))
-            chk("자던 쪽 점수도 깎인다 (사용자가 정한 대로)",
-                rb2["b"]["rating"] != 1000 or rb2["b"]["delta"] != 0,
-                rb2["b"])
+            chk("started 로 구분된다",
+                rb2["a"]["started"] is True and rb2["b"]["started"] is False,
+                (rb2["a"].get("started"), rb2["b"].get("started")))
+            # 돈도 마찬가지다. 이긴 판만, 그리고 건 쪽만.
+            chk("걸려온 쪽은 상금이 없다", rb2["b"]["reward"] == 0,
+                rb2["b"]["reward"])
+            chk("건 쪽은 이기면 500, 지면 0",
+                rb2["a"]["reward"] == (500 if rb2["a"]["result"] == "win"
+                                       else 0),
+                (rb2["a"]["result"], rb2["a"]["reward"]))
 
         print("\n=== 차단하면 안 붙는다 ===")
         call("POST", "/api/friends/%d/block" % ID_C, {}, at)

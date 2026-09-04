@@ -18,6 +18,7 @@ import tkinter as tk
 
 from . import ui_common as U
 from . import ui_loading
+from .ui_box import confirm
 from .ui_common import run_async
 
 W, H = 900, 660
@@ -82,6 +83,8 @@ class PvpWindow(object):
 
         U.ghost_button(inner, "새로고침", self.reload,
                        height=32).pack(side="right", pady=15)
+        U.ghost_button(inner, "기록 지우기", self._clear,
+                       height=32).pack(side="right", padx=(0, 8), pady=15)
         U.ghost_button(inner, "랜덤 배틀", self._random,
                        height=32).pack(side="right", padx=(0, 8), pady=15)
         tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
@@ -200,6 +203,11 @@ class PvpWindow(object):
         if new:
             tk.Label(top, text="NEW", bg=box["bg"], fg=U.ACCENT,
                      font=U.FONT_XS).pack(side="left", padx=(8, 0))
+        # 걸려온 판은 점수·승패·돈에 안 들어간다. 목록에서도 그렇게
+        # 보여야 "왜 이겼는데 점수가 그대로지" 가 안 된다.
+        if not r.get("started", True):
+            tk.Label(top, text="걸려온 판", bg=box["bg"], fg=U.FG_FAINT,
+                     font=U.FONT_XS).pack(side="left", padx=(8, 0))
 
         bits = [KIND.get(r.get("kind"), r.get("kind") or ""),
                 _when(r.get("at")),
@@ -210,6 +218,8 @@ class PvpWindow(object):
             bits.append("점수 %+d" % d)
         if r.get("reward"):
             bits.append("%s원" % format(r["reward"], ","))
+        if not r.get("started", True):
+            bits.append("점수·승패에 안 들어감")
         tk.Label(left, text="  ·  ".join(b for b in bits if b), bg=box["bg"],
                  fg=U.FG_FAINT, font=U.FONT_XS).pack(anchor="w", pady=(4, 0))
 
@@ -247,6 +257,29 @@ class PvpWindow(object):
         self.say("상대를 찾는 중...")
         self.app.pvp_random()
         self.root.after(2500, self.reload)
+
+    def _clear(self):
+        """전적을 통째로 지운다.
+
+        **점수와 승패는 그대로 남는다.** 이건 목록일 뿐이고 점수는 따로
+        센다 - 지운다고 등수가 오르면 진 판만 골라 지우는 사람이 나온다.
+        묻는 창에 그 말을 적어 둔다.
+        """
+        if not self.rows:
+            return self.say("지울 기록이 없습니다.", U.FG_DIM)
+        if not confirm(self.root, "기록 지우기",
+                       "대전 기록 %d줄을 지웁니다.\n\n"
+                       "점수와 승패는 그대로 남습니다. 목록만 비워집니다."
+                       % len(self.rows), ok_text="지우기"):
+            return
+        self.say("지우는 중...")
+
+        def done(r, err):
+            if err:
+                return self.say(getattr(err, "message", str(err)), U.DANGER)
+            self.say("%d줄을 지웠습니다." % (r or {}).get("removed", 0))
+            self.reload()
+        run_async(self.root, self.app.api.pvp_clear_records, done)
 
     # ---------------- 끝 ----------------
     def focus(self):
