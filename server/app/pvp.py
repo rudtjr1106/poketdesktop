@@ -28,8 +28,12 @@ from . import config, db, deps, items
 
 # ---- 상금 ----
 # 경험치는 주지 않는다(사용자가 정했다). 돈만 준다.
-# 진 쪽도 조금 준다 - 아무것도 못 받으면 지고 나서 다시 걸 이유가 없다.
-REWARD = {"win": 1000, "draw": 500, "lose": 300}
+#
+# **이긴 판만 준다. 그리고 내가 건 판만 준다.**
+# 예전에는 진 쪽도 300원을 받았고, 걸려온 쪽도 자는 사이에 돈이 들어왔다.
+# 그러면 아무것도 안 하고 누워 있는 편이 이득인 구간이 생긴다 - 걸어야
+# 벌리는 쪽이 맞다.
+REWARD = {"win": 500, "draw": 0, "lose": 0}
 
 # 친구 배틀은 절반. 지목해서 붙는 구조라 부계정끼리 서로 져 주면
 # 돈이 무한히 나온다. 아래 하루 상한과 같이 쓴다.
@@ -41,6 +45,10 @@ FRIEND_RATE = 0.5
 DAILY_CAP = 6000
 
 # ---- 점수 ----
+# 시즌. 올릴 때는 migrations 에 초기화 한 벌을 같이 넣어야 한다
+# (숫자만 올리면 지난 시즌 점수가 그대로 남는다).
+SEASON = 1
+
 # 흔히 쓰는 값. 32면 한 판에 최대 32점이 움직인다.
 K = 32
 BASE_RATING = 1000
@@ -160,8 +168,10 @@ def run_match(a_uid, b_uid, kind="random", seed=None):
     a_name, b_name = _name(a_uid), _name(b_uid)
     row_a, row_b = _rating_row(a_uid), _rating_row(b_uid)
 
+    # a 가 건 쪽이다(run_match 를 부르는 자리에서 늘 그렇게 넘긴다).
+    # b 는 걸려온 쪽이라 상금이 없다 - 계산도 하지 않는다.
     pay_a, day, used_a = _reward_for(a_uid, row_a, kind, res_a)
-    pay_b, _d, used_b = _reward_for(b_uid, row_b, kind, res_b)
+    pay_b, used_b = 0, 0
 
     mid = db.run(
         "INSERT INTO pvp_match (kind, a_id, b_id, a_name, b_name, winner,"
@@ -180,7 +190,7 @@ def run_match(a_uid, b_uid, kind="random", seed=None):
                     mid, row_b["rating"])
     fin_b = _settle(b_uid, row_b, a_uid, a_name, kind, res_b, pay_b, day,
                     used_b, out["turns"], left_b, left_a, lead_b, lead_a,
-                    mid, row_a["rating"])
+                    mid, row_a["rating"], started=False)
 
     return {"matchId": mid, "winner": winner_id, "turns": out["turns"],
             "kind": kind, "seed": seed, "a": fin_a, "b": fin_b}
@@ -194,26 +204,47 @@ def _left(events, side, total):
 
 
 def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
-            turns, my_left, foe_left, lead, foe_lead, mid, foe_rating):
-    """한 사람 몫의 뒤처리 — 돈, 전적, 점수."""
-    if pay > 0:
-        items.money_add(uid, pay)
+            turns, my_left, foe_left, lead, foe_lead, mid, foe_rating,
+            started=True):
+    """한 사람 몫의 뒤처리 — 돈, 전적, 점수.
 
-    # 점수는 랜덤 배틀만 움직인다. 친구 배틀은 지목해서 붙는 구조라
-    # 부계정끼리 승패를 몰아줄 수 있다. 전적에는 남기되 점수는 그대로 둔다.
+    started 는 **내가 걸었는가**다. 걸려온 쪽은 전적에 남기기만 하고
+    점수도 승패도 돈도 건드리지 않는다.
+
+    상대는 접속해 있지 않아도 붙는다(자는 사람의 파티를 가져와 돌린다).
+    그래서 걸려온 판까지 점수에 넣으면, 자는 동안 남이 몇 번을 걸었느냐로
+    내 점수가 정해진다 - 내가 한 일이 아닌 것으로 등수가 오르내린다.
+    전적에는 남겨서 '누가 나에게 걸었고 어떻게 됐는지' 는 볼 수 있게 한다.
+    """
+    if started and pay > 0:
+        items.money_add(uid, pay)
+    if not started:
+        pay = 0
+
+    # 점수는 **내가 건 랜덤 배틀**만 움직인다. 친구 배틀은 지목해서 붙는
+    # 구조라 부계정끼리 승패를 몰아줄 수 있다. 전적에는 남기되 점수는
+    # 그대로 둔다.
     rating = row["rating"]
     delta = 0
-    if kind == "random":
+    counts = started and kind == "random"
+    if counts:
         exp = _expected(row["rating"], foe_rating)
         delta = int(round(K * (_score(result) - exp)))
         rating = max(0, row["rating"] + delta)
 
     db.run("INSERT INTO battle_record (user_id, foe_id, foe_name, kind,"
            " result, rating, delta, reward, turns, my_left, foe_left,"
-           " lead, foe_lead, match_id, ended_at)"
-           " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+           " lead, foe_lead, match_id, started, ended_at)"
+           " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
            (uid, foe_id, foe_name, kind, result, rating, delta, pay, turns,
-            my_left, foe_left, lead, foe_lead, mid, _iso()))
+            my_left, foe_left, lead, foe_lead, mid, 1 if started else 0,
+            _iso()))
+
+    if not started:
+        # 걸려온 판은 여기서 끝. 점수·승패·하루 상한 어느 것도 안 건드린다.
+        return {"userId": uid, "result": result, "reward": 0,
+                "rating": rating, "delta": 0, "started": False,
+                "myLeft": my_left, "foeLeft": foe_left}
 
     won = 1 if result == "win" else 0
     lost = 1 if result == "lose" else 0
@@ -236,7 +267,7 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
             (won, lost, drew, day, used + pay, _iso(), uid))
 
     return {"userId": uid, "result": result, "reward": pay,
-            "rating": rating, "delta": delta,
+            "rating": rating, "delta": delta, "started": True,
             "myLeft": my_left, "foeLeft": foe_left}
 
 
@@ -429,8 +460,11 @@ def records(uid, limit=30):
         fid = r["foe_id"]
         if fid is not None and fid not in why:
             why[fid] = can_fight(uid, fid)
-        out.append({"foe": r["foe_name"], "foeId": fid,
+        out.append({"id": r["id"], "foe": r["foe_name"], "foeId": fid,
                     "kind": r["kind"], "result": r["result"],
+                    # 내가 건 판인가. 걸려온 판은 점수·승패·돈에 안 들어가서
+                    # 화면에서도 그렇게 보여야 한다.
+                    "started": bool(r["started"]),
                     "rating": r["rating"], "delta": r["delta"],
                     "reward": r["reward"], "turns": r["turns"],
                     "myLeft": r["my_left"], "foeLeft": r["foe_left"],
@@ -442,6 +476,20 @@ def records(uid, limit=30):
     return out
 
 
+def clear_records(uid, rid=None):
+    """전적을 지운다. rid 를 주면 한 줄만.
+
+    **점수와 승패는 그대로 둔다.** 이건 목록일 뿐이고, 점수(rank_stat)는
+    따로 센다. 지운다고 등수가 오르면 진 판만 골라 지우는 사람이 나온다.
+
+    지운 줄 수를 돌려준다.
+    """
+    if rid is not None:
+        return db.run("DELETE FROM battle_record WHERE id=? AND user_id=?",
+                      (rid, uid)).rowcount
+    return db.run("DELETE FROM battle_record WHERE user_id=?", (uid,)).rowcount
+
+
 def summary(uid):
     r = _rating_row(uid)
     return {"rating": r["rating"], "games": r["games"], "wins": r["wins"],
@@ -451,7 +499,8 @@ def summary(uid):
             "best": r["best"], "ranked": bool(r["ranked"]),
             "placementLeft": max(0, PLACEMENT - r["games"]),
             "earnedToday": r["earned"] if r["earned_day"] == _today() else 0,
-            "dailyCap": DAILY_CAP}
+            "dailyCap": DAILY_CAP, "season": SEASON,
+            "winReward": REWARD["win"]}
 
 
 def ranking(limit=50, uid=None):

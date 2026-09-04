@@ -79,21 +79,32 @@ def main():
         }.__contains__((r["a"]["result"], r["b"]["result"])),
             (r["a"]["result"], r["b"]["result"]))
 
-        print("\n=== 돈 ===")
+        print("\n=== 돈 — 건 쪽이 이겼을 때만 ===")
         pa, pb = r["a"]["reward"], r["b"]["reward"]
-        chk("이긴 쪽이 1000원", (pa if r["a"]["result"] == "win" else pb) == 1000,
-            (pa, pb))
-        chk("진 쪽도 300원은 받는다",
-            (pb if r["a"]["result"] == "win" else pa) in (300, 500), (pa, pb))
-        chk("실제 잔액에 반영됐다", money(a) == pa and money(b) == pb,
-            (money(a), pa, money(b), pb))
+        # a 가 건 쪽이다. 이기면 500, 지면 0.
+        want_a = 500 if r["a"]["result"] == "win" else 0
+        chk("건 쪽은 이기면 500원, 지면 0원", pa == want_a, (r["a"]["result"], pa))
+        # **걸려온 쪽은 한 푼도 없다.** 자는 사이에 돈이 들어오면
+        # 아무것도 안 하는 편이 이득인 구간이 생긴다.
+        chk("걸려온 쪽은 이기든 지든 0원", pb == 0, (r["b"]["result"], pb))
+        chk("실제 잔액에 반영됐다", money(a) == pa and money(b) == 0,
+            (money(a), pa, money(b)))
 
-        print("\n=== 점수 ===")
-        chk("점수가 움직였다", r["a"]["delta"] != 0 or r["a"]["result"] == "draw",
-            r["a"]["delta"])
-        chk("두 사람의 점수 변동이 상쇄된다",
-            abs(r["a"]["delta"] + r["b"]["delta"]) <= 1,
-            (r["a"]["delta"], r["b"]["delta"]))
+        print("\n=== 점수 — 건 쪽만 ===")
+        chk("건 쪽 점수가 움직였다",
+            r["a"]["delta"] != 0 or r["a"]["result"] == "draw", r["a"]["delta"])
+        # 걸려온 쪽은 남이 건 것으로 등수가 오르내리면 안 된다.
+        chk("걸려온 쪽은 점수가 안 움직인다", r["b"]["delta"] == 0, r["b"]["delta"])
+        chk("걸려온 쪽 점수는 그대로",
+            pvp.summary(b)["rating"] == pvp.BASE_RATING, pvp.summary(b))
+        chk("걸려온 쪽은 판수도 안 는다", pvp.summary(b)["games"] == 0,
+            pvp.summary(b)["games"])
+        chk("걸려온 쪽은 승패도 안 는다",
+            pvp.summary(b)["wins"] + pvp.summary(b)["losses"] == 0,
+            pvp.summary(b))
+        chk("started 로 구분된다",
+            r["a"]["started"] is True and r["b"]["started"] is False,
+            (r["a"]["started"], r["b"]["started"]))
         sa = pvp.summary(a)
         chk("배치가 남아 있다 (5판 중 1판)", sa["placementLeft"] == 4,
             sa["placementLeft"])
@@ -124,6 +135,12 @@ def main():
         chk("전적이 한 줄 남았다", len(rec) == 1, len(rec))
         chk("상대 이름이 남았다", rec[0]["foe"] == "zz_pvp_b", rec[0])
         chk("받은 돈이 남았다", rec[0]["reward"] == pa, rec[0])
+        chk("내가 건 판으로 남는다", rec[0]["started"] is True, rec[0])
+        # 점수엔 안 들어가도 **목록에는 남아야** 누가 걸어왔는지 볼 수 있다.
+        recb = pvp.records(b)
+        chk("걸려온 쪽도 목록에는 남는다", len(recb) == 1, len(recb))
+        chk("걸려온 판으로 표시된다", recb[0]["started"] is False, recb[0])
+        chk("걸려온 판은 상금 0 으로 남는다", recb[0]["reward"] == 0, recb[0])
 
         print("\n=== 배치 5판 ===")
         for i in range(4):
@@ -132,9 +149,13 @@ def main():
         chk("5판을 채웠다", sa["games"] == 5, sa["games"])
         chk("랭킹에 올랐다", sa["ranked"], sa)
         board = pvp.ranking()
-        chk("순위표에 두 명이 보인다", len(board) == 2, board)
-        chk("점수 높은 쪽이 위",
-            len(board) < 2 or board[0]["rating"] >= board[1]["rating"], board)
+        # b 는 걸려오기만 했으니 한 판도 안 친 것으로 친다.
+        chk("건 사람만 순위표에 오른다", [x["name"] for x in board] == ["zz_pvp_a"],
+            board)
+        chk("걸려온 쪽은 배치가 안 찬다", pvp.summary(b)["games"] == 0,
+            pvp.summary(b)["games"])
+        chk("시즌 번호가 실려 온다", pvp.summary(a)["season"] == pvp.SEASON,
+            pvp.summary(a).get("season"))
 
         print("\n=== 하루 상한 ===")
         before = money(a)
@@ -156,13 +177,18 @@ def main():
         chk("친구 배틀은 점수를 건드리지 않는다",
             fr["a"]["delta"] == 0 and fr["b"]["delta"] == 0,
             (fr["a"]["delta"], fr["b"]["delta"]))
-        chk("친구 배틀 상금은 절반",
-            max(fr["a"]["reward"], fr["b"]["reward"]) == 500,
-            (fr["a"]["reward"], fr["b"]["reward"]))
+        chk("친구 배틀도 건 쪽만, 이겼으면 절반인 250원",
+            fr["a"]["reward"] == (250 if fr["a"]["result"] == "win" else 0),
+            (fr["a"]["result"], fr["a"]["reward"]))
+        chk("친구 배틀도 걸려온 쪽은 0원", fr["b"]["reward"] == 0,
+            fr["b"]["reward"])
         sd = pvp.summary(d1)
         chk("배치 판수에는 안 들어간다", sd["games"] == 0, sd["games"])
         chk("친구 전적에는 남는다",
             sd["friendWins"] + sd["friendLosses"] + sd["friendDraws"] == 1, sd)
+        se = pvp.summary(e1)
+        chk("친구 배틀도 걸려온 쪽은 전적에 안 남는다",
+            se["friendWins"] + se["friendLosses"] + se["friendDraws"] == 0, se)
 
         print("\n=== 못 붙이는 경우 ===")
         f1 = mkuser("zz_pvp_f", 0)
@@ -171,6 +197,28 @@ def main():
             chk("포켓몬이 없으면 거부한다", False, "예외가 안 났다")
         except ValueError:
             chk("포켓몬이 없으면 거부한다", True)
+
+        print("\n=== 전적 지우기 ===")
+        rating_before = pvp.summary(a)["rating"]
+        games_before = pvp.summary(a)["games"]
+        n_rec = len(pvp.records(a, 100))
+        chk("지우기 전에 전적이 있다", n_rec > 1, n_rec)
+        one = pvp.records(a, 100)[0]
+        chk("한 줄만 지울 수 있다", pvp.clear_records(a, one["id"]) == 1)
+        chk("그 줄이 사라졌다", len(pvp.records(a, 100)) == n_rec - 1,
+            len(pvp.records(a, 100)))
+        chk("남의 전적은 못 지운다", pvp.clear_records(b, one["id"]) == 0)
+        removed = pvp.clear_records(a)
+        chk("통째로 지울 수 있다", removed == n_rec - 1, removed)
+        chk("전적이 비었다", pvp.records(a, 100) == [], pvp.records(a, 100))
+        # **점수는 목록과 따로 센다.** 지운다고 등수가 오르면 진 판만
+        # 골라 지우는 사람이 나온다.
+        chk("지워도 점수는 그대로", pvp.summary(a)["rating"] == rating_before,
+            (rating_before, pvp.summary(a)["rating"]))
+        chk("지워도 판수는 그대로", pvp.summary(a)["games"] == games_before,
+            (games_before, pvp.summary(a)["games"]))
+        chk("지워도 순위표에 그대로 있다",
+            any(x["name"] == "zz_pvp_a" for x in pvp.ranking()), pvp.ranking())
 
         print("\n=== 로그 정리 ===")
         n0 = db.q1("SELECT COUNT(*) c FROM pvp_match")["c"]
@@ -183,8 +231,9 @@ def main():
         pvp.prune(days=0)
         n2 = db.q1("SELECT COUNT(*) c FROM pvp_match")["c"]
         chk("양쪽이 다 본 판은 지운다", n2 < n1, (n1, n2))
-        chk("전적은 그대로 남는다", len(pvp.records(a, 100)) >= 5,
-            len(pvp.records(a, 100)))
+        # a 의 전적은 위에서 통째로 지웠다. b 쪽으로 확인한다.
+        chk("로그를 지워도 전적은 그대로 남는다", len(pvp.records(b, 100)) >= 5,
+            len(pvp.records(b, 100)))
     finally:
         for n in ("zz_pvp_a", "zz_pvp_b", "zz_pvp_c", "zz_pvp_d",
                   "zz_pvp_e", "zz_pvp_f"):

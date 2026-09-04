@@ -20,6 +20,7 @@ from .ui_box import BoxWindow
 from .ui_dex import DexWindow
 from .ui_friends import FriendsWindow
 from .ui_pvp import PvpWindow
+from .ui_rank import RankWindow
 from .ui_settings import SettingsWindow
 from .ui_shop import ShopWindow
 
@@ -33,6 +34,7 @@ TABS = [
     ("dex", "도감", DexWindow, False),
     ("friends", "친구", FriendsWindow, False),
     ("pvp", "대전", PvpWindow, False),
+    ("rank", "랭킹", RankWindow, False),
     ("settings", "설정", SettingsWindow, False),
 ]
 

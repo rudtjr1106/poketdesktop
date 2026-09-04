@@ -93,8 +93,24 @@ def records(limit: int = 30, ctx=Depends(deps.current)):
             "records": pvp.records(uid, max(1, min(100, limit)))}
 
 
+@router.delete("/api/pvp/records")
+def clear_records(ctx=Depends(deps.current)):
+    """전적을 통째로 지운다. 점수와 승패는 그대로 남는다."""
+    uid = ctx["user"]["id"]
+    return {"ok": True, "removed": pvp.clear_records(uid)}
+
+
+@router.delete("/api/pvp/records/{rid}")
+def clear_record(rid: int, ctx=Depends(deps.current)):
+    uid = ctx["user"]["id"]
+    if not pvp.clear_records(uid, rid):
+        raise HTTPException(404, "그런 기록이 없습니다.")
+    return {"ok": True, "removed": 1}
+
+
 @router.get("/api/pvp/ranking")
 def ranking(limit: int = 50, ctx=Depends(deps.current)):
     uid = ctx["user"]["id"]
     return {"ranking": pvp.ranking(max(1, min(100, limit)), uid),
-            "me": pvp.summary(uid)}
+            "me": pvp.summary(uid), "season": pvp.SEASON,
+            "placement": pvp.PLACEMENT}
