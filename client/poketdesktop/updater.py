@@ -91,7 +91,9 @@ def parent_dir():
 def check(timeout=TIMEOUT):
     """새 버전이 있으면 정보를, 없으면 None.
 
-    깃허브 API 는 로그인 없이 시간당 60번까지 된다. 켤 때 한 번만 부르므로
+    깃허브 API 는 로그인 없이 시간당 60번까지 된다. 이걸 부르는 자리는
+    둘뿐이다 - 켤 때 한 번(app.check_update), 켜 둔 동안 한 시간마다 한 번
+    (app.UPDATE_EVERY_HOURS). 한 사람이 한 시간에 많아야 한두 번이라
     넉넉하다.
     """
     import urllib.request
