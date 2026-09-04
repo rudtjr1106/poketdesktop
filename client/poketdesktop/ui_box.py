@@ -398,6 +398,21 @@ class BoxWindow(object):
         self.d_moves = tk.Frame(p, bg=U.BG2)
         self.d_moves.pack(fill="x")
 
+        # 기술을 누르면 여기에 설명이 뜬다. 본가에 실제로 실린 문장이다
+        # (도감의 desc — tools/build_pokedex.py 가 PokeAPI 에서 가져온다).
+        # 칸에는 타입과 위력만 적혀 있어서 무엇을 하는 기술인지는 알 수 없다.
+        self.d_move_box = tk.Frame(p, bg="#101623", highlightthickness=2,
+                                   highlightbackground=U.LINE)
+        self.d_move_stat = tk.Label(self.d_move_box, text="", bg="#101623",
+                                    fg=U.ACCENT, font=U.FONT_XS, anchor="w")
+        self.d_move_stat.pack(fill="x", padx=11, pady=(7, 0))
+        self.d_move_desc = tk.Label(self.d_move_box, text="", bg="#101623",
+                                    fg=U.FG_DIM, font=U.FONT_XS, anchor="w",
+                                    justify="left", wraplength=DETAIL_W - 46)
+        self.d_move_desc.pack(fill="x", padx=11, pady=(2, 8))
+        self._move_cells = []
+        self._move_pick = None
+
     # ---------------- 바닥 ----------------
     def _bottom(self):
         tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x", side="bottom")
@@ -766,6 +781,7 @@ class BoxWindow(object):
 
         for w in self.d_moves.winfo_children():
             w.destroy()
+        self._move_cells = []
         moves = info.get("moves", [])
         for i, mv in enumerate(moves[:4]):
             md = None
@@ -773,18 +789,79 @@ class BoxWindow(object):
                 md = next((x for x in (dex.moves or {}).values()
                            if x.get("kr") == mv), None)
             col = U.TYPE_COLOR.get((md or {}).get("type"), U.BG3)
-            cell = tk.Frame(self.d_moves, bg=col)
+            cell = tk.Frame(self.d_moves, bg=col, highlightthickness=2,
+                            highlightbackground=col, cursor="hand2")
             cell.grid(row=i // 2, column=i % 2, sticky="nsew", padx=2, pady=2)
-            tk.Label(cell, text=mv, bg=col, fg="#14141a",
-                     font=U.FONT_B).pack(pady=(4, 0))
+            name = tk.Label(cell, text=mv, bg=col, fg="#14141a",
+                            font=U.FONT_B, cursor="hand2")
+            name.pack(pady=(4, 0))
             sub = "%s · %s" % (dex.type_name((md or {}).get("type")) if dex else "",
                                (md or {}).get("power") or "변화")
-            tk.Label(cell, text=sub, bg=col, fg="#2a2a35",
-                     font=U.FONT_XS).pack(pady=(0, 4))
+            note = tk.Label(cell, text=sub, bg=col, fg="#2a2a35",
+                            font=U.FONT_XS, cursor="hand2")
+            note.pack(pady=(0, 4))
+            # 칸 안쪽 글씨에도 같이 걸어야 한다. 클릭은 글씨가 먼저 받는다.
+            for w in (cell, name, note):
+                w.bind("<Button-1>",
+                       lambda _e, n=i, d=md, t=mv: self.pick_move(n, d, t))
+            self._move_cells.append((cell, col))
         for c in (0, 1):
             self.d_moves.grid_columnconfigure(c, weight=1)
+        # 포켓몬을 바꾸면 아까 고른 기술의 설명이 남아 있으면 안 된다.
+        self.pick_move(None, None, None)
 
         self.load_art(m)
+
+    def pick_move(self, idx, md, name):
+        """기술 하나를 골라 설명을 띄운다. idx 가 None 이면 접는다."""
+        for i, (cell, col) in enumerate(self._move_cells):
+            try:
+                cell.configure(highlightbackground=U.FG if i == idx else col)
+            except Exception:                               # noqa: BLE001
+                pass
+        self._move_pick = idx
+        if idx is None:
+            self.d_move_box.pack_forget()
+            return
+        md = md or {}
+        bits = [name or "?"]
+        power = md.get("power")
+        bits.append("위력 %d" % power if power else "변화 기술")
+        acc = md.get("acc")
+        # 명중률이 없는 기술이 있다(반드시 맞는다). 0 을 그대로 적으면
+        # 절대 안 맞는 것처럼 보인다.
+        bits.append("명중 %d" % acc if acc else "명중 —")
+        if md.get("pp"):
+            bits.append("PP %d" % md["pp"])
+        self.d_move_stat.configure(text="  ·  ".join(bits))
+        self.d_move_desc.configure(
+            text=md.get("desc") or "설명이 아직 없는 기술입니다.")
+        self.d_move_box.pack(fill="x", pady=(7, 0))
+        self._show_move_box()
+
+    def _show_move_box(self):
+        """설명이 화면 밖에 뜨면 누른 보람이 없다. 보이는 데까지 굴린다.
+
+        기술 칸은 상세 칸 맨 아래라, 설명이 붙으면 그만큼 더 아래로
+        밀려난다. 노트북처럼 세로가 짧은 화면에서는 눌러도 아무 일도
+        안 일어난 것처럼 보인다.
+        """
+        try:
+            self.d_canvas.update_idletasks()
+            self.d_canvas.configure(scrollregion=self.d_canvas.bbox("all"))
+            total = max(1, self.d_canvas.bbox("all")[3])
+            view = self.d_canvas.winfo_height()
+            if total <= view:
+                return          # 다 보인다. 굴릴 것이 없다
+            bottom = self.d_move_box.winfo_y() + self.d_move_box.winfo_height()
+            if bottom <= self.d_canvas.canvasy(0) + view:
+                return          # 이미 보인다. 건드리면 오히려 튄다
+            # 여유를 넉넉히 둔다. 딱 맞춰 굴리면 바깥 여백(pady) 때문에
+            # 마지막 줄이 한 줄 잘린 채로 걸린다.
+            self.d_canvas.yview_moveto(
+                max(0.0, (bottom - view + 22) / float(total)))
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def load_art(self, m):
         self.stop_anim()

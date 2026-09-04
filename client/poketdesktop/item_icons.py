@@ -67,6 +67,27 @@ def raw(api, item_id):
     return path
 
 
+def pil(item_id):
+    """받아 둔 그림을 PIL(RGBA) 로. 없으면 None.
+
+    photo() 는 tk 이미지라 tk 스레드에서만 쓸 수 있고, 돌리거나 색을
+    섞을 수도 없다. 몬스터볼을 던지는 연출은 그림을 기울여 가며 써야
+    해서(effects.ball_frames) PIL 그대로가 필요하다.
+
+    **네트워크를 타지 않는다.** 이미 받아 둔 것만 준다 - 던지는 순간에
+    서버를 기다리면 그 사이 화면이 얼어붙는다. 아직 없으면 None 을
+    돌려주고, 부르는 쪽이 직접 그린 볼로 넘어간다.
+    """
+    p = local_path(item_id)
+    if not p:
+        return None
+    try:
+        from PIL import Image
+        return Image.open(p).convert("RGBA")
+    except Exception:                                       # noqa: BLE001
+        return None
+
+
 def photo(item_id, size=28):
     """tk 에 붙일 이미지. 없으면 None. **tk 스레드에서 부를 것.**
 

@@ -13,7 +13,7 @@
 import random
 import tkinter as tk
 
-from . import ball_menu, config, effects, sprite_cache, sprites
+from . import ball_menu, config, effects, item_icons, sprite_cache, sprites
 from . import platform_os as PLAT
 from . import walk_cache
 from . import ui_common as U
@@ -247,10 +247,17 @@ class BallThrow(object):
         bg = PLAT.transparent_window(self.win, hexkey)
         self.view = PLAT.SpriteView(self.win, bg, 26, 26)
         self.label = self.view.widget
-        self.shake_frames = self.view.frames(
-            effects.ball_shake_frames(26, key, ball), key)
-        self.open_photo = self.view.frames(
-            [effects.ball_image(26, key, open_top=True, ball=ball)], key)[0]
+        # 가방·상점에 뜨는 공식 그림을 그대로 쓴다. 아직 안 받아 뒀으면
+        # (그림은 볼을 처음 보는 순간 뒤에서 받아 둔다) 직접 그린 볼로
+        # 넘어간다 - 던지는 순간에 서버를 기다리면 화면이 얼어붙는다.
+        sprite = item_icons.pil(ball)
+        if sprite is not None:
+            shake, open_img = effects.sprite_ball_frames(sprite, 26, key)
+        else:
+            shake = effects.ball_shake_frames(26, key, ball)
+            open_img = effects.ball_image(26, key, open_top=True, ball=ball)
+        self.shake_frames = self.view.frames(shake, key)
+        self.open_photo = self.view.frames([open_img], key)[0]
         # 반짝임은 볼보다 크다(52px). show() 가 창 크기를 알아서 맞춘다.
         self.sparkles = self.view.frames(effects.sparkle_frames(52, 6, key), key)
         self.view.show(self.shake_frames[0])
@@ -342,6 +349,27 @@ class WildController(object):
         self.hint = None
         self._job = None
         self._expire_job = None
+        self._balls_fetched = set()
+
+    def set_ball_options(self, opts):
+        """던질 수 있는 볼 목록을 받아 두고, 그림을 미리 받아 둔다.
+
+        던지는 순간에는 이미 받아 둔 그림만 쓴다(item_icons.pil). 그때
+        서버를 기다리면 그 사이 화면이 얼어붙기 때문이다. 그래서 볼 목록을
+        처음 보는 이 자리에서 미리 받아 둔다 - 가방을 한 번도 안 열어 본
+        사람도 던질 때는 공식 그림이 나오게.
+        """
+        if not opts:
+            return
+        self.ball_options = opts
+        ids = [o.get("id") for o in opts if o.get("id")]
+        want = [i for i in ids if i not in self._balls_fetched]
+        if not want:
+            return
+        self._balls_fetched.update(want)
+        run_async(self.app.root,
+                  lambda: item_icons.prefetch(self.app.api, want),
+                  lambda _r, _e: None)
 
     # ---------------- 켜짐/꺼짐 ----------------
     def enabled(self):
@@ -492,8 +520,7 @@ class WildController(object):
                 self.app.notify("풀숲이 흔들리고 있습니다. 눌러보세요!")
         elif w.get("pokemon") and not self.pet:
             self.show_wild(w["pokemon"])
-        if r.get("ballOptions"):
-            self.ball_options = r["ballOptions"]
+        self.set_ball_options(r.get("ballOptions"))
 
         self.arm_expiry(w.get("expiresAt"))
         self.schedule(POLL_SAFETY)
@@ -676,8 +703,7 @@ class WildController(object):
                 self.check()
                 return
             # 던질 볼 목록. 배율이 여기서 처음 정해진다.
-            if (r or {}).get("ballOptions"):
-                self.ball_options = r["ballOptions"]
+            self.set_ball_options((r or {}).get("ballOptions"))
             w = (r or {}).get("wild") or {}
             mon = w.get("pokemon")
             if mon:
@@ -791,8 +817,7 @@ class WildController(object):
                 self.check()
                 return
             self.app.balls = r.get("balls", self.app.balls)
-            if r.get("ballOptions"):
-                self.ball_options = r["ballOptions"]
+            self.set_ball_options(r.get("ballOptions"))
             self.app.refresh_tray()
             self.play_throw(r)
         run_async(self.app.root,

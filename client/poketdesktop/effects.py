@@ -181,6 +181,58 @@ def ball_shake_frames(size=22, key=(255, 0, 255), ball="POKEBALL"):
     return [ball_image(size, key, tilt=t, ball=ball) for t in (0, -16, 0, 16, 0)]
 
 
+# 흔들릴 때 기울이는 각도. 직접 그린 볼과 같은 사이클이라 연출 길이가
+# 안 바뀐다(wild_ui 가 프레임 수로 흔든 횟수를 센다).
+TILTS = (0, -16, 0, 16, 0)
+
+
+def sprite_ball_frames(sprite, size=26, key=(255, 0, 255)):
+    """가방·상점에 뜨는 **공식 도구 그림**으로 볼 연출 프레임을 만든다.
+
+    직접 그린 볼(ball_image)은 종류마다 위쪽 색만 바꾼 것이라, 가방에서
+    보던 그림과 던지는 그림이 서로 달랐다. 같은 그림을 쓰면 무엇을
+    던졌는지가 한눈에 맞아떨어진다.
+
+    돌려주는 것은 (흔들림 프레임 목록, 열린 볼 한 장) 이다.
+
+    **양쪽 OS 가 같은 형식을 받는다.** 색빼기로 칠한 RGB 한 장씩이고,
+    윈도우는 그 색을 창에서 뚫고 맥은 sprites.to_rgba 로 알파를 되살린다
+    (platform_mac.SpriteView.frames). 직접 그린 볼도 같은 형식이라,
+    이걸 지키면 어느 쪽에서도 새로 손댈 것이 없다.
+    """
+    from .sprites import flatten_rgba, premultiply
+
+    # **여백을 먼저 잘라낸다.** 공식 도구 그림은 30x30 안에 볼이 작게
+    # 들어 있어서, 그대로 쓰면 던지는 볼이 눈에 띄게 작아진다.
+    box = sprite.getbbox()
+    if box:
+        sprite = sprite.crop(box)
+
+    ss = 4                       # 크게 키워서 돌리고 줄인다. 그래야 안 뭉갠다
+    # 돌릴 때 모서리가 잘리지 않게 자리를 조금 남긴다. 원 안에 든 그림이라
+    # 대각선 길이(√2)까지는 필요 없고 이 정도면 ±16도를 견딘다.
+    inner = int(size * ss * 0.86)
+    big = Image.new("RGBA", (size * ss, size * ss), (0, 0, 0, 0))
+    fit = sprite.resize((inner, inner), Image.NEAREST)
+    big.paste(fit, ((big.width - inner) // 2, (big.height - inner) // 2))
+
+    def one(img):
+        # 그냥 줄이면 가장자리가 반투명해져서 투명색이 테두리처럼 번진다.
+        # 알파를 미리 곱해 줄이고 다시 나눠 복원한다(ball_image 와 같다).
+        small = premultiply(img).resize((size, size), Image.LANCZOS)
+        return flatten_rgba(small, key)
+
+    shake = [one(big if not t else
+                 big.rotate(t, resample=Image.BICUBIC, expand=False))
+             for t in TILTS]
+
+    # 공식 그림에는 '열린 볼' 이 없다. 밝게 태워서 터지듯 보이게 한다 -
+    # 여기서 직접 그린 볼로 갈아타면 260ms 동안만 그림체가 튄다.
+    white = Image.new("RGBA", big.size, (255, 255, 255, 0))
+    white.putalpha(big.getchannel("A"))
+    return shake, one(Image.blend(big, white, 0.72))
+
+
 def sparkle_frames(size=40, frames=4, key=(255, 0, 255),
                    color=(255, 226, 120)):
     """포획 성공 때 튀는 반짝임."""
