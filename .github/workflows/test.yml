@@ -61,6 +61,9 @@ jobs:
       - name: 휠 한 칸
         run: python client/test_wheel.py
 
+      - name: 대전 목록 시각 (UTC -> 내 시간대)
+        run: python client/test_pvp_when.py
+
       - name: 진화 뒤 도트
         run: python client/test_evolve_sprite.py
 

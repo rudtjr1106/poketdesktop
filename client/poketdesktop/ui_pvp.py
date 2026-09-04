@@ -13,6 +13,7 @@
 다시 붙을 수 있는지는 **서버가 판정해서 보내준다**. 화면에서 조건을
 다시 따지면(30분 쿨다운·하루 상한·차단) 서버 판정과 어긋난다.
 """
+import datetime
 import tkinter as tk
 
 from . import ui_common as U
@@ -26,9 +27,23 @@ KIND = {"random": "랜덤", "friend": "친구"}
 
 
 def _when(s):
-    """2026-09-02T03:22:07+00:00 -> 09-02 03:22."""
-    t = (s or "").replace("T", " ")
-    return t[5:16] if len(t) >= 16 else t
+    """2026-09-02T03:22:07+00:00 -> 09-02 12:22 (내 PC 시간대로).
+
+    서버는 UTC 로 보낸다. 예전에는 문자열을 그대로 잘라서 보여줬는데,
+    그러면 한국에서는 실제 시각보다 9시간 이르게 나온다 - 새벽 배틀이
+    낮 시간으로 찍히는 식이라, 언제 진 판인지 헷갈리게 만든다.
+
+    astimezone() 은 이 PC 의 시간대로 바꾼다. "+9시간" 을 박아 두는 대신
+    이렇게 하면, 어차피 이 게임의 사용자는 전부 한국이라 결과는 같으면서
+    시간대를 하드코딩하지 않아도 된다.
+    """
+    if not s:
+        return ""
+    try:
+        dt = datetime.datetime.fromisoformat(s).astimezone()
+    except ValueError:
+        return s.replace("T", " ")[:16]      # 모르는 형식이면 예전처럼 대강
+    return dt.strftime("%m-%d %H:%M")
 
 
 class PvpWindow(object):

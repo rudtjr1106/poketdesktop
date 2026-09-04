@@ -312,6 +312,118 @@ CREATE TABLE IF NOT EXISTS meta (
     k  TEXT PRIMARY KEY,
     v  TEXT NOT NULL
 );
+
+-- ---------------------------------------------------------------------------
+-- 보기 편한 판 (v_*) — 전부 UTC 로 저장된 시각을 한국시간(KST, UTC+9)으로
+-- 보여준다. DB 를 브라우저(deploy/dbview.sh)로 열어 보면 created_at 같은
+-- 칸이 "2026-09-03T12:06:26+00:00" 으로 나와서 지금이 몇 시인지 머릿속으로
+-- 9시간을 더해야 했다.
+--
+-- **저장은 그대로 UTC 다.** 세션 만료·야생 쿨다운·랭킹 하루 제한 같은
+-- 계산이 전부 UTC 비교에 기대고 있어서, 저장 형식을 바꾸면 옛날 행과
+-- 새 행이 섞여 문자열 비교가 어긋난다. 그래서 원본 테이블은 손대지 않고,
+-- **보기용 사본**만 따로 둔다. 여기서 고치고 저기서 읽는 식이 아니라
+-- 순수하게 SELECT 만 하는 창이라 데이터가 상할 일이 없다.
+--
+-- 정의를 IF NOT EXISTS 로 두면 나중에 칸을 하나 추가해도 이미 있는
+-- DB 에서는 옛 정의가 그대로 남는다. 그래서 매번 지우고 다시 만든다 -
+-- view 는 저장된 자료가 없는 '질의문' 이라 지웠다 다시 만들어도 비용이
+-- 없다. CREATE TABLE 을 IF NOT EXISTS 로 두는 것과는 다른 이유다.
+DROP VIEW IF EXISTS v_users;
+CREATE VIEW v_users AS
+SELECT
+    u.id, u.username, u.money, u.balls,
+    (SELECT COUNT(*) FROM pokemon p WHERE p.user_id = u.id) AS pokemon_count,
+    datetime(u.created_at, '+9 hours') AS created_at_kst,
+    datetime(u.last_login, '+9 hours') AS last_login_kst,
+    -- '마지막 접속'. last_login 은 로그인한 순간이라 그 뒤로 몇 시간을
+    -- 켜 뒀는지는 안 담는다. 클라이언트는 접속해 있는 동안 90초마다
+    -- 서버를 두드리므로(app.py 의 syncSeconds), 세션의 최근 last_seen 이
+    -- '언제까지 게임이 떠 있었는가' 에 가장 가깝다 - 앱을 끄는 순간
+    -- 서버에 알리는 절차가 따로 없어서(폴링 구조라 그런 신호 자체가
+    -- 없다), 마지막으로 말을 걸어온 시각이 최선의 근사치다.
+    (SELECT datetime(MAX(s.last_seen), '+9 hours')
+       FROM sessions s WHERE s.user_id = u.id) AS last_seen_kst,
+    u.last_ip
+FROM users u;
+
+DROP VIEW IF EXISTS v_sessions;
+CREATE VIEW v_sessions AS
+SELECT
+    s.token_hash, s.user_id, u.username, s.device, s.ip, s.ip_real,
+    datetime(s.created_at, '+9 hours') AS created_at_kst,
+    datetime(s.last_seen, '+9 hours') AS last_seen_kst,
+    datetime(s.expires_at, '+9 hours') AS expires_at_kst
+FROM sessions s JOIN users u ON u.id = s.user_id;
+
+DROP VIEW IF EXISTS v_pokemon;
+CREATE VIEW v_pokemon AS
+SELECT
+    p.*, u.username,
+    datetime(p.caught_at, '+9 hours') AS caught_at_kst
+FROM pokemon p JOIN users u ON u.id = p.user_id;
+
+DROP VIEW IF EXISTS v_friend;
+CREATE VIEW v_friend AS
+SELECT
+    f.a_id, ua.username AS a_username,
+    f.b_id, ub.username AS b_username,
+    f.state, f.asked_by,
+    datetime(f.created_at, '+9 hours') AS created_at_kst,
+    datetime(f.decided_at, '+9 hours') AS decided_at_kst
+FROM friend f
+JOIN users ua ON ua.id = f.a_id
+JOIN users ub ON ub.id = f.b_id;
+
+DROP VIEW IF EXISTS v_friend_block;
+CREATE VIEW v_friend_block AS
+SELECT
+    b.user_id, uu.username,
+    b.target_id, ut.username AS target_username,
+    datetime(b.created_at, '+9 hours') AS created_at_kst
+FROM friend_block b
+JOIN users uu ON uu.id = b.user_id
+JOIN users ut ON ut.id = b.target_id;
+
+-- log 는 gzip+base64 로 묶은 이벤트 목록이라 표로 보면 그냥 긴 글자
+-- 뭉치다. seed/engine 도 재생용이라 여기서는 뺀다.
+DROP VIEW IF EXISTS v_pvp_match;
+CREATE VIEW v_pvp_match AS
+SELECT
+    m.id, m.kind, m.a_id, m.a_name, m.b_id, m.b_name,
+    m.winner, m.turns, m.a_reward, m.b_reward, m.a_seen, m.b_seen,
+    datetime(m.created_at, '+9 hours') AS created_at_kst
+FROM pvp_match m;
+
+DROP VIEW IF EXISTS v_battle_record;
+CREATE VIEW v_battle_record AS
+SELECT
+    r.*, u.username,
+    datetime(r.ended_at, '+9 hours') AS ended_at_kst
+FROM battle_record r JOIN users u ON u.id = r.user_id;
+
+DROP VIEW IF EXISTS v_rank_stat;
+CREATE VIEW v_rank_stat AS
+SELECT
+    s.*, u.username,
+    datetime(s.updated_at, '+9 hours') AS updated_at_kst
+FROM rank_stat s JOIN users u ON u.id = s.user_id;
+
+DROP VIEW IF EXISTS v_server_error;
+CREATE VIEW v_server_error AS
+SELECT
+    id, path, method, kind, detail,
+    datetime(at, '+9 hours') AS at_kst
+FROM server_error;
+
+-- login_fail.at 은 REAL(유닉스 초) 이다. 다른 표들과 저장 형식부터
+-- 다르니 'unixepoch' 를 먼저 거쳐야 한다.
+DROP VIEW IF EXISTS v_login_fail;
+CREATE VIEW v_login_fail AS
+SELECT
+    key, at,
+    datetime(at, 'unixepoch', '+9 hours') AS at_kst
+FROM login_fail;
 """
 
 MIGRATIONS = [
