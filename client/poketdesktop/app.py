@@ -41,9 +41,14 @@ from .wild_ui import WildController            # noqa: E402
 #
 # 이 프로그램은 한 번 켜면 몇 주씩 그대로 돈다(부팅 때 저절로 켜지고,
 # 트레이에만 있다). 켤 때 한 번만 보면 새 판이 나와도 컴퓨터를 다시 켤
-# 때까지 모른다. 그렇다고 자주 볼 것도 아니다 - 깃허브 API 는 로그인
-# 없이 시간당 60번이고, 급한 소식도 아니다.
-UPDATE_EVERY_HOURS = 6
+# 때까지 모른다.
+#
+# 처음엔 6시간으로 뒀는데, 막상 판을 하나 올려 두고 기다려 보니 너무
+# 늦게 알아챈다 - 컴퓨터를 오전에 켜 두고 낮에 판을 올리면 저녁까지도
+# 모른다. 1시간으로 줄였다. 깃허브 API 는 로그인 없이 시간당 60번인데,
+# 한 사람이 한 시간에 부르는 건 많아야 한두 번(켤 때 한 번 + 이 주기로
+# 한 번)이라 훨씬 자주 봐도 넉넉하다.
+UPDATE_EVERY_HOURS = 1
 
 # 손으로 켰다면 사람이 화면을 보고 있다. 한 번만 더 해 보고 로그인 창을 준다.
 MANUAL_LOGIN_TRIES = 1
@@ -1087,7 +1092,7 @@ class App(object):
             config.log("새 버전 안내 창 오류: %s" % e)
             return
         if want != "now":
-            # 같은 판을 여섯 시간마다 다시 물어보면 그게 방해다.
+            # 같은 판을 UPDATE_EVERY_HOURS 마다 다시 물어보면 그게 방해다.
             # 다음에 새로 켤 때 다시 묻는다.
             self.settings["updateSkipped"] = ver
             config.save_settings(self.settings)
