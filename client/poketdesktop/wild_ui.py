@@ -604,6 +604,17 @@ class WildController(object):
                     PLAT.show_again(self.pet.badge_win)
             except Exception:
                 pass
+            # 다시 보인 창은 '항상 위' 무리의 맨 위에 놓인다. 배틀 중이면
+            # 체력바 층을 그 위로 올려야 대미지 글자가 도트 뒤로 안 숨는다.
+            # (체력바 틱은 더 이상 순서를 올리지 않는다 - 메뉴 위로 체력바가
+            # 올라오던 원인이라 뺐다. 창이 다시 보이는 여기서 맞춘다.)
+            b = getattr(self.app, "battle", None)
+            layer = getattr(b, "layer", None) if b else None
+            if layer:
+                try:
+                    layer.raise_above()
+                except Exception:                           # noqa: BLE001
+                    pass
 
     def show_hint(self, near, text):
         self.hide_hint()

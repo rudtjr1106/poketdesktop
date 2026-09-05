@@ -541,7 +541,18 @@ class App(object):
                 # 이걸 위해 폴링을 새로 두지 않는다.
                 self.announce_pvp(me.get("pvpUnseen", 0))
             if self.overlay:
-                self.overlay.sync(mons or [], paths or {}, walks or {})
+                added = self.overlay.sync(mons or [], paths or {}, walks or {})
+                # 배틀 중에 새 도트가 생기면(창에서 바탕화면에 올렸을 때)
+                # '항상 위' 맨 위에 놓여 체력바 층을 가린다. 체력바 틱은 더
+                # 이상 순서를 올리지 않으므로(메뉴 위로 올라오던 원인이라
+                # 뺐다) 새 창이 생긴 여기서 한 번 올린다.
+                layer = (getattr(self.battle, "layer", None)
+                         if self.battle else None)
+                if added and layer:
+                    try:
+                        layer.raise_above()
+                    except Exception:                       # noqa: BLE001
+                        pass
             self.announce_friends(friends)
             self.refresh_tray()
         run_async(self.root, work, done)

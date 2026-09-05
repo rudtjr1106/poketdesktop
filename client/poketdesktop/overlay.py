@@ -80,6 +80,7 @@ class Pet(object):
         self.label.bind("<Double-Button-1>", self.on_double)
 
         self.name_win = None
+        self.name_label = None
         self.tip_win = None
         self.tip_job = None
         if overlay.settings.get("showNames"):
@@ -89,22 +90,48 @@ class Pet(object):
         self.place()
 
     # ---------------- 이름표 ----------------
-    def make_nameplate(self):
+    def nameplate_text(self):
         info = self.mon.get("info", {})
         text = "%s Lv.%s" % (info.get("name", "?"), info.get("level", "?"))
         if self.mon.get("shiny"):
             text = "★ " + text
+        return text
+
+    def nameplate_color(self):
+        return U.TIP_SHINY if self.mon.get("shiny") else U.TIP_FG
+
+    def make_nameplate(self):
         w = tk.Toplevel(self.ov.root)
         w.overrideredirect(True)
         w.attributes("-alpha", 0.88)
         w.configure(bg=U.TIP_BG)
-        tk.Label(w, text=text, bg=U.TIP_BG,
-                 fg=U.TIP_SHINY if self.mon.get("shiny") else U.TIP_FG,
-                 font=U.FONT_TIP).pack(padx=5, pady=1)
+        self.name_label = tk.Label(w, text=self.nameplate_text(), bg=U.TIP_BG,
+                                   fg=self.nameplate_color(), font=U.FONT_TIP)
+        self.name_label.pack(padx=5, pady=1)
         # 맥에서는 창이 화면에 올라간 뒤에 걸어야 '항상 위' 가 먹는다.
         # 그냥 두면 이름표만 다른 창 뒤로 숨는다.
         PLAT.raise_above(w)
         self.name_win = w
+
+    def set_mon(self, mon):
+        """서버가 준 새 값으로 갈아 끼운다. **이름표도 같이 고친다.**
+
+        레벨이 올라도 바탕화면 이름표의 숫자는 그대로였다. 이름표는 만들
+        때 글자를 박아 넣고, sync 는 mon 만 바꿔 끼웠기 때문이다. 포켓몬
+        관리 창은 열 때마다 새로 그려서 거기서만 올라 보였다. 별명을
+        바꿨을 때도 같은 이유로 안 바뀌었다.
+        """
+        self.mon = mon
+        self.refresh_nameplate()
+
+    def refresh_nameplate(self):
+        lbl = getattr(self, "name_label", None)
+        if not self.name_win or lbl is None:
+            return
+        try:
+            lbl.configure(text=self.nameplate_text(), fg=self.nameplate_color())
+        except Exception:                                   # noqa: BLE001
+            pass
 
     # ---------------- 마우스를 올리면 이름 ----------------
     def tip_text(self):
@@ -421,7 +448,7 @@ class Overlay(object):
         added = []
         for pid, mon in want.items():
             if pid in self.pets:
-                self.pets[pid].mon = mon
+                self.pets[pid].set_mon(mon)
                 continue
             pet = self.make(mon)
             if pet:

@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
+from poketdesktop import arena as AR                         # noqa: E402
 from poketdesktop import desktop_battle as DB                # noqa: E402
 
 OK = FAIL = 0
@@ -110,9 +111,14 @@ class 가짜배틀(object):
         self.예약 = []
         self.layer = self          # tick_bars 가 있는지만 본다
         self.root = self
+        self.올린수 = 0             # 창 순서를 올린 횟수
+        self.살린수 = 0             # 클릭 통과를 다시 건 횟수
 
     def raise_above(self):
-        pass
+        self.올린수 += 1
+
+    def keep_alive(self):
+        self.살린수 += 1
 
     def after(self, ms, fn):
         self.예약.append((ms, fn))
@@ -236,9 +242,81 @@ def t_맞는_순간_그_쪽만_준다():
         (d.bars[0].ratio, d.bars[1].ratio) == before)
 
 
+def t_틱은_창_순서를_안_올린다():
+    """**1.0.20 에서 고친 버그.**
+
+    체력바 틱이 0.5초마다 레이어를 맨 위로 올렸다. 볼 고르는 메뉴가 떠
+    있는 동안에도 계속 올라와서 메뉴 위에 체력바가 찍혔다. 도트는 만들
+    때 한 번만 올리니까 메뉴 뒤로 얌전히 들어갔고, 레이어만 메뉴를 뚫고
+    나왔다.
+
+    틱은 순서를 건드리면 안 된다. 맥에서 풀리는 클릭 통과만 다시 건다.
+    순서는 창이 다시 보이는 순간(switch_to)에만 맞춘다.
+    """
+    d = 가짜배틀({"me": {"id": 1, "name": "파이리", "hp": 60, "maxhp": 60},
+                  "foe": {"id": 9, "name": "구구", "hp": 40, "maxhp": 40}},
+                 {1: 가짜도트(1), 2: 가짜도트(2)}, 가짜도트(1))
+    for _ in range(60):                       # 2초어치
+        d.tick_bars()
+    chk("틱 60번에 창 순서를 한 번도 안 올린다", d.올린수 == 0, d.올린수)
+    chk("클릭 통과는 몇 틱마다 다시 건다", d.살린수 >= 2, d.살린수)
+
+    # 교체로 도트가 다시 보이는 순간에는 올려야 한다. 안 그러면 새
+    # 포켓몬의 체력바가 도트 뒤로 숨는다.
+    새배틀 = {"me": {"id": 2, "name": "꼬부기", "hp": 55, "maxhp": 55},
+              "foe": {"id": 9, "name": "구구", "hp": 40, "maxhp": 40}}
+    real = DB.run_async
+    DB.run_async = lambda _root, work, done: done({"battle": 새배틀}, None)
+    try:
+        d.switch_to({"id": 2})
+    finally:
+        DB.run_async = real
+    chk("교체 직후에는 딱 한 번 올린다", d.올린수 == 1, d.올린수)
+
+    for _ in range(60):
+        d.tick_bars()
+    chk("그 뒤 틱은 다시 안 올린다", d.올린수 == 1, d.올린수)
+
+
+class 가짜투기장(object):
+    """Arena._tick_bars 만 빌려 끼운다. 레이어 노릇도 같이 한다."""
+
+    def __init__(self):
+        self.closed = False
+        self.layer = self
+        self.bars = {}
+        self.active = {"me": None, "foe": None}
+        self.root = self
+        self.bar_job = None
+        self.올린수 = 0
+        self.살린수 = 0
+
+    def raise_above(self):
+        self.올린수 += 1
+
+    def keep_alive(self):
+        self.살린수 += 1
+
+    def after(self, ms, fn):
+        return None
+
+    _tick_bars = AR.Arena._tick_bars
+
+
+def t_투기장_틱도_창_순서를_안_올린다():
+    """투기장 쪽도 같은 틱을 갖고 있었다. 트레이 메뉴를 열어도 그 위로
+    체력바가 올라왔다."""
+    a = 가짜투기장()
+    for _ in range(60):
+        a._tick_bars()
+    chk("투기장 틱 60번에 창 순서를 안 올린다", a.올린수 == 0, a.올린수)
+    chk("투기장도 클릭 통과는 다시 건다", a.살린수 >= 2, a.살린수)
+
+
 def main():
     for fn in (t_체력을_그대로_반영한다, t_교체하면_새_포켓몬_체력으로_바뀐다,
-               t_숨은_도트의_체력바는_안_그린다, t_맞는_순간_그_쪽만_준다):
+               t_숨은_도트의_체력바는_안_그린다, t_맞는_순간_그_쪽만_준다,
+               t_틱은_창_순서를_안_올린다, t_투기장_틱도_창_순서를_안_올린다):
         print("-- %s" % fn.__name__[2:])
         fn()
     print()
