@@ -70,12 +70,32 @@ class FxLayer(object):
         """화면 좌표 -> 이 캔버스 좌표."""
         return sx - self.x, sy - self.y
 
+    def keep_alive(self):
+        """맥에서 풀린 클릭 통과만 다시 건다. **창 순서는 건드리지 않는다.**
+
+        체력바 틱이 몇 프레임마다 부른다. 순서를 올리는 일은 raise_above 가
+        따로 맡는다 - 그 둘을 한 함수에 두었던 것이 메뉴 위로 체력바가
+        올라오던 원인이었다.
+        """
+        try:
+            PLAT.keep_click_through(self.win)
+        except Exception:                                   # noqa: BLE001
+            pass
+
     def raise_above(self):
+        """레이어를 '항상 위' 무리의 맨 위로 올린다.
+
+        **새 창이 생긴 직후에만 부른다** (상대 도트 입장, 교체로 다시
+        보이는 도트). 시간에 맞춰 되풀이해 부르면 안 된다 - 예전에는
+        체력바 틱이 0.5초마다 불렀는데, 볼 고르는 메뉴가 떠 있는 동안에도
+        레이어가 계속 맨 위로 올라와서 메뉴 위에 체력바가 찍혔다. 도트는
+        만들 때 한 번만 올리기 때문에 메뉴 뒤로 얌전히 들어갔고, 레이어만
+        메뉴를 뚫고 나왔다.
+        """
         try:
             PLAT.raise_above(self.win)
             self.win.lift()
             # 맥은 창을 다시 올리거나 숨겼다 켜면 클릭 통과가 풀린다.
-            # 매 프레임 부르는 곳이 아니라 몇 프레임에 한 번이라 싸다.
             PLAT.keep_click_through(self.win)
         except Exception:
             pass

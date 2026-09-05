@@ -174,6 +174,10 @@ jobs:
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
+      # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
+      # 창을 실제로 띄워 서버 값이 바뀌면 이름표가 따라오는지 본다.
+      - name: 이름표가 서버 값을 따라오는가
+        run: python client/smoke_nameplate.py
 
   mac:
     name: 맥 전용
@@ -200,6 +204,10 @@ jobs:
         run: python client/smoke_window.py
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
+      # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
+      # 창을 실제로 띄워 서버 값이 바뀌면 이름표가 따라오는지 본다.
+      - name: 이름표가 서버 값을 따라오는가
+        run: python client/smoke_nameplate.py
       # 이건 메뉴 막대에 아이콘을 잠깐 올렸다 내린다 - **화면이 필요하다.**
       # 러너에 로그인 세션이 없어서 NSStatusBar 가 안 되면 이 줄만 지워라.
       # (맥 없이 적은 것이라 첫 실행에서 확인이 필요하다)

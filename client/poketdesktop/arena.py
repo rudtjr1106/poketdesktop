@@ -284,6 +284,11 @@ class Arena(object):
                 ex, ey = L.entry_point(self.ring, "foe", i, n)
                 pet.x, pet.y = L.feet_to_topleft(ex, ey, pet.fw, pet.fh)
                 pet.place()
+                # 새 창은 '항상 위' 무리의 맨 위에 놓인다. 레이어를 그 위로
+                # 다시 올려야 체력바와 대미지 글자가 도트 뒤로 안 숨는다.
+                # 창이 생기는 순간이 순서를 맞출 유일한 자리다.
+                if self.layer:
+                    self.layer.raise_above()
                 sx, sy = L.seat_point(self.ring, "foe", i, n)
                 self._walk(pet, sx, sy, ENTER_MS)
             # 한 마리씩 만든다. 여섯을 한꺼번에 만들면 도트를 읽고 크기를
@@ -385,14 +390,14 @@ class Arena(object):
         """
         if self.closed or not self.layer:
             return
-        # 포켓몬 창도 '항상 위' 라 그냥 두면 체력바가 그 뒤로 숨는다.
-        # 자주 올릴 필요는 없어서 몇 프레임에 한 번만 올린다.
+        # 여기서 창 순서를 올리지 않는다. 예전에는 몇 프레임마다
+        # raise_above 를 불렀는데, 볼 고르는 메뉴가 떠 있는 동안에도
+        # 레이어가 계속 맨 위로 올라와 메뉴 위에 체력바가 찍혔다.
+        # 순서는 새 창이 생기는 순간(_enter_foes)에만 맞추고, 여기서는
+        # 맥에서 풀리는 클릭 통과만 다시 건다.
         self._bar_n = getattr(self, "_bar_n", 0) + 1
         if self._bar_n % 15 == 1:
-            try:
-                self.layer.raise_above()
-            except Exception:                               # noqa: BLE001
-                pass
+            self.layer.keep_alive()
         for side in ("me", "foe"):
             bar = self.bars.get(side)
             pet = self.active.get(side)

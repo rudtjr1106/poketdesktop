@@ -131,11 +131,14 @@ class DesktopBattle(object):
         """
         if self.closed or not self.bars or not self.layer:
             return
-        # 포켓몬 창도 '항상 위' 라서 그냥 두면 체력바가 그 뒤로 숨는다.
-        # 자주 올릴 필요는 없어서 몇 프레임에 한 번만 올린다.
+        # 여기서 창 순서를 올리지 않는다. 예전에는 몇 프레임마다
+        # raise_above 를 불렀는데, 오른쪽 클릭으로 볼 고르는 메뉴를 여는
+        # 동안에도 레이어가 계속 맨 위로 올라와 메뉴 위에 체력바가
+        # 찍혔다. 순서는 창이 다시 보이는 순간(switch_to)에만 맞추고,
+        # 여기서는 맥에서 풀리는 클릭 통과만 다시 건다.
         self._bar_n = getattr(self, "_bar_n", 0) + 1
         if self._bar_n % 15 == 1:
-            self.layer.raise_above()
+            self.layer.keep_alive()
         for bar, pet in zip(self.bars, (self.mine, self.foe)):
             bar.ease()
             if pet is None or not on_screen(pet):
@@ -374,6 +377,10 @@ class DesktopBattle(object):
                 return self.abort("다음 포켓몬을 화면에서 찾지 못했습니다.")
             self.mine.battling = True
             self.saved_home = (self.mine.x, self.mine.y)
+            # 방금 다시 보인 도트가 '항상 위' 맨 위에 놓였다. 레이어를
+            # 그 위로 올려야 새 포켓몬의 체력바가 도트 뒤로 안 숨는다.
+            if self.layer:
+                self.layer.raise_above()
             # **체력바를 새 포켓몬 것으로 바꾼다.**
             #
             # 바는 쓰러진 포켓몬의 0 을 그대로 들고 있다. 여기서 안 맞춰

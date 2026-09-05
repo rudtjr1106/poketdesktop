@@ -492,6 +492,28 @@ def apply_theme(root):
     s.configure("TScrollbar", background=BG3, troughcolor=INK, borderwidth=0,
                 arrowcolor=FG_DIM, relief="flat")
     s.map("TScrollbar", background=[("active", BG4)])
+
+    # 허브 창의 탭. 여기서 안 정하면 clam 테마의 회색 탭에 회색 글씨가
+    # 그대로 나와서 어느 탭에 있는지도, 무슨 탭인지도 안 읽혔다.
+    # 고른 탭은 창 바탕색으로 이어 붙이고 글씨를 금색으로, 나머지는
+    # 어두운 띠에 흐린 글씨로 두어 서로 확실히 갈린다.
+    # clam 은 탭과 판 둘레에 밝은 회색 선을 그린다(bordercolor·lightcolor·
+    # darkcolor). borderwidth=0 으로는 안 지워져서 색을 바탕색에 맞춘다.
+    s.configure("TNotebook", background=BG, borderwidth=0,
+                bordercolor=BG, lightcolor=BG, darkcolor=BG,
+                tabmargins=[6, 6, 6, 0])
+    s.configure("TNotebook.Tab", background=BG3, foreground=FG_DIM,
+                padding=[12, 7], borderwidth=0, font=FONT,
+                bordercolor=BG, darkcolor=BG)
+    s.map("TNotebook.Tab",
+          background=[("selected", BG), ("active", BG4)],
+          foreground=[("selected", ACCENT), ("active", FG)],
+          lightcolor=[("selected", BG), ("", BG3)],
+          # clam 은 고른 탭만 padding 을 '6 4 6 2' 로 바꿔 다른 크기로
+          # 그린다 (style map 은 덮어쓰지 않고 합쳐져서 그 항목이 남는다).
+          # 그대로 두면 고른 탭이 좁고 낮아져 누를 때마다 줄이 흔들린다.
+          # 전부 같은 값으로 못 박는다.
+          padding=[("selected", [12, 7])])
     return s
 
 
