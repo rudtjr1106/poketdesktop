@@ -453,6 +453,8 @@ MIGRATIONS = [
      "ALTER TABLE wild_state ADD COLUMN walk_at TEXT"),
     ("pokemon", "luxury",
      "ALTER TABLE pokemon ADD COLUMN luxury INTEGER NOT NULL DEFAULT 0"),
+    ("pokemon", "held",
+     "ALTER TABLE pokemon ADD COLUMN held TEXT"),
     # 옛 행은 전부 1 로 둔다. 그때는 걸려온 판도 점수에 들어갔으니
     # '내가 건 것' 과 구분이 없었다. 어차피 시즌 1 로 점수를 초기화한다.
     ("battle_record", "started",
@@ -635,6 +637,8 @@ def row_to_mon(r):
         "metLevel": r["met_level"],
         "caughtAt": r["caught_at"],
         # 옛 DB 행에는 없을 수 있어 keys() 로 확인하고 꺼낸다
+        # 지닌 도구 (1.1.0). 옛 행에는 칸이 없다.
+        "held": (r["held"] if "held" in r.keys() else None) or None,
         "hyper": json.loads(r["hyper"]) if "hyper" in r.keys() and r["hyper"] else {},
         "noEvolve": bool(r["no_evolve"]) if "no_evolve" in r.keys() else False,
         "luxury": bool(r["luxury"]) if "luxury" in r.keys() else False,
@@ -645,13 +649,13 @@ def insert_mon(user_id, mon, now):
     cur = run(
         "INSERT INTO pokemon (user_id, species, nickname, level, exp, nature, ability,"
         " hidden_ability, gender, shiny, happiness, ivs, evs, moves, on_desktop, slot,"
-        " met_level, caught_at, hyper, no_evolve, luxury)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " met_level, caught_at, hyper, no_evolve, luxury, held)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user_id, mon["species"], mon.get("nickname"), mon["level"], mon["exp"],
          mon["nature"], mon.get("ability"), int(bool(mon.get("hiddenAbility"))),
          mon.get("gender", "N"), int(bool(mon.get("shiny"))), mon.get("happiness", 70),
          json.dumps(mon["ivs"]), json.dumps(mon["evs"]), json.dumps(mon["moves"]),
          0, None, mon["level"], now,
          json.dumps(mon.get("hyper") or {}), int(bool(mon.get("noEvolve"))),
-         int(bool(mon.get("luxury")))))
+         int(bool(mon.get("luxury"))), mon.get("held") or None))
     return cur.lastrowid

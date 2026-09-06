@@ -48,14 +48,16 @@ STAT_ROWS = [("hp", "HP"), ("atk", "공격"), ("def", "방어"),
 STAT_KR = dict(STAT_ROWS)
 
 # 분류 — 실제로 쓸 수 있는 것부터 위로 올린다
-CAT_ORDER = ["stone", "ev", "iv", "misc", "ball"]
-CAT_KR = {"stone": "진화의 돌", "ev": "노력치", "iv": "단련",
-          "misc": "기타", "ball": "볼"}
-CAT_COLOR = {"stone": U.PINK, "ev": U.GOOD, "iv": U.SHINY,
+CAT_ORDER = ["held", "stone", "ev", "iv", "misc", "ball"]
+CAT_KR = {"held": "지닌 도구", "stone": "진화의 돌", "ev": "노력치",
+          "iv": "단련", "misc": "기타", "ball": "볼"}
+CAT_COLOR = {"held": U.ACCENT, "stone": U.PINK, "ev": U.GOOD, "iv": U.SHINY,
              "misc": U.INFO, "ball": U.RED}
 
 # /api/bag/use 가 받아주는 효과. 나머지(볼, 파는 물건)는 여기서 쓸 수 없다.
-USABLE = ("ev", "iv", "level", "stone", "noevolve")
+# "held" 는 use 가 아니라 /api/pokemon/{id}/hold 로 간다 - 대상을 고르는
+# 흐름은 같아서 여기서 같이 다룬다.
+USABLE = ("ev", "iv", "level", "stone", "noevolve", "held")
 
 ROW_BG = "#10131c"      # 목록 한 줄 바탕
 SEL_BG = "#2b2417"      # 고른 줄
@@ -135,6 +137,9 @@ def item_desc(item):
         return "%s이(가) 진화한다." % ", ".join(who)
     if kind == "noevolve":
         return "진화를 막는다. 한 번 더 쓰면 다시 진화할 수 있게 된다."
+    if kind == "held":
+        # 본가 설명 그대로 (서버가 items.json 에서 실어 보낸다)
+        return item.get("desc") or "포켓몬에게 지니게 하는 도구다. 배틀에서 효과가 난다."
     if kind == "ball":
         return "야생 포켓몬을 만났을 때 던지는 볼이다. 가방에서는 쓸 수 없다."
     if kind == "sell":
@@ -155,6 +160,8 @@ def target_hint(item):
         return "레벨이 오르면서 기술도 배운다"
     if kind == "noevolve":
         return "한 마리씩 껐다 켰다 한다"
+    if kind == "held":
+        return "한 마리에 하나. 이미 지닌 것은 가방으로 돌아온다"
     return ""
 
 
@@ -854,6 +861,14 @@ class BagWindow(object):
         info = mon.get("info") or {}
         level = int(mon.get("level", 0))
 
+        if kind == "held":
+            cur = mon.get("heldKr")
+            if mon.get("held") == it["id"]:
+                return False, True, "이미 지님", U.FG_FAINT
+            if cur:
+                return False, False, "지님: %s" % cur, U.FG_DIM
+            return True, False, "빈손", U.GOOD
+
         if kind == "stone":
             if info.get("species") in (it.get("evolves") or []):
                 return True, False, "진화할 수 있다", U.GOOD
@@ -1018,7 +1033,12 @@ class BagWindow(object):
         self.use_btn.configure(state="disabled")
         self.say("%s을(를) 쓰는 중..." % it["kr"], U.FG_FAINT)
 
+        held = (it.get("effect") or {}).get("kind") == "held"
+
         def work():
+            if held:
+                # 지니는 건 '쓰는' 게 아니다. 가방에서 빠져 포켓몬에게 간다.
+                return api.hold(pid, item_id)
             return use_item(api, item_id, pid, stat, hour)
 
         def done(r, err):

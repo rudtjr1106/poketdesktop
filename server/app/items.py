@@ -79,9 +79,19 @@ def public_list():
             # 볼은 종류마다 쓸모가 다른데 설명이 전부 같았다.
             # 조건을 아는 쪽(서버)이 말까지 만들어 보낸다.
             "note": ball_note(it["id"]),
+            # 본가 설명 (지닌 도구는 effect 가 {"kind": "held"} 뿐이라 이게 전부다)
+            "desc": it.get("desc", ""),
+            # 지닐 수 있는가. 분류가 아니라 common/held.py 의 목록으로 본다 -
+            # 금속코트처럼 돌이면서 지닐 수 있는 것이 있다.
+            "holdable": is_holdable(it["id"]),
         })
     out.sort(key=lambda x: (x["cat"], x["cost"], x["kr"]))
     return out
+
+
+def is_holdable(item_id):
+    from common import held as H
+    return H.normalize(item_id) is not None
 
 
 # ---------------------------------------------------------------- 드랍

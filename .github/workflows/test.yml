@@ -75,6 +75,10 @@ jobs:
 
       - name: 풀숲 끄기·알림·패치노트
         run: python client/test_new_settings.py
+      - name: 지닌 도구 (엔진)
+        run: python common/test_held.py
+      - name: PC 박스 거르기
+        run: python client/test_box_filter.py
 
       # 바뀐 것을 두 곳에 적으면 갈라진다. 앱 안의 '새로운 기능' 창과
       # 릴리스 본문이 어긋난 채로 나가면, 받은 사람은 자기가 받은 판에
@@ -178,6 +182,8 @@ jobs:
       # 창을 실제로 띄워 서버 값이 바뀌면 이름표가 따라오는지 본다.
       - name: 이름표가 서버 값을 따라오는가
         run: python client/smoke_nameplate.py
+      - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
+        run: python client/smoke_box_filter.py
 
   mac:
     name: 맥 전용
@@ -208,6 +214,8 @@ jobs:
       # 창을 실제로 띄워 서버 값이 바뀌면 이름표가 따라오는지 본다.
       - name: 이름표가 서버 값을 따라오는가
         run: python client/smoke_nameplate.py
+      - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
+        run: python client/smoke_box_filter.py
       # 이건 메뉴 막대에 아이콘을 잠깐 올렸다 내린다 - **화면이 필요하다.**
       # 러너에 로그인 세션이 없어서 NSStatusBar 가 안 되면 이 줄만 지워라.
       # (맥 없이 적은 것이라 첫 실행에서 확인이 필요하다)
@@ -292,6 +300,7 @@ jobs:
           python server/test_items.py   http://127.0.0.1:8788
           python server/test_social.py  http://127.0.0.1:8788
           python server/test_arena.py   http://127.0.0.1:8788
+          python server/test_held_api.py http://127.0.0.1:8788
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

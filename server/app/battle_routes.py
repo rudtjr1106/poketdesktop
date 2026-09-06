@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from common import battle as B
+from common import held as HELD
 from common import pokelogic as P
 
 from . import auth, config, db, deps, items, walk
@@ -81,16 +82,20 @@ def _fighters(dex, row):
     me = B.Fighter(dex, me_raw["mon"], me_raw["hp"], me_raw["pp"], me_raw["status"])
     me.stages = me_raw.get("stages") or me.stages
     me.sleep_turns = me_raw.get("sleep", 0)
+    me.load_held(me_raw.get("held"))
     foe = B.Fighter(dex, foe_raw["mon"], foe_raw["hp"], foe_raw["pp"],
                     foe_raw["status"])
     foe.stages = foe_raw.get("stages") or foe.stages
     foe.sleep_turns = foe_raw.get("sleep", 0)
+    foe.load_held(foe_raw.get("held"))
     return me, foe
 
 
 def _dump(f):
+    # held 는 지닌 도구의 '이 판에서 벌어진 일'(먹은 열매, 구애 잠금)이다.
+    # 턴마다 DB 에 잤다 깨는 구조라 이걸 안 남기면 열매를 매 턴 먹는다.
     return {"mon": f.mon, "hp": f.hp, "pp": f.pp, "status": f.status,
-            "stages": f.stages, "sleep": f.sleep_turns}
+            "stages": f.stages, "sleep": f.sleep_turns, "held": f.held_state()}
 
 
 def _save(row_id, bt, result=None, state=None):
@@ -117,6 +122,10 @@ def _side(dex, f, reveal_pp=True):
         "types": [dex.type_name(t) for t in sp.get("types", [])],
         "typeIds": sp.get("types", []),
         "stages": dict((k, v) for k, v in f.stages.items() if v),
+        # 지닌 도구. 구애 도구가 잠근 기술(locked)은 화면이 나머지를 흐리게
+        # 그릴 수 있게 같이 준다. 서버가 어차피 강제한다(battle.take_turn).
+        "held": f.held, "heldKr": HELD.name(f.held) if f.held else None,
+        "locked": f.locked,
     }
     if reveal_pp:
         out["moves"] = [{
@@ -224,10 +233,14 @@ def award(dex, uid, foe, participant_id, hour=None):
     foe_sp = dex.get(foe.mon["species"]) or {}
     ev_yield = foe_sp.get("ev") or {}
 
-    part = db.q1("SELECT level FROM pokemon WHERE id=?", (participant_id,))
+    part = db.q1("SELECT level, held FROM pokemon WHERE id=?", (participant_id,))
     lv = part["level"] if part else 5
+    held = (part["held"] if part and "held" in part.keys() else None)
     main = B.exp_gain(dex, foe, lv)
-    got_ev = give_evs(uid, participant_id, ev_yield)
+    # 행복의알은 경험치 1.5배, 교정깁스·파워 시리즈는 노력치를 더 준다.
+    # 싸운 그 한 마리만 본다 - 학습장치 몫은 도구와 무관하다.
+    main = int(main * HELD.exp_mult(held))
+    got_ev = give_evs(uid, participant_id, HELD.ev_yield(held, ev_yield))
     g = grant_exp(dex, uid, participant_id, main, hour)
     if g:
         g["shared"] = False

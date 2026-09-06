@@ -785,8 +785,89 @@ def release(pid: int, ctx=Depends(current)):
     uid = ctx["user"]["id"]
     r = _own(uid, pid)
     name = r["nickname"] or dex().name(r["species"])
+    # 지닌 도구는 가방으로 돌려준다. 포켓몬과 같이 사라지면 4000원짜리
+    # 구애머리띠가 놓아주기 한 번에 날아간다.
+    held = r["held"] if "held" in r.keys() else None
+    if held:
+        items.bag_add(uid, held, 1)
     db.run("DELETE FROM pokemon WHERE id=?", (pid,))
-    return {"ok": True, "message": "%s 을(를) 보내주었습니다." % name}
+    msg = "%s 을(를) 보내주었습니다." % name
+    if held:
+        msg += " 지니고 있던 %s은(는) 가방에 넣었습니다." % items.name_of(held)
+    return {"ok": True, "message": msg}
+
+
+# ---------------------------------------------------------------- 지닌 도구
+class HoldIn(BaseModel):
+    item: str = ""
+
+
+def _held_of(row):
+    return (row["held"] if "held" in row.keys() else None) or None
+
+
+def _fighting(uid, pid):
+    return db.q1("SELECT id FROM battle WHERE user_id=? AND state='active'"
+                 " AND mine_id=?", (uid, pid)) is not None
+
+
+@app.post("/api/pokemon/{pid}/hold")
+def hold(pid: int, body: HoldIn, ctx=Depends(current)):
+    """가방의 도구 하나를 이 포켓몬에게 지니게 한다.
+
+    지닐 수 있는지는 분류(cat)가 아니라 common/held.py 의 목록으로 본다 -
+    금속코트처럼 진화의 돌이면서 지닐 수도 있는 것이 있다. 이미 무언가를
+    지니고 있었으면 그건 가방으로 돌아간다. 한 마리에 하나다.
+    """
+    from common import held as HELD
+    from common import korean
+    uid = ctx["user"]["id"]
+    r = _own(uid, pid)
+    item = HELD.normalize(body.item)
+    if not item:
+        raise HTTPException(400, "지닐 수 없는 도구입니다.")
+    if _fighting(uid, pid):
+        raise HTTPException(400, "배틀 중에는 도구를 바꿀 수 없습니다.")
+    cur = _held_of(r)
+    name = r["nickname"] or dex().name(r["species"])
+    if cur == item:
+        return {"ok": True, "pokemon": _decorate(db.row_to_mon(r)),
+                "bag": items.bag_get(uid),
+                "message": korean.natural("%s은(는) 이미 %s을(를) 지니고 있다."
+                                          % (name, items.name_of(item)))}
+    # 가방에서 먼저 뺀다. 없으면 여기서 끝난다 - 아무것도 안 바뀐다.
+    if not items.bag_take(uid, item, 1):
+        raise HTTPException(400, "%s이(가) 가방에 없습니다." % items.name_of(item))
+    if cur:
+        items.bag_add(uid, cur, 1)
+    db.run("UPDATE pokemon SET held=? WHERE id=?", (item, pid))
+    msg = "%s에게 %s을(를) 지니게 했다." % (name, items.name_of(item))
+    if cur:
+        msg += " %s은(는) 가방에 넣었다." % items.name_of(cur)
+    return {"ok": True, "pokemon": _decorate(db.row_to_mon(_own(uid, pid))),
+            "bag": items.bag_get(uid), "message": korean.natural(msg)}
+
+
+@app.delete("/api/pokemon/{pid}/hold")
+def unhold(pid: int, ctx=Depends(current)):
+    """지닌 도구를 벗겨 가방에 넣는다."""
+    from common import korean
+    uid = ctx["user"]["id"]
+    r = _own(uid, pid)
+    cur = _held_of(r)
+    if not cur:
+        raise HTTPException(400, "지니고 있는 도구가 없습니다.")
+    if _fighting(uid, pid):
+        raise HTTPException(400, "배틀 중에는 도구를 바꿀 수 없습니다.")
+    # 가방에 먼저 넣고 그다음 비운다. 중간에 죽으면 도구가 둘이 되는데,
+    # 그건 사용자에게 이득이라 괜찮다. 반대는 안 된다.
+    items.bag_add(uid, cur, 1)
+    db.run("UPDATE pokemon SET held=NULL WHERE id=?", (pid,))
+    name = r["nickname"] or dex().name(r["species"])
+    return {"ok": True, "pokemon": _decorate(db.row_to_mon(_own(uid, pid))),
+            "bag": items.bag_get(uid),
+            "message": korean.natural("%s의 %s을(를) 가방에 넣었다."
+                                      % (name, items.name_of(cur)))}
 
 
 @app.post("/api/pokemon/{pid}/exp")

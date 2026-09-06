@@ -180,6 +180,13 @@ class Api(object):
     def release(self, pid):
         return self._call("DELETE", "/api/pokemon/%d" % pid)
 
+    # 지닌 도구. 가방의 도구 하나를 이 포켓몬에게 들린다 / 벗겨 가방에 넣는다.
+    def hold(self, pid, item):
+        return self._call("POST", "/api/pokemon/%d/hold" % pid, {"item": item})
+
+    def unhold(self, pid):
+        return self._call("DELETE", "/api/pokemon/%d/hold" % pid)
+
     def add_exp(self, pid, amount):
         return self._call("POST", "/api/pokemon/%d/exp" % pid, {"amount": int(amount)})
 
