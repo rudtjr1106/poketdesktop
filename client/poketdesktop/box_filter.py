@@ -39,6 +39,24 @@ def apply(mons, dex, type_id=None, query=""):
     return [m for m in mons if matches(m, dex, type_id, query)]
 
 
+def split(mons):
+    """(데리고 다니는 것, PC 박스). 순서는 그대로."""
+    party = [m for m in mons if m.get("onDesktop")]
+    box = [m for m in mons if not m.get("onDesktop")]
+    return party, box
+
+
+def apply_box(mons, dex, type_id=None, query=""):
+    """거름망은 **PC 박스에만** 건다. (파티 전부, 걸러진 박스).
+
+    데리고 다니는 여섯은 늘 보여야 한다. 지금 뭐가 나와 있는지 보는
+    자리인데 거름망에 가려지면 '사라졌나' 하고 놀란다. 거름망은 박스가
+    몇십 마리로 늘었을 때 찾으려고 있는 것이다.
+    """
+    party, box = split(mons)
+    return party, apply(box, dex, type_id, query)
+
+
 def types_present(mons, dex):
     """지금 갖고 있는 포켓몬들의 타입만. 없는 타입까지 단추로 깔면
     열여덟 개가 늘어서서 정작 쓸 것을 못 찾는다."""

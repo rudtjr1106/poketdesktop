@@ -826,7 +826,7 @@
   "AGUAVBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
    "effect": {
     "kind": "held"
@@ -836,13 +836,13 @@
    "ident": "aguav-berry",
    "kr": "아바열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "APICOTBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 특수방어가 올라간다.",
    "effect": {
     "kind": "held"
@@ -852,13 +852,13 @@
    "ident": "apicot-berry",
    "kr": "규살열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "ASPEARBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 얼음을 회복한다.",
    "effect": {
     "kind": "held"
@@ -868,7 +868,7 @@
    "ident": "aspear-berry",
    "kr": "배리열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "AUSPICIOUSARMOR": {
@@ -892,7 +892,7 @@
   "BABIRIBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 강철 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -902,7 +902,7 @@
    "ident": "babiri-berry",
    "kr": "바리비열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "BIGMUSHROOM": {
@@ -956,7 +956,7 @@
   "BIGROOT": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 하면 HP 흡수 기술을 썼을 때 여느 때보다 많은 HP를 자신이 회복할 수 있다.",
    "effect": {
     "kind": "held"
@@ -966,7 +966,7 @@
    "ident": "big-root",
    "kr": "큰뿌리",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "BLACKAUGURITE": {
@@ -990,7 +990,7 @@
   "BLACKBELT": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "마음을 긴장시키는 띠. 지니게 하면 격투타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -1000,13 +1000,13 @@
    "ident": "black-belt",
    "kr": "검은띠",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "BLACKGLASSES": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "괴상하게 보이는 안경. 지니게 하면 악타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -1016,13 +1016,13 @@
    "ident": "black-glasses",
    "kr": "검은안경",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "BLACKSLUDGE": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 하면 독타입의 포켓몬은 조금씩 HP를 회복한다. 그 이외의 타입은 HP가 줄어 버린다.",
    "effect": {
     "kind": "held"
@@ -1032,7 +1032,7 @@
    "ident": "black-sludge",
    "kr": "검은오물",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "BOTTLECAP": {
@@ -1055,7 +1055,7 @@
   "BRIGHTPOWDER": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "반짝반짝 빛나는 가루. 지니게 하면 빛이 상대를 혼란시켜 기술이 명중되기 어려워진다.",
    "effect": {
     "kind": "held"
@@ -1065,7 +1065,7 @@
    "ident": "bright-powder",
    "kr": "반짝가루",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "CALCIUM": {
@@ -1101,7 +1101,7 @@
   "CHARCOAL": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "물건을 태우는 연료. 지니게 하면 불꽃타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -1111,13 +1111,13 @@
    "ident": "charcoal",
    "kr": "목탄",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "CHARTIBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 바위 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -1127,13 +1127,13 @@
    "ident": "charti-berry",
    "kr": "루미열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "CHERIBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 마비를 회복한다.",
    "effect": {
     "kind": "held"
@@ -1143,13 +1143,13 @@
    "ident": "cheri-berry",
    "kr": "버치열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "CHESTOBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 잠듦을 회복한다.",
    "effect": {
     "kind": "held"
@@ -1159,13 +1159,13 @@
    "ident": "chesto-berry",
    "kr": "유루열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "CHILANBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 노말 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -1175,7 +1175,7 @@
    "ident": "chilan-berry",
    "kr": "카리열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "CHIPPEDPOT": {
@@ -1200,7 +1200,7 @@
   "CHOICEBAND": {
    "cat": "held",
    "chance": 0.000511,
-   "cost": 4000,
+   "cost": 15000,
    "desc": "기술을 구애받는 머리띠. 지니게 하면 공격은 올라가지만 똑같은 기술밖에 쓰지 못한다.",
    "effect": {
     "kind": "held"
@@ -1210,13 +1210,13 @@
    "ident": "choice-band",
    "kr": "구애머리띠",
    "rarity": "epic",
-   "sell": 2000,
+   "sell": 7500,
    "weight": 5
   },
   "CHOICESCARF": {
    "cat": "held",
    "chance": 0.000511,
-   "cost": 4000,
+   "cost": 15000,
    "desc": "기술을 구애받는 스카프. 지니게 하면 스피드는 올라가지만 같은 기술밖에 쓸 수 없다.",
    "effect": {
     "kind": "held"
@@ -1226,13 +1226,13 @@
    "ident": "choice-scarf",
    "kr": "구애스카프",
    "rarity": "epic",
-   "sell": 2000,
+   "sell": 7500,
    "weight": 5
   },
   "CHOICESPECS": {
    "cat": "held",
    "chance": 0.000511,
-   "cost": 4000,
+   "cost": 15000,
    "desc": "기술을 구애받는 안경. 지니게 하면 특수공격이 올라가지만 같은 기술밖에 쓸 수 없다.",
    "effect": {
     "kind": "held"
@@ -1242,13 +1242,13 @@
    "ident": "choice-specs",
    "kr": "구애안경",
    "rarity": "epic",
-   "sell": 2000,
+   "sell": 7500,
    "weight": 5
   },
   "CHOPLEBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 격투 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -1258,7 +1258,7 @@
    "ident": "chople-berry",
    "kr": "로플열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "CLEVERWING": {
@@ -1282,7 +1282,7 @@
   "COBABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 비행 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -1292,13 +1292,13 @@
    "ident": "coba-berry",
    "kr": "바코열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "COLBURBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 악 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -1308,7 +1308,7 @@
    "ident": "colbur-berry",
    "kr": "마코열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "COMETSHARD": {
@@ -1349,7 +1349,7 @@
   "CUSTAPBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 한 번만 행동이 빨라진다.",
    "effect": {
     "kind": "held"
@@ -1359,7 +1359,7 @@
    "ident": "custap-berry",
    "kr": "애슈열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "DAWNSTONE": {
@@ -1423,7 +1423,7 @@
   "DRACOPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "드래곤타입의 석판. 지니게 하면 드래곤타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -1433,13 +1433,13 @@
    "ident": "draco-plate",
    "kr": "용의플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "DRAGONFANG": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "단단하고 날카로운 이빨. 지니게 하면 드래곤타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -1449,7 +1449,7 @@
    "ident": "dragon-fang",
    "kr": "용의이빨",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "DRAGONSCALE": {
@@ -1474,7 +1474,7 @@
   "DREADPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "악타입의 석판. 지니게 하면 악타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -1484,7 +1484,7 @@
    "ident": "dread-plate",
    "kr": "공포플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "DREAMBALL": {
@@ -1567,7 +1567,7 @@
   "EARTHPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "땅타입의 석판. 지니게 하면 땅타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -1577,7 +1577,7 @@
    "ident": "earth-plate",
    "kr": "대지플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "ELECTIRIZER": {
@@ -1602,7 +1602,7 @@
   "ENIGMABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 공격을 받았을 때 HP를 회복한다.",
    "effect": {
     "kind": "held"
@@ -1612,7 +1612,7 @@
    "ident": "enigma-berry",
    "kr": "의문열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "EVERSTONE": {
@@ -1634,7 +1634,7 @@
   "EXPERTBELT": {
    "cat": "held",
    "chance": 0.000511,
-   "cost": 4000,
+   "cost": 15000,
    "desc": "오래 사용한 까만 띠. 지니게 하면 효과가 뛰어날 때 기술의 위력이 조금 올라간다.",
    "effect": {
     "kind": "held"
@@ -1644,7 +1644,7 @@
    "ident": "expert-belt",
    "kr": "달인의띠",
    "rarity": "epic",
-   "sell": 2000,
+   "sell": 7500,
    "weight": 5
   },
   "FASTBALL": {
@@ -1668,7 +1668,7 @@
   "FIGYBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
    "effect": {
     "kind": "held"
@@ -1678,7 +1678,7 @@
    "ident": "figy-berry",
    "kr": "무화열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "FIRESTONE": {
@@ -1707,7 +1707,7 @@
   "FISTPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "격투타입의 석판. 지니게 하면 격투타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -1717,13 +1717,13 @@
    "ident": "fist-plate",
    "kr": "주먹플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "FLAMEORB": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "만지면 열을 내는 이상한 구슬. 지니게 하면 배틀 중에 화상 상태가 된다.",
    "effect": {
     "kind": "held"
@@ -1733,13 +1733,13 @@
    "ident": "flame-orb",
    "kr": "화염구슬",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "FLAMEPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "불꽃타입의 석판. 지니게 하면 불꽃타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -1749,13 +1749,13 @@
    "ident": "flame-plate",
    "kr": "불구슬플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "FOCUSBAND": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 하면 기절할 듯한 기술을 받아도 HP를 1 남겨서 견디기도 한다.",
    "effect": {
     "kind": "held"
@@ -1765,13 +1765,13 @@
    "ident": "focus-band",
    "kr": "기합의머리띠",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "FOCUSSASH": {
    "cat": "held",
    "chance": 0.000511,
-   "cost": 4000,
+   "cost": 15000,
    "desc": "지니게 하면 HP가 꽉 찼을 때 기절할 듯한 기술을 당해도 HP 1로 한 번은 버틴다.",
    "effect": {
     "kind": "held"
@@ -1781,7 +1781,7 @@
    "ident": "focus-sash",
    "kr": "기합의띠",
    "rarity": "epic",
-   "sell": 2000,
+   "sell": 7500,
    "weight": 5
   },
   "FRIENDBALL": {
@@ -1805,7 +1805,7 @@
   "FULLINCENSE": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 5000,
+   "cost": 10000,
    "desc": "이상한 향기의 향로. 지니게 한 포켓몬은 여느 때보다 행동이 느려진다.",
    "effect": {
     "kind": "held"
@@ -1815,13 +1815,13 @@
    "ident": "full-incense",
    "kr": "만복향로",
    "rarity": "rare",
-   "sell": 2500,
+   "sell": 5000,
    "weight": 14
   },
   "GANLONBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 방어가 올라간다.",
    "effect": {
     "kind": "held"
@@ -1831,7 +1831,7 @@
    "ident": "ganlon-berry",
    "kr": "용아열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "GENIUSWING": {
@@ -1908,7 +1908,7 @@
   "HABANBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 드래곤 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -1918,13 +1918,13 @@
    "ident": "haban-berry",
    "kr": "하반열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "HARDSTONE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "절대 깨지지 않는 돌. 지니게 하면 바위타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -1934,7 +1934,7 @@
    "ident": "hard-stone",
    "kr": "딱딱한돌",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "HEALBALL": {
@@ -2027,7 +2027,7 @@
   "IAPAPABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
    "effect": {
     "kind": "held"
@@ -2037,7 +2037,7 @@
    "ident": "iapapa-berry",
    "kr": "파야열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "ICESTONE": {
@@ -2064,7 +2064,7 @@
   "ICICLEPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "얼음타입의 석판. 지니게 하면 얼음타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -2074,13 +2074,13 @@
    "ident": "icicle-plate",
    "kr": "고드름플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "INSECTPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "벌레타입의 석판. 지니게 하면 벌레타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -2090,7 +2090,7 @@
    "ident": "insect-plate",
    "kr": "비단벌레플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "IRON": {
@@ -2111,7 +2111,7 @@
   "IRONBALL": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 하면 스피드가 떨어진다. 비행타입이나 부유포켓몬은 땅 기술에 맞아 버린다.",
    "effect": {
     "kind": "held"
@@ -2121,13 +2121,13 @@
    "ident": "iron-ball",
    "kr": "검은철구",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "IRONPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "강철타입의 석판. 지니게 하면 강철타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -2137,13 +2137,13 @@
    "ident": "iron-plate",
    "kr": "강철플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "JABOCABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 물리 기술을 당했을 때 상대에게도 데미지를 준다.",
    "effect": {
     "kind": "held"
@@ -2153,13 +2153,13 @@
    "ident": "jaboca-berry",
    "kr": "자보열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "KASIBBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 고스트 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -2169,13 +2169,13 @@
    "ident": "kasib-berry",
    "kr": "수불열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "KEBIABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 독 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -2185,7 +2185,7 @@
    "ident": "kebia-berry",
    "kr": "으름열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "KELPSYBERRY": {
@@ -2229,7 +2229,7 @@
   "LAGGINGTAIL": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "매우 무거운 무언가의 꼬리. 지니게 하면 여느 때보다 행동이 느려진다.",
    "effect": {
     "kind": "held"
@@ -2239,13 +2239,13 @@
    "ident": "lagging-tail",
    "kr": "느림보꼬리",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "LANSATBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 공격이 급소를 맞히기 쉬워진다.",
    "effect": {
     "kind": "held"
@@ -2255,13 +2255,13 @@
    "ident": "lansat-berry",
    "kr": "랑사열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "LAXINCENSE": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 5000,
+   "cost": 10000,
    "desc": "지니게 하면 향로의 이상한 향기가 상대를 혼란시켜 기술이 명중하기 어려워진다.",
    "effect": {
     "kind": "held"
@@ -2271,7 +2271,7 @@
    "ident": "lax-incense",
    "kr": "무사태평향로",
    "rarity": "rare",
-   "sell": 2500,
+   "sell": 5000,
    "weight": 14
   },
   "LEAFSTONE": {
@@ -2301,7 +2301,7 @@
   "LEFTOVERS": {
    "cat": "held",
    "chance": 0.000511,
-   "cost": 4000,
+   "cost": 15000,
    "desc": "지니게 하면 포켓몬의 HP가 배틀을 하는 동안 조금씩 회복된다.",
    "effect": {
     "kind": "held"
@@ -2311,13 +2311,13 @@
    "ident": "leftovers",
    "kr": "먹다남은음식",
    "rarity": "epic",
-   "sell": 2000,
+   "sell": 7500,
    "weight": 5
   },
   "LEPPABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 PP를 10만큼 회복한다.",
    "effect": {
     "kind": "held"
@@ -2327,7 +2327,7 @@
    "ident": "leppa-berry",
    "kr": "과사열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "LEVELBALL": {
@@ -2351,7 +2351,7 @@
   "LIECHIBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 공격이 올라간다.",
    "effect": {
     "kind": "held"
@@ -2361,13 +2361,13 @@
    "ident": "liechi-berry",
    "kr": "치리열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "LIFEORB": {
    "cat": "held",
    "chance": 0.000511,
-   "cost": 4000,
+   "cost": 15000,
    "desc": "지니게 하면 공격할 때마다 HP가 조금씩 줄지만 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -2377,7 +2377,7 @@
    "ident": "life-orb",
    "kr": "생명의구슬",
    "rarity": "epic",
-   "sell": 2000,
+   "sell": 7500,
    "weight": 5
   },
   "LINKINGCORD": {
@@ -2438,7 +2438,7 @@
   "LUCKYEGG": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 10000,
+   "cost": 20000,
    "desc": "행복이 가득한 알. 지니게 한 포켓몬은 받을 수 있는 경험치가 조금 늘어난다.",
    "effect": {
     "kind": "held"
@@ -2448,13 +2448,13 @@
    "ident": "lucky-egg",
    "kr": "행복의알",
    "rarity": "rare",
-   "sell": 5000,
+   "sell": 10000,
    "weight": 14
   },
   "LUMBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 모든 상태 이상을 회복한다.",
    "effect": {
     "kind": "held"
@@ -2464,7 +2464,7 @@
    "ident": "lum-berry",
    "kr": "리샘열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "LUXURYBALL": {
@@ -2488,7 +2488,7 @@
   "MACHOBRACE": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 3000,
+   "cost": 6000,
    "desc": "단단하고 무거운 깁스. 지니게 하면 스피드는 떨어지지만 여느 때보다 강하게 키우기 쉽다.",
    "effect": {
     "kind": "held"
@@ -2498,7 +2498,7 @@
    "ident": "macho-brace",
    "kr": "교정깁스",
    "rarity": "rare",
-   "sell": 1500,
+   "sell": 3000,
    "weight": 14
   },
   "MAGMARIZER": {
@@ -2523,7 +2523,7 @@
   "MAGNET": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "강력한 자석. 지니게 하면 전기타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -2533,13 +2533,13 @@
    "ident": "magnet",
    "kr": "자석",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "MAGOBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
    "effect": {
     "kind": "held"
@@ -2549,7 +2549,7 @@
    "ident": "mago-berry",
    "kr": "마고열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "MALICIOUSARMOR": {
@@ -2610,7 +2610,7 @@
   "MEADOWPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "풀타입의 석판. 지니게 하면 풀타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -2620,7 +2620,7 @@
    "ident": "meadow-plate",
    "kr": "초록플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "METALALLOY": {
@@ -2664,7 +2664,7 @@
   "METRONOME": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 하면 똑같은 기술을 연속으로 사용했을 때 위력이 올라간다. 그만두면 위력이 되돌아간다.",
    "effect": {
     "kind": "held"
@@ -2674,13 +2674,13 @@
    "ident": "metronome",
    "kr": "메트로놈",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "MICLEBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 한 번만 기술의 명중률이 올라간다.",
    "effect": {
     "kind": "held"
@@ -2690,13 +2690,13 @@
    "ident": "micle-berry",
    "kr": "미클열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "MINDPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "에스퍼타입의 석판. 지니게 하면 에스퍼타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -2706,13 +2706,13 @@
    "ident": "mind-plate",
    "kr": "이상한플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "MIRACLESEED": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "생명이 깃든 씨앗. 지니게 하면 풀타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -2722,7 +2722,7 @@
    "ident": "miracle-seed",
    "kr": "기적의씨",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "MOONBALL": {
@@ -2770,7 +2770,7 @@
   "MUSCLEBAND": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "힘이 끓어오르는 머리띠. 지니게 하면 물리 기술의 위력이 조금 올라간다.",
    "effect": {
     "kind": "held"
@@ -2780,7 +2780,7 @@
    "ident": "muscle-band",
    "kr": "힘의머리띠",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "MUSCLEWING": {
@@ -2804,7 +2804,7 @@
   "MYSTICWATER": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "물방울 모양의 보석. 지니게 하면 물타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -2814,7 +2814,7 @@
    "ident": "mystic-water",
    "kr": "신비의물방울",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "NESTBALL": {
@@ -2856,7 +2856,7 @@
   "NEVERMELTICE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "열을 가까이하지 않게 하는 얼음. 지니게 하면 얼음타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -2866,7 +2866,7 @@
    "ident": "never-melt-ice",
    "kr": "녹지않는얼음",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "NUGGET": {
@@ -2888,7 +2888,7 @@
   "OCCABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 불꽃 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -2898,13 +2898,13 @@
    "ident": "occa-berry",
    "kr": "오카열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "ODDINCENSE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 2000,
+   "cost": 6000,
    "desc": "이상한 향기의 향로. 지니게 하면 에스퍼타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -2914,13 +2914,13 @@
    "ident": "odd-incense",
    "kr": "괴상한향로",
    "rarity": "uncommon",
-   "sell": 1000,
+   "sell": 3000,
    "weight": 45
   },
   "ORANBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 HP를 10만큼 회복한다.",
    "effect": {
     "kind": "held"
@@ -2930,7 +2930,7 @@
    "ident": "oran-berry",
    "kr": "오랭열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "OVALSTONE": {
@@ -2955,7 +2955,7 @@
   "PASSHOBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 물 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -2965,13 +2965,13 @@
    "ident": "passho-berry",
    "kr": "꼬시개열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "PAYAPABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 에스퍼 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -2981,7 +2981,7 @@
    "ident": "payapa-berry",
    "kr": "야파열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "PEARL": {
@@ -3021,7 +3021,7 @@
   "PECHABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 독을 회복한다.",
    "effect": {
     "kind": "held"
@@ -3031,13 +3031,13 @@
    "ident": "pecha-berry",
    "kr": "복슝열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "PETAYABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 특수공격이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3047,13 +3047,13 @@
    "ident": "petaya-berry",
    "kr": "야타비열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "POISONBARB": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "독이 있는 작은 침. 지니게 하면 독타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3063,7 +3063,7 @@
    "ident": "poison-barb",
    "kr": "독바늘",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "POKEBALL": {
@@ -3104,7 +3104,7 @@
   "POWERANKLET": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 3000,
+   "cost": 6000,
    "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 스피드를 올리면서 키우기가 쉽다.",
    "effect": {
     "kind": "held"
@@ -3114,13 +3114,13 @@
    "ident": "power-anklet",
    "kr": "파워앵클릿",
    "rarity": "rare",
-   "sell": 1500,
+   "sell": 3000,
    "weight": 14
   },
   "POWERBAND": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 3000,
+   "cost": 6000,
    "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 특수방어를 올리면서 키우기가 쉽다.",
    "effect": {
     "kind": "held"
@@ -3130,13 +3130,13 @@
    "ident": "power-band",
    "kr": "파워밴드",
    "rarity": "rare",
-   "sell": 1500,
+   "sell": 3000,
    "weight": 14
   },
   "POWERBELT": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 3000,
+   "cost": 6000,
    "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 방어를 올리면서 키우기가 쉽다.",
    "effect": {
     "kind": "held"
@@ -3146,13 +3146,13 @@
    "ident": "power-belt",
    "kr": "파워벨트",
    "rarity": "rare",
-   "sell": 1500,
+   "sell": 3000,
    "weight": 14
   },
   "POWERBRACER": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 3000,
+   "cost": 6000,
    "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 공격을 올리면서 키우기가 쉽다.",
    "effect": {
     "kind": "held"
@@ -3162,13 +3162,13 @@
    "ident": "power-bracer",
    "kr": "파워리스트",
    "rarity": "rare",
-   "sell": 1500,
+   "sell": 3000,
    "weight": 14
   },
   "POWERLENS": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 3000,
+   "cost": 6000,
    "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 특수공격을 올리면서 키우기가 쉽다.",
    "effect": {
     "kind": "held"
@@ -3178,13 +3178,13 @@
    "ident": "power-lens",
    "kr": "파워렌즈",
    "rarity": "rare",
-   "sell": 1500,
+   "sell": 3000,
    "weight": 14
   },
   "POWERWEIGHT": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 3000,
+   "cost": 6000,
    "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 HP를 올리면서 키우기가 쉽다.",
    "effect": {
     "kind": "held"
@@ -3194,7 +3194,7 @@
    "ident": "power-weight",
    "kr": "파워웨이트",
    "rarity": "rare",
-   "sell": 1500,
+   "sell": 3000,
    "weight": 14
   },
   "PREMIERBALL": {
@@ -3323,7 +3323,7 @@
   "QUICKCLAW": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "가볍고 날카로운 손톱. 지니게 하면 상대보다 먼저 행동할 수도 있다.",
    "effect": {
     "kind": "held"
@@ -3333,7 +3333,7 @@
    "ident": "quick-claw",
    "kr": "선제공격손톱",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "RAREBONE": {
@@ -3372,7 +3372,7 @@
   "RAWSTBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 화상을 회복한다.",
    "effect": {
     "kind": "held"
@@ -3382,7 +3382,7 @@
    "ident": "rawst-berry",
    "kr": "복분열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "RAZORCLAW": {
@@ -3481,7 +3481,7 @@
   "RINDOBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 풀 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -3491,13 +3491,13 @@
    "ident": "rindo-berry",
    "kr": "린드열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "ROCKINCENSE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 2000,
+   "cost": 6000,
    "desc": "이상한 향기의 향로. 지니게 하면 바위타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3507,13 +3507,13 @@
    "ident": "rock-incense",
    "kr": "암석향로",
    "rarity": "uncommon",
-   "sell": 1000,
+   "sell": 3000,
    "weight": 45
   },
   "ROSEINCENSE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 2000,
+   "cost": 6000,
    "desc": "이상한 향기의 향로. 지니게 하면 풀타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3523,13 +3523,13 @@
    "ident": "rose-incense",
    "kr": "꽃향로",
    "rarity": "uncommon",
-   "sell": 1000,
+   "sell": 3000,
    "weight": 45
   },
   "ROWAPBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 특수 기술을 당했을 때 상대에게도 데미지를 준다.",
    "effect": {
     "kind": "held"
@@ -3539,7 +3539,7 @@
    "ident": "rowap-berry",
    "kr": "애터열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "SACHET": {
@@ -3564,7 +3564,7 @@
   "SALACBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 스피드가 올라간다.",
    "effect": {
     "kind": "held"
@@ -3574,13 +3574,13 @@
    "ident": "salac-berry",
    "kr": "캄라열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "SCOPELENS": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "약점이 보이는 렌즈. 지니게 한 포켓몬의 기술이 급소에 맞기 쉬워진다.",
    "effect": {
     "kind": "held"
@@ -3590,7 +3590,7 @@
    "ident": "scope-lens",
    "kr": "초점렌즈",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "SCROLLOFDARKNESS": {
@@ -3614,7 +3614,7 @@
   "SEAINCENSE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 2000,
+   "cost": 6000,
    "desc": "이상한 향기의 향로. 지니게 하면 물타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3624,13 +3624,13 @@
    "ident": "sea-incense",
    "kr": "바닷물향로",
    "rarity": "uncommon",
-   "sell": 1000,
+   "sell": 3000,
    "weight": 45
   },
   "SHARPBEAK": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "길고 뾰족한 부리. 지니게 하면 비행타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3640,13 +3640,13 @@
    "ident": "sharp-beak",
    "kr": "예리한부리",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "SHELLBELL": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 한 포켓몬이 공격하여 상대에게 데미지를 줬을 때 HP를 조금 회복할 수 있다.",
    "effect": {
     "kind": "held"
@@ -3656,7 +3656,7 @@
    "ident": "shell-bell",
    "kr": "조개껍질방울",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "SHINYSTONE": {
@@ -3684,7 +3684,7 @@
   "SHUCABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 땅 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -3694,13 +3694,13 @@
    "ident": "shuca-berry",
    "kr": "슈캐열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "SILKSCARF": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "감촉이 좋은 스카프. 지니게 하면 노말타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3710,13 +3710,13 @@
    "ident": "silk-scarf",
    "kr": "실크스카프",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "SILVERPOWDER": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "은색으로 반짝이는 가루. 지니게 하면 벌레타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3726,13 +3726,13 @@
    "ident": "silver-powder",
    "kr": "은빛가루",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "SITRUSBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 HP를 조금 회복한다.",
    "effect": {
     "kind": "held"
@@ -3742,13 +3742,13 @@
    "ident": "sitrus-berry",
    "kr": "자뭉열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "SKYPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "비행타입의 석판. 지니게 하면 비행타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -3758,13 +3758,13 @@
    "ident": "sky-plate",
    "kr": "푸른하늘플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "SMOKEBALL": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 한 포켓몬은 야생 포켓몬과의 배틀에서 반드시 도망칠 수 있다.",
    "effect": {
     "kind": "held"
@@ -3774,13 +3774,13 @@
    "ident": "smoke-ball",
    "kr": "연막탄",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "SOFTSAND": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "만지면 보슬보슬한 모래. 지니게 하면 땅타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3790,13 +3790,13 @@
    "ident": "soft-sand",
    "kr": "부드러운모래",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "SOOTHEBELL": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "기분 좋은 소리의 방울. 지니게 한 포켓몬은 마음이 편안해져 친밀해지기 쉬워진다.",
    "effect": {
     "kind": "held"
@@ -3806,13 +3806,13 @@
    "ident": "soothe-bell",
    "kr": "평온의방울",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "SPELLTAG": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "괴상하고 으스스한 부적. 지니게 하면 고스트타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -3822,13 +3822,13 @@
    "ident": "spell-tag",
    "kr": "저주의부적",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "SPLASHPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "물타입의 석판. 지니게 하면 물타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -3838,13 +3838,13 @@
    "ident": "splash-plate",
    "kr": "물방울플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "SPOOKYPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "고스트타입의 석판. 지니게 하면 고스트타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -3854,7 +3854,7 @@
    "ident": "spooky-plate",
    "kr": "원령플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "STARDUST": {
@@ -3876,7 +3876,7 @@
   "STARFBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 능력 중의 하나가 크게 올라간다.",
    "effect": {
     "kind": "held"
@@ -3886,7 +3886,7 @@
    "ident": "starf-berry",
    "kr": "스타열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "STARPIECE": {
@@ -3908,7 +3908,7 @@
   "STICKYBARB": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 하면 매 턴 데미지를 입는다. 자신에게 접촉해온 상대에게 들러붙기도 한다.",
    "effect": {
     "kind": "held"
@@ -3918,13 +3918,13 @@
    "ident": "sticky-barb",
    "kr": "끈적끈적바늘",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "STONEPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "바위타입의 석판. 지니게 하면 바위타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -3934,7 +3934,7 @@
    "ident": "stone-plate",
    "kr": "암석플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "SUNSTONE": {
@@ -4036,7 +4036,7 @@
   "TANGABERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 벌레 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -4046,7 +4046,7 @@
    "ident": "tanga-berry",
    "kr": "리체열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "TARTAPPLE": {
@@ -4130,7 +4130,7 @@
   "TOXICORB": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "만지면 독을 발산하는 이상한 구슬. 지니게 하면 배틀 중에 맹독 상태가 된다.",
    "effect": {
     "kind": "held"
@@ -4140,13 +4140,13 @@
    "ident": "toxic-orb",
    "kr": "맹독구슬",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "TOXICPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "독타입의 석판. 지니게 하면 독타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -4156,13 +4156,13 @@
    "ident": "toxic-plate",
    "kr": "맹독플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "TWISTEDSPOON": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "염동력을 담은 숟가락. 지니게 하면 에스퍼타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -4172,7 +4172,7 @@
    "ident": "twisted-spoon",
    "kr": "휘어진스푼",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "ULTRABALL": {
@@ -4232,7 +4232,7 @@
   "WACANBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 전기 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -4242,7 +4242,7 @@
    "ident": "wacan-berry",
    "kr": "초나열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "WATERSTONE": {
@@ -4272,7 +4272,7 @@
   "WAVEINCENSE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 2000,
+   "cost": 6000,
    "desc": "이상한 향기의 향로. 지니게 하면 물타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "held"
@@ -4282,7 +4282,7 @@
    "ident": "wave-incense",
    "kr": "잔물결향로",
    "rarity": "uncommon",
-   "sell": 1000,
+   "sell": 3000,
    "weight": 45
   },
   "WHIPPEDDREAM": {
@@ -4307,7 +4307,7 @@
   "WHITEHERB": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 한 포켓몬의 능력이 떨어졌을 때 한 번만 원래 상태로 돌아온다.",
    "effect": {
     "kind": "held"
@@ -4317,13 +4317,13 @@
    "ident": "white-herb",
    "kr": "하양허브",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "WIDELENS": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "물건이 크게 보이는 렌즈. 지니게 하면 기술의 명중률이 조금 올라간다.",
    "effect": {
     "kind": "held"
@@ -4333,13 +4333,13 @@
    "ident": "wide-lens",
    "kr": "광각렌즈",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "WIKIBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
    "effect": {
     "kind": "held"
@@ -4349,13 +4349,13 @@
    "ident": "wiki-berry",
    "kr": "위키열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "WISEGLASSES": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "두꺼운 렌즈를 붙인 안경. 지니게 하면 특수 기술의 위력이 조금 올라간다.",
    "effect": {
     "kind": "held"
@@ -4365,13 +4365,13 @@
    "ident": "wise-glasses",
    "kr": "박식안경",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   },
   "YACHEBERRY": {
    "cat": "held",
    "chance": 0.010217,
-   "cost": 80,
+   "cost": 1000,
    "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 얼음 기술을 당했을 때 위력이 약해진다.",
    "effect": {
     "kind": "held"
@@ -4381,13 +4381,13 @@
    "ident": "yache-berry",
    "kr": "플카열매",
    "rarity": "common",
-   "sell": 40,
+   "sell": 500,
    "weight": 100
   },
   "ZAPPLATE": {
    "cat": "held",
    "chance": 0.004597,
-   "cost": 1000,
+   "cost": 3000,
    "desc": "전기타입의 석판. 지니게 하면 전기타입 기술의 위력이 강해진다.",
    "effect": {
     "kind": "held"
@@ -4397,7 +4397,7 @@
    "ident": "zap-plate",
    "kr": "우레플레이트",
    "rarity": "uncommon",
-   "sell": 500,
+   "sell": 1500,
    "weight": 45
   },
   "ZINC": {
@@ -4418,7 +4418,7 @@
   "ZOOMLENS": {
    "cat": "held",
    "chance": 0.00143,
-   "cost": 4000,
+   "cost": 8000,
    "desc": "지니게 한 포켓몬이 상대보다도 행동하는 것이 늦을 때 기술이 명중하기 쉬워진다.",
    "effect": {
     "kind": "held"
@@ -4428,7 +4428,7 @@
    "ident": "zoom-lens",
    "kr": "포커스렌즈",
    "rarity": "rare",
-   "sell": 2000,
+   "sell": 4000,
    "weight": 14
   }
  },

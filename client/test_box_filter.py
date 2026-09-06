@@ -83,6 +83,24 @@ def main():
     chk("불꽃·물·풀·전기·노말·비행·독", set(types) == {"FIRE", "WATER", "GRASS", "POISON", "ELECTRIC", "NORMAL", "FLYING"}, types)
     chk("처음 나온 순서", types[0] == "FIRE" and types[1] == "WATER", types[:3])
 
+    print("-- 거름망은 PC 박스에만")
+    for m in mons[:3]:
+        m["onDesktop"] = True                 # 파이리·꼬부기·이상해씨가 파티
+    party, box = F.split(mons)
+    chk("파티 셋 · 박스 셋", ([m["num"] for m in party], [m["num"] for m in box]) == ([4, 7, 1], [25, 133, 6]))
+    party, box = F.apply_box(mons, dex, type_id="FIRE")
+    chk("타입을 걸어도 파티는 그대로", [m["num"] for m in party] == [4, 7, 1], [m["num"] for m in party])
+    chk("박스만 걸러진다 (리자몽)", [m["num"] for m in box] == [6], [m["num"] for m in box])
+    party, box = F.apply_box(mons, dex, query="꼬부기")
+    chk("이름을 걸어도 파티는 그대로 (꼬부기는 파티에 있다)", [m["num"] for m in party] == [4, 7, 1])
+    chk("박스에는 없으니 빈 목록", box == [])
+    party, box = F.apply_box(mons, dex, type_id="DRAGON")
+    chk("아무것도 안 맞아도 파티는 남는다", len(party) == 3 and box == [])
+    chk("박스에 있는 타입만 (전기·노말·불꽃·비행)", set(F.types_present(F.split(mons)[1], dex)) == {"ELECTRIC", "NORMAL", "FIRE", "FLYING"},
+        F.types_present(F.split(mons)[1], dex))
+    for m in mons[:3]:
+        m["onDesktop"] = False
+
     print("-- 도감이 없어도 안 터진다")
     chk("dex None 이면 타입 거르기는 전부 걸러진다", F.apply(mons, None, type_id="FIRE") == [])
     chk("dex None 이어도 이름으로는 찾는다", [m["num"] for m in F.apply(mons, None, query="불꽃이")] == [4])
