@@ -121,38 +121,44 @@ def main():
         and items["POKEBALL"].get("holdable") is False)
     chk("금속코트는 돌이지만 지닐 수 있다",
         items["METALCOAT"]["cat"] == "stone" and items["METALCOAT"].get("holdable") is True)
-    chk("오랭열매는 80원", items["ORANBERRY"]["cost"] == 80, items["ORANBERRY"]["cost"])
+    # 값은 본가 정가가 아니다 (tools/build_items._held_price). 열매 1000,
+    # 판을 바꾸는 것 15000. 정가대로면 첫날에 구애머리띠까지 다 산다.
+    chk("열매는 1,000원", items["ORANBERRY"]["cost"] == 1000, items["ORANBERRY"]["cost"])
+    chk("선제공격손톱은 8,000원", items["QUICKCLAW"]["cost"] == 8000, items["QUICKCLAW"]["cost"])
+    chk("구애머리띠·생명의구슬·먹다남은음식은 15,000원",
+        all(items[k]["cost"] == 15000 for k in ("CHOICEBAND", "LIFEORB", "LEFTOVERS")))
+    chk("파는 값은 사는 값의 절반", items["QUICKCLAW"]["sell"] == 4000, items["QUICKCLAW"]["sell"])
+    chk("목탄(타입 강화)은 3,000원", items["CHARCOAL"]["cost"] == 3000, items["CHARCOAL"]["cost"])
 
     section("돈 벌기")
-    money = earn(token, 200)
-    chk("열매 둘을 살 만큼 벌었다", money >= 160, money)
-    if money < 160:
+    money = earn(token, 2100)
+    chk("열매 둘을 살 만큼 벌었다", money >= 2000, money)
+    if money < 2000:
         print("  (돈이 모자라 나머지 검사를 건너뛴다)")
         return finish(token)
 
     section("사서 지니게 하기")
-    st, r = call("POST", "/api/shop/buy", {"item": "ORANBERRY", "count": 2}, token)
-    chk("오랭열매 둘을 산다", st == 200, (st, r))
+    st, r = call("POST", "/api/shop/buy", {"item": "ORANBERRY", "count": 1}, token)
+    chk("오랭열매를 산다", st == 200, (st, r))
+    st, r = call("POST", "/api/shop/buy", {"item": "CHERIBERRY", "count": 1}, token)
+    chk("버치열매를 산다", st == 200, (st, r))
     st, r = call("POST", "/api/pokemon/%d/hold" % pid, {"item": "ORANBERRY"}, token)
     chk("지니게 한다", st == 200 and r.get("ok"), (st, r))
     chk("응답의 포켓몬에 held 가 있다", r.get("pokemon", {}).get("held") == "ORANBERRY", r.get("pokemon", {}).get("held"))
     chk("한글 이름과 설명도 온다", r["pokemon"].get("heldKr") == "오랭열매" and r["pokemon"].get("heldDesc"),
         (r["pokemon"].get("heldKr"), r["pokemon"].get("heldDesc")))
-    chk("가방에서 하나 빠졌다", bag(token).get("ORANBERRY") == 1, bag(token))
+    chk("가방에서 빠졌다", not bag(token).get("ORANBERRY"), bag(token))
     st, r = call("GET", "/api/pokemon", token=token)
     chk("목록에서도 보인다", r["pokemon"][0].get("heldKr") == "오랭열매", r["pokemon"][0].get("heldKr"))
 
     section("같은 것 · 바꾸기")
     st, r = call("POST", "/api/pokemon/%d/hold" % pid, {"item": "ORANBERRY"}, token)
-    chk("이미 지닌 것을 또 주면 그대로 (가방 안 줄어듦)", st == 200 and bag(token).get("ORANBERRY") == 1, (st, bag(token)))
-    st, r = call("POST", "/api/shop/buy", {"item": "CHERIBERRY", "count": 1}, token)
-    if st == 200:
-        st, r = call("POST", "/api/pokemon/%d/hold" % pid, {"item": "CHERIBERRY"}, token)
-        chk("다른 도구로 바꾼다", st == 200 and r["pokemon"].get("held") == "CHERIBERRY", (st, r))
-        b = bag(token)
-        chk("전에 지닌 것은 가방으로 돌아온다", b.get("ORANBERRY") == 2 and not b.get("CHERIBERRY"), b)
-    else:
-        print("  (버치열매를 못 사서 바꾸기 검사는 건너뛴다: %s)" % (r,))
+    chk("이미 지닌 것을 또 주면 그대로 (가방도 그대로 - 없음)",
+        st == 200 and not bag(token).get("ORANBERRY"), (st, bag(token)))
+    st, r = call("POST", "/api/pokemon/%d/hold" % pid, {"item": "CHERIBERRY"}, token)
+    chk("다른 도구로 바꾼다", st == 200 and r["pokemon"].get("held") == "CHERIBERRY", (st, r))
+    b = bag(token)
+    chk("전에 지닌 것은 가방으로 돌아온다", b.get("ORANBERRY") == 1 and not b.get("CHERIBERRY"), b)
 
     section("못 하는 것")
     st, r = call("POST", "/api/pokemon/%d/hold" % pid, {"item": "POKEBALL"}, token)

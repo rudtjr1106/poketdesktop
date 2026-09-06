@@ -206,6 +206,26 @@ def _held_rarity(ident, cost):
     return "rare"
 
 
+def _held_price(ident, cost):
+    """지닌 도구의 상점가. **본가 정가보다 훨씬 비싸다.**
+
+    본가 정가(열매 80원, 선제공격손톱 4000원)는 이 게임의 돈 크기에서
+    너무 싸다. 여기서 돈은 PvP 한 판에 500원, 드랍을 팔아 몇백 원이다.
+    정가대로 두면 첫날에 구애머리띠까지 다 산다. 배틀을 바꾸는 도구는
+    배틀을 해서 모아야 한다 - 선제공격손톱 하나가 PvP 열여섯 판이다.
+
+    띠로 나눈다. 열매(정가 80)는 1000, 타입 강화·플레이트·향로(1000~2000)는
+    세 배, 나머지 배틀 도구(3000 이상)는 두 배, 판을 바꾸는 것은 15000.
+    """
+    if ident in HELD_EPIC:
+        return 15000
+    if cost <= 100:
+        return 1000
+    if cost <= 2000:
+        return cost * 3
+    return cost * 2
+
+
 def norm(s):
     return re.sub(r"[^0-9A-Z]", "", (s or "").upper())
 
@@ -322,6 +342,7 @@ def build(pokedex_path):
     # 위의 already 는 돌을 더하기 전에 만든 것이라 여기서 다시 만든다.
     already = set(x[0] for x in entries)
     held_count = 0
+    held_price = {}
     for iid in sorted(held_ids):
         ident = ident_by_id.get(iid)
         if not ident or ident in HELD_SKIP or ident in already:
@@ -329,6 +350,7 @@ def build(pokedex_path):
         cost = cost_of.get(iid, 0)
         entries.append((ident, "held", _held_rarity(ident, cost),
                         {"kind": "held"}))
+        held_price[ident] = _held_price(ident, cost)
         held_count += 1
     sys.stderr.write("  지닌 도구 %d종 (뺀 것 %d종)\n"
                      % (held_count, len(HELD_SKIP)))
@@ -340,7 +362,9 @@ def build(pokedex_path):
         if iid is None:
             missing.append(ident)
             continue
-        cost = PRICE_OVERRIDE.get(ident, cost_of.get(iid, 0))
+        # 지닌 도구는 본가 정가가 아니라 _held_price 다 (돌로 남긴 넷은
+        # 돌값 그대로). 손으로 적은 PRICE_OVERRIDE 가 그보다 앞선다.
+        cost = PRICE_OVERRIDE.get(ident, held_price.get(ident, cost_of.get(iid, 0)))
         name = kr.get(iid) or en.get(iid) or ident
         d = {
             "id": norm(ident),

@@ -234,15 +234,20 @@ class BoxWindow(object):
         wrap = tk.Frame(parent, bg=U.BG)
         wrap.pack(side="left", fill="both", expand=True)
 
-        # 거르기. 타입 칩은 갖고 있는 타입만 깔린다 (_refresh_filter_bar).
-        # 열여덟 개를 다 깔면 정작 쓸 것을 못 찾는다. 이름은 별명·종 이름·
-        # 도감 번호를 다 본다 (box_filter).
+        # 거르기. **PC 박스에만** 걸린다 - 데리고 다니는 여섯은 늘 보인다.
+        # 타입은 드롭다운이다. 처음에는 칩으로 깔았는데 박스가 차면 타입이
+        # 열댓 개가 되어 줄이 잘려 나갔다. 이름은 별명·종 이름·도감 번호를
+        # 다 본다 (box_filter).
         bar = tk.Frame(wrap, bg=U.BG2, height=40)
         bar.pack(fill="x")
         bar.pack_propagate(False)
-        self.filter_chips = tk.Frame(bar, bg=U.BG2)
-        self.filter_chips.pack(side="left", padx=(10, 0), fill="y")
+        tk.Label(bar, text="PC 박스", bg=U.BG2, fg=U.FG_DIM,
+                 font=U.FONT_XS).pack(side="left", padx=(12, 6))
         self.f_type = None
+        self.type_choices = []
+        self.btn_type = U.ghost_button(bar, "타입: 전체", self._open_type_menu,
+                                       height=26)
+        self.btn_type.pack(side="left", pady=7)
         self.f_query = tk.StringVar()
         self.f_query.trace_add("write", lambda *_a: self._refilter())
         box = U.entry(bar, self.f_query, width=12)
@@ -515,33 +520,69 @@ class BoxWindow(object):
 
     # ---------------- 거르기 ----------------
     def _refresh_filter_bar(self):
-        """갖고 있는 타입만 칩으로 깐다. 고르고 있던 타입이 사라졌으면 푼다."""
-        for w in self.filter_chips.winfo_children():
-            w.destroy()
+        """박스에 있는 타입만 고를 수 있게 한다. 고르던 타입이 사라졌으면 푼다."""
         dex = self.app.dex
-        types = box_filter.types_present(self.mons, dex)
-        if self.f_type and self.f_type not in types:
+        _party, box = box_filter.split(self.mons)
+        self.type_choices = box_filter.types_present(box, dex)
+        if self.f_type and self.f_type not in self.type_choices:
             self.f_type = None
-        self._chips = {}
-        self._chip_add(None, "전체", U.BG3, U.FG)
-        for t in types:
-            self._chip_add(t, dex.type_name(t) if dex else t,
-                           U.TYPE_COLOR.get(t, U.BG3), "#14141a")
+        self._show_type()
 
-    def _chip_add(self, t, label, bg, fg):
-        on = (t == self.f_type)
-        c = U.chip(self.filter_chips, label, bg, fg=fg, padx=8, pady=3)
-        c.configure(cursor="hand2", highlightthickness=2,
-                    highlightbackground=U.ACCENT if on else U.BG2)
-        c.pack(side="left", padx=(0, 4), pady=7)
-        c.bind("<Button-1>", lambda _e, x=t: self._set_type(x))
-        self._chips[t] = c
+    def _show_type(self):
+        dex = self.app.dex
+        name = (dex.type_name(self.f_type) if (dex and self.f_type)
+                else (self.f_type or "전체"))
+        self.btn_type.configure(text="타입: %s" % name)
+
+    def _type_rows(self):
+        """드롭다운 줄 목록. 맨 위가 '전체', 그 아래 박스에 있는 타입."""
+        dex = self.app.dex
+        rows = [{"text": "전체", "checked": self.f_type is None,
+                 "command": lambda: self._set_type(None)}]
+        if self.type_choices:
+            rows.append(None)
+        for t in self.type_choices:
+            rows.append({"text": dex.type_name(t) if dex else t,
+                         "checked": self.f_type == t,
+                         "command": (lambda x=t: self._set_type(x))})
+        return rows
+
+    def _open_type_menu(self):
+        """타입 드롭다운.
+
+        맥에서는 tk.Menu 를 쓰면 안 된다 - aqua 의 NSMenu 는 여는 순간
+        Tk 의 after 타이머와 부딪혀 앱이 죽는다 (ui_common.PopupMenu 머리말).
+        ball_menu 와 같은 갈림길을 쓴다.
+        """
+        from . import platform_os as PLAT
+        # 단추 바로 아래에 연다. PushButton 의 바깥 틀이 holder 다.
+        w = getattr(self.btn_type, "holder", None)
+        try:
+            x = w.winfo_rootx()
+            y = w.winfo_rooty() + w.winfo_height() + 2
+        except Exception:                                   # noqa: BLE001
+            x, y = self.win.winfo_rootx() + 80, self.win.winfo_rooty() + 120
+        rows = self._type_rows()
+        if not PLAT.NATIVE_MENU:
+            return U.PopupMenu(self.root, rows, x, y, width=180)
+        m = tk.Menu(self.root, tearoff=0, bg=U.BG2, fg=U.FG,
+                    activebackground=U.BG4, activeforeground=U.FG,
+                    bd=0, font=U.FONT_S)
+        for row in rows:
+            if row is None:
+                m.add_separator()
+                continue
+            mark = "✓ " if row.get("checked") else "    "
+            m.add_command(label=mark + row["text"], command=row["command"])
+        try:
+            m.tk_popup(x, y)
+        finally:
+            m.grab_release()
+        return m
 
     def _set_type(self, t):
-        self.f_type = None if t == self.f_type and t is not None else t
-        for key, c in self._chips.items():
-            c.configure(highlightbackground=U.ACCENT if key == self.f_type
-                        else U.BG2)
+        self.f_type = t
+        self._show_type()
         self._refilter()
 
     def _refilter(self):
@@ -554,37 +595,38 @@ class BoxWindow(object):
         for w in self.inner.winfo_children():
             w.destroy()
         self.rows = {}
-        shown = box_filter.apply(self.mons, self.app.dex, self.f_type,
-                                 self.f_query.get())
-        party = [m for m in shown if m.get("onDesktop")]
-        box = [m for m in shown if not m.get("onDesktop")]
+        # 거름망은 박스에만. 데리고 다니는 여섯은 늘 그대로 보인다.
+        party, box = box_filter.apply_box(self.mons, self.app.dex, self.f_type,
+                                          self.f_query.get())
+        box_all = len(self.mons) - len(party)
+        filtered = bool(self.f_type or self.f_query.get().strip())
         for m in party:
             self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
                                      self.select, self._dnd).pack()
             tk.Frame(self.inner, bg="#1a1f2e", height=1).pack(fill="x")
-        if box:
+        if box_all:
             sep = tk.Frame(self.inner, bg=U.INK, height=28)
             sep.pack(fill="x")
             sep.pack_propagate(False)
-            U.marker_label(sep, "PC 박스 · %d마리" % len(box), bg=U.INK,
+            label = ("PC 박스 · %d마리 중 %d마리" % (box_all, len(box)) if filtered
+                     else "PC 박스 · %d마리" % box_all)
+            U.marker_label(sep, label, bg=U.INK,
                            mark=U.FG_FAINT).pack(side="left", padx=12, pady=7)
             tk.Frame(self.inner, bg=U.LINE, height=2).pack(fill="x")
             for m in box:
                 self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
                                          self.select, self._dnd).pack()
                 tk.Frame(self.inner, bg="#161a24", height=1).pack(fill="x")
-        if not shown and self.mons:
-            tk.Label(self.inner, text="거름망에 맞는 포켓몬이 없습니다.",
-                     bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S).pack(pady=28)
+            if not box and filtered:
+                tk.Label(self.inner, text="거름망에 맞는 포켓몬이 박스에 없습니다.",
+                         bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S).pack(pady=22)
 
         # 행이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게
         # 여기서 다시 맞춘다.
         self.fit_scroll()
-        all_party = sum(1 for m in self.mons if m.get("onDesktop"))
-        text = "보유 %d마리  ·  데리고 다니는 중 %d마리" % (len(self.mons), all_party)
-        if len(shown) != len(self.mons):
-            text += "  ·  표시 %d마리" % len(shown)
-        self.count.configure(text=text)
+        self.count.configure(text="보유 %d마리  ·  데리고 다니는 중 %d마리"
+                                  % (len(self.mons), len(party)))
+        shown = party + box
         if keep and keep in self.rows:
             self.select(keep)
         elif shown:
