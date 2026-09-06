@@ -323,7 +323,24 @@ def main():
     with_ev = [m for m in mons if m["info"].get("evTotal", 0) > 0]
     chk("배틀로 노력치가 쌓인다", len(with_ev) > 0,
         [(m["info"]["name"], m["info"].get("evTotal")) for m in mons[:3]])
-    chk("학습장치로 여러 마리가 받는다", len(with_ev) > 1, len(with_ev))
+    # 학습장치 몫은 **데리고 다니는** 애들에게만 간다. 잡기는 운이라 둘째가
+    # 없을 수 있고, 잡은 뒤에 이긴 판이 없으면 둘째는 아직 못 받았을 수
+    # 있다. 전제가 있을 때만 보고, 몇 판 더 이겨 본 뒤 판정한다 - 이걸
+    # 안 하면 세 번에 한 번쯤 CI 가 헛되이 빨갛게 된다.
+    party = [m for m in mons if m.get("onDesktop")]
+    if len(party) > 1:
+        for _ in range(8):
+            if len(with_ev) > 1:
+                break
+            wd = wild(token)
+            if wd:
+                battle_once(token, wd)
+            st, p = call("GET", "/api/pokemon", token=token)
+            mons = p.get("pokemon", [])
+            with_ev = [m for m in mons if m["info"].get("evTotal", 0) > 0]
+        chk("학습장치로 여러 마리가 받는다", len(with_ev) > 1, len(with_ev))
+    else:
+        note("데리고 다니는 포켓몬이 하나뿐이라 학습장치 검사는 건너뛴다 (잡기가 운)")
     if with_ev:
         note("%s 노력치 %s" % (with_ev[0]["info"]["name"],
                             dict((k, v) for k, v in
