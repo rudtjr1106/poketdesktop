@@ -366,6 +366,33 @@ class BoxWindow(object):
         self.d_types = tk.Frame(p, bg=U.BG2)
         self.d_types.pack(anchor="w", pady=(8, 0))
 
+        # 특성과 성격이 무슨 뜻인지. 이름만 있으면 알 수가 없다 - '고집'
+        # 이 무엇을 올리는지, '맹화' 가 언제 발동하는지는 본가를 오래 한
+        # 사람만 안다. 설명은 도감이 들고 온다 (pokelogic.describe 의
+        # abilityNote / natureNote).
+        tb = tk.Frame(p, bg="#101623", highlightthickness=2,
+                      highlightbackground=U.LINE)
+        tb.pack(fill="x", pady=(10, 0))
+        self.d_trait = {}
+        for key, title in (("ability", "특성"), ("nature", "성격")):
+            row = tk.Frame(tb, bg="#101623")
+            row.pack(fill="x", padx=11, pady=(8 if key == "ability" else 4,
+                                              8 if key == "nature" else 0))
+            top = tk.Frame(row, bg="#101623")
+            top.pack(fill="x")
+            tk.Label(top, text=title, bg="#101623", fg=U.FG_FAINT,
+                     font=U.FONT_XS, width=4, anchor="w").pack(side="left")
+            name = tk.Label(top, text="", bg="#101623", fg=U.FG,
+                            font=U.FONT_B, anchor="w")
+            name.pack(side="left")
+            note = tk.Label(row, text="", bg="#101623", fg=U.FG_DIM,
+                            font=U.FONT_XS, anchor="w", justify="left",
+                            wraplength=DETAIL_W - 60)
+            note.pack(fill="x", padx=(34, 0))
+            # 지닌 도구 칸과 같은 이유로 폭을 자리가 잡힌 뒤에 잰다.
+            note.bind("<Configure>", self._fit_note)
+            self.d_trait[key] = (name, note)
+
         # 지닌 도구 (1.1.0). 한 마리에 하나. 가방에서 골라 들리고, 벗기면
         # 가방으로 돌아간다. 효과는 배틀에서만 난다 (common/held.py).
         hb = tk.Frame(p, bg="#101623", highlightthickness=2,
@@ -385,7 +412,12 @@ class BoxWindow(object):
         self.d_held = tk.Label(hline, text="없음", bg="#101623", fg=U.FG_DIM,
                                font=U.FONT_XS, anchor="w", justify="left",
                                wraplength=DETAIL_W - 76)
-        self.d_held.pack(side="left", fill="x", padx=(6, 0))
+        self.d_held.pack(side="left", fill="x", expand=True, padx=(6, 0))
+        # **줄바꿈 폭을 라벨의 진짜 폭에 맞춘다.** 붙박이 숫자
+        # (DETAIL_W - 76 = 264)는 실제 라벨 폭(242)보다 커서 오른쪽
+        # 끝 글자가 잘렸다. 상세 칸에는 스크롤바도 있고 안쪽 여백도
+        # 있어서 미리 셈해 맞출 수가 없다 - 자리가 잡힌 뒤에 물어본다.
+        self.d_held.bind("<Configure>", self._fit_held)
         self._held_photo = None
 
         # 경험치. 레벨 숫자만 있으면 방금 올랐는지 다음 레벨이 코앞인지
@@ -868,8 +900,9 @@ class BoxWindow(object):
         self.d_lv.configure(text="Lv.%d" % m["level"])
 
         sp = dex.get(m["species"]) if dex else None
-        bits = [(sp or {}).get("kind", ""), info.get("nature", "") + " 성격",
-                "특성 " + (info.get("ability") or "")]
+        # 특성·성격은 아래 칸에 설명과 함께 따로 둔다. 여기 또 적으면
+        # 같은 말이 두 번 나온다.
+        bits = [(sp or {}).get("kind", "")]
         if m.get("shiny"):
             bits.append("★ 색이 다른 개체")
         self.d_sub.configure(text="  ·  ".join(x for x in bits if x.strip()))
@@ -879,6 +912,14 @@ class BoxWindow(object):
         for t in (sp or {}).get("types", []):
             U.chip(self.d_types, dex.type_name(t), U.TYPE_COLOR.get(t, U.BG3),
                    font=U.FONT_S, padx=10, pady=2).pack(side="left", padx=(0, 4))
+
+        hidden = info.get("hiddenAbility")
+        self._trait("ability",
+                    (info.get("ability") or "?")
+                    + ("  (숨은 특성)" if hidden else ""),
+                    info.get("abilityNote"))
+        self._trait("nature", (info.get("nature") or "?") + " 성격",
+                    info.get("natureNote"))
 
         self._exp(info)
         self._show_held(m)
@@ -1081,7 +1122,25 @@ class BoxWindow(object):
         U.run_async(self.root, lambda: self.app.api.release(m["id"]),
                     self._after("%s 을(를) 보내주었습니다." % name))
 
+    def _fit_note(self, e):
+        """설명 폭을 라벨의 진짜 폭에 맞춘다 (지닌 도구 칸과 같은 이유)."""
+        w = max(80, e.width - 4)
+        if abs(int(e.widget.cget("wraplength")) - w) > 2:
+            e.widget.configure(wraplength=w)
+
+    def _trait(self, key, name, note):
+        """특성/성격 한 칸. 설명이 없는 것도 있어서 그때는 빈 줄로 둔다."""
+        lb, nb = self.d_trait[key]
+        lb.configure(text=name)
+        nb.configure(text=natural(note or "알려진 설명이 없습니다."))
+
     # ---------------- 지닌 도구 ----------------
+    def _fit_held(self, e):
+        """라벨 폭이 정해지면 그 폭으로 줄을 바꾼다."""
+        w = max(80, e.width - 6)
+        if abs(int(self.d_held.cget("wraplength")) - w) > 2:
+            self.d_held.configure(wraplength=w)
+
     def _show_held(self, m):
         held = m.get("held")
         if held:

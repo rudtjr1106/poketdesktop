@@ -10,6 +10,7 @@
 아무것도 못 만지게 된다.
 """
 import tkinter as tk
+from tkinter import ttk
 
 from . import autostart
 from . import config
@@ -35,11 +36,15 @@ class Row(object):
                             font=U.FONT_S)
         self.val.pack(side="right")
         self.var = tk.DoubleVar(value=value)
+        # **손잡이 색은 bg 다.** 그동안 bg 가 창 배경(U.BG)과 같아서
+        # 손잡이가 어디 있는지 보이지 않았다. 홈(troughcolor)도
+        # 어두운 색이라 둘이 구분되지 않았다. 손잡이를 금색으로 바꾼다 -
+        # 이 앱에서 "지금 고른 것" 은 늘 금색이다(탭, 값, 내 순위).
         sc = tk.Scale(box, from_=lo, to=hi, resolution=step,
                       orient="horizontal", variable=self.var,
-                      showvalue=False, bg=U.BG, fg=U.FG,
+                      showvalue=False, bg=U.ACCENT, fg=U.FG,
                       troughcolor=U.INK, highlightthickness=0, bd=0,
-                      activebackground=U.ACCENT, sliderrelief="flat",
+                      activebackground=U.FG, sliderrelief="flat",
                       length=W - 60, command=self._moved)
         sc.pack(fill="x")
         tk.Label(box, text=note, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS,
@@ -74,8 +79,26 @@ class SettingsWindow(object):
                  font=(U.FAMILY_BLACK, 15)).pack(side="left", padx=16, pady=15)
         tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
 
-        p = tk.Frame(self.win, bg=U.BG)
-        p.pack(fill="both", expand=True, padx=20, pady=(4, 0))
+        # **스크롤을 붙인다.** 이 창은 690px 를 바라는데 허브 탭
+        # 안쪽은 640px 밖에 안 된다. 그냥 두면 아래가 잘려서 자동
+        # 시작 스위치와 기본값 단추에 손이 닿지 않는다 - 설정 탭에서만
+        # 못 만지는 항목이 생긴다.
+        holder = tk.Frame(self.win, bg=U.BG)
+        holder.pack(fill="both", expand=True)
+        self.cv = tk.Canvas(holder, bg=U.BG, highlightthickness=0, bd=0)
+        sb = ttk.Scrollbar(holder, orient="vertical",
+                           command=self.cv.yview)
+        self.cv.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self.cv.pack(side="left", fill="both", expand=True)
+        p = tk.Frame(self.cv, bg=U.BG)
+        self._pw = self.cv.create_window((0, 0), window=p, anchor="nw")
+        p.bind("<Configure>", lambda _e: self._fit_scroll())
+        self.cv.bind("<Configure>", lambda e: (
+            self.cv.itemconfigure(self._pw, width=e.width),
+            self._fit_scroll()))
+        U.scrollable(self.cv, 60)
+        p.configure(padx=20, pady=4)
 
         Row(p, "포켓몬 크기", "도트를 이 높이에 맞춰 통일합니다.",
             24, 120, s["targetHeight"], "%.0f px",
@@ -101,6 +124,20 @@ class SettingsWindow(object):
         U.ghost_button(foot, "닫기", self.close, height=32).pack(side="right")
         self.status = U.status_line(self.win, "바꾸면 바로 적용됩니다.")
         self.status.pack(fill="x", side="bottom", padx=20)
+
+    def _fit_scroll(self):
+        """내용이 화면보다 짧으면 스크롤할 것이 없어야 한다."""
+        try:
+            self.cv.update_idletasks()
+            h = self.cv.winfo_height()
+            need = self.cv.bbox("all")
+            if not need:
+                return
+            self.cv.configure(
+                scrollregion=(0, 0, self.cv.winfo_width(),
+                              max(h, need[3])))
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def _checks(self, p, s):
         box = tk.Frame(p, bg=U.BG)

@@ -675,8 +675,18 @@ class ShopWindow(object):
         if buyable:
             bits.append("사면 %s원" % won(cost))
         if int(it.get("sell") or 0):
-            bits.append("팔면 %s원" % won(int(it["sell"]) * self.qty))
+            # 파는 값이 사는 값의 몇 %인지 같이 적는다. 숫자만 두면
+            # 손해인지 아닌지 매번 나눠 봐야 한다.
+            bits.append("팔면 %s원 (사는 값의 %d%%)"
+                        % (won(int(it["sell"]) * self.qty),
+                           int(round(self.sell_rate * 100))))
         short = buyable and cost > self.money
+        if short:
+            # **돈이 모자랄 때 무엇을 하면 되는지 말해 준다.** 그냥
+            # 빨갛게만 두면 "못 산다" 까지만 알고 끝난다. 가방의
+            # 도구를 파는 것이 이 게임에서 돈을 버는 주된 길이다.
+            bits.append("%s원 모자랍니다 - 가방의 도구를 팔아 보세요"
+                        % won(cost - self.money))
         self.total.configure(text="  ·  ".join(bits) or "사고팔 수 없는 물건",
                              fg=U.DANGER if short else U.FG_DIM)
 

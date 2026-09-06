@@ -1002,9 +1002,20 @@ class App(object):
         갈아탄 뒤 처음 켤 때 한 번 저절로 뜨고, 그 뒤로는 트레이 메뉴에서
         언제든 다시 열 수 있다.
         """
-        entry = patchnotes.entry(VERSION)
-        if not entry:
+        # **지난번에 켠 판 다음부터 지금까지를 다 보여준다.**
+        # 하루에 두 판이 나가는 일이 드물지 않은데, 지금 판만
+        # 보여주면 가운데 판은 아무도 못 읽는다.
+        last = self.settings.get("notesShownVersion") or ""
+        entries = patchnotes.since(last, VERSION) if greet \
+            else [patchnotes.entry(VERSION)]
+        entries = [e for e in entries if e]
+        if not entries:
             return self.notify("이 버전에는 적어 둔 변경 내역이 없습니다.")
+        # 여기까지 왔으면 읽을 기회를 준 것이다. 다음에는 이 판
+        # 다음부터 쌓는다.
+        if greet:
+            self.settings["notesShownVersion"] = VERSION
+            config.save_settings(self.settings)
         w = self.notes_win
         if w is not None:
             try:
@@ -1014,7 +1025,7 @@ class App(object):
                 pass
             self.notes_win = None
         try:
-            self.notes_win = PatchNotes(self.root, entry, greet=greet)
+            self.notes_win = PatchNotes(self.root, entries, greet=greet)
             self.notes_win.show()
         except Exception as e:                              # noqa: BLE001
             config.log("새로운 기능 창 오류: %s" % e)
