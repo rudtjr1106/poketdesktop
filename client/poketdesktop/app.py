@@ -1130,8 +1130,10 @@ class App(object):
     #
     # 순서가 중요하다. Idle 이 제일 자주 보이고(가만히 있을 때마다),
     # Faint 는 배틀에서 지는 순간에만 쓴다.
+    # Attack/Charge/Shoot 은 뺐다 - 칸 크기가 크게 달라서 배틀 연출에서
+    # 도트가 튀었다. 안 쓰는 것을 받아 둘 이유가 없다.
     ANIM_ORDER = ("Idle", "Sleep", "Sit", "Laying", "Wake", "Hop", "Hurt",
-                  "Attack", "Charge", "Shoot", "Faint", "EventSleep")
+                  "Faint", "EventSleep")
 
     def _prefetch_anims(self, mons):
         if self._anim_job or not self.overlay:
