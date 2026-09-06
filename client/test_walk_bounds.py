@@ -78,8 +78,10 @@ class FakePet(object):
         self.turns = 0
         self.places = 0
         self.once = None              # 한 번짜리 동작(공격 등) 중이 아니다
-        self.still = 0
         self.anim_name = "Walk"
+        self.calm_ms = 0              # 안 건드린 시간. 쌓이면 잔다
+        self.sleeping = False
+        self.rest_pose = None
 
     # 화면을 안 만들므로 그리는 것은 전부 비운다
     def advance(self, ms):

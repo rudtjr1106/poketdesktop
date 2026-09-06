@@ -362,8 +362,8 @@ WALK_DIR = os.environ.get("POKET_WALK_DIR", os.path.join(SPRITE_DIR, "walk"))
 # 32종을 표본으로 세어 보니 전 종에 있는 것은 Walk/Idle/Sleep/Hurt/
 # Attack/Charge/Swing/Hop/Rotate/Double 이고, EventSleep 은 절반쯤,
 # Shoot 은 거의 다(31/32) 있었다. 우리가 쓰는 것만 적는다.
-ANIM_NAMES = ("Walk", "Idle", "Sleep", "EventSleep", "Hurt", "Faint",
-              "Attack", "Charge", "Shoot", "Hop")
+ANIM_NAMES = ("Walk", "Idle", "Sleep", "EventSleep", "Wake", "Sit", "Laying",
+              "Hurt", "Faint", "Attack", "Charge", "Shoot", "Hop")
 
 # 방향 -> 시트의 몇 번째 행인지. 출처마다 배치가 다르다.
 #   SpriteCollab : 8행. 아래에서 시작해 오른쪽으로 돈다.
