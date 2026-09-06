@@ -150,21 +150,66 @@ def catch_some(token, want=8):
     return got
 
 
+_DEX = None
+
+
+def dex_species():
+    """서버 도감을 한 번 받아 한국어 종 이름으로 찾는다.
+
+    돌 진화 검사가 **조건 없는** 진화쌍만 고르려면 가지의 조건(낮/밤,
+    성별, 기술)을 봐야 하는데, 상점 목록의 evolves 에는 종 이름뿐이다.
+    """
+    global _DEX
+    if _DEX is None:
+        import gzip
+        req = urllib.request.Request(BASE + "/api/pokedex")
+        with urllib.request.urlopen(req, timeout=120) as r:
+            raw = r.read()
+            if r.headers.get("Content-Encoding") == "gzip":
+                raw = gzip.decompress(raw)
+        _DEX = json.loads(raw.decode("utf-8"))
+    return dict((s["kr"], s) for s in _DEX.get("species", []))
+
+
+def _plain_branch(sp, stone_id, mon):
+    """이 종이 이 돌로 진화하는 가지 중 지금 이 개체로 **그냥** 되는 것.
+
+    낮/밤(동글동글돌·핑복), 성별(각성의돌·킬리아), 기술을 알아야 하는
+    가지는 검사가 맞춰 줄 수 없어서 뺀다. 실제로 CI 에서 둘 다 걸렸다.
+    """
+    for b in sp.get("evo", []) or []:
+        if b.get("item") != stone_id:
+            continue
+        if b.get("time") or b.get("stats") or b.get("move") or b.get("moveType"):
+            continue
+        if b.get("gender") and b.get("gender") != mon.get("gender"):
+            continue
+        return b
+    return None
+
+
 def stone_for(token):
-    """잡은 포켓몬 중에 돌로 진화하는 애가 있으면 (도구, 포켓몬id) 를 준다.
+    """잡은 포켓몬 중에 돌로 진화하는 애가 있으면 (도구, 포켓몬) 을 준다.
 
     상점 목록의 evolves 가 한국어 종 이름이고, 포켓몬의 info.species 도
-    한국어 종 이름이라 그대로 맞춰 보면 된다.
+    한국어 종 이름이라 그대로 맞춰 보면 된다. 다만 조건이 붙은 가지는
+    거른다 (_plain_branch) - 낮에만 되는 돌을 밤에 쓰면 "아무 일도
+    일어나지 않았다" 가 정답이라 검사가 헛되이 빨개진다.
     """
     st, shop = call("GET", "/api/shop", token=token)
     st, p = call("GET", "/api/pokemon", token=token)
+    species = dex_species()
     stones = [i for i in shop.get("items", [])
               if i["cat"] == "stone" and i["buyable"]]
     stones.sort(key=lambda i: i["cost"])
     for it in stones:
         want = set(it.get("evolves", []))
         for m in p.get("pokemon", []):
-            if m["info"]["species"] in want:
+            kr = m["info"]["species"]
+            if kr not in want:
+                continue
+            sp = species.get(kr)
+            if sp is None or _plain_branch(sp, it["id"], m):
                 return it, m
     return None, None
 
