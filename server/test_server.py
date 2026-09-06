@@ -358,9 +358,15 @@ def main():
     else:
         chk("경험치 주면 레벨업", st == 200 and r["level"] > tgt["level"],
             (tgt["level"], r.get("level")))
-    st, r = call("DELETE", "/api/pokemon/%d" % ids[0], token=token)
+    # **놓아줄 것과 아래 "남의 것" 검사에 쓸 것을 갈라 둔다.** 볼 10개를
+    # 다 던지고도 놓치는 판이 있다(위에 "확률상 정상"이라고 적어 뒀다).
+    # 그러면 스타팅 한 마리뿐인데, 그걸 놓아주고 ids[1] 을 건드리려다
+    # IndexError 로 검사가 통째로 죽었다.
+    free_id = ids[-1]
+    victim = ids[0] if len(ids) >= 2 else None
+    st, r = call("DELETE", "/api/pokemon/%d" % free_id, token=token)
     chk("놓아주기", st == 200, r)
-    st, r = call("DELETE", "/api/pokemon/%d" % ids[0], token=token)
+    st, r = call("DELETE", "/api/pokemon/%d" % free_id, token=token)
     chk("이미 없는 포켓몬 404", st == 404, st)
 
     section("남의 것 건드리기 차단")
@@ -368,10 +374,15 @@ def main():
     st, r = call("POST", "/api/auth/register",
                  {"username": other, "password": pw, "device": "dev2"})
     otoken = r.get("token")
-    st, r = call("DELETE", "/api/pokemon/%d" % ids[1], token=otoken)
-    chk("남의 포켓몬 삭제 거부(404)", st == 404, st)
-    st, r = call("POST", "/api/pokemon/%d/desktop" % ids[1], {"on": True}, otoken)
-    chk("남의 포켓몬 조작 거부(404)", st == 404, st)
+    if victim is None:
+        print("       한 마리뿐이라 놓아주고 나니 남의 것으로 쓸 게 없습니다"
+              " - 이 두 가지는 건너뜁니다")
+    else:
+        st, r = call("DELETE", "/api/pokemon/%d" % victim, token=otoken)
+        chk("남의 포켓몬 삭제 거부(404)", st == 404, st)
+        st, r = call("POST", "/api/pokemon/%d/desktop" % victim,
+                     {"on": True}, otoken)
+        chk("남의 포켓몬 조작 거부(404)", st == 404, st)
     st, w2 = call("GET", "/api/wild?force=true", token=otoken)
     if w2.get("wild"):
         st, r = call("POST", "/api/wild/%d/reveal" % w2["wild"]["id"], {}, token)
