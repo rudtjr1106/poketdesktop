@@ -33,9 +33,14 @@ def chk(name, cond, got=""):
 def mkuser(name, mons=3, level=30):
     """계정 하나와 바탕화면에 데리고 다니는 포켓몬 몇 마리."""
     import random
+    import zlib
     from app import deps
     d = deps.dex()
-    rng = random.Random(abs(hash(name)) % (1 << 30))
+    # hash(name) 을 쓰면 안 된다. 문자열 hash 는 프로세스마다 달라져서
+    # (PYTHONHASHSEED) 파티가 매번 바뀌고, 그러면 아래 '하루 상한' 검사가
+    # a 가 몇 판 이기느냐에 따라 세 번에 한 번쯤 헛되이 빨갛게 된다
+    # (1.1.1 CI 에서 걸렸다: 7승 = 3500원). crc32 는 언제나 같은 값이다.
+    rng = random.Random(zlib.crc32(name.encode("utf-8")))
     cur = db.run(
         "INSERT INTO users (username, pw_hash, pw_salt, pw_iter, balls, money,"
         " created_at, last_login, last_ip) VALUES (?,?,?,1,10,0,?,?,'')",
@@ -62,7 +67,10 @@ def money(uid):
 def main():
     db.init()
     print("=== 준비 ===")
-    a = mkuser("zz_pvp_a", 3, 30)
+    # a 를 열 레벨 위로 둔다. 아래 '하루 상한' 검사는 a 가 25판 중 열두 판은
+    # 이겨야 상한(6000원)에 닿는다. 같은 레벨이면 crc32 시드의 파티로는
+    # 네 판밖에 못 이긴다. 다른 검사는 누가 이기든 통과하게 짜여 있다.
+    a = mkuser("zz_pvp_a", 3, 40)
     b = mkuser("zz_pvp_b", 3, 30)
     chk("두 계정을 만들었다", a and b and a != b, (a, b))
     chk("돈은 0 에서 시작", money(a) == 0 and money(b) == 0,
