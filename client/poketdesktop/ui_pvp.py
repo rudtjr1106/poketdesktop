@@ -167,6 +167,26 @@ class PvpWindow(object):
             bits.append("오늘 %d판 더 걸 수 있음" % left)
         self.sub.configure(text="  ·  ".join(bits))
 
+        # **이기면 얼마를 받는지 적어 준다.** 상금이 있다는 것을
+        # 화면 어디서도 말해 주지 않아서, 붙어 보고 돈이 늘어야
+        # 알았다. 값은 서버가 실어 보낸다(pvp.summary 의 winReward) -
+        # 여기 숫자를 박아 두면 서버에서 바꿨을 때 거짓말이 된다.
+        pay = s.get("winReward")
+        cap = s.get("dailyCap")
+        if pay:
+            line = ("내가 건 랜덤 배틀에서 이기면 %s원을 받습니다. "
+                    "지면 0원, 걸려온 판은 상금이 없습니다."
+                    % format(int(pay), ","))
+            if cap:
+                line += "  하루 %s원까지" % format(int(cap), ",")
+                got = int(s.get("earnedToday") or 0)
+                if got:
+                    line += " (오늘 %s원 받음)" % format(got, ",")
+                line += "."
+            tk.Label(self.list, text=line, bg=U.BG, fg=U.FG_FAINT,
+                     font=U.FONT_XS, anchor="w", justify="left",
+                     wraplength=W - 80).pack(fill="x", pady=(0, 8))
+
         if not self.rows:
             tk.Label(self.list, text="아직 대전 기록이 없습니다.\n"
                                      "랜덤 배틀로 한 판 붙어보세요.",

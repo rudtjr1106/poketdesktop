@@ -55,6 +55,29 @@ NATURES = [
 ]
 NATURE_BY_NAME = dict((n[0], n) for n in NATURES)
 
+# 능력 이름. 성격 설명에 쓴다 (배틀 로그의 STAT_KR 과 같은 말이라야 한다).
+STAT_KR = {"hp": "HP", "atk": "공격", "def": "방어",
+           "spa": "특수공격", "spd": "특수방어", "spe": "스피드"}
+
+
+def nature_note(nature):
+    """이 성격이 무엇을 올리고 내리는지 한 줄.
+
+    성격은 이름만 봐서는 무슨 뜻인지 알 수가 없다 - '개구쟁이' 가
+    무엇을 올리는지 아는 사람은 본가를 오래 한 사람뿐이다. 표는 이미
+    NATURES 에 있으니 말로 풀어 주기만 하면 된다.
+    """
+    n = NATURE_BY_NAME.get(nature)
+    if not n:
+        return ""
+    up, down = n[1], n[2]
+    if not up or not down or up == down:
+        return "능력에 영향을 주지 않습니다."
+    # 조사는 korean.natural 이 앞 글자를 보고 맞춘다 ("공격이", "스피드가").
+    from .korean import natural
+    return natural("%s 이(가) 잘 오르고 %s 이(가) 잘 안 오릅니다."
+                   % (STAT_KR.get(up, up), STAT_KR.get(down, down)))
+
 # Essentials 의 GenderRate 문자열 -> 암컷이 나올 확률
 GENDER_RATE = {
     "AlwaysMale": 0.0,
@@ -328,6 +351,11 @@ class Pokedex(object):
         a = self.abilities.get(key)
         return a["kr"] if a else str(key)
 
+    def ability_desc(self, key):
+        """특성 설명 (본가 문구). 없는 특성도 있어서 빈 글자를 줄 수 있다."""
+        a = self.abilities.get(key) or {}
+        return a.get("desc", "")
+
     def type_name(self, key):
         t = self.types.get(key)
         return t["kr"] if t else str(key)
@@ -423,7 +451,11 @@ class Pokedex(object):
             "ivTotal": sum(ivs.get(k, 0) for k in STATS),
             "ivPercent": round(100.0 * sum(ivs.get(k, 0) for k in STATS) / (IV_MAX * 6), 1),
             "nature": NATURE_BY_NAME.get(mon.get("nature", "HARDY"), ("", None, None, "?"))[3],
+            # 성격이 무엇을 올리고 내리는지, 특성이 무슨 일을 하는지.
+            # 이름만으로는 알 수가 없어서 같이 보낸다 (포켓몬 관리 창).
+            "natureNote": nature_note(mon.get("nature", "HARDY")),
             "ability": self.ability_name(mon.get("ability")),
+            "abilityNote": self.ability_desc(mon.get("ability")),
             "hiddenAbility": mon.get("hiddenAbility", False),
             "gender": mon.get("gender", "N"),
             "shiny": mon.get("shiny", False),

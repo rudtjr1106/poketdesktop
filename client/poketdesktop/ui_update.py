@@ -259,10 +259,14 @@ def highlights(notes_md, limit=6):
         if not bullet and open_item and out:
             out[-1] = out[-1] + " " + line
             continue
-        if len(out) >= limit:
-            break
         out.append(line)
         open_item = True
+    # **자를 때는 잘랐다고 말한다.** 이 줄거리는 '새 버전이 있다' 창에
+    # 들어가는 요약이라 길면 안 되지만, 말없이 여섯 개에서 끊으면 그게
+    # 전부인 줄 안다. 실제로 1.1.6 은 여덟 가지가 들어 있다.
+    if len(out) > limit:
+        rest = len(out) - limit
+        out = out[:limit] + ["… 그 밖에 %d가지가 더 있습니다" % rest]
     return out
 
 
@@ -394,7 +398,18 @@ class PatchNotes(object):
     딸려 있어서 내용이 얼마든 늘어도 그대로 읽힌다.
     """
 
-    def __init__(self, root, entry, greet=False):
+    def __init__(self, root, entries, greet=False):
+        """entries 는 **여러 판**의 묶음이다. 최신이 앞이어야 한다.
+
+        예전에는 지금 판 하나만 받았다. 그러면 1.0.1 을 쓰던 사람이
+        1.0.3 으로 갈아탔을 때 1.0.2 에 무엇이 들어왔는지 아무도 못 본다
+        - 하루에 두 판이 나가는 일이 드물지 않은데도. 이제 건너뛴 판까지
+        차례로 쌓아 보여준다 (common.patchnotes.since).
+        """
+        if isinstance(entries, dict):        # 한 판만 넘겨도 받아 준다
+            entries = [entries]
+        entries = [e for e in (entries or []) if e]
+        self.entries = entries
         self.root = root
         self.win = tk.Toplevel(root)
         U.style_window(self.win, "포스크탑 — 새로운 기능", NOTE_W, NOTE_H)
@@ -410,8 +425,14 @@ class PatchNotes(object):
                              else "이번 버전 새로운 기능"),
                  bg=U.BG2, fg=U.FG, font=(U.FAMILY_BLACK, 15),
                  anchor="w").pack(fill="x", padx=20, pady=(16, 0))
-        tk.Label(head, text="v%s   ·   %s" % (entry["version"],
-                                              entry.get("headline") or ""),
+        first = entries[0] if entries else {"version": "", "headline": ""}
+        if len(entries) > 1:
+            sub = "v%s  …  v%s   ·   %d개 판이 쌓였습니다" % (
+                entries[-1]["version"], first["version"], len(entries))
+        else:
+            sub = "v%s   ·   %s" % (first["version"],
+                                    first.get("headline") or "")
+        tk.Label(head, text=sub,
                  bg=U.BG2, fg=U.ACCENT, font=U.FONT_S, anchor="w",
                  justify="left", wraplength=NOTE_W - 44).pack(fill="x", padx=20)
         tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
@@ -431,10 +452,21 @@ class PatchNotes(object):
         txt.tag_configure("head", font=U.FONT_B, foreground=U.ACCENT,
                           spacing1=10, spacing3=3)
         txt.tag_configure("body", foreground=U.FG_DIM, lmargin1=12, lmargin2=12)
-        for title, body in entry["items"]:
-            txt.insert("end", title + "\n", "head")
-            if body:
-                txt.insert("end", body + "\n", "body")
+        # 판 제목. 여러 판을 쌓을 때 어디서 어디까지가 한 판인지 갈라 준다.
+        txt.tag_configure("ver", font=(U.FAMILY_BLACK, 12), foreground=U.FG,
+                          spacing1=16, spacing3=2)
+        txt.tag_configure("rule", foreground=U.FG_FAINT, spacing3=6)
+        many = len(entries) > 1
+        for i, e in enumerate(entries):
+            if many:
+                if i:
+                    txt.insert("end", "─" * 34 + "\n", "rule")
+                txt.insert("end", "v%s   %s\n"
+                           % (e["version"], e.get("headline") or ""), "ver")
+            for title, body in e.get("items") or []:
+                txt.insert("end", title + "\n", "head")
+                if body:
+                    txt.insert("end", body + "\n", "body")
         # 읽기만 하는 창이다. 그렇다고 state="disabled" 로 두면 휠 스크롤까지
         # 막히는 판이 있어서, 글자를 넣는 키만 막는다.
         txt.bind("<Key>", lambda e: "break")

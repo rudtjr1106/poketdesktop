@@ -122,7 +122,29 @@ class SpriteView(object):
         self.widget.configure(image=frame)
 
     def resize(self, w, h):
+        """창을 **미리** 이 크기로 키우고 바탕을 칠해 둔다.
+
+        그림부터 걸면 안 된다. Label 이 커지면서 창이 따라 커지는데, 그때
+        새로 드러난 자리는 아직 아무도 안 칠했다. 투명색 창
+        (-transparentcolor)에서 그 자리는 투명색이 아니라 **검게** 합성되고,
+        다음 그리기까지 남는다 - 도트 둘레에 검은 테두리가 깜빡인다.
+
+        동작이 바뀔 때마다 칸 크기가 달라져서(걷기 32x32, 아픔 48x56,
+        뛰기 32x80) 그때마다 나타났다. 1.1.2 에서 동작이 여럿이 되면서
+        생긴 것이고, 걷기만 있던 시절에는 창 크기가 안 변해서 없었다.
+
+        Label 에 그림이 걸려 있으면 width/height 는 글자 수가 아니라
+        픽셀이다. 크기를 못 박아 두면 나중에 그림이 바뀌어도 창이 다시
+        안 흔들린다.
+        """
         self.w, self.h = w, h
+        try:
+            self.widget.configure(width=w, height=h)
+            # 여기서 한 번 그려 둔다. 이 줄이 없으면 위의 configure 가
+            # 다음 그리기까지 미뤄져서 결국 그림과 같이 커진다.
+            self.win.update_idletasks()
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def update_hit(self, lx, ly):
         """커서가 이 도트 창 안 어디에 있는지 알려준다.

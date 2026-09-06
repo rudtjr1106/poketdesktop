@@ -396,9 +396,22 @@ def test_highlights():
     entry = patchnotes.latest()
     body = ("## 받는 법\n\nzip 을 받아 푸세요.\n\n"
             "## 바뀐 것\n\n" + patchnotes.as_markdown(entry["version"]))
+    # 상한을 풀면 항목이 하나도 안 빠져야 한다. 이어 쓴 줄을 앞 항목에
+    # 제대로 붙이는지 보는 검사라, 자르기와 섞으면 무엇이 틀렸는지 모른다.
+    every = ui_update.highlights(body, limit=99)
+    chk("항목을 다 뽑는다", len(every) == len(entry["items"]),
+        "got=%d want=%d" % (len(every), len(entry["items"])))
+
+    # 창에 들어가는 기본 상한은 여섯이다. **자르면 잘랐다고 말해야 한다** -
+    # 말없이 끊으면 그게 전부인 줄 안다.
     got = ui_update.highlights(body)
-    chk("항목을 다 뽑는다", len(got) == len(entry["items"]),
-        "got=%d want=%d" % (len(got), len(entry["items"])))
+    n = len(entry["items"])
+    if n > 6:
+        chk("여섯에서 자르고 한 줄 덧붙인다", len(got) == 7, "got=%d" % len(got))
+        chk("몇 개가 더 있는지 말해 준다",
+            ("%d가지" % (n - 6)) in got[-1], got[-1])
+    else:
+        chk("여섯 이하면 그대로 다 보여준다", len(got) == n, "got=%d" % len(got))
     chk("받는 법은 섞지 않는다", not any("zip" in x for x in got),
         "got=%r" % got[:1])
     chk("마크다운 표시를 뗀다", not any("**" in x for x in got))

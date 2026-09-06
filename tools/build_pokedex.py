@@ -26,7 +26,8 @@ NEEDED = [
     "pokemon_species.csv", "pokemon_species_names.csv", "pokemon.csv",
     "pokemon_types.csv", "types.csv", "type_names.csv", "type_efficacy.csv",
     "pokemon_stats.csv", "stats.csv", "pokemon_abilities.csv", "abilities.csv",
-    "ability_names.csv", "moves.csv", "move_names.csv", "move_damage_classes.csv",
+    "ability_names.csv", "ability_flavor_text.csv",
+    "moves.csv", "move_names.csv", "move_damage_classes.csv",
     "growth_rates.csv", "egg_groups.csv", "pokemon_egg_groups.csv",
     "pokemon_moves.csv", "pokemon_evolution.csv", "evolution_triggers.csv",
     "move_meta.csv", "move_meta_stat_changes.csv", "move_meta_ailments.csv",
@@ -164,10 +165,29 @@ def build():
     for r in rows("ability_names.csv"):
         if as_int(r["local_language_id"]) == KO:
             abil_kr[as_int(r["ability_id"])] = r["name"]
+    # 특성 설명. 본가에 실린 문구 그대로다. 여러 판에 실려 있으면 가장
+    # 최근 것(version_group_id 가 큰 것)을 쓰고, 한국어가 없으면 영어.
+    # 포켓몬 관리 창이 이걸 보여준다 - 이름만 있으면 무슨 특성인지 알 길이
+    # 없다.
+    abil_desc = {}
+    abil_ver = {}
+    for r in rows("ability_flavor_text.csv"):
+        lang = as_int(r["language_id"])
+        if lang not in (KO, EN):
+            continue
+        aid = as_int(r["ability_id"])
+        key = (1 if lang == KO else 0, as_int(r["version_group_id"]))
+        if key > abil_ver.get(aid, (-1, -1)):
+            abil_ver[aid] = key
+            abil_desc[aid] = " ".join(r["flavor_text"].split())
+
     abil_out = {}
     for aid, ident in abil_ident.items():
-        abil_out[ident] = {"id": aid, "en": ident.title(),
-                           "kr": abil_kr.get(aid, ident.title())}
+        d = {"id": aid, "en": ident.title(),
+             "kr": abil_kr.get(aid, ident.title())}
+        if abil_desc.get(aid):
+            d["desc"] = abil_desc[aid]
+        abil_out[ident] = d
 
     # ---- 기술 ----
     dmg_class = dict((as_int(r["id"]), r["identifier"])

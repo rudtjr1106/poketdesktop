@@ -131,10 +131,18 @@ def item_desc(item):
     if kind == "stone":
         who = item.get("evolves") or []
         if not who:
-            return "특정 포켓몬을 진화시키는 돌이다."
-        if len(who) > 6:
-            return "%s 외 %d종이(가) 진화한다." % (", ".join(who[:6]), len(who) - 6)
-        return "%s이(가) 진화한다." % ", ".join(who)
+            out = "특정 포켓몬을 진화시키는 돌이다."
+        elif len(who) > 6:
+            out = "%s 외 %d종이(가) 진화한다." % (", ".join(who[:6]),
+                                            len(who) - 6)
+        else:
+            out = "%s이(가) 진화한다." % ", ".join(who)
+        # **지닐 수도 있는 돌이 넷 있다** (예리한손톱·예리한이빨·
+        # 왕의징표석·금속코트). 진화 얘기만 적어 두면 배틀에서
+        # 무슨 일을 하는지 가방에서는 알 길이 없다.
+        if item.get("holdable") and item.get("desc"):
+            out += "\n\n지니게 하면: " + item["desc"]
+        return out
     if kind == "noevolve":
         return "진화를 막는다. 한 번 더 쓰면 다시 진화할 수 있게 된다."
     if kind == "held":

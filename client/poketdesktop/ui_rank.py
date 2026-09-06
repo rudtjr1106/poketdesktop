@@ -142,8 +142,11 @@ class RankWindow(object):
         # "왜 걸려온 판은 안 세지" 를 알 길이 없다.
         note = tk.Label(
             self.list,
-            text="점수는 내가 건 랜덤 배틀만 오르내립니다. "
-                 "걸려온 판과 친구 배틀은 점수에 들어가지 않습니다.",
+            text=("점수는 내가 건 랜덤 배틀만 오르내립니다. "
+                  "걸려온 판과 친구 배틀은 점수에 들어가지 않습니다."
+                  + (("  이기면 %s원을 받습니다."
+                      % format(int(self.me.get("winReward") or 0), ","))
+                     if self.me.get("winReward") else "")),
             bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
             justify="left", wraplength=W - 80)
         note.pack(fill="x", pady=(0, 8))
