@@ -439,6 +439,12 @@ class DesktopBattle(object):
         if r.get("caught"):
             self.app.notify(r.get("message") or "잡았다!")
             self.foe = None
+            # 잡은 쪽이 기뻐한다. 야생은 볼에 들어갔으니 내 포켓몬이 뛴다.
+            if self.mine:
+                try:
+                    self.mine.play("Hop", once=True)
+                except Exception:                           # noqa: BLE001
+                    pass
             return self.after(500, self.finish_cleanup)
         b = r.get("battle")
         if b:
@@ -477,11 +483,17 @@ class DesktopBattle(object):
                 "cat": ev.get("cat") or "physical", "flags": []}
 
     def lunge(self, who, done):
-        """battle_fx 가 접촉기에서 부른다. 도트가 상대 쪽으로 달려든다."""
+        """battle_fx 가 접촉기에서 부른다. 도트가 상대 쪽으로 달려든다.
+
+        달려드는 동안 공격 동작을 돌린다. 있는 종만 - 없으면 전처럼
+        몸만 움직인다.
+        """
         pet = self.mine if who == "me" else self.foe
         other = self.foe if who == "me" else self.mine
         if not pet or not other:
             return done()
+        pet.face_towards(other.x)
+        pet.play("Attack", once=True)
         hx, hy = pet.x, pet.y
         dx = 26 if other.x > pet.x else -26
         n = 5
@@ -500,6 +512,8 @@ class DesktopBattle(object):
         go(1)
 
     def shake(self, pet, done):
+        """맞았다. 몸이 흔들리는 동안 맞는 동작을 돌린다."""
+        pet.play("Hurt", once=True)
         hx = pet.x
         seq = [-7, 7, -5, 5, -3, 3, 0]
 
@@ -516,6 +530,8 @@ class DesktopBattle(object):
         go(0)
 
     def faint(self, pet, done):
+        """쓰러졌다. 아래로 가라앉는 동안 쓰러지는 동작을 돌린다."""
+        pet.play("Faint", once=True)
         hy = pet.y
 
         def go(i):

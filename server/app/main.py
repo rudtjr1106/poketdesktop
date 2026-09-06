@@ -338,77 +338,189 @@ def item_sprite(item_id: str):
 
 # ---------------------------------------------------------------- 걷는 도트
 # 배틀 도트(showdown)는 정면 고정이라 걷는 모습이 없다. 걸어다니게 하려면
-# 4방향 × 걷기 프레임이 있는 '오버월드' 도트가 필요하다.
+# 8방향 × 걷기 프레임이 있는 '오버월드' 도트가 필요하다.
 # PMDCollab/SpriteCollab 가 그걸 1025종 중 968종에 대해 갖고 있다.
 #   sprite/0025/Walk-Anim.png   가로=프레임, 세로=8방향 스프라이트시트
 #   sprite/0025/AnimData.xml    칸 크기와 프레임별 지속시간
 # 라이선스는 CC BY-NC 4.0 (비상업 + 출처표기).
+#
+# **걷기 말고도 많다.** 같은 규격으로 Idle(가만히 숨쉬기), Sleep, Hurt,
+# Attack, Charge, Shoot, Hop 이 들어 있어서, 도감 번호와 이름만 바꾸면
+# 같은 방식으로 받아 쓸 수 있다. 종마다 있는 것이 다르므로(11~37개)
+# 없으면 ok:false 를 남기고 부르는 쪽이 알아서 대신할 것을 고른다.
 WALK_BASE = "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite"
 # SpriteCollab 에 없는 종을 메우는 두 번째 출처. HGSS 풍 32x32 라 그림체가
-# 다르지만, 걷지도 않는 정면 도트보다는 낫다.
+# 다르지만, 걷지도 않는 정면 도트보다는 낫다. **여기에는 걷기밖에 없다.**
 FOLLOW_BASE = ("https://raw.githubusercontent.com/baptiste-ro/"
                "pokemon-followers-sprites/main/followsprites")
 WALK_DIR = os.environ.get("POKET_WALK_DIR", os.path.join(SPRITE_DIR, "walk"))
 
+# 받아도 되는 애니메이션 이름. **이름이 URL 에서 오므로 반드시 막아야
+# 한다** - 안 그러면 남의 저장소 아무 경로나 우리 서버로 받아오게 시킬 수
+# 있다(../ 나 다른 파일). 여기 있는 것만 통과시킨다.
+#
+# 32종을 표본으로 세어 보니 전 종에 있는 것은 Walk/Idle/Sleep/Hurt/
+# Attack/Charge/Swing/Hop/Rotate/Double 이고, EventSleep 은 절반쯤,
+# Shoot 은 거의 다(31/32) 있었다. 우리가 쓰는 것만 적는다.
+ANIM_NAMES = ("Walk", "Idle", "Sleep", "EventSleep", "Hurt", "Faint",
+              "Attack", "Charge", "Shoot", "Hop")
+
 # 방향 -> 시트의 몇 번째 행인지. 출처마다 배치가 다르다.
-#   SpriteCollab : 8행, 아래에서 반시계 (0 아래, 2 오른쪽, 4 위, 6 왼쪽)
+#   SpriteCollab : 8행. 아래에서 시작해 오른쪽으로 돈다.
 #   followers    : 4행 (0 아래, 1 왼쪽, 2 오른쪽, 3 위)
-ROWMAP_PMD = {"down": 0, "right": 2, "up": 4, "left": 6}
+#
+# 8행 배치는 피카츄 시트로 직접 확인했다. 행 2와 6, 1과 7, 3과 5 를
+# 좌우로 뒤집어 비교하면 차이가 정확히 0 이고(대칭쌍), 0과 4는 서로
+# 완전히 다르다(앞모습/뒷모습).
+ROWMAP_PMD = {"down": 0, "downright": 1, "right": 2, "upright": 3,
+              "up": 4, "upleft": 5, "left": 6, "downleft": 7}
 ROWMAP_FOLLOW = {"down": 0, "left": 1, "right": 2, "up": 3}
 
 
-def _walk_paths(num):
+def _anim_paths(num, name):
     d = os.path.join(WALK_DIR, "%04d" % num)
-    return os.path.join(d, "sheet.png"), os.path.join(d, "anim.json")
+    return (os.path.join(d, "%s.png" % name),
+            os.path.join(d, "%s.json" % name))
 
 
-def _walk_fetch(num):
+def _png_size(data):
+    """PNG 헤더에서 가로세로를 읽는다. (0, 0) 이면 PNG 가 아니다.
+
+    서버에는 Pillow 가 없다. 시트가 몇 행인지 알려면 높이가 필요한데,
+    그것 하나 때문에 의존성을 늘릴 이유가 없다. IHDR 은 항상 파일 맨
+    앞 고정 위치에 있다.
+    """
+    if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n":
+        return 0, 0
+    import struct
+    w, h = struct.unpack(">II", data[16:24])
+    return int(w), int(h)
+
+
+def _migrate_old_walk(num):
+    """예전 이름(sheet.png/anim.json)을 Walk.png/Walk.json 으로 옮긴다.
+
+    걷기만 받던 시절의 캐시다. 그냥 두면 968종을 다시 받게 된다.
+    """
+    d = os.path.join(WALK_DIR, "%04d" % num)
+    old_png, old_meta = os.path.join(d, "sheet.png"), os.path.join(d, "anim.json")
+    new_png, new_meta = _anim_paths(num, "Walk")
+    if not os.path.exists(old_meta) or os.path.exists(new_meta):
+        return
+    try:
+        with open(old_meta, encoding="utf-8") as f:
+            meta = json.load(f)
+        if meta.get("ok") and meta.get("src") == "pmd":
+            # 옛 메타에는 4방향만 적혀 있다. 8방향으로 고쳐 준다.
+            meta["rowmap"] = ROWMAP_PMD
+            meta["rows"] = 8
+        if os.path.exists(old_png):
+            os.replace(old_png, new_png)
+        with open(new_meta, "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+        os.remove(old_meta)
+    except (OSError, ValueError):
+        pass
+
+
+def _pick_anim(root, name):
+    """AnimData.xml 에서 이 이름의 칸 크기와 지속시간을 찾는다.
+
+    돌려주는 값은 (프레임가로, 프레임세로, 지속시간목록, 받을PNG이름).
+    못 찾으면 None.
+
+    **CopyOf 를 따라가야 한다.** 예를 들어 파이리의 SpAttack 은
+    `<CopyOf>Shoot</CopyOf>` 하나뿐이라 자기 PNG 도 칸 크기도 없다.
+    그럴 때는 가리키는 쪽의 것을 쓴다. (한 번만 따라간다 - 사슬이
+    돌면 무한히 돌 수 있고, 실제 자료에 그런 것도 없다.)
+    """
+    def find(nm):
+        for a in root.iter("Anim"):
+            if (a.findtext("Name") or "") == nm:
+                return a
+        return None
+
+    a = find(name)
+    if a is None:
+        return None
+    png_name = name
+    copy = (a.findtext("CopyOf") or "").strip()
+    if copy:
+        b = find(copy)
+        if b is None or (b.findtext("CopyOf") or "").strip():
+            return None
+        a, png_name = b, copy
+    try:
+        fw = int(a.findtext("FrameWidth"))
+        fh = int(a.findtext("FrameHeight"))
+        durs = [int(x.text) for x in a.find("Durations")]
+    except (TypeError, ValueError):
+        return None
+    if fw <= 0 or fh <= 0 or not durs:
+        return None
+    return fw, fh, durs, png_name
+
+
+def _anim_fetch(num, name):
     """스프라이트시트와 메타를 한 번만 받아 디스크에 남긴다.
 
-    없는 종(57마리)은 빈 메타를 남겨서 매번 다시 받지 않게 한다.
+    걷기가 없는 종(57마리)만 두 번째 출처로 넘어간다. 나머지 동작은
+    거기에 아예 없으므로 없다고 적어 둔다.
     """
     import urllib.error
     import urllib.request
     import xml.etree.ElementTree as ET
 
-    png_path, meta_path = _walk_paths(num)
+    png_path, meta_path = _anim_paths(num, name)
     os.makedirs(os.path.dirname(png_path), exist_ok=True)
     base = "%s/%04d/" % (WALK_BASE, num)
 
-    def grab(name):
-        with urllib.request.urlopen(base + name, timeout=12) as r:
+    def grab(fn):
+        with urllib.request.urlopen(base + fn, timeout=12) as r:
             return r.read()
 
     try:
-        xml = grab("AnimData.xml").decode("utf-8")
-        root = ET.fromstring(xml)
-        walk = None
-        for a in root.iter("Anim"):
-            if (a.findtext("Name") or "") == "Walk":
-                walk = a
-                break
-        if walk is None:
-            raise ValueError("Walk 없음")
-        fw = int(walk.findtext("FrameWidth"))
-        fh = int(walk.findtext("FrameHeight"))
-        durs = [int(x.text) for x in walk.find("Durations")]
-        png = grab("Walk-Anim.png")
+        root = ET.fromstring(grab("AnimData.xml").decode("utf-8"))
+        got = _pick_anim(root, name)
+        if got is None:
+            raise ValueError("%s 없음" % name)
+        fw, fh, durs, png_name = got
+        png = grab("%s-Anim.png" % png_name)
         if not png:
             raise ValueError("빈 파일")
     except (urllib.error.URLError, OSError, ValueError, ET.ParseError, TypeError):
-        # SpriteCollab 에 없다. 두 번째 출처를 본다.
-        return _walk_fetch_follow(num, png_path, meta_path)
+        if name == "Walk":
+            # 걷기가 없다. 두 번째 출처를 본다.
+            return _walk_fetch_follow(num, png_path, meta_path)
+        return _mark_missing(meta_path)
+
+    sw, sh = _png_size(png)
+    rows = max(1, sh // fh) if sh else 8
+    frames = max(1, sw // fw) if sw else len(durs)
+    # 지속시간이 프레임 수보다 많으면(자료가 어긋난 종이 있다) 잘라낸다.
+    # 없는 칸을 가리키면 클라이언트가 시트 밖을 자르게 된다.
+    durs = durs[:frames] or [8]
 
     tmp = png_path + ".part"
     with open(tmp, "wb") as f:
         f.write(png)
     os.replace(tmp, png_path)
     meta = {"ok": True, "frameW": fw, "frameH": fh,
-            "durations": durs, "frames": len(durs), "rows": 8,
-            "rowmap": ROWMAP_PMD, "src": "pmd"}
+            "durations": durs, "frames": len(durs), "rows": rows,
+            "rowmap": ROWMAP_PMD, "src": "pmd", "anim": name}
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f)
     return meta
+
+
+def _mark_missing(meta_path):
+    """이 종에 이 동작이 없다고 적어 둔다. 다음부터 안 물어본다."""
+    try:
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump({"ok": False}, f)
+    except OSError:
+        pass
+    return None
 
 
 def _walk_fetch_follow(num, png_path, meta_path):
@@ -416,6 +528,7 @@ def _walk_fetch_follow(num, png_path, meta_path):
 
     128x128 한 장에 32x32 칸이 가로 4프레임 x 세로 4행으로 들어 있다.
     모든 종이 같은 규격이라 메타를 받을 필요가 없다.
+    **여기에는 걷기밖에 없다.** 이 종들은 다른 동작을 못 쓴다.
     """
     import urllib.error
     import urllib.request
@@ -431,9 +544,7 @@ def _walk_fetch_follow(num, png_path, meta_path):
             # 한 번 실패한 종이 영영 안 걷게 된다.
             return None
         # 404 라야 '어느 쪽에도 없는 종' 이다. 그때만 남긴다.
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump({"ok": False}, f)
-        return None
+        return _mark_missing(meta_path)
     except (urllib.error.URLError, OSError, ValueError):
         # network 오류·시간초과·깨진 파일. 없는 종인지 알 수 없으므로
         # 아무것도 남기지 않고 다음에 다시 물어본다.
@@ -445,29 +556,34 @@ def _walk_fetch_follow(num, png_path, meta_path):
     os.replace(tmp, png_path)
     meta = {"ok": True, "frameW": 32, "frameH": 32,
             "durations": [9, 9, 9, 9], "frames": 4, "rows": 4,   # 1/60초 틱
-            "rowmap": ROWMAP_FOLLOW, "src": "follow"}
+            "rowmap": ROWMAP_FOLLOW, "src": "follow", "anim": "Walk"}
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f)
     return meta
 
 
-def _walk_meta(num):
-    _png, meta_path = _walk_paths(num)
+def _anim_meta(num, name):
+    if name == "Walk":
+        _migrate_old_walk(num)
+    _png, meta_path = _anim_paths(num, name)
     if os.path.exists(meta_path):
         try:
             with open(meta_path, encoding="utf-8") as f:
                 return json.load(f)
         except (OSError, ValueError):
             pass
-    return _walk_fetch(num)
+    return _anim_fetch(num, name)
 
 
-@app.get("/api/walk/{num}.json")
-def walk_meta(num: int):
-    """이 종에 걷는 도트가 있는지, 있으면 어떻게 잘라야 하는지."""
+def _check_anim(num, name):
     if not 1 <= num <= 1025:
         raise HTTPException(404, "그런 도감 번호가 없습니다.")
-    meta = _walk_meta(num)
+    if name not in ANIM_NAMES:
+        raise HTTPException(404, "그런 동작이 없습니다.")
+
+
+def _meta_response(num, name):
+    meta = _anim_meta(num, name)
     if meta is None:
         # 지금은 알 수 없다(저쪽이 잠깐 안 된다). 클라이언트가 '없는 종'
         # 으로 굳혀 버리지 않게 구분해서 알려준다.
@@ -477,21 +593,46 @@ def walk_meta(num: int):
     return meta
 
 
-@app.get("/api/walk/{num}.png")
-def walk_sheet(num: int):
-    """걷기 스프라이트시트."""
-    if not 1 <= num <= 1025:
-        raise HTTPException(404, "그런 도감 번호가 없습니다.")
-    png_path, _m = _walk_paths(num)
+def _sheet_response(num, name):
+    png_path, _m = _anim_paths(num, name)
     if not os.path.exists(png_path):
-        if not (_walk_meta(num) or {}).get("ok"):
-            raise HTTPException(404, "걷는 도트가 없는 종입니다.")
+        if not (_anim_meta(num, name) or {}).get("ok"):
+            raise HTTPException(404, "그 동작의 도트가 없는 종입니다.")
     if not os.path.exists(png_path):
-        raise HTTPException(404, "걷는 도트를 받지 못했습니다.")
+        raise HTTPException(404, "도트를 받지 못했습니다.")
     with open(png_path, "rb") as f:
         data = f.read()
     return Response(data, media_type="image/png",
                     headers={"Cache-Control": "public, max-age=604800"})
+
+
+@app.get("/api/anim/{num}/{name}.json")
+def anim_meta(num: int, name: str):
+    """이 종에 이 동작이 있는지, 있으면 어떻게 잘라야 하는지."""
+    _check_anim(num, name)
+    return _meta_response(num, name)
+
+
+@app.get("/api/anim/{num}/{name}.png")
+def anim_sheet(num: int, name: str):
+    """그 동작의 스프라이트시트."""
+    _check_anim(num, name)
+    return _sheet_response(num, name)
+
+
+# 아래 둘은 1.0.15 까지의 클라이언트가 부른다. 걷기 전용이던 시절의
+# 주소라, 새 주소로 넘겨만 준다. 옛 클라이언트가 다 사라지기 전에는
+# 지우면 안 된다 - 지우면 그 사람들 포켓몬이 걷기를 멈춘다.
+@app.get("/api/walk/{num}.json")
+def walk_meta(num: int):
+    _check_anim(num, "Walk")
+    return _meta_response(num, "Walk")
+
+
+@app.get("/api/walk/{num}.png")
+def walk_sheet(num: int):
+    _check_anim(num, "Walk")
+    return _sheet_response(num, "Walk")
 
 
 @app.get("/api/auth/check")

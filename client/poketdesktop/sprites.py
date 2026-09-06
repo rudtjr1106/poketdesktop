@@ -217,36 +217,70 @@ def clear_cache():
 #     4 위(등) 5 위왼쪽      6 왼쪽    7 아래왼쪽
 # 우리는 네 방향만 쓴다 (아래/오른쪽/위/왼쪽).
 DOWN, UP = 2, 3          # RIGHT=0, LEFT=1 은 위에 이미 있다
-ROW_OF = {DOWN: 0, RIGHT: 2, UP: 4, LEFT: 6}
-DIRS = (DOWN, RIGHT, UP, LEFT)
+DOWNRIGHT, UPRIGHT, UPLEFT, DOWNLEFT = 4, 5, 6, 7
+ROW_OF = {DOWN: 0, DOWNRIGHT: 1, RIGHT: 2, UPRIGHT: 3,
+          UP: 4, UPLEFT: 5, LEFT: 6, DOWNLEFT: 7}
+DIRS = (DOWN, DOWNRIGHT, RIGHT, UPRIGHT, UP, UPLEFT, LEFT, DOWNLEFT)
+# 서버 meta 의 rowmap 키와 우리 상수를 잇는다.
+DIR_KEY = {DOWN: "down", DOWNRIGHT: "downright", RIGHT: "right",
+           UPRIGHT: "upright", UP: "up", UPLEFT: "upleft",
+           LEFT: "left", DOWNLEFT: "downleft"}
+# 대각선이 없는 출처(followers, 4행)에서 대신 쓸 방향.
+DIAG_FALLBACK = {DOWNRIGHT: RIGHT, UPRIGHT: RIGHT,
+                 UPLEFT: LEFT, DOWNLEFT: LEFT}
 
 
 class WalkAnimation(object):
-    """4방향 걷기 애니메이션.
+    """방향이 있는 오버월드 애니메이션. 걷기 말고도 쓴다.
 
-    frames[방향] 은 그 방향으로 걸을 때의 프레임 목록이다.
-    좌우 반전이 아니라 방향마다 진짜 다른 그림이라, 위로 가면 등이 보인다.
+    frames[방향] 은 그 방향일 때의 프레임 목록이다. 좌우 반전이 아니라
+    방향마다 진짜 다른 그림이라, 위로 가면 등이 보인다.
+
+    ## anchor 가 왜 필요한가
+
+    동작마다 **칸 크기가 다르다.** 피카츄는 걷기가 32x40 인데 공격은
+    80x80 이다(기술 이펙트까지 한 칸에 들어 있다). 그림에 딱 맞춰
+    잘라내고 창을 그 크기로 만들면, 동작을 바꿀 때마다 몸이 순간이동한다.
+
+    그래서 **칸의 한가운데**가 잘라낸 그림 안 어디였는지를 같이 들고
+    다닌다(ax, ay). 부르는 쪽은 그 점을 화면의 같은 자리에 두면 되고,
+    그러면 창 크기가 변해도 포켓몬은 제자리에 선다.
+
+    scale 도 같이 들고 다닌다. 한 종의 모든 동작은 **같은 배율**을 써야
+    한다 - 동작마다 목표 높이에 맞추면 공격할 때만 작아진다.
     """
 
-    def __init__(self, frames, durations, w, h, key):
+    def __init__(self, frames, durations, w, h, key, ax=None, ay=None,
+                 scale=1.0, name="Walk"):
         self.frames = frames
         self.durations = durations
         self.w = w
         self.h = h
         self.key = key
+        self.ax = w / 2.0 if ax is None else ax
+        self.ay = h / 2.0 if ay is None else ay
+        self.scale = scale
+        self.name = name
 
     def count(self):
         return len(self.durations)
 
 
 def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
-              max_scale=3.0, key=None):
-    """스프라이트시트를 잘라 4방향 걷기 애니메이션으로 만든다.
+              max_scale=3.0, key=None, scale=None, name=None):
+    """스프라이트시트를 잘라 방향별 애니메이션으로 만든다.
 
-    meta 는 서버가 준 {frameW, frameH, durations} 다. 종마다 칸 크기가
-    제각각(24x32 ~ 104x120)이라 반드시 이 값을 보고 잘라야 한다.
+    meta 는 서버가 준 {frameW, frameH, durations, rows, rowmap} 이다.
+    종마다, 그리고 **동작마다** 칸 크기가 제각각이라 반드시 이 값을 보고
+    잘라야 한다.
+
+    scale 을 주면 그 배율을 쓴다. 한 종의 걷기에서 정한 배율을 나머지
+    동작에 물려주기 위한 것이다 - 동작마다 목표 높이에 맞추면 공격할
+    때만 몸이 작아진다.
     """
-    ck = ("walk", sheet_path, key, target_height, min_scale, max_scale)
+    name = name or meta.get("anim") or "Walk"
+    ck = ("anim", sheet_path, name, key, target_height, min_scale, max_scale,
+          scale)
     if ck in _cache:
         return _cache[ck]
 
@@ -254,16 +288,45 @@ def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
     fh = int(meta["frameH"])
     # 방향이 시트의 몇 번째 행인지는 출처마다 다르다. 서버가 알려준다.
     rowmap = meta.get("rowmap") or {}
-    rows = {DOWN: rowmap.get("down", ROW_OF[DOWN]),
-            RIGHT: rowmap.get("right", ROW_OF[RIGHT]),
-            UP: rowmap.get("up", ROW_OF[UP]),
-            LEFT: rowmap.get("left", ROW_OF[LEFT])}
+    nrows = max(1, int(meta.get("rows") or 8))
     durs_ticks = list(meta["durations"]) or [8]
     # 지속시간은 1/60초 단위 틱이다. 밀리초로 바꾼다.
     durs = [max(30, int(round(t * 1000.0 / 60.0))) for t in durs_ticks]
     n = len(durs_ticks)
 
     sheet = Image.open(sheet_path).convert("RGBA")
+    # 시트가 메타보다 짧을 수 있다. 밖을 자르면 빈 칸이 나온다.
+    have_rows = max(1, min(nrows, sheet.height // fh if fh else nrows))
+    have_cols = max(1, min(n, sheet.width // fw if fw else n))
+    if have_cols < n:
+        durs = durs[:have_cols]
+        n = have_cols
+
+    # 어느 방향이 어느 행인가. **행이 모자라면 0행 하나로 때운다** -
+    # Sleep 은 방향이 아예 없어서 1행짜리다. 그때 8행인 줄 알고 자르면
+    # 시트 밖을 긁어서 빈 그림이 나온다.
+    rows = {}
+    for d in DIRS:
+        # **rowmap 에 그 방향이 없으면 ROW_OF 로 때우면 안 된다.**
+        # followers 시트는 4행인데 배치가 아예 달라서(1이 왼쪽),
+        # 8행 기준의 ROW_OF[DOWNRIGHT]=1 을 쓰면 아래오른쪽 자리에
+        # 왼쪽 그림이 들어간다. 없으면 그 대각선의 이웃 가로 방향을 쓴다.
+        # **`if alt` 로 쓰면 안 된다. RIGHT 가 0 이라 거짓이 된다.**
+        # 실제로 걸렸다 - 오른쪽 대각선만 0행(아래)으로 떨어져서,
+        # 오른쪽 위로 걸을 때 정면을 보고 있었다. 왼쪽은 LEFT=1 이라
+        # 멀쩡해서 더 눈에 안 띄었다.
+        r = rowmap.get(DIR_KEY[d])
+        if r is None:
+            alt = DIAG_FALLBACK.get(d)
+            r = rowmap.get(DIR_KEY[alt]) if alt is not None else None
+        if r is None:
+            r = ROW_OF[d] if not rowmap else 0
+        if r >= have_rows:
+            # 행이 모자란다. Sleep 은 방향이 없어 1행뿐이다.
+            alt = DIAG_FALLBACK.get(d)
+            r2 = rowmap.get(DIR_KEY[alt]) if alt is not None else None
+            r = r2 if (r2 is not None and r2 < have_rows) else 0
+        rows[d] = r
 
     # 먼저 쓸 칸을 전부 꺼내서 공통 여백을 잰다.
     # 방향마다 따로 자르면 방향을 바꿀 때 몸이 튄다.
@@ -282,10 +345,15 @@ def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
         key = pick_key_color(every)
     l, t, r, b = union_bbox(every)
     bw, bh = max(1, r - l), max(1, b - t)
-    scale = float(target_height) / bh if bh else 1.0
-    scale = max(min_scale, min(max_scale, scale))
+    if scale is None:
+        scale = float(target_height) / bh if bh else 1.0
+        scale = max(min_scale, min(max_scale, scale))
     ow = max(8, int(round(bw * scale)))
     oh = max(8, int(round(bh * scale)))
+    # 칸 한가운데가 잘라낸 그림 안 어디인지. 동작을 바꿔도 이 점을 같은
+    # 자리에 두면 몸이 안 튄다 (WalkAnimation 의 설명을 보라).
+    ax = (fw / 2.0 - l) * scale
+    ay = (fh / 2.0 - t) * scale
 
     frames = {}
     for d in DIRS:
@@ -296,17 +364,50 @@ def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
             out.append(flatten_rgba(im, key))
         frames[d] = out
 
-    anim = WalkAnimation(frames, durs, ow, oh, key)
+    anim = WalkAnimation(frames, durs, ow, oh, key, ax, ay, scale, name)
     _cache[ck] = anim
     return anim
 
 
-def dir_from(vx, vy):
-    """움직이는 방향에서 네 방향 중 하나를 고른다.
+# 8방향을 각도로 나눈다. 시트에 대각선 그림이 진짜로 들어 있어서
+# (행 1/3/5/7) 쓰지 않을 이유가 없다 - 비스듬히 걸을 때 몸도 비스듬해진다.
+#
+# 칸을 45도로 똑같이 자르지 않고 **가로 방향을 넓게** 준다. 활동 영역이
+# 가로로 길어서 실제 걸음이 대부분 가로에 몰리는데, 45도로 자르면
+# 조금만 기울어도 대각선 그림으로 넘어가 부산스럽다.
+_DIR_BANDS = (
+    (-22.5, 22.5, RIGHT),
+    (22.5, 67.5, DOWNRIGHT),
+    (67.5, 112.5, DOWN),
+    (112.5, 157.5, DOWNLEFT),
+    (157.5, 180.0, LEFT),
+    (-180.0, -157.5, LEFT),
+    (-157.5, -112.5, UPLEFT),
+    (-112.5, -67.5, UP),
+    (-67.5, -22.5, UPRIGHT),
+)
 
-    가로와 세로 중 더 크게 움직이는 쪽을 따른다. 대각선으로 걸을 때
-    방향이 딸깍딸깍 바뀌지 않도록 가로를 조금 우대한다.
+
+def dir_from(vx, vy):
+    """움직이는 방향에서 여덟 방향 중 하나를 고른다.
+
+    화면 좌표라 y 는 아래가 양수다. 그래서 각도가 양수면 아래쪽이다.
     """
+    import math
+    if vx == 0 and vy == 0:
+        return DOWN
+    deg = math.degrees(math.atan2(vy, vx))
+    for lo, hi, d in _DIR_BANDS:
+        if lo <= deg < hi:
+            return d
+    # atan2 는 정확히 180.0 을 돌려줄 수 있다(정왼쪽). 위 칸은 끝을
+    # 안 포함하므로 여기로 떨어진다. 실제로 걸렸다 - 왼쪽으로 걷는데
+    # 오른쪽을 보고 있었다.
+    return LEFT
+
+
+def dir_four(vx, vy):
+    """네 방향만 쓰는 곳(대각선 그림이 없는 종)을 위한 것."""
     if abs(vx) * 1.15 >= abs(vy):
         return RIGHT if vx >= 0 else LEFT
     return DOWN if vy >= 0 else UP

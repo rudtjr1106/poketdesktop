@@ -236,19 +236,26 @@ class Api(object):
             return None
         return r.content if r.status_code == 200 and r.content else None
 
-    def walk_meta(self, num):
-        """걷는 도트가 있는지, 있으면 어떻게 잘라야 하는지."""
-        return self._call("GET", "/api/walk/%d.json" % int(num), auth=False,
-                          timeout=30)
+    def anim_meta(self, num, name="Walk"):
+        """이 종에 이 동작이 있는지, 있으면 어떻게 잘라야 하는지."""
+        return self._call("GET", "/api/anim/%d/%s.json" % (int(num), name),
+                          auth=False, timeout=30)
 
-    def walk_sheet(self, num):
-        """걷기 스프라이트시트 원본 바이트. 없으면 None."""
-        url = "%s/api/walk/%d.png" % (self.base, int(num))
+    def anim_sheet(self, num, name="Walk"):
+        """그 동작의 스프라이트시트 원본 바이트. 없으면 None."""
+        url = "%s/api/anim/%d/%s.png" % (self.base, int(num), name)
         try:
             r = self.session.get(url, timeout=40)
         except requests.RequestException:
             return None
         return r.content if r.status_code == 200 and r.content else None
+
+    # 옛 이름. 부르는 곳이 아직 남아 있을 수 있어 남겨 둔다.
+    def walk_meta(self, num):
+        return self.anim_meta(num, "Walk")
+
+    def walk_sheet(self, num):
+        return self.anim_sheet(num, "Walk")
 
     # ---------------- 친구 ----------------
     # 전부 창을 열었을 때만 부른다. 폴링을 붙이지 않는다 - Turso 는
