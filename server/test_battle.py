@@ -161,9 +161,20 @@ def main():
     chk("기술 사용 이벤트 포함", "move" in kinds, kinds)
     now = r["battle"]
     used = [m for m in now["me"]["moves"] if m["key"] == mv["key"]]
+    # **못 움직인 턴에는 PP 를 안 쓴다** - 본가와 같다 (common/battle.py 의
+    # _use 는 _can_move 가 막으면 PP 를 건드리지 않고 돌아선다). 상대가
+    # 나보다 빨라서 먼저 마비나 잠을 걸면 그 턴에 내가 못 움직일 수 있다.
+    # 그걸 안 보고 "PP 는 늘 1 준다" 로 박아 둬서 가끔 빨간불이 났다.
+    blocked = [e for e in ev if e.get("who") == "me"
+               and (e["t"] == "status"
+                    or (e["t"] == "msg" and "움직이지" in e.get("text", "")))]
     if used and mv["key"] != "STRUGGLE":
-        chk("PP 가 1 줄어듦", used[0]["pp"] == pp_before - 1,
-            (pp_before, used[0]["pp"]))
+        if blocked:
+            chk("못 움직인 턴에는 PP 를 안 씀", used[0]["pp"] == pp_before,
+                (pp_before, used[0]["pp"], [e["text"] for e in blocked]))
+        else:
+            chk("PP 가 1 줄어듦", used[0]["pp"] == pp_before - 1,
+                (pp_before, used[0]["pp"]))
     chk("턴이 올라감", now["turn"] >= 1, now["turn"])
     dmg = [e for e in ev if e["t"] == "hit"]
     if dmg:
