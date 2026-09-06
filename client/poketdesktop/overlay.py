@@ -24,10 +24,21 @@ def work_area(fallback_w, fallback_h):
     return PLAT.work_area(fallback_w, fallback_h)
 
 
-# 이 틱만큼 가만히 있으면 잔다. 틱은 settings["fps"] 에 달렸는데 보통
-# 초당 24라, 900이면 40초쯤이다. 자리를 비운 사이에 자고 있으면 귀엽고,
-# 너무 짧으면 잠깐 딴 데 본 사이에 자 버려서 부산스럽다.
-SLEEP_AFTER = 900
+# 이만큼 안 건드리면 잔다.
+#
+# **틱이 아니라 시간으로 센다.** 틱으로 세면 settings["fps"] 를 낮춘
+# 사람은 그만큼 늦게 자게 된다 - 같은 3분이어야 한다.
+#
+# 3분은 "자리를 떴다" 로 읽히는 가장 짧은 시간쯤이다. 더 짧으면 잠깐
+# 딴 창을 보다 돌아왔는데 자고 있어서 부산스럽고, 더 길면 눈에 잘 안 띈다.
+SLEEP_AFTER_MS = 180000
+
+# 서 있을 때 가끔 취하는 자세. 앉거나 눕는다.
+#
+# 32종을 세어 보니 Sit/Laying 은 절반쯤(17/32)만 있다. 없는 종은 그냥
+# 숨만 쉰다(Idle). Sleep 은 전 종에 있다.
+REST_POSES = ("Sit", "Laying")
+REST_CHANCE = 0.35
 
 
 class Pet(object):
@@ -85,7 +96,9 @@ class Pet(object):
         self.vx = self.vy = 0.0
         self.walked = 0.0            # 걸은 거리. 걸음 위상을 여기에 묶는다
         self.battling = False        # 배틀 중에는 스스로 돌아다니지 않는다
-        self.still = 0               # 가만히 있은 틱. 오래되면 잠든다
+        self.calm_ms = 0             # 안 건드린 시간(ms). 쌓이면 잠든다
+        self.sleeping = False        # 자는 중. 자면 돌아다니지 않는다
+        self.rest_pose = None        # 서 있을 때 취할 자세 (앉기/눕기)
 
         self.label.bind("<Enter>", self.on_enter)
         self.label.bind("<Leave>", self.on_leave)
@@ -216,6 +229,7 @@ class Pet(object):
     # ---------------- 입력 ----------------
     def on_press(self, e):
         # 누르고 있는 동안만 잠깐 멈춘다. 위치는 건드리지 않는다.
+        self.wake()
         self.state = "held"
         self.hide_tip()
 
@@ -224,9 +238,11 @@ class Pet(object):
         self.timer = random.randint(20, 60)
 
     def on_menu(self, e):
+        self.wake()
         self.ov.on_pet_menu(self, e)
 
     def on_double(self, e):
+        self.wake()
         self.ov.on_pet_open(self)
 
     # ---------------- 움직임 ----------------
@@ -345,14 +361,34 @@ class Pet(object):
     def rest_anim(self):
         """서 있을 때 무엇을 돌릴까.
 
-        한참 가만히 있었으면 잔다. 켜 두고 잊어버리는 프로그램이라
-        구석에서 자고 있는 편이 가만히 서 있는 것보다 낫다.
+        자는 중이면 자고, 아니면 이번에 고른 자세(앉기/눕기)를, 그것도
+        없으면 그냥 숨을 쉰다.
         """
-        if self.still > SLEEP_AFTER:
+        if self.sleeping:
             for n in ("Sleep", "EventSleep"):
                 if self.anim_for(n) is not None:
                     return n
+        if self.rest_pose and self.anim_for(self.rest_pose) is not None:
+            return self.rest_pose
         return "Idle" if self.anim_for("Idle") is not None else "Walk"
+
+    def wake(self, show=True):
+        """깨운다. 안 자고 있었으면 시계만 되돌린다.
+
+        show 가 참이면 깨는 모습을 한 번 보여준다. 배틀이 시작돼서 깨는
+        경우처럼 바로 다음 연출이 있는 자리에서는 끄고 부른다 - 깨는
+        동작이 그 연출을 밀어내면 무슨 일이 난 건지 안 읽힌다.
+        """
+        self.calm_ms = 0
+        if not self.sleeping:
+            return
+        self.sleeping = False
+        self.rest_pose = None
+        self.state = "idle"
+        self.timer = random.randint(20, 60)
+        if show and self.play("Wake", once=True):
+            return
+        self.play(self.rest_anim())
 
     def row_for(self, facing):
         """이 방향 그림이 없으면 있는 것 중에서 고른다.
@@ -514,25 +550,49 @@ class Pet(object):
         if self.once:
             return                   # 한 번짜리 동작 중에는 안 움직인다
         if self.state == "held" or self.battling:
+            # 붙잡혀 있거나 배틀 중이면 자고 있을 때가 아니다. 깨는
+            # 모습은 안 보여준다 - 곧 이어질 연출을 밀어낸다.
+            self.wake(show=False)
             return
+
+        # **안 건드린 시간을 잰다.** 걷고 있어도 쌓인다 - 이건 "이 사람이
+        # 자리를 비웠나" 를 보는 것이지 "포켓몬이 서 있었나" 가 아니다.
+        # 전에는 서 있은 틱을 셌는데, 서 있는 상태가 길어야 150틱이라
+        # 900틱이 필요한 잠들기에 **영영 못 닿았다.** 111분을 돌려도
+        # 최고 기록이 150틱이었다.
+        self.calm_ms += ms
+        if not self.sleeping and self.calm_ms > SLEEP_AFTER_MS:
+            if self.anim_for("Sleep") or self.anim_for("EventSleep"):
+                self.sleeping = True
+                self.state = "idle"
+                self.rest_pose = None
+
+        if self.sleeping:
+            # 자는 동안은 돌아다니지 않는다. 자면서 걸으면 자는 게 아니다.
+            want = self.rest_anim()
+            if want != self.anim_name:
+                self.play(want)
+            return
+
         s = self.ov.settings
         self.timer -= 1
         if self.timer <= 0:
             if self.state == "walk" and random.random() < 0.4:
                 self.state = "idle"
                 self.timer = random.randint(40, 150)
+                # 설 때마다 자세를 새로 고른다. 대부분은 그냥 숨만 쉰다.
+                self.rest_pose = (random.choice(REST_POSES)
+                                  if random.random() < REST_CHANCE else None)
             else:
                 self.state = "walk"
+                self.rest_pose = None
                 self.pick_move()
                 self.timer = random.randint(40, 160)
         if self.state != "walk":
-            # 서 있다. 오래 서 있었으면 잠드는 쪽으로 넘어간다.
-            self.still += 1
             want = self.rest_anim()
             if want != self.anim_name:
                 self.play(want)
             return
-        self.still = 0
         if self.anim_name != "Walk":
             self.play("Walk")
 

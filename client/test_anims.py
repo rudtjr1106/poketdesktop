@@ -209,6 +209,110 @@ def main():
     chk("배틀 도트로 대신하는 종은 아무 동작도 없다",
         Pet.anim_for(fp, "Idle") is None)
 
+    print("\n=== 잠들고 깨는가 ===")
+    # **이게 한 번 조용히 망가져 있었다.** 서 있은 틱을 셌는데, 상태
+    # 기계가 idle 에서 반드시 walk 로 넘어가서 서 있는 시간이 길어야
+    # 150틱이었다. 900틱이 필요한 잠들기에는 영영 못 닿았다 - 111분을
+    # 돌려도 최고 기록이 150틱. 그래서 시간으로 센다.
+    from poketdesktop import overlay as O
+
+    class SleepPet(object):
+        """Pet.update 의 판단만 돌린다. 창도 그림도 안 만든다."""
+
+        walking_sprite = True
+
+        def __init__(self, have=("Sleep", "Idle", "Wake")):
+            self.have = set(have)
+            self.once = None
+            self.state = "idle"
+            self.battling = False
+            self.timer = 10 ** 9        # 상태가 안 바뀌게
+            self.calm_ms = 0
+            self.sleeping = False
+            self.rest_pose = None
+            self.anim_name = "Walk"
+            self.played = []
+            self.ov = type("O", (), {"settings": {"walkSpeed": 1,
+                                                  "areaMargin": 0}})()
+
+        def advance(self, ms):
+            pass
+
+        def anim_for(self, name):
+            return object() if name in self.have else None
+
+        def play(self, name, once=False, then=None):
+            if self.anim_for(name) is None:
+                return False
+            self.anim_name = name
+            self.played.append(name)
+            return True
+
+        rest_anim = O.Pet.rest_anim
+        wake = O.Pet.wake
+        update = O.Pet.update
+
+    MS = 33                                   # 30fps
+    p = SleepPet()
+    for _ in range(int(O.SLEEP_AFTER_MS / MS) - 5):
+        p.update(MS)
+    chk("3분 전에는 안 잔다", not p.sleeping)
+    for _ in range(10):
+        p.update(MS)
+    chk("3분이 지나면 잔다", p.sleeping)
+    chk("자는 동작을 돌린다", p.anim_name == "Sleep", p.anim_name)
+
+    x = len(p.played)
+    for _ in range(300):
+        p.update(MS)
+    chk("자는 동안은 계속 잔다", p.sleeping and p.anim_name == "Sleep")
+    chk("자면서 걷지 않는다", "Walk" not in p.played[x:], p.played[x:])
+
+    p.wake()
+    chk("만지면 깬다", not p.sleeping)
+    chk("깨는 모습을 보여준다", p.played[-1] == "Wake", p.played[-1])
+    chk("시계가 되돌아간다", p.calm_ms == 0)
+
+    # Wake 가 없는 종은 그냥 일어난다
+    p2 = SleepPet(have=("Sleep", "Idle"))
+    p2.sleeping = True
+    p2.wake()
+    chk("Wake 가 없으면 그냥 일어난다",
+        not p2.sleeping and p2.anim_name == "Idle", p2.anim_name)
+
+    # 잘 줄 모르는 종은 영영 안 잔다 (Sleep 도 EventSleep 도 없는 종)
+    p3 = SleepPet(have=("Idle",))
+    for _ in range(int(O.SLEEP_AFTER_MS / MS) + 200):
+        p3.update(MS)
+    chk("자는 도트가 없는 종은 안 잔다", not p3.sleeping)
+    chk("그래도 숨은 쉰다", p3.anim_name == "Idle", p3.anim_name)
+
+    # 배틀이 시작되면 조용히 깬다
+    p4 = SleepPet()
+    p4.sleeping = True
+    p4.battling = True
+    p4.update(MS)
+    chk("배틀이 시작되면 깬다", not p4.sleeping)
+    chk("그때는 깨는 모습을 안 낀다 (연출을 밀지 않게)",
+        "Wake" not in p4.played, p4.played)
+
+    print("\n=== 앉기·눕기 ===")
+    p5 = SleepPet(have=("Idle", "Sit", "Laying", "Sleep"))
+    p5.rest_pose = "Sit"
+    chk("자세를 골랐으면 그걸 돌린다", p5.rest_anim() == "Sit")
+    p5.rest_pose = "Laying"
+    chk("눕기도 마찬가지", p5.rest_anim() == "Laying")
+    p5.rest_pose = None
+    chk("안 골랐으면 그냥 숨쉬기", p5.rest_anim() == "Idle")
+    p5.rest_pose = "Sit"
+    p5.sleeping = True
+    chk("자는 게 자세보다 먼저다", p5.rest_anim() == "Sleep")
+    p6 = SleepPet(have=("Idle",))
+    p6.rest_pose = "Sit"
+    chk("없는 종은 자세를 못 취해도 숨은 쉰다", p6.rest_anim() == "Idle")
+    chk("고를 자세는 앉기와 눕기 둘",
+        set(O.REST_POSES) == {"Sit", "Laying"}, O.REST_POSES)
+
     print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0
