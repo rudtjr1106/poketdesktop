@@ -44,6 +44,14 @@ def decorate(mon):
     d = dex()
     out = dict(mon)
     out["info"] = d.describe(mon)
+    # 지닌 도구의 이름과 본가 설명. 클라이언트는 id 만 갖고는 뭘 지녔는지
+    # 그릴 수 없다 (도구 목록은 상점·가방을 열 때만 받는다).
+    held = mon.get("held")
+    if held:
+        from . import items as _items
+        it = _items.get(held) or {}
+        out["heldKr"] = it.get("kr", held)
+        out["heldDesc"] = it.get("desc", "")
     sp = d.get(mon["species"])
     if sp:
         out["num"] = sp["num"]

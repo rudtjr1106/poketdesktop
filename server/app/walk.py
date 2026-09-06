@@ -84,9 +84,11 @@ def settle(uid, st=None):
     got = ticks * GAIN
     # 데리고 다니는 애들만 오른다. 박스에 있는 건 같이 걷지 않는다.
     # 럭셔리볼로 잡은 개체는 두 배로 오른다(본가와 같다).
+    # 평온의방울을 지닌 개체는 1.5배 (본가와 같다). 정수 칸이라 잘라 넣는다.
     db.run(
-        "UPDATE pokemon SET happiness = MIN(?, happiness + ? * "
-        " CASE WHEN luxury=1 THEN 2 ELSE 1 END)"
+        "UPDATE pokemon SET happiness = MIN(?, happiness + CAST(? * "
+        " (CASE WHEN luxury=1 THEN 2 ELSE 1 END) * "
+        " (CASE WHEN held='SOOTHEBELL' THEN 1.5 ELSE 1 END) AS INTEGER))"
         " WHERE user_id=? AND on_desktop=1 AND happiness < ?",
         (MAX_HAPPINESS, got, uid, MAX_HAPPINESS))
     return got

@@ -13,7 +13,7 @@ from PIL import ImageTk
 
 from common.korean import natural
 
-from . import sprite_cache, sprites
+from . import box_filter, item_icons, sprite_cache, sprites
 from . import ui_common as U
 from . import ui_loading
 
@@ -234,6 +234,23 @@ class BoxWindow(object):
         wrap = tk.Frame(parent, bg=U.BG)
         wrap.pack(side="left", fill="both", expand=True)
 
+        # 거르기. 타입 칩은 갖고 있는 타입만 깔린다 (_refresh_filter_bar).
+        # 열여덟 개를 다 깔면 정작 쓸 것을 못 찾는다. 이름은 별명·종 이름·
+        # 도감 번호를 다 본다 (box_filter).
+        bar = tk.Frame(wrap, bg=U.BG2, height=40)
+        bar.pack(fill="x")
+        bar.pack_propagate(False)
+        self.filter_chips = tk.Frame(bar, bg=U.BG2)
+        self.filter_chips.pack(side="left", padx=(10, 0), fill="y")
+        self.f_type = None
+        self.f_query = tk.StringVar()
+        self.f_query.trace_add("write", lambda *_a: self._refilter())
+        box = U.entry(bar, self.f_query, width=12)
+        box.pack(side="right", padx=(6, 10), pady=3)
+        tk.Label(bar, text="이름 찾기", bg=U.BG2, fg=U.FG_DIM,
+                 font=U.FONT_XS).pack(side="right")
+        tk.Frame(wrap, bg=U.LINE, height=1).pack(fill="x")
+
         head = tk.Frame(wrap, bg=U.INK, height=26)
         head.pack(fill="x")
         head.pack_propagate(False)
@@ -343,6 +360,28 @@ class BoxWindow(object):
         self.d_sub.pack(fill="x", pady=(3, 0))
         self.d_types = tk.Frame(p, bg=U.BG2)
         self.d_types.pack(anchor="w", pady=(8, 0))
+
+        # 지닌 도구 (1.1.0). 한 마리에 하나. 가방에서 골라 들리고, 벗기면
+        # 가방으로 돌아간다. 효과는 배틀에서만 난다 (common/held.py).
+        hb = tk.Frame(p, bg="#101623", highlightthickness=2,
+                      highlightbackground=U.LINE)
+        hb.pack(fill="x", pady=(10, 0))
+        hrow = tk.Frame(hb, bg="#101623")
+        hrow.pack(fill="x", padx=11, pady=(8, 4))
+        U.marker_label(hrow, "지닌 도구", bg="#101623").pack(side="left")
+        self.btn_unhold = U.ghost_button(hrow, "벗기기", self.do_unhold, height=24)
+        self.btn_unhold.pack(side="right")
+        self.btn_hold = U.ghost_button(hrow, "지니게 하기", self.do_hold, height=24)
+        self.btn_hold.pack(side="right", padx=(0, 6))
+        hline = tk.Frame(hb, bg="#101623")
+        hline.pack(fill="x", padx=11, pady=(0, 8))
+        self.d_held_icon = tk.Label(hline, bg="#101623")
+        self.d_held_icon.pack(side="left")
+        self.d_held = tk.Label(hline, text="없음", bg="#101623", fg=U.FG_DIM,
+                               font=U.FONT_XS, anchor="w", justify="left",
+                               wraplength=DETAIL_W - 76)
+        self.d_held.pack(side="left", fill="x", padx=(6, 0))
+        self._held_photo = None
 
         # 경험치. 레벨 숫자만 있으면 방금 올랐는지 다음 레벨이 코앞인지
         # 알 수가 없다. 바로 한눈에, 숫자로 정확히, %로 그 둘을 잇는다.
@@ -469,13 +508,56 @@ class BoxWindow(object):
         if err:
             return self.say(getattr(err, "message", str(err)), U.DANGER)
         self.mons = mons or []
-        keep = self.sel
+        self._refresh_filter_bar()
+        self.balls.configure(text=str(self.app.balls))
+        self.say("")
+        self._render(self.sel)
+
+    # ---------------- 거르기 ----------------
+    def _refresh_filter_bar(self):
+        """갖고 있는 타입만 칩으로 깐다. 고르고 있던 타입이 사라졌으면 푼다."""
+        for w in self.filter_chips.winfo_children():
+            w.destroy()
+        dex = self.app.dex
+        types = box_filter.types_present(self.mons, dex)
+        if self.f_type and self.f_type not in types:
+            self.f_type = None
+        self._chips = {}
+        self._chip_add(None, "전체", U.BG3, U.FG)
+        for t in types:
+            self._chip_add(t, dex.type_name(t) if dex else t,
+                           U.TYPE_COLOR.get(t, U.BG3), "#14141a")
+
+    def _chip_add(self, t, label, bg, fg):
+        on = (t == self.f_type)
+        c = U.chip(self.filter_chips, label, bg, fg=fg, padx=8, pady=3)
+        c.configure(cursor="hand2", highlightthickness=2,
+                    highlightbackground=U.ACCENT if on else U.BG2)
+        c.pack(side="left", padx=(0, 4), pady=7)
+        c.bind("<Button-1>", lambda _e, x=t: self._set_type(x))
+        self._chips[t] = c
+
+    def _set_type(self, t):
+        self.f_type = None if t == self.f_type and t is not None else t
+        for key, c in self._chips.items():
+            c.configure(highlightbackground=U.ACCENT if key == self.f_type
+                        else U.BG2)
+        self._refilter()
+
+    def _refilter(self):
+        if not hasattr(self, "inner"):
+            return
+        self._render(self.sel)
+
+    def _render(self, keep=None):
+        """목록을 그린다. 거름망을 통과한 것만."""
         for w in self.inner.winfo_children():
             w.destroy()
         self.rows = {}
-
-        party = [m for m in self.mons if m.get("onDesktop")]
-        box = [m for m in self.mons if not m.get("onDesktop")]
+        shown = box_filter.apply(self.mons, self.app.dex, self.f_type,
+                                 self.f_query.get())
+        party = [m for m in shown if m.get("onDesktop")]
+        box = [m for m in shown if not m.get("onDesktop")]
         for m in party:
             self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
                                      self.select, self._dnd).pack()
@@ -491,18 +573,22 @@ class BoxWindow(object):
                 self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
                                          self.select, self._dnd).pack()
                 tk.Frame(self.inner, bg="#161a24", height=1).pack(fill="x")
+        if not shown and self.mons:
+            tk.Label(self.inner, text="거름망에 맞는 포켓몬이 없습니다.",
+                     bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S).pack(pady=28)
 
         # 행이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게
         # 여기서 다시 맞춘다.
         self.fit_scroll()
-        self.count.configure(text="보유 %d마리  ·  데리고 다니는 중 %d마리"
-                                  % (len(self.mons), len(party)))
-        self.balls.configure(text=str(self.app.balls))
-        self.say("")
+        all_party = sum(1 for m in self.mons if m.get("onDesktop"))
+        text = "보유 %d마리  ·  데리고 다니는 중 %d마리" % (len(self.mons), all_party)
+        if len(shown) != len(self.mons):
+            text += "  ·  표시 %d마리" % len(shown)
+        self.count.configure(text=text)
         if keep and keep in self.rows:
             self.select(keep)
-        elif self.mons:
-            self.select(self.mons[0]["id"])
+        elif shown:
+            self.select(shown[0]["id"])
 
     # ---------------- 끌어서 옮기기 ----------------
     # 누른 채로 이만큼 움직여야 '끄는 것' 으로 본다. 이게 없으면 클릭할 때
@@ -753,6 +839,7 @@ class BoxWindow(object):
                    font=U.FONT_S, padx=10, pady=2).pack(side="left", padx=(0, 4))
 
         self._exp(info)
+        self._show_held(m)
 
         stats = info.get("stats", {})
         ivs = m.get("ivs", {})
@@ -952,6 +1039,40 @@ class BoxWindow(object):
         U.run_async(self.root, lambda: self.app.api.release(m["id"]),
                     self._after("%s 을(를) 보내주었습니다." % name))
 
+    # ---------------- 지닌 도구 ----------------
+    def _show_held(self, m):
+        held = m.get("held")
+        if held:
+            text = m.get("heldKr") or held
+            if m.get("heldDesc"):
+                text += "\n" + m["heldDesc"]
+            self.d_held.configure(text=text, fg=U.FG)
+            try:
+                self._held_photo = item_icons.photo(held, 28)
+            except Exception:                               # noqa: BLE001
+                self._held_photo = None
+            self.d_held_icon.configure(image=self._held_photo or "")
+        else:
+            self.d_held.configure(text="없음. 가방의 도구를 지니게 하면 배틀에서 "
+                                       "효과가 납니다.", fg=U.FG_DIM)
+            self.d_held_icon.configure(image="")
+            self._held_photo = None
+        self.btn_unhold.configure(state="normal" if held else "disabled")
+
+    def do_hold(self):
+        m = self.current()
+        if not m:
+            return
+        HeldPicker(self, m)
+
+    def do_unhold(self):
+        m = self.current()
+        if not m or not m.get("held"):
+            return
+        U.run_async(self.root, lambda: self.app.api.unhold(m["id"]),
+                    self._after("%s을(를) 가방에 넣었습니다."
+                                % (m.get("heldKr") or "도구")))
+
     def close(self):
         # 휠은 이제 창 하나가 받아서 나눠 준다(U.install_wheel). 예전에는
         # 여기서 unbind_all 을 불렀는데, 그건 **다른 창의 휠까지 지웠다.**
@@ -971,6 +1092,131 @@ class BoxWindow(object):
 
 
 # ---------------------------------------------------------------- 대화상자
+class HeldPicker(object):
+    """가방에서 지니게 할 도구를 고르는 창.
+
+    상점 목록(/api/shop)을 받는다 - 거기에 이름·설명·지닐 수 있는지가 다
+    들어 있고 가방 개수도 같이 온다. 가진 것 중 지닐 수 있는 것만 보여준다.
+    """
+
+    def __init__(self, box, mon):
+        self.box = box
+        self.app = box.app
+        self.root = box.root
+        self.mon = mon
+        self.win = U.panel(None, self.root, "도구 지니게 하기", 460, 560,
+                           380, 400, self.close)
+        self.win.configure(bg=U.BG, highlightthickness=2,
+                           highlightbackground=U.LINE2)
+        U.install_wheel(self.win)
+        self.photos = []
+
+        head = tk.Frame(self.win, bg=U.BG2, height=56)
+        head.pack(fill="x")
+        head.pack_propagate(False)
+        tk.Label(head, text="%s에게 지니게 할 도구" % mon["info"].get("name", ""),
+                 bg=U.BG2, fg=U.FG, font=U.FONT_B).pack(side="left", padx=16,
+                                                        pady=16)
+        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        self.note = tk.Label(self.win, text="가방을 여는 중...", bg=U.BG,
+                             fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
+                             justify="left", wraplength=420)
+        self.note.pack(fill="x", padx=16, pady=(8, 4))
+
+        holder = tk.Frame(self.win, bg=U.BG)
+        holder.pack(fill="both", expand=True, padx=16, pady=(0, 12))
+        self.cv = tk.Canvas(holder, bg=U.INK, highlightthickness=2,
+                            highlightbackground=U.LINE, bd=0)
+        sb = ttk.Scrollbar(holder, orient="vertical", command=self.cv.yview)
+        self.cv.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self.cv.pack(side="left", fill="both", expand=True)
+        self.inner = tk.Frame(self.cv, bg=U.INK)
+        self._wid = self.cv.create_window((0, 0), window=self.inner, anchor="nw")
+        self.inner.bind("<Configure>", lambda _e: self.cv.configure(
+            scrollregion=self.cv.bbox("all")))
+        self.cv.bind("<Configure>", lambda e: self.cv.itemconfigure(
+            self._wid, width=e.width))
+        U.scrollable(self.cv, 60)
+
+        U.run_async(self.root, self.app.api.shop, self._loaded)
+
+    def _loaded(self, r, err):
+        if err:
+            return self.note.configure(text=getattr(err, "message", str(err)),
+                                       fg=U.DANGER)
+        bag = (r or {}).get("bag") or {}
+        rows = [it for it in (r or {}).get("items", [])
+                if it.get("holdable") and bag.get(it["id"], 0) > 0]
+        if not rows:
+            self.note.configure(text="지닐 수 있는 도구가 가방에 없습니다. "
+                                     "상점의 '지닌 도구' 칸에서 살 수 있습니다.")
+            return
+        cur = self.mon.get("heldKr")
+        self.note.configure(text=("지금은 %s을(를) 지니고 있습니다. 바꾸면 그건 "
+                                  "가방으로 돌아갑니다." % cur) if cur
+                            else "하나를 고르면 바로 지닙니다.")
+        rows.sort(key=lambda it: (it.get("cat") != "held", it.get("kr", "")))
+        for it in rows:
+            self._row(it, bag.get(it["id"], 0))
+
+    def _row(self, it, count):
+        f = tk.Frame(self.inner, bg=U.INK, cursor="hand2")
+        f.pack(fill="x")
+        line = tk.Frame(f, bg=U.INK)
+        line.pack(fill="x", padx=10, pady=6)
+        try:
+            ph = item_icons.photo(it["id"], 24)
+        except Exception:                                   # noqa: BLE001
+            ph = None
+        if ph is not None:
+            self.photos.append(ph)
+            tk.Label(line, image=ph, bg=U.INK).pack(side="left", padx=(0, 8))
+        tk.Label(line, text=it["kr"], bg=U.INK, fg=U.FG,
+                 font=U.FONT_B).pack(side="left")
+        tk.Label(line, text="%d개" % count, bg=U.INK, fg=U.FG_FAINT,
+                 font=U.FONT_XS).pack(side="right")
+        desc = tk.Label(f, text=it.get("desc") or "", bg=U.INK, fg=U.FG_DIM,
+                        font=U.FONT_XS, anchor="w", justify="left",
+                        wraplength=380)
+        desc.pack(fill="x", padx=10, pady=(0, 6))
+        tk.Frame(self.inner, bg="#1a1f2e", height=1).pack(fill="x")
+        for w in (f, line, desc) + tuple(line.winfo_children()):
+            w.bind("<Button-1>", lambda _e, i=it: self.pick(i))
+            w.bind("<Enter>", lambda _e, fr=f: self._paint(fr, "#181d2b"))
+            w.bind("<Leave>", lambda _e, fr=f: self._paint(fr, U.INK))
+
+    def _paint(self, f, bg):
+        try:
+            f.configure(bg=bg)
+            for c in f.winfo_children():
+                c.configure(bg=bg)
+                for cc in c.winfo_children():
+                    cc.configure(bg=bg)
+        except tk.TclError:
+            pass
+
+    def pick(self, it):
+        pid = self.mon["id"]
+        self.note.configure(text="%s을(를) 지니게 하는 중..." % it["kr"])
+        done = self.box._after("%s에게 %s을(를) 지니게 했습니다."
+                               % (self.mon["info"].get("name", ""), it["kr"]))
+
+        def finish(r, err):
+            if err:
+                return self.note.configure(
+                    text=getattr(err, "message", str(err)), fg=U.DANGER)
+            self.close()
+            done(r, None)
+        U.run_async(self.root, lambda: self.app.api.hold(pid, it["id"]), finish)
+
+    def close(self):
+        try:
+            self.win.destroy()
+        except tk.TclError:
+            pass
+
+
 def _shell(parent, title, w, h, danger=False):
     win = tk.Toplevel(parent)
     U.style_window(win, title, w, h)

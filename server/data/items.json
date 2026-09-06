@@ -1,8 +1,24 @@
 {
  "dropTable": [
   [
+   "AGUAVBERRY",
+   100
+  ],
+  [
+   "APICOTBERRY",
+   100
+  ],
+  [
+   "ASPEARBERRY",
+   100
+  ],
+  [
    "AUSPICIOUSARMOR",
    14
+  ],
+  [
+   "BABIRIBERRY",
+   100
   ],
   [
    "BIGMUSHROOM",
@@ -17,7 +33,23 @@
    45
   ],
   [
+   "BIGROOT",
+   14
+  ],
+  [
    "BLACKAUGURITE",
+   14
+  ],
+  [
+   "BLACKBELT",
+   45
+  ],
+  [
+   "BLACKGLASSES",
+   45
+  ],
+  [
+   "BLACKSLUDGE",
    14
   ],
   [
@@ -25,11 +57,59 @@
    34
   ],
   [
+   "BRIGHTPOWDER",
+   14
+  ],
+  [
+   "CHARCOAL",
+   45
+  ],
+  [
+   "CHARTIBERRY",
+   100
+  ],
+  [
+   "CHERIBERRY",
+   100
+  ],
+  [
+   "CHESTOBERRY",
+   100
+  ],
+  [
+   "CHILANBERRY",
+   100
+  ],
+  [
    "CHIPPEDPOT",
    5
   ],
   [
+   "CHOICEBAND",
+   5
+  ],
+  [
+   "CHOICESCARF",
+   5
+  ],
+  [
+   "CHOICESPECS",
+   5
+  ],
+  [
+   "CHOPLEBERRY",
+   100
+  ],
+  [
    "CLEVERWING",
+   100
+  ],
+  [
+   "COBABERRY",
+   100
+  ],
+  [
+   "COLBURBERRY",
    100
   ],
   [
@@ -39,6 +119,10 @@
   [
    "CRACKEDPOT",
    14
+  ],
+  [
+   "CUSTAPBERRY",
+   100
   ],
   [
    "DAWNSTONE",
@@ -53,8 +137,20 @@
    14
   ],
   [
+   "DRACOPLATE",
+   45
+  ],
+  [
+   "DRAGONFANG",
+   45
+  ],
+  [
    "DRAGONSCALE",
    14
+  ],
+  [
+   "DREADPLATE",
+   45
   ],
   [
    "DREAMBALL",
@@ -73,24 +169,68 @@
    14
   ],
   [
+   "EARTHPLATE",
+   45
+  ],
+  [
    "ELECTIRIZER",
    14
+  ],
+  [
+   "ENIGMABERRY",
+   100
   ],
   [
    "EVERSTONE",
    45
   ],
   [
+   "EXPERTBELT",
+   5
+  ],
+  [
    "FASTBALL",
    45
+  ],
+  [
+   "FIGYBERRY",
+   100
   ],
   [
    "FIRESTONE",
    14
   ],
   [
+   "FISTPLATE",
+   45
+  ],
+  [
+   "FLAMEORB",
+   14
+  ],
+  [
+   "FLAMEPLATE",
+   45
+  ],
+  [
+   "FOCUSBAND",
+   14
+  ],
+  [
+   "FOCUSSASH",
+   5
+  ],
+  [
    "FRIENDBALL",
    45
+  ],
+  [
+   "FULLINCENSE",
+   14
+  ],
+  [
+   "GANLONBERRY",
+   100
   ],
   [
    "GENIUSWING",
@@ -109,6 +249,14 @@
    100
   ],
   [
+   "HABANBERRY",
+   100
+  ],
+  [
+   "HARDSTONE",
+   45
+  ],
+  [
    "HEALBALL",
    45
   ],
@@ -125,8 +273,40 @@
    100
   ],
   [
+   "IAPAPABERRY",
+   100
+  ],
+  [
    "ICESTONE",
    14
+  ],
+  [
+   "ICICLEPLATE",
+   45
+  ],
+  [
+   "INSECTPLATE",
+   45
+  ],
+  [
+   "IRONBALL",
+   14
+  ],
+  [
+   "IRONPLATE",
+   45
+  ],
+  [
+   "JABOCABERRY",
+   100
+  ],
+  [
+   "KASIBBERRY",
+   100
+  ],
+  [
+   "KEBIABERRY",
+   100
   ],
   [
    "KELPSYBERRY",
@@ -137,12 +317,40 @@
    14
   ],
   [
+   "LAGGINGTAIL",
+   14
+  ],
+  [
+   "LANSATBERRY",
+   100
+  ],
+  [
+   "LAXINCENSE",
+   14
+  ],
+  [
    "LEAFSTONE",
    14
   ],
   [
+   "LEFTOVERS",
+   5
+  ],
+  [
+   "LEPPABERRY",
+   100
+  ],
+  [
    "LEVELBALL",
    45
+  ],
+  [
+   "LIECHIBERRY",
+   100
+  ],
+  [
+   "LIFEORB",
+   5
   ],
   [
    "LINKINGCORD",
@@ -153,12 +361,32 @@
    45
   ],
   [
+   "LUCKYEGG",
+   14
+  ],
+  [
+   "LUMBERRY",
+   100
+  ],
+  [
    "LUXURYBALL",
+   14
+  ],
+  [
+   "MACHOBRACE",
    14
   ],
   [
    "MAGMARIZER",
    14
+  ],
+  [
+   "MAGNET",
+   45
+  ],
+  [
+   "MAGOBERRY",
+   100
   ],
   [
    "MALICIOUSARMOR",
@@ -173,12 +401,32 @@
    5
   ],
   [
+   "MEADOWPLATE",
+   45
+  ],
+  [
    "METALALLOY",
    14
   ],
   [
    "METALCOAT",
    14
+  ],
+  [
+   "METRONOME",
+   14
+  ],
+  [
+   "MICLEBERRY",
+   100
+  ],
+  [
+   "MINDPLATE",
+   45
+  ],
+  [
+   "MIRACLESEED",
+   45
   ],
   [
    "MOONBALL",
@@ -189,8 +437,16 @@
    14
   ],
   [
+   "MUSCLEBAND",
+   14
+  ],
+  [
    "MUSCLEWING",
    100
+  ],
+  [
+   "MYSTICWATER",
+   45
   ],
   [
    "NESTBALL",
@@ -201,12 +457,36 @@
    45
   ],
   [
+   "NEVERMELTICE",
+   45
+  ],
+  [
    "NUGGET",
    45
   ],
   [
+   "OCCABERRY",
+   100
+  ],
+  [
+   "ODDINCENSE",
+   45
+  ],
+  [
+   "ORANBERRY",
+   100
+  ],
+  [
    "OVALSTONE",
    14
+  ],
+  [
+   "PASSHOBERRY",
+   100
+  ],
+  [
+   "PAYAPABERRY",
+   100
   ],
   [
    "PEARL",
@@ -217,12 +497,48 @@
    14
   ],
   [
+   "PECHABERRY",
+   100
+  ],
+  [
+   "PETAYABERRY",
+   100
+  ],
+  [
+   "POISONBARB",
+   45
+  ],
+  [
    "POKEBALL",
    100
   ],
   [
    "POMEGBERRY",
    100
+  ],
+  [
+   "POWERANKLET",
+   14
+  ],
+  [
+   "POWERBAND",
+   14
+  ],
+  [
+   "POWERBELT",
+   14
+  ],
+  [
+   "POWERBRACER",
+   14
+  ],
+  [
+   "POWERLENS",
+   14
+  ],
+  [
+   "POWERWEIGHT",
+   14
   ],
   [
    "PREMIERBALL",
@@ -249,12 +565,20 @@
    45
   ],
   [
+   "QUICKCLAW",
+   14
+  ],
+  [
    "RAREBONE",
    45
   ],
   [
    "RARECANDY",
    20
+  ],
+  [
+   "RAWSTBERRY",
+   100
   ],
   [
    "RAZORCLAW",
@@ -277,7 +601,31 @@
    100
   ],
   [
+   "RINDOBERRY",
+   100
+  ],
+  [
+   "ROCKINCENSE",
+   45
+  ],
+  [
+   "ROSEINCENSE",
+   45
+  ],
+  [
+   "ROWAPBERRY",
+   100
+  ],
+  [
    "SACHET",
+   14
+  ],
+  [
+   "SALACBERRY",
+   100
+  ],
+  [
+   "SCOPELENS",
    14
   ],
   [
@@ -285,16 +633,84 @@
    14
   ],
   [
+   "SEAINCENSE",
+   45
+  ],
+  [
+   "SHARPBEAK",
+   45
+  ],
+  [
+   "SHELLBELL",
+   14
+  ],
+  [
    "SHINYSTONE",
    14
+  ],
+  [
+   "SHUCABERRY",
+   100
+  ],
+  [
+   "SILKSCARF",
+   45
+  ],
+  [
+   "SILVERPOWDER",
+   45
+  ],
+  [
+   "SITRUSBERRY",
+   100
+  ],
+  [
+   "SKYPLATE",
+   45
+  ],
+  [
+   "SMOKEBALL",
+   14
+  ],
+  [
+   "SOFTSAND",
+   45
+  ],
+  [
+   "SOOTHEBELL",
+   14
+  ],
+  [
+   "SPELLTAG",
+   45
+  ],
+  [
+   "SPLASHPLATE",
+   45
+  ],
+  [
+   "SPOOKYPLATE",
+   45
   ],
   [
    "STARDUST",
    100
   ],
   [
+   "STARFBERRY",
+   100
+  ],
+  [
    "STARPIECE",
    14
+  ],
+  [
+   "STICKYBARB",
+   14
+  ],
+  [
+   "STONEPLATE",
+   45
   ],
   [
    "SUNSTONE",
@@ -317,6 +733,10 @@
    100
   ],
   [
+   "TANGABERRY",
+   100
+  ],
+  [
    "TARTAPPLE",
    14
   ],
@@ -333,6 +753,18 @@
    100
   ],
   [
+   "TOXICORB",
+   14
+  ],
+  [
+   "TOXICPLATE",
+   45
+  ],
+  [
+   "TWISTEDSPOON",
+   45
+  ],
+  [
    "ULTRABALL",
    14
   ],
@@ -345,19 +777,103 @@
    14
   ],
   [
+   "WACANBERRY",
+   100
+  ],
+  [
    "WATERSTONE",
    14
   ],
   [
+   "WAVEINCENSE",
+   45
+  ],
+  [
    "WHIPPEDDREAM",
+   14
+  ],
+  [
+   "WHITEHERB",
+   14
+  ],
+  [
+   "WIDELENS",
+   14
+  ],
+  [
+   "WIKIBERRY",
+   100
+  ],
+  [
+   "WISEGLASSES",
+   14
+  ],
+  [
+   "YACHEBERRY",
+   100
+  ],
+  [
+   "ZAPPLATE",
+   45
+  ],
+  [
+   "ZOOMLENS",
    14
   ]
  ],
- "dropTotal": 3368,
+ "dropTotal": 9788,
  "items": {
+  "AGUAVBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Aguav Berry",
+   "id": "AGUAVBERRY",
+   "ident": "aguav-berry",
+   "kr": "아바열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "APICOTBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 특수방어가 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Apicot Berry",
+   "id": "APICOTBERRY",
+   "ident": "apicot-berry",
+   "kr": "규살열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "ASPEARBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 얼음을 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Aspear Berry",
+   "id": "ASPEARBERRY",
+   "ident": "aspear-berry",
+   "kr": "배리열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "AUSPICIOUSARMOR": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -373,10 +889,27 @@
    "sell": 1500,
    "weight": 14
   },
+  "BABIRIBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 강철 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Babiri Berry",
+   "id": "BABIRIBERRY",
+   "ident": "babiri-berry",
+   "kr": "바리비열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "BIGMUSHROOM": {
    "cat": "misc",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 5000,
+   "desc": "크고 진귀한 버섯. 일부 마니아 사이에서는 매우 인기가 높다.",
    "effect": {
     "kind": "sell"
    },
@@ -390,8 +923,9 @@
   },
   "BIGNUGGET": {
    "cat": "misc",
-   "chance": 0.002375,
+   "chance": 0.000817,
    "cost": 40000,
+   "desc": "금색으로 반짝반짝 빛나는 순금으로 만들어진 큰 구슬. 상점에서 비싸게 팔린다.",
    "effect": {
     "kind": "sell"
    },
@@ -405,8 +939,9 @@
   },
   "BIGPEARL": {
    "cat": "misc",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 8000,
+   "desc": "예쁜 은색으로 빛나는 상당히 큰 낱알의 진주. 상점에서 비싸게 팔린다.",
    "effect": {
     "kind": "sell"
    },
@@ -418,9 +953,25 @@
    "sell": 4000,
    "weight": 45
   },
+  "BIGROOT": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 하면 HP 흡수 기술을 썼을 때 여느 때보다 많은 HP를 자신이 회복할 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Big Root",
+   "id": "BIGROOT",
+   "ident": "big-root",
+   "kr": "큰뿌리",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
   "BLACKAUGURITE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -436,10 +987,59 @@
    "sell": 1500,
    "weight": 14
   },
+  "BLACKBELT": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "마음을 긴장시키는 띠. 지니게 하면 격투타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Black Belt",
+   "id": "BLACKBELT",
+   "ident": "black-belt",
+   "kr": "검은띠",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "BLACKGLASSES": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "괴상하게 보이는 안경. 지니게 하면 악타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Black Glasses",
+   "id": "BLACKGLASSES",
+   "ident": "black-glasses",
+   "kr": "검은안경",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "BLACKSLUDGE": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 하면 독타입의 포켓몬은 조금씩 HP를 회복한다. 그 이외의 타입은 HP가 줄어 버린다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Black Sludge",
+   "id": "BLACKSLUDGE",
+   "ident": "black-sludge",
+   "kr": "검은오물",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
   "BOTTLECAP": {
    "cat": "iv",
-   "chance": 0.010095,
+   "chance": 0.003474,
    "cost": 5000,
+   "desc": "은색의 아름다운 왕관. 받으면 좋아하는 사람도 있다.",
    "effect": {
     "count": 1,
     "kind": "iv"
@@ -452,9 +1052,26 @@
    "sell": 2500,
    "weight": 34
   },
+  "BRIGHTPOWDER": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "반짝반짝 빛나는 가루. 지니게 하면 빛이 상대를 혼란시켜 기술이 명중되기 어려워진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Bright Powder",
+   "id": "BRIGHTPOWDER",
+   "ident": "bright-powder",
+   "kr": "반짝가루",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
   "CALCIUM": {
    "cat": "ev",
    "cost": 10000,
+   "desc": "포켓몬의 영양 드링크. 포켓몬 1마리의 특수공격 기초 포인트를 올린다.",
    "effect": {
     "amount": 10,
     "kind": "ev",
@@ -469,6 +1086,7 @@
   "CARBOS": {
    "cat": "ev",
    "cost": 10000,
+   "desc": "포켓몬의 영양 드링크. 포켓몬 1마리의 스피드 기초 포인트를 올린다.",
    "effect": {
     "amount": 10,
     "kind": "ev",
@@ -480,10 +1098,91 @@
    "kr": "알칼로이드",
    "sell": 5000
   },
+  "CHARCOAL": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "물건을 태우는 연료. 지니게 하면 불꽃타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Charcoal",
+   "id": "CHARCOAL",
+   "ident": "charcoal",
+   "kr": "목탄",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "CHARTIBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 바위 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Charti Berry",
+   "id": "CHARTIBERRY",
+   "ident": "charti-berry",
+   "kr": "루미열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "CHERIBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 마비를 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Cheri Berry",
+   "id": "CHERIBERRY",
+   "ident": "cheri-berry",
+   "kr": "버치열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "CHESTOBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 잠듦을 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Chesto Berry",
+   "id": "CHESTOBERRY",
+   "ident": "chesto-berry",
+   "kr": "유루열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "CHILANBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 노말 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Chilan Berry",
+   "id": "CHILANBERRY",
+   "ident": "chilan-berry",
+   "kr": "카리열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "CHIPPEDPOT": {
    "cat": "stone",
-   "chance": 0.001485,
+   "chance": 0.000511,
    "cost": 38000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 포트. 이가 빠졌지만 차는 맛있어진다.",
    "effect": {
     "kind": "stone"
    },
@@ -498,10 +1197,75 @@
    "sell": 19000,
    "weight": 5
   },
+  "CHOICEBAND": {
+   "cat": "held",
+   "chance": 0.000511,
+   "cost": 4000,
+   "desc": "기술을 구애받는 머리띠. 지니게 하면 공격은 올라가지만 똑같은 기술밖에 쓰지 못한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Choice Band",
+   "id": "CHOICEBAND",
+   "ident": "choice-band",
+   "kr": "구애머리띠",
+   "rarity": "epic",
+   "sell": 2000,
+   "weight": 5
+  },
+  "CHOICESCARF": {
+   "cat": "held",
+   "chance": 0.000511,
+   "cost": 4000,
+   "desc": "기술을 구애받는 스카프. 지니게 하면 스피드는 올라가지만 같은 기술밖에 쓸 수 없다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Choice Scarf",
+   "id": "CHOICESCARF",
+   "ident": "choice-scarf",
+   "kr": "구애스카프",
+   "rarity": "epic",
+   "sell": 2000,
+   "weight": 5
+  },
+  "CHOICESPECS": {
+   "cat": "held",
+   "chance": 0.000511,
+   "cost": 4000,
+   "desc": "기술을 구애받는 안경. 지니게 하면 특수공격이 올라가지만 같은 기술밖에 쓸 수 없다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Choice Specs",
+   "id": "CHOICESPECS",
+   "ident": "choice-specs",
+   "kr": "구애안경",
+   "rarity": "epic",
+   "sell": 2000,
+   "weight": 5
+  },
+  "CHOPLEBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 격투 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Chople Berry",
+   "id": "CHOPLEBERRY",
+   "ident": "chople-berry",
+   "kr": "로플열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "CLEVERWING": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 300,
+   "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 특수방어 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
     "kind": "ev",
@@ -515,10 +1279,43 @@
    "sell": 150,
    "weight": 100
   },
+  "COBABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 비행 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Coba Berry",
+   "id": "COBABERRY",
+   "ident": "coba-berry",
+   "kr": "바코열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "COLBURBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 악 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Colbur Berry",
+   "id": "COLBURBERRY",
+   "ident": "colbur-berry",
+   "kr": "마코열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "COMETSHARD": {
    "cat": "misc",
-   "chance": 0.001781,
+   "chance": 0.000613,
    "cost": 25000,
+   "desc": "혜성이 가까워졌을 때 지표면에 떨어진 조각. 상점에서 비싸게 팔린다.",
    "effect": {
     "kind": "sell"
    },
@@ -532,8 +1329,9 @@
   },
   "CRACKEDPOT": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 1600,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 포트. 깨졌지만 차는 맛있어진다.",
    "effect": {
     "kind": "stone"
    },
@@ -548,10 +1346,27 @@
    "sell": 800,
    "weight": 14
   },
+  "CUSTAPBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 한 번만 행동이 빨라진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Custap Berry",
+   "id": "CUSTAPBERRY",
+   "ident": "custap-berry",
+   "kr": "애슈열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "DAWNSTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 눈동자처럼 아름답다.",
    "effect": {
     "kind": "stone"
    },
@@ -569,8 +1384,9 @@
   },
   "DEEPSEASCALE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "진주몽에게 지니게 하면 특수방어가 올라가는 비늘. 연한 분홍색으로 빛난다.",
    "effect": {
     "kind": "stone"
    },
@@ -587,8 +1403,9 @@
   },
   "DEEPSEATOOTH": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "진주몽에게 지니게 하면 특수공격이 올라가는 이빨. 날카로운 은색으로 빛난다.",
    "effect": {
     "kind": "stone"
    },
@@ -603,10 +1420,43 @@
    "sell": 1000,
    "weight": 14
   },
+  "DRACOPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "드래곤타입의 석판. 지니게 하면 드래곤타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Draco Plate",
+   "id": "DRACOPLATE",
+   "ident": "draco-plate",
+   "kr": "용의플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "DRAGONFANG": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "단단하고 날카로운 이빨. 지니게 하면 드래곤타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Dragon Fang",
+   "id": "DRAGONFANG",
+   "ident": "dragon-fang",
+   "kr": "용의이빨",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "DRAGONSCALE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "단단하고 튼튼한 비늘. 드래곤타입의 포켓몬이 지니고 있는 경우가 있다.",
    "effect": {
     "kind": "stone"
    },
@@ -621,10 +1471,27 @@
    "sell": 1000,
    "weight": 14
   },
+  "DREADPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "악타입의 석판. 지니게 하면 악타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Dread Plate",
+   "id": "DREADPLATE",
+   "ident": "dread-plate",
+   "kr": "공포플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "DREAMBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1500,
+   "desc": "잠듦 상태의 포켓몬을 잡기 쉬운 조금 특이한 볼.",
    "effect": {
     "cond": "asleep",
     "kind": "ball",
@@ -640,8 +1507,9 @@
   },
   "DUBIOUSDISC": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "안에 괴상한 정보가 가득한 투명한 기계다. 제작자 불명.",
    "effect": {
     "kind": "stone"
    },
@@ -658,8 +1526,9 @@
   },
   "DUSKBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "밤이나 동굴 등 어두운 곳에서 포켓몬을 잡기 쉬운 조금 특이한 볼.",
    "effect": {
     "cond": "night",
     "kind": "ball",
@@ -675,8 +1544,9 @@
   },
   "DUSKSTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 칠흑처럼 어둡다.",
    "effect": {
     "kind": "stone"
    },
@@ -694,10 +1564,27 @@
    "sell": 1500,
    "weight": 14
   },
+  "EARTHPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "땅타입의 석판. 지니게 하면 땅타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Earth Plate",
+   "id": "EARTHPLATE",
+   "ident": "earth-plate",
+   "kr": "대지플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "ELECTIRIZER": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "엄청난 전기의 에너지가 비축되어 있는 상자. 어떤 포켓몬이 좋아하는 물건이다.",
    "effect": {
     "kind": "stone"
    },
@@ -712,10 +1599,27 @@
    "sell": 1000,
    "weight": 14
   },
+  "ENIGMABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 공격을 받았을 때 HP를 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Enigma Berry",
+   "id": "ENIGMABERRY",
+   "ident": "enigma-berry",
+   "kr": "의문열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "EVERSTONE": {
    "cat": "misc",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 3000,
+   "desc": "포켓몬에게 지니게 하면 지닌 동안에는 진화하지 않게 되는 이상한 돌.",
    "effect": {
     "kind": "noevolve"
    },
@@ -727,10 +1631,27 @@
    "sell": 1500,
    "weight": 45
   },
+  "EXPERTBELT": {
+   "cat": "held",
+   "chance": 0.000511,
+   "cost": 4000,
+   "desc": "오래 사용한 까만 띠. 지니게 하면 효과가 뛰어날 때 기술의 위력이 조금 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Expert Belt",
+   "id": "EXPERTBELT",
+   "ident": "expert-belt",
+   "kr": "달인의띠",
+   "rarity": "epic",
+   "sell": 2000,
+   "weight": 5
+  },
   "FASTBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "도주가 빠른 포켓몬이 잡기 쉬워지는 조금 특이한 볼.",
    "effect": {
     "cond": "fast_species",
     "kind": "ball",
@@ -744,10 +1665,27 @@
    "sell": 500,
    "weight": 45
   },
+  "FIGYBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Figy Berry",
+   "id": "FIGYBERRY",
+   "ident": "figy-berry",
+   "kr": "무화열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "FIRESTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 주황색을 띠고 있다.",
    "effect": {
     "kind": "stone"
    },
@@ -766,10 +1704,91 @@
    "sell": 1500,
    "weight": 14
   },
+  "FISTPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "격투타입의 석판. 지니게 하면 격투타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Fist Plate",
+   "id": "FISTPLATE",
+   "ident": "fist-plate",
+   "kr": "주먹플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "FLAMEORB": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "만지면 열을 내는 이상한 구슬. 지니게 하면 배틀 중에 화상 상태가 된다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Flame Orb",
+   "id": "FLAMEORB",
+   "ident": "flame-orb",
+   "kr": "화염구슬",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "FLAMEPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "불꽃타입의 석판. 지니게 하면 불꽃타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Flame Plate",
+   "id": "FLAMEPLATE",
+   "ident": "flame-plate",
+   "kr": "불구슬플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "FOCUSBAND": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 하면 기절할 듯한 기술을 받아도 HP를 1 남겨서 견디기도 한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Focus Band",
+   "id": "FOCUSBAND",
+   "ident": "focus-band",
+   "kr": "기합의머리띠",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "FOCUSSASH": {
+   "cat": "held",
+   "chance": 0.000511,
+   "cost": 4000,
+   "desc": "지니게 하면 HP가 꽉 찼을 때 기절할 듯한 기술을 당해도 HP 1로 한 번은 버틴다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Focus Sash",
+   "id": "FOCUSSASH",
+   "ident": "focus-sash",
+   "kr": "기합의띠",
+   "rarity": "epic",
+   "sell": 2000,
+   "weight": 5
+  },
   "FRIENDBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "잡은 야생 포켓몬이 바로 친밀해지는 조금 특이한 볼.",
    "effect": {
     "kind": "ball",
     "mult": 1.0,
@@ -783,10 +1802,43 @@
    "sell": 500,
    "weight": 45
   },
+  "FULLINCENSE": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 5000,
+   "desc": "이상한 향기의 향로. 지니게 한 포켓몬은 여느 때보다 행동이 느려진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Full Incense",
+   "id": "FULLINCENSE",
+   "ident": "full-incense",
+   "kr": "만복향로",
+   "rarity": "rare",
+   "sell": 2500,
+   "weight": 14
+  },
+  "GANLONBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 방어가 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Ganlon Berry",
+   "id": "GANLONBERRY",
+   "ident": "ganlon-berry",
+   "kr": "용아열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "GENIUSWING": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 300,
+   "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 특수공격 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
     "kind": "ev",
@@ -803,8 +1855,9 @@
   "GOLDBOTTLECAP": {
    "buyable": false,
    "cat": "iv",
-   "chance": 0.002672,
+   "chance": 0.000919,
    "cost": 10000,
+   "desc": "금색의 아름다운 왕관. 은왕관보다 진귀하다. 받으면 좋아하는 사람도 있다.",
    "effect": {
     "count": 6,
     "kind": "iv"
@@ -819,8 +1872,9 @@
   },
   "GREATBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 600,
+   "desc": "몬스터볼보다도 더욱 포켓몬을 잡기 쉬워진 약간 성능이 좋은 볼.",
    "effect": {
     "kind": "ball",
     "mult": 1.5
@@ -835,8 +1889,9 @@
   },
   "GREPABERRY": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 80,
+   "desc": "포켓몬에게 주면 매우 친밀해지기 쉬워지지만 특수방어의 기초 포인트가 떨어진다.",
    "effect": {
     "amount": -10,
     "kind": "ev",
@@ -850,10 +1905,43 @@
    "sell": 40,
    "weight": 100
   },
+  "HABANBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 드래곤 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Haban Berry",
+   "id": "HABANBERRY",
+   "ident": "haban-berry",
+   "kr": "하반열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "HARDSTONE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "절대 깨지지 않는 돌. 지니게 하면 바위타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Hard Stone",
+   "id": "HARDSTONE",
+   "ident": "hard-stone",
+   "kr": "딱딱한돌",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "HEALBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 300,
+   "desc": "잡은 포켓몬의 HP와 상태 이상을 회복시키는 조금 다정한 볼.",
    "effect": {
     "kind": "ball",
     "mult": 1.0,
@@ -869,8 +1957,9 @@
   },
   "HEALTHWING": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 300,
+   "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 HP 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
     "kind": "ev",
@@ -886,8 +1975,9 @@
   },
   "HEAVYBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "체중이 무거운 포켓몬이 잡기 쉬워지는 조금 특이한 볼.",
    "effect": {
     "cond": "heavy",
     "kind": "ball",
@@ -903,8 +1993,9 @@
   },
   "HONDEWBERRY": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 80,
+   "desc": "포켓몬에게 주면 매우 친밀해지기 쉬워지지만 특수공격의 기초 포인트가 떨어진다.",
    "effect": {
     "amount": -10,
     "kind": "ev",
@@ -921,6 +2012,7 @@
   "HPUP": {
    "cat": "ev",
    "cost": 10000,
+   "desc": "포켓몬의 영양 드링크. 포켓몬 1마리의 HP 기초 포인트를 올린다.",
    "effect": {
     "amount": 10,
     "kind": "ev",
@@ -932,10 +2024,27 @@
    "kr": "맥스업",
    "sell": 5000
   },
+  "IAPAPABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Iapapa Berry",
+   "id": "IAPAPABERRY",
+   "ident": "iapapa-berry",
+   "kr": "파야열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "ICESTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 눈송이 무늬가 있다.",
    "effect": {
     "kind": "stone"
    },
@@ -952,9 +2061,42 @@
    "sell": 1500,
    "weight": 14
   },
+  "ICICLEPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "얼음타입의 석판. 지니게 하면 얼음타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Icicle Plate",
+   "id": "ICICLEPLATE",
+   "ident": "icicle-plate",
+   "kr": "고드름플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "INSECTPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "벌레타입의 석판. 지니게 하면 벌레타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Insect Plate",
+   "id": "INSECTPLATE",
+   "ident": "insect-plate",
+   "kr": "비단벌레플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "IRON": {
    "cat": "ev",
    "cost": 10000,
+   "desc": "포켓몬의 영양 드링크. 포켓몬 1마리의 방어 기초 포인트를 올린다.",
    "effect": {
     "amount": 10,
     "kind": "ev",
@@ -966,10 +2108,91 @@
    "kr": "사포닌",
    "sell": 5000
   },
+  "IRONBALL": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 하면 스피드가 떨어진다. 비행타입이나 부유포켓몬은 땅 기술에 맞아 버린다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Iron Ball",
+   "id": "IRONBALL",
+   "ident": "iron-ball",
+   "kr": "검은철구",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "IRONPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "강철타입의 석판. 지니게 하면 강철타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Iron Plate",
+   "id": "IRONPLATE",
+   "ident": "iron-plate",
+   "kr": "강철플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "JABOCABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 물리 기술을 당했을 때 상대에게도 데미지를 준다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Jaboca Berry",
+   "id": "JABOCABERRY",
+   "ident": "jaboca-berry",
+   "kr": "자보열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "KASIBBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 고스트 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Kasib Berry",
+   "id": "KASIBBERRY",
+   "ident": "kasib-berry",
+   "kr": "수불열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "KEBIABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 독 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Kebia Berry",
+   "id": "KEBIABERRY",
+   "ident": "kebia-berry",
+   "kr": "으름열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "KELPSYBERRY": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 80,
+   "desc": "포켓몬에게 주면 매우 친밀해지기 쉬워지지만 공격의 기초 포인트가 떨어진다.",
    "effect": {
     "amount": -10,
     "kind": "ev",
@@ -985,8 +2208,9 @@
   },
   "KINGSROCK": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 5000,
+   "desc": "지니게 하면 공격해서 데미지를 줄 때 상대를 풀죽이기도 한다.",
    "effect": {
     "kind": "stone"
    },
@@ -1002,10 +2226,59 @@
    "sell": 2500,
    "weight": 14
   },
+  "LAGGINGTAIL": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "매우 무거운 무언가의 꼬리. 지니게 하면 여느 때보다 행동이 느려진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Lagging Tail",
+   "id": "LAGGINGTAIL",
+   "ident": "lagging-tail",
+   "kr": "느림보꼬리",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "LANSATBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 공격이 급소를 맞히기 쉬워진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Lansat Berry",
+   "id": "LANSATBERRY",
+   "ident": "lansat-berry",
+   "kr": "랑사열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "LAXINCENSE": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 5000,
+   "desc": "지니게 하면 향로의 이상한 향기가 상대를 혼란시켜 기술이 명중하기 어려워진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Lax Incense",
+   "id": "LAXINCENSE",
+   "ident": "lax-incense",
+   "kr": "무사태평향로",
+   "rarity": "rare",
+   "sell": 2500,
+   "weight": 14
+  },
   "LEAFSTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 잎사귀 무늬가 있다.",
    "effect": {
     "kind": "stone"
    },
@@ -1025,10 +2298,43 @@
    "sell": 1500,
    "weight": 14
   },
+  "LEFTOVERS": {
+   "cat": "held",
+   "chance": 0.000511,
+   "cost": 4000,
+   "desc": "지니게 하면 포켓몬의 HP가 배틀을 하는 동안 조금씩 회복된다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Leftovers",
+   "id": "LEFTOVERS",
+   "ident": "leftovers",
+   "kr": "먹다남은음식",
+   "rarity": "epic",
+   "sell": 2000,
+   "weight": 5
+  },
+  "LEPPABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 PP를 10만큼 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Leppa Berry",
+   "id": "LEPPABERRY",
+   "ident": "leppa-berry",
+   "kr": "과사열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "LEVELBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "자신의 포켓몬보다 레벨이 낮을수록 잡기 쉬워지는 조금 특이한 볼.",
    "effect": {
     "cond": "level_gap",
     "kind": "ball",
@@ -1042,9 +2348,41 @@
    "sell": 500,
    "weight": 45
   },
+  "LIECHIBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 공격이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Liechi Berry",
+   "id": "LIECHIBERRY",
+   "ident": "liechi-berry",
+   "kr": "치리열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "LIFEORB": {
+   "cat": "held",
+   "chance": 0.000511,
+   "cost": 4000,
+   "desc": "지니게 하면 공격할 때마다 HP가 조금씩 줄지만 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Life Orb",
+   "id": "LIFEORB",
+   "ident": "life-orb",
+   "kr": "생명의구슬",
+   "rarity": "epic",
+   "sell": 2000,
+   "weight": 5
+  },
   "LINKINGCORD": {
    "cat": "stone",
-   "chance": 0.001485,
+   "chance": 0.000511,
    "cost": 8000,
    "effect": {
     "kind": "stone"
@@ -1081,8 +2419,9 @@
   },
   "LOVEBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "자신의 포켓몬과 성별이 다르면 잡기 쉬워지는 조금 특이한 볼.",
    "effect": {
     "cond": "same_species_other_gender",
     "kind": "ball",
@@ -1096,10 +2435,43 @@
    "sell": 500,
    "weight": 45
   },
+  "LUCKYEGG": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 10000,
+   "desc": "행복이 가득한 알. 지니게 한 포켓몬은 받을 수 있는 경험치가 조금 늘어난다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Lucky Egg",
+   "id": "LUCKYEGG",
+   "ident": "lucky-egg",
+   "kr": "행복의알",
+   "rarity": "rare",
+   "sell": 5000,
+   "weight": 14
+  },
+  "LUMBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 모든 상태 이상을 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Lum Berry",
+   "id": "LUMBERRY",
+   "ident": "lum-berry",
+   "kr": "리샘열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "LUXURYBALL": {
    "cat": "ball",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "잡은 야생 포켓몬이 매우 친밀해지기 쉬운 편안한 볼.",
    "effect": {
     "kind": "ball",
     "mult": 1.0,
@@ -1113,10 +2485,27 @@
    "sell": 1500,
    "weight": 14
   },
+  "MACHOBRACE": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 3000,
+   "desc": "단단하고 무거운 깁스. 지니게 하면 스피드는 떨어지지만 여느 때보다 강하게 키우기 쉽다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Macho Brace",
+   "id": "MACHOBRACE",
+   "ident": "macho-brace",
+   "kr": "교정깁스",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
   "MAGMARIZER": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "엄청난 마그마의 에너지가 비축되어 있는 상자. 어떤 포켓몬이 좋아하는 물건이다.",
    "effect": {
     "kind": "stone"
    },
@@ -1131,9 +2520,41 @@
    "sell": 1000,
    "weight": 14
   },
+  "MAGNET": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "강력한 자석. 지니게 하면 전기타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Magnet",
+   "id": "MAGNET",
+   "ident": "magnet",
+   "kr": "자석",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "MAGOBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Mago Berry",
+   "id": "MAGOBERRY",
+   "ident": "mago-berry",
+   "kr": "마고열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "MALICIOUSARMOR": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 750,
    "effect": {
     "kind": "stone"
@@ -1152,8 +2573,9 @@
   "MASTERBALL": {
    "buyable": false,
    "cat": "ball",
-   "chance": 0.000594,
+   "chance": 0.000204,
    "cost": 0,
+   "desc": "야생 포켓몬을 반드시 잡을 수 있는 최고 성능의 볼.",
    "effect": {
     "kind": "ball",
     "mult": 255.0,
@@ -1169,7 +2591,7 @@
   },
   "MASTERPIECETEACUP": {
    "cat": "stone",
-   "chance": 0.001485,
+   "chance": 0.000511,
    "cost": 9500,
    "effect": {
     "kind": "stone"
@@ -1185,9 +2607,25 @@
    "sell": 4750,
    "weight": 5
   },
+  "MEADOWPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "풀타입의 석판. 지니게 하면 풀타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Meadow Plate",
+   "id": "MEADOWPLATE",
+   "ident": "meadow-plate",
+   "kr": "초록플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "METALALLOY": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -1205,8 +2643,9 @@
   },
   "METALCOAT": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "특수한 금속 장막. 지니게 하면 강철타입 기술의 위력이 올라간다.",
    "effect": {
     "kind": "stone"
    },
@@ -1222,10 +2661,75 @@
    "sell": 1000,
    "weight": 14
   },
+  "METRONOME": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 하면 똑같은 기술을 연속으로 사용했을 때 위력이 올라간다. 그만두면 위력이 되돌아간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Metronome",
+   "id": "METRONOME",
+   "ident": "metronome",
+   "kr": "메트로놈",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "MICLEBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 한 번만 기술의 명중률이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Micle Berry",
+   "id": "MICLEBERRY",
+   "ident": "micle-berry",
+   "kr": "미클열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "MINDPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "에스퍼타입의 석판. 지니게 하면 에스퍼타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Mind Plate",
+   "id": "MINDPLATE",
+   "ident": "mind-plate",
+   "kr": "이상한플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "MIRACLESEED": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "생명이 깃든 씨앗. 지니게 하면 풀타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Miracle Seed",
+   "id": "MIRACLESEED",
+   "ident": "miracle-seed",
+   "kr": "기적의씨",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "MOONBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "달의돌로 진화하는 포켓몬이 잡기 쉬워지는 조금 특이한 볼.",
    "effect": {
     "cond": "moon_family",
     "kind": "ball",
@@ -1241,8 +2745,9 @@
   },
   "MOONSTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 밤하늘처럼 까맣다.",
    "effect": {
     "kind": "stone"
    },
@@ -1262,10 +2767,27 @@
    "sell": 1500,
    "weight": 14
   },
+  "MUSCLEBAND": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "힘이 끓어오르는 머리띠. 지니게 하면 물리 기술의 위력이 조금 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Muscle Band",
+   "id": "MUSCLEBAND",
+   "ident": "muscle-band",
+   "kr": "힘의머리띠",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
   "MUSCLEWING": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 300,
+   "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 공격 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
     "kind": "ev",
@@ -1279,10 +2801,27 @@
    "sell": 150,
    "weight": 100
   },
+  "MYSTICWATER": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "물방울 모양의 보석. 지니게 하면 물타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Mystic Water",
+   "id": "MYSTICWATER",
+   "ident": "mystic-water",
+   "kr": "신비의물방울",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "NESTBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "잡으려는 야생 포켓몬이 약할수록 잡기 쉬운 조금 특이한 볼.",
    "effect": {
     "cond": "low_level",
     "kind": "ball",
@@ -1298,8 +2837,9 @@
   },
   "NETBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "물타입과 벌레타입의 포켓몬을 잡기 쉬운 조금 특이한 볼.",
    "effect": {
     "cond": "water_or_bug",
     "kind": "ball",
@@ -1313,10 +2853,27 @@
    "sell": 500,
    "weight": 45
   },
+  "NEVERMELTICE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "열을 가까이하지 않게 하는 얼음. 지니게 하면 얼음타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Never-Melt Ice",
+   "id": "NEVERMELTICE",
+   "ident": "never-melt-ice",
+   "kr": "녹지않는얼음",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "NUGGET": {
    "cat": "misc",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 10000,
+   "desc": "금색으로 반짝반짝 빛나는 순금으로 만들어진 구슬. 상점에서 비싸게 팔린다.",
    "effect": {
     "kind": "sell"
    },
@@ -1328,10 +2885,59 @@
    "sell": 5000,
    "weight": 45
   },
+  "OCCABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 불꽃 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Occa Berry",
+   "id": "OCCABERRY",
+   "ident": "occa-berry",
+   "kr": "오카열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "ODDINCENSE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 2000,
+   "desc": "이상한 향기의 향로. 지니게 하면 에스퍼타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Odd Incense",
+   "id": "ODDINCENSE",
+   "ident": "odd-incense",
+   "kr": "괴상한향로",
+   "rarity": "uncommon",
+   "sell": 1000,
+   "weight": 45
+  },
+  "ORANBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 HP를 10만큼 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Oran Berry",
+   "id": "ORANBERRY",
+   "ident": "oran-berry",
+   "kr": "오랭열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "OVALSTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 구슬처럼 둥글다.",
    "effect": {
     "kind": "stone"
    },
@@ -1346,10 +2952,43 @@
    "sell": 1000,
    "weight": 14
   },
+  "PASSHOBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 물 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Passho Berry",
+   "id": "PASSHOBERRY",
+   "ident": "passho-berry",
+   "kr": "꼬시개열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "PAYAPABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 에스퍼 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Payapa Berry",
+   "id": "PAYAPABERRY",
+   "ident": "payapa-berry",
+   "kr": "야파열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "PEARL": {
    "cat": "misc",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 2000,
+   "desc": "예쁜 은색으로 빛나는 자그마한 진주. 상점에서 싸게 팔린다.",
    "effect": {
     "kind": "sell"
    },
@@ -1363,7 +3002,7 @@
   },
   "PEATBLOCK": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
    "effect": {
     "kind": "stone"
@@ -1379,10 +3018,59 @@
    "sell": 1500,
    "weight": 14
   },
+  "PECHABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 독을 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Pecha Berry",
+   "id": "PECHABERRY",
+   "ident": "pecha-berry",
+   "kr": "복슝열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "PETAYABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 특수공격이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Petaya Berry",
+   "id": "PETAYABERRY",
+   "ident": "petaya-berry",
+   "kr": "야타비열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "POISONBARB": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "독이 있는 작은 침. 지니게 하면 독타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Poison Barb",
+   "id": "POISONBARB",
+   "ident": "poison-barb",
+   "kr": "독바늘",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "POKEBALL": {
    "cat": "ball",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 200,
+   "desc": "야생 포켓몬에게 던져서 잡기 위한 볼. 캡슐식으로 되어 있다.",
    "effect": {
     "kind": "ball",
     "mult": 1.0
@@ -1397,8 +3085,9 @@
   },
   "POMEGBERRY": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 80,
+   "desc": "포켓몬에게 주면 매우 친밀해지기 쉬워지지만 HP의 기초 포인트가 떨어진다.",
    "effect": {
     "amount": -10,
     "kind": "ev",
@@ -1412,10 +3101,107 @@
    "sell": 40,
    "weight": 100
   },
+  "POWERANKLET": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 3000,
+   "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 스피드를 올리면서 키우기가 쉽다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Power Anklet",
+   "id": "POWERANKLET",
+   "ident": "power-anklet",
+   "kr": "파워앵클릿",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "POWERBAND": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 3000,
+   "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 특수방어를 올리면서 키우기가 쉽다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Power Band",
+   "id": "POWERBAND",
+   "ident": "power-band",
+   "kr": "파워밴드",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "POWERBELT": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 3000,
+   "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 방어를 올리면서 키우기가 쉽다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Power Belt",
+   "id": "POWERBELT",
+   "ident": "power-belt",
+   "kr": "파워벨트",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "POWERBRACER": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 3000,
+   "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 공격을 올리면서 키우기가 쉽다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Power Bracer",
+   "id": "POWERBRACER",
+   "ident": "power-bracer",
+   "kr": "파워리스트",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "POWERLENS": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 3000,
+   "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 특수공격을 올리면서 키우기가 쉽다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Power Lens",
+   "id": "POWERLENS",
+   "ident": "power-lens",
+   "kr": "파워렌즈",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
+  "POWERWEIGHT": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 3000,
+   "desc": "지니게 하면 스피드는 떨어지지만 여느 때보다 포켓몬의 HP를 올리면서 키우기가 쉽다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Power Weight",
+   "id": "POWERWEIGHT",
+   "ident": "power-weight",
+   "kr": "파워웨이트",
+   "rarity": "rare",
+   "sell": 1500,
+   "weight": 14
+  },
   "PREMIERBALL": {
    "cat": "ball",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 200,
+   "desc": "무언가의 기념품으로 특별히 만들어진 조금 희귀한 볼.",
    "effect": {
     "kind": "ball",
     "mult": 1.0,
@@ -1431,8 +3217,9 @@
   },
   "PRETTYWING": {
    "cat": "misc",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 1000,
+   "desc": "아름답기만 할 뿐 아무 효과도 없는 지극히 평범한 날개.",
    "effect": {
     "kind": "sell"
    },
@@ -1446,8 +3233,9 @@
   },
   "PRISMSCALE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 비늘. 무지갯빛으로 빛나고 있다.",
    "effect": {
     "kind": "stone"
    },
@@ -1464,8 +3252,9 @@
   },
   "PROTECTOR": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "무언가의 프로텍터. 매우 단단하고 무겁다. 어떤 포켓몬이 좋아하는 물건이다.",
    "effect": {
     "kind": "stone"
    },
@@ -1483,6 +3272,7 @@
   "PROTEIN": {
    "cat": "ev",
    "cost": 10000,
+   "desc": "포켓몬의 영양 드링크. 포켓몬 1마리의 공격 기초 포인트를 올린다.",
    "effect": {
     "amount": 10,
     "kind": "ev",
@@ -1496,8 +3286,9 @@
   },
   "QUALOTBERRY": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 80,
+   "desc": "포켓몬에게 주면 매우 친밀해지기 쉬워지지만 방어의 기초 포인트가 떨어진다.",
    "effect": {
     "amount": -10,
     "kind": "ev",
@@ -1513,8 +3304,9 @@
   },
   "QUICKBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "배틀이 시작되자마자 사용하면 잡기 쉬워지는 조금 특이한 볼.",
    "effect": {
     "cond": "first_turn",
     "kind": "ball",
@@ -1528,10 +3320,27 @@
    "sell": 500,
    "weight": 45
   },
+  "QUICKCLAW": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "가볍고 날카로운 손톱. 지니게 하면 상대보다 먼저 행동할 수도 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Quick Claw",
+   "id": "QUICKCLAW",
+   "ident": "quick-claw",
+   "kr": "선제공격손톱",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
   "RAREBONE": {
    "cat": "misc",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 5000,
+   "desc": "포켓몬 고고학에 있어 매우 귀중한 뼈. 상점에서 비싸게 팔린다.",
    "effect": {
     "kind": "sell"
    },
@@ -1545,8 +3354,9 @@
   },
   "RARECANDY": {
    "cat": "misc",
-   "chance": 0.005938,
+   "chance": 0.002043,
    "cost": 10000,
+   "desc": "에너지가 가득한 사탕. 먹이면 포켓몬 1마리의 레벨이 1만큼 올라간다.",
    "effect": {
     "amount": 1,
     "kind": "level"
@@ -1559,10 +3369,27 @@
    "sell": 5000,
    "weight": 20
   },
+  "RAWSTBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 화상을 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Rawst Berry",
+   "id": "RAWSTBERRY",
+   "ident": "rawst-berry",
+   "kr": "복분열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "RAZORCLAW": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 5000,
+   "desc": "날카롭고 뾰족한 손톱. 지니게 하면 기술이 급소에 맞기 쉬워진다.",
    "effect": {
     "kind": "stone"
    },
@@ -1579,8 +3406,9 @@
   },
   "RAZORFANG": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 5000,
+   "desc": "날카롭고 뾰족한 이빨. 지니게 하면 데미지를 줬을 때 풀죽게 하기도 한다.",
    "effect": {
     "kind": "stone"
    },
@@ -1597,8 +3425,9 @@
   },
   "REAPERCLOTH": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "무섭고 강한 영력이 담겨 있는 천. 어떤 포켓몬이 좋아하는 물건이다.",
    "effect": {
     "kind": "stone"
    },
@@ -1615,8 +3444,9 @@
   },
   "REPEATBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "잡은 적이 있는 포켓몬을 잡기 쉬운 조금 특이한 볼.",
    "effect": {
     "cond": "already_caught",
     "kind": "ball",
@@ -1632,8 +3462,9 @@
   },
   "RESISTWING": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 300,
+   "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 방어 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
     "kind": "ev",
@@ -1647,10 +3478,75 @@
    "sell": 150,
    "weight": 100
   },
+  "RINDOBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 풀 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Rindo Berry",
+   "id": "RINDOBERRY",
+   "ident": "rindo-berry",
+   "kr": "린드열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "ROCKINCENSE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 2000,
+   "desc": "이상한 향기의 향로. 지니게 하면 바위타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Rock Incense",
+   "id": "ROCKINCENSE",
+   "ident": "rock-incense",
+   "kr": "암석향로",
+   "rarity": "uncommon",
+   "sell": 1000,
+   "weight": 45
+  },
+  "ROSEINCENSE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 2000,
+   "desc": "이상한 향기의 향로. 지니게 하면 풀타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Rose Incense",
+   "id": "ROSEINCENSE",
+   "ident": "rose-incense",
+   "kr": "꽃향로",
+   "rarity": "uncommon",
+   "sell": 1000,
+   "weight": 45
+  },
+  "ROWAPBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 특수 기술을 당했을 때 상대에게도 데미지를 준다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Rowap Berry",
+   "id": "ROWAPBERRY",
+   "ident": "rowap-berry",
+   "kr": "애터열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "SACHET": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "살짝 강렬한 향기가 나는 향료를 채운 주머니. 어떤 포켓몬이 좋아하는 물건이다.",
    "effect": {
     "kind": "stone"
    },
@@ -1665,9 +3561,41 @@
    "sell": 1000,
    "weight": 14
   },
+  "SALACBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 자신의 스피드가 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Salac Berry",
+   "id": "SALACBERRY",
+   "ident": "salac-berry",
+   "kr": "캄라열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "SCOPELENS": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "약점이 보이는 렌즈. 지니게 한 포켓몬의 기술이 급소에 맞기 쉬워진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Scope Lens",
+   "id": "SCOPELENS",
+   "ident": "scope-lens",
+   "kr": "초점렌즈",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
   "SCROLLOFDARKNESS": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 5000,
    "effect": {
     "kind": "stone"
@@ -1683,10 +3611,59 @@
    "sell": 2500,
    "weight": 14
   },
+  "SEAINCENSE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 2000,
+   "desc": "이상한 향기의 향로. 지니게 하면 물타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Sea Incense",
+   "id": "SEAINCENSE",
+   "ident": "sea-incense",
+   "kr": "바닷물향로",
+   "rarity": "uncommon",
+   "sell": 1000,
+   "weight": 45
+  },
+  "SHARPBEAK": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "길고 뾰족한 부리. 지니게 하면 비행타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Sharp Beak",
+   "id": "SHARPBEAK",
+   "ident": "sharp-beak",
+   "kr": "예리한부리",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "SHELLBELL": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 한 포켓몬이 공격하여 상대에게 데미지를 줬을 때 HP를 조금 회복할 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Shell Bell",
+   "id": "SHELLBELL",
+   "ident": "shell-bell",
+   "kr": "조개껍질방울",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
   "SHINYSTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 빛처럼 눈부시다.",
    "effect": {
     "kind": "stone"
    },
@@ -1704,10 +3681,187 @@
    "sell": 1500,
    "weight": 14
   },
+  "SHUCABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 땅 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Shuca Berry",
+   "id": "SHUCABERRY",
+   "ident": "shuca-berry",
+   "kr": "슈캐열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "SILKSCARF": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "감촉이 좋은 스카프. 지니게 하면 노말타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Silk Scarf",
+   "id": "SILKSCARF",
+   "ident": "silk-scarf",
+   "kr": "실크스카프",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "SILVERPOWDER": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "은색으로 반짝이는 가루. 지니게 하면 벌레타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Silver Powder",
+   "id": "SILVERPOWDER",
+   "ident": "silver-powder",
+   "kr": "은빛가루",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "SITRUSBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 HP를 조금 회복한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Sitrus Berry",
+   "id": "SITRUSBERRY",
+   "ident": "sitrus-berry",
+   "kr": "자뭉열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "SKYPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "비행타입의 석판. 지니게 하면 비행타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Sky Plate",
+   "id": "SKYPLATE",
+   "ident": "sky-plate",
+   "kr": "푸른하늘플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "SMOKEBALL": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 한 포켓몬은 야생 포켓몬과의 배틀에서 반드시 도망칠 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Smoke Ball",
+   "id": "SMOKEBALL",
+   "ident": "smoke-ball",
+   "kr": "연막탄",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "SOFTSAND": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "만지면 보슬보슬한 모래. 지니게 하면 땅타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Soft Sand",
+   "id": "SOFTSAND",
+   "ident": "soft-sand",
+   "kr": "부드러운모래",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "SOOTHEBELL": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "기분 좋은 소리의 방울. 지니게 한 포켓몬은 마음이 편안해져 친밀해지기 쉬워진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Soothe Bell",
+   "id": "SOOTHEBELL",
+   "ident": "soothe-bell",
+   "kr": "평온의방울",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "SPELLTAG": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "괴상하고 으스스한 부적. 지니게 하면 고스트타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Spell Tag",
+   "id": "SPELLTAG",
+   "ident": "spell-tag",
+   "kr": "저주의부적",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "SPLASHPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "물타입의 석판. 지니게 하면 물타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Splash Plate",
+   "id": "SPLASHPLATE",
+   "ident": "splash-plate",
+   "kr": "물방울플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "SPOOKYPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "고스트타입의 석판. 지니게 하면 고스트타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Spooky Plate",
+   "id": "SPOOKYPLATE",
+   "ident": "spooky-plate",
+   "kr": "원령플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "STARDUST": {
    "cat": "misc",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 3000,
+   "desc": "감촉이 보슬보슬한 빨갛고 예쁜 모래. 상점에서 싸게 팔린다.",
    "effect": {
     "kind": "sell"
    },
@@ -1719,10 +3873,27 @@
    "sell": 1500,
    "weight": 100
   },
+  "STARFBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 능력 중의 하나가 크게 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Starf Berry",
+   "id": "STARFBERRY",
+   "ident": "starf-berry",
+   "kr": "스타열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "STARPIECE": {
    "cat": "misc",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 12000,
+   "desc": "반짝반짝 빨갛게 빛나는 예쁜 보석 조각. 상점에서 비싸게 팔린다.",
    "effect": {
     "kind": "sell"
    },
@@ -1734,10 +3905,43 @@
    "sell": 6000,
    "weight": 14
   },
+  "STICKYBARB": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 하면 매 턴 데미지를 입는다. 자신에게 접촉해온 상대에게 들러붙기도 한다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Sticky Barb",
+   "id": "STICKYBARB",
+   "ident": "sticky-barb",
+   "kr": "끈적끈적바늘",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "STONEPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "바위타입의 석판. 지니게 하면 바위타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Stone Plate",
+   "id": "STONEPLATE",
+   "ident": "stone-plate",
+   "kr": "암석플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "SUNSTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 태양처럼 빨갛다.",
    "effect": {
     "kind": "stone"
    },
@@ -1758,8 +3962,9 @@
   },
   "SWEETAPPLE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2200,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 사과. 엄청나게 달다.",
    "effect": {
     "kind": "stone"
    },
@@ -1776,8 +3981,9 @@
   },
   "SWIFTWING": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 300,
+   "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 스피드 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
     "kind": "ev",
@@ -1793,7 +3999,7 @@
   },
   "SYRUPYAPPLE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 500,
    "effect": {
     "kind": "stone"
@@ -1811,8 +4017,9 @@
   },
   "TAMATOBERRY": {
    "cat": "ev",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 80,
+   "desc": "포켓몬에게 주면 매우 친밀해지기 쉬워지지만 스피드의 기초 포인트가 떨어진다.",
    "effect": {
     "amount": -10,
     "kind": "ev",
@@ -1826,10 +4033,27 @@
    "sell": 40,
    "weight": 100
   },
+  "TANGABERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 벌레 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Tanga Berry",
+   "id": "TANGABERRY",
+   "ident": "tanga-berry",
+   "kr": "리체열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "TARTAPPLE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2200,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 사과. 엄청나게 새콤하다.",
    "effect": {
     "kind": "stone"
    },
@@ -1846,8 +4070,9 @@
   },
   "THUNDERSTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 천둥번개 무늬가 있다.",
    "effect": {
     "kind": "stone"
    },
@@ -1870,8 +4095,9 @@
   },
   "TIMERBALL": {
    "cat": "ball",
-   "chance": 0.013361,
+   "chance": 0.004597,
    "cost": 1000,
+   "desc": "턴 수가 길어지면 길어질수록 포켓몬을 잡기 쉬운 조금 특이한 볼.",
    "effect": {
     "cond": "many_turns",
     "kind": "ball",
@@ -1887,8 +4113,9 @@
   },
   "TINYMUSHROOM": {
    "cat": "misc",
-   "chance": 0.029691,
+   "chance": 0.010217,
    "cost": 500,
+   "desc": "작고 진귀한 버섯. 일부 마니아 사이에서는 매우 인기가 높다.",
    "effect": {
     "kind": "sell"
    },
@@ -1900,10 +4127,59 @@
    "sell": 250,
    "weight": 100
   },
+  "TOXICORB": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "만지면 독을 발산하는 이상한 구슬. 지니게 하면 배틀 중에 맹독 상태가 된다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Toxic Orb",
+   "id": "TOXICORB",
+   "ident": "toxic-orb",
+   "kr": "맹독구슬",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "TOXICPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "독타입의 석판. 지니게 하면 독타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Toxic Plate",
+   "id": "TOXICPLATE",
+   "ident": "toxic-plate",
+   "kr": "맹독플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
+  "TWISTEDSPOON": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "염동력을 담은 숟가락. 지니게 하면 에스퍼타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Twisted Spoon",
+   "id": "TWISTEDSPOON",
+   "ident": "twisted-spoon",
+   "kr": "휘어진스푼",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "ULTRABALL": {
    "cat": "ball",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 800,
+   "desc": "수퍼볼보다도 더욱 포켓몬을 잡기 쉬워진 매우 성능이 좋은 볼.",
    "effect": {
     "kind": "ball",
     "mult": 2.0
@@ -1918,7 +4194,7 @@
   },
   "UNREMARKABLETEACUP": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 400,
    "effect": {
     "kind": "stone"
@@ -1936,8 +4212,9 @@
   },
   "UPGRADE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "안에 여러 가지 정보가 가득한 투명한 기계다. 실프주식회사 제품.",
    "effect": {
     "kind": "stone"
    },
@@ -1952,10 +4229,27 @@
    "sell": 1000,
    "weight": 14
   },
+  "WACANBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 전기 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Wacan Berry",
+   "id": "WACANBERRY",
+   "ident": "wacan-berry",
+   "kr": "초나열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
   "WATERSTONE": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 3000,
+   "desc": "어느 특정 포켓몬을 진화시키는 이상한 돌. 투명한 푸른색을 띠고 있다.",
    "effect": {
     "kind": "stone"
    },
@@ -1975,10 +4269,27 @@
    "sell": 1500,
    "weight": 14
   },
+  "WAVEINCENSE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 2000,
+   "desc": "이상한 향기의 향로. 지니게 하면 물타입 기술의 위력이 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Wave Incense",
+   "id": "WAVEINCENSE",
+   "ident": "wave-incense",
+   "kr": "잔물결향로",
+   "rarity": "uncommon",
+   "sell": 1000,
+   "weight": 45
+  },
   "WHIPPEDDREAM": {
    "cat": "stone",
-   "chance": 0.004157,
+   "chance": 0.00143,
    "cost": 2000,
+   "desc": "풍성하게 거품을 낸 살짝 달콤한 크림. 어떤 포켓몬이 좋아한다.",
    "effect": {
     "kind": "stone"
    },
@@ -1993,9 +4304,106 @@
    "sell": 1000,
    "weight": 14
   },
+  "WHITEHERB": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 한 포켓몬의 능력이 떨어졌을 때 한 번만 원래 상태로 돌아온다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "White Herb",
+   "id": "WHITEHERB",
+   "ident": "white-herb",
+   "kr": "하양허브",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "WIDELENS": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "물건이 크게 보이는 렌즈. 지니게 하면 기술의 명중률이 조금 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Wide Lens",
+   "id": "WIDELENS",
+   "ident": "wide-lens",
+   "kr": "광각렌즈",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "WIKIBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 위급할 때 HP를 회복한다. 싫어하는 맛이면 혼란에 빠진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Wiki Berry",
+   "id": "WIKIBERRY",
+   "ident": "wiki-berry",
+   "kr": "위키열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "WISEGLASSES": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "두꺼운 렌즈를 붙인 안경. 지니게 하면 특수 기술의 위력이 조금 올라간다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Wise Glasses",
+   "id": "WISEGLASSES",
+   "ident": "wise-glasses",
+   "kr": "박식안경",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
+  },
+  "YACHEBERRY": {
+   "cat": "held",
+   "chance": 0.010217,
+   "cost": 80,
+   "desc": "포켓몬에게 지니게 하면 효과가 뛰어난 얼음 기술을 당했을 때 위력이 약해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Yache Berry",
+   "id": "YACHEBERRY",
+   "ident": "yache-berry",
+   "kr": "플카열매",
+   "rarity": "common",
+   "sell": 40,
+   "weight": 100
+  },
+  "ZAPPLATE": {
+   "cat": "held",
+   "chance": 0.004597,
+   "cost": 1000,
+   "desc": "전기타입의 석판. 지니게 하면 전기타입 기술의 위력이 강해진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Zap Plate",
+   "id": "ZAPPLATE",
+   "ident": "zap-plate",
+   "kr": "우레플레이트",
+   "rarity": "uncommon",
+   "sell": 500,
+   "weight": 45
+  },
   "ZINC": {
    "cat": "ev",
    "cost": 10000,
+   "desc": "포켓몬의 영양 드링크. 포켓몬 1마리의 특수방어 기초 포인트를 올린다.",
    "effect": {
     "amount": 10,
     "kind": "ev",
@@ -2006,6 +4414,22 @@
    "ident": "zinc",
    "kr": "키토산",
    "sell": 5000
+  },
+  "ZOOMLENS": {
+   "cat": "held",
+   "chance": 0.00143,
+   "cost": 4000,
+   "desc": "지니게 한 포켓몬이 상대보다도 행동하는 것이 늦을 때 기술이 명중하기 쉬워진다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Zoom Lens",
+   "id": "ZOOMLENS",
+   "ident": "zoom-lens",
+   "kr": "포커스렌즈",
+   "rarity": "rare",
+   "sell": 2000,
+   "weight": 14
   }
  },
  "rarityKr": {

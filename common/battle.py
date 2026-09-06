@@ -16,6 +16,7 @@
 import math
 import random
 
+from . import held as H
 from . import pokelogic as P
 
 # ---------------------------------------------------------------- 상수
@@ -105,10 +106,23 @@ class Fighter(object):
         self.flinched = False
         self.name = (mon.get("nickname")
                      or (self.species["kr"] if self.species else mon["species"]))
+        self._dex = dex
+        # 지닌 도구 (common/held.py). 없으면 None 이고, 그러면 훅은 전부
+        # 아무것도 안 한다 - 도구 없는 판의 로그는 예전과 한 글자도 안 다르다.
+        self.held = H.normalize(mon.get("held"))
+        self.used = False            # 한 번 쓰는 도구를 이 판에서 썼는가
+        self.locked = None           # 구애 도구가 잠근 기술
+        self.last_move = None
+        self.metro = 0               # 메트로놈 연속 횟수
+        self.armed = False           # 랑사·미클열매를 먹어 둔 상태
+        self.moved_second = False    # 이 턴에 나중에 움직였나 (포커스렌즈)
 
     # ---- 상태 ----
     def alive(self):
         return self.hp > 0
+
+    def dex_move_name(self, key):
+        return self._dex.move_name(key)
 
     def stat(self, key, crit=False):
         v = self.base.get(key, 1)
@@ -118,11 +132,20 @@ class Fighter(object):
         v = int(v * stage_mult(s))
         if key == "spe" and self.status == "paralysis":
             v = int(v * 0.5)
+        if self.held:
+            v = int(v * H.stat_mult(self, key))
         return max(1, v)
+
+    def held_state(self):
+        return H.state(self)
+
+    def load_held(self, d):
+        H.load(self, d)
 
     def snapshot(self):
         return {"hp": self.hp, "maxhp": self.maxhp, "status": self.status,
-                "pp": dict(self.pp), "stages": dict(self.stages)}
+                "pp": dict(self.pp), "stages": dict(self.stages),
+                "held": self.held, "heldState": self.held_state()}
 
 
 # ---------------------------------------------------------------- 계산
@@ -141,6 +164,8 @@ def accuracy_check(dex, move, user, target, rng):
         return True
     rate = acc * stage_mult(user.stages["acc"], "acc") \
         / stage_mult(target.stages["eva"], "acc")
+    if user.held or target.held:
+        rate *= H.acc_mult(user, target)
     return rng.uniform(0, 100) < rate
 
 
@@ -152,8 +177,11 @@ def damage(dex, move, user, target, rng, crit=None):
     phys = move.get("cat") == "physical"
     if crit is None:
         chance = CRIT_CHANCE
-        if move.get("crit"):                # 급소율이 높은 기술
-            chance = max(2, CRIT_CHANCE // (2 ** move["crit"]))
+        # 급소율이 높은 기술 + 초점렌즈 같은 도구. 도구가 없으면 예전 식과
+        # 같은 값이다.
+        stages = (move.get("crit") or 0) + (H.crit_stages(user) if user.held else 0)
+        if stages:
+            chance = max(2, CRIT_CHANCE // (2 ** stages))
         crit = rng.randrange(chance) == 0
 
     a = user.stat("atk" if phys else "spa", crit)
@@ -171,6 +199,8 @@ def damage(dex, move, user, target, rng, crit=None):
     mult *= rng.uniform(0.85, 1.0)
     if user.status == "burn" and phys:
         mult *= 0.5
+    if user.held:
+        mult *= H.damage_mult(user, move, eff)
 
     dmg = int(base * mult)
     if eff > 0:
@@ -251,6 +281,8 @@ class Battle(object):
         pool = self.usable(user)
         if not pool:
             return STRUGGLE
+        if user.held:
+            pool = H.lock_pool(user, pool)      # 구애 도구는 처음 쓴 기술만
 
         if ai == "wild":
             # 위력이 있는 기술 쪽으로 살짝만 기울인 무작위
@@ -378,10 +410,15 @@ class Battle(object):
         if my_move != STRUGGLE and (my_move not in self.me.pp
                                     or self.me.pp.get(my_move, 0) <= 0):
             my_move = self.usable(self.me)[0]
+        if self.me.held:
+            # 사람이 고른 기술도 구애 잠금을 받는다 (야생 배틀은 사람이 고른다).
+            my_move = H.force_move(self.me, my_move, ev, "me")
 
-        order = self._order(my_move, foe_move)
+        order = self._order(my_move, foe_move, ev)
         self.me.flinched = False
         self.foe.flinched = False
+        self.me.moved_second = order[0] != "me"
+        self.foe.moved_second = order[0] != "foe"
 
         for who in order:
             if self.over:
@@ -403,11 +440,19 @@ class Battle(object):
                                % (self.foe_prefix, self.foe.name)})
         return ev
 
-    def _order(self, my_move, foe_move):
+    def _order(self, my_move, foe_move, ev=None):
         mp = self.move_of(my_move).get("pri", 0) if my_move else 0
         fp = self.move_of(foe_move).get("pri", 0) if foe_move else 0
         if mp != fp:
             return ["me", "foe"] if mp > fp else ["foe", "me"]
+        # 같은 우선도 안에서 도구가 순서를 당기거나 미룬다 (선제공격손톱,
+        # 느림보꼬리, 애슈열매). 도구가 없으면 난수를 안 건드린다.
+        if self.me.held or self.foe.held:
+            ev = ev if ev is not None else []
+            bm = H.order_bias(self, self.me, "me", ev)
+            bf = H.order_bias(self, self.foe, "foe", ev)
+            if bm != bf:
+                return ["me", "foe"] if bm > bf else ["foe", "me"]
         ms, fs = self.me.stat("spe"), self.foe.stat("spe")
         if ms != fs:
             return ["me", "foe"] if ms > fs else ["foe", "me"]
@@ -424,6 +469,8 @@ class Battle(object):
 
         if key != STRUGGLE:
             user.pp[key] = max(0, user.pp.get(key, 0) - 1)
+            if user.held:
+                H.restore_pp(user, key, move.get("pp"), who, ev)   # 과사열매
         ev.append({"t": "move", "who": who, "name": user.name,
                    "move": self.move_name(key), "moveType": move.get("type"),
                    "cat": move.get("cat"),
@@ -452,6 +499,10 @@ class Battle(object):
                     ev.append({"t": "immune", "who": who,
                                "text": "%s 에게는 효과가 없는 것 같다..." % target.name})
                     return
+                if target.held:
+                    # 반감 열매, 기합의띠. 맞는 쪽 도구가 데미지를 고친다.
+                    dmg = H.on_incoming(self, target, "foe" if who == "me" else "me",
+                                        move, eff, dmg, ev)
                 target.hp = max(0, target.hp - dmg)
                 total += dmg
                 ev.append({"t": "hit", "who": who, "target": "foe" if who == "me" else "me",
@@ -465,11 +516,20 @@ class Battle(object):
                 ev.append({"t": "msg", "text": "효과가 굉장했다!"})
             elif 0 < eff < 1:
                 ev.append({"t": "msg", "text": "효과가 별로인 듯하다..."})
+            if user.held or target.held:
+                # 생명의구슬 반동, 조개껍질방울, 자보·애터·의문열매, 그리고
+                # 체력이 줄어 발동하는 열매들.
+                tw = "foe" if who == "me" else "me"
+                H.after_hit(self, user, who, target, tw, move, eff, total, ev)
+                H.check_hp(self, target, tw, ev)
+                H.check_hp(self, user, who, ev)
 
         # 흡수 / 반동
         drain = move.get("drain") or 0
         if drain and total:
             amount = max(1, int(total * abs(drain) / 100.0))
+            if drain > 0 and user.held:
+                amount = max(1, int(amount * H.drain_mult(user)))    # 큰뿌리
             if drain > 0:
                 user.hp = min(user.maxhp, user.hp + amount)
                 ev.append({"t": "heal", "who": who, "amount": amount, "hp": user.hp,
@@ -516,6 +576,9 @@ class Battle(object):
         fl = move.get("flinch") or 0
         if fl and target.alive() and self.rng.uniform(0, 100) < fl:
             target.flinched = True
+        if user.held:
+            H.flinch(self, user, target, move)          # 왕의징표석·예리한이빨
+            H.note_move(user, key)                      # 구애 잠금·메트로놈
 
         self._check_faint(ev)
 
@@ -565,6 +628,11 @@ class Battle(object):
                    "text": "%s 의 %s 이(가) %s!"
                            % (f.name, STAT_KR.get(stat, stat),
                               word.get(change, "변했다"))})
+        if change < 0 and f.held:
+            H.on_stat_drop(self, f, who, ev)            # 하양허브
+
+    def status_kr(self, ail):
+        return STATUS_KR.get(ail, ail)
 
     def _apply_status(self, f, ail, ev):
         if f.status:
@@ -581,9 +649,11 @@ class Battle(object):
         f.status = ail
         if ail == "sleep":
             f.sleep_turns = self.rng.randint(1, 3)
-        ev.append({"t": "ailment", "status": ail,
-                   "who": "me" if f is self.me else "foe",
+        who = "me" if f is self.me else "foe"
+        ev.append({"t": "ailment", "status": ail, "who": who,
                    "text": "%s 은(는) %s 상태가 되었다!" % (f.name, STATUS_KR.get(ail, ail))})
+        if f.held:
+            H.on_status(self, f, who, ev)               # 버치열매 같은 것
 
     # ---------------- 턴 종료 ----------------
     def _end_of_turn(self, ev):
@@ -602,6 +672,8 @@ class Battle(object):
                 ev.append({"t": "chip", "who": who, "damage": d, "hp": f.hp,
                            "maxhp": f.maxhp,
                            "text": "%s 은(는) 독 때문에 데미지를 입었다!" % f.name})
+            if f.held:
+                H.end_of_turn(self, f, who, ev)     # 먹다남은음식, 맹독구슬 ...
         self._check_faint(ev)
 
     def _check_faint(self, ev):
@@ -620,6 +692,8 @@ class Battle(object):
     # ---------------- 도주 ----------------
     def try_run(self, attempts=1):
         """본가 도주 공식. 스피드가 빠를수록 잘 도망간다."""
+        if self.me.held and H.flee_sure(self.me):      # 연막탄
+            return True
         a, b = self.me.stat("spe"), self.foe.stat("spe")
         if a >= b:
             return True

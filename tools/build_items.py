@@ -23,7 +23,9 @@ import urllib.request
 
 CSV_BASE = "https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv"
 CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_cache")
-NEEDED = ["items.csv", "item_names.csv", "item_categories.csv"]
+NEEDED = ["items.csv", "item_names.csv", "item_categories.csv",
+          # 지닌 도구 고르기 + 설명 문구 (본가 도구 설명 그대로)
+          "item_flags.csv", "item_flag_map.csv", "item_flavor_text.csv"]
 KO = 3
 EN = 9
 
@@ -162,6 +164,47 @@ CATALOG = [
 # 진화의 돌은 값이 비싼 것만 따로 등급을 올린다. 나머지는 rare.
 STONE_EPIC_OVER = 6000
 
+# ---------------------------------------------------------------- 지닌 도구
+# **손으로 고르지 않는다.** PokeAPI 가 '지닐 수 있고 배틀에 관여한다'
+# (item_flags: holdable-passive / holdable-active) 고 표시한 것을 전부
+# 넣는다 - 141종. 거기서 이 엔진에 없는 개념에 걸린 것만 뺀다(아래).
+# 무엇을 하는지는 common/held.py 에 있다. 거기 없는 도구가 카탈로그에
+# 들어가면 '지녔는데 아무 일도 안 하는' 물건이 되므로 검사가 막는다
+# (common/test_held.py).
+HELD_FLAGS = ("holdable-passive", "holdable-active")
+HELD_SKIP = {
+    # 엔진에 없는 것: 날씨, 벽(리플렉터), 교체, 충전 기술, 구속 기술
+    "icy-rock": "날씨 없음", "smooth-rock": "날씨 없음",
+    "heat-rock": "날씨 없음", "damp-rock": "날씨 없음",
+    "light-clay": "리플렉터·빛의장막 없음", "power-herb": "충전 기술 없음",
+    "grip-claw": "구속 기술 없음", "shed-shell": "자유 교체 없음",
+    "mental-herb": "헤롱헤롱·도발 없음", "persim-berry": "혼란 없음",
+    "destiny-knot": "교배 없음",
+    # 콘테스트
+    "red-scarf": "콘테스트 없음", "blue-scarf": "콘테스트 없음",
+    "pink-scarf": "콘테스트 없음", "green-scarf": "콘테스트 없음",
+    "yellow-scarf": "콘테스트 없음",
+    # 돈이 배틀에서 안 나온다 (상점 판매 · PvP 상금뿐)
+    "amulet-coin": "배틀 상금 없음", "luck-incense": "배틀 상금 없음",
+    # 이미 다른 얼굴로 있는 것
+    "exp-share": "학습장치는 서버 설정(EXP_SHARE)이다",
+    "everstone": "이미 '변함없는돌' 로 있다 (가방에서 켜고 끄는 표시)",
+}
+# 등급은 값으로 가른다. 열매는 흔하고, 구애·생명의구슬처럼 판을
+# 바꾸는 것은 귀하다.
+HELD_EPIC = {"choice-band", "choice-specs", "choice-scarf", "life-orb",
+             "focus-sash", "leftovers", "expert-belt"}
+
+
+def _held_rarity(ident, cost):
+    if ident in HELD_EPIC:
+        return "epic"
+    if cost <= 100:
+        return "common"          # 열매
+    if cost <= 2000:
+        return "uncommon"        # 타입 강화, 플레이트
+    return "rare"
+
 
 def norm(s):
     return re.sub(r"[^0-9A-Z]", "", (s or "").upper())
@@ -226,6 +269,31 @@ def build(pokedex_path):
         elif lang == EN:
             en[i] = r["name"]
 
+    # 본가 도구 설명. 여러 버전에 실려 있으면 가장 최근 것을 쓴다
+    # (version_group_id 가 클수록 최근). 한국어가 없으면 영어.
+    desc = {}
+    desc_ver = {}
+    for r in rows("item_flavor_text.csv"):
+        lang = as_int(r["language_id"])
+        if lang not in (KO, EN):
+            continue
+        i = as_int(r["item_id"])
+        ver = as_int(r["version_group_id"])
+        # 한국어를 영어보다 앞세우고, 같은 언어면 최근 판을 앞세운다
+        key = (1 if lang == KO else 0, ver)
+        if key > desc_ver.get(i, (-1, -1)):
+            desc_ver[i] = key
+            desc[i] = " ".join(r["flavor_text"].split())
+
+    # PokeAPI 가 '지닐 수 있는 배틀 도구' 로 표시한 것
+    flag_name = dict((as_int(r["id"]), r["identifier"])
+                     for r in rows("item_flags.csv"))
+    held_ids = set()
+    for r in rows("item_flag_map.csv"):
+        if flag_name.get(as_int(r["item_flag_id"])) in HELD_FLAGS:
+            held_ids.add(as_int(r["item_id"]))
+    ident_by_id = dict((v, k) for k, v in ident_of.items())
+
     used_stones = stones_from_pokedex(pokedex_path)
     by_internal = dict((norm(k), k) for k in ident_of)
 
@@ -246,6 +314,25 @@ def build(pokedex_path):
         rar = "epic" if price >= STONE_EPIC_OVER else "rare"
         entries.append((ident, "stone", rar, {"kind": "stone"}))
 
+    # 지닌 도구. 손으로 고르지 않고 PokeAPI 표시를 따른다 (HELD_SKIP 만 뺀다).
+    #
+    # 금속코트·왕의징표석·예리한손톱·예리한이빨은 진화의 돌이면서 지닐 수도
+    # 있다. 그런 것은 **돌로 남긴다** - 진화 경로가 그걸 보고, 지니는 쪽은
+    # 분류가 아니라 common/held.py 의 목록으로 판단한다(서버 hold 라우트).
+    # 위의 already 는 돌을 더하기 전에 만든 것이라 여기서 다시 만든다.
+    already = set(x[0] for x in entries)
+    held_count = 0
+    for iid in sorted(held_ids):
+        ident = ident_by_id.get(iid)
+        if not ident or ident in HELD_SKIP or ident in already:
+            continue
+        cost = cost_of.get(iid, 0)
+        entries.append((ident, "held", _held_rarity(ident, cost),
+                        {"kind": "held"}))
+        held_count += 1
+    sys.stderr.write("  지닌 도구 %d종 (뺀 것 %d종)\n"
+                     % (held_count, len(HELD_SKIP)))
+
     out = {}
     missing = []
     for ident, cat, rar, eff in entries:
@@ -265,6 +352,10 @@ def build(pokedex_path):
             "sell": int(cost * SELL_RATE),
             "effect": eff,
         }
+        # 본가 설명 그대로. 지닌 도구는 이게 없으면 뭘 하는지 알 길이 없다
+        # (효과가 코드에 있고 effect 사전은 {"kind": "held"} 뿐이다).
+        if desc.get(iid):
+            d["desc"] = desc[iid]
         if rar:
             d["rarity"] = rar
         if ident in NO_BUY or cost <= 0:
