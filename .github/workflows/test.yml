@@ -220,8 +220,12 @@ jobs:
         run: python client/smoke_nameplate.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
         run: python client/smoke_box_filter.py
-      - name: 동작 바꿀 때 검은 테두리 (진짜 Tk)
-        run: python client/smoke_anim_resize.py
+      # **검은 테두리 검사(smoke_anim_resize.py)는 여기서 안 돌린다.**
+      # 그건 윈도우의 투명색 창(-transparentcolor)이 새로 드러난 자리를
+      # 검게 합성하는 것이고, 맥은 platform_mac.py 에 SpriteView 를 따로
+      # 갖고 있어서 그 길로 아예 안 간다. 게다가 맥 러너는 화면을
+      # 집어오는 게 느려서(10초에 95장, 윈도우는 278장) 깜빡임을 잡을
+      # 만큼 촘촘히 못 본다 - 있으나 마나 한 검사가 된다.
       # 이건 메뉴 막대에 아이콘을 잠깐 올렸다 내린다 - **화면이 필요하다.**
       # 러너에 로그인 세션이 없어서 NSStatusBar 가 안 되면 이 줄만 지워라.
       # (맥 없이 적은 것이라 첫 실행에서 확인이 필요하다)

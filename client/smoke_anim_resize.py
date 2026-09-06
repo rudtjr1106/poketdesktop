@@ -17,6 +17,11 @@
 
 흰 판을 깔고 그 위에서 재므로, 도트 자체의 검은 외곽선 말고는 검은 것이
 나오면 안 된다. 고치기 전에는 1066, 고친 뒤에는 121(외곽선)이었다.
+지어낸 시트로 돌리면 외곽선이 없어서 675 -> 0 이 된다.
+
+**윈도우 검사다.** 맥은 platform_mac.py 에 SpriteView 를 따로 갖고 있어
+투명색 창을 안 쓰므로 이 결함이 날 수가 없다. CI 도 윈도우 잡에서만
+돌린다 - 맥 러너는 화면을 집어오는 게 느려 촘촘히 못 본다.
 """
 import os
 import sys
@@ -133,20 +138,25 @@ def main():
     chk("칸 크기가 다른 동작이 있다 (검사 전제)", len(sizes) > 1, sorted(sizes))
 
     box = (X - PAD, Y - PAD, X + 220 + PAD, Y + 220 + PAD)
-    state = {"i": 0, "worst": 0, "when": "", "shots": 0, "stop": False}
+    state = {"i": 0, "worst": 0, "when": "", "shots": 0, "seen": 0,
+         "stop": False}
 
     def grab():
         if state["stop"]:
             return
         im = ImageGrab.grab(bbox=box).convert("RGB")
         px = im.load()
-        n = 0
+        n = seen = 0
         for yy in range(0, im.height, 2):
             for xx in range(0, im.width, 2):
                 r, g, b = px[xx, yy]
                 if r < 50 and g < 50 and b < 50:
                     n += 1
+                elif b > 150 and r < 150 and g < 150:
+                    seen += 1          # 지어낸 도트의 파란 덩어리
         state["shots"] += 1
+        if seen > state["seen"]:
+            state["seen"] = seen
         if n > state["worst"]:
             state["worst"] = n
             state["when"] = pet.anim_name
@@ -187,9 +197,12 @@ def main():
     root.after(SECONDS * 1000, stop)
     root.mainloop()
 
-    print("  %d장 집어옴 · 가장 검은 값 %d (동작 %s)"
-          % (state["shots"], state["worst"], state["when"]))
-    chk("충분히 집어왔다 (검사 전제)", state["shots"] > 100, state["shots"])
+    print("  %d장 집어옴 · 도트 %d칸 보임 · 가장 검은 값 %d (동작 %s)"
+          % (state["shots"], state["seen"], state["worst"], state["when"]))
+    # **도트를 못 봤으면 검은 값이 0인 것은 아무 뜻도 없다.** 화면을 못
+    # 집어오는 곳에서 이 검사가 조용히 통과해 버리는 것을 막는다.
+    chk("도트를 화면에서 봤다 (검사 전제)", state["seen"] > 0, state["seen"])
+    chk("충분히 집어왔다 (검사 전제)", state["shots"] > 40, state["shots"])
     chk("동작을 여러 번 바꿨다 (검사 전제)", state["i"] >= 3, state["i"])
     chk("도트 둘레에 검은 테두리가 없다", state["worst"] < LIMIT, state["worst"])
 
