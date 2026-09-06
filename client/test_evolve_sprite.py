@@ -215,9 +215,15 @@ def main():
 
     if ev.anim_new is not None:
         evolve_fx.swap_sprite(pet, ev.anim_new)
-        chk("네 방향을 다 옮겼다",
-            set(pet.photos) == {DOWN, RIGHT, UP, LEFT},
-            "photos=%r" % sorted(pet.photos))
+        # 그림은 볼 때 만든다(Pet.frames_for). 여기서는 새 도트가 어느
+        # 방향을 가졌는지를 본다.
+        chk("여덟 방향을 다 옮겼다",
+            set(pet.anims["Walk"].frames) == set(sprites.DIRS),
+            "dirs=%r" % sorted(pet.anims["Walk"].frames))
+        chk("옛 종의 다른 동작은 버렸다", pet.anims.keys() == {"Walk"},
+            "anims=%r" % sorted(pet.anims))
+        chk("없다고 확인해 둔 것도 지웠다", pet.miss == set(), pet.miss)
+        chk("걷기로 돌아왔다", pet.anim_name == "Walk", pet.anim_name)
         chk("걷는 도트라고 표시했다", pet.walking_sprite is True)
         chk("보던 방향을 그대로 본다", pet.facing == DOWN, "facing=%r" % pet.facing)
 
@@ -231,12 +237,14 @@ def main():
 
     if ev2.anim_new is not None:
         evolve_fx.swap_sprite(pet2, ev2.anim_new)
-        chk("좌우 두 벌만 있다", set(pet2.photos) == {RIGHT, LEFT},
-            "photos=%r" % sorted(pet2.photos))
+        chk("좌우 두 벌만 있다",
+            set(pet2.anims["Walk"].frames) == {RIGHT, LEFT},
+            "dirs=%r" % sorted(pet2.anims["Walk"].frames))
         chk("걷는 도트가 아니라고 표시했다", pet2.walking_sprite is False)
         # 아래를 보고 있었는데 좌우뿐이다. 없는 방향을 들고 있으면
         # redraw() 가 KeyError 로 죽는다.
-        chk("없는 방향에 머물지 않는다", pet2.facing in pet2.photos,
+        chk("없는 방향에 머물지 않는다",
+            pet2.facing in pet2.anims["Walk"].frames,
             "facing=%r" % pet2.facing)
 
     # 걷는 도트가 없는 종(배틀 도트로 서 있던 애)이 걷는 종으로 진화하는
@@ -250,7 +258,7 @@ def main():
         "got %r" % type(ev3.anim_new).__name__)
     if ev3.anim_new is not None:
         evolve_fx.swap_sprite(pet3, ev3.anim_new)
-        chk("방향이 넷으로 늘었다", set(pet3.photos) == {DOWN, RIGHT, UP, LEFT},
+        chk("방향이 여덟으로 늘었다", set(pet3.anims["Walk"].frames) == set(sprites.DIRS),
             "photos=%r" % sorted(pet3.photos))
         chk("이제 걷는 도트다", pet3.walking_sprite is True)
         chk("보던 방향을 유지한다", pet3.facing == RIGHT,

@@ -130,7 +130,20 @@ def swap_sprite(pet, anim):
     cx = pet.x + pet.fw / 2.0
     by = pet.y + pet.fh
 
-    pet.anim = anim
+    # **다른 동작들도 같이 버려야 한다.** 안 그러면 진화한 뒤에도 가만히
+    # 있을 때만 옛 모습이 튀어나온다 - 걷기는 새 것, Idle 은 옛 것이 된다.
+    # miss(이 종에 없다고 확인해 둔 것)도 종이 바뀌었으니 다시 봐야 한다.
+    pet.anims = {"Walk": anim}
+    pet._first_anim = anim
+    pet.anim_name = "Walk"
+    pet.miss = set()
+    pet.photo_cache = {}
+    pet.once = None
+    pet.once_then = None
+    pet.base_scale = getattr(anim, "scale", None)
+    pet.ax = getattr(anim, "ax", anim.w / 2.0)
+    pet.ay = getattr(anim, "ay", anim.h / 2.0)
+    pet._diag = None
     pet.fw, pet.fh = anim.w, anim.h
     # 투명색은 그림마다 다르다. 창까지 같이 바꿔주지 않으면 새 도트 배경이
     # 그대로 남아 네모난 판이 하나 떠다닌다. (맥은 색으로 뚫는 방식이
@@ -144,15 +157,16 @@ def swap_sprite(pet, anim):
     pet.view.resize(pet.fw, pet.fh)
     # **새 도트가 가진 방향을 그대로 옮긴다.** 좌우 둘만 챙기면, 걷는
     # 도트로 진화해도 위아래가 없어서 Pet 이 방향을 못 바꾼다.
-    pet.photos = dict(
-        (d, pet.view.frames(frames, anim.key))
-        for d, frames in anim.frames.items())
+    # 방향은 볼 때 만든다(Pet.frames_for). 여덟 방향 x 프레임을 여기서
+    # 전부 만들면 진화 연출 한가운데서 눈에 띄게 멈춘다.
+    pet.photos = {}
+    pet.photo_cache["Walk"] = pet.photos
     # 걷는 도트인지도 같이 바뀐다. 이걸 안 고치면 4방향을 들고도
     # 좌우로만 돌아서(overlay.Pet 이 이 값으로 방향을 고른다) 위로 갈 때
     # 등이 안 보인다.
     pet.walking_sprite = isinstance(anim, sprites.WalkAnimation)
-    if pet.facing not in pet.photos:
-        pet.facing = next(iter(pet.photos))
+    if pet.facing not in anim.frames:
+        pet.facing = next(iter(anim.frames))
 
     pet.frame = 0
     pet.elapsed = 0
@@ -431,6 +445,12 @@ class Evolution(object):
         연출은 여기서 끝난 것으로 보고 on_done 을 지금 부른다. 문구가 다
         떠오를 때까지 기다리게 하면 부르는 쪽의 갱신이 괜히 늦어진다.
         """
+        # 새 모습이 된 김에 한 번 뛴다. 진화가 끝났다는 것이 문구보다
+        # 몸으로 먼저 읽힌다.
+        try:
+            self.pet.play("Hop", once=True)
+        except Exception:                                   # noqa: BLE001
+            pass
         from_kr = self.info.get("fromKr") or "포켓몬"
         to_kr = self.info.get("toKr") or "새로운 모습"
         line = "축하합니다! %s%s %s%s 진화했다!" % (

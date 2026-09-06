@@ -56,7 +56,9 @@ jobs:
         run: python client/test_boot_retry.py
 
       - name: 걷는 범위
-        run: python client/test_walk_bounds.py
+        run: |
+          python client/test_walk_bounds.py
+          python client/test_anims.py
 
       - name: 휠 한 칸
         run: python client/test_wheel.py
@@ -235,6 +237,9 @@ jobs:
 
       - name: 의존성
         run: pip install -r server/requirements.txt
+
+      - name: 동작 도트 (서버 없이)
+        run: cd server && python test_anim.py
 
       - name: 서버 띄우기
         env:

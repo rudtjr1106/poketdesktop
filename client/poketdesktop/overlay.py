@@ -24,6 +24,12 @@ def work_area(fallback_w, fallback_h):
     return PLAT.work_area(fallback_w, fallback_h)
 
 
+# 이 틱만큼 가만히 있으면 잔다. 틱은 settings["fps"] 에 달렸는데 보통
+# 초당 24라, 900이면 40초쯤이다. 자리를 비운 사이에 자고 있으면 귀엽고,
+# 너무 짧으면 잠깐 딴 데 본 사이에 자 버려서 부산스럽다.
+SLEEP_AFTER = 900
+
+
 class Pet(object):
     """포켓몬 한 마리."""
 
@@ -31,7 +37,7 @@ class Pet(object):
         self.ov = overlay
         self.mon = mon
         self.id = mon.get("id")
-        self.anim = anim
+        self._first_anim = anim
         self.fw, self.fh = anim.w, anim.h
         key = anim.key                    # 투명색은 그림마다 다르다
         hexkey = "#%02x%02x%02x" % key
@@ -55,9 +61,20 @@ class Pet(object):
         bg = PLAT.transparent_window(self.win, hexkey)
         self.view = PLAT.SpriteView(self.win, bg, self.fw, self.fh)
         self.label = self.view.widget      # 마우스는 이 위젯이 받는다
-        self.photos = dict(
-            (d, self.view.frames(frames, key))
-            for d, frames in anim.frames.items())
+        # 동작마다 그림을 미리 다 만들지 않는다. 피카츄의 Attack 은
+        # 127x106 이 8방향 x 10프레임이라, 한 마리당 그것만 800장이다.
+        # 여섯 마리를 띄우는 프로그램에서 그러면 메모리가 감당이 안 된다.
+        # **쓰는 순간에 그 방향치만** 만들고 여기에 담아 둔다.
+        self.anims = {"Walk": anim}          # 이름 -> WalkAnimation
+        self.miss = set()                    # 이 종에 없다고 확인된 동작
+        self.photo_cache = {}                # (이름, 방향) -> PhotoImage 목록
+        self.anim_name = "Walk"
+        self.base_scale = getattr(anim, "scale", None)
+        self.ax = getattr(anim, "ax", self.fw / 2.0)
+        self.ay = getattr(anim, "ay", self.fh / 2.0)
+        self.once = None                     # 한 번만 돌리는 중인 동작
+        self.once_then = None
+        self.photos = self._photos(anim, key)
         PLAT.raise_above(self.win)
 
         self.facing = random.choice(list(self.photos.keys()))
@@ -68,6 +85,7 @@ class Pet(object):
         self.vx = self.vy = 0.0
         self.walked = 0.0            # 걸은 거리. 걸음 위상을 여기에 묶는다
         self.battling = False        # 배틀 중에는 스스로 돌아다니지 않는다
+        self.still = 0               # 가만히 있은 틱. 오래되면 잠든다
 
         self.label.bind("<Enter>", self.on_enter)
         self.label.bind("<Leave>", self.on_leave)
@@ -225,20 +243,142 @@ class Pet(object):
         if self.tip_win:
             self.hide_tip()
 
+    # ---------------- 동작 갈아끼우기 ----------------
+    def _photos(self, anim, key):
+        """지금 보고 있는 방향치만 만든다. 나머지는 볼 때 만든다."""
+        d = getattr(self, "facing", None)
+        if d is None or d not in anim.frames:
+            d = list(anim.frames.keys())[0]
+        return {d: self.view.frames(anim.frames[d], key)}
+
+    def frames_for(self, d):
+        """이 동작 이 방향의 그림. 아직 안 만들었으면 지금 만든다."""
+        got = self.photos.get(d)
+        if got is not None:
+            return got
+        anim = self.anims.get(self.anim_name)
+        if anim is None or d not in anim.frames:
+            return None
+        got = self.view.frames(anim.frames[d], anim.key)
+        self.photos[d] = got
+        return got
+
+    def anim_for(self, name):
+        """그 동작의 애니메이션. 아직 안 잘랐으면 지금 자른다. 없으면 None.
+
+        **배율은 걷기에서 정한 것을 물려준다.** 동작마다 목표 높이에
+        맞추면 공격할 때만 몸이 작아진다 - 칸 크기가 걷기 32x40,
+        공격 80x80 처럼 크게 다르기 때문이다.
+        """
+        got = self.anims.get(name)
+        if got is not None:
+            return got
+        if not self.walking_sprite:
+            return None                   # 배틀 도트로 대신하는 종
+        key = (self.mon.get("num"), name)
+        if key in self.miss:
+            return None
+        ent = self.ov.sheets.get(key)
+        if ent is None:
+            # **아직 안 받았을 뿐이다. 없다고 적어 두면 안 된다.**
+            # 시트는 포켓몬이 나온 뒤에 뒷줄에서 받는다. 여기서 굳혀
+            # 버리면 다 받고 나서도 영영 걷기만 한다 - 실제로 그랬다.
+            return None
+        sheet, meta = ent
+        if not sheet or not meta:
+            self.miss.add(key)            # 이 종에 이 동작이 없다
+            return None
+        try:
+            anim = sprites.load_walk(sheet, meta,
+                                     self.ov.settings["targetHeight"],
+                                     scale=self.base_scale, name=name)
+        except Exception:                                  # noqa: BLE001
+            self.miss.add(key)
+            return None
+        self.anims[name] = anim
+        return anim
+
+    def play(self, name, once=False, then=None):
+        """동작을 바꾼다. 그 종에 없으면 아무 일도 안 하고 False.
+
+        **기준점을 붙들고 바꾼다.** 동작마다 그림 크기가 달라서, 창
+        왼쪽 위를 그대로 두면 몸이 순간이동한다. 칸 한가운데가 화면의
+        같은 자리에 오도록 창을 옮긴다 (sprites.WalkAnimation 을 보라).
+        """
+        if name == self.anim_name and not once:
+            return True
+        anim = self.anim_for(name)
+        if anim is None:
+            return False
+        cx = self.x + self.ax
+        cy = self.y + self.ay
+        self.anim_name = name
+        self.photo_cache[name] = self.photo_cache.get(name) or {}
+        self.photos = self.photo_cache[name]
+        self.fw, self.fh = anim.w, anim.h
+        self.ax, self.ay = anim.ax, anim.ay
+        self.frame = 0
+        self.elapsed = 0
+        self.walked = 0.0
+        self.once = name if once else None
+        self.once_then = then if once else None
+        self.x = cx - self.ax
+        self.y = cy - self.ay
+        try:
+            self.view.resize(anim.w, anim.h)
+        except Exception:                                  # noqa: BLE001
+            pass
+        self.redraw()
+        self.place()
+        return True
+
+    def end_once(self):
+        """한 번짜리 동작이 끝났다. 원래대로 돌아간다."""
+        then, self.once, self.once_then = self.once_then, None, None
+        self.play("Walk" if self.state == "walk" else self.rest_anim())
+        if then:
+            try:
+                then()
+            except Exception:                              # noqa: BLE001
+                pass
+
+    def rest_anim(self):
+        """서 있을 때 무엇을 돌릴까.
+
+        한참 가만히 있었으면 잔다. 켜 두고 잊어버리는 프로그램이라
+        구석에서 자고 있는 편이 가만히 서 있는 것보다 낫다.
+        """
+        if self.still > SLEEP_AFTER:
+            for n in ("Sleep", "EventSleep"):
+                if self.anim_for(n) is not None:
+                    return n
+        return "Idle" if self.anim_for("Idle") is not None else "Walk"
+
     def row_for(self, facing):
         """이 방향 그림이 없으면 있는 것 중에서 고른다.
 
         배틀 도트로 대신하는 종(걷는 도트가 없는 57마리)은 좌우 두 벌뿐이라
         위/아래로 갈 때도 좌우 중 하나를 써야 한다.
         """
-        if facing in self.photos:
-            return self.photos[facing]
+        got = self.frames_for(facing)
+        if got:
+            return got
         if facing == UP:
-            return self.photos.get(LEFT) or self.photos[RIGHT]
-        return self.photos.get(RIGHT) or list(self.photos.values())[0]
+            return self.frames_for(LEFT) or self.frames_for(RIGHT)
+        got = self.frames_for(RIGHT)
+        if got:
+            return got
+        return list(self.photos.values())[0]
+
+    @property
+    def anim(self):
+        """지금 돌고 있는 동작."""
+        return self.anims.get(self.anim_name) or self._first_anim
 
     def redraw(self):
         row = self.row_for(self.facing)
+        if not row:
+            return
         self.view.show(row[self.frame % len(row)])
 
     def stride(self):
@@ -261,6 +401,30 @@ class Pet(object):
 
         배틀 도트로 대신하는 종은 원래 제자리 애니메이션이라 시간으로 돌린다.
         """
+        # 한 번짜리 동작(공격·맞음·기뻐하기)은 시간으로 돌리고, 끝나면
+        # 원래대로 돌아간다.
+        if self.once:
+            self.elapsed += ms
+            d = self.anim.durations[self.frame % len(self.anim.durations)]
+            if self.elapsed >= d:
+                self.elapsed = 0
+                if self.frame + 1 >= self.anim.count():
+                    return self.end_once()
+                self.frame += 1
+                self.redraw()
+            return
+
+        if self.walking_sprite and self.anim_name != "Walk":
+            # 서 있을 때 돌리는 것(Idle/Sleep)은 제자리 애니메이션이라
+            # 시간으로 돌린다. 걸은 거리로 넘기면 영영 안 움직인다.
+            self.elapsed += ms
+            d = self.anim.durations[self.frame % len(self.anim.durations)]
+            if self.elapsed >= d:
+                self.elapsed = 0
+                self.frame = (self.frame + 1) % self.anim.count()
+                self.redraw()
+            return
+
         if self.walking_sprite:
             if self.state != "walk":
                 if self.frame != 0:
@@ -289,13 +453,44 @@ class Pet(object):
         ang = random.uniform(0, 2 * math.pi)
         self.vx = math.cos(ang)
         self.vy = math.sin(ang) * 0.65        # 세로로는 덜 움직이게
-        want = (sprites.dir_from(self.vx, self.vy) if self.walking_sprite
+        want = (self.dir_for(self.vx, self.vy) if self.walking_sprite
                 else (RIGHT if self.vx > 0 else LEFT))
         if want != self.facing:
             self.facing = want
             self.frame = 0
             self.elapsed = 0
         self.redraw()
+
+    def dir_for(self, vx, vy):
+        """방향을 고른다. 대각선 그림이 있으면 여덟 방향, 없으면 넷.
+
+        SpriteCollab 시트에는 대각선이 진짜로 들어 있다(행 1/3/5/7).
+        followers 로 메운 종은 4행뿐이라 대각선이 없다.
+        """
+        anim = self.anims.get("Walk") or self._first_anim
+        eight = len(getattr(anim, "frames", {}) or {}) >= 8
+        if eight and (getattr(anim, "name", "") or "") and self._has_diag():
+            return sprites.dir_from(vx, vy)
+        return sprites.dir_four(vx, vy)
+
+    def _has_diag(self):
+        """대각선 그림이 진짜 따로 있는가.
+
+        4행짜리 출처는 load_walk 가 대각선을 좌우 행으로 때워 두므로
+        방향 수만 봐서는 구분이 안 된다. 그림이 같은지 본다.
+        """
+        got = getattr(self, "_diag", None)
+        if got is not None:
+            return got
+        anim = self.anims.get("Walk") or self._first_anim
+        fr = getattr(anim, "frames", None) or {}
+        try:
+            got = (fr[sprites.DOWNRIGHT][0].tobytes()
+                   != fr[sprites.RIGHT][0].tobytes())
+        except Exception:                                  # noqa: BLE001
+            got = False
+        self._diag = got
+        return got
 
     def face_towards(self, x):
         """저쪽을 바라보게 방향을 돌린다."""
@@ -306,7 +501,7 @@ class Pet(object):
 
     def turn_to(self, vx, vy):
         """움직이는 방향에 맞춰 몸을 돌린다."""
-        want = (sprites.dir_from(vx, vy) if self.walking_sprite
+        want = (self.dir_for(vx, vy) if self.walking_sprite
                 else (RIGHT if vx >= 0 else LEFT))
         if want != self.facing:
             self.facing = want
@@ -316,6 +511,8 @@ class Pet(object):
 
     def update(self, ms):
         self.advance(ms)
+        if self.once:
+            return                   # 한 번짜리 동작 중에는 안 움직인다
         if self.state == "held" or self.battling:
             return
         s = self.ov.settings
@@ -329,7 +526,15 @@ class Pet(object):
                 self.pick_move()
                 self.timer = random.randint(40, 160)
         if self.state != "walk":
+            # 서 있다. 오래 서 있었으면 잠드는 쪽으로 넘어간다.
+            self.still += 1
+            want = self.rest_anim()
+            if want != self.anim_name:
+                self.play(want)
             return
+        self.still = 0
+        if self.anim_name != "Walk":
+            self.play("Walk")
 
         x1, y1, x2, y2 = self.ov.area()
         m = s["areaMargin"]
@@ -402,6 +607,11 @@ class Overlay(object):
         self.locked = False
         self.paths = {}
         self.walks = {}          # {번호: (시트경로, meta)} — 걷는 도트
+        # 걷기 말고 다른 동작. {(번호, 이름): (시트경로, meta)}
+        # 켤 때 다 받으면 첫 화면이 그만큼 늦어지므로, 포켓몬이 나온
+        # 뒤에 뒷줄에서 하나씩 받아 채운다 (app._prefetch_anims).
+        # (self.extra 는 야생 포켓몬 목록이라 이름을 겹치면 안 된다.)
+        self.sheets = {}
         self._menu_cb = on_pet_menu
         self._open_cb = on_pet_open
         self._running = False

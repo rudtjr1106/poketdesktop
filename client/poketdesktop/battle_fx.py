@@ -340,11 +340,33 @@ class Effect(object):
 
     # ---- 시작 ----
     def play(self):
+        # 접촉기는 lunge 가 알아서 Attack 을 돌린다. 여기서는 **떨어져서
+        # 쏘는 기술**만 챙긴다 - 그냥 서 있는데 화염방사만 날아가면
+        # 누가 쐈는지 안 보인다.
+        self.pose()
         fn = getattr(self, "_" + self.style, None) or self._beam
         try:
             fn()
         except Exception:
             self.finish()
+
+    # 접촉기는 lunge 가 Attack 을 돌리므로 여기서 또 돌리면 안 된다.
+    CONTACT = ("slash", "fist", "fangs", "tackle", "boom")
+
+    def pose(self):
+        """쏘는 쪽이 쏘는 자세를 취한다. 있는 종만."""
+        if self.style in self.CONTACT:
+            return
+        pet = getattr(self.st, "mine" if self.who == "me" else "foe", None)
+        other = getattr(self.st, "foe" if self.who == "me" else "mine", None)
+        if not pet:
+            return
+        try:
+            if other:
+                pet.face_towards(other.x)
+            pet.play("Shoot", once=True) or pet.play("Charge", once=True)
+        except Exception:                                   # noqa: BLE001
+            pass
 
     # ---- 각 연출 ----
     def _beam(self):

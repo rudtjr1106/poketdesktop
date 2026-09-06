@@ -16,6 +16,8 @@ import random
 import sys
 import tkinter as tk
 
+from poketdesktop import platform_os as PLAT
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from common import party_battle as PB                  # noqa: E402
@@ -180,6 +182,7 @@ def state_of(ov):
 def main():
     dex = P.Pokedex.load(DEX)
     rng = random.Random(20260901)
+    PLAT.before_tk()   # 맥: 죽은 Tk 의 복구 대화상자에 안 막히게
     root = tk.Tk()
     root.withdraw()
     U.init_fonts(root)

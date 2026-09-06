@@ -105,6 +105,7 @@ class App(object):
         self._update_job = None
         self._update_asking = False
         self.notes_win = None
+        self._anim_job = False
         self.arena = None
         self.battle = None
         self._quitting = False
@@ -542,6 +543,7 @@ class App(object):
                 self.announce_pvp(me.get("pvpUnseen", 0))
             if self.overlay:
                 added = self.overlay.sync(mons or [], paths or {}, walks or {})
+                self._prefetch_anims(mons or [])
                 # 배틀 중에 새 도트가 생기면(창에서 바탕화면에 올렸을 때)
                 # '항상 위' 맨 위에 놓여 체력바 층을 가린다. 체력바 틱은 더
                 # 이상 순서를 올리지 않으므로(메뉴 위로 올라오던 원인이라
@@ -1121,6 +1123,46 @@ class App(object):
         except Exception as e:                              # noqa: BLE001
             return config.log("새 버전 실행 실패: %s" % e)
         self.quit()
+
+    # 걷기 말고 다른 동작. 종마다 아홉 개라 켤 때 다 받으면 첫 화면이
+    # 한참 늦어진다. 포켓몬이 이미 나와서 걸어다니는 동안 뒷줄에서
+    # 하나씩 받아 채운다 - 다 받기 전에는 그냥 걷기만 한다.
+    #
+    # 순서가 중요하다. Idle 이 제일 자주 보이고(가만히 있을 때마다),
+    # Faint 는 배틀에서 지는 순간에만 쓴다.
+    ANIM_ORDER = ("Idle", "Sleep", "Hop", "Hurt", "Attack",
+                  "Charge", "Shoot", "Faint", "EventSleep")
+
+    def _prefetch_anims(self, mons):
+        if self._anim_job or not self.overlay:
+            return
+        nums = []
+        for m in mons:
+            n = m.get("num")
+            # 걷는 도트가 없는 종은 다른 동작도 없다. 물어볼 것도 없다.
+            if n and n not in nums and self.overlay.walks.get(n):
+                nums.append(n)
+        want = [(n, a) for n in nums for a in self.ANIM_ORDER
+                if (n, a) not in self.overlay.sheets]
+        if not want:
+            return
+        self._anim_job = True
+
+        def work():
+            got = {}
+            for n, a in want:
+                if self._quitting:
+                    break
+                got[(n, a)] = walk_cache.ensure(self.api, n, a)
+            return got
+
+        def done(r, err):
+            self._anim_job = False
+            if err or not r or self._quitting or not self.overlay:
+                return
+            self.overlay.sheets.update(r)
+
+        run_async(self.root, work, done)
 
     def toggle_names(self):
         self.settings["showNames"] = not self.settings.get("showNames")
