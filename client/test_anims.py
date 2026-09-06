@@ -341,6 +341,39 @@ def main():
     chk("고를 수 있는 것은 앉기·눕기·자기",
         set(O.REST_POSES) == {"Sit", "Laying", "Sleep"}, O.REST_POSES)
 
+    print("\n=== 배틀에서 동작이 튀지 않는가 ===")
+    # 할퀴기 같은 접촉기를 쓸 때 도트가 튀었다. 배틀 연출은 좌표를
+    # 잡아 뒀다가 되돌리는데, 그 사이에 동작이 끝나면서 창 크기가
+    # 바뀌면 그 차이만큼 옆으로 밀린다.
+    from poketdesktop import desktop_battle as DB, battle_fx as FX, app as APP
+    import inspect
+
+    for name in ("Attack", "Shoot", "Charge"):
+        src = inspect.getsource(DB) + inspect.getsource(FX)
+        chk("배틀이 %s 를 안 돌린다" % name, '"%s"' % name not in src)
+        chk("%s 를 받아 두지도 않는다" % name, name not in APP.App.ANIM_ORDER)
+
+    # 남긴 것(Hurt/Faint)은 기준점으로 되돌려야 한다. 왼쪽 위를 되돌리면
+    # 크기가 바뀐 만큼 밀린다.
+    for fn in ("lunge", "shake", "faint"):
+        src = inspect.getsource(getattr(DB.DesktopBattle, fn))
+        chk("%s 가 기준점을 쓴다" % fn, "pet.ax" in src or "pet.ay" in src)
+        chk("%s 가 왼쪽 위를 그대로 되돌리지 않는다" % fn,
+            "= hx" not in src and "= hy" not in src)
+
+    # 실제로 얼마나 밀리는지 - 기준점을 안 쓰면 이만큼 튄다
+    class P(object):
+        pass
+    walk_w, walk_h, hurt_w, hurt_h = 48, 48, 72, 70
+    p_ = P()
+    p_.x, p_.ax = 100.0, walk_w / 2.0
+    cx = p_.x + p_.ax
+    p_.ax = hurt_w / 2.0                       # 맞는 동작으로 바뀌었다
+    good = cx - p_.ax
+    bad = 100.0                                # 왼쪽 위를 그대로 되돌린 것
+    chk("기준점으로 되돌리면 안 밀린다 (안 쓰면 %.0fpx 밀린다)"
+        % abs(good - bad), abs((good + hurt_w / 2.0) - cx) < 1e-9)
+
     print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0

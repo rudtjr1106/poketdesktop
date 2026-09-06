@@ -485,16 +485,17 @@ class DesktopBattle(object):
     def lunge(self, who, done):
         """battle_fx 가 접촉기에서 부른다. 도트가 상대 쪽으로 달려든다.
 
-        달려드는 동안 공격 동작을 돌린다. 있는 종만 - 없으면 전처럼
-        몸만 움직인다.
+        **공격 동작(Attack)은 여기서 안 돌린다.** 칸 크기가 크게 달라서
+        (피카츄 걷기 32x40, 공격 80x80) 창이 커졌다 작아지는데, 이 연출은
+        시작할 때 좌표를 잡아 두고 그 자리로 되돌린다. 둘이 겹치면서
+        할퀴기 같은 기술을 쓸 때 도트가 튀었다. 몸만 움직인다.
         """
         pet = self.mine if who == "me" else self.foe
         other = self.foe if who == "me" else self.mine
         if not pet or not other:
             return done()
         pet.face_towards(other.x)
-        pet.play("Attack", once=True)
-        hx, hy = pet.x, pet.y
+        cx, cy = pet.x + pet.ax, pet.y + pet.ay
         dx = 26 if other.x > pet.x else -26
         n = 5
 
@@ -502,37 +503,46 @@ class DesktopBattle(object):
             if self.closed:
                 return
             if i > n * 2:
-                pet.x, pet.y = hx, hy
+                pet.x, pet.y = cx - pet.ax, cy - pet.ay
                 pet.place()
                 return self.after(80, done)
             k = i if i <= n else n * 2 - i
-            pet.x = hx + dx * k / float(n)
+            pet.x = cx - pet.ax + dx * k / float(n)
             pet.place()
             self.after(22, lambda: go(i + 1))
         go(1)
 
     def shake(self, pet, done):
-        """맞았다. 몸이 흔들리는 동안 맞는 동작을 돌린다."""
+        """맞았다. 몸이 흔들리는 동안 맞는 동작을 돌린다.
+
+        **왼쪽 위가 아니라 기준점을 잡아 둔다.** 맞는 동작은 칸이 커서
+        (피카츄 걷기 32x40, 맞기 48x64) 창이 커졌다가, 끝나면 걷기로
+        돌아가며 다시 작아진다. 창 왼쪽 위를 되돌리면 그 크기 차이만큼
+        옆으로 밀려난다. 기준점(칸 한가운데)은 크기가 바뀌어도 같은 자리다.
+        """
         pet.play("Hurt", once=True)
-        hx = pet.x
+        cx = pet.x + pet.ax
         seq = [-7, 7, -5, 5, -3, 3, 0]
 
         def go(i):
             if self.closed:
                 return
             if i >= len(seq):
-                pet.x = hx
+                pet.x = cx - pet.ax
                 pet.place()
                 return done()
-            pet.x = hx + seq[i]
+            pet.x = cx - pet.ax + seq[i]
             pet.place()
             self.after(30, lambda: go(i + 1))
         go(0)
 
     def faint(self, pet, done):
-        """쓰러졌다. 아래로 가라앉는 동안 쓰러지는 동작을 돌린다."""
+        """쓰러졌다. 아래로 가라앉는 동안 쓰러지는 동작을 돌린다.
+
+        shake 와 같은 이유로 기준점을 잡아 둔다.
+        """
         pet.play("Faint", once=True)
-        hy = pet.y
+        cy = pet.y + pet.ay
 
         def go(i):
             if self.closed:
@@ -544,9 +554,9 @@ class DesktopBattle(object):
                         pet.badge_win.withdraw()
                 except Exception:
                     pass
-                pet.y = hy
+                pet.y = cy - pet.ay
                 return self.after(240, done)
-            pet.y = hy + i * 6
+            pet.y = cy - pet.ay + i * 6
             pet.place()
             self.after(26, lambda: go(i + 1))
         go(1)
