@@ -314,6 +314,7 @@ jobs:
         run: |
           python server/test_server.py  http://127.0.0.1:8788
           python server/test_battle.py  http://127.0.0.1:8788
+          python server/test_rotation.py http://127.0.0.1:8788
           python server/test_items.py   http://127.0.0.1:8788
           python server/test_social.py  http://127.0.0.1:8788
           python server/test_arena.py   http://127.0.0.1:8788

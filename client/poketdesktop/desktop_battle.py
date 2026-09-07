@@ -341,7 +341,13 @@ class DesktopBattle(object):
             party = result.get("party") or []
             if result.get("canSwitch") and party:
                 return self.switch_to(party[0])
-            self.app.notify("%s 은(는) 쓰러졌다..." % self.b["me"]["name"])
+            # **여섯을 다 쓰면 야생은 그냥 가 버린다.** 예전에는 이미
+            # 쓰러진 애가 다시 나와서 1죽고 2죽고 1나오고 2나오고 끝없이
+            # 돌았다 (서버 battle_routes 의 fainted 를 보라).
+            msg = "%s 은(는) 쓰러졌다..." % self.b["me"]["name"]
+            if result.get("allDown"):
+                msg += "  데리고 다니는 포켓몬이 모두 쓰러져서 "                        "야생 포켓몬은 가 버렸다."
+            self.app.notify(natural(msg))
         elif res == "fled":
             self.app.notify("야생 포켓몬이 떠나버렸다.")
         # 진화는 배틀 정리가 끝난 뒤에 한다. 배틀이 남아 있는 동안 종을
