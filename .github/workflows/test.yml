@@ -79,6 +79,10 @@ jobs:
         run: python client/test_new_settings.py
       - name: 지닌 도구 (엔진)
         run: python common/test_held.py
+      - name: 기술 배우기·잊기 (엔진)
+        run: python common/test_moves_learn.py
+      - name: 떠오르는 글씨가 안 겹치는가
+        run: python client/test_float_stack.py
       - name: PC 박스 거르기
         run: python client/test_box_filter.py
 

@@ -22,6 +22,11 @@ import time
 
 from . import config
 
+# 걷기 말고 받아 두는 동작들. **여기가 유일한 목록이다** - app 이
+# 받아 오는 것도, overlay 가 칸을 잡을 때 훑는 것도 이걸 본다.
+ANIMS = ("Idle", "Sleep", "Sit", "Laying", "Wake", "Hop", "Hurt",
+         "Faint", "EventSleep")
+
 _lock = threading.Lock()
 _failed = {}
 RETRY_AFTER = 300.0        # 못 받았을 때 다시 시도하기까지 (초)

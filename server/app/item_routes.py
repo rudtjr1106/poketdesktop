@@ -251,8 +251,9 @@ def _use_stone(uid, it, mon, dex, hour):
         name = mon.get("nickname") or dex.name(mon["species"])
         raise HTTPException(400, "%s에게는 아무 일도 일어나지 않았다." % name)
     before = mon["species"]
-    evolution.apply(uid, mon, b, dex, _now())
-    info = evolution.public(dex, before, b["to"])
+    got = evolution.apply(uid, mon, b, dex, _now())
+    info = evolution.public(dex, before, b["to"],
+                            got.get("learned") or [], got.get("forgot") or [])
     return {"ok": True, "evolve": info,
             "message": "축하합니다! %s은(는) %s(으)로 진화했다!"
                        % (info["fromKr"], info["toKr"])}

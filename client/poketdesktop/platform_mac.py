@@ -503,6 +503,15 @@ class SpriteView(object):
         except Exception:                                   # noqa: BLE001
             pass
 
+    def reserve(self, w, h):
+        """맥에서는 아무것도 안 한다.
+
+        윈도우판은 창 크기가 바뀔 때 검게 번쩍여서 가장 큰 칸을 미리
+        잡아 둔다(platform_base). 여기서는 그 일이 없고, 오히려 **칸을
+        키우면 안 된다** - 위에 적었듯이 도트 둘레의 투명한 자리까지
+        클릭을 먹기 때문에, 칸을 키우면 그만큼 마우스를 가로챈다.
+        """
+
     def resize(self, w, h):
         self.w, self.h = w, h
         try:

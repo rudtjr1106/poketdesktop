@@ -339,6 +339,29 @@ class ShopWindow(object):
 
         tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
 
+        # **돈 버는 법을 여기서 알려 준다.** 이 게임에서 돈이 생기는 곳은
+        # 배틀 상금과 도구 판매 둘뿐인데, 상점에 들어와서 가격만 보면
+        # '살 돈이 없다' 까지만 알고 나가게 된다. 살 때든 아니든 늘
+        # 보이도록 머리 바로 아래 한 줄로 둔다.
+        tip = tk.Frame(self.win, bg=U.INK)
+        tip.pack(fill="x")
+        # 라벨을 셋으로 나눠 '가방' 만 색을 준다. **padx 를 0 으로 박아야
+        # 한다** - Label 은 기본으로 양옆에 1px 씩 두는데, 그게 붙어서
+        # '가방 에서' 처럼 한 칸 띈 것으로 읽힌다.
+        tk.Label(tip, text="돈이 모자라면 ", bg=U.INK, fg=U.FG_FAINT,
+                 font=U.FONT_XS, padx=0, bd=0,
+                 highlightthickness=0).pack(side="left", padx=(16, 0),
+                                            pady=6)
+        tk.Label(tip, text="가방", bg=U.INK, fg=U.ACCENT,
+                 font=U.FONT_XS, padx=0, bd=0,
+                 highlightthickness=0).pack(side="left", pady=6)
+        tk.Label(tip, text="에서 안 쓰는 도구를 팔아 보세요."
+                          "   랜덤 대전에서 이겨도 돈이 들어옵니다.",
+                 bg=U.INK, fg=U.FG_FAINT,
+                 font=U.FONT_XS, padx=0, bd=0,
+                 highlightthickness=0).pack(side="left", pady=6)
+        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+
     # ---------------- 바닥 ----------------
     def _bottom(self):
         U.dot_footer(self.win, 1020,
@@ -675,11 +698,7 @@ class ShopWindow(object):
         if buyable:
             bits.append("사면 %s원" % won(cost))
         if int(it.get("sell") or 0):
-            # 파는 값이 사는 값의 몇 %인지 같이 적는다. 숫자만 두면
-            # 손해인지 아닌지 매번 나눠 봐야 한다.
-            bits.append("팔면 %s원 (사는 값의 %d%%)"
-                        % (won(int(it["sell"]) * self.qty),
-                           int(round(self.sell_rate * 100))))
+            bits.append("팔면 %s원" % won(int(it["sell"]) * self.qty))
         short = buyable and cost > self.money
         if short:
             # **돈이 모자랄 때 무엇을 하면 되는지 말해 준다.** 그냥

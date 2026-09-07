@@ -187,23 +187,45 @@ def apply(uid, mon, branch, dex, now):
 
     ability, hidden = _ability_after(dex, mon, new_sp)
 
-    db.run("UPDATE pokemon SET species=?, exp=?, ability=?, hidden_ability=?"
-           " WHERE id=? AND user_id=?",
-           (new_key, exp, ability, int(bool(hidden)), mon["id"], uid))
+    # **진화하면서 배우는 기술을 넣는다.** 알던 기술은 그대로 두고 새로
+    # 배우는 것만 얹는다. 이걸 안 해서 버터플이 염동력도 바람일으키기도
+    # 못 배우고, Lv21 까지 때릴 방법이 없었다 (279종, 기술 383개).
+    moves = list(mon.get("moves") or [])
+    learned = [m for m in P.evolution_moves(new_sp) if m not in moves]
+    forgot = []
+    if learned:
+        moves, forgot = P.trim_moves(dex, moves + learned)
+        # 넉 장을 넘겨 밀려난 것이 방금 배운 것일 수도 있다.
+        learned = [m for m in learned if m in moves]
+
+    db.run("UPDATE pokemon SET species=?, exp=?, ability=?, hidden_ability=?,"
+           " moves=? WHERE id=? AND user_id=?",
+           (new_key, exp, ability, int(bool(hidden)), json.dumps(moves),
+            mon["id"], uid))
 
     out = dict(mon)
     out["species"] = new_key
     out["exp"] = exp
     out["ability"] = ability
     out["hiddenAbility"] = hidden
+    out["moves"] = moves
+    out["learned"] = learned
+    out["forgot"] = forgot
     return out
 
 
-def public(dex, before, after):
-    """클라이언트에 보낼 진화 알림 한 덩이."""
+def public(dex, before, after, learned=(), forgot=()):
+    """클라이언트에 보낼 진화 알림 한 덩이.
+
+    **무엇을 배웠는지 같이 보낸다.** 진화하면서 배우는 기술이 있는데
+    말없이 들어가면 언제 생긴 건지 알 길이 없다. 밀려난 것도 적는다 -
+    아끼던 기술이 조용히 사라지면 나중에야 알게 된다.
+    """
     a = dex.get(before) or {}
     b = dex.get(after) or {}
     return {
         "from": before, "fromKr": a.get("kr", before), "fromNum": a.get("num"),
         "to": after, "toKr": b.get("kr", after), "toNum": b.get("num"),
+        "learned": [dex.move_name(m) for m in learned],
+        "forgot": [dex.move_name(m) for m in forgot],
     }

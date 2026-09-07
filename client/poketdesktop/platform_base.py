@@ -109,7 +109,13 @@ class SpriteView(object):
 
         self.win = win
         self.w, self.h = w, h
-        self.widget = tk.Label(win, bd=0, highlightthickness=0, bg=bg, **kw)
+        # 창에 잡아 둔 칸. **한 번 잡으면 안 바꾼다** (resize 를 보라).
+        self.bw, self.bh = w, h
+        # 그림을 왼쪽 위에 붙인다. 칸이 도트보다 커도 도트가 화면에서
+        # 안 움직인다 - 창 왼쪽 위가 곧 도트 왼쪽 위다. 가운데 정렬로
+        # 두면 칸이 바뀔 때마다 도트가 슬쩍슬쩍 밀린다.
+        self.widget = tk.Label(win, bd=0, highlightthickness=0, bg=bg,
+                               anchor="nw", **kw)
         self.widget.pack()
 
     def frames(self, pil_frames, key):
@@ -122,26 +128,42 @@ class SpriteView(object):
         self.widget.configure(image=frame)
 
     def resize(self, w, h):
-        """창을 **미리** 이 크기로 키우고 바탕을 칠해 둔다.
+        """도트 크기만 적어 둔다. **창은 안 건드린다.**
 
-        그림부터 걸면 안 된다. Label 이 커지면서 창이 따라 커지는데, 그때
-        새로 드러난 자리는 아직 아무도 안 칠했다. 투명색 창
-        (-transparentcolor)에서 그 자리는 투명색이 아니라 **검게** 합성되고,
-        다음 그리기까지 남는다 - 도트 둘레에 검은 테두리가 깜빡인다.
+        투명색 창(-transparentcolor)은 크기가 바뀌는 순간 한 프레임 동안
+        통째로 검게 합성된다. 도트 둘레가 아니라 창 전체가 검은 네모로
+        번쩍인다. 세 마리를 20초 굴리며 동작을 77번 바꿔 재 보면,
 
-        동작이 바뀔 때마다 칸 크기가 달라져서(걷기 32x32, 아픔 48x56,
-        뛰기 32x80) 그때마다 나타났다. 1.1.2 에서 동작이 여럿이 되면서
-        생긴 것이고, 걷기만 있던 시절에는 창 크기가 안 변해서 없었다.
+            리사이즈 0번   검은 장수 0 / 731
+            커지기만       검은 장수 2 / 847
+            매번 바꾸기    검은 장수 2 / 812
 
-        Label 에 그림이 걸려 있으면 width/height 는 글자 수가 아니라
-        픽셀이다. 크기를 못 박아 두면 나중에 그림이 바뀌어도 창이 다시
-        안 흔들린다.
+        창을 옮기는 것은 아무리 빨라도(40ms 마다 20px) 0 이다. 바뀌는
+        것은 **크기**뿐이다.
+
+        1.1.6 에서 "그림보다 창을 먼저 키운다" 로 고친 것은 절반이었다.
+        순서를 어떻게 바꿔도 크기가 바뀌는 순간은 남는다. 그래서 만들
+        때 reserve() 로 가장 큰 칸을 잡아 두고 여기서는 아무것도 안
+        한다. 잡아 둔 것보다 큰 것이 나오면(나중에 받은 시트) 그때만
+        한 번 늘린다.
         """
         self.w, self.h = w, h
+        if w <= self.bw and h <= self.bh:
+            return
+        self.reserve(w, h)
+
+    def reserve(self, w, h):
+        """적어도 이만큼은 잡아 둔다. 나중에 커질 일을 미리 없앤다.
+
+        남는 자리는 투명색이라 아무것도 안 보이고, 윈도우에서는 그 자리로
+        클릭도 그대로 지나간다. Label 에 그림이 걸려 있으면 width/height
+        는 글자 수가 아니라 픽셀이다.
+        """
+        if w <= self.bw and h <= self.bh:
+            return
+        self.bw, self.bh = max(self.bw, w), max(self.bh, h)
         try:
-            self.widget.configure(width=w, height=h)
-            # 여기서 한 번 그려 둔다. 이 줄이 없으면 위의 configure 가
-            # 다음 그리기까지 미뤄져서 결국 그림과 같이 커진다.
+            self.widget.configure(width=self.bw, height=self.bh)
             self.win.update_idletasks()
         except Exception:                                   # noqa: BLE001
             pass

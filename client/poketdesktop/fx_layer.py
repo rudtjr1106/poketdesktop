@@ -65,6 +65,9 @@ class FxLayer(object):
         self.cv.pack()
         PLAT.raise_above(self.win)
         self.click_through = make_click_through(self.win)
+        # 지금 떠 있는 짧은 글씨들. 새로 뜨는 것이 겹치지 않게 이걸 본다
+        # (FloatText).
+        self.floats = []
 
     def to_local(self, sx, sy):
         """화면 좌표 -> 이 캔버스 좌표."""
@@ -101,6 +104,7 @@ class FxLayer(object):
             pass
 
     def clear(self):
+        self.floats = []
         try:
             self.cv.delete("all")
         except Exception:
@@ -114,10 +118,30 @@ class FxLayer(object):
 
 
 class FloatText(object):
-    """도트 위에 잠깐 떠올랐다 사라지는 짧은 글씨."""
+    """도트 위에 잠깐 떠올랐다 사라지는 짧은 글씨.
+
+    **같은 자리에 겹쳐 띄우지 않는다.** 한 번에 여러 개가 뜨는 자리가
+    많다 - 배틀이 끝나면 '+120 exp' 와 주운 도구가 같이 뜨고, 한 방에
+    '급소!', '효과가 굉장하다!', '-38' 이 한꺼번에 뜬다. 그동안은 셋 다
+    같은 좌표에서 시작해서 글씨가 포개져 아무것도 못 읽었다.
+
+    아직 떠 있는 글씨가 근처에 있으면 그만큼 아래에서 시작한다. 올라가는
+    속도가 같으니 간격이 그대로 유지된다.
+    """
+
+    GAP = 15                   # 글씨 사이 최소 간격 (px)
+    NEAR = 90                  # 이만큼 가로로 가까우면 같은 자리로 본다
 
     def __init__(self, layer, sx, sy, text, color="#ffffff", ms=900):
         self.layer = layer
+        self.sx = sx
+        self.step = 0
+        live = [t for t in getattr(layer, "floats", None) or [] if t.items]
+        # 위에서부터 훑으며 부딪히면 그 아래로 내린다.
+        for t in sorted(live, key=lambda t: t.y()):
+            if abs(t.sx - sx) < self.NEAR and sy < t.y() + self.GAP:
+                sy = t.y() + self.GAP
+        self.sy = sy
         x, y = layer.to_local(sx, sy)
         self.items = [
             layer.cv.create_text(x + 1, y + 1, text=text, fill="#101014",
@@ -125,10 +149,17 @@ class FloatText(object):
             layer.cv.create_text(x, y, text=text, fill=color,
                                  font=(U.FAMILY, 10, "bold")),
         ]
-        self.step = 0
         self.jobs = []
         self.ms = ms
-        self._rise()
+        live.append(self)
+        layer.floats = live
+        # **첫 올라감은 한 틱 뒤에.** 여기서 바로 부르면 놓자마자 2px 이
+        # 올라가 버려서, 방금 계산한 간격이 그만큼 어긋난다.
+        self.jobs.append(layer.root.after(int(self.ms / 16.0), self._rise))
+
+    def y(self):
+        """지금 떠 있는 높이 (화면 좌표). _rise 가 한 번에 2px 올린다."""
+        return self.sy - 2 * self.step
 
     def _rise(self):
         if self.step > 14:

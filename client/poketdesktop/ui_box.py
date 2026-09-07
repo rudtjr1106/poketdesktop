@@ -215,18 +215,9 @@ class BoxWindow(object):
 
         U.ghost_button(inner, "새로고침", self.reload,
                        height=32).pack(side="right", pady=15)
-        ball = tk.Frame(inner, bg=U.INK, highlightthickness=2,
-                        highlightbackground=U.LINE)
-        ball.pack(side="right", padx=(0, 10), pady=17)
-        bcv = tk.Canvas(ball, width=14, height=14, bg=U.INK,
-                        highlightthickness=0, bd=0)
-        bcv.pack(side="left", padx=(8, 5), pady=4)
-        bcv.create_oval(1, 1, 13, 13, fill="#f4f6fb", outline=U.INK, width=2)
-        bcv.create_arc(1, 1, 13, 13, start=0, extent=180, fill=U.RED,
-                       outline=U.INK, width=2)
-        self.balls = tk.Label(ball, text="0", bg=U.INK, fg=U.ACCENT,
-                              font=U.FONT_B, padx=(0))
-        self.balls.pack(side="left", padx=(0, 10))
+        # **몬스터볼 개수는 여기 안 둔다.** 이 창에서 하는 일(고르기,
+        # 별명, 데리고 다니기, 놓아주기)과 아무 상관이 없다. 볼은 던질
+        # 때 필요한 것이고, 그건 가방과 상점에서 본다.
         tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
 
     # ---------------- 목록 ----------------
@@ -546,7 +537,6 @@ class BoxWindow(object):
             return self.say(getattr(err, "message", str(err)), U.DANGER)
         self.mons = mons or []
         self._refresh_filter_bar()
-        self.balls.configure(text=str(self.app.balls))
         self.say("")
         self._render(self.sel)
 

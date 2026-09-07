@@ -89,24 +89,29 @@ def free_slot(uid, exclude=None):
 
 
 # ---------------------------------------------------------------- 성장
-MAX_MOVES = 4
+MAX_MOVES = P.MAX_MOVES        # 규칙은 common/pokelogic.py 에 있다
 
 
-def _learn(sp, moves, before, after):
+def _learn(sp, moves, before, after, d=None):
     """구간에서 배우는 기술을 넣는다.
 
     본가는 네 개가 차면 '어떤 기술을 잊을까요?' 를 물어본다. 여기서는
     바탕화면에서 자동으로 싸우는 중이라 창을 띄울 수 없어서 가장 오래된
     것부터 밀어낸다. 대신 **무엇을 잊었는지 같이 돌려준다** —
     말없이 사라지면 아끼던 기술이 없어진 걸 나중에야 알게 된다.
+
+    밀어내는 규칙은 P.trim_moves 에 있다. 하나 남은 공격기는 안 민다.
+
+    **레벨 0 은 여기서 안 걸린다.** 그건 진화하면서 배우는 것이고
+    (P.evolution_moves), evolution.apply 가 넣어 준다.
     """
     learned = []
     for mlv, mv in sp.get("moves", []):
         if before < mlv <= after and mv not in moves:
             learned.append(mv)
             moves.append(mv)
-    kept = moves[-MAX_MOVES:]
-    forgot = [m for m in moves[:-MAX_MOVES]] if len(moves) > MAX_MOVES else []
+    kept, forgot = P.trim_moves(d or dex(), moves)
+    learned = [m for m in learned if m in kept]
     return kept, learned, forgot
 
 
@@ -131,7 +136,7 @@ def grant_exp(uid, mon_id, amount, hour=None):
     learned = []
     forgot = []
     if lv > before:
-        moves, learned, forgot = _learn(sp, moves, before, lv)
+        moves, learned, forgot = _learn(sp, moves, before, lv, d)
     db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
            (exp, lv, json.dumps(moves), mon_id))
 
@@ -165,7 +170,7 @@ def set_level(uid, mon_id, level, hour=None):
     before = r["level"]
     lv = max(1, min(P.LEVEL_MAX, int(level)))
     exp = P.exp_for_level(curve, lv)
-    moves, learned, forgot = _learn(sp, json.loads(r["moves"]), before, lv)
+    moves, learned, forgot = _learn(sp, json.loads(r["moves"]), before, lv, d)
     db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
            (exp, lv, json.dumps(moves), mon_id))
     out = {"id": mon_id, "level": lv, "levelBefore": before,
@@ -192,5 +197,6 @@ def try_evolve(uid, mon_id, hour=None):
     if not b:
         return None
     before = mon["species"]
-    evolution.apply(uid, mon, b, d, "")
-    return evolution.public(d, before, b["to"])
+    got = evolution.apply(uid, mon, b, d, "")
+    return evolution.public(d, before, b["to"],
+                            got.get("learned") or [], got.get("forgot") or [])
