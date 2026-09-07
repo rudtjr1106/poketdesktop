@@ -15,6 +15,7 @@ import tkinter as tk
 from . import config
 from . import platform_os as PLAT
 from . import sprites
+from . import walk_cache
 from .sprites import DOWN, LEFT, RIGHT, UP
 from . import ui_common as U
 
@@ -39,6 +40,10 @@ SLEEP_AFTER_MS = 1800000
 # 32종을 세어 보니 Sleep 은 전 종에 있고 Sit/Laying 은 절반쯤(17/32)이다.
 # 그래서 없는 것은 빼고 있는 것 중에서만 고른다 - 늘 자기만 하지 않게.
 REST_POSES = ("Sit", "Laying", "Sleep")
+
+# 이름표와 도트 창 사이 간격(px). **0 이면 안 된다** - 반투명 창과
+# 투명색 창이 맞닿으면 그 줄이 검게 합성된다 (Pet.measure_nameplate).
+NAME_GAP = 2
 
 
 class Pet(object):
@@ -83,6 +88,7 @@ class Pet(object):
         self.base_scale = getattr(anim, "scale", None)
         self.ax = getattr(anim, "ax", self.fw / 2.0)
         self.ay = getattr(anim, "ay", self.fh / 2.0)
+        self.reserve_box()
         self.once = None                     # 한 번만 돌리는 중인 동작
         self.once_then = None
         self.photos = self._photos(anim, key)
@@ -143,6 +149,30 @@ class Pet(object):
         # 그냥 두면 이름표만 다른 창 뒤로 숨는다.
         PLAT.raise_above(w)
         self.name_win = w
+        self.measure_nameplate()
+        self.place()
+
+    def measure_nameplate(self):
+        """이름표가 몇 픽셀인지 재 둔다. **겹치면 검게 보이기 때문이다.**
+
+        예전에는 그냥 17픽셀 위에 뒀다. 그런데 이름표는 25픽셀쯤 되므로
+        아래 8픽셀이 도트 창을 덮었다. 도트 창은 투명색으로 뚫은 창이고
+        이름표는 반투명 창이라, 그 둘이 겹친 자리는 뚫린 것으로 합성되지
+        않고 **검게** 나온다 - 도트 머리 위에 검은 띠가 깜빡였다.
+
+        글꼴과 화면 배율에 따라 높이가 달라지므로 숫자를 박지 않고 잰다.
+        야생 포켓몬 표식(wild_ui.place_badge)은 처음부터 이렇게 하고
+        있었고, 그래서 거기서는 이 일이 안 났다.
+        """
+        h = 0
+        try:
+            self.name_win.update_idletasks()
+            h = int(self.name_win.winfo_height())
+        except Exception:                                   # noqa: BLE001
+            h = 0
+        # 아직 화면에 안 올라갔으면 winfo_height 가 1 이다. 그때는 글꼴
+        # 높이로 어림잡는다 - 다음 place() 에서 다시 잰다.
+        self.name_h = h if h > 4 else 25
 
     def set_mon(self, mon):
         """서버가 준 새 값으로 갈아 끼운다. **이름표도 같이 고친다.**
@@ -161,6 +191,9 @@ class Pet(object):
             return
         try:
             lbl.configure(text=self.nameplate_text(), fg=self.nameplate_color())
+            # 글자가 바뀌면 높이도 바뀔 수 있다 (★ 가 붙거나 이름이 길어지거나).
+            self.measure_nameplate()
+            self.place()
         except Exception:                                   # noqa: BLE001
             pass
 
@@ -255,7 +288,12 @@ class Pet(object):
     def place(self):
         self.win.geometry("+%d+%d" % (int(self.x), int(self.y)))
         if self.name_win:
-            self.name_win.geometry("+%d+%d" % (int(self.x), int(self.y) - 17))
+            # **도트 창을 한 픽셀도 덮으면 안 된다** (measure_nameplate).
+            if getattr(self, "name_h", 0) <= 4:
+                self.measure_nameplate()
+            self.name_win.geometry(
+                "+%d+%d" % (int(self.x),
+                            int(self.y) - self.name_h - NAME_GAP))
         if self.tip_win:
             self.hide_tip()
 
@@ -411,6 +449,42 @@ class Pet(object):
     def anim(self):
         """지금 돌고 있는 동작."""
         return self.anims.get(self.anim_name) or self._first_anim
+
+    def reserve_box(self):
+        """이 종이 쓸 수 있는 **가장 큰 칸**을 미리 잡아 둔다.
+
+        투명색 창은 크기가 바뀌는 순간 통째로 검게 번쩍인다
+        (platform_base.SpriteView.resize). 동작마다 칸이 다르므로
+        (걷기 32x32, 아픔 48x56, 뛰기 32x80) 바꿀 때마다 그랬다.
+        그래서 처음에 제일 큰 것으로 잡아 두고 다시는 안 바꾼다.
+
+        칸의 진짜 크기는 시트의 **그려진 부분**을 재야 나오는데, 그러려면
+        시트를 다 열어야 한다(sprites.load_walk). 여기서는 열지 않고
+        meta 의 frameW/frameH 로 **위쪽 어림값**을 쓴다 - 그려진 부분은
+        칸을 넘지 않으므로 늘 충분하고, 남는 자리는 투명색이라 안 보인다.
+        """
+        fn = getattr(self.view, "reserve", None)
+        if fn is None:
+            return
+        # 맥판(platform_mac)의 reserve 는 일부러 아무것도 안 한다.
+        # 거기서는 칸을 키우면 그만큼 마우스를 가로채기 때문이다.
+        num = self.mon.get("num")
+        scale = self.base_scale or 1.0
+        bw, bh = self.fw, self.fh
+        for name in ("Walk",) + tuple(walk_cache.ANIMS):
+            ent = self.ov.sheets.get((num, name))
+            if ent is None:
+                # 아직 안 물어본 동작. 받아 둔 것이 있으면 meta 만 읽는다.
+                ent = walk_cache.local(num, name)
+            meta = ent[1] if ent else None
+            if not meta or not meta.get("ok"):
+                continue
+            try:
+                bw = max(bw, int(round(int(meta["frameW"]) * scale)))
+                bh = max(bh, int(round(int(meta["frameH"]) * scale)))
+            except (KeyError, TypeError, ValueError):
+                continue
+        fn(bw, bh)
 
     def redraw(self):
         row = self.row_for(self.facing)

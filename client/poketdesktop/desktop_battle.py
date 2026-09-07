@@ -612,6 +612,18 @@ class DesktopBattle(object):
         self.finish_cleanup()
 
 
+def evolve_learned_text(info):
+    """진화하면서 배운 기술을 한 줄로. 없으면 빈 글."""
+    learned = info.get("learned") or []
+    forgot = info.get("forgot") or []
+    if not learned:
+        return ""
+    line = "  그리고 %s 을(를) 배웠다!" % ", ".join(learned)
+    if forgot:
+        line += "  (%s 을(를) 잊었다)" % ", ".join(forgot)
+    return natural(line)
+
+
 def play_evolutions(app, infos):
     """진화 연출을 차례로 재생한다.
 
@@ -627,6 +639,9 @@ def play_evolutions(app, infos):
     pet = (getattr(ov, "pets", {}) or {}).get(info.get("pokemonId")) if ov else None
     text = natural("%s 은(는) %s 으로(로) 진화했다!"
                    % (info["fromKr"], info["toKr"]))
+    # **진화하면서 배우는 기술이 있다.** 말없이 들어가면 언제 생긴
+    # 건지 알 길이 없고, 넉 장이 차서 밀려난 것도 모르고 지나간다.
+    text += evolve_learned_text(info)
     if pet is None:
         # 바탕화면에 없으면(박스에 있으면) 글로만 알린다
         app.notify("축하합니다! " + text)

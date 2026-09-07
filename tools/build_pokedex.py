@@ -314,7 +314,17 @@ def build():
 
     # ---- 레벨업 기술 (가장 최신 버전그룹 기준) ----
     sys.stderr.write("  레벨업 기술 집계 중 (파일이 큽니다)...\n")
+    # **레벨 0 은 '진화하면서 배우는 기술' 이다.** 그동안 lv <= 0 으로
+    # 통째로 버렸는데, 그래서 버터플이 바람일으키기를, 독침붕이
+    # 더블니들을 영영 못 배웠다 (344종, 기술 491개).
+    #
+    # 최신 버전그룹에는 레벨 0 이 아예 없다. 요즘 판은 그걸 레벨 1 에
+    # 합쳐 적기 때문이다. 그런데 레벨 1 을 다 주면 안 된다 - 갸라도스의
+    # 레벨 1 에는 하이드로펌프가 있어서, 잉어킹이 진화하자마자 그걸
+    # 들고 나온다. 그래서 **레벨 0 이 남아 있는 가장 최근 버전그룹**
+    # (17~25, 5~7세대)에서 따로 모은다.
     best_vg, tmp = {}, {}
+    evo_vg, evo_tmp = {}, {}
     for r in rows("pokemon_moves.csv"):
         if as_int(r["pokemon_move_method_id"]) != LEVEL_UP:
             continue
@@ -322,7 +332,16 @@ def build():
         if pid not in pid_to_sid:
             continue
         vg, lv, mid = as_int(r["version_group_id"]), as_int(r["level"]), as_int(r["move_id"])
-        if lv <= 0 or mid not in move_ident:
+        if mid not in move_ident:
+            continue
+        if lv == 0:
+            if vg > evo_vg.get(pid, -1):
+                evo_vg[pid] = vg
+                evo_tmp[pid] = []
+            if vg == evo_vg[pid]:
+                evo_tmp[pid].append(move_ident[mid])
+            continue
+        if lv < 0:
             continue
         if vg > best_vg.get(pid, -1):
             best_vg[pid] = vg
@@ -330,9 +349,14 @@ def build():
         if vg == best_vg[pid]:
             tmp[pid].append((lv, move_ident[mid]))
     lvmoves = {}
-    for pid, lst in tmp.items():
+    for pid in set(tmp) | set(evo_tmp):
         seen, out = set(), []
-        for lv, mv in sorted(lst):
+        # 진화하며 배우는 것을 앞에 둔다. 레벨 0 이라 정렬해도 맨 앞이다.
+        for mv in evo_tmp.get(pid, []):
+            if mv not in seen:
+                seen.add(mv)
+                out.append([0, mv])
+        for lv, mv in sorted(tmp.get(pid, [])):
             if mv not in seen:
                 seen.add(mv)
                 out.append([lv, mv])

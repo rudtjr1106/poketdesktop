@@ -273,6 +273,45 @@ def learnable_moves(species, level):
     return out
 
 
+MAX_MOVES = 4
+
+
+def evolution_moves(species):
+    """진화하면서 배우는 기술.
+
+    도감에 **레벨 0** 으로 적혀 있는 것들이다 (tools/build_pokedex.py).
+    레벨업으로는 영영 안 걸린다 - 레벨이 0 보다 커지는 순간은 없으니까.
+    진화할 때 따로 넣어 줘야 한다.
+    """
+    return [mv for lv, mv in (species.get("moves") or []) if lv <= 0]
+
+
+def is_attack(dex, key):
+    """때리는 기술인가. 위력이 0 이어도(지구던지기) 분류로 가른다."""
+    return (dex.move(key) or {}).get("cat") in ("physical", "special")
+
+
+def trim_moves(dex, moves):
+    """네 개가 넘으면 오래된 것부터 밀어낸다. (남길 것, 잊은 것).
+
+    본가는 '어떤 기술을 잊을까요?' 를 물어본다. 바탕화면에서 자동으로
+    싸우는 중이라 창을 못 띄우므로 오래된 것부터 민다.
+
+    **다만 하나 남은 공격기는 안 민다.** 버터플이 그랬다 - 독가루,
+    저리가루, 수면가루, 초음파를 연달아 배우면서 몸통박치기가 밀려나,
+    Lv21~31 동안 때릴 방법이 몸부림밖에 없었다. 상태이상 기술만 넉 장
+    들고 있는 포켓몬은 만들지 않는다.
+    """
+    keep, forgot = list(moves), []
+    while len(keep) > MAX_MOVES:
+        i = 0
+        atk = [j for j, m in enumerate(keep) if is_attack(dex, m)]
+        if len(atk) == 1 and atk[0] == 0:
+            i = 1                    # 제일 오래된 것이 하나뿐인 공격기다
+        forgot.append(keep.pop(i))
+    return keep, forgot
+
+
 def default_moveset(species, level):
     """야생 개체가 들고 나오는 기술 4개 (가장 최근에 배운 것들)."""
     known = learnable_moves(species, level)
