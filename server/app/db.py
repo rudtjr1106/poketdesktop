@@ -431,6 +431,10 @@ FROM login_fail;
 """
 
 MIGRATIONS = [
+    # 이 야생 한 판에서 쓰러진 내 포켓몬 id 들 (json 배열).
+    # 없으면 쓰러진 애가 다시 나온다 (battle_routes 의 lost 처리를 보라).
+    ("battle", "fainted",
+     "ALTER TABLE battle ADD COLUMN fainted TEXT NOT NULL DEFAULT '[]'"),
     ("wild_state", "battles",
      "ALTER TABLE wild_state ADD COLUMN battles INTEGER NOT NULL DEFAULT 0"),
     ("wild_state", "wins",

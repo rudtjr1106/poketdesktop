@@ -49,11 +49,30 @@ def _party(uid):
         (uid,))]
 
 
-def _first_healthy(uid, hp_map):
-    for m in _party(uid):
-        if hp_map.get(m["id"], 1) > 0:
-            return m
-    return None
+def _next_ups(uid, down):
+    """이 판에서 **아직 안 쓰러진**, 데리고 다니는 애들.
+
+    down 은 이 야생 한 판에서 이미 쓰러진 id 들이다 (_fainted).
+    여기가 비면 여섯을 다 쓴 것이고, 야생은 그냥 가 버린다.
+    """
+    return [m for m in _party(uid) if m["id"] not in set(down or ())]
+
+
+def _fainted(row):
+    """이 야생 한 판에서 이미 쓰러진 내 포켓몬 id 들.
+
+    교체해도 배틀 행은 그대로 쓰므로(switch 가 mine_id 만 갈아 끼운다)
+    여기에 쌓인다. 옛 행에는 칸이 없을 수 있다.
+    """
+    try:
+        if "fainted" not in row.keys():
+            return []
+    except AttributeError:
+        pass
+    try:
+        return list(json.loads(row["fainted"] or "[]"))
+    except (TypeError, ValueError):
+        return []
 
 
 def _load(ctx, bid=None):
@@ -395,10 +414,21 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
     elif bt.over and bt.result == "lost":
         # 쓰러진 그 한 마리만 조금 깎인다. 본가와 같은 방향이되 훨씬 약하다.
         walk.on_faint(uid, row["mine_id"])
-        nxt = [m for m in _party(uid) if m["id"] != row["mine_id"]]
+        # **이 판에서 쓰러진 애들을 다 적어 둔다.** 예전에는 방금 쓰러진
+        # 한 마리만 후보에서 뺐다. 그래서 1번이 지고 2번이 나오고, 2번이
+        # 지면 1번이 다시 나와서 끝없이 돌았다.
+        down = _fainted(row)
+        if row["mine_id"] not in down:
+            down.append(row["mine_id"])
+        db.run("UPDATE battle SET fainted=? WHERE id=?",
+               (json.dumps(down), row["id"]))
+        nxt = _next_ups(uid, down)
         out["canSwitch"] = bool(nxt)
         out["party"] = [deps.decorate(m) for m in nxt]
+        out["fainted"] = down
         if not nxt:
+            # 데리고 다니는 여섯을 다 썼다. 야생은 그냥 가 버린다.
+            out["allDown"] = True
             db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
             reschedule(uid)
     elif bt.over and bt.result == "fled":
@@ -439,6 +469,10 @@ def switch(bid: int, body: SwitchIn, ctx=Depends(deps.current)):
         raise HTTPException(410, "야생 포켓몬은 이미 떠났습니다.")
     if body.pokemon == row["mine_id"]:
         raise HTTPException(409, "방금 쓰러진 포켓몬입니다.")
+    # **이 판에서 이미 쓰러진 애는 다시 못 내보낸다.** 이걸 안 막으면
+    # 클라이언트가 뭘 보내든 서버가 되살려 줘서 무한히 돈다.
+    if body.pokemon in _fainted(row):
+        raise HTTPException(409, "이 판에서 이미 쓰러진 포켓몬입니다.")
     mine = db.q1("SELECT * FROM pokemon WHERE id=? AND user_id=? AND on_desktop=1",
                  (body.pokemon, uid))
     if not mine:

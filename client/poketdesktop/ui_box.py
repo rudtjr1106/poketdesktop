@@ -1160,9 +1160,14 @@ class BoxWindow(object):
         m = self.current()
         if not m or not m.get("held"):
             return
-        U.run_async(self.root, lambda: self.app.api.unhold(m["id"]),
-                    self._after("%s을(를) 가방에 넣었습니다."
-                                % (m.get("heldKr") or "도구")))
+        after = self._after("%s을(를) 가방에 넣었습니다."
+                            % (m.get("heldKr") or "도구"))
+        wait = ui_loading.Overlay(self.win, "가방에 넣는 중")
+
+        def done(r, err):
+            wait.close()
+            after(r, err)
+        U.run_async(self.root, lambda: self.app.api.unhold(m["id"]), done)
 
     def close(self):
         # 휠은 이제 창 하나가 받아서 나눠 준다(U.install_wheel). 예전에는
@@ -1230,9 +1235,19 @@ class HeldPicker(object):
             self._wid, width=e.width))
         U.scrollable(self.cv, 60)
 
+        # **기다리는 동안 빈 창을 보여주지 않는다.** 가방을 서버에서 받아야
+        # 목록이 채워지는데, 그동안 아무 표시가 없어서 '안 열렸나' 싶었다.
+        self._wait = ui_loading.Overlay(self.win, "가방을 보는 중")
         U.run_async(self.root, self.app.api.shop, self._loaded)
 
+    def _close_wait(self):
+        w = getattr(self, "_wait", None)
+        if w:
+            w.close()
+            self._wait = None
+
     def _loaded(self, r, err):
+        self._close_wait()
         if err:
             return self.note.configure(text=getattr(err, "message", str(err)),
                                        fg=U.DANGER)
@@ -1294,11 +1309,14 @@ class HeldPicker(object):
                                % (self.mon["info"].get("name", ""), it["kr"]))
 
         def finish(r, err):
+            self._close_wait()
             if err:
                 return self.note.configure(
                     text=getattr(err, "message", str(err)), fg=U.DANGER)
             self.close()
             done(r, None)
+        # 누르고 나서 서버가 답할 때까지 아무 일도 안 일어나 보였다.
+        self._wait = ui_loading.Overlay(self.win, "지니게 하는 중")
         U.run_async(self.root, lambda: self.app.api.hold(pid, it["id"]), finish)
 
     def close(self):

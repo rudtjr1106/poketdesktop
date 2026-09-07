@@ -466,7 +466,30 @@ class ShopWindow(object):
         d.pack_propagate(False)
         tk.Frame(d, bg=U.LINE2, width=2).place(x=0, y=0, relheight=1.0)
 
-        p = tk.Frame(d, bg=U.BG2)
+        # 이 칸은 세로로 길다 - 이름, 태그, 설명, 값 세 칸, 개수, 빠른 수량,
+        # 사기/팔기, 맨 아래 안내까지 들어간다. 노트북처럼 세로가 짧은
+        # 화면에서는 아래가 그냥 잘려서 사기 단추가 안 보였다. 목록 쪽과
+        # 똑같이 굴릴 수 있게 한다 (포켓몬 관리 창의 상세칸과 같은 방식).
+        holder = tk.Frame(d, bg=U.BG2)
+        holder.pack(fill="both", expand=True)
+        self.d_canvas = tk.Canvas(holder, bg=U.BG2, highlightthickness=0, bd=0)
+        dsb = ttk.Scrollbar(holder, orient="vertical",
+                            command=self.d_canvas.yview)
+        self.d_canvas.configure(yscrollcommand=dsb.set)
+        dsb.pack(side="right", fill="y")
+        self.d_canvas.pack(side="left", fill="both", expand=True)
+
+        outer = tk.Frame(self.d_canvas, bg=U.BG2)
+        self._dwin = self.d_canvas.create_window((0, 0), window=outer,
+                                                 anchor="nw")
+        # 캔버스 너비에 맞춰 안쪽도 같이 늘린다. 안 하면 폭이 1px 로 남는다.
+        self.d_canvas.bind("<Configure>", lambda e: self.d_canvas.itemconfigure(
+            self._dwin, width=e.width))
+        outer.bind("<Configure>", lambda e: self.d_canvas.configure(
+            scrollregion=self.d_canvas.bbox("all")))
+        U.scrollable(self.d_canvas, 60)
+
+        p = tk.Frame(outer, bg=U.BG2)
         p.pack(fill="both", expand=True, padx=(17, 15), pady=14)
 
         head = tk.Frame(p, bg=U.BG2)
