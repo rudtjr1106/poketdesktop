@@ -53,6 +53,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -288,13 +289,29 @@ def make_dmg(app_path, dist):
     dmg_path = os.path.join(dist, ZIP_NAME + ".dmg")
     if os.path.exists(dmg_path):
         os.remove(dmg_path)
-    r = subprocess.run(["hdiutil", "create", "-quiet",
-                        "-volname", APP_NAME, "-srcfolder", stage,
-                        "-ov", "-format", "UDZO", dmg_path],
-                       capture_output=True, text=True)
+    # **-quiet 를 쓰지 않는다.** 그러면 실패해도 stderr 이 비어서
+    # "dmg 를 못 만들었습니다: " 만 찍히고 왜 그런지 알 길이 없다.
+    # 1.1.8 릴리스에서 러너가 한 번 그렇게 실패했다.
+    #
+    # 한 번은 다시 해 본다. hdiutil 은 러너에서 가끔 이유 없이 실패하는데
+    # (앞서 남은 볼륨을 떼는 중이거나 해서), 다시 하면 대개 된다.
+    r = None
+    for attempt in (1, 2):
+        r = subprocess.run(["hdiutil", "create",
+                            "-volname", APP_NAME, "-srcfolder", stage,
+                            "-ov", "-format", "UDZO", dmg_path],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            break
+        print("  dmg 만들기 %d번째 실패 (코드 %s)" % (attempt, r.returncode))
+        out = ((r.stderr or "") + (r.stdout or "")).strip()
+        print("    %s" % (out or "(아무 말도 없음)"))
+        if attempt == 1:
+            time.sleep(3)
     shutil.rmtree(stage, ignore_errors=True)
     if r.returncode != 0:
-        print("  dmg 를 못 만들었습니다: %s" % (r.stderr or "").strip())
+        print("  dmg 를 못 만들었습니다: %s"
+              % (((r.stderr or "") + (r.stdout or "")).strip() or "이유 없음"))
         return None
     return dmg_path
 
