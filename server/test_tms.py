@@ -262,14 +262,17 @@ def main():
     rate = len(hits) / 4000.0
     chk("확률이 설정값 근처 (%.3f)" % rate,
         abs(rate - tms.DROP_CHANCE) < 0.02, rate)
+    allno = set(tms.all_tms())
+    chk("358개 전체에서 나온다 (종으로 안 좁힌다)",
+        all(h in allno for h in hits) and len(set(hits)) > 60,
+        len(set(hits)))
     can = set(tms.learnable(1))
-    chk("그 종이 배울 수 있는 것만 나온다",
-        all(h in can for h in hits), [h for h in hits if h not in can][:5])
+    chk("잡은 종이 못 배우는 것도 나온다",
+        any(h not in can for h in hits))
 
     # 이미 가진 것은 안 나온다
     for h in set(hits):
         tms.give(uid2, h)
-    left = [n for n in can if n not in tms.owned(uid2)]
     again = [tms.roll_drop(rng, species_num=1, uid=uid2) for _ in range(2000)]
     dup = [g for g in again if g is not None and tms.has(uid2, g)]
     chk("이미 가진 것은 다시 안 나온다", not dup, dup[:5])
