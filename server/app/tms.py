@@ -109,32 +109,25 @@ def give(uid, no, now=None):
 def roll_drop(rng, species_num=None, shiny=False, uid=None):
     """떨어질 기술머신 하나. 안 떨어지면 None.
 
+    **358개 전체에서 고른다.** 잡은 종이 배울 수 있는 것으로 좁히지
+    않는다 - 지금 못 쓰는 게 나와도 나중에 다른 애가 쓰거나 모으는
+    맛이 있고, 좁히면 자주 잡는 종 근처만 계속 나온다.
+
     **이미 가진 것은 안 준다.** 살 수도 팔 수도 없는 물건이라, 중복이
     나오면 아무 일도 안 일어난 것과 같다. 다 모았으면 그때부터는 평소처럼
     도구만 나온다.
 
-    종을 주면 **그 종이 배울 수 있는 것**에서 고른다. 방금 잡은 애가 못
-    쓰는 기술머신이 나오면 무엇을 얻은 건지 와닿지 않는다. 그 종이 배울
-    게 없으면 전체에서 고른다.
+    species_num 은 안 쓴다. 부르는 쪽을 안 고치려고 받아만 둔다.
     """
     rolls = SHINY_ROLLS if shiny else 1
     if rng.random() > 1.0 - (1.0 - DROP_CHANCE) ** rolls:
         return None
 
-    pool = None
-    if species_num:
-        pool = [n for n in learnable(species_num)]
-    if not pool:
-        pool = sorted(all_tms())
+    pool = sorted(all_tms())
     if uid is not None:
-        got = owned(uid)
-        left = [n for n in pool if n not in got]
-        if not left:
-            # 이 종 것은 다 모았다. 전체에서 못 모은 것을 본다.
-            left = [n for n in sorted(all_tms()) if n not in got]
-        if not left:
+        pool = [n for n in pool if n not in owned(uid)]
+        if not pool:
             return None          # 358개를 다 모았다
-        pool = left
     return rng.choice(pool)
 
 
