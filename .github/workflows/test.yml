@@ -61,7 +61,6 @@ jobs:
         run: |
           python client/test_walk_bounds.py
           python client/test_anims.py
-          python client/test_popup_close.py
 
       - name: 휠 한 칸
         run: python client/test_wheel.py
@@ -182,7 +181,9 @@ jobs:
       - name: 설정 창·트레이 (창을 실제로 만든다)
         run: python client/smoke_autostart.py
       - name: 테두리 없는 창이 제자리에 뜨는가
-        run: python client/smoke_window.py
+        run: |
+          python client/smoke_window.py
+          python client/test_popup_close.py
       # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
@@ -218,7 +219,9 @@ jobs:
       - name: 업데이트 (dmg)
         run: python client/test_update_mac.py
       - name: 테두리 없는 창이 제자리에 뜨는가
-        run: python client/smoke_window.py
+        run: |
+          python client/smoke_window.py
+          python client/test_popup_close.py
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
       # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
