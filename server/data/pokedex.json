@@ -395,7 +395,7 @@
    "kr": "다운로드"
   },
   "DRAGONIZE": {
-   "desc": "The Pokémon's Normal-type moves become Dragon-type moves and their power is boosted by 20%.",
+   "desc": "노말타입 기술이 드래곤타입이 되고 위력이 20% 올라간다.",
    "en": "Dragonize",
    "id": 309,
    "kr": "드래곤스킨"
@@ -437,7 +437,7 @@
    "kr": "흙먹기"
   },
   "EELEVATE": {
-   "desc": "The Pokémon floats off the ground, making it immune to Ground-type moves, as well as the Spikes, Toxic Spikes, and Sticky Web statuses. When the Pokémon knocks out a target with an attack, its highest stat is boosted by 1 stage.",
+   "desc": "공중에 떠 있어 땅타입 기술을 받지 않는다. 압정뿌리기·독압정·끈적끈적네트의 영향도 받지 않는다.",
    "en": "Eelevate",
    "id": 312,
    "kr": "Eelevate"
@@ -461,7 +461,7 @@
    "kr": "전기로바꾸기"
   },
   "EMBODYASPECT": {
-   "desc": "The Pokémon's heart fills with memories, causing the Mask to shine and one of the Pokémon's stats to be boosted.",
+   "desc": "추억이 가슴을 채워 가면이 빛나고 능력 하나가 올라간다.",
    "en": "Embodyaspect",
    "id": 303,
    "kr": "초상투영"
@@ -490,7 +490,7 @@
    "kr": "필터"
   },
   "FIREMANE": {
-   "desc": "Boosts the power of the Pokémon's Fire-type moves by 50%.",
+   "desc": "불꽃타입 기술의 위력이 50% 올라간다.",
    "en": "Firemane",
    "id": 313,
    "kr": "Firemane"
@@ -1012,7 +1012,7 @@
    "kr": "메가런처"
   },
   "MEGASOL": {
-   "desc": "Even when the sunlight has not turned harsh, the Pokémon can use its moves as if the weather were harsh sunlight.",
+   "desc": "날씨가 쾌청하지 않아도 강한 햇살 아래인 것처럼 기술을 쓸 수 있다.",
    "en": "Megasol",
    "id": 310,
    "kr": "메가솔라"
@@ -1035,7 +1035,7 @@
    "kr": "의태"
   },
   "MINDSEYE": {
-   "desc": "The Pokémon ignores changes to opponents' evasiveness, its accuracy can't be lowered, and it can hit Ghost types with Normal-type and Fighting-type moves",
+   "desc": "상대의 회피율 변화를 무시한다. 자신의 명중률은 떨어지지 않고, 노말타입과 격투타입 기술로 고스트타입을 맞힐 수 있다.",
    "en": "Mindseye",
    "id": 299,
    "kr": "심안"
@@ -1238,7 +1238,7 @@
    "kr": "픽업"
   },
   "PIERCINGDRILL": {
-   "desc": "When the Pokémon uses contact moves, it can hit even targets that are protecting themselves, dealing 1/4 of the damage that the move would otherwise deal. Everything aside from the target's protective effects is still triggered.",
+   "desc": "직접 닿는 기술을 쓰면 방어하는 상대도 맞힐 수 있다. 다만 그때는 데미지가 1/4이 된다.",
    "en": "Piercingdrill",
    "id": 308,
    "kr": "관통드릴"
@@ -1702,7 +1702,7 @@
    "kr": "가속"
   },
   "SPICYSPRAY": {
-   "desc": "When the Pokémon takes damage from a move, it burns the attacker.",
+   "desc": "기술로 데미지를 받으면 상대를 화상 상태로 만든다.",
    "en": "Spicyspray",
    "id": 311,
    "kr": "하바네로분출"
@@ -1919,13 +1919,13 @@
    "kr": "Tenacity"
   },
   "TERAFORMZERO": {
-   "desc": "When Terapagos changes into its Stellar Form, it uses its hidden powers to eliminate all effects of weather and terrain, reducing them to zero.",
+   "desc": "테라파고스가 스텔라폼이 될 때 숨은 힘으로 날씨와 필드의 효과를 모두 없앤다.",
    "en": "Teraformzero",
    "id": 306,
    "kr": "제로포밍"
   },
   "TERASHELL": {
-   "desc": "The Pokémon's shell contains the powers of each type. All damage-dealing moves that hit the Pokémon when its HP is full will not be very effective.",
+   "desc": "등껍질에 모든 타입의 힘이 깃들어 있다. HP가 가득할 때 받는 공격은 전부 효과가 별로가 된다.",
    "en": "Terashell",
    "id": 305,
    "kr": "테라셸"
