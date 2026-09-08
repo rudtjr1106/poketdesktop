@@ -455,10 +455,17 @@ class BoxWindow(object):
             val.grid(row=i, column=1, sticky="e")
             cv = tk.Canvas(grid, width=116, height=7, bg="#232b3d",
                            highlightthickness=0, bd=0)
-            cv.grid(row=i, column=2, padx=(9, 8))
-            iv = tk.Label(grid, text="", bg="#101623", fg=U.FG_DIM, font=U.FONT_XS,
-                          anchor="e", width=6)
-            iv.grid(row=i, column=3, sticky="e")
+            cv.grid(row=i, column=2, padx=(9, 10))
+            # **글자 수로 폭을 잡지 않는다(width=6 이었다).** 그 폭은
+            # 글꼴의 '평균 글자 너비' 로 계산되는데, 한글은 그보다 훨씬
+            # 넓어서 글꼴이 바뀌면 어긋난다. 윈도우에서 '개체 31' 이
+            # 막대에 딱 붙고 오른쪽 여백이 사라졌다.
+            #
+            # 폭을 안 주면 grid 가 그 열에서 가장 넓은 것에 맞춰 준다.
+            # 여섯 줄이 같은 열이라 들쭉날쭉해지지도 않는다.
+            iv = tk.Label(grid, text="", bg="#101623", fg=U.FG_DIM,
+                          font=U.FONT_XS, anchor="e")
+            iv.grid(row=i, column=3, sticky="e", padx=(0, 2))
             self.bars[k] = (val, cv, iv)
 
         U.marker_label(p, "기술", bg=U.BG2).pack(anchor="w", pady=(11, 5))

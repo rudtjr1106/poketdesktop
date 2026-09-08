@@ -19,6 +19,11 @@ import re
 import sys
 import urllib.request
 
+# 9세대 특성 설명은 PokeAPI 에 한국어가 없어서 직접 적어 뒀다.
+sys.path.insert(0, os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
+from common.ability_kr import DESC as ABILITY_KR  # noqa: E402
+
 CSV_BASE = "https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv"
 CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_cache")
 
@@ -61,6 +66,10 @@ roaring-moon walking-wake gouging-fire raging-bolt
 iron-treads iron-bundle iron-hands iron-jugulis iron-moth iron-thorns
 iron-valiant iron-leaves iron-boulder iron-crown
 """
+
+
+def _has_hangul(s):
+    return bool(re.search(r"[가-힣]", s or ""))
 
 
 def norm(s):
@@ -183,10 +192,20 @@ def build():
 
     abil_out = {}
     for aid, ident in abil_ident.items():
+        key = norm(ident)
         d = {"id": aid, "en": ident.title(),
              "kr": abil_kr.get(aid, ident.title())}
-        if abil_desc.get(aid):
-            d["desc"] = abil_desc[aid]
+        # **9세대 특성 47개에는 PokeAPI 에 한국어 줄이 아예 없다.**
+        # 그대로 두면 영어가 화면에 나온다(찌리비의 풍력발전이 그랬다).
+        # 손으로 적어 둔 것이 있으면 그걸 쓴다. 저쪽에 한국어가 들어오면
+        # 위에서 이미 한국어를 골랐으므로 자동으로 그쪽이 이긴다.
+        got = abil_desc.get(aid)
+        if got and not _has_hangul(got):
+            got = ABILITY_KR.get(key) or got
+        elif not got:
+            got = ABILITY_KR.get(key)
+        if got:
+            d["desc"] = got
         abil_out[ident] = d
 
     # ---- 기술 ----

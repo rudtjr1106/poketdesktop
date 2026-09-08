@@ -47,7 +47,9 @@ jobs:
 
       # 창을 안 만드는 것들. 어느 OS 에서나 그대로 돈다.
       - name: 지난 시간 표기
-        run: python common/test_korean.py
+        run: |
+          python common/test_korean.py
+          python common/test_dex_kr.py
 
       - name: 배틀 화면 (체력바)
         run: python client/test_battle_ui.py
