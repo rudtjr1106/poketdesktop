@@ -37,7 +37,7 @@ class PinEntry(object):
         for i in range(digits):
             box = tk.Frame(self.frame, bg=U.INK, highlightthickness=2,
                            highlightbackground=U.LINE, highlightcolor=U.ACCENT,
-                           width=42, height=44, bd=0)
+                           width=42, height=U.h(44), bd=0)
             box.pack_propagate(False)
             box.pack(side="left", padx=(0, 7))
             e = tk.Entry(box, bg=U.INK, fg=U.FG, insertbackground=U.ACCENT,
@@ -182,7 +182,7 @@ class LoginWindow(object):
         U.ball_header(self.win, 460, 96, "포스크탑",
                       "바탕화면에서 포켓몬을 만나고 키웁니다",
                       "v" + VERSION).pack(fill="x")
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
         U.dot_footer(self.win, 460, "Enter 로 확인").pack(fill="x", side="bottom")
 
@@ -211,7 +211,7 @@ class LoginWindow(object):
         tabs.pack(fill="x", pady=(11, 0))
         self.tab_login = self._tab(tabs, "로그인", "login")
         self.tab_signup = self._tab(tabs, "회원가입", "signup")
-        tk.Frame(body, bg=U.LINE, height=2).pack(fill="x")
+        tk.Frame(body, bg=U.LINE, height=U.h(2)).pack(fill="x")
 
         self.panel = tk.Frame(body, bg=U.BG2, highlightthickness=2,
                               highlightbackground=U.LINE, bd=0)
@@ -635,12 +635,12 @@ def ask_password(root, title, message):
     win.resizable(False, False)
     out = {}
 
-    bar = tk.Frame(win, bg=U.BG2, height=34)
+    bar = tk.Frame(win, bg=U.BG2, height=U.h(34))
     bar.pack(fill="x")
     bar.pack_propagate(False)
-    tk.Frame(bar, bg=U.ACCENT, width=3, height=13).pack(side="left", padx=(12, 8))
+    tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(13)).pack(side="left", padx=(12, 8))
     tk.Label(bar, text=title, bg=U.BG2, fg=U.FG, font=U.FONT_B).pack(side="left")
-    tk.Frame(win, bg=U.LINE2, height=2).pack(fill="x")
+    tk.Frame(win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     f = tk.Frame(win, bg=U.BG)
     f.pack(fill="both", expand=True, padx=18, pady=16)

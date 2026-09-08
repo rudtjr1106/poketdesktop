@@ -17,7 +17,7 @@ from . import box_filter, item_icons, sprite_cache, sprites
 from . import ui_common as U
 from . import ui_loading
 
-ROW_H = 30
+ROW_H = U.h(30)
 DETAIL_W = 340
 
 # (제목, x, 너비, 정렬)
@@ -192,7 +192,7 @@ class BoxWindow(object):
 
     # ---------------- 머리 ----------------
     def _header(self):
-        h = tk.Frame(self.win, bg=U.BG2, height=62)
+        h = tk.Frame(self.win, bg=U.BG2, height=U.h(62))
         h.pack(fill="x")
         h.pack_propagate(False)
         inner = tk.Frame(h, bg=U.BG2)
@@ -218,7 +218,7 @@ class BoxWindow(object):
         # **몬스터볼 개수는 여기 안 둔다.** 이 창에서 하는 일(고르기,
         # 별명, 데리고 다니기, 놓아주기)과 아무 상관이 없다. 볼은 던질
         # 때 필요한 것이고, 그건 가방과 상점에서 본다.
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     # ---------------- 목록 ----------------
     def _list(self, parent):
@@ -229,7 +229,7 @@ class BoxWindow(object):
         # 타입은 드롭다운이다. 처음에는 칩으로 깔았는데 박스가 차면 타입이
         # 열댓 개가 되어 줄이 잘려 나갔다. 이름은 별명·종 이름·도감 번호를
         # 다 본다 (box_filter).
-        bar = tk.Frame(wrap, bg=U.BG2, height=40)
+        bar = tk.Frame(wrap, bg=U.BG2, height=U.h(40))
         bar.pack(fill="x")
         bar.pack_propagate(False)
         tk.Label(bar, text="PC 박스", bg=U.BG2, fg=U.FG_DIM,
@@ -245,16 +245,16 @@ class BoxWindow(object):
         box.pack(side="right", padx=(6, 10), pady=3)
         tk.Label(bar, text="이름 찾기", bg=U.BG2, fg=U.FG_DIM,
                  font=U.FONT_XS).pack(side="right")
-        tk.Frame(wrap, bg=U.LINE, height=1).pack(fill="x")
+        tk.Frame(wrap, bg=U.LINE, height=U.h(1)).pack(fill="x")
 
-        head = tk.Frame(wrap, bg=U.INK, height=26)
+        head = tk.Frame(wrap, bg=U.INK, height=U.h(26))
         head.pack(fill="x")
         head.pack_propagate(False)
         for title, x, w, anchor in COLS:
             tk.Label(head, text=title, bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS,
                      anchor=anchor if anchor != "center" else "center"
                      ).place(x=x, y=0, width=w, relheight=1.0)
-        tk.Frame(wrap, bg=U.LINE, height=2).pack(fill="x")
+        tk.Frame(wrap, bg=U.LINE, height=U.h(2)).pack(fill="x")
 
         holder = tk.Frame(wrap, bg=U.BG)
         holder.pack(fill="both", expand=True)
@@ -329,7 +329,7 @@ class BoxWindow(object):
 
         # 도트 액자
         art = tk.Frame(p, bg="#101623", highlightthickness=2,
-                       highlightbackground=U.LINE, height=112)
+                       highlightbackground=U.LINE, height=U.h(112))
         art.pack(fill="x")
         art.pack_propagate(False)
         self.d_num = tk.Label(art, text="", bg="#101623", fg="#4e566f",
@@ -489,8 +489,8 @@ class BoxWindow(object):
 
     # ---------------- 바닥 ----------------
     def _bottom(self):
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x", side="bottom")
-        bar = tk.Frame(self.win, bg=U.INK, height=58)
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x", side="bottom")
+        bar = tk.Frame(self.win, bg=U.INK, height=U.h(58))
         bar.pack(fill="x", side="bottom")
         bar.pack_propagate(False)
         inner = tk.Frame(bar, bg=U.INK)
@@ -632,20 +632,20 @@ class BoxWindow(object):
         for m in party:
             self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
                                      self.select, self._dnd).pack()
-            tk.Frame(self.inner, bg="#1a1f2e", height=1).pack(fill="x")
+            tk.Frame(self.inner, bg="#1a1f2e", height=U.h(1)).pack(fill="x")
         if box_all:
-            sep = tk.Frame(self.inner, bg=U.INK, height=28)
+            sep = tk.Frame(self.inner, bg=U.INK, height=U.h(28))
             sep.pack(fill="x")
             sep.pack_propagate(False)
             label = ("PC 박스 · %d마리 중 %d마리" % (box_all, len(box)) if filtered
                      else "PC 박스 · %d마리" % box_all)
             U.marker_label(sep, label, bg=U.INK,
                            mark=U.FG_FAINT).pack(side="left", padx=12, pady=7)
-            tk.Frame(self.inner, bg=U.LINE, height=2).pack(fill="x")
+            tk.Frame(self.inner, bg=U.LINE, height=U.h(2)).pack(fill="x")
             for m in box:
                 self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
                                          self.select, self._dnd).pack()
-                tk.Frame(self.inner, bg="#161a24", height=1).pack(fill="x")
+                tk.Frame(self.inner, bg="#161a24", height=U.h(1)).pack(fill="x")
             if not box and filtered:
                 tk.Label(self.inner, text="거름망에 맞는 포켓몬이 박스에 없습니다.",
                          bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S).pack(pady=22)
@@ -1214,13 +1214,13 @@ class HeldPicker(object):
         U.install_wheel(self.win)
         self.photos = []
 
-        head = tk.Frame(self.win, bg=U.BG2, height=56)
+        head = tk.Frame(self.win, bg=U.BG2, height=U.h(56))
         head.pack(fill="x")
         head.pack_propagate(False)
         tk.Label(head, text="%s에게 지니게 할 도구" % mon["info"].get("name", ""),
                  bg=U.BG2, fg=U.FG, font=U.FONT_B).pack(side="left", padx=16,
                                                         pady=16)
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
         self.note = tk.Label(self.win, text="가방을 여는 중...", bg=U.BG,
                              fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
                              justify="left", wraplength=420)
@@ -1293,7 +1293,7 @@ class HeldPicker(object):
                         font=U.FONT_XS, anchor="w", justify="left",
                         wraplength=380)
         desc.pack(fill="x", padx=10, pady=(0, 6))
-        tk.Frame(self.inner, bg="#1a1f2e", height=1).pack(fill="x")
+        tk.Frame(self.inner, bg="#1a1f2e", height=U.h(1)).pack(fill="x")
         for w in (f, line, desc) + tuple(line.winfo_children()):
             w.bind("<Button-1>", lambda _e, i=it: self.pick(i))
             w.bind("<Enter>", lambda _e, fr=f: self._paint(fr, "#181d2b"))
@@ -1340,14 +1340,14 @@ def _shell(parent, title, w, h, danger=False):
     win.configure(highlightthickness=2,
                   highlightbackground=U.DANGER_LINE if danger else U.LINE2)
     win.resizable(False, False)
-    bar = tk.Frame(win, bg=U.DANGER_BG if danger else U.BG2, height=34)
+    bar = tk.Frame(win, bg=U.DANGER_BG if danger else U.BG2, height=U.h(34))
     bar.pack(fill="x")
     bar.pack_propagate(False)
     tk.Frame(bar, bg=U.DANGER if danger else U.ACCENT, width=3,
-             height=13).pack(side="left", padx=(12, 8))
+             height=U.h(13)).pack(side="left", padx=(12, 8))
     tk.Label(bar, text=title, bg=U.DANGER_BG if danger else U.BG2,
              fg="#ffb3b3" if danger else U.FG, font=U.FONT_B).pack(side="left")
-    tk.Frame(win, bg=U.DANGER_LINE if danger else U.LINE2, height=2).pack(fill="x")
+    tk.Frame(win, bg=U.DANGER_LINE if danger else U.LINE2, height=U.h(2)).pack(fill="x")
     body = tk.Frame(win, bg=U.BG)
     body.pack(fill="both", expand=True, padx=18, pady=16)
     return win, body
