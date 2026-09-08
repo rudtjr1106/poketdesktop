@@ -485,6 +485,15 @@ def wheel_units(delta, div):
     return n
 
 
+def pt(n):
+    """글꼴 크기. 본문(BASE_PT)에 맞춰 같이 커진다.
+
+    창 제목이나 배틀 글자처럼 FONT_* 로 안 떨어지는 자리가 있다. 거기에
+    숫자를 그대로 박아 두면 본문만 커지고 그것들만 작게 남는다.
+    """
+    return max(7, int(round(n * (BASE_PT / 10.0))))
+
+
 def h(px):
     """글자가 든 칸의 높이. 글꼴이 커지면 같이 커진다.
 
@@ -698,7 +707,7 @@ class PopupMenu(object):
         indent = row.get("indent", 0)
         if row.get("header"):
             tk.Label(body, text=text, bg=BG2, fg=FG_FAINT, anchor="w",
-                     font=(FAMILY, 8), bd=0, highlightthickness=0,
+                     font=FONT_XS, bd=0, highlightthickness=0,
                      width=1).pack(fill="x", padx=10 + indent * 12,
                                    pady=(4, 0))
             return
@@ -707,13 +716,19 @@ class PopupMenu(object):
         mark = "" if checked is None else ("✓ " if checked else "    ")
         lab = tk.Label(body, text=mark + text, bg=BG2, anchor="w",
                        fg=FG if row.get("enabled", True) else DISABLED_FG,
-                       font=(FAMILY, 10, "bold") if row.get("bold")
-                       else (FAMILY, 10),
+                       font=FONT_B if row.get("bold") else FONT,
                        bd=0, highlightthickness=0, width=1)
         lab.pack(fill="x", padx=8 + indent * 12, ipady=2)
         if not enabled:
             return
-        lab.configure(cursor="pointinghand")
+        # **`pointinghand` 는 맥에만 있다.** 윈도우 Tk 은 그 이름을 모르고
+        # `bad cursor spec` 으로 그 자리에서 죽는다. 이 메뉴가 그동안
+        # 맥에서만 돌아서(윈도우는 tk.Menu 를 쓴다) 안 드러났을 뿐이다.
+        # `hand2` 는 양쪽에 다 있다.
+        try:
+            lab.configure(cursor="pointinghand")
+        except tk.TclError:
+            lab.configure(cursor="hand2")
         lab.bind("<Enter>", lambda e, w=lab: w.configure(bg=BG4))
         lab.bind("<Leave>", lambda e, w=lab: w.configure(bg=BG2))
 

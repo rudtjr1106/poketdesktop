@@ -208,7 +208,7 @@ class BoxWindow(object):
         cv.create_oval(10, 10, 18, 18, fill="#f4f6fb", outline=U.INK, width=2)
 
         tk.Label(inner, text="포켓몬 관리", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, 15)).pack(side="left", padx=(12, 12))
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=(12, 12))
         self.count = tk.Label(inner, text="", bg=U.BG2, fg=U.FG_FAINT,
                               font=U.FONT_S)
         self.count.pack(side="left")
@@ -342,7 +342,7 @@ class BoxWindow(object):
         row = tk.Frame(p, bg=U.BG2)
         row.pack(fill="x", pady=(12, 0))
         self.d_name = tk.Label(row, text="", bg=U.BG2, fg=U.ACCENT_TEXT,
-                               font=(U.FAMILY_BLACK, 16))
+                               font=(U.FAMILY_BLACK, U.pt(16)))
         self.d_name.pack(side="left")
         self.d_gender = tk.Label(row, text="", bg=U.BG2, fg=U.INFO, font=U.FONT_H)
         self.d_gender.pack(side="left", padx=(6, 0))

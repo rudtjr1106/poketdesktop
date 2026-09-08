@@ -76,7 +76,7 @@ class SettingsWindow(object):
         head.pack(fill="x")
         head.pack_propagate(False)
         tk.Label(head, text="설정", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, 15)).pack(side="left", padx=16, pady=15)
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=16, pady=15)
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
         # **스크롤을 붙인다.** 이 창은 690px 를 바라는데 허브 탭

@@ -74,7 +74,7 @@ class DexWindow(object):
         inner = tk.Frame(h, bg=U.BG2)
         inner.pack(fill="both", expand=True, padx=16)
         tk.Label(inner, text="도감", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, 15)).pack(side="left", pady=17)
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", pady=17)
         self.count = tk.Label(inner, text="", bg=U.BG2, fg=U.ACCENT,
                               font=U.FONT_B)
         self.count.pack(side="left", padx=(12, 0))

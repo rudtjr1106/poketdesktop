@@ -481,7 +481,7 @@ class BagWindow(object):
                             width=1)
 
         tk.Label(inner, text="가방", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, 15)).pack(side="left", padx=(12, 12))
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=(12, 12))
         self.count_label = tk.Label(inner, text="", bg=U.BG2, fg=U.FG_FAINT,
                                     font=U.FONT_S)
         self.count_label.pack(side="left")
@@ -523,7 +523,7 @@ class BagWindow(object):
         head = tk.Frame(p, bg=U.BG2)
         head.pack(fill="x")
         self.i_name = tk.Label(head, text="도구를 고르세요", bg=U.BG2,
-                               fg=U.ACCENT_TEXT, font=(U.FAMILY_BLACK, 16))
+                               fg=U.ACCENT_TEXT, font=(U.FAMILY_BLACK, U.pt(16)))
         self.i_name.pack(side="left")
         self.i_cat = U.chip(head, "", U.BG3, fg=U.FG_DIM)
         self.i_cat.pack(side="left", padx=(10, 0), pady=5)
@@ -1155,7 +1155,7 @@ def announce_evolve(parent, app, info):
     keep = {}
 
     tk.Label(f, text="축하합니다!", bg=U.BG, fg=U.ACCENT_TEXT,
-             font=(U.FAMILY_BLACK, 20)).pack(anchor="w")
+             font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
     # '(으)로' 는 natural() 이 못 고치는 표기다. '로(으로)' 로 적어야
     # 앞말의 받침을 보고 '로 / 으로' 가 제대로 골라진다.
     tk.Label(f, text=natural("%s은(는) %s로(으로) 진화했다!"

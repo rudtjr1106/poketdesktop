@@ -42,7 +42,7 @@ class PinEntry(object):
             box.pack(side="left", padx=(0, 7))
             e = tk.Entry(box, bg=U.INK, fg=U.FG, insertbackground=U.ACCENT,
                          relief="flat", bd=0, justify="center",
-                         font=(U.FAMILY, 16, "bold"), highlightthickness=0,
+                         font=(U.FAMILY, U.pt(16), "bold"), highlightthickness=0,
                          show="●", width=2)
             e.pack(expand=True)
             e.bind("<KeyRelease>", lambda ev, k=i: self._typed(ev, k))

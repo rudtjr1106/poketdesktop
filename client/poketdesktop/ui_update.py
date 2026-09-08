@@ -56,7 +56,7 @@ class UpdateWindow(object):
                             highlightthickness=0, bd=0)
         self.cv.pack()
         self.cv.create_text(24, 32, text="새 버전이 있습니다", anchor="w",
-                            fill="#ffffff", font=(U.FAMILY_BLACK, 16))
+                            fill="#ffffff", font=(U.FAMILY_BLACK, U.pt(16)))
         self.cv.create_text(24, 58, anchor="w", fill="#ffd9d6",
                             font=U.FONT_S,
                             text="v%s  →  v%s" % (VERSION, self.info["version"]))
@@ -298,7 +298,7 @@ class NewVersionAsk(object):
         head.pack(fill="x")
         head.pack_propagate(False)
         tk.Label(head, text="새 버전이 나왔습니다", bg=U.RED, fg="#ffffff",
-                 font=(U.FAMILY_BLACK, 15), anchor="w").pack(
+                 font=(U.FAMILY_BLACK, U.pt(15)), anchor="w").pack(
                      fill="x", padx=20, pady=(16, 0))
         sub = "v%s  →  v%s" % (VERSION, info["version"])
         size = info.get("size") or 0
@@ -423,7 +423,7 @@ class PatchNotes(object):
         head.pack_propagate(False)
         tk.Label(head, text=("새 버전으로 갈아탔습니다" if greet
                              else "이번 버전 새로운 기능"),
-                 bg=U.BG2, fg=U.FG, font=(U.FAMILY_BLACK, 15),
+                 bg=U.BG2, fg=U.FG, font=(U.FAMILY_BLACK, U.pt(15)),
                  anchor="w").pack(fill="x", padx=20, pady=(16, 0))
         first = entries[0] if entries else {"version": "", "headline": ""}
         if len(entries) > 1:
@@ -453,7 +453,7 @@ class PatchNotes(object):
                           spacing1=10, spacing3=3)
         txt.tag_configure("body", foreground=U.FG_DIM, lmargin1=12, lmargin2=12)
         # 판 제목. 여러 판을 쌓을 때 어디서 어디까지가 한 판인지 갈라 준다.
-        txt.tag_configure("ver", font=(U.FAMILY_BLACK, 12), foreground=U.FG,
+        txt.tag_configure("ver", font=(U.FAMILY_BLACK, U.pt(12)), foreground=U.FG,
                           spacing1=16, spacing3=2)
         txt.tag_configure("rule", foreground=U.FG_FAINT, spacing3=6)
         many = len(entries) > 1

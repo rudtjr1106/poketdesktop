@@ -220,7 +220,7 @@ class Arena(object):
         x, y = self.to_local(sx, sy)
         # 글자만 그리면 도트와 겹쳐 안 보인다. 뒤에 판을 깔고 그 위에 쓴다.
         t = cv.create_text(x, y, text=text, fill=color, anchor=anchor,
-                           font=(U.FAMILY, 10, "bold"))
+                           font=(U.FAMILY, U.pt(10), "bold"))
         bx = cv.bbox(t)
         if bx:
             pad = 6

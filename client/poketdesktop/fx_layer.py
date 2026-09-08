@@ -145,9 +145,9 @@ class FloatText(object):
         x, y = layer.to_local(sx, sy)
         self.items = [
             layer.cv.create_text(x + 1, y + 1, text=text, fill="#101014",
-                                 font=(U.FAMILY, 10, "bold")),
+                                 font=(U.FAMILY, U.pt(10), "bold")),
             layer.cv.create_text(x, y, text=text, fill=color,
-                                 font=(U.FAMILY, 10, "bold")),
+                                 font=(U.FAMILY, U.pt(10), "bold")),
         ]
         self.jobs = []
         self.ms = ms
