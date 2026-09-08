@@ -19,6 +19,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
 from common.ability_kr import DESC as HAND                  # noqa: E402
+from common.move_kr import DESC as MOVE_HAND                # noqa: E402
 
 DEX = os.environ.get("POKET_POKEDEX",
                      os.path.join(ROOT, "server", "data", "pokedex.json"))
@@ -88,12 +89,25 @@ def main():
     mnoname = [k for k, v in mv.items() if not hangul(v.get("kr"))]
     chk("기술 %d개가 전부 한국어 이름" % len(mv), not mnoname,
         sorted(mnoname)[:8])
-    # 기술 설명은 아직 88개가 영어다(9세대). 특성과 달리 종 화면에서
-    # 늘 보이는 것이 아니라 지금은 둔다. 숫자가 늘면 알아채게 세어만 둔다.
     meng = [k for k, v in mv.items()
             if v.get("desc") and not hangul(v["desc"])]
-    print("     기술 설명 중 영어 %d개 (아직 손 안 댐)" % len(meng))
-    chk("기술 설명 영어가 100개를 넘지 않는다", len(meng) <= 100, len(meng))
+    chk("영어로 남은 기술 설명이 없다", not meng, sorted(meng)[:8])
+    mblank = [k for k, v in mv.items() if not (v.get("desc") or "").strip()]
+    chk("설명이 빈 기술도 없다", not mblank, sorted(mblank)[:8])
+
+    stale = [k for k in MOVE_HAND if k not in mv]
+    chk("도감에 없는 기술 키를 적어 두지 않았다", not stale, stale[:8])
+    chk("손으로 적은 기술 %d개가 전부 한국어" % len(MOVE_HAND),
+        all(hangul(v) for v in MOVE_HAND.values()),
+        [k for k, v in MOVE_HAND.items() if not hangul(v)][:5])
+    chk("기술 문장이 마침표로 끝난다",
+        all(v.rstrip().endswith(".") for v in MOVE_HAND.values()),
+        [k for k, v in MOVE_HAND.items()
+         if not v.rstrip().endswith(".")][:5])
+    # 설명이 이름을 그대로 되풀이하는 것은 번역을 빠뜨린 표시다
+    lazy = [k for k, v in MOVE_HAND.items()
+            if v.strip().rstrip(".") == (mv.get(k) or {}).get("kr", "")]
+    chk("이름만 적어 둔 것이 없다", not lazy, lazy[:5])
 
     print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))
