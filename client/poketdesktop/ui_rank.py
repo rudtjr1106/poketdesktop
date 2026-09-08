@@ -45,7 +45,7 @@ class RankWindow(object):
 
     # ---------------- 머리 ----------------
     def _header(self):
-        h = tk.Frame(self.win, bg=U.BG2, height=62)
+        h = tk.Frame(self.win, bg=U.BG2, height=U.h(62))
         h.pack(fill="x")
         h.pack_propagate(False)
         inner = tk.Frame(h, bg=U.BG2)
@@ -61,7 +61,7 @@ class RankWindow(object):
                        height=32).pack(side="right", pady=15)
         U.ghost_button(inner, "랜덤 배틀", self._random,
                        height=32).pack(side="right", padx=(0, 8), pady=15)
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     def _body(self):
         wrap = tk.Frame(self.win, bg=U.BG)

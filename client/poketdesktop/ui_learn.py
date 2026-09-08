@@ -49,14 +49,14 @@ class ForgetAsk(object):
         self.win.resizable(False, False)
         self.parent = parent
 
-        bar = tk.Frame(self.win, bg=U.BG2, height=34)
+        bar = tk.Frame(self.win, bg=U.BG2, height=U.h(34))
         bar.pack(fill="x")
         bar.pack_propagate(False)
-        tk.Frame(bar, bg=U.ACCENT, width=3, height=13).pack(side="left",
+        tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(13)).pack(side="left",
                                                             padx=(12, 8))
         tk.Label(bar, text="기술 배우기", bg=U.BG2, fg=U.FG,
                  font=U.FONT_B).pack(side="left")
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
         f = tk.Frame(self.win, bg=U.BG)
         f.pack(fill="both", expand=True, padx=18, pady=(14, 14))
@@ -74,7 +74,7 @@ class ForgetAsk(object):
         box.pack(fill="both", expand=True)
         for mv in self.known:
             self._row(box, mv, is_new=False)
-        tk.Frame(box, bg=U.LINE, height=1).pack(fill="x", pady=6)
+        tk.Frame(box, bg=U.LINE, height=U.h(1)).pack(fill="x", pady=6)
         self._row(box, new_move, is_new=True)
 
         row = tk.Frame(f, bg=U.BG)

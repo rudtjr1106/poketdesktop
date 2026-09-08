@@ -21,7 +21,7 @@ from . import ui_loading
 from .ui_common import run_async
 
 W, H = 900, 660
-CELL_W, CELL_H = 84, 92
+CELL_W, CELL_H = 84, U.h(92)
 PAD = 6
 COLS = 9                       # 창 너비에 맞춰 다시 계산한다
 
@@ -68,7 +68,7 @@ class DexWindow(object):
 
     # ---------------- 머리 ----------------
     def _header(self):
-        h = tk.Frame(self.win, bg=U.BG2, height=62)
+        h = tk.Frame(self.win, bg=U.BG2, height=U.h(62))
         h.pack(fill="x")
         h.pack_propagate(False)
         inner = tk.Frame(h, bg=U.BG2)
@@ -83,7 +83,7 @@ class DexWindow(object):
         self.sub.pack(side="left", padx=(10, 0))
         U.ghost_button(inner, "새로고침", self.reload,
                        height=32).pack(side="right", pady=15)
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     def _filters(self):
         bar = tk.Frame(self.win, bg=U.BG)

@@ -24,8 +24,8 @@ from .ui_bag import _scroller
 from .ui_learn import ask_forget
 
 LIST_W = 320
-ROW_H = 30
-MON_H = 34
+ROW_H = U.h(30)
+MON_H = U.h(34)
 THUMB = 22
 
 TYPE_KR = {
@@ -75,10 +75,10 @@ class TmWindow(object):
 
     # ---------------- 머리 ----------------
     def _header(self):
-        bar = tk.Frame(self.win, bg=U.BG2, height=44)
+        bar = tk.Frame(self.win, bg=U.BG2, height=U.h(44))
         bar.pack(fill="x")
         bar.pack_propagate(False)
-        tk.Frame(bar, bg=U.ACCENT, width=3, height=16).pack(side="left",
+        tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(16)).pack(side="left",
                                                             padx=(14, 10))
         tk.Label(bar, text="기술머신", bg=U.BG2, fg=U.FG,
                  font=U.FONT_T).pack(side="left")
@@ -92,10 +92,10 @@ class TmWindow(object):
         tk.Label(bar, text="상점에서 살 수 없습니다. 포켓몬을 잡으면 나옵니다.",
                  bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="right",
                                                                padx=(0, 12))
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     def _bottom(self):
-        f = tk.Frame(self.win, bg=U.BG2, height=44)
+        f = tk.Frame(self.win, bg=U.BG2, height=U.h(44))
         f.pack(fill="x", side="bottom")
         f.pack_propagate(False)
         self.status = tk.Label(f, text="", bg=U.BG2, fg=U.FG_FAINT,
@@ -104,7 +104,7 @@ class TmWindow(object):
         self.use_btn = U.PushButton(f, "가르치기", self.teach, height=30,
                                     font=U.FONT_B)
         self.use_btn.pack(side="right", padx=14, pady=7)
-        tk.Frame(self.win, bg=U.LINE, height=1).pack(fill="x", side="bottom")
+        tk.Frame(self.win, bg=U.LINE, height=U.h(1)).pack(fill="x", side="bottom")
 
     def say(self, msg, color=None):
         if not self.alive:

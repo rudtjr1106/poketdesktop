@@ -49,7 +49,7 @@ class UpdateWindow(object):
 
     # ---------------- 머리: 굴러가는 몬스터볼 ----------------
     def _head(self):
-        head = tk.Frame(self.win, bg=U.RED, height=92)
+        head = tk.Frame(self.win, bg=U.RED, height=U.h(92))
         head.pack(fill="x")
         head.pack_propagate(False)
         self.cv = tk.Canvas(head, width=W, height=92, bg=U.RED,
@@ -96,7 +96,7 @@ class UpdateWindow(object):
         self.msg.pack(fill="x")
 
         # 진행 막대 (ttk 대신 직접 그린다 — 테마를 그대로 쓰려고)
-        bar = tk.Frame(p, bg=U.INK, height=12, highlightthickness=2,
+        bar = tk.Frame(p, bg=U.INK, height=U.h(12), highlightthickness=2,
                        highlightbackground=U.LINE)
         bar.pack(fill="x", pady=(10, 0))
         bar.pack_propagate(False)
@@ -294,7 +294,7 @@ class NewVersionAsk(object):
         self.win.resizable(False, False)
         self.win.protocol("WM_DELETE_WINDOW", self.on_later)
 
-        head = tk.Frame(self.win, bg=U.RED, height=76)
+        head = tk.Frame(self.win, bg=U.RED, height=U.h(76))
         head.pack(fill="x")
         head.pack_propagate(False)
         tk.Label(head, text="새 버전이 나왔습니다", bg=U.RED, fg="#ffffff",
@@ -418,7 +418,7 @@ class PatchNotes(object):
                            highlightbackground=U.LINE2)
         self.win.protocol("WM_DELETE_WINDOW", self.close)
 
-        head = tk.Frame(self.win, bg=U.BG2, height=84)
+        head = tk.Frame(self.win, bg=U.BG2, height=U.h(84))
         head.pack(fill="x")
         head.pack_propagate(False)
         tk.Label(head, text=("새 버전으로 갈아탔습니다" if greet
@@ -435,7 +435,7 @@ class PatchNotes(object):
         tk.Label(head, text=sub,
                  bg=U.BG2, fg=U.ACCENT, font=U.FONT_S, anchor="w",
                  justify="left", wraplength=NOTE_W - 44).pack(fill="x", padx=20)
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
         wrap = tk.Frame(self.win, bg=U.BG)
         wrap.pack(fill="both", expand=True, padx=18, pady=(14, 0))

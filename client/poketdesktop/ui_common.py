@@ -9,6 +9,7 @@ tkinter 가 그대로 그릴 수 있는 것만 쓰기 위해서다.
     라벨        왼쪽에 금색 3px 막대
     강조        몬스터볼 빨강은 머리띠와 위험한 동작에만
 """
+import sys
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -69,16 +70,23 @@ FAMILY_LIGHT = FAMILY
 FAMILY_MEDIUM = FAMILY
 FAMILY_BLACK = FAMILY
 
-FONT = (FAMILY, 10)
-FONT_B = (FAMILY, 10, "bold")
-FONT_S = (FAMILY, 9)
-FONT_XS = (FAMILY, 8)
-FONT_T = (FAMILY, 18, "bold")
-FONT_H = (FAMILY, 12, "bold")
-FONT_TIP = (FAMILY, 9)
-FONT_NUM = (FAMILY, 11, "bold")
-FONT_BTN = (FAMILY, 11, "bold")
-FONT_LABEL = (FAMILY, 8)
+# 본문 크기. 나머지는 전부 여기서 몇 pt 위아래로만 잡는다.
+#
+# 맥은 한 단계 크게 간다. 같은 pt 라도 맥 글꼴이 눈에 더 작게 앉아서,
+# 10pt 본문이 한글로는 확실히 작았다. 윈도우(맑은 고딕)는 지금 크기가
+# 맞으므로 건드리지 않는다 - 거기서 키우면 반대로 넘친다.
+BASE_PT = 12 if sys.platform == "darwin" else 10
+
+FONT = (FAMILY, BASE_PT)
+FONT_B = (FAMILY, BASE_PT, "bold")
+FONT_S = (FAMILY, BASE_PT - 1)
+FONT_XS = (FAMILY, BASE_PT - 2)
+FONT_T = (FAMILY, BASE_PT + 8, "bold")
+FONT_H = (FAMILY, BASE_PT + 2, "bold")
+FONT_TIP = (FAMILY, BASE_PT - 1)
+FONT_NUM = (FAMILY, BASE_PT + 1, "bold")
+FONT_BTN = (FAMILY, BASE_PT + 1, "bold")
+FONT_LABEL = (FAMILY, BASE_PT - 2)
 
 
 def _system_family(root):
@@ -115,22 +123,31 @@ def init_fonts(root):
     FAMILY_MEDIUM = pick(_MEDIUM_CANDIDATES, FAMILY)
     FAMILY_BLACK = pick(_BLACK_CANDIDATES, FAMILY)
 
-    FONT = (FAMILY, 10)
-    FONT_B = (FAMILY_MEDIUM, 10) if FAMILY_MEDIUM != FAMILY else (FAMILY, 10, "bold")
-    FONT_S = (FAMILY, 9)
-    FONT_XS = (FAMILY_LIGHT, 8)
-    FONT_LABEL = (FAMILY, 8)
-    FONT_T = (FAMILY_BLACK, 18) if FAMILY_BLACK != FAMILY else (FAMILY, 18, "bold")
-    FONT_H = (FAMILY, 13, "bold")
-    FONT_TIP = (FAMILY, 9)
-    FONT_NUM = (FAMILY, 11, "bold")
-    FONT_BTN = (FAMILY_BLACK, 11) if FAMILY_BLACK != FAMILY else (FAMILY, 11, "bold")
+    # 크기는 한 곳에서 정한다. 여기저기 숫자를 박아 두면 하나만 고쳐도
+    # 어긋나고, 무엇보다 "전부 한 단계 키우자" 를 할 수가 없다.
+    #
+    # **맥에서 한 단계 키운다.** 같은 pt 라도 맥 글꼴이 눈에 더 작게
+    # 앉는다. 본문 10pt 는 한글로는 확실히 작았다.
+    b = BASE_PT
+    FONT = (FAMILY, b)
+    FONT_B = ((FAMILY_MEDIUM, b) if FAMILY_MEDIUM != FAMILY
+              else (FAMILY, b, "bold"))
+    FONT_S = (FAMILY, b - 1)
+    FONT_XS = (FAMILY_LIGHT, b - 2)
+    FONT_LABEL = (FAMILY, b - 2)
+    FONT_T = ((FAMILY_BLACK, b + 8) if FAMILY_BLACK != FAMILY
+              else (FAMILY, b + 8, "bold"))
+    FONT_H = (FAMILY, b + 3, "bold")
+    FONT_TIP = (FAMILY, b - 1)
+    FONT_NUM = (FAMILY, b + 1, "bold")
+    FONT_BTN = ((FAMILY_BLACK, b + 1) if FAMILY_BLACK != FAMILY
+                else (FAMILY, b + 1, "bold"))
 
     try:
         import tkinter.font as tkfont
         for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont",
                      "TkHeadingFont", "TkTooltipFont"):
-            tkfont.nametofont(name, root).configure(family=FAMILY, size=10)
+            tkfont.nametofont(name, root).configure(family=FAMILY, size=b)
     except Exception:
         pass
     return FAMILY
@@ -156,7 +173,7 @@ def marker_label(parent, text, bg=None, color=FG_DIM, mark=ACCENT):
     """왼쪽에 금색 막대가 붙은 작은 라벨."""
     bg = bg or parent["bg"]
     row = tk.Frame(parent, bg=bg)
-    tk.Frame(row, bg=mark, width=3, height=11).pack(side="left")
+    tk.Frame(row, bg=mark, width=3, height=h(11)).pack(side="left")
     tk.Label(row, text=text, bg=bg, fg=color, font=FONT_LABEL).pack(side="left", padx=(6, 0))
     return row
 
@@ -303,12 +320,12 @@ def ball_header(parent, width, height, title, subtitle=None, tag=None):
 
 def dot_footer(parent, width, note=""):
     """바닥의 네 점 + 안내문."""
-    bar = tk.Frame(parent, bg=INK, height=34, highlightthickness=0)
+    bar = tk.Frame(parent, bg=INK, height=h(34), highlightthickness=0)
     bar.pack_propagate(False)
     inner = tk.Frame(bar, bg=INK)
     inner.pack(fill="both", expand=True, padx=20)
     for c in (RED, ACCENT, GOOD, INFO):
-        tk.Frame(inner, bg=c, width=6, height=6).pack(side="left", padx=(0, 4),
+        tk.Frame(inner, bg=c, width=6, height=h(6)).pack(side="left", padx=(0, 4),
                                                       pady=14)
     tk.Label(inner, text=note, bg=INK, fg="#4e566f",
              font=FONT_XS).pack(side="right", pady=10)
@@ -468,6 +485,21 @@ def wheel_units(delta, div):
     return n
 
 
+def h(px):
+    """글자가 든 칸의 높이. 글꼴이 커지면 같이 커진다.
+
+    막대(bar)와 줄(row) 높이를 픽셀로 박아 두면, 글꼴을 한 단계만 키워도
+    글이 세로로 눌린다. 맥에서 본문을 10 -> 12pt 로 올렸더니 헤더와 줄
+    마흔 곳이 2~6px 씩 모자랐다.
+
+    **글자를 줄여서 맞추지 않는다.** 칸을 늘린다. 그것이 이 함수다.
+
+    도트나 능력치 막대처럼 글자가 없는 것에는 쓰지 마라 - 그건 커지면
+    안 되고, 커지면 오히려 그림이 흐려진다.
+    """
+    return int(round(px * (BASE_PT / 10.0)))
+
+
 def wrap_to_width(label, pad=0):
     """라벨이 **자기 실제 폭**에 맞춰 줄을 접게 한다.
 
@@ -622,10 +654,13 @@ class PopupMenu(object):
         self.root = root
         self.win = self.catcher = None
         self.width = width or self.W
+        self._watch_job = None
+        self._was_down = PLAT.mouse_buttons_down()
         close_all()
         self._build(rows)
         self._place(x, y, anchor)
         PopupMenu._open.append(self)
+        self._watch()
 
     # ---------------- 만들기 ----------------
     def _build(self, rows):
@@ -654,7 +689,7 @@ class PopupMenu(object):
         body.pack(fill="both", expand=True, padx=1, pady=6)
         for row in rows:
             if row is None:
-                tk.Frame(body, bg=LINE, height=1).pack(fill="x", padx=8, pady=4)
+                tk.Frame(body, bg=LINE, height=h(1)).pack(fill="x", padx=8, pady=4)
                 continue
             self._row(body, row)
 
@@ -710,7 +745,53 @@ class PopupMenu(object):
         win.lift()
 
     # ---------------- 닫기 ----------------
+    # ---------------- 바깥을 누르면 닫는다 ----------------
+    def _watch(self):
+        """마우스가 메뉴 **밖에서** 눌리면 닫는다.
+
+        화면을 덮는 catcher 만으로는 맥에서 부족했다. Tk 은 앱이 활성일
+        때만 클릭을 받으므로, 다른 앱의 창을 누르면 그 클릭이 우리에게
+        오지 않는다. 그래서 메뉴가 그대로 떠 있었다.
+
+        여기서는 Tk 을 거치지 않고 **눌린 단추를 직접 물어본다**
+        (NSEvent.pressedMouseButtons). 앱이 비활성이어도 답이 온다.
+        우클릭을 받는 것과 같은 방식이다.
+
+        윈도우에서는 mouse_buttons_down() 이 늘 0 이라 이 고리가 아무
+        일도 안 한다 - 거기서는 catcher 가 이미 제 몫을 한다.
+        """
+        if self.win is None:
+            return
+        try:
+            down = PLAT.mouse_buttons_down()
+            if down and not self._was_down and not self._inside():
+                return self.close()
+            self._was_down = down
+        except Exception:                                   # noqa: BLE001
+            pass
+        try:
+            self._watch_job = self.root.after(60, self._watch)
+        except Exception:                                   # noqa: BLE001
+            self._watch_job = None
+
+    def _inside(self):
+        """마우스가 메뉴 위에 있나. 모르겠으면 True (섣불리 안 닫는다)."""
+        try:
+            x, y = self.root.winfo_pointerxy()
+            w = self.win
+            wx, wy = w.winfo_rootx(), w.winfo_rooty()
+            return (wx <= x <= wx + w.winfo_width()
+                    and wy <= y <= wy + w.winfo_height())
+        except Exception:                                   # noqa: BLE001
+            return True
+
     def close(self):
+        if self._watch_job is not None:
+            try:
+                self.root.after_cancel(self._watch_job)
+            except Exception:                               # noqa: BLE001
+                pass
+            self._watch_job = None
         for w in (self.win, self.catcher):
             try:
                 if w is not None:

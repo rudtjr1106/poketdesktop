@@ -72,12 +72,12 @@ class SettingsWindow(object):
             # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
             U.install_wheel(self.win)
 
-        head = tk.Frame(self.win, bg=U.BG2, height=56)
+        head = tk.Frame(self.win, bg=U.BG2, height=U.h(56))
         head.pack(fill="x")
         head.pack_propagate(False)
         tk.Label(head, text="설정", bg=U.BG2, fg=U.FG,
                  font=(U.FAMILY_BLACK, 15)).pack(side="left", padx=16, pady=15)
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
         # **스크롤을 붙인다.** 이 창은 690px 를 바라는데 허브 탭
         # 안쪽은 640px 밖에 안 된다. 그냥 두면 아래가 잘려서 자동

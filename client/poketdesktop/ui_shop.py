@@ -28,7 +28,7 @@ from . import item_icons
 from . import ui_common as U
 from . import ui_loading
 
-ROW_H = 30
+ROW_H = U.h(30)
 CATS_W = 136
 DETAIL_W = 348
 # 설명 액자 안에서 줄을 접는 폭. **첫 값일 뿐이고 그린 뒤 U.wrap_to_width
@@ -307,7 +307,7 @@ class ShopWindow(object):
 
     # ---------------- 머리 ----------------
     def _header(self):
-        h = tk.Frame(self.win, bg=U.BG2, height=68)
+        h = tk.Frame(self.win, bg=U.BG2, height=U.h(68))
         h.pack(fill="x")
         h.pack_propagate(False)
         inner = tk.Frame(h, bg=U.BG2)
@@ -344,7 +344,7 @@ class ShopWindow(object):
         tk.Label(wallet, text="원", bg=U.INK, fg=U.ACCENT_TEXT,
                  font=U.FONT_S).pack(side="left", padx=(4, 14), pady=(0, 2))
 
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
         # **돈 버는 법을 여기서 알려 준다.** 이 게임에서 돈이 생기는 곳은
         # 배틀 상금과 도구 판매 둘뿐인데, 상점에 들어와서 가격만 보면
@@ -367,7 +367,7 @@ class ShopWindow(object):
                  bg=U.INK, fg=U.FG_FAINT,
                  font=U.FONT_XS, padx=0, bd=0,
                  highlightthickness=0).pack(side="left", pady=6)
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     # ---------------- 바닥 ----------------
     def _bottom(self):
@@ -376,7 +376,7 @@ class ShopWindow(object):
                      ).pack(fill="x", side="bottom")
         self.status = U.status_line(self.win, "", U.FG_FAINT)
         self.status.pack(fill="x", side="bottom")
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x", side="bottom")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x", side="bottom")
 
     def say(self, msg, color=U.GOOD):
         U.set_status(self.status, natural(msg or ""), color)
@@ -429,7 +429,7 @@ class ShopWindow(object):
         wrap = tk.Frame(parent, bg=U.BG)
         wrap.pack(side="left", fill="both", expand=True)
 
-        bar = tk.Frame(wrap, bg=U.BG2, height=46)
+        bar = tk.Frame(wrap, bg=U.BG2, height=U.h(46))
         bar.pack(fill="x")
         bar.pack_propagate(False)
         U.marker_label(bar, "이름으로 찾기", bg=U.BG2).pack(side="left",
@@ -441,15 +441,15 @@ class ShopWindow(object):
                               font=U.FONT_XS)
         self.found.pack(side="right", padx=16)
         self.q.trace_add("write", lambda *a: self.render())
-        tk.Frame(wrap, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(wrap, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
-        head = tk.Frame(wrap, bg=U.INK, height=26)
+        head = tk.Frame(wrap, bg=U.INK, height=U.h(26))
         head.pack(fill="x")
         head.pack_propagate(False)
         for title, x, w, anchor in COLS:
             tk.Label(head, text=title, bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS,
                      anchor=anchor).place(x=x, y=0, width=w, relheight=1.0)
-        tk.Frame(wrap, bg=U.LINE, height=2).pack(fill="x")
+        tk.Frame(wrap, bg=U.LINE, height=U.h(2)).pack(fill="x")
 
         holder = tk.Frame(wrap, bg=U.BG)
         holder.pack(fill="both", expand=True)
@@ -631,7 +631,7 @@ class ShopWindow(object):
             r = Row(self.inner, it, self.bag.get(it["id"], 0), self.select)
             r.pack()
             self.rows[it["id"]] = r
-            tk.Frame(self.inner, bg="#181d2a", height=1).pack(fill="x")
+            tk.Frame(self.inner, bg="#181d2a", height=U.h(1)).pack(fill="x")
         if not shown:
             tk.Label(self.inner, text="찾는 도구가 없습니다.", bg=U.BG,
                      fg=U.FG_FAINT, font=U.FONT_S).pack(pady=40)

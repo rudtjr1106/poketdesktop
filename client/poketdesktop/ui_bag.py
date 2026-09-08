@@ -35,8 +35,8 @@ from . import ui_common as U
 from . import ui_loading
 
 LIST_W = 292            # 왼쪽 도구 목록 폭
-ITEM_H = 28             # 도구 한 줄 높이
-MON_H = 34              # 포켓몬 한 줄 높이
+ITEM_H = U.h(28)        # 도구 한 줄 높이 (글꼴 따라 늘어난다)
+MON_H = U.h(34)         # 포켓몬 한 줄 높이
 THUMB = 22              # 목록에 놓는 도트 높이 (다른 창과 겹치지 않는 값)
 
 EV_STAT_MAX = 252       # 서버 config 와 같은 값 (스탯 하나당)
@@ -256,7 +256,7 @@ class ItemRow(object):
             self.dot.place(x=8, rely=0.5, anchor="w")
         else:
             self.dot = tk.Frame(self.f, bg=CAT_COLOR.get(item.get("cat"), U.BG3),
-                                width=5, height=5)
+                                width=5, height=U.h(5))
             self.dot.place(x=13, rely=0.5, anchor="w")
         self.name = tk.Label(self.f, text=item["kr"], bg=ROW_BG,
                              fg=U.FG if self.usable else U.FG_FAINT,
@@ -463,7 +463,7 @@ class BagWindow(object):
 
     # ---------------- 머리 ----------------
     def _header(self):
-        h = tk.Frame(self.win, bg=U.BG2, height=62)
+        h = tk.Frame(self.win, bg=U.BG2, height=U.h(62))
         h.pack(fill="x")
         h.pack_propagate(False)
         inner = tk.Frame(h, bg=U.BG2)
@@ -496,7 +496,7 @@ class BagWindow(object):
         self.money_label = tk.Label(purse, text="0원", bg=U.INK, fg=U.ACCENT,
                                     font=U.FONT_B)
         self.money_label.pack(side="left", padx=(0, 10))
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     # ---------------- 왼쪽: 가진 도구 ----------------
     def _items_pane(self, parent):
@@ -504,12 +504,12 @@ class BagWindow(object):
         wrap.pack(side="left", fill="y")
         wrap.pack_propagate(False)
 
-        head = tk.Frame(wrap, bg=U.INK, height=26)
+        head = tk.Frame(wrap, bg=U.INK, height=U.h(26))
         head.pack(fill="x")
         head.pack_propagate(False)
         U.marker_label(head, "가진 도구", bg=U.INK).pack(side="left", padx=12,
                                                      pady=6)
-        tk.Frame(wrap, bg=U.LINE, height=2).pack(fill="x")
+        tk.Frame(wrap, bg=U.LINE, height=U.h(2)).pack(fill="x")
         self.item_canvas, self.item_inner = _scroller(wrap, U.BG)
 
     # ---------------- 오른쪽: 설명과 대상 ----------------
@@ -609,8 +609,8 @@ class BagWindow(object):
 
     # ---------------- 바닥 ----------------
     def _bottom(self):
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x", side="bottom")
-        bar = tk.Frame(self.win, bg=U.INK, height=58)
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x", side="bottom")
+        bar = tk.Frame(self.win, bg=U.INK, height=U.h(58))
         bar.pack(fill="x", side="bottom")
         bar.pack_propagate(False)
         inner = tk.Frame(bar, bg=U.INK)
@@ -757,18 +757,18 @@ class BagWindow(object):
             if it["cat"] != cat:
                 cat = it["cat"]
                 n = sum(1 for x in owned if x["cat"] == cat)
-                strip = tk.Frame(self.item_inner, bg=U.INK, height=26)
+                strip = tk.Frame(self.item_inner, bg=U.INK, height=U.h(26))
                 strip.pack(fill="x")
                 strip.pack_propagate(False)
                 U.marker_label(strip, "%s · %d종" % (CAT_KR.get(cat, cat), n),
                                bg=U.INK,
                                mark=CAT_COLOR.get(cat, U.ACCENT)).pack(
                     side="left", padx=12, pady=6)
-                tk.Frame(self.item_inner, bg=U.LINE, height=1).pack(fill="x")
+                tk.Frame(self.item_inner, bg=U.LINE, height=U.h(1)).pack(fill="x")
             self.item_rows[it["id"]] = ItemRow(self.item_inner, it,
                                                self.bag.get(it["id"], 0),
                                                self.pick_item).pack()
-            tk.Frame(self.item_inner, bg="#161a24", height=1).pack(fill="x")
+            tk.Frame(self.item_inner, bg="#161a24", height=U.h(1)).pack(fill="x")
 
     def _fill_mons(self):
         for w in self.mon_list.winfo_children():
@@ -780,7 +780,7 @@ class BagWindow(object):
             if ph:
                 row.set_photo(ph)
             self.mon_rows[m["id"]] = row
-            tk.Frame(self.mon_list, bg="#161a24", height=1).pack(fill="x")
+            tk.Frame(self.mon_list, bg="#161a24", height=U.h(1)).pack(fill="x")
         if not self.mons:
             tk.Label(self.mon_list, text="가진 포켓몬이 없다.", bg=ROW_BG,
                      fg=U.FG_FAINT, font=U.FONT_S, pady=30).pack()
@@ -1178,7 +1178,7 @@ def announce_evolve(parent, app, info):
                  justify="left").pack(anchor="w", pady=(2, 0))
 
     art = tk.Frame(f, bg=PANEL, highlightthickness=2, highlightbackground=U.LINE,
-                   height=110)
+                   height=U.h(110))
     art.pack(fill="x", pady=(14, 0))
     art.pack_propagate(False)
     before = tk.Label(art, bg=PANEL, text="...", fg=U.FG_FAINT, font=U.FONT_S)

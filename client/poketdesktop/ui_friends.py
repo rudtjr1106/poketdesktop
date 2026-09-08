@@ -47,7 +47,7 @@ class FriendsWindow(object):
 
     # ---------------- 머리 ----------------
     def _header(self):
-        h = tk.Frame(self.win, bg=U.BG2, height=62)
+        h = tk.Frame(self.win, bg=U.BG2, height=U.h(62))
         h.pack(fill="x")
         h.pack_propagate(False)
         inner = tk.Frame(h, bg=U.BG2)
@@ -69,7 +69,7 @@ class FriendsWindow(object):
         self.count.pack(side="left")
         U.ghost_button(inner, "새로고침", self.reload,
                        height=32).pack(side="right", pady=15)
-        tk.Frame(self.win, bg=U.LINE2, height=2).pack(fill="x")
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     # ---------------- 찾기 ----------------
     def _search(self):
