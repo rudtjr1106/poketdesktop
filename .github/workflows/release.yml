@@ -86,6 +86,7 @@ jobs:
         run: |
           python client/test_layout.py
           python common/test_korean.py
+          python common/test_dex_kr.py
           python client/test_wheel.py
           python client/test_battle_ui.py
           python client/test_boot_retry.py
@@ -139,6 +140,7 @@ jobs:
         run: |
           python client/test_layout.py
           python common/test_korean.py
+          python common/test_dex_kr.py
           python client/test_wheel.py
           python client/test_mac_input.py
           python client/test_walk_bounds.py

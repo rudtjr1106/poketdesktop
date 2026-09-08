@@ -31,7 +31,14 @@ from . import ui_loading
 ROW_H = 30
 CATS_W = 136
 DETAIL_W = 348
-WRAP = DETAIL_W - 62          # 설명 액자 안에서 줄을 접는 폭
+# 설명 액자 안에서 줄을 접는 폭. **첫 값일 뿐이고 그린 뒤 U.wrap_to_width
+# 가 실제 폭으로 다시 잡는다.**
+#
+# 상수로만 두면 안 맞는다. 이 칸에 세로 스크롤바가 붙으면서 안쪽이 15px
+# 쯤 줄었는데 이 숫자는 그대로였다. 라벨 폭이 271인데 286에서 접으니
+# **매 줄 18px 이 잘려 나갔다** - 맥에서 설명이 오른쪽에서 뭉텅 잘리던
+# 것이 이것이다.
+WRAP = DETAIL_W - 80
 MAX_QTY = 999                 # 서버 item_routes.MAX_QTY 와 같은 값
 
 PANEL = "#101623"             # 액자 안 (ui_box 상세와 같은 색)
@@ -510,10 +517,12 @@ class ShopWindow(object):
         self.d_eff = tk.Label(eff, text="", bg=PANEL, fg=U.FG, font=U.FONT_S,
                               wraplength=WRAP, justify="left", anchor="w")
         self.d_eff.pack(fill="x", padx=13, pady=(12, 0))
+        U.wrap_to_width(self.d_eff, pad=4)
         self.d_note = tk.Label(eff, text="", bg=PANEL, fg=U.FG_FAINT,
                                font=U.FONT_XS, wraplength=WRAP, justify="left",
                                anchor="w")
         self.d_note.pack(fill="x", padx=13, pady=(5, 12))
+        U.wrap_to_width(self.d_note, pad=4)
 
         price = tk.Frame(p, bg=U.BG2)
         price.pack(fill="x", pady=(12, 0))
@@ -555,8 +564,11 @@ class ShopWindow(object):
     def _price_cell(self, parent, title, col):
         """사는 값 / 파는 값 / 보유 를 담는 작은 액자 하나."""
         box = U.framed(parent, bg=PANEL, border=U.LINE)
-        box.grid(row=0, column=col, sticky="nsew", padx=(0, 6 if col < 2 else 0))
-        parent.grid_columnconfigure(col, weight=1)
+        # **셋에 똑같이 padx 를 준다.** 앞 두 칸에만 주면 그 칸만 6px 씩
+        # 좁아진다 - 102/102/85 가 나와서 '보유' 만 눌려 보였다.
+        # 마지막 칸 오른쪽 6px 은 그냥 여백으로 둔다. 셋이 같은 편이 낫다.
+        box.grid(row=0, column=col, sticky="nsew", padx=(0, 6))
+        parent.grid_columnconfigure(col, weight=1, uniform="price")
         tk.Label(box, text=title, bg=PANEL, fg=U.FG_FAINT,
                  font=U.FONT_XS).pack(pady=(8, 0))
         val = tk.Label(box, text="—", bg=PANEL, fg=U.FG, font=U.FONT_NUM)

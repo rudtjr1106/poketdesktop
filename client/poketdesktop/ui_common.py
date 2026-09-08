@@ -468,6 +468,24 @@ def wheel_units(delta, div):
     return n
 
 
+def wrap_to_width(label, pad=0):
+    """라벨이 **자기 실제 폭**에 맞춰 줄을 접게 한다.
+
+    wraplength 를 상수로 박아 두면 안 맞는다. 창 크기, 글꼴, 스크롤바가
+    붙었는지에 따라 실제 폭이 달라지기 때문이다. 실제로 상점 상세에서
+    라벨 폭이 271인데 286에서 접고 있어서 **매 줄 18px 이 잘려 나갔다** -
+    스크롤바를 나중에 붙이면서 상수를 안 고친 탓이었다.
+
+    그려진 뒤에 <Configure> 로 다시 잡으므로 창을 늘였다 줄여도 맞는다.
+    """
+    def fit(e):
+        w = e.width - pad
+        if w > 40 and int(label.cget("wraplength")) != w:
+            label.configure(wraplength=w)
+    label.bind("<Configure>", fit)
+    return label
+
+
 def scrollable(canvas, div=60, after=None):
     """이 캔버스를 휠로 굴릴 수 있다고 표시한다. install_wheel 이 찾아 쓴다."""
     canvas.wheel_div = div

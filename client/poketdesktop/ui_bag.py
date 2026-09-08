@@ -619,6 +619,12 @@ class BagWindow(object):
         self.use_btn = U.PushButton(inner, "쓰기", self.do_use, height=34)
         self.use_btn.pack(side="right", pady=11)
         self.use_btn.configure(state="disabled")
+        # **가방에서도 판다.** 팔려고 상점 탭으로 건너갔다가 목록에서 그
+        # 도구를 다시 찾아야 하는 게 번거로웠다. 파는 곳은 서버가 같다
+        # (/api/shop/sell) - 여기서는 부르기만 한다.
+        self.sell_btn = U.ghost_button(inner, "팔기", self.do_sell, height=34)
+        self.sell_btn.pack(side="right", padx=(0, 8), pady=11)
+        self.sell_btn.configure(state="disabled")
         U.ghost_button(inner, "닫기", self.close,
                        height=34).pack(side="right", padx=(0, 8), pady=11)
         self.status = U.status_line(inner, "", bg=U.INK)
@@ -1024,6 +1030,61 @@ class BagWindow(object):
             self.use_btn.configure(text="%s 쓰기" % it["kr"])
         else:
             self.use_btn.configure(text="쓰기")
+
+        # 팔기는 포켓몬을 안 골라도 된다. 값이 붙어 있고 실제로 갖고
+        # 있으면 팔 수 있다. 몬스터볼은 게임이 안 돌아가므로 뺀다.
+        have = int(self.bag.get((it or {}).get("id"), 0)) if it else 0
+        price = int((it or {}).get("sell") or 0)
+        can_sell = bool(it) and price > 0 and have > 0 and it["id"] != "POKEBALL"
+        self.sell_btn.configure(state="normal" if can_sell else "disabled")
+        self.sell_btn.configure(
+            text="%d원에 팔기" % price if can_sell else "팔기")
+
+    # ---------------- 팔기 ----------------
+    def do_sell(self):
+        """가방에서 바로 판다. 값과 재고 판정은 서버가 한다.
+
+        **되돌릴 수 없으니 한 번 묻는다.** 진화의 돌처럼 아껴 둔 것을
+        잘못 누르면 그대로 사라진다.
+        """
+        it = self.current_item()
+        if not it:
+            return
+        have = int(self.bag.get(it["id"], 0))
+        price = int(it.get("sell") or 0)
+        if have <= 0 or price <= 0:
+            return
+        n = 1
+        if not ui_box.confirm(
+                self.win, "팔기",
+                "%s 을(를) 한 개 팔아 %d원을 받습니다. 되돌릴 수 없습니다."
+                % (it["kr"], price),
+                danger=True, ok_text="판다"):
+            return
+
+        api = self.app.api
+        item_id = it["id"]
+        self.sell_btn.configure(state="disabled")
+        self.say("%s을(를) 파는 중..." % it["kr"], U.FG_FAINT)
+
+        def work():
+            fn = getattr(api, "sell", None)
+            if fn is not None:
+                return fn(item_id, n)
+            return api._call("POST", "/api/shop/sell",
+                             body={"item": item_id, "count": n})
+
+        def done(r, err):
+            if not self.alive:
+                return
+            if err:
+                self.say(getattr(err, "message", str(err)), U.DANGER, U.DANGER)
+                return self._refresh_button()
+            r = r or {}
+            self._pending = (r.get("message") or "팔았다.", U.GOOD)
+            self.reload()
+
+        U.run_async(self.root, work, done)
 
     # ---------------- 쓰기 ----------------
     def do_use(self):
