@@ -87,6 +87,7 @@ BALL_TOP = {
     "FASTBALL": (238, 196, 78),
     "HEAVYBALL": (84, 106, 140),
     "DREAMBALL": (232, 158, 208),
+    "FLOWERBALL": (240, 138, 176),
 }
 
 # 위쪽에 한 줄 더 긋는 볼. 흰 볼끼리 구분이 안 되는 것을 막는다.
@@ -95,7 +96,12 @@ BALL_STRIPE = {
     "TIMERBALL": (60, 60, 68),
     "LUXURYBALL": (214, 176, 92),
     "MASTERBALL": (238, 150, 200),
+    "FLOWERBALL": (250, 206, 224),
 }
+
+# 위쪽에 작은 꽃을 하나 더 그리는 볼. 분홍 볼끼리(하트볼·드림볼) 색만으로는
+# 구분이 안 돼서, 22px 에서도 알아볼 표식을 얹는다.
+BALL_BLOOM = ("FLOWERBALL",)
 
 
 def _blade(d, x, base_y, h, lean, w, color):
@@ -108,8 +114,72 @@ def _blade(d, x, base_y, h, lean, w, color):
                (tip_x, tip_y), (mid_x - w * 0.6, mid_y)], fill=color)
 
 
-def grass_frames(size=48, frames=4, key=(255, 0, 255)):
-    """흔들리는 풀숲. 배경은 투명색으로 채워서 그대로 창에 올릴 수 있다."""
+# 꽃이 핀 풀숲에 쓰는 색.
+PETAL = (236, 130, 170)
+PETAL_HI = (250, 176, 200)
+PETAL_DIM = (198, 104, 142)      # 뒤쪽 포기의 꽃. 조금 어두워야 멀어 보인다
+PETAL_CORE = (252, 246, 232)
+
+# 풀 포기 (x비율, 높이비율, 두께비율, 기우는 세기). 겹마다 나눠 둔다.
+_BLADES = (
+    (GRASS_DARK, 0.11, [(0.20, 0.62, 0.045, -1), (0.50, 0.74, 0.050, +1),
+                        (0.80, 0.60, 0.045, -1)]),
+    (GRASS_MID, 0.15, [(0.33, 0.80, 0.055, -1), (0.66, 0.86, 0.055, +1)]),
+    (GRASS_LIGHT, 0.18, [(0.44, 0.95, 0.060, +1), (0.58, 0.70, 0.050, -1)]),
+)
+
+# 어느 포기의 줄기 어디에 꽃을 달까. (겹, 포기 번호, 줄기 위치 0~1, 크기비율)
+# 줄기 위치는 0 이 뿌리, 1 이 끝이다. **끝에 달면 안 된다** - 제일 높은
+# 포기 끝이 그림 위쪽 끝이라 꽃이 잘려 나간다. 중간에 달면 머리 공간이
+# 남아서 크게 그릴 수 있고, 얹어 놓은 것이 아니라 풀숲에서 핀 것으로 읽힌다.
+_BLOOMS = [
+    (0, 0, 0.55, 0.17), (0, 2, 0.58, 0.16),
+    (1, 0, 0.62, 0.21), (1, 1, 0.46, 0.19),
+    (2, 0, 0.50, 0.22), (2, 0, 0.26, 0.17), (2, 1, 0.60, 0.20),
+]
+
+
+def _stem_point(w, h, size, base, blade, t, ph, lean_mul):
+    """포기의 줄기에서 t 지점(0 뿌리 ~ 1 끝)의 좌표.
+
+    _blade 가 그리는 다각형을 그대로 따라간다 - 뿌리에서 중간(0.55)까지와
+    중간에서 끝까지가 기우는 정도가 달라서, 직선으로 이으면 어긋난다.
+    """
+    bx, bh, _bw, sign = blade
+    x0 = w * bx
+    lean = ph * size * lean_mul * sign
+    mid_x, mid_y = x0 + lean * 0.35, base - h * bh * 0.55
+    tip_x, tip_y = x0 + lean, base - h * bh
+    if t <= 0.55:
+        k = t / 0.55
+        return x0 + (mid_x - x0) * k, base + (mid_y - base) * k
+    k = (t - 0.55) / 0.45
+    return mid_x + (tip_x - mid_x) * k, mid_y + (tip_y - mid_y) * k
+
+
+def _petal_flower(d, cx, cy, r, ph, petal, hi):
+    """다섯 장짜리 꽃 하나. ph 로 살짝 돌려 풀과 흔들림 결을 맞춘다."""
+    r = max(2.0, r)
+    for i in range(5):
+        a = ph * 0.22 + i * (2 * math.pi / 5) - math.pi / 2
+        px = cx + math.cos(a) * r * 0.60
+        py = cy + math.sin(a) * r * 0.60
+        d.ellipse((px - r * 0.55, py - r * 0.55, px + r * 0.55, py + r * 0.55),
+                  fill=hi if i in (0, 4) else petal)
+    d.ellipse((cx - r * 0.28, cy - r * 0.28, cx + r * 0.28, cy + r * 0.28),
+              fill=PETAL_CORE)
+
+
+def grass_frames(size=48, frames=4, key=(255, 0, 255), bloom=False):
+    """흔들리는 풀숲. 배경은 투명색으로 채워서 그대로 창에 올릴 수 있다.
+
+    bloom 이면 줄기에 꽃이 핀 판을 그린다. 풀 배치와 흔들림은 한 픽셀도
+    안 바뀌므로 평소 풀숲과 **같은 물건**으로 읽힌다 - 아예 다른 그림을
+    쓰면 눌러 볼 것인지부터 헷갈린다.
+
+    꽃은 겹마다 그 겹의 풀을 그린 **직후**에 그린다. 전부 맨 위에 그리면
+    앞쪽 풀이 뒤쪽 꽃을 못 가려서 스티커를 붙인 것처럼 보인다.
+    """
     w = int(size * 1.15)
     h = size
     out = []
@@ -118,19 +188,21 @@ def grass_frames(size=48, frames=4, key=(255, 0, 255)):
         im = Image.new("RGB", (w, h), key)
         d = ImageDraw.Draw(im)
         base = h - max(2, h // 12)
-        # 뒤쪽 어두운 포기
-        for k, (bx, bh, bw) in enumerate([(0.20, 0.62, 0.045), (0.50, 0.74, 0.05),
-                                          (0.80, 0.60, 0.045)]):
-            _blade(d, w * bx, base, h * bh, ph * size * 0.11 * (1 if k % 2 else -1),
-                   max(1.5, w * bw), GRASS_DARK)
-        # 가운데
-        for k, (bx, bh, bw) in enumerate([(0.33, 0.80, 0.055), (0.66, 0.86, 0.055)]):
-            _blade(d, w * bx, base, h * bh, ph * size * 0.15 * (1 if k else -1),
-                   max(1.5, w * bw), GRASS_MID)
-        # 앞쪽 밝은 포기
-        for k, (bx, bh, bw) in enumerate([(0.44, 0.95, 0.06), (0.58, 0.70, 0.05)]):
-            _blade(d, w * bx, base, h * bh, ph * size * 0.18 * (-1 if k else 1),
-                   max(1.5, w * bw), GRASS_LIGHT)
+        for layer, (color, lean_mul, blades) in enumerate(_BLADES):
+            for (bx, bh, bw, sign) in blades:
+                _blade(d, w * bx, base, h * bh, ph * size * lean_mul * sign,
+                       max(1.5, w * bw), color)
+            if not bloom:
+                continue
+            back = layer == 0
+            for (lay, idx, t, fr) in _BLOOMS:
+                if lay != layer or idx >= len(blades):
+                    continue
+                cx, cy = _stem_point(w, h, size, base, blades[idx], t, ph,
+                                     lean_mul)
+                _petal_flower(d, cx, cy, size * fr * 0.5, ph,
+                              PETAL_DIM if back else PETAL,
+                              PETAL if back else PETAL_HI)
         # 바닥 그림자
         d.ellipse((w * 0.18, base - h * 0.06, w * 0.82, base + h * 0.06),
                   fill=GRASS_SHADOW)
@@ -159,6 +231,9 @@ def ball_image(size=22, key=(255, 0, 255), open_top=False, tilt=0.0,
         if stripe:
             # 위쪽에 띠 하나. 흰 볼(프리미어·타이머)끼리 구분이 된다.
             d.arc(box, 200, 340, fill=stripe, width=ss * 3)
+        if ball in BALL_BLOOM:
+            _petal_flower(d, S * 0.5, S * 0.30, S * 0.13, 0.0,
+                          PETAL_HI, PETAL_CORE)
     mid = S // 2
     band = max(ss, S // 12)
     d.rectangle((pad, mid - band, S - pad, mid + band), fill=BALL_LINE)
