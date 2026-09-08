@@ -87,6 +87,9 @@ class App(object):
         self.box_window = None
         self.shop_window = None
         self.bag_window = None
+        self.tm_window = None
+        self._learn_queue = []       # 배울지 물어볼 포켓몬
+        self._learn_asking = False
         self.friends_win = None
         self.dex_window = None
         self.settings_win = None
@@ -613,6 +616,101 @@ class App(object):
 
     def open_bag(self):
         self.bag_window = self._tab("bag")
+
+    def open_tms(self):
+        self.tm_window = self._tab("tms")
+
+    # ---------------- 배우려고 기다리는 기술 ----------------
+    # 레벨업으로 배울 기술이 생겼는데 자리가 네 개 다 찼을 때다. 서버는
+    # 밀어내지 않고 적어만 두고(pokemon.pending), 여기서 물어본다.
+    #
+    # **배틀이 끝난 뒤에 띄운다.** 싸우는 도중에 창이 튀어나오면 연출이
+    # 끊기고, 자동으로 도는 배틀이라 사용자가 화면을 안 보고 있을 수도 있다.
+    def want_learn(self, mon_id, name=""):
+        if not mon_id:
+            return
+        for i, (mid, _n) in enumerate(self._learn_queue):
+            if mid == mon_id:
+                return              # 이미 줄에 있다
+        self._learn_queue.append((int(mon_id), name or "포켓몬"))
+        self.root.after(900, self._ask_learn)
+
+    def _ask_learn(self):
+        if self._learn_asking or self._quitting or not self._learn_queue:
+            return
+        # 배틀이나 진화 연출 중이면 기다린다. 창이 겹치면 무엇을 고르는
+        # 중인지 알 수 없다.
+        if self.battle or self.arena or getattr(self, "evolving", None):
+            return self.root.after(1500, self._ask_learn)
+        self._learn_asking = True
+        mon_id, name = self._learn_queue[0]
+
+        def work():
+            return self.api.pokemon()
+
+        def done(r, err):
+            if err or self._quitting:
+                self._learn_asking = False
+                self._learn_queue.pop(0) if self._learn_queue else None
+                return
+            mons = r if isinstance(r, list) else (r or {}).get("pokemon") or []
+            mon = next((m for m in mons if m.get("id") == mon_id), None)
+            pending = list((mon or {}).get("pending") or [])
+            moves = list((mon or {}).get("moves") or [])
+            if not mon or not pending:
+                self._learn_asking = False
+                if self._learn_queue:
+                    self._learn_queue.pop(0)
+                return self.root.after(200, self._ask_learn)
+            nick = (mon.get("info") or {}).get("name") or name
+            self._ask_one(mon_id, nick, pending, moves)
+
+        run_async(self.root, work, done)
+
+    def _ask_one(self, mon_id, name, pending, moves):
+        """기다리는 것 하나를 물어본다. 여럿이면 하나씩 이어서."""
+        from .ui_learn import ask_forget
+
+        move = pending[0]
+        PLAT.activate()
+        try:
+            pick = ask_forget(self.root, name, move, moves, self.dex)
+        except Exception as e:                              # noqa: BLE001
+            config.log("기술 배우기 창 오류: %s" % e)
+            self._learn_asking = False
+            if self._learn_queue:
+                self._learn_queue.pop(0)
+            return
+        if pick is None:
+            # 그냥 닫았다. 서버에 아무것도 안 보낸다 - 다음에 다시 묻는다.
+            self._learn_asking = False
+            if self._learn_queue:
+                self._learn_queue.pop(0)
+            return
+
+        def work():
+            return self.api.learn_pending(mon_id, move, pick,
+                                          skip=(pick == ""))
+
+        def done(r, err):
+            self._learn_asking = False
+            if err:
+                config.log("기술 배우기 실패: %s" % err)
+                if self._learn_queue:
+                    self._learn_queue.pop(0)
+                return
+            if r.get("message"):
+                self.notify(r["message"])
+            rest = r.get("pending") or []
+            if rest:
+                # 한 번에 여러 개가 기다릴 수 있다. 이어서 묻는다.
+                return self.root.after(400, self._ask_learn)
+            if self._learn_queue:
+                self._learn_queue.pop(0)
+            self.sync()
+            self.root.after(400, self._ask_learn)
+
+        run_async(self.root, work, done)
 
     def open_friends(self):
         self.friends_win = self._tab("friends")

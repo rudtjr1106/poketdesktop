@@ -1101,14 +1101,17 @@ def announce_evolve(parent, app, info):
                              % (info.get("fromKr", "?"), info.get("toKr", "?"))),
              bg=U.BG, fg=U.FG, font=U.FONT_H, wraplength=360,
              justify="left").pack(anchor="w", pady=(6, 0))
-    # 진화하면서 배우는 기술이 있으면 같이 적는다. 밀려난 것도 적는다 -
-    # 말없이 사라지면 아끼던 기술이 없어진 걸 한참 뒤에야 알게 된다.
+    # 진화하면서 배우는 기술이 있으면 같이 적는다. 자리가 없어 못 배운
+    # 것도 적는다 - 잠시 뒤에 무엇을 잊을지 묻는 창이 뜬다.
     learned = info.get("learned") or []
-    if learned:
-        line = "%s 을(를) 배웠다!" % ", ".join(learned)
-        forgot = info.get("forgot") or []
-        if forgot:
-            line += "  (%s 을(를) 잊었다)" % ", ".join(forgot)
+    pending = info.get("pending") or []
+    if learned or pending:
+        bits = []
+        if learned:
+            bits.append("%s 을(를) 배웠다!" % ", ".join(learned))
+        if pending:
+            bits.append("%s 을(를) 배우려 한다." % ", ".join(pending))
+        line = "  ".join(bits)
         tk.Label(f, text=natural(line), bg=U.BG, fg=U.ACCENT_TEXT,
                  font=U.FONT_S, wraplength=360,
                  justify="left").pack(anchor="w", pady=(2, 0))

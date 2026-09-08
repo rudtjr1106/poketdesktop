@@ -169,6 +169,15 @@ CREATE TABLE IF NOT EXISTS bag (
     PRIMARY KEY (user_id, item)
 );
 
+-- 기술머신은 개수가 없다. 한 번 얻으면 계속 쓰고, 팔지도 사지도 못한다.
+-- 그래서 가방(bag)에 안 넣는다 - 거기는 개수를 세는 곳이다.
+CREATE TABLE IF NOT EXISTS tm_owned (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    no       INTEGER NOT NULL,
+    got_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, no)
+);
+
 -- 리피트볼이 "이미 잡아본 종" 을 봐야 해서 남긴다. 도감 역할도 겸한다.
 CREATE TABLE IF NOT EXISTS seen (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -455,6 +464,11 @@ MIGRATIONS = [
      "ALTER TABLE rank_stat ADD COLUMN fought INTEGER NOT NULL DEFAULT 0"),
     ("wild_state", "walk_at",
      "ALTER TABLE wild_state ADD COLUMN walk_at TEXT"),
+    # 배우려고 기다리는 기술. 네 개가 차 있으면 무엇을 잊을지 사용자가
+    # 골라야 하는데, 배틀은 바탕화면에서 저 혼자 도는 중이라 그 자리에서
+    # 물어볼 수가 없다. 여기 적어 두고 다음에 창을 띄운다.
+    ("pokemon", "pending",
+     "ALTER TABLE pokemon ADD COLUMN pending TEXT NOT NULL DEFAULT '[]'"),
     ("pokemon", "luxury",
      "ALTER TABLE pokemon ADD COLUMN luxury INTEGER NOT NULL DEFAULT 0"),
     ("pokemon", "held",
@@ -646,6 +660,10 @@ def row_to_mon(r):
         "hyper": json.loads(r["hyper"]) if "hyper" in r.keys() and r["hyper"] else {},
         "noEvolve": bool(r["no_evolve"]) if "no_evolve" in r.keys() else False,
         "luxury": bool(r["luxury"]) if "luxury" in r.keys() else False,
+        # 배우려고 기다리는 기술 (1.1.6). 네 개가 차 있어서 무엇을 잊을지
+        # 아직 못 고른 것들이다. 클라이언트가 이걸 보고 창을 띄운다.
+        "pending": (json.loads(r["pending"])
+                    if "pending" in r.keys() and r["pending"] else []),
     }
 
 

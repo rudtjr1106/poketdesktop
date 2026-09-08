@@ -190,18 +190,27 @@ def apply(uid, mon, branch, dex, now):
     # **진화하면서 배우는 기술을 넣는다.** 알던 기술은 그대로 두고 새로
     # 배우는 것만 얹는다. 이걸 안 해서 버터플이 염동력도 바람일으키기도
     # 못 배우고, Lv21 까지 때릴 방법이 없었다 (279종, 기술 383개).
+    #
+    # **네 개가 차 있으면 안 밀어낸다.** 레벨업과 같은 규칙이다 - 기다리는
+    # 목록에 적어 두고 나중에 무엇을 잊을지 물어본다. 전에는 오래된 것부터
+    # 밀어냈는데(P.trim_moves), 진화 연출 한가운데라 무엇이 사라졌는지
+    # 더 안 보였다.
     moves = list(mon.get("moves") or [])
-    learned = [m for m in P.evolution_moves(new_sp) if m not in moves]
-    forgot = []
-    if learned:
-        moves, forgot = P.trim_moves(dex, moves + learned)
-        # 넉 장을 넘겨 밀려난 것이 방금 배운 것일 수도 있다.
-        learned = [m for m in learned if m in moves]
+    pending = list(mon.get("pending") or [])
+    learned = []
+    for m in P.evolution_moves(new_sp):
+        if m in moves or m in pending:
+            continue
+        if len(moves) < P.MAX_MOVES:
+            moves.append(m)
+            learned.append(m)
+        else:
+            pending.append(m)
 
     db.run("UPDATE pokemon SET species=?, exp=?, ability=?, hidden_ability=?,"
-           " moves=? WHERE id=? AND user_id=?",
+           " moves=?, pending=? WHERE id=? AND user_id=?",
            (new_key, exp, ability, int(bool(hidden)), json.dumps(moves),
-            mon["id"], uid))
+            json.dumps(pending), mon["id"], uid))
 
     out = dict(mon)
     out["species"] = new_key
@@ -210,11 +219,12 @@ def apply(uid, mon, branch, dex, now):
     out["hiddenAbility"] = hidden
     out["moves"] = moves
     out["learned"] = learned
-    out["forgot"] = forgot
+    out["pending"] = pending
+    out["pendingIds"] = list(pending)
     return out
 
 
-def public(dex, before, after, learned=(), forgot=()):
+def public(dex, before, after, learned=(), pending=()):
     """클라이언트에 보낼 진화 알림 한 덩이.
 
     **무엇을 배웠는지 같이 보낸다.** 진화하면서 배우는 기술이 있는데
@@ -227,5 +237,7 @@ def public(dex, before, after, learned=(), forgot=()):
         "from": before, "fromKr": a.get("kr", before), "fromNum": a.get("num"),
         "to": after, "toKr": b.get("kr", after), "toNum": b.get("num"),
         "learned": [dex.move_name(m) for m in learned],
-        "forgot": [dex.move_name(m) for m in forgot],
+        # 자리가 없어 아직 못 배운 것. 클라이언트가 이걸 보고 물어본다.
+        "pending": [dex.move_name(m) for m in pending],
+        "pendingIds": list(pending),
     }

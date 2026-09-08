@@ -29,13 +29,14 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from . import (auth, battle_routes, config, db, deps, item_routes,  # noqa: E402
                errors, items, migrations, pvp, pvp_routes,
-               social_routes, walk)
+               social_routes, tm_routes, tms, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
 app.include_router(item_routes.router)
 app.include_router(pvp_routes.router)
 app.include_router(social_routes.router)
+app.include_router(tm_routes.router)
 
 RNG = deps.RNG
 
@@ -1029,6 +1030,9 @@ def add_exp(pid: int, body: ExpIn, ctx=Depends(current)):
         raise HTTPException(500, "도감에 없는 종입니다.")
     out = {"ok": True, "level": got["level"], "leveledUp": got["leveledUp"],
            "learned": got["learned"],
+           # 자리가 없어 아직 못 배운 것. 클라이언트가 이걸 보고 물어본다.
+           "pending": got.get("pending") or [],
+           "pendingIds": got.get("pendingIds") or [],
            "pokemon": _decorate(db.row_to_mon(_own(uid, pid)))}
     if got.get("evolve"):
         out["evolve"] = got["evolve"]
@@ -1250,6 +1254,26 @@ def _drop(uid, mon, chance):
     return items.drop_public(item_id)
 
 
+def _drop_tm(uid, mon, rng):
+    """기술머신이 떨어지는지. **도구 드랍과 따로 굴린다.**
+
+    같은 표에 섞으면 358개가 한꺼번에 들어가서 도구 드랍이 기술머신
+    잔치가 된다. 여기서 안 나오면 평소처럼 도구만 나온다.
+
+    이미 가진 것은 안 준다 - 팔 수도 없는 물건이라 중복은 아무 일도
+    안 일어난 것과 같다.
+    """
+    sp = dex().get(mon.get("species"))
+    num = (sp or {}).get("num")
+    no = tms.roll_drop(rng, species_num=num,
+                       shiny=bool(mon.get("shiny")), uid=uid)
+    if no is None:
+        return None
+    if not tms.give(uid, no):
+        return None
+    return tms.public(no)
+
+
 @app.post("/api/wild/{wid}/catch")
 def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     """몬스터볼을 던진다. 판정은 본가 5세대 이후 공식 그대로."""
@@ -1299,14 +1323,18 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     _schedule_next(uid, _cooldown())
     items.mark_seen(uid, mon["species"], True, auth.now_iso())
     drop = _drop(uid, mon, config.DROP_ON_CATCH)
+    tm_drop = _drop_tm(uid, mon, RNG)
     msg = "신난다! %s 을(를) 잡았다!" % dex().name(mon["species"])
     if where == "box":
         msg += " 자리가 없어서 PC 박스로 보냈다."
     if drop:
         msg += "  %s 을(를) 주웠다!" % drop["kr"]
+    if tm_drop:
+        msg += "  %s 을(를) 주웠다!" % tm_drop["label"]
     return {"caught": True, "shakes": 4, "balls": balls, "where": where,
             "ball": ball_id,
-            "pokemon": got, "drop": drop, "money": items.money(uid),
+            "pokemon": got, "drop": drop, "tmDrop": tm_drop,
+            "money": items.money(uid),
             "bag": items.bag_get(uid), "message": korean.natural(msg)}
 
 
