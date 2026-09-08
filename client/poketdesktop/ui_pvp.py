@@ -76,7 +76,7 @@ class PvpWindow(object):
         inner = tk.Frame(h, bg=U.BG2)
         inner.pack(fill="both", expand=True, padx=16)
         tk.Label(inner, text="대전", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, 15)).pack(side="left", pady=17)
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", pady=17)
         self.sub = tk.Label(inner, text="", bg=U.BG2, fg=U.FG_DIM,
                             font=U.FONT_XS)
         self.sub.pack(side="left", padx=(12, 0))
@@ -217,7 +217,7 @@ class PvpWindow(object):
         top.pack(fill="x")
         mark, color = RESULT.get(r.get("result"), ("?", U.FG_DIM))
         tk.Label(top, text=mark, bg=color, fg="#14141a",
-                 font=(U.FAMILY_BLACK, 11), width=3).pack(side="left")
+                 font=(U.FAMILY_BLACK, U.pt(11)), width=3).pack(side="left")
         tk.Label(top, text=r.get("foe") or "?", bg=box["bg"], fg=U.FG,
                  font=U.FONT_B).pack(side="left", padx=(9, 0))
         if new:

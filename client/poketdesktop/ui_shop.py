@@ -325,7 +325,7 @@ class ShopWindow(object):
         title = tk.Frame(inner, bg=U.BG2)
         title.pack(side="left", padx=(12, 0))
         tk.Label(title, text="프렌들리샵", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, 15)).pack(anchor="w")
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(anchor="w")
         self.sub = tk.Label(title, text="", bg=U.BG2, fg=U.FG_FAINT,
                             font=U.FONT_XS)
         self.sub.pack(anchor="w")
@@ -339,7 +339,7 @@ class ShopWindow(object):
         tk.Label(wallet, text="소지금", bg=U.INK, fg=U.FG_FAINT,
                  font=U.FONT_XS).pack(side="left", padx=(13, 9), pady=6)
         self.money_lb = tk.Label(wallet, text="0", bg=U.INK, fg=U.ACCENT,
-                                 font=(U.FAMILY_BLACK, 17))
+                                 font=(U.FAMILY_BLACK, U.pt(17)))
         self.money_lb.pack(side="left")
         tk.Label(wallet, text="원", bg=U.INK, fg=U.ACCENT_TEXT,
                  font=U.FONT_S).pack(side="left", padx=(4, 14), pady=(0, 2))
@@ -504,7 +504,7 @@ class ShopWindow(object):
         self.d_icon = tk.Label(head, bg=U.BG2, bd=0)
         self.d_icon.pack(side="left", padx=(0, 10))
         self.d_name = tk.Label(head, text="도구를 고르세요", bg=U.BG2, fg=U.FG_FAINT,
-                               font=(U.FAMILY_BLACK, 16), anchor="w")
+                               font=(U.FAMILY_BLACK, U.pt(16)), anchor="w")
         self.d_name.pack(side="left", fill="x", expand=True)
         self.d_en = tk.Label(p, text="", bg=U.BG2, fg=U.FG_FAINT,
                              font=U.FONT_XS, anchor="w")
@@ -536,7 +536,7 @@ class ShopWindow(object):
         U.ghost_button(qrow, "-", lambda: self.add_qty(-1),
                        height=36).pack(side="left")
         self.qty_lb = tk.Label(qrow, text="1", bg=U.INK, fg=U.FG,
-                               font=(U.FAMILY_BLACK, 14), highlightthickness=2,
+                               font=(U.FAMILY_BLACK, U.pt(14)), highlightthickness=2,
                                highlightbackground=U.LINE, highlightcolor=U.LINE)
         self.qty_lb.pack(side="left", fill="both", expand=True, padx=8, pady=2)
         U.ghost_button(qrow, "+", lambda: self.add_qty(1),

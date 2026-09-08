@@ -63,7 +63,7 @@ class FriendsWindow(object):
         cv.create_oval(10, 10, 18, 18, fill="#f4f6fb", outline=U.INK, width=2)
 
         tk.Label(inner, text="친구", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, 15)).pack(side="left", padx=(12, 12))
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=(12, 12))
         self.count = tk.Label(inner, text="", bg=U.BG2, fg=U.FG_FAINT,
                               font=U.FONT_S)
         self.count.pack(side="left")

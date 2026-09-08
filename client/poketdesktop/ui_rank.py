@@ -51,7 +51,7 @@ class RankWindow(object):
         inner = tk.Frame(h, bg=U.BG2)
         inner.pack(fill="both", expand=True, padx=16)
         self.title = tk.Label(inner, text="랭킹", bg=U.BG2, fg=U.FG,
-                              font=(U.FAMILY_BLACK, 15))
+                              font=(U.FAMILY_BLACK, U.pt(15)))
         self.title.pack(side="left", pady=17)
         self.sub = tk.Label(inner, text="", bg=U.BG2, fg=U.FG_DIM,
                             font=U.FONT_XS)
@@ -178,7 +178,7 @@ class RankWindow(object):
 
         tk.Label(inner, text="%d" % rank, bg=box["bg"],
                  fg=MEDAL.get(rank, U.FG_DIM),
-                 font=(U.FAMILY_BLACK, 13), width=3,
+                 font=(U.FAMILY_BLACK, U.pt(13)), width=3,
                  anchor="e").pack(side="left")
 
         left = tk.Frame(inner, bg=box["bg"])

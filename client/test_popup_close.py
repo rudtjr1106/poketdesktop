@@ -99,6 +99,34 @@ def main():
     U.close_all()
     chk("close_all 로 전부 닫힌다", not b.alive())
 
+    print("\n=== 어느 OS 에서나 뜬다 ===")
+    # 커서 이름 하나로 죽은 적이 있다. `pointinghand` 는 맥에만 있어서
+    # 윈도우 Tk 이 `bad cursor spec` 으로 그 자리에서 멈췄다.
+    made = None
+    try:
+        made = U.PopupMenu(root, ROWS, 200, 200)
+        root.update_idletasks()
+        ok = made.alive()
+    except Exception as e:                                  # noqa: BLE001
+        ok = False
+        print("     못 만들었다: %s" % e)
+    chk("이 OS 에서 메뉴가 만들어진다", ok)
+    if made is not None and made.alive():
+        cur = []
+
+        def walkc(w):
+            for c in w.winfo_children():
+                try:
+                    if str(c.cget("cursor")):
+                        cur.append(str(c.cget("cursor")))
+                except Exception:
+                    pass
+                walkc(c)
+        walkc(made.win)
+        chk("커서 이름이 이 OS 에서 통한다 (%s)" % (sorted(set(cur)) or "없음"),
+            True)
+        U.close_all()
+
     print("\n=== 글꼴이 커져도 글이 안 눌린다 ===")
     # 줄 높이를 픽셀로 박아 두면 글꼴을 키웠을 때 세로로 눌린다.
     m3 = U.PopupMenu(root, ROWS, 400, 300)
