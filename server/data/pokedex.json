@@ -2755,7 +2755,7 @@
   "ALLURINGVOICE": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user attacks the target using its angelic voice. This also confuses the target if its stats have been boosted during the turn.",
+   "desc": "천사 같은 목소리로 공격한다. 그 턴에 능력이 올라간 상대는 혼란 상태가 된다.",
    "eff": 0,
    "en": "Alluring Voice",
    "flags": [],
@@ -2953,7 +2953,7 @@
   "AQUACUTTER": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user expels pressurized water to cut at the target like a blade. This move has a heightened chance of landing a critical hit.",
+   "desc": "고압의 물을 칼날처럼 내뿜어 벤다. 급소에 맞기 쉽다.",
    "eff": 0,
    "en": "Aqua Cutter",
    "flags": [],
@@ -3030,7 +3030,7 @@
   "AQUASTEP": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user toys with the target and attacks it using light and fluid dance steps. This also boosts the user's Speed stat.",
+   "desc": "가볍고 유려한 스텝으로 상대를 농락하며 공격한다. 자신의 스피드를 올린다.",
    "eff": 0,
    "en": "Aqua Step",
    "flags": [],
@@ -3077,7 +3077,7 @@
   "ARMORCANNON": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user shoots its own armor out as blazing projectiles. This also lowers the user’s Defense and Sp. Def stats.",
+   "desc": "자신의 갑옷을 불타는 탄환으로 쏘아 공격한다. 자신의 방어와 특수방어가 떨어진다.",
    "eff": 0,
    "en": "Armor Cannon",
    "flags": [],
@@ -3581,7 +3581,7 @@
   "AXEKICK": {
    "acc": 90,
    "cat": "physical",
-   "desc": "The user attacks by kicking up into the air and slamming its heel down upon the target. This may also confuse the target. If it misses, the user takes damage instead.",
+   "desc": "발꿈치를 치켜올렸다가 내리찍는다. 상대를 혼란 상태로 만들 때가 있다. 빗나가면 자신이 데미지를 입는다.",
    "eff": 0,
    "en": "Axe Kick",
    "flags": [],
@@ -3692,7 +3692,7 @@
   "BARBBARRAGE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user launches countless toxic barbs to inflict damage. This may also poison the target. This move’s power is doubled if the target is already poisoned.",
+   "desc": "무수한 독가시를 쏘아 공격한다. 상대를 독 상태로 만들 때가 있다. 이미 독 상태라면 위력이 두 배가 된다.",
    "eff": 0,
    "en": "Barb Barrage",
    "flags": [],
@@ -4115,7 +4115,7 @@
   "BITTERBLADE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user focuses its bitter feelings toward the world of the living into a slashing attack. The user's HP is restored by up to half the damage taken by the target.",
+   "desc": "세상에 대한 원념을 베기에 실어 공격한다. 준 데미지의 절반만큼 HP를 회복한다.",
    "eff": 0,
    "en": "Bitter Blade",
    "flags": [],
@@ -4130,7 +4130,7 @@
   "BITTERMALICE": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user attacks the target with spine-chilling resentment. This also lowers the target’s Attack stat.",
+   "desc": "소름 끼치는 원한으로 공격한다. 상대의 공격을 떨어뜨린다.",
    "eff": 0,
    "en": "Bitter Malice",
    "flags": [],
@@ -4265,7 +4265,7 @@
   "BLAZINGTORQUE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "",
+   "desc": "엔진을 불태워 돌진한다. 상대를 화상 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Blazing Torque",
    "flags": [],
@@ -4280,7 +4280,7 @@
   "BLEAKWINDSTORM": {
    "acc": 80,
    "cat": "special",
-   "desc": "The user attacks with savagely cold winds that cause both body and spirit to tremble. This may also lower the Speed stats of opposing Pokémon.",
+   "desc": "몸도 마음도 떨리게 하는 차가운 바람으로 공격한다. 상대의 스피드를 떨어뜨릴 때가 있다.",
    "eff": 0,
    "en": "Bleakwind Storm",
    "flags": [],
@@ -4357,7 +4357,7 @@
   "BLOODMOON": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user unleashes the full brunt of its spirit from a full moon that shines as red as blood. This move can't be used twice in a row.",
+   "desc": "핏빛으로 물든 보름달에서 온 힘을 뿜어내 공격한다. 연달아 쓸 수는 없다.",
    "eff": 0,
    "en": "Blood Moon",
    "flags": [],
@@ -5317,7 +5317,7 @@
   "BURNINGBULWARK": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user's intensely hot fur protects it from attacks and also burns any attacker that makes direct contact with it.",
+   "desc": "타오르는 털로 공격을 막는다. 직접 닿은 상대는 화상 상태가 된다.",
    "eff": 0,
    "en": "Burning Bulwark",
    "flags": [],
@@ -5562,7 +5562,7 @@
   "CEASELESSEDGE": {
    "acc": 90,
    "cat": "physical",
-   "desc": "The user slashes its shell blade at the target. Shell splinters left behind by this attack remain scattered under the target as spikes.",
+   "desc": "조개 칼날로 벤다. 부서진 조각이 상대의 발밑에 뿌려져 압정이 된다.",
    "eff": 0,
    "en": "Ceaseless Edge",
    "flags": [],
@@ -5747,7 +5747,7 @@
   "CHILLINGWATER": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user attacks the target by showering it with water that's so cold it saps the target's power. This also lowers the target's Attack stat.",
+   "desc": "몸에서 힘이 빠질 만큼 차가운 물을 끼얹어 공격한다. 상대의 공격을 떨어뜨린다.",
    "eff": 0,
    "en": "Chilling Water",
    "flags": [],
@@ -5762,7 +5762,7 @@
   "CHILLYRECEPTION": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user tells a chillingly bad joke before switching places with a party Pokémon in waiting. This summons a snowstorm lasting five turns.",
+   "desc": "썰렁한 농담을 남기고 대기 중인 포켓몬과 교체된다. 5턴 동안 눈보라가 몰아친다.",
    "eff": 0,
    "en": "Chilly Reception",
    "flags": [],
@@ -5809,7 +5809,7 @@
   "CHLOROBLAST": {
    "acc": 95,
    "cat": "special",
-   "desc": "The user launches its amassed chlorophyll to inflict damage on the target. This also damages the user.",
+   "desc": "모아 둔 엽록소를 쏘아 공격한다. 자신도 데미지를 입는다.",
    "eff": 0,
    "en": "Chloroblast",
    "flags": [],
@@ -6185,7 +6185,7 @@
   "COLLISIONCOURSE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user transforms and crashes to the ground, causing a massive prehistoric explosion. This move's power is boosted more than usual if it’s a supereffective hit.",
+   "desc": "모습을 바꿔 땅에 부딪치며 태고의 대폭발을 일으킨다. 효과가 굉장할 때 위력이 더 올라간다.",
    "eff": 0,
    "en": "Collision Course",
    "flags": [],
@@ -6200,7 +6200,7 @@
   "COMBATTORQUE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "",
+   "desc": "엔진의 힘을 실어 후려친다. 상대를 마비 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Combat Torque",
    "flags": [],
@@ -6248,7 +6248,7 @@
   "COMEUPPANCE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user retaliates with much greater force against the opponent that last inflicted damage on it.",
+   "desc": "마지막으로 자신에게 데미지를 준 상대에게 훨씬 큰 힘으로 되갚는다.",
    "eff": 0,
    "en": "Comeuppance",
    "flags": [],
@@ -7623,7 +7623,7 @@
   "DIRECLAW": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user lashes out at the target with ruinous claws. This may also leave the target poisoned, paralyzed, or asleep.",
+   "desc": "파멸의 발톱으로 할퀸다. 상대를 독·마비·잠듦 중 하나의 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Dire Claw",
    "flags": [],
@@ -7803,7 +7803,7 @@
   "DOODLE": {
    "acc": 100,
    "cat": "status",
-   "desc": "The user captures the very essence of the target in a sketch. This changes the Abilities of the user and its ally Pokémon to that of the target.",
+   "desc": "상대의 본질을 그림으로 베낀다. 자신과 같은 편의 특성이 상대와 같아진다.",
    "eff": 0,
    "en": "Doodle",
    "flags": [],
@@ -7975,7 +7975,7 @@
   "DOUBLESHOCK": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user discharges all the electricity from its body to perform a high-damage attack. After using this move, the user will no longer be Electric type.",
+   "desc": "몸속의 전기를 전부 내보내 큰 데미지를 준다. 쓰고 나면 전기타입이 아니게 된다.",
    "eff": 0,
    "en": "Double Shock",
    "flags": [],
@@ -8166,7 +8166,7 @@
   "DRAGONCHEER": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user raises its allies’ morale with a draconic cry so that their future attacks have a heightened chance of landing critical hits. This rouses Dragon types more.",
+   "desc": "드래곤의 함성으로 같은 편의 사기를 올려 급소에 맞기 쉽게 만든다. 드래곤타입에게는 더 잘 통한다.",
    "eff": 0,
    "en": "Dragon Cheer",
    "flags": [],
@@ -9099,7 +9099,7 @@
   "ELECTRODRIFT": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user races forward at ultrafast speeds, piercing its target with futuristic electricity. This move's power is boosted more than usual if it's a supereffective hit.",
+   "desc": "초고속으로 달려들어 미래의 전기로 꿰뚫는다. 효과가 굉장할 때 위력이 더 올라간다.",
    "eff": 0,
    "en": "Electro Drift",
    "flags": [],
@@ -9114,7 +9114,7 @@
   "ELECTROSHOT": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user gathers electricity on the first turn, boosting its Sp. Atk stat, then fires a high-voltage shot on the next turn. The shot will be fired immediately in rain.",
+   "desc": "1턴째에 전기를 모아 특수공격을 올리고 2턴째에 고전압을 쏜다. 비가 올 때는 바로 쏜다.",
    "eff": 0,
    "en": "Electro Shot",
    "flags": [],
@@ -9422,7 +9422,7 @@
   "ESPERWING": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user slashes the target with aura-enriched wings. This also boosts the user's Speed stat. This move has a heightened chance of landing a critical hit.",
+   "desc": "오라를 두른 날개로 벤다. 자신의 스피드가 올라가고 급소에 맞기 쉽다.",
    "eff": 0,
    "en": "Esper Wing",
    "flags": [],
@@ -10002,7 +10002,7 @@
   "FICKLEBEAM": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user shoots a beam of light to inflict damage. Sometimes all the user's heads shoot beams in unison, doubling the move's power.",
+   "desc": "빛의 다발을 쏘아 공격한다. 가끔 모든 머리가 함께 쏘아 위력이 두 배가 된다.",
    "eff": 0,
    "en": "Fickle Beam",
    "flags": [],
@@ -10085,7 +10085,7 @@
   "FILLETAWAY": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user sharply boosts its Attack, Sp. Atk, and Speed stats by using its own HP.",
+   "desc": "자신의 HP를 깎아 공격·특수공격·스피드를 크게 올린다.",
    "eff": 0,
    "en": "Fillet Away",
    "flags": [],
@@ -10930,7 +10930,7 @@
   "FLOWERTRICK": {
    "acc": 0,
    "cat": "physical",
-   "desc": "The user throws a rigged bouquet of flowers at the target. This attack never misses and always lands a critical hit.",
+   "desc": "속임수를 부린 꽃다발을 던진다. 반드시 명중하고 반드시 급소에 맞는다.",
    "eff": 0,
    "en": "Flower Trick",
    "flags": [],
@@ -11920,7 +11920,7 @@
   "GIGATONHAMMER": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user swings its whole body around to attack with its huge hammer. This move can't be used twice in a row.",
+   "desc": "온몸을 휘둘러 거대한 해머로 공격한다. 연달아 쓸 수는 없다.",
    "eff": 0,
    "en": "Gigaton Hammer",
    "flags": [],
@@ -12058,7 +12058,7 @@
   "GLAIVERUSH": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user throws its entire body into a reckless charge. After this move is used, attacks on the user cannot miss and will inflict double damage until the user’s next turn.",
+   "desc": "온몸을 던져 무모하게 돌진한다. 다음 자신의 차례까지 받는 공격이 반드시 맞고 데미지가 두 배가 된다.",
    "eff": 0,
    "en": "Glaive Rush",
    "flags": [],
@@ -12818,7 +12818,7 @@
   "HARDPRESS": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The target is crushed with an arm, a claw, or the like to inflict damage. The more HP the target has left, the greater the move's power.",
+   "desc": "팔이나 집게로 짓눌러 공격한다. 상대의 HP가 많이 남아 있을수록 위력이 올라간다.",
    "eff": 0,
    "en": "Hard Press",
    "flags": [],
@@ -12927,7 +12927,7 @@
   "HEADLONGRUSH": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user smashes into the target in a full-body tackle. This also lowers the user’s Defense and Sp. Def stats.",
+   "desc": "온몸으로 부딪쳐 공격한다. 자신의 방어와 특수방어가 떨어진다.",
    "eff": 0,
    "en": "Headlong Rush",
    "flags": [],
@@ -13783,7 +13783,7 @@
   "HYDROSTEAM": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user blasts the target with boiling-hot water. This move's power is not lowered in harsh sunlight but rather boosted by 50 percent.",
+   "desc": "펄펄 끓는 물을 뿜어 공격한다. 강한 햇살에서도 위력이 떨어지지 않고 오히려 1.5배가 된다.",
    "eff": 0,
    "en": "Hydro Steam",
    "flags": [],
@@ -13886,7 +13886,7 @@
   "HYPERDRILL": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user spins the pointed part of its body at high speed to pierce the target. This attack can hit a target using a move such as Protect or Detect.",
+   "desc": "몸의 뾰족한 부분을 빠르게 돌려 꿰뚫는다. 방어나 판별로도 막을 수 없다.",
    "eff": 0,
    "en": "Hyper Drill",
    "flags": [],
@@ -14297,7 +14297,7 @@
   "ICESPINNER": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user covers its feet in thin ice and twirls around, slamming into the target. This move's spinning motion also destroys the terrain.",
+   "desc": "발에 얇은 얼음을 두르고 회전하며 부딪친다. 필드 상태도 부순다.",
    "eff": 0,
    "en": "Ice Spinner",
    "flags": [],
@@ -14472,7 +14472,7 @@
   "INFERNALPARADE": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user attacks with myriad fireballs. This may also leave the target with a burn. This move's power is doubled if the target has a status condition.",
+   "desc": "무수한 불덩이로 공격한다. 상대를 화상 상태로 만들 때가 있다. 상대가 상태 이상이면 위력이 두 배가 된다.",
    "eff": 0,
    "en": "Infernal Parade",
    "flags": [],
@@ -14800,7 +14800,7 @@
   "IVYCUDGEL": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user strikes with an ivy-wrapped cudgel. This move's type changes depending on the mask worn by the user, and it has a heightened chance of landing a critical hit.",
+   "desc": "덩굴을 감은 방망이로 내리친다. 쓰고 있는 가면에 따라 타입이 바뀌고 급소에 맞기 쉽다.",
    "eff": 0,
    "en": "Ivy Cudgel",
    "flags": [],
@@ -14848,7 +14848,7 @@
   "JETPUNCH": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user summons a torrent around its fist and punches at blinding speed. This move always goes first.",
+   "desc": "주먹에 급류를 두르고 눈에 보이지 않는 속도로 지른다. 반드시 선제공격할 수 있다.",
    "eff": 0,
    "en": "Jet Punch",
    "flags": [],
@@ -15087,7 +15087,7 @@
   "KOWTOWCLEAVE": {
    "acc": 0,
    "cat": "physical",
-   "desc": "The user slashes at the target after kowtowing to make the target let down its guard. This attack never misses.",
+   "desc": "머리를 조아려 방심하게 만든 뒤 벤다. 반드시 명중한다.",
    "eff": 0,
    "en": "Kowtow Cleave",
    "flags": [],
@@ -15228,7 +15228,7 @@
   "LASTRESPECTS": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user attacks to avenge its allies. The more defeated allies there are in the user's party, the greater the move's power.",
+   "desc": "쓰러진 같은 편의 원한을 갚는다. 쓰러진 수가 많을수록 위력이 올라간다.",
    "eff": 0,
    "en": "Last Respects",
    "flags": [],
@@ -15893,7 +15893,7 @@
   "LUMINACRASH": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user attacks by unleashing a peculiar light that even affects the mind. This also harshly lowers the target's Sp. Def stat.",
+   "desc": "마음에까지 영향을 주는 기묘한 빛으로 공격한다. 상대의 특수방어를 크게 떨어뜨린다.",
    "eff": 0,
    "en": "Lumina Crash",
    "flags": [],
@@ -15908,7 +15908,7 @@
   "LUNARBLESSING": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user receives a blessing from the crescent moon, restoring HP and curing status conditions for itself and its ally Pokémon currently in the battle.",
+   "desc": "초승달에 기도를 올린다. 자신과 같은 편의 HP와 상태 이상을 회복한다.",
    "eff": 0,
    "en": "Lunar Blessing",
    "flags": [],
@@ -16092,7 +16092,7 @@
   "MAGICALTORQUE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "",
+   "desc": "요정의 힘을 실어 돌진한다. 상대를 혼란 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Magical Torque",
    "flags": [],
@@ -16365,7 +16365,7 @@
   "MAKEITRAIN": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user attacks by throwing out a mass of coins. This also lowers the user's Sp. Atk stat. Money is earned after the battle.",
+   "desc": "많은 양의 동전을 던져 공격한다. 자신의 특수공격이 떨어진다. 배틀이 끝나면 돈을 받는다.",
    "eff": 0,
    "en": "Make It Rain",
    "flags": [],
@@ -16410,7 +16410,7 @@
   "MALIGNANTCHAIN": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user pours toxins into the target by wrapping them in a toxic, corrosive chain. This may also leave the target badly poisoned.",
+   "desc": "독을 머금은 사슬로 휘감아 독을 흘려 넣는다. 상대를 맹독 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Malignant Chain",
    "flags": [],
@@ -16456,7 +16456,7 @@
   "MATCHAGOTCHA": {
    "acc": 90,
    "cat": "special",
-   "desc": "The user fires a blast of tea that it mixed. The user's HP is restored by up to half the damage taken by the target. This may also leave the target with a burn.",
+   "desc": "휘저은 차를 뿜어 공격한다. 준 데미지의 절반만큼 HP를 회복한다. 상대를 화상 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Matcha Gotcha",
    "flags": [],
@@ -17534,7 +17534,7 @@
   "MIGHTYCLEAVE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user wields the light that has accumulated atop its head to cleave the target. This move hits even if the target protects itself.",
+   "desc": "머리에 모은 빛으로 벤다. 상대가 방어해도 맞힐 수 있다.",
    "eff": 0,
    "en": "Mighty Cleave",
    "flags": [],
@@ -18092,7 +18092,7 @@
   "MORTALSPIN": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user performs a spin attack that can also eliminate the effects of such moves as Bind, Wrap, and Leech Seed. This also poisons opposing Pokémon.",
+   "desc": "회전하며 공격한다. 감기·조이기·씨뿌리기 등의 상태에서 벗어난다. 상대를 독 상태로 만든다.",
    "eff": 0,
    "en": "Mortal Spin",
    "flags": [],
@@ -18107,7 +18107,7 @@
   "MOUNTAINGALE": {
    "acc": 85,
    "cat": "physical",
-   "desc": "The user hurls giant chunks of ice at the target to inflict damage. This may also make the target flinch.",
+   "desc": "거대한 얼음덩이를 던져 공격한다. 상대를 풀죽게 만들 때가 있다.",
    "eff": 0,
    "en": "Mountain Gale",
    "flags": [],
@@ -18366,7 +18366,7 @@
   "MYSTICALPOWER": {
    "acc": 90,
    "cat": "special",
-   "desc": "The user attacks by emitting a mysterious power. This also boosts the user’s Sp. Atk stat.",
+   "desc": "신비한 힘을 뿜어 공격한다. 자신의 특수공격이 올라간다.",
    "eff": 0,
    "en": "Mystical Power",
    "flags": [],
@@ -18818,7 +18818,7 @@
   "NOXIOUSTORQUE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "",
+   "desc": "독을 실어 돌진한다. 상대를 독 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Noxious Torque",
    "flags": [],
@@ -19107,7 +19107,7 @@
   "ORDERUP": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user attacks with elegant poise. If the user has a Tatsugiri in its mouth, this move boosts one of the user's stats based on the Tatsugiri's form.",
+   "desc": "우아한 몸놀림으로 공격한다. 입안에 싸리용이 있으면 그 모습에 따라 자신의 능력 하나가 올라간다.",
    "eff": 0,
    "en": "Order Up",
    "flags": [],
@@ -20074,7 +20074,7 @@
   "POPULATIONBOMB": {
    "acc": 90,
    "cat": "physical",
-   "desc": "The user’s fellows gather in droves to perform a combo attack that hits the target one to ten times in a row.",
+   "desc": "동료들이 떼지어 몰려와 1~10번 연속으로 공격한다.",
    "eff": 0,
    "en": "Population Bomb",
    "flags": [],
@@ -20089,7 +20089,7 @@
   "POUNCE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user attacks by pouncing on the target. This also lowers the target's Speed stat.",
+   "desc": "상대에게 달려들어 공격한다. 상대의 스피드를 떨어뜨린다.",
    "eff": 0,
    "en": "Pounce",
    "flags": [],
@@ -20232,7 +20232,7 @@
   "POWERSHIFT": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user swaps its Attack and Defense stats.",
+   "desc": "자신의 공격과 방어를 맞바꾼다.",
    "eff": 0,
    "en": "Power Shift",
    "flags": [],
@@ -20595,7 +20595,7 @@
   "PSYBLADE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user rends the target with an ethereal blade. This move's power is boosted by 50 percent if the user is on Electric Terrain.",
+   "desc": "환상의 칼날로 벤다. 일렉트릭필드에서는 위력이 1.5배가 된다.",
    "eff": 0,
    "en": "Psyblade",
    "flags": [],
@@ -20679,7 +20679,7 @@
   "PSYCHICNOISE": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user attacks the target with unpleasant sound waves. For two turns, the target is prevented from recovering HP through moves, Abilities, or held items.",
+   "desc": "불쾌한 음파로 공격한다. 2턴 동안 상대는 기술·특성·도구로 HP를 회복할 수 없게 된다.",
    "eff": 0,
    "en": "Psychic Noise",
    "flags": [],
@@ -20852,7 +20852,7 @@
   "PSYSHIELDBASH": {
    "acc": 90,
    "cat": "physical",
-   "desc": "Cloaking itself in psychic energy, the user slams into the target. This also boosts the user’s Defense stat.",
+   "desc": "초능력을 두르고 부딪친다. 자신의 방어가 올라간다.",
    "eff": 0,
    "en": "Psyshield Bash",
    "flags": [],
@@ -21288,7 +21288,7 @@
   "RAGEFIST": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user converts its rage into energy to attack. The more times the user has been hit by attacks, the greater the move's power.",
+   "desc": "분노를 힘으로 바꾸어 공격한다. 지금까지 받은 공격의 횟수가 많을수록 위력이 올라간다.",
    "eff": 0,
    "en": "Rage Fist",
    "flags": [],
@@ -21333,7 +21333,7 @@
   "RAGINGBULL": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user performs a tackle like a raging bull. This move's type depends on the user's form. It can also break barriers, such as Light Screen and Reflect.",
+   "desc": "성난 소처럼 돌진해 공격한다. 자신의 모습에 따라 타입이 바뀐다. 빛의장막이나 리플렉터도 부순다.",
    "eff": 0,
    "en": "Raging Bull",
    "flags": [],
@@ -21348,7 +21348,7 @@
   "RAGINGFURY": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user rampages around spewing flames for two to three turns. The user then becomes confused.",
+   "desc": "2~3턴 동안 불꽃을 뿜으며 날뛴다. 끝나면 자신이 혼란 상태가 된다.",
    "eff": 0,
    "en": "Raging Fury",
    "flags": [],
@@ -21904,7 +21904,7 @@
   "REVIVALBLESSING": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user bestows a loving blessing, reviving a party Pokémon that has fainted and restoring half that Pokémon's max HP.",
+   "desc": "따뜻한 기도로 쓰러진 같은 편 하나를 되살리고 최대 HP의 절반을 회복시킨다.",
    "eff": 0,
    "en": "Revival Blessing",
    "flags": [],
@@ -22480,7 +22480,7 @@
   "RUINATION": {
    "acc": 90,
    "cat": "special",
-   "desc": "The user summons a ruinous disaster. This cuts the target’s HP in half.",
+   "desc": "파멸의 재앙을 부른다. 상대의 HP를 절반으로 만든다.",
    "eff": 0,
    "en": "Ruination",
    "flags": [],
@@ -22589,7 +22589,7 @@
   "SALTCURE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user salt cures the target, inflicting damage every turn. Steel and Water types are more strongly affected by this move.",
+   "desc": "상대를 소금에 절인다. 매 턴 데미지를 준다. 강철타입과 물타입에게는 더 크게 통한다.",
    "eff": 0,
    "en": "Salt Cure",
    "flags": [],
@@ -22641,7 +22641,7 @@
   "SANDSEARSTORM": {
    "acc": 80,
    "cat": "special",
-   "desc": "The user attacks by wrapping opposing Pokémon in fierce winds and searingly hot sand. This may also leave them with a burn.",
+   "desc": "사나운 바람과 타는 듯한 모래로 휩싼다. 상대를 화상 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Sandsear Storm",
    "flags": [],
@@ -23555,7 +23555,7 @@
   "SHEDTAIL": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user creates a substitute for itself using its own HP before switching places with a party Pokémon in waiting.",
+   "desc": "자신의 HP를 깎아 분신을 만들고 대기 중인 포켓몬과 교체된다.",
    "eff": 0,
    "en": "Shed Tail",
    "flags": [],
@@ -23713,7 +23713,7 @@
   "SHELTER": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user makes its skin as hard as an iron shield, sharply boosting its Defense stat.",
+   "desc": "살갗을 강철 방패처럼 단단하게 만든다. 자신의 방어를 크게 올린다.",
    "eff": 0,
    "en": "Shelter",
    "flags": [],
@@ -23860,7 +23860,7 @@
   "SILKTRAP": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user spins a silken trap, protecting itself from damage while lowering the Speed stat of any attacker that makes direct contact.",
+   "desc": "실로 짠 덫으로 몸을 지킨다. 직접 닿은 상대의 스피드를 떨어뜨린다.",
    "eff": 0,
    "en": "Silk Trap",
    "flags": [],
@@ -24866,7 +24866,7 @@
   "SNOWSCAPE": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user summons a snowstorm lasting five turns. This boosts the Defense stats of Ice types.",
+   "desc": "5턴 동안 눈이 내린다. 얼음타입의 방어가 올라간다.",
    "eff": 0,
    "en": "Snowscape",
    "flags": [],
@@ -25262,7 +25262,7 @@
   "SPICYEXTRACT": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user emits an incredibly spicy extract, sharply boosting the target's Attack stat and harshly lowering the target's Defense stat.",
+   "desc": "굉장히 매운 엑기스를 뿜는다. 상대의 공격을 크게 올리고 방어를 크게 떨어뜨린다.",
    "eff": 0,
    "en": "Spicy Extract",
    "flags": [],
@@ -25399,7 +25399,7 @@
   "SPINOUT": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user spins furiously by straining its legs, inflicting damage on the target. This also harshly lowers the user's Speed stat.",
+   "desc": "다리에 힘을 실어 격렬하게 회전하며 공격한다. 자신의 스피드가 크게 떨어진다.",
    "eff": 0,
    "en": "Spin Out",
    "flags": [],
@@ -25698,7 +25698,7 @@
   "SPRINGTIDESTORM": {
    "acc": 80,
    "cat": "special",
-   "desc": "The user attacks by wrapping opposing Pokémon in fierce winds brimming with love and hate. This may also lower their Attack stats.",
+   "desc": "사랑과 미움이 뒤엉킨 거센 바람으로 휩싼다. 상대의 공격을 떨어뜨릴 때가 있다.",
    "eff": 0,
    "en": "Springtide Storm",
    "flags": [],
@@ -26069,7 +26069,7 @@
   "STONEAXE": {
    "acc": 90,
    "cat": "physical",
-   "desc": "The user swings its stone axes at the target. Stone splinters left behind by this attack float around the target.",
+   "desc": "바위 도끼로 내리친다. 부서진 돌조각이 상대의 주위를 떠다닌다.",
    "eff": 0,
    "en": "Stone Axe",
    "flags": [],
@@ -26662,7 +26662,7 @@
   "SUPERCELLSLAM": {
    "acc": 95,
    "cat": "physical",
-   "desc": "The user electrifies its body and drops onto the target to inflict damage. If this move misses, the user takes damage instead.",
+   "desc": "몸에 전기를 두르고 상대에게 떨어진다. 빗나가면 자신이 데미지를 입는다.",
    "eff": 0,
    "en": "Supercell Slam",
    "flags": [],
@@ -27205,7 +27205,7 @@
    "ailChance": 0,
    "cat": "special",
    "crit": 0,
-   "desc": "The user sets off an explosion of sticky candy syrup, which coats the target and causes the target's Speed stat to drop each turn for three turns.",
+   "desc": "끈적한 시럽을 터뜨려 상대를 뒤덮는다. 3턴 동안 매 턴 상대의 스피드가 떨어진다.",
    "drain": 0,
    "eff": 0,
    "en": "Syrup Bomb",
@@ -27235,7 +27235,7 @@
   "TACHYONCUTTER": {
    "acc": 0,
    "cat": "special",
-   "desc": "The user attacks by launching particle blades at the target twice in a row. This attack never misses.",
+   "desc": "입자의 칼날을 2번 연속으로 쏜다. 반드시 명중한다.",
    "eff": 0,
    "en": "Tachyon Cutter",
    "flags": [],
@@ -27448,7 +27448,7 @@
   "TAKEHEART": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user lifts its spirits, curing its own status conditions and boosting its Sp. Atk and Sp. Def stats.",
+   "desc": "마음을 다잡아 자신의 상태 이상을 회복하고 특수공격과 특수방어를 올린다.",
    "eff": 0,
    "en": "Take Heart",
    "flags": [],
@@ -27784,7 +27784,7 @@
   "TEMPERFLARE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "Spurred by desperation, the user attacks the target. This move's power is doubled if the user's previous move failed.",
+   "desc": "될 대로 되라는 심정으로 공격한다. 앞선 기술이 실패했다면 위력이 두 배가 된다.",
    "eff": 0,
    "en": "Temper Flare",
    "flags": [],
@@ -27799,7 +27799,7 @@
   "TERABLAST": {
    "acc": 100,
    "cat": "special",
-   "desc": "If the user has Terastallized, it unleashes energy of its Tera Type. This move inflicts damage using the Attack or Sp. Atk stat—whichever is higher for the user.",
+   "desc": "테라스탈했다면 테라스탈타입의 에너지를 뿜는다. 자신의 공격과 특수공격 중 높은 쪽으로 데미지를 준다.",
    "eff": 0,
    "en": "Tera Blast",
    "flags": [],
@@ -27814,7 +27814,7 @@
   "TERASTARSTORM": {
    "acc": 100,
    "cat": "special",
-   "desc": "With the power of its crystals, the user bombards and eliminates the target. When used by Terapagos in its Stellar Form, this move damages all opposing Pokémon.",
+   "desc": "결정의 힘으로 상대를 쓸어버린다. 테라파고스가 스텔라폼일 때 쓰면 상대 모두를 공격한다.",
    "eff": 0,
    "en": "Tera Starstorm",
    "flags": [],
@@ -28114,7 +28114,7 @@
   "THUNDERCLAP": {
    "acc": 100,
    "cat": "special",
-   "desc": "This move enables the user to attack first with a jolt of electricity. This move fails if the target is not readying an attack.",
+   "desc": "번개를 날려 상대보다 먼저 공격한다. 상대가 공격 기술을 쓰려는 것이 아니면 실패한다.",
    "eff": 0,
    "en": "Thunderclap",
    "flags": [],
@@ -28336,7 +28336,7 @@
   "TIDYUP": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user tidies up and removes the effects of Spikes, Stealth Rock, Sticky Web, Toxic Spikes, and Substitute. This also boosts the user’s Attack and Speed stats.",
+   "desc": "말끔히 치운다. 압정뿌리기·스텔스록·끈적끈적네트·독압정·분신이 사라진다. 자신의 공격과 스피드가 올라간다.",
    "eff": 0,
    "en": "Tidy Up",
    "flags": [],
@@ -28383,7 +28383,7 @@
   "TORCHSONG": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user blows out raging flames as if singing a song, scorching the target. This also boosts the user's Sp. Atk stat.",
+   "desc": "노래하듯 거센 불꽃을 뿜어 태운다. 자신의 특수공격이 올라간다.",
    "eff": 0,
    "en": "Torch Song",
    "flags": [],
@@ -28532,7 +28532,7 @@
   "TRAILBLAZE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user attacks suddenly as if leaping out from tall grass. The user's nimble footwork boosts its Speed stat.",
+   "desc": "풀숲에서 뛰어나오듯 갑자기 공격한다. 날렵한 발놀림으로 자신의 스피드가 올라간다.",
    "eff": 0,
    "en": "Trailblaze",
    "flags": [],
@@ -28699,7 +28699,7 @@
   "TRIPLEARROWS": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user kicks, then fires three arrows. This move has a heightened chance of landing a critical hit and may also lower the target’s Defense stat or make it flinch.",
+   "desc": "발차기에 이어 화살 3발을 쏜다. 급소에 맞기 쉽고 상대의 방어를 떨어뜨리거나 풀죽게 만들 때가 있다.",
    "eff": 0,
    "en": "Triple Arrows",
    "flags": [],
@@ -28746,7 +28746,7 @@
   "TRIPLEDIVE": {
    "acc": 95,
    "cat": "physical",
-   "desc": "The user performs a perfectly timed triple dive, hitting the target with splashes of water three times in a row.",
+   "desc": "호흡을 맞춘 3연속 다이빙으로 물보라를 일으켜 3번 공격한다.",
    "eff": 0,
    "en": "Triple Dive",
    "flags": [],
@@ -28862,7 +28862,7 @@
   "TWINBEAM": {
    "acc": 100,
    "cat": "special",
-   "desc": "The user shoots mystical beams from its eyes to inflict damage. The target is hit twice in a row.",
+   "desc": "두 눈에서 신비한 광선을 쏘아 2번 공격한다.",
    "eff": 0,
    "en": "Twin Beam",
    "flags": [],
@@ -28995,7 +28995,7 @@
   "UPPERHAND": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user reacts to the target's movement and strikes with the heel of its palm, making the target flinch. This move fails if the target is not readying a priority move.",
+   "desc": "상대의 움직임을 감지해 손바닥 밑동으로 쳐서 풀죽게 만든다. 상대가 선제공격 기술을 쓰려는 것이 아니면 실패한다.",
    "eff": 0,
    "en": "Upper Hand",
    "flags": [],
@@ -29291,7 +29291,7 @@
   "VICTORYDANCE": {
    "acc": 0,
    "cat": "status",
-   "desc": "The user performs an intense dance to usher in victory, boosting its Attack, Defense, and Speed stats.",
+   "desc": "승리를 부르는 격렬한 춤을 춘다. 자신의 공격·방어·스피드가 올라간다.",
    "eff": 0,
    "en": "Victory Dance",
    "flags": [],
@@ -29685,7 +29685,7 @@
   "WAVECRASH": {
    "acc": 100,
    "cat": "physical",
-   "desc": "The user shrouds itself in water and slams into the target with its whole body to inflict damage. This also damages the user quite a lot.",
+   "desc": "물을 두르고 온몸으로 부딪친다. 자신도 꽤 큰 데미지를 입는다.",
    "eff": 0,
    "en": "Wave Crash",
    "flags": [],
@@ -29828,7 +29828,7 @@
   "WICKEDTORQUE": {
    "acc": 100,
    "cat": "physical",
-   "desc": "",
+   "desc": "악의를 실어 돌진한다. 상대를 잠듦 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Wicked Torque",
    "flags": [],
@@ -29873,7 +29873,7 @@
   "WILDBOLTSTORM": {
    "acc": 80,
    "cat": "special",
-   "desc": "The user summons a thunderous tempest and savagely attacks with lightning and wind. This may also leave opposing Pokémon with paralysis.",
+   "desc": "천둥구름을 불러 번개와 바람으로 사납게 공격한다. 상대를 마비 상태로 만들 때가 있다.",
    "eff": 0,
    "en": "Wildbolt Storm",
    "flags": [],

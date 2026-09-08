@@ -23,6 +23,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 from common.ability_kr import DESC as ABILITY_KR  # noqa: E402
+from common.move_kr import DESC as MOVE_KR  # noqa: E402
 
 CSV_BASE = "https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv"
 CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_cache")
@@ -66,6 +67,18 @@ roaring-moon walking-wake gouging-fire raging-bolt
 iron-treads iron-bundle iron-hands iron-jugulis iron-moth iron-thorns
 iron-valiant iron-leaves iron-boulder iron-crown
 """
+
+
+def _move_desc(ident, got):
+    """기술 설명. 한국어가 없으면 손으로 적어 둔 것을 쓴다.
+
+    **9세대 기술에는 PokeAPI 에 한국어 줄이 없다.** 88개가 영어로,
+    5개는 아예 빈 채로 나왔다. 저쪽에 한국어가 들어오면 위에서 이미
+    한국어를 골랐으므로 자동으로 그쪽이 이긴다.
+    """
+    if got and _has_hangul(got):
+        return got
+    return MOVE_KR.get(ident) or got or ""
 
 
 def _has_hangul(s):
@@ -276,7 +289,7 @@ def build():
             "eff": as_int(r["effect_chance"]),
             "target": as_int(r["target_id"]),
             "flags": sorted(move_flags.get(mid, [])),
-            "desc": (move_desc.get(mid) or (None, ""))[1],
+            "desc": _move_desc(ident, (move_desc.get(mid) or (None, ""))[1]),
         }
         m = meta.get(mid)
         if m:
