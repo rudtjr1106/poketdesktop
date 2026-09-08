@@ -19,7 +19,7 @@ from common import battle as B
 from common import held as HELD
 from common import pokelogic as P
 
-from . import auth, config, db, deps, items, walk
+from . import auth, config, db, deps, items, tms, walk
 
 router = APIRouter()
 
@@ -226,6 +226,26 @@ def _drop(uid, mon, chance):
     return items.drop_public(item_id)
 
 
+def _drop_tm(uid, mon, rng):
+    """기술머신이 떨어지는지. **도구 드랍과 따로 굴린다.**
+
+    같은 표에 섞으면 358개가 한꺼번에 들어가서 도구 드랍이 기술머신
+    잔치가 된다. 여기서 안 나오면 평소처럼 도구만 나온다.
+
+    이미 가진 것은 안 준다 - 팔 수도 없는 물건이라 중복은 아무 일도
+    안 일어난 것과 같다.
+    """
+    sp = deps.dex().get(mon.get("species"))
+    num = (sp or {}).get("num")
+    no = tms.roll_drop(rng, species_num=num,
+                       shiny=bool(mon.get("shiny")), uid=uid)
+    if no is None:
+        return None
+    if not tms.give(uid, no):
+        return None
+    return tms.public(no)
+
+
 def give_evs(uid, mon_id, yields):
     """쓰러뜨린 종이 주는 노력치를 더한다.
 
@@ -407,6 +427,9 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
         drop = _drop(uid, foe.mon, config.DROP_ON_WIN)
         if drop:
             out["drop"] = drop
+        tm_drop = _drop_tm(uid, foe.mon, deps.RNG)
+        if tm_drop:
+            out["tmDrop"] = tm_drop
         out["money"] = items.money(uid)
         out["bag"] = items.bag_get(uid)
         db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
@@ -550,8 +573,11 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
            " ON CONFLICT(user_id) DO UPDATE SET caught=caught+1", (uid,))
     items.mark_seen(uid, foe.mon["species"], True, auth.now_iso())
     drop = _drop(uid, foe.mon, config.DROP_ON_CATCH)
+    tm_drop = _drop_tm(uid, foe.mon, deps.RNG)
     if drop:
         out["drop"] = drop
+    if tm_drop:
+        out["tmDrop"] = tm_drop
     out["money"] = items.money(uid)
     out["bag"] = items.bag_get(uid)
     reschedule(uid)

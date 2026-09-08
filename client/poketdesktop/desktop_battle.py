@@ -314,15 +314,16 @@ class DesktopBattle(object):
                 # 밀려나는데, 말없이 사라지면 아끼던 기술이 없어진 걸
                 # 한참 뒤에야 알게 된다.
                 learned = e.get("learned") or []
-                forgot = e.get("forgot") or []
                 if learned:
-                    line = "%s 은(는) %s 을(를) 배웠다!" % (
-                        e["name"], ", ".join(learned))
-                    if forgot:
-                        # 네 개가 차면 오래된 것이 밀려난다. 무엇이 사라졌는지
-                        # 같이 알려야 나중에 "왜 없지?" 가 되지 않는다.
-                        line += "  (%s 을(를) 잊었다)" % ", ".join(forgot)
-                    msgs.append(natural(line))
+                    msgs.append(natural("%s 은(는) %s 을(를) 배웠다!"
+                                        % (e["name"], ", ".join(learned))))
+                # 자리가 없어 아직 못 배운 것. **여기서 창을 띄우지 않는다** -
+                # 배틀 연출이 도는 중이고, 자동으로 싸우는 중이라 사용자가
+                # 화면을 안 보고 있을 수 있다. 정리가 끝난 뒤에 물어본다.
+                if e.get("pendingIds"):
+                    msgs.append(natural(
+                        "%s 은(는) %s 을(를) 배우려 한다."
+                        % (e["name"], ", ".join(e.get("pending") or []))))
             main = next((e for e in (result.get("exp") or [])
                          if not e.get("shared")), None)
             if main and self.mine:
@@ -336,6 +337,11 @@ class DesktopBattle(object):
                 head += "  " + natural("%s 을(를) 주웠다!" % drop["kr"])
                 if self.mine:
                     self.float_over(self.mine, drop["kr"], "#ffd447")
+            tm = result.get("tmDrop")
+            if tm:
+                head += "  " + natural("%s 을(를) 주웠다!" % tm["label"])
+                if self.mine:
+                    self.float_over(self.mine, "기술머신!", "#6fb3ff")
             self.app.notify(head)
         elif res == "lost":
             party = result.get("party") or []
@@ -354,6 +360,11 @@ class DesktopBattle(object):
         # 바꾸면 서버가 들고 있는 배틀 스냅샷과 어긋난다.
         # 어느 포켓몬이 진화했는지 id 로 들고 간다. 같은 종이 파티에 둘 있으면
         # 종 이름으로는 누가 진화했는지 가릴 수 없다.
+        # 배우려고 기다리는 기술도 여기서 챙긴다. 진화와 같은 이유로
+        # 배틀이 다 끝난 뒤에 물어본다.
+        for e in (result.get("exp") or []):
+            if e.get("pendingIds"):
+                self.app.want_learn(e.get("id"), e["name"])
         evolves = [dict(e["evolve"], pokemonId=e.get("id"))
                    for e in (result.get("exp") or []) if e.get("evolve")]
         self.pending_evolve = evolves
@@ -621,12 +632,16 @@ class DesktopBattle(object):
 def evolve_learned_text(info):
     """진화하면서 배운 기술을 한 줄로. 없으면 빈 글."""
     learned = info.get("learned") or []
-    forgot = info.get("forgot") or []
-    if not learned:
+    pending = info.get("pending") or []
+    if not learned and not pending:
         return ""
-    line = "  그리고 %s 을(를) 배웠다!" % ", ".join(learned)
-    if forgot:
-        line += "  (%s 을(를) 잊었다)" % ", ".join(forgot)
+    bits = []
+    if learned:
+        bits.append("  그리고 %s 을(를) 배웠다!" % ", ".join(learned))
+    if pending:
+        # 자리가 없어 아직 못 배운 것. 잠시 뒤에 창이 떠서 물어본다.
+        bits.append("  %s 을(를) 배우려 한다." % ", ".join(pending))
+    line = "".join(bits)
     return natural(line)
 
 
@@ -648,6 +663,10 @@ def play_evolutions(app, infos):
     # **진화하면서 배우는 기술이 있다.** 말없이 들어가면 언제 생긴
     # 건지 알 길이 없고, 넉 장이 차서 밀려난 것도 모르고 지나간다.
     text += evolve_learned_text(info)
+    # 진화하면서 배울 기술이 자리에 안 들어가면 물어봐야 한다. 연출이
+    # 다 끝난 뒤에 뜬다 - app 이 줄을 세워 하나씩 묻는다.
+    if info.get("pendingIds"):
+        app.want_learn(info.get("pokemonId"), info.get("toKr", ""))
     if pet is None:
         # 바탕화면에 없으면(박스에 있으면) 글로만 알린다
         app.notify("축하합니다! " + text)

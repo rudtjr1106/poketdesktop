@@ -251,7 +251,10 @@ jobs:
         run: pip install -r server/requirements.txt
 
       - name: 동작 도트 (서버 없이)
-        run: cd server && python test_anim.py
+        run: |
+          cd server
+          python test_anim.py
+          python test_tms.py
 
       - name: 서버 띄우기
         env:

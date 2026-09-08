@@ -253,7 +253,7 @@ def _use_stone(uid, it, mon, dex, hour):
     before = mon["species"]
     got = evolution.apply(uid, mon, b, dex, _now())
     info = evolution.public(dex, before, b["to"],
-                            got.get("learned") or [], got.get("forgot") or [])
+                            got.get("learned") or [], got.get("pendingIds") or [])
     return {"ok": True, "evolve": info,
             "message": "축하합니다! %s은(는) %s(으)로 진화했다!"
                        % (info["fromKr"], info["toKr"])}

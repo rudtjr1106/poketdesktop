@@ -333,6 +333,35 @@ class Api(object):
     def sell(self, item, count=1):
         return self._call("POST", "/api/shop/sell", {"item": item, "count": count})
 
+    # ---------------- 기술머신 ----------------
+    # 사고팔 수 없고 쓴다고 없어지지도 않는다. 그래서 개수를 주고받는
+    # 자리가 없다 - 가졌는지 아닌지만 있다.
+    def tms(self):
+        """가진 것과 못 가진 것 전부. 358개라 한 번에 받아도 된다."""
+        return self._call("GET", "/api/tms")
+
+    def tms_for(self, pokemon):
+        """이 포켓몬에게 지금 쓸 수 있는 기술머신."""
+        return self._call("GET", "/api/tms/%d" % int(pokemon))
+
+    def tm_learners(self, no):
+        """이 기술머신을 배울 수 있는 내 포켓몬. **한 번에 받는다** -
+        마리마다 물어보면 예순 마리면 예순 번이 된다."""
+        return self._call("GET", "/api/tms/%d/learners" % int(no))
+
+    def tm_use(self, no, pokemon, forget=""):
+        """가르친다. 기술이 네 개면 forget 없이 부르면 무엇을 잊을지 묻는
+        답(needForget)이 온다."""
+        return self._call("POST", "/api/tms/use",
+                          body={"no": int(no), "pokemon": int(pokemon),
+                                "forget": forget})
+
+    def learn_pending(self, pokemon, move, forget="", skip=False):
+        """레벨업으로 배우려던 기술을 배우거나 버린다."""
+        return self._call("POST", "/api/pokemon/learn",
+                          body={"pokemon": int(pokemon), "move": move,
+                                "forget": forget, "skip": bool(skip)})
+
     def use_item(self, item, pokemon=0, stat=""):
         return self._call("POST", "/api/bag/use",
                           {"item": item, "pokemon": pokemon, "stat": stat,

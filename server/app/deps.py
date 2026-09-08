@@ -92,27 +92,45 @@ def free_slot(uid, exclude=None):
 MAX_MOVES = P.MAX_MOVES        # 규칙은 common/pokelogic.py 에 있다
 
 
-def _learn(sp, moves, before, after, d=None):
+def _pending_of(r):
+    """DB 행에서 기다리는 기술 목록. 옛 행에는 칸이 없다."""
+    try:
+        if "pending" in r.keys() and r["pending"]:
+            return json.loads(r["pending"])
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return []
+
+
+def _learn(sp, moves, before, after, pending=None, d=None):
     """구간에서 배우는 기술을 넣는다.
 
-    본가는 네 개가 차면 '어떤 기술을 잊을까요?' 를 물어본다. 여기서는
-    바탕화면에서 자동으로 싸우는 중이라 창을 띄울 수 없어서 가장 오래된
-    것부터 밀어낸다. 대신 **무엇을 잊었는지 같이 돌려준다** —
-    말없이 사라지면 아끼던 기술이 없어진 걸 나중에야 알게 된다.
+    자리가 남으면 그냥 배운다. **네 개가 차 있으면 안 밀어낸다** —
+    기다리는 목록(pending)에 적어 두고, 나중에 사용자가 무엇을 잊을지
+    고른다. 본가가 그 자리에서 물어보는 것을 우리는 미뤄서 물어본다.
+    바탕화면에서 저 혼자 싸우는 중이라 그 순간에는 창을 띄울 수 없다.
 
-    밀어내는 규칙은 P.trim_moves 에 있다. 하나 남은 공격기는 안 민다.
+    전에는 가장 오래된 것부터 밀어냈다(P.trim_moves). 하나 남은 공격기는
+    안 미는 규칙까지 뒀지만, 그래도 아끼던 기술이 말없이 사라졌다.
+    **안 밀면 그 규칙 자체가 필요 없다.**
 
     **레벨 0 은 여기서 안 걸린다.** 그건 진화하면서 배우는 것이고
     (P.evolution_moves), evolution.apply 가 넣어 준다.
+
+    돌려주는 것은 (남은 기술, 방금 배운 것, 기다리는 것) 이다.
     """
+    pending = list(pending or [])
     learned = []
     for mlv, mv in sp.get("moves", []):
-        if before < mlv <= after and mv not in moves:
-            learned.append(mv)
-            moves.append(mv)
-    kept, forgot = P.trim_moves(d or dex(), moves)
-    learned = [m for m in learned if m in kept]
-    return kept, learned, forgot
+        if before < mlv <= after:
+            if mv in moves or mv in pending:
+                continue
+            if len(moves) < MAX_MOVES:
+                moves.append(mv)
+                learned.append(mv)
+            else:
+                pending.append(mv)
+    return moves, learned, pending
 
 
 def grant_exp(uid, mon_id, amount, hour=None):
@@ -133,12 +151,12 @@ def grant_exp(uid, mon_id, amount, hour=None):
     exp = min(r["exp"] + int(amount), P.exp_for_level(curve, P.LEVEL_MAX))
     lv = P.level_from_exp(curve, exp)
     moves = json.loads(r["moves"])
+    pending = _pending_of(r)
     learned = []
-    forgot = []
     if lv > before:
-        moves, learned, forgot = _learn(sp, moves, before, lv, d)
-    db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
-           (exp, lv, json.dumps(moves), mon_id))
+        moves, learned, pending = _learn(sp, moves, before, lv, pending, d)
+    db.run("UPDATE pokemon SET exp=?, level=?, moves=?, pending=? WHERE id=?",
+           (exp, lv, json.dumps(moves), json.dumps(pending), mon_id))
 
     out = {
         "id": mon_id,
@@ -148,7 +166,9 @@ def grant_exp(uid, mon_id, amount, hour=None):
         "levelBefore": before,
         "leveledUp": lv > before,
         "learned": [d.move_name(m) for m in learned],
-        "forgot": [d.move_name(m) for m in forgot],
+        # 자리가 없어 아직 못 배운 것. 클라이언트가 이걸 보고 물어본다.
+        "pending": [d.move_name(m) for m in pending],
+        "pendingIds": list(pending),
     }
     if lv > before:
         ev = try_evolve(uid, mon_id, hour)
@@ -170,13 +190,15 @@ def set_level(uid, mon_id, level, hour=None):
     before = r["level"]
     lv = max(1, min(P.LEVEL_MAX, int(level)))
     exp = P.exp_for_level(curve, lv)
-    moves, learned, forgot = _learn(sp, json.loads(r["moves"]), before, lv, d)
-    db.run("UPDATE pokemon SET exp=?, level=?, moves=? WHERE id=?",
-           (exp, lv, json.dumps(moves), mon_id))
+    moves, learned, pending = _learn(sp, json.loads(r["moves"]), before, lv,
+                                     _pending_of(r), d)
+    db.run("UPDATE pokemon SET exp=?, level=?, moves=?, pending=? WHERE id=?",
+           (exp, lv, json.dumps(moves), json.dumps(pending), mon_id))
     out = {"id": mon_id, "level": lv, "levelBefore": before,
            "leveledUp": lv > before,
            "learned": [d.move_name(m) for m in learned],
-           "forgot": [d.move_name(m) for m in forgot]}
+           "pending": [d.move_name(m) for m in pending],
+           "pendingIds": list(pending)}
     if lv > before:
         ev = try_evolve(uid, mon_id, hour)
         if ev:
@@ -199,4 +221,4 @@ def try_evolve(uid, mon_id, hour=None):
     before = mon["species"]
     got = evolution.apply(uid, mon, b, d, "")
     return evolution.public(d, before, b["to"],
-                            got.get("learned") or [], got.get("forgot") or [])
+                            got.get("learned") or [], got.get("pendingIds") or [])

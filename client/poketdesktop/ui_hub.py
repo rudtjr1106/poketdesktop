@@ -23,6 +23,7 @@ from .ui_pvp import PvpWindow
 from .ui_rank import RankWindow
 from .ui_settings import SettingsWindow
 from .ui_shop import ShopWindow
+from .ui_tms import TmWindow
 
 W, H = 1040, 700
 
@@ -31,6 +32,7 @@ TABS = [
     ("box", "포켓몬", BoxWindow, True),
     ("bag", "가방", BagWindow, True),
     ("shop", "상점", ShopWindow, True),
+    ("tms", "기술머신", TmWindow, True),
     ("dex", "도감", DexWindow, False),
     ("friends", "친구", FriendsWindow, False),
     ("pvp", "대전", PvpWindow, False),
