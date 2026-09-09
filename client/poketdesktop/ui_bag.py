@@ -1245,6 +1245,22 @@ def announce_gifts(parent, app, gifts):
     row.pack(fill="x", pady=(14, 0))
     U.PushButton(row, "고맙습니다", win.destroy, height=34,
                  font=U.FONT_B).pack(side="right")
+
+    # **다 담고 나서 창을 내용에 맞춘다.**
+    #
+    # 줄 수만 세서 높이를 잡으면 모자란다. 제목과 설명이 길면 여러 줄로
+    # 접히는데 그 줄 수는 글꼴에 달렸고, 글꼴은 OS 마다 다르다. 맥에서
+    # 맞춰 둔 숫자가 윈도우(맑은 고딕)에서 맞으리라는 보장이 없다.
+    #
+    # 글자를 줄이지 않는다. 칸을 늘린다.
+    try:
+        win.update_idletasks()
+        need = win.winfo_reqheight()
+        if need > win.winfo_height():
+            win.geometry("%dx%d" % (win.winfo_width() or 420, need))
+    except Exception:                                      # noqa: BLE001
+        pass
+
     win.grab_set()
     parent.wait_window(win)
 
