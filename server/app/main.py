@@ -805,13 +805,28 @@ def me(ctx=Depends(current)):
     # 걸어다닌 만큼 친밀도를 올린다. 이 라우트가 이미 wild_state 를 읽고
     # 있어서 조회가 늘지 않고, 20분에 한 번만 쓰기 두 문장이 나간다.
     walked = walk.settle(uid, st)
+
+    # **선물을 먼저 지급하고 지갑을 읽는다.** 순서를 바꾸면 "5000원을
+    # 받았습니다" 라고 알리면서 화면의 소지금은 받기 전 값이 된다 -
+    # 다음 sync 까지 90초 동안 어긋나 있다.
+    gifts = items.gift_claim(uid)
+    if gifts:
+        fresh = db.q1("SELECT balls, money FROM users WHERE id=?", (uid,))
+        if fresh:
+            balls, money = fresh["balls"], fresh["money"]
+        else:
+            balls, money = u["balls"], u["money"]
+    else:
+        balls, money = u["balls"], u["money"]
+
     return {
         "user": auth.user_public(u),
         "walked": walked,
-        "balls": u["balls"],
-        "money": u["money"],
+        "balls": balls,
+        "money": money,
         # 사용자 행을 이미 들고 있으니 balls 를 넘겨 users 를 다시 안 읽는다.
-        "bag": items.bag_get(uid, u["balls"]),
+        # 선물을 받았으면 위에서 다시 읽은 값이다.
+        "bag": items.bag_get(uid, balls),
         "box": box, "onDesktop": desk,
         "limits": {"maxBox": config.MAX_BOX, "maxParty": config.MAX_PARTY,
                    "grassTtl": config.GRASS_TTL, "wildTtl": config.WILD_TTL},
@@ -822,6 +837,10 @@ def me(ctx=Depends(current)):
         # 이걸 위해 폴링을 새로 두지 않는다 - 어차피 90초마다 도는 sync 가
         # 이 라우트를 부르므로 여기에 얹는다. 쿼리 한 번 는다.
         "pvpUnseen": pvp.unseen_count(uid),
+        # 운영자가 넣어 둔 선물. **위에서 이미 지급했다** - 받았다는 것을
+        # 알리려면 지급과 알림이 한 흐름이어야 한다. 대전 수와 같은
+        # 이유로 폴링을 새로 두지 않고 여기에 얹는다.
+        "gifts": gifts,
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 
@@ -1061,7 +1080,12 @@ def _wild_public(row, reveal):
     """풀숲 상태에서는 어떤 포켓몬인지 알려주지 않는다."""
     mon = json.loads(row["data"])
     out = {"id": row["id"], "state": row["state"], "throws": row["throws"],
-           "expiresAt": row["expires_at"], "createdAt": row["created_at"]}
+           "expiresAt": row["expires_at"], "createdAt": row["created_at"],
+           # 이벤트 포켓몬이 숨어 있으면 풀숲에 꽃이 핀다.
+           #
+           # **종은 여전히 안 알려준다.** 참/거짓 하나뿐이라 "뭔가 특별한
+           # 것이 있다" 까지만 전해지고, 무엇인지는 눌러 봐야 안다.
+           "bloom": row["species"] == config.EVENT_SPECIES}
     if reveal:
         mon["id"] = row["id"]
         mon["wild"] = True
@@ -1109,10 +1133,56 @@ def _wild_levels(uid):
     return lvl, lvl, cap
 
 
+def _event_mon(uid):
+    """이벤트 포켓몬을 낼 차례인가. 낼 것이면 그 개체를, 아니면 None.
+
+    갈래는 둘이다.
+
+      1. **이벤트 볼을 가진 사람** — 잡을 때까지 반드시 나온다. 운영자가
+         볼을 선물한 사람이 이벤트 대상이다. 볼을 준 것 자체가 명단이라
+         따로 명단을 둘 필요가 없다.
+      2. **그 밖의 모두** — 아주 가끔 만난다(EVENT_RESPAWN). 새로 가입한
+         사람도, 이미 잡은 사람도 여기에 해당한다. 이 종은 이벤트가
+         끝나도 게임에 남되 아주 귀하다.
+
+    1번을 볼로 거는 이유가 있다. 조건 없이 "안 잡았으면 반드시" 로 하면
+    **새로 가입한 사람이 막힌다** - 첫 풀숲이 Lv30 짜리인데 Lv5 스타팅
+    으로는 못 이기고, 잡을 때까지 다른 포켓몬이 아예 안 나온다. 게다가
+    볼이 없으면 보통 볼로 12% 를 뚫어야 한다. 실제로 검사가 이걸 잡았다
+    (야생 30 / 파티 [5]).
+
+    **roll_wild 를 안 거친다.** 야생 종족값 상한은 330 + 레벨x8 이라
+    600짜리가 나오려면 파티 최저 레벨이 34는 되어야 한다. 그냥 굴리면
+    이벤트가 고레벨 유저만의 것이 된다.
+    """
+    key = config.EVENT_SPECIES
+    sp = dex().get(key)
+    if not sp:
+        return None                      # 도감에 없는 종을 적어 뒀다
+
+    def make():
+        return P.make_pokemon(sp, config.EVENT_LEVEL, RNG,
+                              shiny_rate=config.SHINY_RATE)
+
+    # 이벤트 대상인가. 볼을 아직 갖고 있고 아직 못 잡았으면 반드시 낸다.
+    # 풀숲은 90초 뒤에 사라지므로 한 번만 내면 자리를 비운 사이에 놓친
+    # 사람이 영영 못 갖는다.
+    if (items.bag_count(uid, config.EVENT_BALL) > 0
+            and not items.has_caught(uid, key)):
+        return make()
+
+    if RNG.random() >= config.EVENT_RESPAWN:
+        return None
+    return make()
+
+
 def _make_grass(uid):
     """풀숲을 만들면서 어떤 포켓몬이 숨어 있을지 미리 정해둔다."""
-    lo, hi, cap = _wild_levels(uid)
-    mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, shiny_rate=config.SHINY_RATE)
+    mon = _event_mon(uid)
+    if mon is None:
+        lo, hi, cap = _wild_levels(uid)
+        mon = dex().roll_wild(lo, hi, RNG, max_bst=cap,
+                              shiny_rate=config.SHINY_RATE)
     if mon is None:
         raise HTTPException(500, "등장 가능한 포켓몬이 없습니다.")
     t = now()

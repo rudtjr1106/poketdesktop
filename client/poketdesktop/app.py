@@ -23,6 +23,7 @@ if sys.platform == "darwin" and PLAT.gui_ready():   # noqa: E402
     # 그래서 먼저 물어보고, 없으면 main() 이 사람에게 말해 준다.
     from .tray_mac import Tray                 # noqa: E402,F811
 from .desktop_battle import DesktopBattle       # noqa: E402
+from . import ui_bag                          # noqa: E402
 from .ui_bag import BagWindow                  # noqa: E402
 from .ui_box import BoxWindow, confirm         # noqa: E402
 from .ui_dex import DexWindow                  # noqa: E402
@@ -89,6 +90,8 @@ class App(object):
         self.bag_window = None
         self.tm_window = None
         self._learn_queue = []       # 배울지 물어볼 포켓몬
+        self._gift_queue = []        # 알릴 선물
+        self._gift_showing = False
         self._learn_asking = False
         self.friends_win = None
         self.dex_window = None
@@ -544,6 +547,9 @@ class App(object):
                 # 상대가 걸어온 대전은 서버가 이 응답에 개수로 실어 준다.
                 # 이걸 위해 폴링을 새로 두지 않는다.
                 self.announce_pvp(me.get("pvpUnseen", 0))
+                # 운영자가 보낸 선물. 서버가 /api/me 에서 이미 지급했고
+                # 여기서는 알리기만 한다.
+                self.announce_gifts(me.get("gifts") or [])
             if self.overlay:
                 added = self.overlay.sync(mons or [], paths or {}, walks or {})
                 self._prefetch_anims(mons or [])
@@ -851,6 +857,39 @@ class App(object):
         if n:
             config.log("확인하지 않은 대전 %d개" % n)
         self.refresh_tray()
+
+    def announce_gifts(self, gifts):
+        """선물이 왔다고 알린다. 창은 배틀·진화가 끝난 뒤에 띄운다.
+
+        **창이 떠 있는 동안 다음 sync 가 와도 두 번 안 뜬다.** 서버가
+        이미 claimed 로 찍었으므로 그 다음 응답에는 안 실려 온다. 여기서는
+        띄우는 중인지만 보면 된다 - 같은 선물을 두 창이 물고 있으면
+        뒤엣것이 앞엣것을 덮는다.
+        """
+        if not gifts or self._gift_showing:
+            return
+        self._gift_queue.extend(gifts)
+        self._show_gifts()
+
+    def _show_gifts(self):
+        if self._gift_showing or self._quitting or not self._gift_queue:
+            return
+        # 배틀이나 진화 연출 중이면 기다린다. 그 위에 겹치면 무엇이
+        # 일어났는지 안 읽힌다.
+        if self.battle or self.arena:
+            return self.root.after(1500, self._show_gifts)
+        got, self._gift_queue = list(self._gift_queue), []
+        self._gift_showing = True
+        try:
+            PLAT.activate()
+            ui_bag.announce_gifts(self.root, self, got)
+        except Exception as e:                              # noqa: BLE001
+            config.log("선물 알림 오류: %s" % e)
+        finally:
+            self._gift_showing = False
+        # 창이 떠 있는 동안 새로 온 것이 있으면 이어서 보여준다.
+        if self._gift_queue:
+            self.root.after(400, self._show_gifts)
 
     def announce_friends(self, listing):
         """친구 요청이 새로 왔는지 본다. sync 응답에 실려 온다.

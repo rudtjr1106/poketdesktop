@@ -1144,6 +1144,111 @@ class BagWindow(object):
 
 
 # ---------------------------------------------------------------- 진화 알림
+def _gift_icon(parent, app, label, item_id, keep, tag):
+    """선물 상자에 도구 그림을 넣는다. 안 받아 뒀으면 받아서 넣는다.
+
+    **처음 받는 도구는 이 PC 에 그림이 없다.** 선물이 바로 그런 경우다 -
+    이벤트 볼처럼 상점에 없는 물건은 가방을 열어 본 적이 없으면 그림도
+    없다. 그대로 두면 이름만 뜨고 자리가 비어 보인다.
+
+    창을 늦게 띄우지는 않는다. 먼저 글로 띄우고, 그림이 오면 채운다.
+    """
+    got = item_icons.photo(item_id, 26)
+    if got is not None:
+        keep[tag] = got
+        return label.configure(image=got)
+
+    def work():
+        item_icons.raw(app.api, item_id)     # 받아서 이 PC 에 남긴다
+        return True
+
+    def done(_r, err):
+        if err:
+            return
+        try:
+            ph = item_icons.photo(item_id, 26)
+            if ph is not None:
+                keep[tag] = ph
+                label.configure(image=ph)
+        except Exception:                                  # noqa: BLE001
+            pass
+
+    U.run_async(parent, work, done)
+
+
+def announce_gifts(parent, app, gifts):
+    """운영자가 보낸 선물이 도착했다고 알린다.
+
+    **여럿이면 한 창에 모아 보여준다.** 하나씩 띄우면 창이 줄줄이 뜬다.
+
+    껍데기는 진화 알림과 같은 것을 쓴다(ui_box._shell). 창마다 다시
+    그리면 미묘하게 달라진다.
+
+    도구 그림은 이미 받아 둔 것만 쓴다. 없으면 글로만 보여준다 - 선물이
+    왔다는 사실이 그림보다 중요하고, 그림 받다 창이 늦게 뜨면 안 된다.
+    """
+    if not gifts:
+        return
+    keep = {}
+    n = len(gifts)
+    # 창 높이는 줄 수에 따라 잡고, 글꼴이 커지면 같이 커진다.
+    # **넉넉하게 잡는다.** 모자라면 아래에서부터 조용히 눌린다 - 실제로
+    # 18px 이 모자라 단추 글씨('고맙습니다')까지 잘렸다.
+    height = U.h(250) + min(n, 8) * U.h(38)
+    win, f = ui_box._shell(parent, "선물", 420, height)
+
+    tk.Label(f, text="선물이 도착했습니다", bg=U.BG, fg=U.ACCENT_TEXT,
+             font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
+    # 제목과 메시지는 운영자가 적은 것이다. 첫 선물의 것을 쓴다 -
+    # 한 번에 여러 개를 보낼 때는 보통 같은 이유로 보낸다.
+    head = gifts[0].get("title") or ""
+    msg = gifts[0].get("message") or ""
+    if head:
+        tk.Label(f, text=head, bg=U.BG, fg=U.FG, font=U.FONT_H,
+                 wraplength=360, justify="left").pack(anchor="w", pady=(6, 0))
+    if msg:
+        tk.Label(f, text=natural(msg), bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,
+                 wraplength=360, justify="left").pack(anchor="w", pady=(4, 0))
+
+    box = tk.Frame(f, bg=PANEL, highlightthickness=2,
+                   highlightbackground=U.LINE)
+    box.pack(fill="x", pady=(14, 0))
+    inner = tk.Frame(box, bg=PANEL)
+    inner.pack(fill="x", padx=14, pady=10)
+    for i, g in enumerate(gifts[:8]):
+        row = tk.Frame(inner, bg=PANEL, height=U.h(34))
+        row.pack(fill="x")
+        row.pack_propagate(False)
+        # **그림 자리를 픽셀로 잡는다.** Label 의 width 는 글자일 때는
+        # 글자 수인데 그림일 때는 픽셀이라, width=3 을 주면 그림이 3px
+        # 로 눌린다. 게다가 돈처럼 그림이 없는 줄과 들여쓰기가 어긋난다.
+        # 칸(Frame)으로 자리를 잡으면 있든 없든 줄이 맞는다.
+        slot = tk.Frame(row, bg=PANEL, width=U.h(30), height=U.h(30))
+        slot.pack(side="left", padx=(0, 8))
+        slot.pack_propagate(False)
+        icon = tk.Label(slot, bg=PANEL)
+        icon.pack(expand=True)
+        if g.get("kind") == "item" and g.get("item"):
+            _gift_icon(parent, app, icon, g["item"], keep, i)
+        tk.Label(row, text="%s ×%d" % (g.get("name") or "?", g.get("count", 1)),
+                 bg=PANEL, fg=U.FG, font=U.FONT_B,
+                 anchor="w").pack(side="left")
+    if n > 8:
+        tk.Label(inner, text="그 밖 %d개" % (n - 8), bg=PANEL,
+                 fg=U.FG_FAINT, font=U.FONT_XS).pack(anchor="w", pady=(4, 0))
+
+    tk.Label(f, text="가방에 넣어 두었습니다.", bg=U.BG, fg=U.FG_DIM,
+             font=U.FONT_S, wraplength=360,
+             justify="left").pack(anchor="w", pady=(10, 0))
+
+    row = tk.Frame(f, bg=U.BG)
+    row.pack(fill="x", pady=(14, 0))
+    U.PushButton(row, "고맙습니다", win.destroy, height=34,
+                 font=U.FONT_B).pack(side="right")
+    win.grab_set()
+    parent.wait_window(win)
+
+
 def announce_evolve(parent, app, info):
     """진화했다고 크게 알린다.
 

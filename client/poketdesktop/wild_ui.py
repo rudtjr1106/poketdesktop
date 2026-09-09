@@ -35,7 +35,11 @@ class GrassPatch(object):
         hexkey = "#%02x%02x%02x" % key
 
         size = max(28, int(ov.settings["targetHeight"]))
-        frames, w, h = effects.grass_frames(size, 6, key)
+        # 이벤트 포켓몬이 숨어 있으면 꽃이 핀 판을 그린다. 서버가
+        # 참/거짓만 알려주므로 **무엇이 있는지는 여기서도 모른다.**
+        # 풀 배치와 흔들림은 한 픽셀도 안 바뀐다 - 같은 풀숲으로 읽힌다.
+        frames, w, h = effects.grass_frames(
+            size, 6, key, bloom=bool((wild or {}).get("bloom")))
         self.fw, self.fh = w, h
         self.frame = 0
 

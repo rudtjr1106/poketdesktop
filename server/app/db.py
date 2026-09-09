@@ -169,6 +169,27 @@ CREATE TABLE IF NOT EXISTS bag (
     PRIMARY KEY (user_id, item)
 );
 
+-- 운영자가 주는 선물. **가방을 직접 고치지 않고 여기 한 줄을 넣는다.**
+--
+-- 가방을 직접 늘리면 유저는 그게 늘어난 줄을 모른다. 드랍·판매·배틀
+-- 보상으로도 가방은 늘어나므로, 서버가 "이건 선물이다" 를 구분할 방법이
+-- 없기 때문이다. 여기 넣으면 서버가 지급하면서 알려 줄 수 있다.
+--
+-- claimed_at 이 NULL 이면 아직 안 받은 것이다. /api/me 가 지급하면서
+-- 그 자리에서 시각을 찍는다 - 90초마다 오는 요청이라 두 번 주면 안 된다.
+CREATE TABLE IF NOT EXISTS gift (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,          -- item / money / balls
+    item_id    TEXT,                   -- kind=item 일 때만
+    count      INTEGER NOT NULL DEFAULT 1,
+    title      TEXT,
+    message    TEXT,
+    created_at TEXT NOT NULL,
+    claimed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_gift_user ON gift(user_id, claimed_at);
+
 -- 기술머신은 개수가 없다. 한 번 얻으면 계속 쓰고, 팔지도 사지도 못한다.
 -- 그래서 가방(bag)에 안 넣는다 - 거기는 개수를 세는 곳이다.
 CREATE TABLE IF NOT EXISTS tm_owned (
