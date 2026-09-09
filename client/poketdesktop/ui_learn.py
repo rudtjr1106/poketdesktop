@@ -73,7 +73,10 @@ class ForgetAsk(object):
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.resizable(False, False)
+        # 크기 고정은 _fit 이 끝에서 건다. 여기서 미리 걸면 안 된다 -
+        # 창이 화면에 붙은 뒤에는 창 관리자가 크기 바꾸기를 거절해서,
+        # 처음 잡아 둔 360 에 그대로 묶인다. CI 의 맥 러너가 그랬다
+        # (내 맥은 받아 줘서 안 드러났다).
         self.parent = parent
 
         bar = tk.Frame(self.win, bg=U.BG2, height=U.h(34))
@@ -226,8 +229,12 @@ class ForgetAsk(object):
                 want = self.win.winfo_reqheight()
 
             h = max(MIN_H, min(want, cap))
+            # **잠깐 풀었다 다시 잠근다.** 고정된 창은 창 관리자가 크기
+            # 바꾸기를 거절할 수 있다.
+            self.win.resizable(True, True)
             self.win.geometry("%dx%d" % (W, h))
             self.win.update_idletasks()
+            self.win.resizable(False, False)
         except Exception:                                  # noqa: BLE001
             pass
 
