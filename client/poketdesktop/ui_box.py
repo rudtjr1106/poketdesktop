@@ -11,6 +11,7 @@ from tkinter import ttk
 
 from PIL import ImageTk
 
+from common import movetext as MT
 from common.korean import natural
 
 from . import box_filter, item_icons, sprite_cache, sprites
@@ -962,8 +963,10 @@ class BoxWindow(object):
             name = tk.Label(cell, text=mv, bg=col, fg="#14141a",
                             font=U.FONT_B, cursor="hand2")
             name.pack(pady=(4, 0))
+            # 타입만 적혀 있어서 물리인지 특수인지 알 수가 없었다.
+            # 칸이 좁으니 `불꽃 · 특수 · 90` 까지만.
             sub = "%s · %s" % (dex.type_name((md or {}).get("type")) if dex else "",
-                               (md or {}).get("power") or "변화")
+                               MT.short_line(md))
             note = tk.Label(cell, text=sub, bg=col, fg="#2a2a35",
                             font=U.FONT_XS, cursor="hand2")
             note.pack(pady=(0, 4))
@@ -991,18 +994,8 @@ class BoxWindow(object):
             self.d_move_box.pack_forget()
             return
         md = md or {}
-        bits = [name or "?"]
-        power = md.get("power")
-        bits.append("위력 %d" % power if power else "변화 기술")
-        acc = md.get("acc")
-        # 명중률이 없는 기술이 있다(반드시 맞는다). 0 을 그대로 적으면
-        # 절대 안 맞는 것처럼 보인다.
-        bits.append("명중 %d" % acc if acc else "명중 —")
-        if md.get("pp"):
-            bits.append("PP %d" % md["pp"])
-        self.d_move_stat.configure(text="  ·  ".join(bits))
-        self.d_move_desc.configure(
-            text=md.get("desc") or "설명이 아직 없는 기술입니다.")
+        self.d_move_stat.configure(text=MT.stat_line(md, name or "?"))
+        self.d_move_desc.configure(text=MT.desc(md))
         self.d_move_box.pack(fill="x", pady=(7, 0))
         self._show_move_box()
 

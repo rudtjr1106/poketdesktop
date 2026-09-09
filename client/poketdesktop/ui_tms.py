@@ -16,6 +16,7 @@
 """
 import tkinter as tk
 
+from common import movetext as MT
 from common.korean import natural
 
 from . import sprite_cache, sprites
@@ -35,7 +36,9 @@ TYPE_KR = {
     "ROCK": "바위", "GHOST": "고스트", "DRAGON": "드래곤", "DARK": "악",
     "STEEL": "강철", "FAIRY": "페어리", "STELLAR": "스텔라",
 }
-CAT_KR = {"physical": "물리", "special": "특수", "status": "변화"}
+# 분류 이름은 common/movetext 가 갖고 있다. 화면마다 따로 적으면
+# 한쪽만 고쳐지는 날이 온다.
+CAT_KR = MT.CAT_KR
 
 
 class TmWindow(object):
@@ -134,6 +137,15 @@ class TmWindow(object):
                                 font=U.FONT_S, anchor="w", justify="left",
                                 wraplength=520)
         self.sub_lbl.pack(anchor="w", pady=(4, 0))
+        # 무엇을 하는 기술인지가 어디에도 없었다. 타입과 분류만 보고
+        # 가르칠지 말지를 정해야 했다. 설명은 도감에 이미 들어 있다
+        # (t["move"] 가 내부 이름이라 그대로 찾아 쓴다. 서버가 다시
+        # 실어 보낼 것이 없다).
+        self.desc_lbl = tk.Label(head, text="", bg=U.BG2, fg=U.FG_DIM,
+                                 font=U.FONT_S, anchor="w", justify="left",
+                                 wraplength=520)
+        self.desc_lbl.pack(anchor="w", pady=(6, 0), fill="x")
+        U.wrap_to_width(self.desc_lbl)
 
         tk.Label(right, text="배울 수 있는 포켓몬", bg=U.BG2, fg=U.FG_FAINT,
                  font=U.FONT_XS, anchor="w").pack(anchor="w", padx=18,
@@ -207,16 +219,22 @@ class TmWindow(object):
                       fg=U.FG_FAINT if have else U.LINE2,
                       font=U.FONT_XS, anchor="e")
         ty.pack(side="right", padx=(0, 12))
-        self.rows[t["no"]] = (f, no, nm, ty, have)
+        # 358개를 훑을 때 타입만으로는 쓸 만한지 모른다. 공격이 높은
+        # 포켓몬을 키우는 사람에게 특수기 기술머신은 소용이 없다.
+        ct = tk.Label(f, text=CAT_KR.get(t["cat"], t["cat"]), bg=U.BG,
+                      fg=MT.cat_color(t) if have else U.LINE2,
+                      font=U.FONT_XS, anchor="e")
+        ct.pack(side="right", padx=(0, 8))
+        self.rows[t["no"]] = (f, no, nm, ty, ct, have)
         if have:
-            for w in (f, no, nm, ty):
+            for w in (f, no, nm, ty, ct):
                 w.bind("<Button-1>", lambda _e, n=t["no"]: self.pick(n))
 
     def _mark(self):
-        for n, (f, no, nm, ty, have) in self.rows.items():
+        for n, (f, no, nm, ty, ct, have) in self.rows.items():
             on = (n == self.no)
             bg = U.ACCENT_SOFT if on else U.BG
-            for w in (f, no, nm, ty):
+            for w in (f, no, nm, ty, ct):
                 w.configure(bg=bg)
             nm.configure(fg=U.ACCENT_TEXT if on
                          else (U.FG if have else U.FG_FAINT))
@@ -234,6 +252,16 @@ class TmWindow(object):
                 return t
         return None
 
+    def _move(self, t):
+        """이 기술머신이 가르치는 기술. 도감이 없으면 빈 것."""
+        dex = getattr(self.app, "dex", None)
+        if dex is None or not t.get("move"):
+            return {}
+        try:
+            return dex.move(t["move"]) or {}
+        except Exception:                                   # noqa: BLE001
+            return {}
+
     def _paint_detail(self):
         for w in self.mon_inner.winfo_children():
             w.destroy()
@@ -242,11 +270,16 @@ class TmWindow(object):
         if not t:
             self.title_lbl.configure(text="기술머신을 고르세요")
             self.sub_lbl.configure(text="")
+            self.desc_lbl.configure(text="")
             return
         self.title_lbl.configure(text=t["label"])
-        self.sub_lbl.configure(
-            text="%s · %s" % (TYPE_KR.get(t["type"], t["type"]),
-                              CAT_KR.get(t["cat"], t["cat"])))
+        md = self._move(t)
+        bits = [TYPE_KR.get(t["type"], t["type"]),
+                CAT_KR.get(t["cat"], t["cat"])]
+        # 위력·명중·PP 는 도감에서 온다. 없으면 타입과 분류만 적는다.
+        bits += MT.stat_bits(md, with_cat=False) if md else []
+        self.sub_lbl.configure(text=MT.SEP.join(b for b in bits if b))
+        self.desc_lbl.configure(text=MT.desc(md) if md else "")
 
         self._fill_mons(t)
 
