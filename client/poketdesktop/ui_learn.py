@@ -201,22 +201,27 @@ class ForgetAsk(object):
             cat.configure(fg=MT.cat_color(md))
 
     def _resize(self, h):
-        """창 높이를 h 로. **잠깐 풀었다 다시 잠근다.**
+        """창 높이를 h 로 못 박는다.
 
-        크기 고정된 창은 창 관리자가 크기 바꾸기를 거절할 수 있다.
-        CI 의 맥 러너가 그래서 창이 360 에 묶여 있었다.
+        **resizable(False, False) 로 잠그면 안 된다.** 그렇게 잠그면 창이
+        자기 '요청 높이' 로 되돌아간다. 그런데 요청 높이는 실제로 필요한
+        높이보다 몇 px 작게 나올 때가 있어서(창 테두리·스크롤바를 어떻게
+        세는지가 OS 마다 다르다), 애써 키운 창이 도로 줄어든다. CI 의 맥
+        러너에서 709 로 키워도 649 로 돌아가 마지막 줄이 안 보였다.
+
+        min 과 max 를 같은 값으로 두면 그 크기로 못 박히고, 크기를 바꿀
+        수 없다는 점도 그대로다.
         """
-        self.win.resizable(True, True)
+        self.win.minsize(W, h)
+        self.win.maxsize(W, h)
         self.win.geometry("%dx%d" % (W, h))
         # **update_idletasks 로는 모자란다.** 창 크기는 창 관리자가
         # 나중에 알려 준다(ConfigureNotify). idle 만 돌리면 그 소식을
-        # 못 받아서, 바로 재면 옛 크기가 나온다. 그 값으로 다시 맞추면
-        # 8px 이 모자란 채로 끝난다 - CI 의 맥 러너가 그랬다.
+        # 못 받아서, 바로 재면 옛 크기가 나온다.
         try:
             self.win.update()
         except Exception:                                  # noqa: BLE001
             self.win.update_idletasks()
-        self.win.resizable(False, False)
 
     def _fit(self):
         """다 담고 나서 창을 내용에 맞춘다.
