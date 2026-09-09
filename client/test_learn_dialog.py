@@ -58,17 +58,22 @@ def chk(name, cond, got=""):
 
 
 def squeezed(win):
-    """필요한 크기보다 작게 그려진 위젯. 있으면 글이 잘려 있다는 뜻이다."""
+    """필요한 크기보다 작게 그려진 위젯. 있으면 글이 잘려 있다는 뜻이다.
+
+    **굴러가는 칸 안은 안 본다.** 거기 든 것은 원래 화면보다 크고, 그래서
+    굴려서 보는 것이다. 그걸 눌렸다고 세면 화면이 작아 굴려야 하는 순간
+    검사가 통째로 거짓 경보를 낸다.
+    """
     out = []
 
-    def walk(w):
+    def walk(w, inside_canvas=False):
         for c in w.winfo_children():
+            is_canvas = c.winfo_class() == "Canvas"
             try:
                 rw, rh = c.winfo_reqwidth(), c.winfo_reqheight()
                 aw, ah = c.winfo_width(), c.winfo_height()
-                # 1x1 은 아직 안 그려진 것이다. 굴러가는 칸(Canvas)은
-                # 원래 내용보다 작게 잘라 보여주는 것이라 뺀다.
-                if aw > 1 and ah > 1 and c.winfo_class() != "Canvas":
+                # 1x1 은 아직 안 그려진 것이다.
+                if aw > 1 and ah > 1 and not is_canvas and not inside_canvas:
                     if rh > ah + 1:
                         out.append(("세로", c.winfo_class(),
                                     str(c.cget("text"))[:18]
@@ -79,7 +84,7 @@ def squeezed(win):
                                     if "text" in c.keys() else "", rw, aw))
             except Exception:                               # noqa: BLE001
                 pass
-            walk(c)
+            walk(c, inside_canvas or is_canvas)
     walk(win)
     return out
 
