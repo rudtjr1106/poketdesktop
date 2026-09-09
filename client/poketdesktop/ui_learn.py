@@ -100,6 +100,16 @@ class ForgetAsk(object):
                  wraplength=W - 60, justify="left").pack(anchor="w",
                                                          pady=(4, 12))
 
+        # **단추를 먼저 담는다.** pack 은 먼저 담은 쪽에 자리를 먼저 준다.
+        # 굴러가는 칸을 먼저 담으면 그것이 자리를 다 먹고 단추를 밀어낸다 -
+        # 작은 화면에서 '결정' 글씨가 23px 이 필요한데 5px 만 받았다.
+        # 단추가 안 보이면 창을 닫는 것 말고 할 수 있는 일이 없어진다.
+        row = tk.Frame(f, bg=U.BG)
+        row.pack(side="bottom", fill="x", pady=(14, 0))
+        self.ok_btn = U.PushButton(row, "결정", self._ok, height=34,
+                                   font=U.FONT_B)
+        self.ok_btn.pack(side="right")
+
         # 굴러가는 영역에 담는다. 다섯 개가 화면에 다 들어가면 스크롤바는
         # 움직이지 않는다(_scroller 가 그렇게 만든다).
         from .ui_bag import _scroller
@@ -109,12 +119,6 @@ class ForgetAsk(object):
             self._row(box, mv, is_new=False)
         tk.Frame(box, bg=U.LINE, height=U.h(1)).pack(fill="x", pady=6)
         self._row(box, new_move, is_new=True)
-
-        row = tk.Frame(f, bg=U.BG)
-        row.pack(fill="x", pady=(14, 0))
-        self.ok_btn = U.PushButton(row, "결정", self._ok, height=34,
-                                   font=U.FONT_B)
-        self.ok_btn.pack(side="right")
 
         self.win.protocol("WM_DELETE_WINDOW", self._cancel)
         self._fit()
@@ -204,7 +208,14 @@ class ForgetAsk(object):
         """
         self.win.resizable(True, True)
         self.win.geometry("%dx%d" % (W, h))
-        self.win.update_idletasks()
+        # **update_idletasks 로는 모자란다.** 창 크기는 창 관리자가
+        # 나중에 알려 준다(ConfigureNotify). idle 만 돌리면 그 소식을
+        # 못 받아서, 바로 재면 옛 크기가 나온다. 그 값으로 다시 맞추면
+        # 8px 이 모자란 채로 끝난다 - CI 의 맥 러너가 그랬다.
+        try:
+            self.win.update()
+        except Exception:                                  # noqa: BLE001
+            self.win.update_idletasks()
         self.win.resizable(False, False)
 
     def _fit(self):
@@ -244,7 +255,7 @@ class ForgetAsk(object):
             h = max(MIN_H, min(want, cap))
             self._resize(h)
 
-            for _ in range(3):
+            for _ in range(5):
                 seen = self.canvas.winfo_height()
                 now = self.win.winfo_height()
                 if seen <= 1 or now <= 1:
