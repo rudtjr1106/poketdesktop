@@ -518,9 +518,22 @@ def wrap_to_width(label, pad=0):
     스크롤바를 나중에 붙이면서 상수를 안 고친 탓이었다.
 
     그려진 뒤에 <Configure> 로 다시 잡으므로 창을 늘였다 줄여도 맞는다.
+
+    **라벨 자신의 여백을 빼야 한다.** wraplength 는 글자가 차지할 폭이고,
+    라벨이 실제로 먹는 폭은 거기에 padx 와 테두리가 더 붙는다. tk 기본값이
+    padx=1, bd=2 라 좌우로 6px 이 더 든다. 그대로 두면 필요한 폭이 받은
+    폭보다 6px 커져서 가장 긴 줄의 끝이 잘린다 - 기술 배우기 창에서
+    설명 라벨이 389 를 원하는데 383 만 받아 실제로 잘려 있었다.
     """
+    def chrome():
+        try:
+            return 2 * (int(label.cget("padx")) + int(label.cget("bd"))
+                        + int(label.cget("highlightthickness")))
+        except Exception:                                   # noqa: BLE001
+            return 0
+
     def fit(e):
-        w = e.width - pad
+        w = e.width - pad - chrome()
         if w > 40 and int(label.cget("wraplength")) != w:
             label.configure(wraplength=w)
     label.bind("<Configure>", fit)
