@@ -23,7 +23,11 @@
 ## 돌리는 법
 
     python3 tools/make_dbview_app.py                 # dist/ 에 만든다
-    python3 tools/make_dbview_app.py --install       # 응용 프로그램에 놓는다
+    python3 tools/make_dbview_app.py --install       # /Applications 에 놓는다
+
+`--install` 은 **`/Applications`** 에 넣는다. `~/Applications` 가 아니다 -
+파인더 사이드바의 '응용 프로그램' 과 런치패드가 보는 곳은 `/Applications`
+라서, 홈 밑에 넣으면 만들어 놓고도 안 보인다. 실제로 그렇게 헤맸다.
 
 서명은 안 한다. 내가 내 맥에서 만든 것이라 격리 딱지가 안 붙고,
 Gatekeeper 도 묻지 않는다. 남에게 보낼 것이 아니다.
@@ -101,8 +105,9 @@ def build(dest_dir):
         "CFBundleShortVersionString": "1.0",
         "CFBundlePackageType": "APPL",
         "LSMinimumSystemVersion": "11.0",
-        # Dock 에 남지 않는다. 터미널을 띄우고 나면 할 일이 없다.
-        "LSUIElement": True,
+        # **LSUIElement 를 켜면 안 된다.** 그건 '보조 프로그램' 표시라
+        # 런치패드에 안 뜬다. 이 앱은 터미널만 띄우고 바로 끝나므로 Dock
+        # 에 잠깐 튀는 것이 오히려 눌렸다는 신호가 된다.
         "NSHighResolutionCapable": True,
     }
 
@@ -126,14 +131,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
     ap.add_argument("--install", action="store_true",
-                    help="~/Applications 에 놓는다")
+                    help="/Applications 에 놓는다 (파인더에서 보이는 그곳)")
     a = ap.parse_args()
 
     if sys.platform != "darwin":
         sys.stderr.write("맥에서만 만듭니다.\n")
         return 1
 
-    out = os.path.expanduser("~/Applications") if a.install else a.out
+    # 파인더 사이드바의 '응용 프로그램' 과 런치패드는 /Applications 를
+    # 본다. ~/Applications 는 기본으로 어디에도 안 나온다.
+    out = "/Applications" if a.install else a.out
     if not os.path.isdir(out):
         os.makedirs(out)
 
@@ -142,7 +149,8 @@ def main():
         return 1
     print("  만들었습니다: %s" % app)
     if a.install:
-        print("  런치패드나 응용 프로그램 폴더에서 두 번 누르세요.")
+        print("  파인더 > 응용 프로그램, 또는 런치패드에서 두 번 누르세요.")
+        subprocess.run(["open", "-R", app], check=False)   # 파인더에서 보여준다
     else:
         print("  두 번 눌러 열거나, 응용 프로그램 폴더로 끌어다 놓으세요.")
         print("  (또는 python3 tools/make_dbview_app.py --install)")
