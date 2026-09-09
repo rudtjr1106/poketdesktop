@@ -1176,6 +1176,18 @@ def _gift_icon(parent, app, label, item_id, keep, tag):
     U.run_async(parent, work, done)
 
 
+def gift_line(g):
+    """선물 한 줄에 적을 말.
+
+    돈은 개수가 아니다. "돈 ×5000" 이라고 적으면 5000개를 받은 것처럼
+    읽힌다. 화면 어디서나 돈은 "5,000원" 이라 여기서도 그렇게 적는다.
+    """
+    n = int(g.get("count", 1) or 0)
+    if g.get("kind") == "money":
+        return "%s원" % format(n, ",")
+    return "%s ×%d" % (g.get("name") or "?", n)
+
+
 def announce_gifts(parent, app, gifts):
     """운영자가 보낸 선물이 도착했다고 알린다.
 
@@ -1230,8 +1242,7 @@ def announce_gifts(parent, app, gifts):
         icon.pack(expand=True)
         if g.get("kind") == "item" and g.get("item"):
             _gift_icon(parent, app, icon, g["item"], keep, i)
-        tk.Label(row, text="%s ×%d" % (g.get("name") or "?", g.get("count", 1)),
-                 bg=PANEL, fg=U.FG, font=U.FONT_B,
+        tk.Label(row, text=gift_line(g), bg=PANEL, fg=U.FG, font=U.FONT_B,
                  anchor="w").pack(side="left")
     if n > 8:
         tk.Label(inner, text="그 밖 %d개" % (n - 8), bg=PANEL,

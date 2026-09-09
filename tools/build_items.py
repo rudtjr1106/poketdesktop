@@ -89,7 +89,7 @@ EXTRA = [
         "kr": "플라워볼", "en": "Flower Ball",
         "cat": "ball", "cost": 0, "sell": 0, "buyable": False,
         # **설명에 종 이름을 쓰지 않는다.** 가방에서 미리 읽힌다.
-        "desc": "어떤 포켓몬을 위해 만들어진 볼."
+        "desc": "등에 꽃이 핀 포켓몬을 위해 만들어진 볼."
                 " 그 포켓몬은 반드시 잡을 수 있다.",
         "effect": {"kind": "ball", "mult": 1.0, "cond": "event_target"},
     },
