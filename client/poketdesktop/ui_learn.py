@@ -200,25 +200,34 @@ class ForgetAsk(object):
         글꼴에 달렸고, 글꼴은 OS 마다 다르다. 화면보다 커질 때만
         거기서 자르고, 그때는 굴려서 본다.
 
-        **창의 reqheight 를 보면 안 된다.** 줄들이 굴러가는 칸(Canvas)
-        안에 있어서, 창은 그 안에 무엇이 얼마나 들었는지 모른다. 캔버스가
-        원하는 크기는 자기 설정값이지 내용이 아니다. 그래서 안쪽 칸이
-        원하는 높이와 지금 보이는 높이의 차이만큼만 창을 키운다.
+        **그려진 크기(winfo_height)를 보면 안 된다.** 창이 화면에 막
+        붙은 참이라 아직 제자리를 못 잡았을 수 있다. CI 의 맥 러너가
+        그랬다 - 캔버스 높이가 1 로 읽혀 창이 안 커졌고, 다섯 줄 중
+        둘만 보였다. 여기서는 **요청 크기(winfo_reqheight)만** 쓴다.
+        그건 그리기 전에도 맞는 값이다.
 
-        창이 아직 화면에 안 붙었으면 winfo_height 가 1 이라 이 계산이
-        안 된다. 그래서 show() 에서 한 번 더 부른다.
+        방법은 이렇다. 줄들이 든 칸이 원하는 높이를 캔버스에 그대로
+        요청 높이로 물려 준다. 그러면 창의 요청 높이에 내용이 포함되어,
+        창을 그 크기로 잡기만 하면 된다. 화면 상한을 넘으면 넘친 만큼만
+        캔버스에서 덜어낸다 - 그때는 굴려서 본다.
         """
         try:
             self.win.update_idletasks()
-            cur = self.win.winfo_height()
-            if cur <= 1:
-                cur = self.win.winfo_reqheight()
-            seen = self.canvas.winfo_height()
-            grow = self.box.winfo_reqheight() - seen if seen > 1 else 0
+            need = self.box.winfo_reqheight()
+            self.canvas.configure(height=max(1, need))
+            self.win.update_idletasks()
+
+            want = self.win.winfo_reqheight()
             cap = self.win.winfo_screenheight() - SCREEN_PAD
-            h = max(MIN_H, min(cur + max(0, grow), cap))
-            if h != self.win.winfo_height():
-                self.win.geometry("%dx%d" % (self.win.winfo_width() or W, h))
+            if want > cap:
+                # 넘친 만큼 캔버스를 줄인다. 창은 상한에 딱 맞는다.
+                self.canvas.configure(height=max(U.h(80), need - (want - cap)))
+                self.win.update_idletasks()
+                want = self.win.winfo_reqheight()
+
+            h = max(MIN_H, min(want, cap))
+            self.win.geometry("%dx%d" % (W, h))
+            self.win.update_idletasks()
         except Exception:                                  # noqa: BLE001
             pass
 
