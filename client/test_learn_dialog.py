@@ -162,13 +162,19 @@ def main():
     # **창이 내용만큼 커져야 한다.** 굴러가는 칸에 담아 두면 창은 그 안에
     # 무엇이 얼마나 들었는지 모른다. 안 키우면 두 줄만 보이고 나머지는
     # 굴려야 나오는데, 비교하라고 만든 창에서 그러면 안 된다.
-    room = root.winfo_screenheight() - ui_learn.SCREEN_PAD
-    if need <= room:
+    #
+    # **내용 높이만 화면과 견주면 안 된다.** 창에는 제목·설명·단추가
+    # 같이 들어서 내용보다 190px 쯤 더 든다. 그걸 빼먹고 재는 바람에,
+    # 창이 화면 상한에 걸려 줄어든 것을 검사가 버그로 읽었다. 창이
+    # 상한에 안 걸렸을 때만 '다 보여야 한다' 고 따진다.
+    cap = root.winfo_screenheight() - ui_learn.SCREEN_PAD
+    print("  화면 %d · 상한 %d · 창 %d · 내용 %d · 보이는 %d"
+          % (root.winfo_screenheight(), cap, size[1], need, seen))
+    if size[1] < cap:
         chk("다섯 줄이 다 보인다 (굴릴 필요 없다)", seen >= need,
             "보이는 %d < 필요한 %d" % (seen, need))
     else:
-        print("  건너뜀 화면이 작아 굴려야 한다 (필요 %d > 자리 %d)"
-              % (need, room))
+        print("  건너뜀 화면이 작아 창이 상한(%d)에 걸렸다. 굴려서 본다." % cap)
 
     print("\n=== 분류가 보인다 (물리·특수·변화 한 창에)")
     # 분류가 다른 것만 골라 담는다. 셋이 다 나와야 한다.
