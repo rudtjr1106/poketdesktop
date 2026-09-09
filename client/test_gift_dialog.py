@@ -96,7 +96,7 @@ def show(root, app, gifts, hold=700):
                 root.update_idletasks()
                 box["sq"] = squeezed(w)
                 box["size"] = (w.winfo_width(), w.winfo_height())
-                box["rows"] = _rows(w)
+                box["rows"] = _rows(w, gifts)
                 w.destroy()
                 return
         root.after(120, snap)
@@ -106,21 +106,28 @@ def show(root, app, gifts, hold=700):
     return box.get("sq", []), box.get("size", (0, 0)), box.get("rows", [])
 
 
-def _rows(win):
-    """선물 한 줄의 이름 라벨 x 좌표. 줄이 맞는지 본다."""
-    xs = []
+def _rows(win, gifts):
+    """선물 한 줄의 (x 좌표, 글).
+
+    줄이 맞는지와 **말이 맞는지**를 같이 본다. 찾을 글을 ui_bag 에서
+    직접 만들어 맞춰 보므로, 문구를 고치면 여기도 같이 따라온다.
+    돈을 "돈 ×5000" 이라고 적던 적이 있어서 남겨 둔다.
+    """
+    want = set(ui_bag.gift_line(g) for g in gifts[:8])
+    found = []
 
     def walk(w):
         for c in w.winfo_children():
             try:
-                if (c.winfo_class() == "Label" and "text" in c.keys()
-                        and "×" in str(c.cget("text"))):
-                    xs.append(c.winfo_rootx() - win.winfo_rootx())
+                if c.winfo_class() == "Label" and "text" in c.keys():
+                    t = str(c.cget("text"))
+                    if t in want:
+                        found.append((c.winfo_rootx() - win.winfo_rootx(), t))
             except Exception:
                 pass
             walk(c)
     walk(win)
-    return xs
+    return found
 
 
 def main():
@@ -134,30 +141,35 @@ def main():
           % (U.FAMILY, U.FONT[1], U.BASE_PT))
 
     print("\n=== 선물 셋 ===")
-    sq, size, xs = show(root, app, GIFTS)
+    sq, size, rows = show(root, app, GIFTS)
+    xs = [x for x, _ in rows]
+    texts = [t for _, t in rows]
     chk("창이 떴다", size[0] > 100 and size[1] > 100, size)
     chk("눌린 것이 없다", not sq, sq[:4])
-    chk("줄이 셋", len(xs) == 3, xs)
+    chk("줄이 셋", len(rows) == 3, texts)
     # 그림이 있는 줄과 없는 줄의 이름이 같은 x 에서 시작해야 한다.
     # Label 의 width 를 글자 수로 주면 여기가 어긋난다.
     chk("이름이 같은 자리에서 시작한다", len(set(xs)) <= 1, xs)
+    # 돈은 개수가 아니다. "돈 ×5000" 은 5000개로 읽힌다.
+    chk("돈은 원으로 적는다", "5,000원" in texts, texts)
+    chk("돈에 ×를 안 쓴다", not any("돈" in t for t in texts), texts)
 
     print("\n=== 하나만 ===")
-    sq, size, xs = show(root, app, GIFTS[:1])
+    sq, size, rows = show(root, app, GIFTS[:1])
     chk("눌린 것이 없다", not sq, sq[:4])
-    chk("줄이 하나", len(xs) == 1, xs)
+    chk("줄이 하나", len(rows) == 1, rows)
 
     print("\n=== 여덟 개 넘게 (넘치면 접어야 한다) ===")
     many = [dict(GIFTS[1], count=i + 1, name="돈") for i in range(12)]
-    sq, size, xs = show(root, app, many)
+    sq, size, rows = show(root, app, many)
     chk("눌린 것이 없다", not sq, sq[:4])
-    chk("여덟 줄까지만 그린다", len(xs) <= 8, len(xs))
+    chk("여덟 줄까지만 그린다", len(rows) <= 8, len(rows))
 
     print("\n=== 글이 길어도 안 잘린다 ===")
     longish = [dict(GIFTS[0],
                     title="아주 긴 제목을 넣어 봅니다 " * 2,
                     message="설명도 길게 넣어 봅니다. " * 4)]
-    sq, size, xs = show(root, app, longish)
+    sq, size, rows = show(root, app, longish)
     chk("눌린 것이 없다", not sq, sq[:4])
 
     print("\n=== 빈 목록이면 창을 안 띄운다 ===")
