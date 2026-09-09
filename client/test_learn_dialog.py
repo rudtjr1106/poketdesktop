@@ -66,14 +66,29 @@ def squeezed(win):
     """
     out = []
 
+    def holds_canvas(w):
+        """이 위젯 아래에 굴러가는 칸이 있나.
+
+        그런 칸을 품은 틀은 **내용 전부**만큼을 달라고 한다. 화면이
+        작아 굴려서 볼 때는 당연히 그만큼 못 받는다. 그걸 눌렸다고
+        세면 거짓 경보다. 반대로 단추와 머리글은 굴리는 것이 아니므로
+        한 픽셀도 눌리면 안 된다 - 실제로 '결정' 단추가 5px 로 눌려
+        있었다.
+        """
+        for c in w.winfo_children():
+            if c.winfo_class() == "Canvas" or holds_canvas(c):
+                return True
+        return False
+
     def walk(w, inside_canvas=False):
         for c in w.winfo_children():
             is_canvas = c.winfo_class() == "Canvas"
+            skip = is_canvas or inside_canvas or holds_canvas(c)
             try:
                 rw, rh = c.winfo_reqwidth(), c.winfo_reqheight()
                 aw, ah = c.winfo_width(), c.winfo_height()
                 # 1x1 은 아직 안 그려진 것이다.
-                if aw > 1 and ah > 1 and not is_canvas and not inside_canvas:
+                if aw > 1 and ah > 1 and not skip:
                     if rh > ah + 1:
                         out.append(("세로", c.winfo_class(),
                                     str(c.cget("text"))[:18]

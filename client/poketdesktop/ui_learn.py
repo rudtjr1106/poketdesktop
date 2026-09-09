@@ -196,6 +196,17 @@ class ForgetAsk(object):
             name.configure(fg=U.ACCENT_TEXT if on else U.FG)
             cat.configure(fg=MT.cat_color(md))
 
+    def _resize(self, h):
+        """창 높이를 h 로. **잠깐 풀었다 다시 잠근다.**
+
+        크기 고정된 창은 창 관리자가 크기 바꾸기를 거절할 수 있다.
+        CI 의 맥 러너가 그래서 창이 360 에 묶여 있었다.
+        """
+        self.win.resizable(True, True)
+        self.win.geometry("%dx%d" % (W, h))
+        self.win.update_idletasks()
+        self.win.resizable(False, False)
+
     def _fit(self):
         """다 담고 나서 창을 내용에 맞춘다.
 
@@ -203,16 +214,17 @@ class ForgetAsk(object):
         글꼴에 달렸고, 글꼴은 OS 마다 다르다. 화면보다 커질 때만
         거기서 자르고, 그때는 굴려서 본다.
 
-        **그려진 크기(winfo_height)를 보면 안 된다.** 창이 화면에 막
-        붙은 참이라 아직 제자리를 못 잡았을 수 있다. CI 의 맥 러너가
-        그랬다 - 캔버스 높이가 1 로 읽혀 창이 안 커졌고, 다섯 줄 중
-        둘만 보였다. 여기서는 **요청 크기(winfo_reqheight)만** 쓴다.
-        그건 그리기 전에도 맞는 값이다.
+        ## 두 단계로 맞춘다
 
-        방법은 이렇다. 줄들이 든 칸이 원하는 높이를 캔버스에 그대로
-        요청 높이로 물려 준다. 그러면 창의 요청 높이에 내용이 포함되어,
-        창을 그 크기로 잡기만 하면 된다. 화면 상한을 넘으면 넘친 만큼만
-        캔버스에서 덜어낸다 - 그때는 굴려서 본다.
+        **먼저 요청 크기로 어림잡는다.** 줄들이 든 칸이 원하는 높이를
+        캔버스에 요청 높이로 물려 주면 창의 요청 높이에 내용이 포함된다.
+        요청 크기는 그리기 전에도 맞는 값이라, 창이 아직 화면에 안 붙은
+        상태에서도 쓸 수 있다.
+
+        **그다음 그려진 크기로 다듬는다.** 요청 크기만으로는 몇 px 이
+        어긋난다 - 창 테두리와 스크롤바가 어떻게 잡히는지는 OS 마다
+        다르다. 맥 러너에서 8px 이 모자라 마지막 줄이 잘렸다. 실제로
+        보이는 높이를 보고 모자란 만큼 더 키운다. 두어 번이면 맞는다.
         """
         try:
             self.win.update_idletasks()
@@ -220,21 +232,30 @@ class ForgetAsk(object):
             self.canvas.configure(height=max(1, need))
             self.win.update_idletasks()
 
-            want = self.win.winfo_reqheight()
             cap = self.win.winfo_screenheight() - SCREEN_PAD
+            want = self.win.winfo_reqheight()
             if want > cap:
-                # 넘친 만큼 캔버스를 줄인다. 창은 상한에 딱 맞는다.
+                # **넘친 만큼 캔버스에서 덜어낸다.** 안 그러면 굴러가는
+                # 칸이 자리를 다 먹고 아래 '결정' 단추를 밀어낸다 -
+                # 600px 화면에서 단추 글씨가 5px 로 눌려 있었다.
                 self.canvas.configure(height=max(U.h(80), need - (want - cap)))
                 self.win.update_idletasks()
                 want = self.win.winfo_reqheight()
-
             h = max(MIN_H, min(want, cap))
-            # **잠깐 풀었다 다시 잠근다.** 고정된 창은 창 관리자가 크기
-            # 바꾸기를 거절할 수 있다.
-            self.win.resizable(True, True)
-            self.win.geometry("%dx%d" % (W, h))
-            self.win.update_idletasks()
-            self.win.resizable(False, False)
+            self._resize(h)
+
+            for _ in range(3):
+                seen = self.canvas.winfo_height()
+                now = self.win.winfo_height()
+                if seen <= 1 or now <= 1:
+                    break                     # 아직 안 그려졌다. 어림잡은 값으로 둔다
+                short = need - seen
+                if short <= 0:
+                    break                     # 다 보인다
+                nxt = min(now + short, cap)
+                if nxt <= now:
+                    break                     # 화면이 작다. 굴려서 본다
+                self._resize(nxt)
         except Exception:                                  # noqa: BLE001
             pass
 
