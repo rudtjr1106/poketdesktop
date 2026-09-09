@@ -199,6 +199,64 @@ def money_take(uid, n):
 
 
 # ---------------------------------------------------------------- 도감(잡아본 종)
+# ---------------------------------------------------------------- 선물
+def gift_claim(uid, now=None):
+    """안 받은 선물을 **지급하면서** 목록을 돌려준다. 없으면 빈 목록.
+
+    /api/me 가 부른다. 거기는 90초마다 오므로 **지급과 표시를 한 흐름에서**
+    끝내야 한다 - 주고 나서 claimed_at 을 나중에 찍으면 그 사이에 다음
+    요청이 와서 두 번 준다.
+
+    운영자가 가방을 직접 늘리면 이 길을 안 타므로 알림이 안 뜬다.
+    그건 평소 플레이로 늘어난 것과 구분할 방법이 없기 때문이다 -
+    선물은 gift 표에 넣는 것이 유일한 길이다.
+    """
+    rows = db.q("SELECT * FROM gift WHERE user_id=? AND claimed_at IS NULL"
+                " ORDER BY id", (uid,))
+    if not rows:
+        return []
+    now = now or _now_iso()
+    out = []
+    for r in rows:
+        kind = r["kind"]
+        n = int(r["count"] or 0)
+        # **먼저 claimed 로 찍고 그다음 지급한다.** 반대로 하면 중간에
+        # 죽었을 때 두 번 주게 된다. 이 순서면 최악이 '못 받음' 인데,
+        # 그건 운영자가 다시 넣어 주면 된다.
+        cur = db.run("UPDATE gift SET claimed_at=? WHERE id=? AND"
+                     " claimed_at IS NULL", (now, r["id"]))
+        if getattr(cur, "rowcount", 1) == 0:
+            continue          # 다른 요청이 먼저 가져갔다
+        name = ""
+        if kind == "item" and r["item_id"]:
+            bag_add(uid, r["item_id"], n)
+            it = get(r["item_id"])
+            name = (it or {}).get("kr") or r["item_id"]
+        elif kind == "money":
+            money_add(uid, n)
+            name = "돈"
+        elif kind == "balls":
+            db.run("UPDATE users SET balls=balls+? WHERE id=?", (n, uid))
+            name = "몬스터볼"
+        else:
+            continue          # 모르는 종류. 지급하지 않는다
+        out.append({
+            "kind": kind,
+            "item": r["item_id"],
+            "count": n,
+            "name": name,
+            "title": r["title"] or "선물이 도착했습니다",
+            "message": r["message"] or "",
+        })
+    return out
+
+
+def _now_iso():
+    import datetime
+    return datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0).isoformat()
+
+
 def mark_seen(uid, species, caught, now):
     db.run("INSERT INTO seen (user_id, species, caught, first_at) VALUES (?,?,?,?)"
            " ON CONFLICT(user_id, species) DO UPDATE SET caught = MAX(caught, ?)",
@@ -259,6 +317,17 @@ def ball_bonus(item_id, dex, wild, mine=None, turn=0, uid=None, hour=None):
 
     sp = dex.get(wild["species"]) or {}
     lv = int(wild.get("level", 1))
+
+    if cond == "event_target":
+        # 이벤트 볼. **그 종에만 통한다.**
+        #
+        # 255 이상이면 P.catch_attempt 가 판정 없이 잡는다(마스터볼과 같은
+        # 길). 이벤트 종은 포획률이 45 라 보통 볼로는 잘 안 잡히는데,
+        # 이 볼은 하나뿐이라 실패하면 되돌릴 수가 없다.
+        #
+        # 다른 포켓몬에게는 1.0 - 몬스터볼과 다를 게 없다. 그래서 다른
+        # 데서는 추천으로도 안 뜬다(best["mult"] > 1.0 조건).
+        return 255.0 if wild.get("species") == config.EVENT_SPECIES else 1.0
 
     if cond == "water_or_bug":
         types = sp.get("types", [])
@@ -410,6 +479,11 @@ def ball_why(item_id, dex, wild, mult, mine=None, turn=0, hour=None):
     on = mult > 1.0
     sp = dex.get(wild["species"]) or {}
     lv = int(wild.get("level", 1))
+    if cond == "event_target":
+        if wild.get("species") == config.EVENT_SPECIES:
+            return "이 포켓몬을 위해 만들어진 볼이다. 반드시 잡는다"
+        return "이 볼이 통하는 상대가 아니다"
+
     if cond == "water_or_bug":
         return "물·벌레라서" if on else "물·벌레가 아니라"
     if cond == "low_level":
@@ -459,7 +533,16 @@ def ball_options(uid, dex, wild, balls, mine=None, turn=0, hour=None):
         })
     # 추천 하나. 마스터볼은 뺀다 - 배율이 255라 언제나 1등이라 추천이
     # 의미가 없고, 실수로 한 번 쓰면 돌이킬 수 없다.
-    owned = [o for o in out if o["count"] > 0 and o["mult"] < 100]
+    # **배율이 아니라 id 로 거른다.**
+    #
+    # 원래는 `o["mult"] < 100` 이었다. 마스터볼을 추천에서 빼려는
+    # 것이고(실수로 한 번 쓰면 돌이킬 수 없다), 그 조건이면 배율이
+    # 255 인 것은 전부 빠진다. 이벤트 볼도 대상 종 앞에서는 255라
+    # 같이 빠져서, 정작 필요한 순간에 다른 볼을 추천하게 된다.
+    #
+    # 그 이유는 이벤트 볼에는 안 맞는다 - 대상 종 말고는 쓸 데가
+    # 없어서 잘못 쓸 대상 자체가 없다. 안 알려주는 것이 손해다.
+    owned = [o for o in out if o["count"] > 0 and o["id"] != "MASTERBALL"]
     if owned:
         # 배율이 같으면 싼 것을 권한다. 귀한 볼은 아껴야 한다.
         best = max(owned, key=lambda o: (o["mult"], -o["cost"]))

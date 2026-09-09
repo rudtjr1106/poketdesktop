@@ -328,6 +328,8 @@ jobs:
           python server/test_social.py  http://127.0.0.1:8788
           python server/test_arena.py   http://127.0.0.1:8788
           python server/test_held_api.py http://127.0.0.1:8788
+          # 이벤트 검사는 풀숲 시각을 되돌리려고 DB 를 직접 만진다.
+          python server/test_event.py http://127.0.0.1:8788 /tmp/poket-test.db
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

@@ -1752,6 +1752,22 @@
    "sell": 1500,
    "weight": 45
   },
+  "FLOWERBALL": {
+   "buyable": false,
+   "cat": "ball",
+   "cost": 0,
+   "desc": "어떤 포켓몬을 위해 만들어진 볼. 그 포켓몬은 반드시 잡을 수 있다.",
+   "effect": {
+    "cond": "event_target",
+    "kind": "ball",
+    "mult": 1.0
+   },
+   "en": "Flower Ball",
+   "id": "FLOWERBALL",
+   "ident": "flower-ball",
+   "kr": "플라워볼",
+   "sell": 0
+  },
   "FOCUSBAND": {
    "cat": "held",
    "chance": 0.00143,

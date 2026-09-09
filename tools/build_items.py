@@ -76,6 +76,25 @@ PRICE_OVERRIDE = {
 # 상점에서 팔지 않는 것 (드랍으로만 얻는다)
 NO_BUY = {"master-ball", "gold-bottle-cap"}
 
+# 본가에 없는, 우리가 만든 도구. PokeAPI 에서 안 오므로 여기 적는다.
+#
+# **rarity 를 주지 않는다.** 드랍표는 rarity 가 있는 것만 담으므로,
+# 없으면 자연히 안 떨어진다. 운영자가 선물로만 주는 물건이다.
+#
+# cost 0 · buyable false 라 상점에도 안 뜬다. 이벤트 전에 목록에서
+# 들키면 재미가 없다 - 마스터볼이 "안 판다" 로 되어 있는 것과 같다.
+EXTRA = [
+    {
+        "id": "FLOWERBALL", "ident": "flower-ball",
+        "kr": "플라워볼", "en": "Flower Ball",
+        "cat": "ball", "cost": 0, "sell": 0, "buyable": False,
+        # **설명에 종 이름을 쓰지 않는다.** 가방에서 미리 읽힌다.
+        "desc": "어떤 포켓몬을 위해 만들어진 볼."
+                " 그 포켓몬은 반드시 잡을 수 있다.",
+        "effect": {"kind": "ball", "mult": 1.0, "cond": "event_target"},
+    },
+]
+
 
 def _ball(mult, cond=None, note=""):
     d = {"kind": "ball", "mult": mult}
@@ -390,6 +409,14 @@ def build(pokedex_path):
 
     if missing:
         sys.stderr.write("  경고: items.csv 에 없는 항목 %s\n" % ", ".join(missing))
+
+    # 본가에 없는, 우리가 만든 도구. **여기 안 적으면 다음 빌드 때
+    # 사라진다** - 이 스크립트가 items.json 을 통째로 다시 만들기 때문에
+    # 손으로 넣어 둔 것은 남지 않는다.
+    for d in EXTRA:
+        out[d["id"]] = dict(d)
+    if EXTRA:
+        sys.stderr.write("  직접 넣은 도구 %d종\n" % len(EXTRA))
 
     # 드랍표: (도구 id, 가중치). 서버는 가중치 합에서 한 번 뽑으면 된다.
     table = []
