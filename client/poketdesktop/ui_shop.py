@@ -31,6 +31,10 @@ from . import ui_loading
 ROW_H = U.h(30)
 CATS_W = 136
 DETAIL_W = 348
+# 목록을 나눠 만드는 크기(U.Chunked). 첫 묶음은 첫 화면만큼이면 된다.
+FIRST_ROWS = 20
+CHUNK_ROWS = 20
+ICON = 24                     # 줄 왼쪽 도구 그림 크기
 # 설명 액자 안에서 줄을 접는 폭. **첫 값일 뿐이고 그린 뒤 U.wrap_to_width
 # 가 실제 폭으로 다시 잡는다.**
 #
@@ -173,16 +177,26 @@ def _err(e):
 
 
 # ---------------------------------------------------------------- 목록 한 줄
+def _row_sig(it):
+    """줄에 그려지는 값(보유 개수는 뺀다). 다시 불러와서 같으면 줄을 그대로 쓴다."""
+    return (it.get("kr"), it.get("rarity"), bool(it.get("buyable")),
+            it.get("cost"), it.get("sell"))
+
+
 class Row(object):
     """도구 목록 한 줄.
 
     ui_box.Row 와 같은 방식이다. place 로 칸을 잡고, 마우스가 올라오거나
     골라지면 바탕색을 칠한다. 왼쪽 3px 막대는 등급 색이다.
+
+    아래에 1px 선(line)이 붙어 다니고, selected 를 주면 만들 때 칠한다
+    (목록을 나눠 만들기 때문이다 - ui_box.Row 머리말).
     """
 
-    def __init__(self, parent, it, have, on_pick):
+    def __init__(self, parent, it, have, on_pick, selected=False):
         self.it = it
         self.iid = it["id"]
+        self.sig = _row_sig(it)
         self.on_pick = on_pick
         self.selected = False
         self.base = U.BG
@@ -190,6 +204,8 @@ class Row(object):
 
         self.f = tk.Frame(parent, bg=self.base, height=ROW_H, cursor="hand2")
         self.f.pack_propagate(False)
+        # 줄 사이 선. 줄과 같이 담고 같이 뺀다(pack/forget).
+        self.line = tk.Frame(parent, bg="#181d2a", height=U.h(1))
         self.mark = tk.Frame(self.f, bg=self.rare, width=3)
         self.mark.place(x=0, y=0, relheight=1.0)
 
@@ -216,6 +232,8 @@ class Row(object):
             w.bind("<Button-1>", lambda e: self.on_pick(self.iid))
             w.bind("<Enter>", self._hover_in)
             w.bind("<Leave>", self._hover_out)
+        if selected:
+            self.set_selected(True)
 
     def _cell(self, text, col, fg, font):
         _title, x, w, anchor = col
@@ -226,14 +244,27 @@ class Row(object):
         return lb
 
     def set_icon(self):
-        ph = item_icons.photo(self.iid, 24)
+        ph = item_icons.photo(self.iid, ICON)
         if ph is not None:
             self.icon.configure(image=ph)
             self.icon.image = ph          # 참조를 놓으면 tk 가 그림을 지운다
 
     def pack(self, **kw):
+        """줄과 그 아래 선을 함께 담는다. after/before 는 줄에 건다."""
         self.f.pack(fill="x", **kw)
+        self.line.pack(fill="x", after=self.f)
         return self
+
+    def forget(self):
+        self.f.pack_forget()
+        self.line.pack_forget()
+
+    def destroy(self):
+        for w in (self.f, self.line):
+            try:
+                w.destroy()
+            except tk.TclError:
+                pass
 
     def set_have(self, n):
         n = int(n or 0)
@@ -277,7 +308,11 @@ class ShopWindow(object):
         self.bag = {}
         self.money = 0
         self.sell_rate = 0.5
-        self.rows = {}
+        self.rows = {}           # {도구: Row} — 받은 목록으로 만들어 둔 줄 전부 (숨긴 줄 포함)
+        self._order = []         # 지금 담긴 줄, 화면 순서대로
+        self._by_id = {}         # {도구: 받은 도구 정보}
+        self._rows_job = None    # 줄을 나눠 만들고 담는 일 (U.Chunked)
+        self._wait = None        # 불러오는 중 표시
         self.cat_btns = {}
         self.sel = None
         self.cat = "all"
@@ -465,6 +500,9 @@ class ShopWindow(object):
             scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(
             self._win, width=e.width))
+        # 맞는 게 없을 때의 한 줄. 한 번 만들어 두고 담았다 뺐다만 한다.
+        self._nomatch = tk.Label(self.inner, text="찾는 도구가 없습니다.",
+                                 bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S)
 
     # ---------------- 상세 ----------------
     def _detail(self, parent):
@@ -583,77 +621,191 @@ class ShopWindow(object):
         if api is None:
             return self.say("로그인이 필요합니다.", U.DANGER)
         self.say("상점을 불러오는 중...", U.FG_FAINT)
-        self._wait = ui_loading.Overlay(self.win, "상점을 불러오는 중")
+        # 이미 떠 있으면 하나 더 띄우지 않는다. 겹쳐 띄우면 먼저 온 답이
+        # 나중 것만 걷고, 먼저 띄운 것은 창을 덮은 채 남는다(가방과 같다).
+        if self._wait is None:
+            self._wait = ui_loading.Overlay(self.win, "상점을 불러오는 중")
 
         def work():
             data = api.shop()
             # 그림도 여기서 같이 받아 둔다. 목록을 그린 뒤에 받으면
             # 처음 한 번은 빈칸으로 보였다가 늦게 채워져서 어수선하다.
-            item_icons.prefetch(api, [i["id"] for i in (data.get("items") or [])])
+            # 줄 크기(ICON)로 풀어 두는 것까지 여기서 한다 - tk 스레드에서
+            # 줄마다 풀면 목록 한 번에 0.3초가 들었다.
+            item_icons.prefetch(api, [i["id"] for i in (data.get("items") or [])],
+                                sizes=(ICON,))
             return data
 
         U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, data, err):
-        w = getattr(self, "_wait", None)
-        if w:
-            w.close()
-            self._wait = None
+        w, self._wait = self._wait, None
         if err:
+            if w:
+                w.close()
             return self.say(_err(err), U.DANGER)
-        data = data or {}
-        self.items = data.get("items") or []
-        self.bag = data.get("bag") or {}
-        self.money = int(data.get("money") or 0)
-        self.sell_rate = float(data.get("sellRate") or 0.5)
-        self.sub.configure(text="파는 값은 사는 값의 %d%%  ·  도구 %d종"
-                                % (round(self.sell_rate * 100), len(self.items)))
-        self._paint_money()
-        self._paint_cat_counts()
-        self.render()
-        self.say("무엇을 사시겠습니까?", U.GOOD)
+        try:
+            data = data or {}
+            self.items = data.get("items") or []
+            self.bag = data.get("bag") or {}
+            self.money = int(data.get("money") or 0)
+            self.sell_rate = float(data.get("sellRate") or 0.5)
+            self.sub.configure(text="파는 값은 사는 값의 %d%%  ·  도구 %d종"
+                                    % (round(self.sell_rate * 100), len(self.items)))
+            self._paint_money()
+            self._paint_cat_counts()
+            self._reuse_rows()
+            self.render()
+            self.say("무엇을 사시겠습니까?", U.GOOD)
+        finally:
+            if w:
+                # **첫 화면이 그려진 뒤에 걷는다.** 맨 앞에서 걷으면 줄을
+                # 그리는 동안(3~4초) 아무 표시 없이 멈춘 것처럼 보였다.
+                try:
+                    self.root.after_idle(w.close)
+                except tk.TclError:
+                    w.close()
 
     def _match(self, it, q):
         if self.cat != "all" and it.get("cat") != self.cat:
             return False
         if not q:
             return True
-        return q in (it.get("kr", "") + it.get("en", "") + it.get("id", "")).lower()
+        if q in (it.get("kr", "") + it.get("en", "") + it.get("id", "")).lower():
+            return True
+        # 진화시키는 포켓몬 이름으로도 찾는다. '윤겔라' 를 쳐도 연결의끈이
+        # 안 나와서, 통신교환 진화가 도구로 바뀐 것을 상점에서 알 길이 없었다.
+        return any(q in (n or "").lower() for n in it.get("evolves") or [])
+
+    def _reuse_rows(self):
+        """새로 받은 목록에 줄을 맞춘다.
+
+        줄은 도구 id 로 들고 있다가, 그대로인 것은 그대로 쓰고(보유 개수만
+        고친다) 이름·등급·값이 바뀐 것과 없어진 것만 부순다. 새로 생긴 줄은
+        render 가 만든다.
+        """
+        self._stop_rows()
+        self._by_id = dict((it["id"], it) for it in self.items)
+        for iid, row in list(self.rows.items()):
+            it = self._by_id.get(iid)
+            if it is None or _row_sig(it) != row.sig:
+                del self.rows[iid]
+                if iid in self._order:
+                    self._order.remove(iid)
+                row.destroy()
+                continue
+            row.it = it
+            n = int(self.bag.get(iid, 0) or 0)
+            if n != row.have:
+                row.set_have(n)
+            if getattr(row.icon, "image", None) is None:
+                row.set_icon()          # 지난번에는 그림이 없었다
 
     def render(self):
-        """분류·검색어에 맞는 줄만 다시 그린다."""
-        for w in self.inner.winfo_children():
-            w.destroy()
-        self.rows = {}
+        """분류·검색어에 맞는 줄만 담는다.
+
+        **줄을 다시 만들지 않는다.** 예전에는 분류를 누르거나 검색어를
+        한 글자 칠 때마다 줄을 다 부수고 새로 만들어 1~3초씩 멈췄다.
+        줄은 받은 목록마다 한 번 만들어 두고, 여기서는 안 보일 줄을 빼고
+        새로 보일 줄을 제자리에 끼우기만 한다. 끼우는 것은 나눠 한다
+        (포켓몬 관리 창의 _show 와 같은 방식이다).
+        """
+        self._stop_rows()
         q = (self.q.get() or "").strip().lower()
         shown = [it for it in self.items if self._match(it, q)]
-        for it in shown:
-            r = Row(self.inner, it, self.bag.get(it["id"], 0), self.select)
-            r.pack()
-            self.rows[it["id"]] = r
-            tk.Frame(self.inner, bg="#181d2a", height=U.h(1)).pack(fill="x")
-        if not shown:
-            tk.Label(self.inner, text="찾는 도구가 없습니다.", bg=U.BG,
-                     fg=U.FG_FAINT, font=U.FONT_S).pack(pady=40)
+        want = [it["id"] for it in shown]
+        wanted = set(want)
+        order = self._order
+        for iid in [i for i in order if i not in wanted]:
+            self.rows[iid].forget()
+            order.remove(iid)
+        packed = set(order)
+        if order != [i for i in want if i in packed]:
+            # 다시 불러왔더니 순서가 바뀌었다. 다 빼고 새 순서로 담는다.
+            for iid in order:
+                self.rows[iid].forget()
+            del order[:]
+        if shown:
+            self._nomatch.pack_forget()
+        else:
+            self._nomatch.pack(pady=40)
+
+        # 할 일: (담을지, 도구, 순서상 바로 앞 도구). 안 보일 줄도 끝에
+        # 만들어만 둔다 - 분류를 바꿀 때 새로 만들지 않고 담기만 하려고.
+        plan = []
+        packed = set(order)
+        prev = None
+        for iid in want:
+            if iid not in packed:
+                plan.append((True, iid, prev))
+            prev = iid
+        plan += [(False, it["id"], None) for it in self.items
+                 if it["id"] not in self.rows and it["id"] not in wanted]
+        self._rows_job = U.Chunked(self.win, plan, self._place_row,
+                                   first=FIRST_ROWS, size=CHUNK_ROWS)
         self.found.configure(text="%d개" % len(shown))
         self.canvas.yview_moveto(0)
 
-        if self.sel in self.rows:
+        if self.sel in wanted:
             self.select(self.sel, keep_qty=True)
         elif shown:
             self.select(shown[0]["id"])
         else:
-            self.sel = None
+            # 고른 줄이 숨었다. 칠한 것을 지워 둬야 다시 보일 때 두 줄이
+            # 골라져 보이지 않는다.
+            prev, self.sel = self.sel, None
+            row = self.rows.get(prev)
+            if row is not None:
+                row.set_selected(False)
             self._clear_detail()
+
+    def _place_row(self, item):
+        """할 일 하나 - 줄이 없으면 만들고, 보일 줄이면 제자리에 담는다."""
+        show, iid, prev = item
+        row = self.rows.get(iid)
+        if row is None:
+            it = self._by_id.get(iid)
+            if it is None:
+                return
+            # 고름은 만들 때 칠한다. 다 만든 뒤 전부 다시 칠하지 않는다.
+            row = Row(self.inner, it, self.bag.get(iid, 0), self.select,
+                      selected=(iid == self.sel))
+            self.rows[iid] = row
+        if not show:
+            return
+        order = self._order
+        if prev is not None:
+            row.pack(after=self.rows[prev].line)
+            order.insert(order.index(prev) + 1, iid)
+            return
+        if order:
+            row.pack(before=self.rows[order[0]].f)
+        else:
+            row.pack()
+        order.insert(0, iid)
+
+    def _stop_rows(self):
+        """남은 줄 일을 버린다. 새로 맞추기 전에 반드시 부른다 - 안 그러면
+        옛 계획의 줄이 새 목록 사이에 끼어든다."""
+        if self._rows_job is not None:
+            self._rows_job.cancel()
+            self._rows_job = None
 
     def current(self):
         return next((i for i in self.items if i["id"] == self.sel), None)
 
     def select(self, iid, keep_qty=False):
+        if (iid not in self.rows and iid in self._by_id
+                and self._rows_job is not None and self._rows_job.pending):
+            self._rows_job.flush()      # 아직 안 만든 줄이면 먼저 다 만든다
         changed = (iid != self.sel)
-        self.sel = iid
-        for key, r in self.rows.items():
-            r.set_selected(key == iid)
+        prev, self.sel = self.sel, iid
+        # 바뀐 두 줄만 칠한다. 고른 줄은 늘 하나라 나머지는 이미 안 고른
+        # 모습이다 - 예전에는 누를 때마다 줄을 전부 다시 칠했다.
+        for key in set((prev, iid)):
+            r = self.rows.get(key)
+            if r is not None:
+                r.set_selected(key == iid)
         if changed and not keep_qty:
             self.qty = 1          # 다른 물건으로 옮겼는데 99개가 남아 있으면 위험하다
         self.show_detail()
@@ -755,9 +907,15 @@ class ShopWindow(object):
         self.btn_sell.configure(state="normal" if can_sell else "disabled")
 
     def _refresh_counts(self):
-        """사고판 뒤 — 목록의 보유 개수와 상세를 다시 칠한다."""
+        """사고판 뒤 — 목록의 보유 개수와 상세를 다시 칠한다.
+
+        줄은 숨긴 것까지 다 들고 있어서 전부 본다(분류를 바꿔 다시 보일 때
+        개수가 맞아야 한다). 고치는 것은 개수가 바뀐 줄뿐이다.
+        """
         for iid, r in self.rows.items():
-            r.set_have(self.bag.get(iid, 0))
+            n = int(self.bag.get(iid, 0) or 0)
+            if n != r.have:
+                r.set_have(n)
         self.show_detail()
 
     # ---------------- 개수 ----------------
@@ -819,6 +977,7 @@ class ShopWindow(object):
 
     # ---------------- 창 ----------------
     def close(self):
+        self._stop_rows()
         self.app.shop_window = None
         try:
             self.win.destroy()

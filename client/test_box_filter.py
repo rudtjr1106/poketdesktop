@@ -101,6 +101,27 @@ def main():
     for m in mons[:3]:
         m["onDesktop"] = False
 
+    print("-- 순서는 받은 그대로 (창이 이 순서를 믿고 줄을 끼워 넣는다)")
+    # 포켓몬 관리 창은 줄을 다시 만들지 않고 담았다 뺐다만 한다. 새로 보일
+    # 줄은 '순서상 바로 앞 줄의 뒤' 에 끼우므로, 걸러진 목록이 원래 순서를
+    # 한 번이라도 뒤섞으면 줄이 엉뚱한 자리에 들어간다.
+    order = [mon(dex, 7), mon(dex, 4, "불꽃이"), mon(dex, 1), mon(dex, 25),
+             mon(dex, 133, "이브"), mon(dex, 6), mon(dex, 16), mon(dex, 43)]
+    for m in order[:3]:
+        m["onDesktop"] = True       # 파티 순서는 꼬부기·파이리·이상해씨 (번호 순이 아니다)
+    party, box = F.apply_box(order, dex, query="이")
+    chk("파티는 받은 순서 그대로 (번호 순으로 바뀌지 않는다)",
+        [m["num"] for m in party] == [7, 4, 1], [m["num"] for m in party])
+    full_box = F.split(order)[1]
+    for t, q in ((None, "이"), ("FIRE", ""), ("NORMAL", "이브"), ("GRASS", ""),
+                 ("FLYING", "피"), (None, "없는이름")):
+        _p, got = F.apply_box(order, dex, t, q)
+        at = [full_box.index(m) for m in got]
+        chk("걸러진 박스는 전체 박스 순서를 지킨다 (%s / %r)" % (t, q),
+            at == sorted(at), [m["num"] for m in got])
+        chk("거름망이 뭐든 파티는 그대로 (%s / %r)" % (t, q),
+            [m["num"] for m in _p] == [7, 4, 1])
+
     print("-- 도감이 없어도 안 터진다")
     chk("dex None 이면 타입 거르기는 전부 걸러진다", F.apply(mons, None, type_id="FIRE") == [])
     chk("dex None 이어도 이름으로는 찾는다", [m["num"] for m in F.apply(mons, None, query="불꽃이")] == [4])

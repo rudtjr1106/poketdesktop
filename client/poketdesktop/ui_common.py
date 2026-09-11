@@ -9,6 +9,7 @@ tkinter 가 그대로 그릴 수 있는 것만 쓰기 위해서다.
     라벨        왼쪽에 금색 3px 막대
     강조        몬스터볼 빨강은 머리띠와 위험한 동작에만
 """
+import queue
 import sys
 import threading
 import tkinter as tk
@@ -216,7 +217,13 @@ class PushButton(object):
         self.label.pack(expand=True)
         # pack_propagate 를 꺼놔서 폭을 직접 정해줘야 한다.
         # fill="x" 로 담으면 이 값은 덮어써지고, side="left" 로 담으면 이게 쓰인다.
-        self.label.update_idletasks()
+        #
+        # **update_idletasks 를 부르지 않는다.** 라벨의 요청 폭은 글자를
+        # 넣는 순간 이미 계산돼 있다(라벨 42개를 재 봤더니 부르기 전과
+        # 후가 하나도 안 달랐다). 그런데 이걸 부르면 이 라벨만이 아니라
+        # **앱 전체의 밀린 배치**를 그 자리에서 다 끝낸다. 단추 하나에
+        # 25ms, 줄마다 단추가 붙은 친구·대전 목록에서는 그것만으로 2~3초,
+        # 가방에서는 단추 글씨 한 번 바꾸는 데 4초가 들었다.
         self.holder.configure(width=max(72, self.label.winfo_reqwidth() + 34))
         for w in (self.box, self.label):
             w.bind("<Enter>", self._enter)
@@ -234,9 +241,11 @@ class PushButton(object):
         return self
 
     def configure(self, text=None, state=None):
-        if text is not None:
+        # 글씨가 그대로면 건드리지 않는다. 고를 때마다 같은 글씨로 다시
+        # 칠하는 곳이 많은데(가방의 '쓰기'), 그때마다 폭을 다시 잡으면
+        # 단추 둘레의 배치를 괜히 다시 한다.
+        if text is not None and str(text) != self.label.cget("text"):
             self.label.configure(text=text)
-            self.label.update_idletasks()
             self.holder.configure(width=max(72, self.label.winfo_reqwidth() + 34))
         if state is not None:
             self.enabled = (state == "normal")
@@ -548,6 +557,280 @@ def scrollable(canvas, div=60, after=None):
     return canvas
 
 
+class ScrollFit(object):
+    """굴러가는 목록의 스크롤 영역을 내용에 맞춘다 - **몰아서 한 번만.**
+
+    ## 왜 따로 두나
+
+    예전에는 창마다 fit_scroll 을 <Configure> 에 걸고, 그 안에서
+    update_idletasks 로 밀린 배치를 억지로 끝낸 뒤 높이를 쟀다. 그런데
+    update_idletasks 가 또 <Configure> 를 일으켜서 **자기 자신을 다시
+    불렀다.** 줄을 담을 때마다 앱 전체를 다시 배치하는 셈이라, 포켓몬
+    관리 창 한 번 여는 데 이것만 12초가 쌓였고(프로파일 누계) 기술머신
+    358줄은 2.3초 중 거의 전부가 이 한 줄이었다.
+
+    여기서는 <Configure> 가 와도 **예약만** 한다. 캔버스 하나에 예약은
+    하나뿐이라 수백 번 와도 한 번 돈다. 예약은 Tk 가 밀린 배치를 끝낸
+    뒤에(after_idle) 돌기 때문에 update_idletasks 없이 재도 맞는 값이다.
+
+    ## 규칙은 그대로다
+
+    내용이 화면보다 짧으면 **스크롤할 게 없어야 한다.** bbox 를 그대로
+    넣으면 두 줄뿐인데도 스크롤바가 움직이고 빈 화면이 보인다. 그래서
+    그때는 스크롤 영역을 화면 크기로 두고 맨 위로 되돌린다.
+
+    ## 쓰는 법
+
+        self.fit = U.scroll_fitter(canvas, inner, wid)
+
+    canvas 는 굴러가는 Canvas, inner 는 그 위에 create_window 로 올린
+    Frame, wid 는 create_window 가 돌려준 번호다(없으면 None). 이 한 줄이
+
+      · inner 의 <Configure>  -> 예약
+      · canvas 의 <Configure> -> inner 폭을 캔버스 폭에 맞추고(wid) 예약
+
+    을 **덧붙여(add="+")** 건다. 이미 직접 건 핸들러를 살려야 하면
+    bind=False 로 만들고 그 핸들러에서 fit.schedule() 을 부르면 된다.
+
+        fit.schedule()   곧 맞춘다. 몇 번을 불러도 한 번만 돈다. 보통 이것.
+        fit.fit_now()    지금 바로 맞춘다. 밀린 배치를 **여기서 한 번**
+                         끝내므로(update_idletasks) 비싸다. 줄을 다 담고
+                         곧바로 yview_moveto 로 어떤 줄까지 굴려야 할 때만
+                         쓴다 - 예약을 기다리면 그 사이 스크롤 영역이 옛
+                         값이라 엉뚱한 자리로 간다.
+        fit.cancel()     걸려 있는 예약을 거둔다. 안 불러도 캔버스가
+                         없어지면 예약은 조용히 아무 일도 안 한다.
+
+    예약은 캔버스가 아니라 **Tk 루트에** 건다. 위젯에 건 예약은 그 위젯이
+    부서질 때 소리 없이 사라진다. 여기서는 그래도 괜찮지만, 같은 방식을
+    쓰는 Chunked 는 예약이 사라지면 '아직 남았다(pending)' 로 영영 멈춰
+    있고 틀까지 부수는 retire 는 중간에 끊긴다. 그래서 한 곳(루트)으로 맞춘다.
+    """
+
+    def __init__(self, cv, inner, wid=None, bind=True):
+        self.cv = cv
+        self.inner = inner
+        self.wid = wid
+        self._tk = cv._root()
+        self._job = None
+        if bind:
+            inner.bind("<Configure>", self.schedule, add="+")
+            cv.bind("<Configure>", self._on_canvas, add="+")
+
+    def _on_canvas(self, e):
+        if self.wid is not None:
+            try:
+                self.cv.itemconfigure(self.wid, width=e.width)
+            except tk.TclError:
+                pass
+        self.schedule()
+
+    def schedule(self, _e=None):
+        if self._job is not None:
+            return
+        try:
+            self._job = self._tk.after_idle(self._run)
+        except tk.TclError:
+            self._job = None
+
+    def _run(self):
+        self._job = None
+        self._fit()
+
+    def cancel(self):
+        if self._job is None:
+            return
+        try:
+            self._tk.after_cancel(self._job)
+        except Exception:                                   # noqa: BLE001
+            pass
+        self._job = None
+
+    def fit_now(self):
+        self.cancel()
+        try:
+            self.cv.update_idletasks()
+        except tk.TclError:
+            return
+        self._fit()
+        # 방금 끝낸 배치가 일으킨 <Configure> 가 또 예약을 걸었다.
+        # 이미 맞췄으니 거둔다.
+        self.cancel()
+
+    def _fit(self):
+        try:
+            h = self.inner.winfo_reqheight()
+            view = self.cv.winfo_height()
+            w = self.cv.winfo_width()
+            if h <= view:
+                self.cv.configure(scrollregion=(0, 0, w, view))
+                self.cv.yview_moveto(0)
+            else:
+                self.cv.configure(scrollregion=(0, 0, w, h))
+        except Exception:                                   # noqa: BLE001
+            pass
+
+
+def scroll_fitter(cv, inner, wid=None, bind=True):
+    """ScrollFit 을 만들어 돌려준다. 쓰는 법은 ScrollFit 을 보라."""
+    return ScrollFit(cv, inner, wid, bind)
+
+
+class Chunked(object):
+    """긴 목록을 몇 줄씩 끊어서 만든다.
+
+    줄마다 Frame 과 Label 을 몇 개씩 만드는 목록은 수백 줄이면 만드는
+    동안 창이 몇 초씩 얼어붙는다. 같은 Tk 스레드에서 도는 바탕화면
+    도트도 그동안 같이 멈춘다. 다 만드는 시간은 못 줄여도, **첫 화면만큼
+    먼저 만들고** 나머지를 조금씩 끊어 만들면 그 사이사이에 Tk 가 그리고
+    입력을 받는다.
+
+        job = U.Chunked(widget, items, build, first=25, size=30)
+
+    build(item) 를 items 순서대로 부른다. 처음 first 개는 **그 자리에서**
+    만들고, 나머지는 size 개씩 widget.after(1) 로 이어 만든다. 만들 때
+    줄의 상태(고름, 흐림)까지 같이 칠해야 한다 - 다 만든 뒤 전부 다시
+    칠하면 끊어 만든 보람이 없다.
+
+        job.pending     아직 안 만든 것이 남았나
+        job.flush()     남은 것을 지금 다 만든다. **아직 안 만든 줄을 고르거나
+                        찾아야 하는 코드는 먼저 이걸 부른다.**
+        job.cancel()    남은 것을 버린다. 목록을 새로 그리기 전에(다시
+                        불러오기, 거르기) 반드시 부른다 - 안 그러면 옛 목록의
+                        줄이 새 목록 뒤에 이어 붙는다.
+
+    취소는 세대 번호로 한다. 예약을 거둬도 이미 꺼내진 예약이 한 번 더
+    불릴 수 있어서, 불렸을 때 세대가 다르면 아무것도 안 한다.
+
+    ## 다음 묶음 전에 앞 묶음의 배치를 끝낸다
+
+    줄을 만드는 것 자체는 싸다(30줄에 20ms). 비싼 것은 Tk 가 idle 에 하는
+    배치와 창 붙이기인데, 이게 **한 층씩** 내려간다 - 목록이 줄을 붙이면
+    다음 idle 에 줄이 칸을 붙이고, 그다음 idle 에 칸이 그림을 붙인다.
+    그런데 다음 묶음의 after(1) 은 늘 그보다 먼저 때가 되어서, 아래층
+    배치가 전부 뒤로 밀렸다가 마지막 묶음 뒤에 **한꺼번에** 터졌다(가방
+    200마리에서 1.6초 한 덩어리). 그래서 묶음을 만들기 전에 앞 묶음의
+    배치를 update_idletasks 로 끝낸다. 밀린 일이 한 묶음치뿐이라 짧고,
+    묶음 사이에는 입력과 그리기가 돈다.
+
+    예약은 Tk 루트에 건다(ScrollFit 과 같은 까닭).
+    """
+
+    def __init__(self, widget, items, build, first=25, size=30, on_done=None):
+        self.widget = widget
+        self._tk = widget._root()
+        self.items = list(items)
+        self.build = build
+        self.size = max(1, int(size))
+        self.on_done = on_done
+        self.i = 0
+        self.gen = 0
+        self._job = None
+        self._step(first)
+        self._next()
+
+    @property
+    def pending(self):
+        return self.gen >= 0 and self.i < len(self.items)
+
+    def _step(self, n):
+        end = min(len(self.items), self.i + max(0, int(n)))
+        while self.i < end:
+            it = self.items[self.i]
+            self.i += 1
+            self.build(it)
+
+    def _next(self):
+        if self.gen < 0:
+            return
+        if self.i >= len(self.items):
+            self._job = None
+            done, self.on_done = self.on_done, None
+            if done:
+                done()
+            return
+        gen = self.gen
+        try:
+            self._job = self._tk.after(1, lambda: self._tick(gen))
+        except tk.TclError:
+            self.gen = -1                    # 창이 없어졌다
+
+    def _tick(self, gen):
+        self._job = None
+        if gen != self.gen:
+            return
+        try:
+            self._tk.update_idletasks()      # 앞 묶음의 배치를 먼저 끝낸다
+            if gen != self.gen:
+                return                       # 그 사이에 누가 취소했다
+            self._step(self.size)
+        except tk.TclError:
+            self.gen = -1                    # 만드는 도중에 창이 닫혔다
+            return
+        self._next()
+
+    def _drop_job(self):
+        if self._job is not None:
+            try:
+                self._tk.after_cancel(self._job)
+            except Exception:                               # noqa: BLE001
+                pass
+            self._job = None
+
+    def flush(self):
+        if not self.pending:
+            return
+        self._drop_job()
+        self.gen += 1
+        self._step(len(self.items) - self.i)
+        self._next()
+
+    def cancel(self):
+        self._drop_job()
+        self.gen = -1
+
+
+def retire(frame, size=30):
+    """다 쓴 목록 틀을 **먼저 숨기고, 속은 조금씩 부순다.**
+
+    다시 불러올 때 옛 줄 수백 개를 한 번에 destroy 하면 그것만으로 창이
+    멈춘다 - 가방에서 0.8초였다. 틀을 화면에서 빼는 것은 한 번이면 되므로
+    먼저 빼고, 속의 위젯은 Chunked 로 나눠 부순 뒤 마지막에 틀을 부순다.
+    숨긴 위젯은 그리지 않으니 그동안 새 목록이 먼저 보인다.
+
+        old = self.list_frame
+        self.list_frame = tk.Frame(parent, ...)
+        self.list_frame.pack(..., before=old)
+        U.retire(old)
+
+    돌려주는 것은 Chunked 다(다 부쉈나 보려면 .pending).
+
+    **뒤에서부터 부순다.** 앞줄을 부수면 남은 줄이 전부 한 칸씩 올라가서,
+    숨겨 둔 줄 수백 개를 묶음마다 다시 옮긴다(가방에서 한 묶음에 0.5초가
+    더 들었다). 끝줄을 부수면 남은 줄은 제자리라 옮길 것이 없다.
+    """
+    try:
+        how = frame.winfo_manager()
+        if how == "pack":
+            frame.pack_forget()
+        elif how == "grid":
+            frame.grid_forget()
+        elif how == "place":
+            frame.place_forget()
+        kids = list(reversed(frame.winfo_children()))
+    except tk.TclError:
+        return None
+
+    def smash(w):
+        try:
+            w.destroy()
+        except tk.TclError:
+            pass
+
+    return Chunked(frame, kids, smash, first=0, size=size,
+                   on_done=lambda: smash(frame))
+
+
 def apply_theme(root):
     s = ttk.Style(root)
     try:
@@ -610,34 +893,103 @@ def entry(parent, textvariable, show=None, focus_border=LINE2, width=None):
 
 
 # ---------------------------------------------------------------- 도구
+# 답을 Tk 스레드로 넘기는 간격(ms). 일이 남아 있을 때만 돈다.
+DRAIN_MS = 15
+
+
 def run_async(root, fn, on_done):
-    """네트워크 호출을 딴 스레드로 돌리고 결과를 tk 스레드로 되돌린다."""
-    box = {}
+    """네트워크 호출을 딴 스레드로 돌리고 결과를 tk 스레드로 되돌린다.
+
+    ## 되돌리는 길은 하나다
+
+    예전에는 부를 때마다 그 일 전용 확인 고리를 걸어 50ms 뒤, 그다음
+    60ms 마다 '끝났나' 를 물었다. 끝난 일도 최대 110ms 를 더 기다렸고,
+    기술머신 창처럼 예순 개를 한꺼번에 던지면 예순 고리가 서로 뒤에
+    줄을 서서 평균 1.4초씩 밀렸다.
+
+    이제 일이 끝나면 **큐에 넣고**, Tk 쪽에서는 창(Tcl 인터프리터)마다
+    고리 **하나**가 DRAIN_MS 마다 큐를 비운다. 기다리는 일이 있을 때만
+    돈다 - 다 끝나면 멈추고, 새 일을 부를 때(Tk 스레드에서) 다시 건다.
+
+    **인터프리터마다 따로 둔다.** 검사는 Tk 를 만들었다 부쉈다 한다.
+    부서진 창에 남은 답이 새 창의 고리에서 불리면 없는 위젯을 만진다.
+    예전처럼 부서진 창의 답은 그냥 안 불린다.
+
+    **답 안에서 창을 띄우고 기다려도(wait_window) 다른 답은 온다.**
+    진화 알림이 그렇다 - 답 안에서 창을 띄우고, 그 창의 도트는 또 다른
+    답으로 온다. 고리가 그 답 하나를 끝내기만 기다리면 도트가 창을 닫을
+    때까지 안 뜬다. 그래서 답을 부르기 전에, 남은 일이 있으면 다음 고리를
+    먼저 걸어 둔다.
+    """
+    # 진짜 Tk 위젯이면 창(인터프리터)의 뿌리에 고리를 건다. 검사가 쓰는
+    # 가짜 루트처럼 after 만 있는 것도 받는다 - 예전 run_async 는 after 만
+    # 불렀으므로, 그걸 믿고 만든 검사(test_new_settings)가 여기서 죽었다.
+    top = root._root() if hasattr(root, "_root") else root
+    st = _async_state(top)
 
     def worker():
         try:
-            box["r"] = fn()
+            item = (on_done, fn(), None)
         except Exception as e:                   # noqa: BLE001
-            box["e"] = e
+            item = (on_done, None, e)
+        st["q"].put(item)
 
-    t = threading.Thread(target=worker, daemon=True)
-    t.start()
+    with st["lock"]:
+        st["n"] += 1
+    threading.Thread(target=worker, daemon=True).start()
+    if st["job"] is None:
+        _pump(top, st)
 
-    def poll():
-        if t.is_alive():
-            root.after(60, poll)
-            return
+
+def _async_state(top):
+    st = getattr(top, "_poket_async", None)
+    if st is None:
+        st = {"q": queue.Queue(), "n": 0, "job": None,
+              "lock": threading.Lock()}
+        top._poket_async = st
+    return st
+
+
+def _pump(top, st):
+    """다음 고리를 건다. 창이 부서졌으면 걸지 않는다(남은 답은 버린다)."""
+    try:
+        st["job"] = top.after(DRAIN_MS, lambda: _drain(top, st))
+    except tk.TclError:
+        st["job"] = None
+
+
+def _drain(top, st):
+    st["job"] = None
+    while True:
         try:
-            on_done(box.get("r"), box.get("e"))
-        except tk.TclError as e:
+            on_done, r, e = st["q"].get_nowait()
+        except queue.Empty:
+            break
+        with st["lock"]:
+            st["n"] -= 1
+            more = st["n"] > 0
+        if more and st["job"] is None:
+            _pump(top, st)
+        try:
+            on_done(r, e)
+        except tk.TclError as err:
             # 답이 오기 전에 창을 닫으면, 그리려던 위젯이 이미 없다.
             # ("invalid command name ...") 고칠 것이 없는 상황이라 조용히
             # 넘긴다 - 다만 무엇이었는지는 남긴다. 탭으로 합치면서 여섯
             # 화면이 한꺼번에 닫히다 보니 더 자주 만난다.
             from . import config
-            config.log("창이 닫힌 뒤 도착한 응답을 버립니다: %s" % e)
-
-    root.after(50, poll)
+            config.log("창이 닫힌 뒤 도착한 응답을 버립니다: %s" % err)
+        except Exception:                                   # noqa: BLE001
+            # 하나가 터져도 뒤에 줄 선 답은 불러야 한다. 무엇이 터졌는지는
+            # 예전과 같은 길(Tk 의 오류 보고)로 넘긴다.
+            try:
+                top.report_callback_exception(*sys.exc_info())
+            except Exception:                               # noqa: BLE001
+                pass
+    with st["lock"]:
+        more = st["n"] > 0
+    if more and st["job"] is None:
+        _pump(top, st)
 
 
 def gender_mark(g):

@@ -186,7 +186,9 @@ def refresh_nameplate(pet):
             pass
         pet.name_win = None
     try:
-        if pet.ov.settings.get("showNames"):
+        # 설정만 보면 안 된다. 진화 중에 배틀이 시작됐으면 체력바와 겹친다
+        # (Overlay.names_visible). 그때는 풀릴 때 Overlay 가 만들어 준다.
+        if pet.ov.names_visible():
             pet.make_nameplate()
     except Exception:
         pass
@@ -412,7 +414,8 @@ class Evolution(object):
         self.keep = None
         if self.pet.name_win:
             try:
-                PLAT.show_again(self.pet.name_win)
+                if self.pet.ov.names_visible():
+                    PLAT.show_again(self.pet.name_win)
             except Exception:                               # noqa: BLE001
                 pass
         self.flash(0)
@@ -688,9 +691,17 @@ class Evolution(object):
         self.keep = None
         self.thaw()
         try:
-            if self.pet.name_win:
-                PLAT.show_again(self.pet.name_win)
-            self.pet.place()
+            # 이름표는 띄워도 될 때만 되살린다. 막혀 있으면 풀 때 Overlay 가
+            # 띄운다. 막힌 동안 reveal 이 없애 버렸으면 여기서 새로 만든다 -
+            # 진화 중인 도트는 Overlay 가 건너뛰기 때문이다. 도트가 이미
+            # 사라졌으면(sync 가 없앴으면) 만들지 않는다. 주인 없는 창이 남는다.
+            pet = self.pet
+            if pet.ov.names_visible() and pet.win.winfo_exists():
+                if pet.name_win:
+                    PLAT.show_again(pet.name_win)
+                else:
+                    pet.make_nameplate()
+            pet.place()
         except Exception:
             pass
         try:

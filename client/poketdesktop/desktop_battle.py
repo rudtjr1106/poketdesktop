@@ -12,6 +12,8 @@
 도트 위에 작은 체력바만 띄우고, 나머지는 도트의 움직임과 이펙트,
 급소/효과 같은 짧은 글씨로 보여준다.
 """
+import traceback
+
 from common.korean import natural
 
 from . import ball_menu
@@ -65,6 +67,9 @@ class DesktopBattle(object):
         self.bars = None        # 체력바 (내 것, 상대 것)
         self.bar_job = None
         self.saved_home = None
+        # 이름표를 막아 둔 Overlay. begin() 이 막고, finish_cleanup() 이
+        # 같은 곳을 한 번만 푼다.
+        self._names_ov = None
 
         self.setup(intro)
 
@@ -111,6 +116,14 @@ class DesktopBattle(object):
         self.tick_bars()
         self.app.notify(intro or "배틀 시작!")
         self.approach()
+        # **이름표를 치운다.** 체력바와 급소·대미지 글자가 딱 이름표 줄에
+        # 그려져서 글자끼리 포개진다. 맨 끝에서 막는 것은 위에서 무엇이
+        # 터져도 막기만 하고 못 푸는 일이 없게 하려는 것이다. 같은 틱
+        # 안이라 화면에는 처음부터 치운 것으로 보인다.
+        ov = self.app.overlay
+        if ov is not None and self._names_ov is None:
+            self._names_ov = ov
+            ov.block_names()
 
     # ---------------- 체력바 ----------------
     def sync_bars(self, snap=False):
@@ -237,7 +250,8 @@ class DesktopBattle(object):
                 return self.abort(getattr(err, "message", str(err)))
             self.play(r.get("events") or [], r)
         run_async(self.root,
-                  lambda: self.app.api.battle_move(self.b["id"], ""), done)
+                  lambda: self.app.api.battle_move(self.b["id"], ""),
+                  lambda r, err: self._safe(done, r, err))
 
     def play(self, events, result):
         q = list(events)
@@ -409,7 +423,8 @@ class DesktopBattle(object):
             self.sync_bars(snap=True)
             self.after(300, self.approach)
         run_async(self.root,
-                  lambda: self.app.api.battle_switch(self.b["id"], mon["id"]), done)
+                  lambda: self.app.api.battle_switch(self.b["id"], mon["id"]),
+                  lambda r, err: self._safe(done, r, err))
 
     # ---------------- 몬스터볼 ----------------
     def throw_ball(self, e=None):
@@ -446,9 +461,11 @@ class DesktopBattle(object):
             if r.get("ballOptions") is not None:
                 self.ball_opts = r["ballOptions"]
             self.app.refresh_tray()
-            self.app.wild.play_catch(r, on_done=lambda: self.after_ball(r))
+            self.app.wild.play_catch(
+                r, on_done=lambda: self._safe(self.after_ball, r))
         run_async(self.root,
-                  lambda: self.app.api.battle_ball(self.b["id"], ball), done)
+                  lambda: self.app.api.battle_ball(self.b["id"], ball),
+                  lambda r, err: self._safe(done, r, err))
 
     def after_ball(self, r):
         if self.closed:
@@ -567,8 +584,14 @@ class DesktopBattle(object):
             if i > 10:
                 try:
                     pet.win.withdraw()
-                    if pet.badge_win:
-                        pet.badge_win.withdraw()
+                    # 이름표·야생 표식도 같이 치운다. 안 치우면 쓰러진 자리
+                    # 허공에 글자만 남는다. 내 포켓몬(Pet)에는 badge_win 이
+                    # 없어서 예전에는 여기서 AttributeError 가 났는데, 아래
+                    # except 가 삼켜서 아무도 몰랐다.
+                    for w in (getattr(pet, "name_win", None),
+                              getattr(pet, "badge_win", None)):
+                        if w:
+                            w.withdraw()
                 except Exception:
                     pass
                 pet.y = cy - pet.ay
@@ -581,9 +604,24 @@ class DesktopBattle(object):
     def after(self, ms, fn):
         if self.closed:
             return
-        j = self.root.after(ms, fn)
+        j = self.root.after(ms, lambda: self._safe(fn))
         self.jobs.append(j)
         return j
+
+    def _safe(self, fn, *args):
+        """연출 한 조각을 돌린다. **터지면 로그를 남기고 배틀을 접는다.**
+
+        after 와 응답으로 이어지는 사슬은 한 고리가 예외를 내면 거기서
+        조용히 끊긴다. 그러면 finish_cleanup 에 영영 안 닿아서 app.battle
+        이 남고(야생을 눌러도 반응이 없다), 배틀 동안 치워 둔 이름표도
+        로그아웃할 때까지 안 돌아온다.
+        """
+        try:
+            return fn(*args)
+        except Exception as e:                              # noqa: BLE001
+            config.log("배틀 연출 오류: %s\n%s" % (e, traceback.format_exc()))
+            if not self.closed:
+                self.abort("배틀을 이어가지 못해 멈췄습니다.")
 
     # ---------------- 정리 ----------------
     def finish_cleanup(self):
@@ -618,12 +656,32 @@ class DesktopBattle(object):
             if self.saved_home:
                 self.mine.x, self.mine.y = self.saved_home
                 self.mine.clamp()
-                self.mine.place()
+                # 배틀 중에 그 도트가 바탕화면에서 내려갔으면(sync 가 창을
+                # 없앴으면) 여기서 터진다. 그러면 아래의 이름표 풀기와
+                # app.battle 비우기에 못 닿는다.
+                try:
+                    self.mine.place()
+                except Exception:                           # noqa: BLE001
+                    pass
+        # 치워 뒀던 이름표를 되살린다. **내 포켓몬 창을 다시 보인 뒤에**
+        # 푼다 - Overlay 는 창이 숨은 도트에는 이름표를 안 띄우므로, 쓰러진
+        # 채로 풀면 그 도트의 이름표만 안 돌아온다.
+        self._release_names()
         self.app.battle = None
         self.app.request_sync()
         if self.app.wild:
             self.app.wild.check()
         config.log("배틀 종료")
+
+    def _release_names(self):
+        """begin() 에서 막은 이름표를 푼다. 몇 번을 불러도 한 번만 푼다."""
+        ov, self._names_ov = self._names_ov, None
+        if ov is None:
+            return
+        try:
+            ov.release_names()
+        except Exception as e:                              # noqa: BLE001
+            config.log("이름표를 되살리지 못했습니다: %s" % e)
 
     def close(self):
         self.finish_cleanup()

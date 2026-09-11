@@ -20,7 +20,7 @@ import json
 
 from common import pokelogic as P
 
-from . import db
+from . import db, items
 
 
 def _hour(hour=None):
@@ -211,6 +211,10 @@ def apply(uid, mon, branch, dex, now):
            " moves=?, pending=? WHERE id=? AND user_id=?",
            (new_key, exp, ability, int(bool(hidden)), json.dumps(moves),
             json.dumps(pending), mon["id"], uid))
+    # **진화한 종도 도감에 올린다.** 도감(seen)은 잡을 때만 올리고 있어서,
+    # 파이리를 키워 리자드가 돼도 리자드 칸은 비어 있었다. 이제 가진
+    # 포켓몬이니 '잡음' 으로 올린다. 이미 쓰던 사람 몫은 migrations 가 한 번 채운다.
+    items.mark_seen(uid, new_key, True, now or items._now_iso())
 
     out = dict(mon)
     out["species"] = new_key

@@ -61,6 +61,7 @@ class 가짜도트(object):
         self.id = pid
         self.x = self.y = 0
         self.fw = self.fh = 32
+        self.ax = self.ay = 16
         self.battling = False
 
         class W(object):
@@ -75,9 +76,18 @@ class 가짜도트(object):
             def winfo_viewable(self):
                 return self.보임
         self.win = W()
+        # 진짜 Pet 처럼 이름표 창도 따로 있다. badge_win 은 없다 - 야생만
+        # 표식을 단다.
+        self.name_win = W()
 
     def place(self):
         pass
+
+    def clamp(self):
+        pass
+
+    def play(self, name, once=False, then=None):
+        return False                  # 그 동작이 없는 종처럼
 
 
 class 가짜앱(object):
@@ -127,6 +137,7 @@ class 가짜배틀(object):
     sync_bars = DB.DesktopBattle.sync_bars
     apply_hp = DB.DesktopBattle.apply_hp
     switch_to = DB.DesktopBattle.switch_to
+    _safe = DB.DesktopBattle._safe
     approach = lambda self: None
 
 
@@ -313,10 +324,273 @@ def t_투기장_틱도_창_순서를_안_올린다():
     chk("투기장도 클릭 통과는 다시 건다", a.살린수 >= 2, a.살린수)
 
 
+class 가짜시계(object):
+    """root.after 를 쌓아 두었다가 run() 에서 차례로 돌린다."""
+
+    def __init__(self):
+        self.jobs = {}
+        self.n = 0
+
+    def after(self, ms, fn):
+        self.n += 1
+        self.jobs[self.n] = fn
+        return self.n
+
+    def after_cancel(self, j):
+        self.jobs.pop(j, None)
+
+    def run(self, limit=500):
+        k = 0
+        while self.jobs and k < limit:
+            fn = self.jobs.pop(min(self.jobs))
+            fn()
+            k += 1
+
+
+class 가짜오버레이(object):
+    """이름표를 몇 번 막고 풀었는지만 센다."""
+
+    def __init__(self):
+        self.pets = {}
+        self.extra = []
+        self.locked = True
+        self.settings = {"areaMargin": 4}
+        self.막은수 = 0
+        self.푼수 = 0
+        self.풀때 = None           # 풀 때 부를 것 (그 순간의 화면을 본다)
+
+    def area(self):
+        return (0, 0, 800, 600)
+
+    def block_names(self):
+        self.막은수 += 1
+
+    def release_names(self):
+        self.푼수 += 1
+        if self.풀때:
+            self.풀때()
+
+
+class 가짜판앱(object):
+    def __init__(self, ov):
+        self.overlay = ov
+        self.battle = "싸우는 중"
+        self.wild = None
+        self.말 = []
+
+    def notify(self, m):
+        self.말.append(m)
+
+    def request_sync(self):
+        pass
+
+
+class 가짜판(object):
+    """begin / finish_cleanup / after 를 진짜 그대로 빌려 끼운다.
+
+    레이어는 없다(open_layer 를 None 으로 바꿔 끼운다). 레이어를 못 만든
+    PC 에서 도는 길과 같다.
+    """
+
+    def __init__(self, ov):
+        self.app = 가짜판앱(ov)
+        self.root = 가짜시계()
+        self.b = {"id": 1, "me": {"id": 1, "name": "파이리"}}
+        self.closed = False
+        self.busy = False
+        self.jobs = []
+        self.fx = None
+        self.texts = []
+        self.layer = None
+        self.bars = None
+        self.bar_job = None
+        self.mine = 가짜도트(1)
+        self.foe = 가짜도트(9)
+        self.saved_home = None
+        self._names_ov = None
+
+    after = DB.DesktopBattle.after
+    _safe = DB.DesktopBattle._safe
+    abort = DB.DesktopBattle.abort
+    begin = DB.DesktopBattle.begin
+    finish_cleanup = DB.DesktopBattle.finish_cleanup
+    close = DB.DesktopBattle.close
+    _release_names = DB.DesktopBattle._release_names
+    clear_bars = DB.DesktopBattle.clear_bars
+    sync_bars = DB.DesktopBattle.sync_bars
+    tick_bars = DB.DesktopBattle.tick_bars
+    faint = DB.DesktopBattle.faint
+    approach = lambda self: None
+
+
+def 판_시작(ov=None):
+    real = DB.open_layer
+    DB.open_layer = lambda root, area: None
+    try:
+        d = 가짜판(ov or 가짜오버레이())
+        d.begin(None)
+    finally:
+        DB.open_layer = real
+    return d
+
+
+def t_배틀_동안_이름표를_막고_끝나면_한_번_푼다():
+    """체력바와 대미지 글자가 이름표 줄에 그려져서 글자끼리 포개졌다.
+
+    막는 것만큼 **반드시 한 번 푸는 것**이 중요하다. 못 풀면 이름표가
+    로그아웃할 때까지 안 돌아오고, 두 번 풀면 다음 배틀에서 안 숨는다.
+    """
+    d = 판_시작()
+    ov = d.app.overlay
+    chk("배틀이 시작되면 이름표를 막는다", ov.막은수 == 1, ov.막은수)
+    chk("아직 안 풀었다", ov.푼수 == 0, ov.푼수)
+    d.begin(None)
+    chk("begin 을 또 불러도 한 번만 막는다", ov.막은수 == 1, ov.막은수)
+
+    # 쓰러져서 숨은 채로 끝났다. 창을 먼저 보인 뒤에 풀어야 그 도트의
+    # 이름표도 돌아온다 (Overlay 는 창이 숨은 도트를 건너뛴다).
+    d.mine.win.withdraw()
+    본것 = []
+    ov.풀때 = lambda: 본것.append(d.mine.win.보임)
+    d.finish_cleanup()
+    chk("끝나면 푼다", ov.푼수 == 1, ov.푼수)
+    chk("내 포켓몬 창을 보인 뒤에 푼다", 본것 == [1], 본것)
+    chk("app.battle 을 비운다", d.app.battle is None, d.app.battle)
+    d.finish_cleanup()
+    d.close()
+    chk("끝내기를 여러 번 불러도 한 번만 푼다", ov.푼수 == 1, ov.푼수)
+
+
+def t_막기_전에_끝나면_안_푼다():
+    """setup 에서 곧바로 접힌 배틀(야생이 사라졌다)은 막은 적이 없다.
+    그런데 풀면 다른 쪽(투기장)이 막아 둔 것까지 풀린다."""
+    ov = 가짜오버레이()
+    d = 가짜판(ov)
+    d.abort("야생 포켓몬이 사라졌습니다.")
+    chk("막은 적 없으면 안 푼다", ov.푼수 == 0, ov.푼수)
+
+
+def t_연출이_터져도_배틀을_접는다():
+    """after 사슬의 한 고리가 터지면 거기서 조용히 끊겼다.
+
+    finish_cleanup 에 영영 안 닿아서 app.battle 이 남고(야생을 눌러도
+    반응이 없다), 치워 둔 이름표도 로그아웃할 때까지 안 돌아왔다.
+    """
+    d = 판_시작()
+    ov = d.app.overlay
+
+    def 터짐():
+        raise RuntimeError("연출이 터졌다")
+    d.after(30, 터짐)
+    d.root.run()
+    chk("터지면 배틀을 접는다", d.closed is True)
+    chk("이름표를 푼다", ov.푼수 == 1, ov.푼수)
+    chk("app.battle 을 비운다", d.app.battle is None, d.app.battle)
+    chk("멈췄다고 알린다", any("멈췄" in m for m in d.app.말), d.app.말)
+
+    # 서버 응답을 받아 이어가는 자리(run_async 의 done)도 같은 사슬이다.
+    d2 = 판_시작()
+    d2._safe(lambda r, err: {}["없는 키"], {"events": []}, None)
+    chk("응답 처리에서 터져도 접는다",
+        d2.closed is True and d2.app.overlay.푼수 == 1,
+        (d2.closed, d2.app.overlay.푼수))
+
+    # 이미 끝난 뒤에 터진 것은 남기기만 한다. 또 알리면 끝난 배틀이
+    # 멈췄다는 말이 뒤늦게 뜬다.
+    n = len(d.app.말)
+    d._safe(터짐)
+    chk("끝난 뒤에 터진 것은 다시 안 알린다", len(d.app.말) == n, d.app.말)
+
+
+def t_내_도트_창이_없어져도_정리는_끝난다():
+    """배틀 중에 그 도트가 바탕화면에서 내려가면(sync 가 창을 없애면)
+    제자리로 옮기는 place() 가 터진다. 거기서 멈추면 이름표도 안 풀리고
+    app.battle 도 남는다."""
+    d = 판_시작()
+
+    def 없는창():
+        raise RuntimeError("invalid command name")
+    d.mine.place = 없는창
+    try:
+        d.finish_cleanup()
+        chk("터지지 않는다", True)
+    except Exception as e:                                  # noqa: BLE001
+        chk("터지지 않는다", False, e)
+    chk("그래도 이름표를 푼다", d.app.overlay.푼수 == 1, d.app.overlay.푼수)
+    chk("그래도 app.battle 을 비운다", d.app.battle is None)
+
+
+def t_쓰러지면_이름표도_치운다():
+    """예전에는 창과 badge_win 만 숨겼다. 내 포켓몬(Pet)에는 badge_win 이
+    없어서 AttributeError 가 났고 except 가 삼켰다 - 쓰러진 자리 허공에
+    이름표만 남았다."""
+    d = 판_시작()
+    끝 = []
+    pet = 가짜도트(1)
+    d.faint(pet, lambda: 끝.append(True))
+    d.root.run()
+    chk("도트 창이 숨는다", pet.win.보임 == 0)
+    chk("이름표도 숨는다", pet.name_win.보임 == 0)
+    chk("다음으로 넘어간다", 끝 == [True], 끝)
+
+    야생 = 가짜도트(9)
+    야생.name_win = None             # 야생에는 이름표가 없다
+    야생.badge_win = type(pet.win)()
+    d.faint(야생, lambda: 끝.append(True))
+    d.root.run()
+    chk("야생은 표식이 숨는다", 야생.badge_win.보임 == 0)
+
+
+class 가짜투기장정리(object):
+    """Arena.cleanup 만 빌려 끼운다."""
+
+    def __init__(self, ov):
+        self.closed = False
+        self.root = 가짜시계()
+        self.jobs = []
+        self.bar_job = None
+        self.app = 가짜판앱(ov)
+        self.foes = []
+        self.mine = [가짜도트(1), 가짜도트(2)]
+        self.home = {}
+        self.bars = {}
+        self.texts = []
+        self.layer = None
+        self.on_done = None
+        self._names_ov = ov
+
+    _cancel_jobs = AR.Arena._cancel_jobs
+    _release_names = AR.Arena._release_names
+    cleanup = AR.Arena.cleanup
+
+
+def t_투기장은_제자리로_돌아온_뒤에_한_번_푼다():
+    """예전에는 선수마다 설정을 보고 이름표를 따로 다시 띄웠다. 막고 푸는
+    곳을 Overlay 하나로 모았으니 cleanup 에서 한 번만 푼다."""
+    ov = 가짜오버레이()
+    a = 가짜투기장정리(ov)
+    쓰러진애 = a.mine[1]
+    쓰러진애.win.withdraw()
+    본것 = []
+    ov.풀때 = lambda: 본것.append((쓰러진애.win.보임, ov.locked))
+    a.cleanup()
+    chk("투기장이 끝나면 푼다", ov.푼수 == 1, ov.푼수)
+    chk("쓰러진 선수 창을 보인 뒤, 잠금을 풀기 전에 푼다",
+        본것 == [(1, True)], 본것)
+    chk("잠금도 푼다", ov.locked is False)
+    a.closed = False                  # 강제로 한 번 더 돌려 본다
+    a.cleanup()
+    chk("다시 불러도 한 번만 푼다", ov.푼수 == 1, ov.푼수)
+
+
 def main():
     for fn in (t_체력을_그대로_반영한다, t_교체하면_새_포켓몬_체력으로_바뀐다,
                t_숨은_도트의_체력바는_안_그린다, t_맞는_순간_그_쪽만_준다,
-               t_틱은_창_순서를_안_올린다, t_투기장_틱도_창_순서를_안_올린다):
+               t_틱은_창_순서를_안_올린다, t_투기장_틱도_창_순서를_안_올린다,
+               t_배틀_동안_이름표를_막고_끝나면_한_번_푼다,
+               t_막기_전에_끝나면_안_푼다, t_연출이_터져도_배틀을_접는다,
+               t_내_도트_창이_없어져도_정리는_끝난다, t_쓰러지면_이름표도_치운다,
+               t_투기장은_제자리로_돌아온_뒤에_한_번_푼다):
         print("-- %s" % fn.__name__[2:])
         fn()
     print()

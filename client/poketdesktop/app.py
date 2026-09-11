@@ -1317,7 +1317,10 @@ class App(object):
         self.settings["showNames"] = not self.settings.get("showNames")
         config.save_settings(self.settings)
         if self.overlay:
-            self.overlay.refresh_visuals()
+            # 이름표 창만 붙이거나 뗀다. refresh_visuals() 로 도트를 다시
+            # 만들면 배틀 중에 싸우던 도트까지 사라진다. 배틀 중이면 저장만
+            # 되고, 배틀이 끝나 이름표를 풀 때 반영된다.
+            self.overlay.apply_names()
         self.refresh_tray()
 
     def _tell_autostart_once(self):

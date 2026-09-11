@@ -38,6 +38,11 @@ LIST_W = 292            # 왼쪽 도구 목록 폭
 ITEM_H = U.h(28)        # 도구 한 줄 높이 (글꼴 따라 늘어난다)
 MON_H = U.h(34)         # 포켓몬 한 줄 높이
 THUMB = 22              # 목록에 놓는 도트 높이 (다른 창과 겹치지 않는 값)
+# 목록을 나눠 만드는 크기(U.Chunked). 가방의 줄은 위젯이 8~9개로 무겁고
+# 목록 둘이 같이 자라서, 30줄씩 만들면 묶음 하나에 0.5초씩 멈췄다.
+# 첫 묶음은 첫 화면만큼(도구 스무 줄 남짓, 포켓몬 열몇 줄)이면 된다.
+FIRST_ROWS = 20
+CHUNK_ROWS = 15
 
 EV_STAT_MAX = 252       # 서버 config 와 같은 값 (스탯 하나당)
 EV_TOTAL_MAX = 510      # 서버 config 와 같은 값 (여섯 개 합계)
@@ -195,7 +200,18 @@ def _scrollable(cv):
 
 # ---------------------------------------------------------------- 조각 위젯
 def _scroller(parent, bg):
-    """세로로 굴러가는 빈 영역을 만든다. (canvas, inner) 를 돌려준다."""
+    """세로로 굴러가는 빈 영역을 만든다. (canvas, inner) 를 돌려준다.
+
+    내용이 화면보다 짧으면 **스크롤할 게 없어야 한다.** bbox 를 그대로
+    넣으면, 도구가 두 개뿐인데도 스크롤바가 움직이고 빈 화면이 보인다.
+    포켓몬 관리 창에서 이미 같은 것을 고쳤다.
+
+    맞추는 일은 U.scroll_fitter 가 **몰아서 한 번** 한다. 예전에는 여기서
+    <Configure> 마다 update_idletasks 로 배치를 억지로 끝내고 쟀는데, 그게
+    또 <Configure> 를 불러 제 발로 되돌아왔다. 기술머신 358줄을 그리는
+    2.6초 중 2.3초가 이 한 줄이었다. 줄을 담자마자 굴려야 하면
+    canvas.scroll_fit.fit_now() 를 부른다.
+    """
     holder = tk.Frame(parent, bg=bg)
     holder.pack(fill="both", expand=True)
     cv = tk.Canvas(holder, bg=bg, highlightthickness=0, bd=0)
@@ -205,40 +221,14 @@ def _scroller(parent, bg):
     cv.pack(side="left", fill="both", expand=True)
     inner = tk.Frame(cv, bg=bg)
     wid = cv.create_window((0, 0), window=inner, anchor="nw")
-
-    def resize(_e=None):
-        """내용이 화면보다 짧으면 **스크롤할 게 없어야 한다.**
-
-        bbox 를 그대로 넣으면, 도구가 두 개뿐인데도 스크롤바가 움직이고
-        빈 화면이 보인다. 포켓몬 관리 창에서 이미 같은 것을 고쳤다.
-        """
-        try:
-            cv.update_idletasks()
-            h = inner.winfo_reqheight()
-            view = cv.winfo_height()
-            w = cv.winfo_width()
-            if h <= view:
-                cv.configure(scrollregion=(0, 0, w, view))
-                cv.yview_moveto(0)
-            else:
-                cv.configure(scrollregion=(0, 0, w, h))
-        except Exception:                                   # noqa: BLE001
-            pass
-
-    inner.bind("<Configure>", resize)
-
-    def on_cv(e):
-        cv.itemconfigure(wid, width=e.width)
-        resize()
-
-    cv.bind("<Configure>", on_cv)
+    cv.scroll_fit = U.scroll_fitter(cv, inner, wid)
     return cv, inner
 
 
 class ItemRow(object):
     """왼쪽 도구 목록 한 줄 — 분류 색점 · 이름 · 개수."""
 
-    def __init__(self, parent, item, count, on_pick):
+    def __init__(self, parent, item, count, on_pick, selected=False):
         self.item = item
         self.on_pick = on_pick
         self.selected = False
@@ -272,6 +262,8 @@ class ItemRow(object):
             w.bind("<Button-1>", lambda e: self.on_pick(self.item["id"]))
             w.bind("<Enter>", self._in)
             w.bind("<Leave>", self._out)
+        if selected:
+            self.set_selected(True)      # 만들 때 칠한다 (나눠 만드는 줄)
 
     def pack(self, **kw):
         self.f.pack(fill="x", **kw)
@@ -306,9 +298,13 @@ class MonRow(object):
     """'누구에게 쓸까?' 목록 한 줄 — 왼쪽에 **실제 도트**를 작게 놓는다.
 
     도트 자리는 그림이 오기 전에도 폭이 흔들리지 않게 고정 크기 액자에 넣는다.
+
+    state=(good, blocked, note, color) 와 selected 를 주면 **만들 때 칠한다.**
+    목록을 나눠 만들기 때문에, 다 만든 뒤 모든 줄을 다시 칠하면 줄 수만큼
+    도로 멈춘다.
     """
 
-    def __init__(self, parent, mon, on_pick):
+    def __init__(self, parent, mon, on_pick, state=None, selected=False):
         self.mon = mon
         self.on_pick = on_pick
         self.selected = False
@@ -316,6 +312,8 @@ class MonRow(object):
         self.blocked = False
         self.note_text = ""
         self.photo = None
+        # 아래에서 만든 모습 그대로의 상태. set_state 가 바뀐 것만 칠하려고 쓴다.
+        self._state = (False, False, "", U.FG_FAINT)
         info = mon.get("info") or {}
 
         self.f = tk.Frame(parent, bg=ROW_BG, height=MON_H, cursor="hand2")
@@ -356,6 +354,12 @@ class MonRow(object):
             w.bind("<Enter>", self._in)
             w.bind("<Leave>", self._out)
 
+        self.selected = bool(selected)
+        if state is not None and tuple(state) != self._state:
+            self.set_state(*state)           # 안에서 다시 칠한다
+        elif self.selected:
+            self.repaint()
+
     def pack(self, **kw):
         self.f.pack(fill="x", **kw)
         return self
@@ -369,6 +373,11 @@ class MonRow(object):
             pass
 
     def set_state(self, good, blocked, note, color):
+        # 그대로면 안 칠한다. 도구를 고를 때마다 모든 줄에 부르는데,
+        # 대부분의 줄은 바뀌는 게 없다(진화의 돌이면 거의 다 '해당 없음').
+        if (good, blocked, note, color) == self._state:
+            return
+        self._state = (good, blocked, note, color)
         self.good = good
         self.blocked = blocked
         self.note_text = note
@@ -440,6 +449,11 @@ class BagWindow(object):
         self.stat = None         # 병뚜껑으로 단련할 능력
         self.stat_needed = False
         self._pending = None     # 다시 불러온 뒤에 띄울 말
+        self._wait = None        # 여는 중 표시
+        self._states = {}        # {포켓몬id: (good, blocked, note, color)} — 고른 도구 기준
+        self._mon_ids = set()
+        self._items_job = None   # 줄을 나눠 만드는 일 (U.Chunked)
+        self._mons_job = None
 
         # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
         self.win = U.panel(parent, root, "포스크탑 — 가방",
@@ -511,6 +525,10 @@ class BagWindow(object):
                                                      pady=6)
         tk.Frame(wrap, bg=U.LINE, height=U.h(2)).pack(fill="x")
         self.item_canvas, self.item_inner = _scroller(wrap, U.BG)
+        # 줄은 틀 하나에 담는다. 다시 불러올 때 틀째 숨기고 조금씩 부수려고
+        # (U.retire). 틀은 바탕색이 같아 화면에는 차이가 없다.
+        self.item_list = tk.Frame(self.item_inner, bg=U.BG)
+        self.item_list.pack(fill="x")
 
     # ---------------- 오른쪽: 설명과 대상 ----------------
     def _detail_pane(self, parent):
@@ -647,7 +665,9 @@ class BagWindow(object):
     def reload(self):
         if not self.app.api:
             return self.say("로그인이 필요합니다.", U.DANGER, U.DANGER)
-        if not self._pending:
+        # 여는 중 표시가 이미 떠 있으면 하나 더 띄우지 않는다. 겹쳐 띄우면
+        # 먼저 온 답이 나중 것만 걷고, 먼저 띄운 것은 창을 덮은 채 남는다.
+        if not self._pending and self._wait is None:
             self.say("가방을 여는 중...", U.FG_FAINT)
             self._wait = ui_loading.Overlay(self.win, "가방을 여는 중")
         api = self.app.api
@@ -657,6 +677,10 @@ class BagWindow(object):
             mons = api.pokemon()
             # 도트는 여기서 그림까지 다 만들어 둔다. tk 스레드에서 만들면
             # 마릿수만큼 창이 멈춘다. PhotoImage 만 tk 쪽에서 씌운다.
+            #
+            # 칸(frame_art) 을 넘지 않게 max_size 로 줄인다. 옆으로 긴 종은
+            # 높이만 맞추면 30px 칸 밖으로 나가 잘렸다(캐시된 312종 중 40종).
+            # 칸을 넓히지는 않는다 - 이름과 레벨 자리가 옮겨 간다.
             thumbs = {}
             for m in mons:
                 path = sprite_cache.ensure(api, m.get("num"), m.get("shiny"))
@@ -665,28 +689,31 @@ class BagWindow(object):
                 try:
                     anim = sprites.load_animation(path, target_height=THUMB,
                                                   min_scale=0.2, max_scale=3.0,
-                                                  max_frames=1)
+                                                  max_frames=1,
+                                                  max_size=(26, MON_H - 4))
                     thumbs[m["id"]] = sprites.to_rgba(
                         anim.frames[sprites.RIGHT][0], anim.key)
                 except Exception:                       # noqa: BLE001
                     pass
-            # 도구 그림도 같이 받아 둔다 (가진 것만)
+            # 도구 그림도 같이 받아 둔다 (가진 것만). 목록 크기(20)로
+            # 풀어 두기까지 해서 tk 스레드는 감싸기만 한다.
             try:
                 bag = (shop or {}).get("bag") or {}
-                item_icons.prefetch(api, list(bag))
+                item_icons.prefetch(api, list(bag), sizes=(20,))
             except Exception:                           # noqa: BLE001
                 pass
             return shop, mons, thumbs
         U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, r, err):
-        w = getattr(self, "_wait", None)
-        if w:
-            w.close()
-            self._wait = None
+        w, self._wait = self._wait, None
         if not self.alive:
+            if w:
+                w.close()
             return
         if err:
+            if w:
+                w.close()
             return self.say(getattr(err, "message", str(err)), U.DANGER,
                             U.DANGER)
         shop, mons, thumbs = r
@@ -694,6 +721,7 @@ class BagWindow(object):
         self.bag = shop.get("bag") or {}
         self.money = int(shop.get("money") or 0)
         self.mons = mons or []
+        self._mon_ids = set(m["id"] for m in self.mons)
         self.photos = {}
         for pid, img in thumbs.items():
             try:
@@ -706,15 +734,18 @@ class BagWindow(object):
         total = sum(v for v in self.bag.values() if v > 0)
         self.count_label.configure(text="%d종 · 모두 %d개" % (kinds, total))
 
+        # 고를 도구를 먼저 정해 둔다. 줄을 만들면서 고른 줄을 바로 칠한다.
+        keep_item = self.item_id
+        if keep_item and self.bag.get(keep_item, 0) > 0:
+            target = keep_item
+        else:
+            target = self._first_item()
+        self.item_id = target
         self._fill_items()
         self._fill_mons()
 
-        keep_item = self.item_id
         self.item_id = None
-        if keep_item and self.bag.get(keep_item, 0) > 0:
-            self.pick_item(keep_item)
-        else:
-            self.pick_item(self._first_item())
+        self.pick_item(target)
 
         if self._pending:
             text, color = self._pending
@@ -722,6 +753,15 @@ class BagWindow(object):
             self.say(text, color)
         else:
             self.say("")
+
+        if w:
+            # **다 그리고 나서 걷는다.** 맨 앞에서 걷으면 줄을 만드는 동안
+            # 아무 표시 없이 창이 멈춘 것처럼 보였다(4초). 첫 화면만큼은
+            # 이미 만들었으니, 그것이 그려진 뒤(idle)에 걷는다.
+            try:
+                self.root.after_idle(w.close)
+            except tk.TclError:
+                w.close()
 
     def _first_item(self):
         """처음에 골라 둘 도구 — 쓸 수 있는 것 중 맨 위."""
@@ -740,57 +780,105 @@ class BagWindow(object):
         return owned
 
     def _fill_items(self):
-        for w in self.item_inner.winfo_children():
-            w.destroy()
+        """왼쪽 도구 목록을 새로 만든다.
+
+        **나눠 만든다(U.Chunked).** 첫 화면만큼 먼저 만들고 나머지는 조금씩
+        이어 만든다. 줄은 만들 때 고름까지 칠한다 - self.item_id 가 그 기준이다.
+        """
+        if self._items_job is not None:
+            self._items_job.cancel()     # 옛 목록의 남은 줄이 뒤에 붙지 않게
+            self._items_job = None
+        old = self.item_list
+        if old.winfo_children():
+            # 옛 줄은 틀째 숨기고 조금씩 부순다. 수백 개를 한 번에 부수면
+            # 그것만으로 0.8초 멈췄다(쓰기·팔기 뒤에 다시 불러올 때).
+            self.item_list = tk.Frame(self.item_inner, bg=U.BG)
+            self.item_list.pack(fill="x", before=old)
+            U.retire(old)
+        box = self.item_list
         self.item_rows = {}
         owned = self._owned()
         if not owned:
-            tk.Label(self.item_inner, text="가방이 비어 있다.", bg=U.BG,
+            tk.Label(box, text="가방이 비어 있다.", bg=U.BG,
                      fg=U.FG_DIM, font=U.FONT_S).pack(pady=(34, 4))
-            tk.Label(self.item_inner,
+            tk.Label(box,
                      text="야생 포켓몬을 잡거나 배틀에서\n도구를 주울 수 있다.",
                      bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS,
                      justify="center").pack()
             return
-        cat = None
-        for it in owned:
-            if it["cat"] != cat:
-                cat = it["cat"]
-                n = sum(1 for x in owned if x["cat"] == cat)
-                strip = tk.Frame(self.item_inner, bg=U.INK, height=U.h(26))
+        counts = {}
+        for x in owned:
+            counts[x["cat"]] = counts.get(x["cat"], 0) + 1
+        last = {"cat": None}
+
+        def build(it):
+            if it["cat"] != last["cat"]:
+                cat = last["cat"] = it["cat"]
+                strip = tk.Frame(box, bg=U.INK, height=U.h(26))
                 strip.pack(fill="x")
                 strip.pack_propagate(False)
-                U.marker_label(strip, "%s · %d종" % (CAT_KR.get(cat, cat), n),
+                U.marker_label(strip, "%s · %d종" % (CAT_KR.get(cat, cat),
+                                                    counts[cat]),
                                bg=U.INK,
                                mark=CAT_COLOR.get(cat, U.ACCENT)).pack(
                     side="left", padx=12, pady=6)
-                tk.Frame(self.item_inner, bg=U.LINE, height=U.h(1)).pack(fill="x")
-            self.item_rows[it["id"]] = ItemRow(self.item_inner, it,
-                                               self.bag.get(it["id"], 0),
-                                               self.pick_item).pack()
-            tk.Frame(self.item_inner, bg="#161a24", height=U.h(1)).pack(fill="x")
+                tk.Frame(box, bg=U.LINE, height=U.h(1)).pack(fill="x")
+            self.item_rows[it["id"]] = ItemRow(
+                box, it, self.bag.get(it["id"], 0), self.pick_item,
+                selected=(it["id"] == self.item_id)).pack()
+            tk.Frame(box, bg="#161a24", height=U.h(1)).pack(fill="x")
+
+        self._items_job = U.Chunked(self.win, owned, build,
+                                    first=FIRST_ROWS, size=CHUNK_ROWS)
 
     def _fill_mons(self):
-        for w in self.mon_list.winfo_children():
-            w.destroy()
+        """'누구에게 쓸까?' 목록을 새로 만든다. 나눠 만든다.
+
+        줄은 만들 때 그 시점의 고른 도구 기준 상태(self._states)와 고름
+        (self.mon_id)으로 칠한다. 첫 화면만큼은 곧이어 pick_item 이 맞춰
+        칠하고, 나중에 만들어지는 줄은 이미 맞춰진 상태로 태어난다.
+        """
+        if self._mons_job is not None:
+            self._mons_job.cancel()
+            self._mons_job = None
+        old = self.mon_list
+        if old.winfo_children():
+            # 도구 목록과 같다 - 틀째 숨기고 조금씩 부순다. 못 쓰는 도구를
+            # 골라 틀이 빠져 있었으면 새 틀도 빠진 채로 둔다(_show_targets 가 담는다).
+            self.mon_list = tk.Frame(self.mon_inner, bg=ROW_BG)
+            if old.winfo_manager() == "pack":
+                self.mon_list.pack(fill="both", expand=True, before=old)
+            U.retire(old)
         self.mon_rows = {}
-        for m in self.mons:
-            row = MonRow(self.mon_list, m, self.pick_mon).pack()
+        if not self.mons:
+            tk.Label(self.mon_list, text="가진 포켓몬이 없다.", bg=ROW_BG,
+                     fg=U.FG_FAINT, font=U.FONT_S, pady=30).pack()
+            return
+
+        def build(m):
+            row = MonRow(self.mon_list, m, self.pick_mon,
+                         state=self._states.get(m["id"]),
+                         selected=(m["id"] == self.mon_id)).pack()
             ph = self.photos.get(m["id"])
             if ph:
                 row.set_photo(ph)
             self.mon_rows[m["id"]] = row
             tk.Frame(self.mon_list, bg="#161a24", height=U.h(1)).pack(fill="x")
-        if not self.mons:
-            tk.Label(self.mon_list, text="가진 포켓몬이 없다.", bg=ROW_BG,
-                     fg=U.FG_FAINT, font=U.FONT_S, pady=30).pack()
+
+        self._mons_job = U.Chunked(self.win, self.mons, build,
+                                   first=FIRST_ROWS, size=CHUNK_ROWS)
 
     # ---------------- 고르기 ----------------
     def pick_item(self, item_id):
+        prev = self.item_id
         self.item_id = item_id
         self.stat = None
-        for i, r in self.item_rows.items():
-            r.set_selected(i == item_id)
+        # 바뀐 두 줄만 칠한다. 고른 줄은 늘 하나라 나머지는 이미 안 고른
+        # 모습이다. 아직 안 만든 줄은 만들 때 self.item_id 를 보고 칠한다.
+        for i in set((prev, item_id)):
+            r = self.item_rows.get(i)
+            if r is not None:
+                r.set_selected(i == item_id)
         it = self.current_item()
         if not it:
             self.stat_needed = False
@@ -839,29 +927,35 @@ class BagWindow(object):
                 text=natural(unusable_note(it)) if it else
                 "도구를 고르면 쓸 수 있는 포켓몬을 보여준다.")
             self.mon_note.pack(fill="both", expand=True)
-            self.mon_id = None
-            for r in self.mon_rows.values():
-                r.set_selected(False)
+            prev, self.mon_id = self.mon_id, None
+            row = self.mon_rows.get(prev)
+            if row is not None:
+                row.set_selected(False)
             return
         self.mon_note.pack_forget()
         self.mon_list.pack(fill="both", expand=True)
 
+        # 판정은 **줄이 아니라 데이터로** 한다. 줄은 나눠 만드는 중이라
+        # 아직 없는 줄이 있을 수 있다. 없는 줄은 만들 때 이 상태로 칠해진다.
+        self._states = {}
         first_ok = None
-        for pid, row in self.mon_rows.items():
-            good, blocked, note, color = self._target_state(it, row.mon)
-            row.set_state(good, blocked, note, color)
+        for m in self.mons:
+            good, blocked, note, color = self._target_state(it, m)
+            self._states[m["id"]] = (good, blocked, note, color)
             if not blocked and (first_ok is None or (good and not self._is_good(first_ok))):
-                first_ok = pid
+                first_ok = m["id"]
+        for pid, row in self.mon_rows.items():
+            row.set_state(*self._states[pid])
         # 고르고 있던 포켓몬이 이 도구로는 못 쓰는 대상이면 옮겨 준다
-        cur = self.mon_rows.get(self.mon_id)
-        if cur is None or cur.blocked:
+        cur = self._states.get(self.mon_id)
+        if cur is None or cur[1]:
             self.pick_mon(first_ok, quiet=True)
         else:
             self.pick_mon(self.mon_id, quiet=True)
 
     def _is_good(self, pid):
-        row = self.mon_rows.get(pid)
-        return bool(row and row.good)
+        st = self._states.get(pid)
+        return bool(st and st[0])
 
     def _target_state(self, it, mon):
         """이 도구를 이 포켓몬에게 쓸 수 있는지.
@@ -930,15 +1024,20 @@ class BagWindow(object):
         return False, True, "쓸 수 없다", U.FG_FAINT
 
     def pick_mon(self, pid, quiet=False):
-        row = self.mon_rows.get(pid)
-        if row is not None and row.blocked:
+        # 줄이 아직 안 만들어졌을 수 있어서 데이터(self._states)로 본다.
+        st = self._states.get(pid)
+        if st is not None and st[1]:
             if not quiet:
-                self.say(row.note_text or "이 포켓몬에게는 쓸 수 없다.", U.ACCENT,
+                self.say(st[2] or "이 포켓몬에게는 쓸 수 없다.", U.ACCENT,
                          U.FG_DIM)
             return
-        self.mon_id = pid if row is not None else None
-        for i, r in self.mon_rows.items():
-            r.set_selected(i == self.mon_id)
+        prev = self.mon_id
+        self.mon_id = pid if pid in self._mon_ids else None
+        # 바뀐 두 줄만 칠한다 (pick_item 과 같은 까닭).
+        for i in set((prev, self.mon_id)):
+            r = self.mon_rows.get(i)
+            if r is not None:
+                r.set_selected(i == self.mon_id)
         self.stat = None
         self._refresh_stats()
         self._refresh_evs()
@@ -1128,6 +1227,9 @@ class BagWindow(object):
     # ---------------- 끝내기 ----------------
     def close(self):
         self.alive = False
+        for job in (self._items_job, self._mons_job):
+            if job is not None:
+                job.cancel()
         if getattr(self.app, "bag_window", None) is self:
             self.app.bag_window = None
         try:

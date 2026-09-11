@@ -19,6 +19,12 @@ W, H = 900, 660
 # 1·2·3 등만 색으로 구분한다. 그 아래까지 물들이면 표가 시끄러워진다.
 MEDAL = {1: "#ffc043", 2: "#c9d1e6", 3: "#d08a52"}
 
+# 목록을 나눠 만드는 크기(U.Chunked). 쉰 줄을 한 번에 만들면 그동안 창이
+# 멈춘다. 카드에 단추가 없어 가벼우니 친구·대전보다 크게 끊는다. 첫 묶음은
+# 첫 화면(카드 여덟 장 남짓)이면 된다.
+FIRST_ROWS = 10
+CHUNK_ROWS = 6
+
 
 class RankWindow(object):
 
@@ -26,6 +32,7 @@ class RankWindow(object):
         self.app = app
         self.root = app.root
         self.busy = False
+        self._job = None          # 목록을 나눠 만드는 일 (U.Chunked)
         self.rows = []
         self.me = {}
         self.season = 1
@@ -70,29 +77,17 @@ class RankWindow(object):
         sb = tk.Scrollbar(wrap, orient="vertical", command=cv.yview)
         self.list = tk.Frame(cv, bg=U.BG)
         self._win_id = cv.create_window((0, 0), window=self.list, anchor="nw")
-        self.list.bind("<Configure>", lambda _e: self.fit_scroll())
-        cv.bind("<Configure>", lambda e: (
-            cv.itemconfigure(self._win_id, width=e.width), self.fit_scroll()))
+        # 스크롤 영역은 U.scroll_fitter 가 **몰아서 한 번** 맞춘다. 예전에는
+        # <Configure> 마다 update_idletasks 로 밀린 배치를 억지로 끝내고
+        # 쟀는데, 그게 또 <Configure> 를 불러 제 발로 되돌아왔다 - 카드를
+        # 담을 때마다 앱 전체를 다시 배치했다. 내용이 짧으면 스크롤할 게
+        # 없게 하는 규칙은 그대로다.
+        self.fit = U.scroll_fitter(cv, self.list, self._win_id)
         cv.configure(yscrollcommand=sb.set)
         cv.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
         U.scrollable(cv, 120)
         self.cv = cv
-
-    def fit_scroll(self):
-        """내용이 화면보다 짧으면 스크롤할 게 없어야 한다."""
-        try:
-            self.cv.update_idletasks()
-            h = self.list.winfo_reqheight()
-            view = self.cv.winfo_height()
-            w = self.cv.winfo_width()
-            if h <= view:
-                self.cv.configure(scrollregion=(0, 0, w, view))
-                self.cv.yview_moveto(0)
-            else:
-                self.cv.configure(scrollregion=(0, 0, w, h))
-        except Exception:                                   # noqa: BLE001
-            pass
 
     def _status(self):
         self.status = U.status_line(self.win, "")
@@ -110,20 +105,37 @@ class RankWindow(object):
 
         def done(r, err):
             self.busy = False
-            wait.close()
             if err:
+                wait.close()
                 return self.say(getattr(err, "message", str(err)), U.DANGER)
-            self.rows = r.get("ranking") or []
-            self.me = r.get("me") or {}
-            self.season = r.get("season", 1)
-            self.placement = r.get("placement", 5)
-            self.draw()
+            try:
+                self.rows = r.get("ranking") or []
+                self.me = r.get("me") or {}
+                self.season = r.get("season", 1)
+                self.placement = r.get("placement", 5)
+                self.draw()
+            finally:
+                # **첫 화면을 그린 뒤에 걷는다.** 맨 앞에서 걷으면 카드를
+                # 만드는 동안 아무 표시 없이 창이 멈춘 것처럼 보였다. 첫
+                # 묶음은 이미 만들었으니 그것이 그려진 뒤(idle)에 걷는다.
+                # 그리다 터져도 걷는다 - 덮개가 새로고침 단추까지 가린다.
+                try:
+                    self.root.after_idle(wait.close)
+                except tk.TclError:
+                    wait.close()
         run_async(self.root, self.app.api.pvp_ranking, done)
 
     # ---------------- 그리기 ----------------
     def draw(self):
+        if self._job is not None:
+            self._job.cancel()      # 옛 목록의 남은 카드가 새 목록 뒤에 붙지 않게
+            self._job = None
         for w in self.list.winfo_children():
             w.destroy()
+        # 카드는 위에서부터 나눠 만든다. 맨 위로 올려 둬야 먼저 만든 묶음이
+        # 곧 보이는 화면이다 - 아래를 보던 채로 두면 아직 안 만든 자리가
+        # 빈 채로 먼저 보인다.
+        self.cv.yview_moveto(0)
 
         self.title.configure(text="랭킹  ·  시즌 %d" % self.season)
         me = self.me
@@ -158,11 +170,11 @@ class RankWindow(object):
                           % self.placement,
                      bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S,
                      justify="center").pack(pady=48)
-            return self.fit_scroll()
+            return self.fit.schedule()
 
-        for r in self.rows:
-            self._card(r)
-        self.fit_scroll()
+        self._job = U.Chunked(self.win, self.rows, self._card,
+                              first=FIRST_ROWS, size=CHUNK_ROWS)
+        self.fit.schedule()
 
     def _card(self, r):
         mine = bool(r.get("me"))
@@ -225,6 +237,9 @@ class RankWindow(object):
             pass
 
     def close(self):
+        if self._job is not None:
+            self._job.cancel()          # 남은 카드를 닫힌 창에 만들지 않게
+            self._job = None
         try:
             self.win.destroy()
         except Exception:                                   # noqa: BLE001

@@ -107,6 +107,15 @@ class WildPet(Pet):
         self.make_badge()
         self.blink()
 
+    def make_nameplate(self):
+        """야생에는 이름표를 안 붙인다. **표식이 이미 그 자리에 있다.**
+
+        표식('야생 꼬부기 Lv.5')이 도트 바로 위 같은 줄에 뜬다. 이름표까지
+        붙이면 두 글자가 거의 통째로 포개져서 둘 다 못 읽었고, 볼에 넣으면
+        표식만 숨고 이름표는 허공에 남았다 (hide_wild_sprite).
+        """
+        return
+
     def make_badge(self):
         info = self.mon.get("info", {})
         shiny = self.mon.get("shiny")

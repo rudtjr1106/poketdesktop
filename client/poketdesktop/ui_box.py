@@ -7,6 +7,8 @@
 오른쪽 상세에는 **실제 도트**가 제자리에서 움직인다.
 """
 import tkinter as tk
+import tkinter.font as tkfont
+from collections import OrderedDict
 from tkinter import ttk
 
 from PIL import ImageTk
@@ -20,6 +22,14 @@ from . import ui_loading
 
 ROW_H = U.h(30)
 DETAIL_W = 340
+# 목록을 나눠 만드는 크기(U.Chunked). 줄 하나에 위젯이 열서너 개라 무겁다.
+# 첫 묶음은 첫 화면만큼(창 높이에 스무 줄 남짓)이면 된다.
+FIRST_ROWS = 20
+CHUNK_ROWS = 15
+# 상세 칸 도트의 높이, 그리고 만들어 둔 것을 몇 마리까지 들고 있을지.
+# 방금 본 포켓몬을 다시 고르면 다시 풀지 않고 그대로 쓴다.
+ART_H = 92
+ART_KEEP = 8
 
 # (제목, x, 너비, 정렬)
 COLS = [("도감", 12, 50, "w"), ("이름", 66, 168, "w"), ("Lv", 240, 34, "center"),
@@ -29,12 +39,112 @@ COLS = [("도감", 12, 50, "w"), ("이름", 66, 168, "w"), ("Lv", 240, 34, "cent
 STAT_ROWS = [("hp", "HP"), ("atk", "공격"), ("def", "방어"),
              ("spa", "특수공격"), ("spd", "특수방어"), ("spe", "스피드")]
 
+# 성별 기호 자리를 재는 글꼴. 줄마다 tkfont.Font 를 새로 만들면 200줄에
+# 26ms 가 들었다(만들어 둔 것으로 재면 9ms). **Tk 인터프리터마다 따로
+# 둔다** - 검사는 Tk 를 만들었다 부쉈다 하는데, 부서진 쪽 글꼴로 재면
+# 오류가 나서 글자 수 어림으로 떨어진다.
+_measure_fonts = {}
+
+
+def _text_width(widget, text, font):
+    key = (id(widget.tk), tuple(font))
+    f = _measure_fonts.get(key)
+    if f is None:
+        f = tkfont.Font(root=widget, font=font)
+        _measure_fonts[key] = f
+    return f.measure(text)
+
+
+def _row_sig(mon):
+    """줄에 그려지는 값. 다시 불러왔을 때 이게 같으면 줄을 그대로 쓴다."""
+    info = mon.get("info") or {}
+    return (mon.get("num"), mon.get("species"), info.get("name"),
+            bool(mon.get("shiny")), mon.get("gender"), mon.get("level"),
+            info.get("nature"), info.get("ivPercent"),
+            bool(mon.get("onDesktop")))
+
+
+# 진화 칸에 적는 조건. 시간은 서버(evolution._time_ok)가 실제로 보는 것만
+# 적는다 - 도감에는 '보름달' 도 있지만 서버가 안 보므로 적으면 거짓말이 된다.
+EVO_TIME = {"day": "낮에", "night": "밤에", "dusk": "해 질 녘에"}
+EVO_GENDER = {"M": "수컷만", "F": "암컷만"}
+EVO_STATS = {1: "공격이 방어보다 높을 때", -1: "공격이 방어보다 낮을 때",
+             0: "공격과 방어가 같을 때"}
+# 도구 고르기 창에서 이 포켓몬의 진화 도구 밑에 붙이는 한 줄.
+HOLD_EVO_NOTE = "지니게 하면 진화에 쓸 수 없습니다. 진화시키려면 가방에서 쓰세요."
+
+
+def evo_items(dex, mon):
+    """이 포켓몬을 진화시키는 도구 id 들 (가방에서 쓰는 것)."""
+    sp = dex.get(mon.get("species")) if (dex and mon) else None
+    return set(b["item"] for b in ((sp or {}).get("evo") or [])
+               if b.get("mode") == "stone" and b.get("item"))
+
+
+def evo_lines(dex, mon, item_kr=None):
+    """진화 갈래마다 한 줄 - 무엇을 하면 무엇이 되는지.
+
+    **통신교환 진화가 도구로 바뀐 것을 여기서 말해 준다.** 이 게임에는
+    교환이 없어서 통신교환은 연결의끈을(지닌 물건이 있던 교환은 그 물건을)
+    가방에서 쓰는 것으로 바뀌어 있다 (tools/build_pokedex.py). 그런데 게임
+    어디에도 그 말이 없어서, 윤겔라나 롱스톤을 어떻게 진화시키는지 알 길이
+    없었다.
+
+    도구 이름은 상점 목록에서 받은 것(item_kr)으로 적고, 아직 못 받았으면
+    id 를 그대로 적는다.
+    """
+    sp = dex.get(mon.get("species")) if (dex and mon) else None
+    names = item_kr or {}
+    out = []
+    for b in (sp or {}).get("evo") or []:
+        mode = b.get("mode")
+        if mode == "stone" and b.get("item"):
+            what = "%s을(를) 가방에서 쓰면" % (names.get(b["item"]) or b["item"])
+        elif mode == "level":
+            lv = int(b.get("level") or 0)
+            # Lv.1 은 '아무 레벨' 이다. 진화는 레벨이 오를 때 보므로
+            # 기술 조건만 있는 갈래(내루미 등)는 다음 레벨업에 진화한다.
+            what = ("Lv.%d" % lv) if lv > 1 else "레벨이 오르면"
+        elif mode == "friend":
+            # 얼마나 남았는지는 친밀도 칸이 따로 보여 준다.
+            what = "친밀도가 차면"
+        else:
+            continue
+        notes = []
+        if b.get("time") in EVO_TIME:
+            notes.append(EVO_TIME[b["time"]])
+        if b.get("gender") in EVO_GENDER:
+            notes.append(EVO_GENDER[b["gender"]])
+        if b.get("move"):
+            notes.append("%s을(를) 알 때" % dex.move_name(b["move"]))
+        if b.get("moveType"):
+            notes.append("%s 기술을 알 때" % dex.type_name(b["moveType"]))
+        if b.get("stats") in EVO_STATS:
+            notes.append(EVO_STATS[b["stats"]])
+        if b.get("wasTrade"):
+            notes.append("원래 통신교환")
+        if mode == "stone" and mon.get("held") == b.get("item"):
+            # 지니게 한 도구는 가방에서 빠져 있다. 서버는 가방에 있는 것만
+            # 쓰므로, 본가 버릇대로 지니게 했다면 벗겨야 쓸 수 있다.
+            notes.append("지금 지니고 있어 먼저 벗겨야 함")
+        line = "%s → %s" % (what, dex.name(b.get("to")))
+        if notes:
+            line += " (%s)" % ", ".join(notes)
+        out.append(natural(line))
+    return out
+
 
 class Row(object):
-    """목록 한 줄."""
+    """목록 한 줄. 아래에 1px 선(line)이 붙어 다닌다.
 
-    def __init__(self, parent, mon, dex, on_pick, dnd=None):
+    selected 를 주면 **만들 때 칠한다.** 목록을 나눠 만들기 때문에, 다 만든
+    뒤 모든 줄을 다시 칠하면 줄 수만큼 도로 멈춘다.
+    """
+
+    def __init__(self, parent, mon, dex, on_pick, dnd=None, selected=False):
         self.mon = mon
+        self.dex = dex
+        self.sig = _row_sig(mon)
         self.on_pick = on_pick
         # 끌어서 옮기기. 창이 넘겨준 세 가지를 그대로 부른다.
         # 누르자마자 고르지 않고 **놓을 때** 고른다 - 그래야 끌기 시작한
@@ -48,6 +158,9 @@ class Row(object):
 
         self.f = tk.Frame(parent, bg=base, height=ROW_H, cursor="hand2")
         self.f.pack_propagate(False)
+        # 줄 사이 선. 줄과 같이 담고 같이 뺀다(pack/forget).
+        self.line = tk.Frame(parent, bg="#1a1f2e" if self.party else "#161a24",
+                             height=U.h(1))
         self.mark = tk.Frame(self.f, bg=base, width=3)
         self.mark.place(x=0, y=0, relheight=1.0)
 
@@ -66,8 +179,7 @@ class Row(object):
         if g:
             # 글자 수로 어림하면 한글에서 어긋난다. 글꼴에 실제 폭을 물어본다.
             try:
-                import tkinter.font as tkfont
-                wpx = tkfont.Font(font=U.FONT_S).measure(name)
+                wpx = _text_width(self.f, name, U.FONT_S)
             except Exception:
                 wpx = len(name) * 11
             gx = min(COLS[1][1] + wpx + 6, COLS[2][1] - 14)
@@ -109,6 +221,8 @@ class Row(object):
                 w.bind("<Button-1>", lambda e, i=pid: self.on_pick(i))
             w.bind("<Enter>", self._hover_in)
             w.bind("<Leave>", self._hover_out)
+        if selected:
+            self.set_selected(True)
 
     def _cell(self, text, col, fg, font):
         title, x, w, anchor = col
@@ -119,8 +233,21 @@ class Row(object):
         return lb
 
     def pack(self, **kw):
+        """줄과 그 아래 선을 함께 담는다. after/before 는 줄에 건다."""
         self.f.pack(fill="x", **kw)
+        self.line.pack(fill="x", after=self.f)
         return self
+
+    def forget(self):
+        self.f.pack_forget()
+        self.line.pack_forget()
+
+    def destroy(self):
+        for w in (self.f, self.line):
+            try:
+                w.destroy()
+            except tk.TclError:
+                pass
 
     def _paint(self, bg, mark):
         self.f.configure(bg=bg)
@@ -159,7 +286,12 @@ class BoxWindow(object):
         self.root = root
         self.app = app
         self.mons = []
-        self.rows = {}
+        self.rows = {}           # {id: Row} — 받은 목록으로 만들어 둔 줄 전부 (숨긴 줄 포함)
+        self._shown = {"party": [], "box": []}   # 지금 담긴 줄 id, 화면 순서대로
+        self._by_id = {}         # {id: 포켓몬} — 받은 목록
+        self._rows_job = None    # 줄을 나눠 만들고 담는 일 (U.Chunked)
+        self._sep_on = False     # 'PC 박스' 머리가 담겨 있나
+        self._wait = None        # 불러오는 중 표시
         self.sel = None
         # 끌어서 옮기기 상태. Row 가 이 세 가지를 부른다.
         self._drag = None
@@ -168,9 +300,14 @@ class BoxWindow(object):
                      "move": self._drag_move,
                      "release": self._drag_release}
         self.photos = []
-        self.anim = None
+        self.anim_durs = []
         self.anim_i = 0
         self.anim_job = None
+        self._art = OrderedDict()   # {(도감 번호, 이로치, 높이): (PhotoImage 목록, 프레임 시간)}
+        self._art_gen = 0           # 도트를 부탁한 차례. 늦게 온 답은 버린다
+        self._kr_moves = None       # (dex.moves, {한글 이름: 기술})
+        self._item_kr = None        # {도구: 한글 이름} — 진화 칸에 적는다. 창마다 한 번 받는다
+        self._item_kr_busy = False  # 받는 중
 
         # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
         self.win = U.panel(parent, root, "포스크탑 — 포켓몬 관리",
@@ -268,11 +405,24 @@ class BoxWindow(object):
         self._win = self.canvas.create_window((0, 0), window=self.inner,
                                               anchor="nw")
         self.scroller = sb
-        self.inner.bind("<Configure>", lambda _e: self.fit_scroll())
-        self.canvas.bind("<Configure>", lambda e: (
-            self.canvas.itemconfigure(self._win, width=e.width),
-            self.fit_scroll()))
+        # 캔버스 폭에 안쪽을 맞추고 스크롤 영역을 내용에 맞추는 일은
+        # U.scroll_fitter 가 **몰아서 한 번** 한다. 예전에는 <Configure> 마다
+        # update_idletasks 로 배치를 억지로 끝내고 쟀는데, 그게 또
+        # <Configure> 를 불러 제 발로 되돌아왔다 - 이 창 한 번 여는 데
+        # 그것만 12초가 쌓였다(프로파일 누계).
+        self.fit = U.scroll_fitter(self.canvas, self.inner, self._win)
         U.scrollable(self.canvas, 60)
+
+        # 줄 사이에 끼는 것들. 한 번 만들어 두고 담았다 뺐다만 한다(_show).
+        self._sep = tk.Frame(self.inner, bg=U.INK, height=U.h(28))
+        self._sep.pack_propagate(False)
+        head = U.marker_label(self._sep, "", bg=U.INK, mark=U.FG_FAINT)
+        head.pack(side="left", padx=12, pady=7)
+        self._sep_label = head.winfo_children()[-1]
+        self._box_top = tk.Frame(self.inner, bg=U.LINE, height=U.h(2))
+        self._nomatch = tk.Label(self.inner,
+                                 text="거름망에 맞는 포켓몬이 박스에 없습니다.",
+                                 bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S)
 
     def fit_scroll(self):
         """스크롤 영역을 내용에 맞춘다.
@@ -281,21 +431,11 @@ class BoxWindow(object):
         bbox 를 그대로 넣기만 해서, 목록이 줄어들어도 스크롤 위치가
         남아 있었다. 그러면 두 마리밖에 없는데 빈 화면이 보이고 스크롤바가
         움직인다.
+
+        그 규칙은 U.ScrollFit 이 그대로 지킨다. 여기서는 **예약만** 한다 -
+        배치가 끝난 뒤에 한 번 재므로 몇 번을 불러도 한 번 돈다.
         """
-        try:
-            self.canvas.update_idletasks()
-            h = self.inner.winfo_reqheight()
-            view = self.canvas.winfo_height()
-            w = self.canvas.winfo_width()
-            if h <= view:
-                # 내용이 다 들어간다. 스크롤 영역을 화면 크기로 두면
-                # 스크롤바가 꽉 차서 움직이지 않는다.
-                self.canvas.configure(scrollregion=(0, 0, w, view))
-                self.canvas.yview_moveto(0)
-            else:
-                self.canvas.configure(scrollregion=(0, 0, w, h))
-        except Exception:                                   # noqa: BLE001
-            pass
+        self.fit.schedule()
 
     def _detail(self, parent):
         d = tk.Frame(parent, bg=U.BG2, width=DETAIL_W, highlightthickness=0)
@@ -319,10 +459,9 @@ class BoxWindow(object):
         self._dwin = self.d_canvas.create_window((0, 0), window=outer,
                                                  anchor="nw")
         # 캔버스 너비에 맞춰 안쪽도 같이 늘린다. 안 하면 폭이 1px 로 남는다.
-        self.d_canvas.bind("<Configure>", lambda e: self.d_canvas.itemconfigure(
-            self._dwin, width=e.width))
-        outer.bind("<Configure>", lambda e: self.d_canvas.configure(
-            scrollregion=self.d_canvas.bbox("all")))
+        # 그것과 스크롤 영역 맞추기를 목록과 같은 U.scroll_fitter 에 맡긴다 -
+        # 기술 설명을 펼칠 때 곧바로 굴려야 해서 fit_now 가 필요하다.
+        self.d_fit = U.scroll_fitter(self.d_canvas, outer, self._dwin)
         U.scrollable(self.d_canvas, 60)
 
         p = tk.Frame(outer, bg=U.BG2)
@@ -434,10 +573,22 @@ class BoxWindow(object):
         # 친밀도 (친밀도로 진화하는 종에만 뜬다)
         self.d_friend = tk.Frame(p, bg=U.BG2)
 
+        # 진화. 갈래마다 무엇을 하면 무엇이 되는지 한 줄씩 (evo_lines 머리말).
+        # 통신교환이 도구 쓰기로 바뀐 것을 알려 줄 곳이 이 게임에 없었다.
+        # 진화하지 않는 종에서는 칸째 빼고, 보일 때 능력치 칸 앞에 담는다.
+        self.d_evo = tk.Frame(p, bg="#101623", highlightthickness=2,
+                              highlightbackground=U.LINE)
+        erow = tk.Frame(self.d_evo, bg="#101623")
+        erow.pack(fill="x", padx=11, pady=(8, 4))
+        U.marker_label(erow, "진화", bg="#101623").pack(side="left")
+        self.d_evo_lines = tk.Frame(self.d_evo, bg="#101623")
+        self.d_evo_lines.pack(fill="x", padx=11, pady=(0, 8))
+
         # 능력치
         stats = tk.Frame(p, bg="#101623", highlightthickness=2,
                          highlightbackground=U.LINE)
         stats.pack(fill="x", pady=(11, 0))
+        self._d_stats = stats
         sh = tk.Frame(stats, bg="#101623")
         sh.pack(fill="x", padx=11, pady=(9, 6))
         U.marker_label(sh, "능력치", bg="#101623").pack(side="left")
@@ -526,7 +677,10 @@ class BoxWindow(object):
         self.say("불러오는 중...")
         # 서버가 자고 있으면 깨는 데 1분까지 걸린다. 빈 창을 보여주면
         # 고장으로 오해하고 다시 누르거나 닫아 버린다.
-        self._wait = ui_loading.Overlay(self.win, "포켓몬을 불러오는 중")
+        # 이미 떠 있으면 하나 더 띄우지 않는다. 겹쳐 띄우면 먼저 온 답이
+        # 나중 것만 걷고, 먼저 띄운 것은 창을 덮은 채 남는다(가방과 같다).
+        if self._wait is None:
+            self._wait = ui_loading.Overlay(self.win, "포켓몬을 불러오는 중")
 
         def work():
             mons = self.app.api.pokemon()
@@ -537,16 +691,25 @@ class BoxWindow(object):
         U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, mons, err):
-        w = getattr(self, "_wait", None)
-        if w:
-            w.close()
-            self._wait = None
+        w, self._wait = self._wait, None
         if err:
+            if w:
+                w.close()
             return self.say(getattr(err, "message", str(err)), U.DANGER)
-        self.mons = mons or []
-        self._refresh_filter_bar()
-        self.say("")
-        self._render(self.sel)
+        try:
+            self.mons = mons or []
+            self._refresh_filter_bar()
+            self.say("")
+            self._render(self.sel)
+        finally:
+            if w:
+                # **첫 화면이 그려진 뒤에 걷는다.** 맨 앞에서 걷으면 줄을
+                # 만드는 동안 아무 표시 없이 창이 멈춘 것처럼 보였다(3~4초).
+                # 첫 묶음은 이미 만들었으니 그것이 그려진 뒤(idle)에 걷는다.
+                try:
+                    self.root.after_idle(w.close)
+                except tk.TclError:
+                    w.close()
 
     # ---------------- 거르기 ----------------
     def _refresh_filter_bar(self):
@@ -618,49 +781,171 @@ class BoxWindow(object):
     def _refilter(self):
         if not hasattr(self, "inner"):
             return
-        self._render(self.sel)
+        self._show(self.sel)
 
+    # ---------------- 줄 ----------------
     def _render(self, keep=None):
-        """목록을 그린다. 거름망을 통과한 것만."""
-        for w in self.inner.winfo_children():
-            w.destroy()
-        self.rows = {}
+        """새로 받은 목록에 줄을 맞춘다.
+
+        **줄을 다 부수고 새로 만들지 않는다.** 예전에는 다시 불러올 때마다,
+        거르기 글자를 하나 칠 때마다 이백 줄(위젯 2,500개)을 부수고 새로
+        만들어서 1~5초씩 멈췄다. 이제 줄은 id 로 들고 있다가
+          · 그대로인 포켓몬은 그 줄을 그대로 쓰고
+          · 줄에 보이는 값(이름, 레벨, 파티/박스 ...)이 바뀐 것만 새로 만들고
+          · 없어진 포켓몬의 줄만 부순다.
+        무엇을 어디에 보여줄지는 _show 가 정한다.
+        """
+        self._stop_rows()
+        dex = self.app.dex
+        self._by_id = dict((m["id"], m) for m in self.mons)
+        for pid, row in list(self.rows.items()):
+            m = self._by_id.get(pid)
+            if m is None or row.dex is not dex or _row_sig(m) != row.sig:
+                self._drop_row(pid)
+            else:
+                row.mon = m
+        self._show(keep)
+
+    def _show(self, keep=None):
+        """거름망에 맞는 줄만 **순서대로** 담는다.
+
+        보이던 줄은 건드리지 않는다. 안 보일 줄만 빼고, 새로 보일 줄은
+        제자리(순서상 바로 앞 줄의 뒤)에 끼운다. 없는 줄은 그때 만든다.
+
+        끼우는 것은 나눠 한다(U.Chunked). 처음 화면에 나오는 줄은 창을
+        붙이느라 한 줄에 몇 ms 씩 들어서, 이백 줄을 한꺼번에 담으면 그것만으로
+        몇 초 멈췄다. 안 보일 줄도 맨 끝에 만들어만 둔다 - 거름망을 풀 때
+        새로 만들지 않고 담기만 하려고.
+
+        담긴 줄은 늘 파티 순서, 박스 순서 그대로다. 그래서 담는 도중에 또
+        거르기를 바꿔도 남은 일만 버리고 거기서부터 다시 맞추면 된다.
+        """
+        self._stop_rows()
         # 거름망은 박스에만. 데리고 다니는 여섯은 늘 그대로 보인다.
         party, box = box_filter.apply_box(self.mons, self.app.dex, self.f_type,
                                           self.f_query.get())
         box_all = len(self.mons) - len(party)
         filtered = bool(self.f_type or self.f_query.get().strip())
-        for m in party:
-            self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
-                                     self.select, self._dnd).pack()
-            tk.Frame(self.inner, bg="#1a1f2e", height=U.h(1)).pack(fill="x")
+        want = {"party": [m["id"] for m in party],
+                "box": [m["id"] for m in box]}
+
+        for sec in ("party", "box"):
+            order = self._shown[sec]
+            stay = set(want[sec])
+            for pid in [p for p in order if p not in stay]:
+                self.rows[pid].forget()
+                order.remove(pid)
+            # 다시 불러왔더니 앞뒤가 바뀌었다(파티를 끌어서 바꿨다). 끼워
+            # 넣기로는 못 고치니 그 칸의 줄을 다 빼고 새 순서로 다시 담는다.
+            packed = set(order)
+            if order != [p for p in want[sec] if p in packed]:
+                for pid in order:
+                    self.rows[pid].forget()
+                del order[:]
+
         if box_all:
-            sep = tk.Frame(self.inner, bg=U.INK, height=U.h(28))
-            sep.pack(fill="x")
-            sep.pack_propagate(False)
-            label = ("PC 박스 · %d마리 중 %d마리" % (box_all, len(box)) if filtered
-                     else "PC 박스 · %d마리" % box_all)
-            U.marker_label(sep, label, bg=U.INK,
-                           mark=U.FG_FAINT).pack(side="left", padx=12, pady=7)
-            tk.Frame(self.inner, bg=U.LINE, height=U.h(2)).pack(fill="x")
-            for m in box:
-                self.rows[m["id"]] = Row(self.inner, m, self.app.dex,
-                                         self.select, self._dnd).pack()
-                tk.Frame(self.inner, bg="#161a24", height=U.h(1)).pack(fill="x")
-            if not box and filtered:
-                tk.Label(self.inner, text="거름망에 맞는 포켓몬이 박스에 없습니다.",
-                         bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S).pack(pady=22)
+            self._sep_label.configure(
+                text=("PC 박스 · %d마리 중 %d마리" % (box_all, len(box)) if filtered
+                      else "PC 박스 · %d마리" % box_all))
+            if not self._sep_on:
+                # 박스가 비어 있었으니 담긴 박스 줄이 없다. 끝에 붙이면 된다.
+                self._sep.pack(fill="x")
+                self._box_top.pack(fill="x")
+                self._sep_on = True
+        elif self._sep_on:
+            self._sep.pack_forget()
+            self._box_top.pack_forget()
+            self._sep_on = False
+        if box_all and filtered and not box:
+            self._nomatch.pack(pady=22)
+        else:
+            self._nomatch.pack_forget()
+
+        # 할 일: (칸, id, 순서상 바로 앞 id). 앞 줄은 이미 담겨 있거나 이
+        # 목록에서 먼저 담긴다. 칸이 None 이면 만들어만 둔다.
+        plan = []
+        for sec in ("party", "box"):
+            packed = set(self._shown[sec])
+            prev = None
+            for pid in want[sec]:
+                if pid not in packed:
+                    plan.append((sec, pid, prev))
+                prev = pid
+        wanted = set(want["party"]) | set(want["box"])
+        plan += [(None, m["id"], None) for m in self.mons
+                 if m["id"] not in self.rows and m["id"] not in wanted]
+        self._rows_job = U.Chunked(self.win, plan, self._place_row,
+                                   first=FIRST_ROWS, size=CHUNK_ROWS)
 
         # 행이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게
         # 여기서 다시 맞춘다.
         self.fit_scroll()
         self.count.configure(text="보유 %d마리  ·  데리고 다니는 중 %d마리"
                                   % (len(self.mons), len(party)))
-        shown = party + box
-        if keep and keep in self.rows:
+        shown = want["party"] + want["box"]
+        if keep and keep in wanted:
             self.select(keep)
         elif shown:
-            self.select(shown[0]["id"])
+            self.select(shown[0])
+
+    def _place_row(self, item):
+        """할 일 하나 - 줄이 없으면 만들고, 칸이 있으면 제자리에 담는다."""
+        sec, pid, prev = item
+        row = self.rows.get(pid)
+        if row is None:
+            m = self._by_id.get(pid)
+            if m is None:
+                return
+            # 고름은 만들 때 칠한다. 다 만든 뒤 이백 줄을 다시 칠하지 않는다.
+            row = Row(self.inner, m, self.app.dex, self.select, self._dnd,
+                      selected=(pid == self.sel))
+            self.rows[pid] = row
+        if sec is None:
+            return                          # 안 보일 줄. 만들어만 둔다
+        order = self._shown[sec]
+        if prev is not None:
+            row.pack(after=self.rows[prev].line)
+            order.insert(order.index(prev) + 1, pid)
+            return
+        # 칸의 맨 앞. 담긴 줄이 있으면 그 앞, 없으면 칸의 자리에.
+        if order:
+            row.pack(before=self.rows[order[0]].f)
+        elif sec == "party" and self._sep_on:
+            row.pack(before=self._sep)
+        elif sec == "box":
+            row.pack(after=self._box_top)
+        else:
+            row.pack()
+        order.insert(0, pid)
+
+    def _drop_row(self, pid):
+        row = self.rows.pop(pid, None)
+        if row is None:
+            return
+        for order in self._shown.values():
+            if pid in order:
+                order.remove(pid)
+        row.destroy()
+
+    def _stop_rows(self):
+        """남은 줄 일을 버린다. 새로 맞추기 전에 반드시 부른다 - 안 그러면
+        옛 계획의 줄이 새 목록 사이에 끼어든다."""
+        if self._rows_job is not None:
+            self._rows_job.cancel()
+            self._rows_job = None
+
+    def _ensure_built(self, pid):
+        """아직 안 만든 줄을 고르면 남은 줄을 지금 다 만든다.
+
+        나눠 만드는 동안에도 고를 수 있다 - 도트를 두 번 눌러 관리 창을
+        열면 app.pet_open 이 목록이 오자마자 select 를 부른다. 고른 줄은
+        늘 있어야 끌어서 옮기기나 칠하기가 그 줄을 찾는다.
+        """
+        job = self._rows_job
+        if (pid in self.rows or pid not in self._by_id
+                or job is None or not job.pending):
+            return
+        job.flush()
 
     # ---------------- 끌어서 옮기기 ----------------
     # 누른 채로 이만큼 움직여야 '끄는 것' 으로 본다. 이게 없으면 클릭할 때
@@ -708,8 +993,12 @@ class BoxWindow(object):
             w = self.win.winfo_containing(e.x_root, e.y_root)
         except Exception:                                   # noqa: BLE001
             return None
+        shown = self._shown["party"] + self._shown["box"]
         while w is not None:
-            for pid, row in self.rows.items():
+            # **담긴 줄만 본다.** 거름망에 걸려 숨긴 줄도 self.rows 에는 남아
+            # 있지만 화면에 없으니 그 위에 놓을 수도 없다.
+            for pid in shown:
+                row = self.rows[pid]
                 if w is row.f or w in row.cells:
                     return pid
             w = getattr(w, "master", None)
@@ -803,9 +1092,15 @@ class BoxWindow(object):
         return next((m for m in self.mons if m["id"] == self.sel), None)
 
     def select(self, pid):
-        self.sel = pid
-        for i, r in self.rows.items():
-            r.set_selected(i == pid)
+        self._ensure_built(pid)
+        prev, self.sel = self.sel, pid
+        # 바뀐 두 줄만 칠한다. 고른 줄은 늘 하나라 나머지는 이미 안 고른
+        # 모습이다 - 예전에는 누를 때마다 이백 줄을 전부 다시 칠했다.
+        # 숨긴 줄도 칠해 둔다(다시 보일 때 맞는 모습으로 나온다).
+        for i in set((prev, pid)):
+            r = self.rows.get(i)
+            if r is not None:
+                r.set_selected(i == pid)
         m = self.current()
         if m:
             self.show_detail(m)
@@ -887,6 +1182,63 @@ class BoxWindow(object):
         tk.Label(box, text=msg, bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS,
                  anchor="w").pack(fill="x", pady=(2, 0))
 
+    def _evolution(self, m):
+        """진화 칸을 채운다. 진화하지 않는 종이면 칸째 뺀다.
+
+        도구 이름을 아직 모르면 **기다리지 않는다.** id 로 먼저 적고 상점
+        목록을 따로 받아 온 뒤 다시 적는다 (_load_item_names).
+        """
+        box = getattr(self, "d_evo", None)
+        if box is None:
+            return
+        for w in self.d_evo_lines.winfo_children():
+            w.destroy()
+        dex = self.app.dex
+        lines = evo_lines(dex, m, self._item_kr)
+        if not lines:
+            box.pack_forget()
+            return
+        if self._item_kr is None and evo_items(dex, m):
+            self._load_item_names()
+        for text in lines:
+            lb = tk.Label(self.d_evo_lines, text=text, bg="#101623", fg=U.FG,
+                          font=U.FONT_XS, anchor="w", justify="left",
+                          wraplength=DETAIL_W - 60)
+            lb.pack(fill="x", pady=(0, 2))
+            # 특성 설명과 같은 이유로 폭을 자리가 잡힌 뒤에 잰다.
+            lb.bind("<Configure>", self._fit_note)
+        box.pack(fill="x", pady=(10, 0), before=self._d_stats)
+
+    def _load_item_names(self):
+        """도구 한글 이름을 상점 목록에서 **창마다 한 번** 받는다.
+
+        도구 고르기 창도 같은 목록(/api/shop)을 받지만 가방 개수가 바뀌므로
+        그건 열 때마다 새로 받는다. 이름은 안 바뀌니 여기서 한 번이면 된다.
+        못 받으면 빈 표로 두고 id 로 적는다 - 고를 때마다 다시 물으면 서버가
+        안 될 때 요청만 쌓인다. 창을 다시 열면 다시 받는다.
+        """
+        if self._item_kr_busy:
+            return
+        self._item_kr_busy = True
+        api = self.app.api
+
+        def work():
+            r = api.shop() or {}
+            return dict((it["id"], it.get("kr") or it["id"])
+                        for it in (r.get("items") or []) if it.get("id"))
+
+        def done(names, err):
+            self._item_kr_busy = False
+            self._item_kr = {} if err else (names or {})
+            m = self.current()
+            if m is None:
+                return
+            try:
+                self._evolution(m)
+            except tk.TclError:
+                pass                    # 그사이 창을 닫았다
+        U.run_async(self.root, work, done)
+
     def show_detail(self, m):
         info = m.get("info", {})
         dex = self.app.dex
@@ -946,16 +1298,15 @@ class BoxWindow(object):
             text="종족값 %d  ·  개체값 %d / 186  (%.0f%%)"
                  % (bst, info.get("ivTotal", 0), info.get("ivPercent", 0)))
         self._friendship(m)
+        self._evolution(m)
 
         for w in self.d_moves.winfo_children():
             w.destroy()
         self._move_cells = []
         moves = info.get("moves", [])
+        kr_moves = self._moves_by_kr(dex)
         for i, mv in enumerate(moves[:4]):
-            md = None
-            if dex:
-                md = next((x for x in (dex.moves or {}).values()
-                           if x.get("kr") == mv), None)
+            md = kr_moves.get(mv) if dex else None
             col = U.TYPE_COLOR.get((md or {}).get("type"), U.BG3)
             cell = tk.Frame(self.d_moves, bg=col, highlightthickness=2,
                             highlightbackground=col, cursor="hand2")
@@ -982,6 +1333,22 @@ class BoxWindow(object):
 
         self.load_art(m)
 
+    def _moves_by_kr(self, dex):
+        """한글 기술 이름 -> 기술. 도감이 그대로면 한 번만 만든다.
+
+        예전에는 기술 칸마다 919개를 처음부터 훑었다. 같은 이름이 둘이면
+        예전처럼 먼저 나온 것을 쓴다.
+        """
+        moves = (dex.moves or {}) if dex else {}
+        got = self._kr_moves
+        if got is not None and got[0] is moves:
+            return got[1]
+        table = {}
+        for x in moves.values():
+            table.setdefault(x.get("kr"), x)
+        self._kr_moves = (moves, table)
+        return table
+
     def pick_move(self, idx, md, name):
         """기술 하나를 골라 설명을 띄운다. idx 가 None 이면 접는다."""
         for i, (cell, col) in enumerate(self._move_cells):
@@ -1007,8 +1374,10 @@ class BoxWindow(object):
         안 일어난 것처럼 보인다.
         """
         try:
-            self.d_canvas.update_idletasks()
-            self.d_canvas.configure(scrollregion=self.d_canvas.bbox("all"))
+            # 설명을 붙인 자리까지 곧바로 굴려야 해서 예약을 기다리지 않고
+            # 지금 맞춘다. fit_now 는 밀린 배치를 여기서 한 번 끝내므로
+            # 비싸다 - 기술을 누를 때만 온다.
+            self.d_fit.fit_now()
             total = max(1, self.d_canvas.bbox("all")[3])
             view = self.d_canvas.winfo_height()
             if total <= view:
@@ -1024,30 +1393,59 @@ class BoxWindow(object):
             pass
 
     def load_art(self, m):
+        """상세 칸 도트를 붙인다.
+
+        **푸는 일은 전부 작업 스레드에서 한다.** 예전에는 받은 GIF 를 Tk
+        스레드에서 풀고 48프레임에 투명색을 입혀서, 고를 때마다 0.2초씩
+        멈췄다. 이제 Tk 스레드는 다 풀린 그림을 PhotoImage 로 감싸기만 한다.
+        만든 것은 최근 ART_KEEP 마리만큼 들고 있다가 다시 고르면 곧바로 쓴다.
+        """
         self.stop_anim()
+        # 늦게 온 답은 버린다. 같은 포켓몬을 빨리 두 번 고르면(거르기 글자를
+        # 칠 때마다 다시 고른다) 답이 둘 오는데, 둘 다 붙이면 움직임 고리가
+        # 둘 돌아서 두 배로 빨라진다.
+        self._art_gen += 1
+        gen = self._art_gen
+        key = (m.get("num"), bool(m.get("shiny")), ART_H)
+        got = self._art.get(key)
+        if got is not None:
+            self._art.move_to_end(key)
+            return self._show_art(*got)
         self.d_art.configure(image="", text="...", fg=U.FG_FAINT)
-        want = m["id"]
+        api = self.app.api
 
         def work():
-            return sprite_cache.ensure(self.app.api, m.get("num"), m.get("shiny"))
+            path = sprite_cache.ensure(api, m.get("num"), m.get("shiny"))
+            if not path:
+                return None
+            anim = sprites.load_animation(path, target_height=ART_H,
+                                          min_scale=0.2, max_scale=3.0)
+            return ([sprites.to_rgba(f, anim.key)
+                     for f in anim.frames[sprites.RIGHT]], anim.durations)
 
-        def done(path, err):
-            if err or not path or self.sel != want:
-                if self.sel == want:
-                    self.d_art.configure(text="도트 없음")
+        def done(r, err):
+            if gen != self._art_gen:
+                return                      # 그사이 다른 것을 골랐다
+            if err or not r or not r[0]:
+                self.d_art.configure(text="도트 없음")
                 return
             try:
-                anim = sprites.load_animation(path, target_height=92,
-                                              min_scale=0.2, max_scale=3.0)
-                self.photos = [ImageTk.PhotoImage(sprites.to_rgba(f, anim.key))
-                               for f in anim.frames[sprites.RIGHT]]
-                self.anim = anim
-                self.anim_i = 0
-                self.d_art.configure(text="", image=self.photos[0])
-                self.play_anim()
+                photos = [ImageTk.PhotoImage(img) for img in r[0]]
             except Exception:
                 self.d_art.configure(text="도트 없음")
+                return
+            self._art[key] = (photos, r[1])
+            while len(self._art) > ART_KEEP:
+                self._art.popitem(last=False)   # 가장 오래 안 본 것부터
+            self._show_art(photos, r[1])
         U.run_async(self.root, work, done)
+
+    def _show_art(self, photos, durations):
+        self.photos = photos
+        self.anim_durs = durations
+        self.anim_i = 0
+        self.d_art.configure(text="", image=photos[0])
+        self.play_anim()
 
     def play_anim(self):
         if not self.photos:
@@ -1057,7 +1455,7 @@ class BoxWindow(object):
             self.d_art.configure(image=self.photos[self.anim_i])
         except Exception:
             return
-        d = self.anim.durations[self.anim_i % len(self.anim.durations)]
+        d = self.anim_durs[self.anim_i % len(self.anim_durs)]
         self.anim_job = self.root.after(max(60, d), self.play_anim)
 
     def stop_anim(self):
@@ -1173,6 +1571,7 @@ class BoxWindow(object):
         # 휠은 이제 창 하나가 받아서 나눠 준다(U.install_wheel). 예전에는
         # 여기서 unbind_all 을 불렀는데, 그건 **다른 창의 휠까지 지웠다.**
         self.stop_anim()
+        self._stop_rows()
         self.app.box_window = None
         try:
             self.win.destroy()
@@ -1206,6 +1605,10 @@ class HeldPicker(object):
                            highlightbackground=U.LINE2)
         U.install_wheel(self.win)
         self.photos = []
+        # 이 포켓몬의 진화 도구. 지니게 하면 가방에서 빠지는데, 서버는 가방에
+        # 있는 것만 진화에 쓴다. 본가 버릇대로 롱스톤에게 금속코트를 지니게
+        # 하면 조용히 진화를 못 하게 된다 - 그 줄에 미리 한 줄 적는다(_row).
+        self.evo_items = evo_items(self.app.dex, mon)
 
         head = tk.Frame(self.win, bg=U.BG2, height=U.h(56))
         head.pack(fill="x")
@@ -1282,12 +1685,22 @@ class HeldPicker(object):
                  font=U.FONT_B).pack(side="left")
         tk.Label(line, text="%d개" % count, bg=U.INK, fg=U.FG_FAINT,
                  font=U.FONT_XS).pack(side="right")
+        extra = ()
+        if it["id"] in self.evo_items:
+            # **막지는 않는다.** 왕의징표석·금속코트·예리한손톱/이빨은 배틀
+            # 효과가 있어서 일부러 지니게 할 수도 있다. 모르고 지니게 하는
+            # 것만 막으려고 이름 바로 밑에 적는다.
+            warn = tk.Label(f, text=HOLD_EVO_NOTE, bg=U.INK, fg=U.ACCENT,
+                            font=U.FONT_XS, anchor="w", justify="left",
+                            wraplength=380)
+            warn.pack(fill="x", padx=10, pady=(0, 2))
+            extra = (warn,)
         desc = tk.Label(f, text=it.get("desc") or "", bg=U.INK, fg=U.FG_DIM,
                         font=U.FONT_XS, anchor="w", justify="left",
                         wraplength=380)
         desc.pack(fill="x", padx=10, pady=(0, 6))
         tk.Frame(self.inner, bg="#1a1f2e", height=U.h(1)).pack(fill="x")
-        for w in (f, line, desc) + tuple(line.winfo_children()):
+        for w in (f, line, desc) + extra + tuple(line.winfo_children()):
             w.bind("<Button-1>", lambda _e, i=it: self.pick(i))
             w.bind("<Enter>", lambda _e, fr=f: self._paint(fr, "#181d2b"))
             w.bind("<Leave>", lambda _e, fr=f: self._paint(fr, U.INK))

@@ -150,7 +150,7 @@ class SettingsWindow(object):
         # 바탕화면에서 눈으로 보이는 것으로 충분하고, 그런 것까지 화면
         # 구석에서 튀어나오면 하던 일을 방해한다 (app.toast 를 보라).
         #
-        # 손잡이마다 하는 일이 다르다. 이름표는 도트를 다시 만들어야
+        # 손잡이마다 하는 일이 다르다. 이름표는 이름표 창을 붙이거나 떼야
         # 하고, 풀숲은 야생 폴링을 켜고 끄고, 알림은 저장만 하면 된다.
         # 그래서 누를 때 무엇을 부를지도 같이 적는다.
         for var, label, key, note, how in (
@@ -245,7 +245,9 @@ class SettingsWindow(object):
         self.app.settings[key] = bool(var.get())
         self._save()
         if self.app.overlay:
-            self.app.overlay.refresh_visuals()
+            # 이름표 창만 붙이거나 뗀다 (app.toggle_names 와 같은 길).
+            # 도트를 다시 만들면 배틀 중에 싸우던 도트까지 사라진다.
+            self.app.overlay.apply_names()
         self.app.refresh_tray()
 
     def _toggle_plain(self, key, var):

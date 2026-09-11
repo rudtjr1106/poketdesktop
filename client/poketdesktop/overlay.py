@@ -120,7 +120,10 @@ class Pet(object):
         self.name_label = None
         self.tip_win = None
         self.tip_job = None
-        if overlay.settings.get("showNames"):
+        # 설정만 보지 않고 Overlay 에 묻는다. 배틀 중에 새로 생긴 도트(sync
+        # 로 올라온 것, 투기장 상대편)는 이름표 없이 태어나야 한다 - 풀릴 때
+        # Overlay.release_names 가 만들어 준다.
+        if overlay.names_visible():
             self.make_nameplate()
 
         self.redraw()
@@ -173,6 +176,15 @@ class Pet(object):
         # 아직 화면에 안 올라갔으면 winfo_height 가 1 이다. 그때는 글꼴
         # 높이로 어림잡는다 - 다음 place() 에서 다시 잰다.
         self.name_h = h if h > 4 else 25
+
+    def drop_nameplate(self):
+        """이름표만 없앤다. 도트는 그대로 둔다 (이름표를 껐을 때)."""
+        w, self.name_win, self.name_label = self.name_win, None, None
+        if w:
+            try:
+                w.destroy()
+            except Exception:                               # noqa: BLE001
+                pass
 
     def set_mon(self, mon):
         """서버가 준 새 값으로 갈아 끼운다. **이름표도 같이 고친다.**
@@ -753,6 +765,10 @@ class Overlay(object):
         self._open_cb = on_pet_open
         self._running = False
         self.hidden = False
+        # 이름표를 잠깐 치워 달라고 한 곳이 몇 군데인가 (야생 배틀, 투기장).
+        # **참/거짓이 아니라 숫자로 센다.** 하나로 두면 먼저 끝난 쪽이 아직
+        # 싸우는 쪽의 이름표까지 도로 띄운다. 0 이 되어야 다시 띄운다.
+        self._names_block = 0
 
     # ---------------- 영역 ----------------
     def area(self):
@@ -856,6 +872,9 @@ class Overlay(object):
                 pass
         self.extra = []
         self.locked = False
+        # 막아 둔 쪽(배틀)도 여기서 같이 끝난다. 로그아웃·종료는 clear()
+        # 뒤에 배틀을 닫는데, 그때 푸는 것은 0 아래로 안 내려가서 괜찮다.
+        self._names_block = 0
 
     def set_hidden(self, hidden):
         """배틀 중처럼 잠깐 치워야 할 때. 목록은 그대로 두고 창만 감춘다."""
@@ -864,16 +883,101 @@ class Overlay(object):
             for w in (p.win, p.name_win):
                 if not w:
                     continue
+                if w is p.name_win and not hidden:
+                    continue            # 이름표는 아래 apply_names 가 맞춘다
                 try:
                     w.withdraw() if hidden else PLAT.show_again(w)
                 except Exception:
                     pass
             p.hide_tip()
+        if not hidden:
+            self.apply_names()
+
+    # ---------------- 이름표 켜고 끄기 ----------------
+    def names_visible(self):
+        """지금 이름표를 화면에 띄워도 되는가.
+
+        **이름표를 만들거나 다시 보이는 곳은 전부 이걸 묻는다.** 설정만
+        보고 띄우면 배틀 중에 이름표가 튀어나온다. 체력바와 대미지 글자가
+        정확히 이름표 줄(도트 머리 위)에 그려져서 글자끼리 포개진다 -
+        전투에 들어가면 화면이 망가져 보이던 원인이다.
+        """
+        return (bool(self.settings.get("showNames"))
+                and self._names_block <= 0 and not self.hidden)
+
+    def block_names(self):
+        """배틀이 시작됐다. 이름표를 전부 치운다 (없애지는 않는다).
+
+        release_names() 와 짝이다. 막은 쪽이 끝날 때 반드시 한 번 푼다.
+        """
+        self._names_block += 1
+        for p in list(self.pets.values()) + list(self.extra):
+            try:
+                p.hide_tip()
+                if p.name_win:
+                    p.name_win.withdraw()
+            except Exception:                               # noqa: BLE001
+                pass
+
+    def release_names(self):
+        """배틀이 끝났다. 막은 곳이 더 없으면 이름표를 되살린다.
+
+        **두 번 풀어도 0 아래로 안 내려간다.** 내려가면 다음 배틀이 막아도
+        숫자가 0 을 못 넘어서 이름표가 그대로 남는다.
+        """
+        if self._names_block > 0:
+            self._names_block -= 1
+        if self._names_block <= 0:
+            self.apply_names()
+
+    def apply_names(self):
+        """이름표 설정을 지금 화면에 맞춘다. **도트는 다시 만들지 않는다.**
+
+        예전에는 refresh_visuals() 로 도트를 전부 지우고 다시 만들었다.
+        배틀 중에 그러면 싸우고 있던 Pet 객체가 사라지고 locked 도 풀린다.
+        여기서는 이름표 창만 만들거나 없앤다.
+
+        배틀 중(막혀 있는 동안)이면 아무것도 안 한다. 설정은 이미 저장돼
+        있으니 release_names() 가 풀면서 이리로 다시 온다.
+        """
+        if self._names_block > 0:
+            return
+        on = bool(self.settings.get("showNames"))
+        for p in list(self.pets.values()) + list(self.extra):
+            try:
+                if not on:
+                    p.drop_nameplate()
+                elif not self.hidden:
+                    self._show_name(p)
+            except Exception:                               # noqa: BLE001
+                pass
+
+    def _show_name(self, p):
+        """이 도트의 이름표를 띄운다. 없으면(배틀 중에 태어났으면) 만든다.
+
+        도트 창이 숨어 있으면 건드리지 않는다 - 허공에 이름표만 뜬다.
+        진화 중인 도트도 건너뛴다. 연출이 끝날 때 evolve_fx 가 띄운다.
+        **다시 보일 때는 PLAT.show_again 이다.** 맥에서 deiconify 만 부르면
+        '항상 위' 와 클릭 통과가 풀린다.
+        """
+        if getattr(p, "evolving", False) or p.win.state() == "withdrawn":
+            return
+        if p.name_win is None:
+            p.make_nameplate()
+            return
+        if p.name_win.state() == "withdrawn":
+            PLAT.show_again(p.name_win)
+        p.place()
 
     def refresh_visuals(self):
         """설정(크기/이름표)이 바뀌면 전부 다시 만든다."""
         mons = [p.mon for p in self.pets.values()]
+        # 배틀 중에 크기를 바꿨으면 이름표를 막아 둔 것은 그대로 둔다.
+        # clear() 가 0 으로 되돌리면 다시 만든 도트에 이름표가 붙어 체력바와
+        # 겹친다. 막은 쪽은 끝날 때 어차피 한 번 푼다.
+        block = self._names_block
         self.clear()
+        self._names_block = block
         sprites.clear_cache()
         self.sync(mons, {})
 

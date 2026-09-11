@@ -106,6 +106,8 @@ class Arena(object):
         self.queue = []
         self.gap = EV_GAP
         self.bar_job = None
+        # 이름표를 막아 둔 Overlay. _setup 이 막고 cleanup 이 한 번만 푼다.
+        self._names_ov = None
 
     # ---------------- 도구 ----------------
     def after(self, ms, fn):
@@ -171,6 +173,12 @@ class Arena(object):
 
         # 화면을 빌린다. 이제부터 sync 가 도트를 재배치하지 않는다.
         ov.locked = True
+        # 이름표도 치운다. 체력바·대미지 글자가 이름표 줄에 그려지고, 반원
+        # 으로 늘어서면 왼쪽에 붙은 이름표가 옆 선수의 도트를 덮는다. 상대편
+        # 도트는 막힌 동안 태어나서 처음부터 이름표가 없다. 여기서부터는
+        # 무엇이 터져도 cleanup() 에 닿으므로 거기서 한 번 푼다.
+        self._names_ov = ov
+        ov.block_names()
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         self.work = work_area(sw, sh)
         # 평소 걸어다니는 자리에서 싸운다. 화면 한가운데로 끌어오지 않는다.
@@ -641,6 +649,16 @@ class Arena(object):
             self._walk(p, hx + p.fw / 2.0, hy + p.fh, LEAVE_MS)
         self.after(LEAVE_MS + 120, self.cleanup)
 
+    def _release_names(self):
+        """_setup 에서 막은 이름표를 푼다. 몇 번을 불러도 한 번만 푼다."""
+        ov, self._names_ov = self._names_ov, None
+        if ov is None:
+            return
+        try:
+            ov.release_names()
+        except Exception as e:                              # noqa: BLE001
+            config.log("투기장 이름표를 되살리지 못했습니다: %s" % e)
+
     def cleanup(self):
         """원상 복귀. **몇 번을 불러도 안전해야 한다.**
 
@@ -677,9 +695,6 @@ class Arena(object):
                 hx, hy = self.home.get(id(p), (p.x, p.y))
                 p.x, p.y = hx, hy
                 PLAT.show_again(p.win)
-                if getattr(p, "name_win", None) and ov and not ov.hidden:
-                    if ov.settings.get("showNames"):
-                        PLAT.show_again(p.name_win)
                 p.place()
             except Exception:                               # noqa: BLE001
                 pass
@@ -703,6 +718,10 @@ class Arena(object):
             except Exception:                               # noqa: BLE001
                 pass
             self.layer = None
+        # 이름표는 내 팀이 제자리로 돌아온 뒤에 한 번만 푼다. 선수마다 따로
+        # 다시 띄우던 것을 여기로 모았다 - 이름표를 띄울지는 Overlay 한
+        # 곳에서 정한다(쓰러져 숨었던 도트는 위에서 창을 먼저 보였다).
+        self._release_names()
         if ov:
             ov.locked = False
         if self.on_done:

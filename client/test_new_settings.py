@@ -25,6 +25,7 @@
     패치노트    처음 켠 사람에게는 안 띄운다. 그리고 한 번 본 판을
                 켤 때마다 또 띄우면 안 된다.
 """
+import json
 import os
 import sys
 import tempfile
@@ -498,6 +499,111 @@ def test_tray_menu():
     chk("기본 toast 는 False", t.toast("제목", "내용") is False)
 
 
+# ---------------------------------------------------------------- 이름표
+def test_names_default():
+    """이름표 기본값은 **꺼짐 그대로** 둔다. 손잡이는 이름표 창만 붙이고 뗀다.
+
+    한때 기본으로 켜고 옛 설정까지 한 번 켜 주려 했다. 원한 것은 그게
+    아니었다 - 켜 둔 사람에게만 보이고, 배틀에 들어가면 치우면 된다.
+    그래서 기본값이 꺼짐으로 남아 있는지, 켜 준다는 표시 같은 것이 다시
+    생기지 않았는지 본다.
+    """
+    print("이름표 기본값과 손잡이")
+    from poketdesktop import ui_settings
+
+    saved_path = config.SETTINGS_PATH
+    config.SETTINGS_PATH = os.path.join(
+        tempfile.mkdtemp(prefix="poket-test-names-"), "settings.json")
+
+    def write(obj):
+        with open(config.SETTINGS_PATH, "w", encoding="utf-8") as f:
+            json.dump(obj, f)
+
+    def on_disk():
+        with open(config.SETTINGS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+
+    try:
+        s = config.load_settings()
+        chk("처음 켜면 이름표는 꺼져 있다", s["showNames"] is False,
+            s["showNames"])
+        chk("켜 준다는 표시 같은 것은 없다", "namesDefaultOn" not in s, s)
+
+        write({"showNames": False, "autostart": False, "lastBall": "GREATBALL"})
+        s = config.load_settings()
+        chk("옛 설정의 false 는 그대로 둔다", s["showNames"] is False,
+            s["showNames"])
+        chk("다른 값도 그대로 둔다",
+            s["autostart"] is False and s["lastBall"] == "GREATBALL", s)
+
+        write({"showNames": True})
+        chk("켜 둔 사람은 켜진 채로 둔다",
+            config.load_settings()["showNames"] is True)
+
+        # "기본값으로" 는 이름표를 끈다 (기본값이 꺼짐이다).
+        write({"showNames": True, "targetHeight": 64,
+               "lastRunVersion": "1.2.2", "autostart": False})
+        app = FakeApp()
+        app.settings = config.load_settings()
+        sizes = []
+        app.set_size = lambda px: sizes.append(px)
+
+        class Part(object):
+            def configure(self, **kw):
+                pass
+
+        class FakeSettingsWin(object):
+            _save = ui_settings.SettingsWindow._save
+            _toggle = ui_settings.SettingsWindow._toggle
+            reset = ui_settings.SettingsWindow.reset
+
+        win = FakeSettingsWin()
+        win.app = app
+        win.status = type("Status", (), {})()
+        win.status._bar = Part()
+        win.status._label = Part()
+        win.reset()
+        s = config.load_settings()
+        chk("기본값으로 되돌리면 이름표가 꺼진다", s["showNames"] is False,
+            s["showNames"])
+        chk("되돌려도 기록은 그대로다",
+            s["lastRunVersion"] == "1.2.2" and s["autostart"] is False, s)
+        chk("크기도 기본값으로 다시 만든다",
+            sizes == [config.DEFAULTS["targetHeight"]], sizes)
+
+        # **이름표 손잡이는 도트를 다시 만들지 않는다.** refresh_visuals 로
+        # 가면 배틀 중에 싸우던 도트까지 지우고 다시 만든다.
+        class FakeOverlay(object):
+            def __init__(self):
+                self.applied = 0
+                self.rebuilt = 0
+
+            def apply_names(self):
+                self.applied += 1
+
+            def refresh_visuals(self):
+                self.rebuilt += 1
+
+        app.overlay = FakeOverlay()
+        App.toggle_names(app)
+        chk("트레이에서 누르면 켜진다", app.settings["showNames"] is True)
+        chk("누르면 바로 저장한다", on_disk().get("showNames") is True, on_disk())
+        chk("트레이 손잡이는 이름표만 맞춘다",
+            app.overlay.applied == 1 and app.overlay.rebuilt == 0,
+            vars(app.overlay))
+
+        class Off(object):
+            def get(self):
+                return False
+
+        win._toggle("showNames", Off())
+        chk("설정 창에서 끄면 꺼진다", app.settings["showNames"] is False)
+        chk("설정 창 손잡이도 이름표만 맞춘다",
+            app.overlay.applied == 2 and app.overlay.rebuilt == 0,
+            vars(app.overlay))
+    finally:
+        config.SETTINGS_PATH = saved_path
+
 def main():
     os.makedirs(TMP, exist_ok=True)
     test_grass()
@@ -506,6 +612,7 @@ def main():
     test_patchnotes()
     test_highlights()
     test_tray_menu()
+    test_names_default()
     print()
     print("통과 %d, 실패 %d" % (OK, FAIL))
     return 1 if FAIL else 0

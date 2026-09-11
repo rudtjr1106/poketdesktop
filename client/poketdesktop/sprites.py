@@ -143,8 +143,19 @@ class Animation(object):
 
 
 def load_animation(path, target_height=48, min_scale=0.25, max_scale=2.5,
-                   max_frames=64, key=None):
-    ck = (path, key, target_height, min_scale, max_scale)
+                   max_frames=64, key=None, max_size=None):
+    """max_size=(폭, 높이) 를 주면 그 칸을 넘지 않게 더 줄인다.
+
+    목록의 작은 칸에 넣는 도트가 그렇다. 높이만 맞추면 옆으로 긴 종
+    (#564 는 22px 높이에 72px)이 칸 밖으로 나가 잘린다. **min_scale 보다
+    칸이 이긴다** - 잘려서 안 보이는 것보다 작게라도 다 보이는 편이 낫다.
+    줄이는 것은 아래의 알파를 곱해 줄이는 길 안에서 한 번에 한다. 다 만든
+    그림을 한 번 더 줄이면 가장자리에 검은 테가 번진다.
+    """
+    ms = tuple(max_size) if max_size else None
+    # max_frames 도 열쇠에 넣는다. 안 넣으면 첫 장만 읽어 둔 것이 모든
+    # 프레임을 원하는 쪽에 그대로 건너간다.
+    ck = (path, key, target_height, min_scale, max_scale, max_frames, ms)
     if ck in _cache:
         return _cache[ck]
 
@@ -155,8 +166,16 @@ def load_animation(path, target_height=48, min_scale=0.25, max_scale=2.5,
     bw, bh = r - l, b - t
     scale = float(target_height) / bh if bh else 1.0
     scale = max(min_scale, min(max_scale, scale))
+    if ms:
+        if bw:
+            scale = min(scale, float(ms[0]) / bw)
+        if bh:
+            scale = min(scale, float(ms[1]) / bh)
     fw = max(8, int(round(bw * scale)))
     fh = max(8, int(round(bh * scale)))
+    if ms:
+        fw = max(1, min(fw, int(ms[0])))
+        fh = max(1, min(fh, int(ms[1])))
 
     right, left = [], []
     for f in frames:

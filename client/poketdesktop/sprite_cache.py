@@ -37,9 +37,19 @@ def _still_giving_up(key):
         return False
 
 
+# 폴더를 이미 만든 곳. 도트를 찾을 때마다 os.makedirs 를 부르면 가방을
+# 열 때만 1,400번이 불려 0.2초가 들었다. POKET_HOME 이 바뀌면 자리가
+# 달라지므로 그 값을 열쇠로 둔다.
+_made = {}
+
+
 def sprite_dir():
-    d = os.path.join(config.data_dir(), "sprites")
-    os.makedirs(d, exist_ok=True)
+    home = os.environ.get("POKET_HOME")
+    d = _made.get(home)
+    if d is None:
+        d = os.path.join(config.data_dir(), "sprites")
+        os.makedirs(d, exist_ok=True)
+        _made[home] = d
     return d
 
 
@@ -80,6 +90,8 @@ def ensure(api, num, shiny=False):
     path = os.path.join(sprite_dir(), _stem(num, shiny) + (ext or ".gif"))
     tmp = path + ".part"
     try:
+        # 쓰는 것은 드물다. 그사이 누가 폴더를 지웠어도 여기서 다시 만든다.
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(tmp, "wb") as f:
             f.write(data)
         os.replace(tmp, path)

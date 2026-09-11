@@ -196,6 +196,9 @@ jobs:
         run: python client/smoke_nameplate.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
         run: python client/smoke_box_filter.py
+      # 기술머신 창의 포켓몬 도트가 잘려 있었다 (Label width=3 이 3px 로 읽혔다).
+      - name: 기술머신 창 도트·목록 (진짜 Tk)
+        run: python client/smoke_tms.py
       - name: 동작 바꿀 때 검은 테두리 (진짜 Tk)
         run: python client/smoke_anim_resize.py
 
@@ -234,6 +237,8 @@ jobs:
         run: python client/smoke_nameplate.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
         run: python client/smoke_box_filter.py
+      - name: 기술머신 창 도트·목록 (진짜 Tk)
+        run: python client/smoke_tms.py
       # **검은 테두리 검사(smoke_anim_resize.py)는 여기서 안 돌린다.**
       # 그건 윈도우의 투명색 창(-transparentcolor)이 새로 드러난 자리를
       # 검게 합성하는 것이고, 맥은 platform_mac.py 에 SpriteView 를 따로
@@ -265,6 +270,7 @@ jobs:
           cd server
           python test_anim.py
           python test_tms.py
+          python test_evolution.py
 
       - name: 서버 띄우기
         env:

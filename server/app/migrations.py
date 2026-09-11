@@ -87,9 +87,35 @@ def _season1_reset(conn):
     return "%d명 점수 초기화" % n
 
 
+def _dex_evolved(conn):
+    """진화로 얻은 종을 도감에 채운다.
+
+    1.2.3 전에는 진화해도 도감(seen)에 안 올라갔다 (evolution.apply). 잡을
+    때만 올리고 있어서, 파이리를 키워 리자드가 돼도 리자드 칸이 비어 있었다.
+    지금 가진 포켓몬의 종은 모두 '잡음' 이어야 한다 - 없는 줄은 그 종을
+    처음 가진 시각으로 만들고, '봄' 으로만 있던 줄은 '잡음' 으로 올린다.
+
+    잡음을 봄으로 내리는 일은 없어서 사용자에게 손해가 없다. 놓아준
+    포켓몬은 행이 지워져서 되살릴 수 없다 - 가진 것만 채운다.
+    """
+    before = conn.execute(
+        "SELECT COUNT(*) FROM seen WHERE caught=1").fetchone()[0]
+    # WHERE true 는 지우면 안 된다. INSERT ... SELECT 뒤의 ON CONFLICT 를
+    # SQLite 가 조인 조건으로 잘못 읽는다 (공식 문서의 UPSERT 주의 사항).
+    conn.execute(
+        "INSERT INTO seen (user_id, species, caught, first_at)"
+        " SELECT user_id, species, 1, MIN(caught_at) FROM pokemon"
+        " WHERE true GROUP BY user_id, species"
+        " ON CONFLICT(user_id, species) DO UPDATE SET caught = 1")
+    after = conn.execute(
+        "SELECT COUNT(*) FROM seen WHERE caught=1").fetchone()[0]
+    return "도감 잡음 %d -> %d" % (before, after)
+
+
 ONCE = [
     ("0140-refund-heals", _refund_heals),
     ("0190-season1-reset", _season1_reset),
+    ("0250-dex-evolved", _dex_evolved),
 ]
 
 

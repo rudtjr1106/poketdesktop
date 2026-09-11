@@ -151,14 +151,23 @@ class DexWindow(object):
 
         def done(r, err):
             self.busy = False
-            wait.close()
             if err:
+                wait.close()
                 return self.app.notify(getattr(err, "message", str(err)))
-            self.seen = set(r.get("seen") or [])
-            self.caught = set(r.get("caught") or [])
-            self.gens = r.get("gens") or {}
-            self.total = r.get("total") or 0
-            self.draw()
+            try:
+                self.seen = set(r.get("seen") or [])
+                self.caught = set(r.get("caught") or [])
+                self.gens = r.get("gens") or {}
+                self.total = r.get("total") or 0
+                self.draw()
+            finally:
+                # **그린 뒤에 걷는다.** 맨 앞에서 걷으면 칸을 그리는 동안
+                # 아무 표시 없는 창이 잠깐 보였다. 그려진 뒤(idle)에 걷고,
+                # 그리다 터져도 걷는다 - 덮개가 남으면 새로고침 단추까지 가린다.
+                try:
+                    self.root.after_idle(wait.close)
+                except tk.TclError:
+                    wait.close()
         run_async(self.root, lambda: self.app.api.dexbook(), done)
 
     def set_gen(self, g):
