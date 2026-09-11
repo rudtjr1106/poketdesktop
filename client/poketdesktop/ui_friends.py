@@ -226,6 +226,7 @@ class FriendsWindow(object):
 
     # ---------------- 그리기 ----------------
     def draw(self):
+        keep = self._scroll_top()
         if self._job is not None:
             self._job.cancel()      # 옛 목록의 남은 카드가 새 목록 뒤에 붙지 않게
             self._job = None
@@ -233,7 +234,7 @@ class FriendsWindow(object):
             w.destroy()
         # 카드는 위에서부터 나눠 만든다. 맨 위로 올려 둬야 먼저 만든 묶음이
         # 곧 보이는 화면이다 - 아래를 보던 채로 두면 아직 안 만든 자리가
-        # 빈 채로 먼저 보인다.
+        # 빈 채로 먼저 보인다. 다 만들면 보던 자리로 돌려놓는다 (_back_to).
         self.cv.yview_moveto(0)
         d = self.data or {}
         fr = d.get("friends") or []
@@ -265,9 +266,31 @@ class FriendsWindow(object):
             steps.append((self._title, ("차단 %d" % len(blk), U.FG_FAINT)))
             steps += [(self._blocked_row, (x,)) for x in blk]
         self._job = U.Chunked(self.win, steps, lambda s: s[0](*s[1]),
-                              first=FIRST_ROWS, size=CHUNK_ROWS)
+                              first=FIRST_ROWS, size=CHUNK_ROWS,
+                              on_done=lambda: self._back_to(keep))
         # 목록이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게.
         self.fit.schedule()
+
+    def _scroll_top(self):
+        try:
+            return self.cv.yview()[0]
+        except tk.TclError:
+            return 0.0
+
+    def _back_to(self, top):
+        """다 그린 뒤 보던 자리로 돌아간다.
+
+        삭제·차단·풀기를 누르면 목록을 다시 불러온다. 나눠 그리려고 맨 위로
+        올린 채로 두면, 아래 카드를 하나 지울 때마다 목록이 맨 위로 튄다.
+        처음 열 때는 top 이 0 이라 아무것도 안 한다.
+        """
+        if top <= 0:
+            return
+        try:
+            self.fit.fit_now()
+            self.cv.yview_moveto(top)
+        except tk.TclError:
+            pass
 
     def _title(self, text, color=U.FG_DIM):
         tk.Label(self.list, text=text, bg=U.BG, fg=color, font=U.FONT_S,

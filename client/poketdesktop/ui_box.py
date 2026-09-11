@@ -107,7 +107,10 @@ def evo_lines(dex, mon, item_kr=None):
             what = ("Lv.%d" % lv) if lv > 1 else "레벨이 오르면"
         elif mode == "friend":
             # 얼마나 남았는지는 친밀도 칸이 따로 보여 준다.
-            what = "친밀도가 차면"
+            # **친밀도만 차서는 진화하지 않는다.** 서버는 레벨이 오를 때만
+            # 진화를 본다 (deps.try_evolve). '차면' 이라고만 적었더니 바탕화면에
+            # 두고 기다리기만 하는 사람이 생긴다.
+            what = "친밀도가 찬 뒤 레벨이 오르면"
         else:
             continue
         notes = []
@@ -123,6 +126,10 @@ def evo_lines(dex, mon, item_kr=None):
             notes.append(EVO_STATS[b["stats"]])
         if b.get("wasTrade"):
             notes.append("원래 통신교환")
+        if mode in ("level", "friend") and mon.get("noEvolve"):
+            # 변함없는돌을 쓴 포켓몬은 레벨 진화를 안 한다 (check_level).
+            # 도구 진화는 그대로 되므로 그 줄에는 안 붙인다.
+            notes.append("변함없는돌로 잠겨 있음")
         if mode == "stone" and mon.get("held") == b.get("item"):
             # 지니게 한 도구는 가방에서 빠져 있다. 서버는 가방에 있는 것만
             # 쓰므로, 본가 버릇대로 지니게 했다면 벗겨야 쓸 수 있다.
