@@ -62,11 +62,26 @@ PLACEMENT = 5
 PAIR_COOLDOWN_MIN = 30      # 같은 사람에게 다시 걸기까지
 DAILY_BATTLES = 20          # 하루에 내가 걸 수 있는 도전 수
 
-# 레벨대. 파티 평균 레벨을 20 단위로 끊는다. 같은 칸끼리 먼저 붙이고,
-# 없으면 옆 칸으로, 그래도 없으면 아무나. 친구 몇 명이 하는 서버라
-# '상대가 없습니다' 만 뜨는 것보다는 조금 기울어도 붙는 쪽이 낫다.
-TIER_SIZE = 20
-MAX_TIER = 4
+# 랜덤 배틀에서 상대를 고를 때만 쓰는 값들.
+#
+# **레벨이 비슷한 사람부터 찾는다.** 전에는 파티 평균 레벨을 스무 단위로
+# 끊어 같은 칸이면 아무나 붙였다. 그런데 지금 사람들의 절반이 Lv0~19 한
+# 칸에 몰려 있어서 Lv2 가 Lv19 를 만났다. 이레치 기록을 보니 평균 레벨
+# 차이가 10 이상인 판이 54%였고, 그런 판은 높은 쪽이 85% 이겼다. 차이가
+# 2 이하면 54% 로 반반이다 - 즉 레벨 차이가 승패를 거의 정하고 있었다.
+#
+# 좁혀도 상대는 남는다. 파티가 있는 92명으로 재어 보면 +-5 안에 중앙값
+# 26명이 있다. 그래도 못 찾으면 **안 붙인다** - 기울어진 판을 억지로
+# 만드는 것보다 '지금은 상대가 없다' 가 낫다.
+LEVEL_BAND = 5
+LEVEL_BAND_MAX = 10
+
+# 랜덤 배틀 상대를 고를 때는 최근에 붙은 사람을 이만큼 건너뛴다.
+# 직접 지목하는 쪽(PAIR_COOLDOWN_MIN)보다 길게 본다 - 후보가 서른 명
+# 넘게 있는데도 이레 동안 같은 사람과 열아홉 번 붙은 짝이 있었다.
+RANDOM_REPEAT_MIN = 180
+# 이 안에 만난 적이 없는 사람을 먼저 고른다.
+FRESH_WINDOW_MIN = 60 * 24
 
 # 다 본 대전 로그를 며칠이나 들고 있을지. 로그는 보고 나면 값이 없어지는
 # 자료인데 한 판에 수십 KB 라 Turso 용량을 제일 먼저 먹는다.
@@ -272,9 +287,6 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
 
 
 # ---------------------------------------------------------------- 상대 고르기
-def _tier(level):
-    return max(0, min(MAX_TIER, int(level) // TIER_SIZE))
-
 
 def _avg_levels():
     """사람마다 데리고 다니는 포켓몬의 평균 레벨. 한 번에 다 가져온다."""
@@ -283,12 +295,18 @@ def _avg_levels():
         " WHERE on_desktop=1 GROUP BY user_id HAVING n > 0"))
 
 
-def _recent_foes(uid):
+def _last_met(uid, minutes):
+    """그 시간 안에 붙은 상대 -> 마지막으로 붙은 시각."""
+    cut = _iso(_now() - datetime.timedelta(minutes=minutes))
+    rows = db.q("SELECT foe_id, MAX(ended_at) last FROM battle_record"
+                " WHERE user_id=? AND ended_at > ? AND foe_id IS NOT NULL"
+                " GROUP BY foe_id", (uid, cut))
+    return dict((r["foe_id"], r["last"]) for r in rows)
+
+
+def _recent_foes(uid, minutes=PAIR_COOLDOWN_MIN):
     """최근에 붙은 사람들. 연달아 같은 사람을 때리지 않게."""
-    cut = _iso(_now() - datetime.timedelta(minutes=PAIR_COOLDOWN_MIN))
-    rows = db.q("SELECT foe_id FROM battle_record WHERE user_id=?"
-                " AND ended_at > ? AND foe_id IS NOT NULL", (uid, cut))
-    return set(r["foe_id"] for r in rows)
+    return set(_last_met(uid, minutes))
 
 
 def _blocked_ids(uid):
@@ -312,19 +330,33 @@ def find_opponent(uid, rng=None):
     levels = _avg_levels()
     if uid not in levels:
         return None
-    skip = _recent_foes(uid) | _blocked_ids(uid)
+    skip = _recent_foes(uid, RANDOM_REPEAT_MIN) | _blocked_ids(uid)
     skip.add(uid)
 
-    my = _tier(levels[uid])
-    pool = [(u, _tier(lv)) for u, lv in levels.items() if u not in skip]
+    my = levels[uid]
+    pool = [(u, lv) for u, lv in levels.items() if u not in skip]
     if not pool:
         return None
-    # 같은 칸 -> 옆 칸 -> 아무나. 넓혀 가며 처음 걸리는 데서 멈춘다.
-    for gap in range(0, MAX_TIER + 1):
-        near = [u for u, t in pool if abs(t - my) <= gap]
+    # 가까운 띠부터. 한 번만 넓히고, 그래도 없으면 안 붙인다.
+    for band in (LEVEL_BAND, LEVEL_BAND_MAX):
+        near = [u for u, lv in pool if abs(lv - my) <= band]
         if near:
-            return rng.choice(near)
+            return _pick_fresh(uid, near, rng)
     return None
+
+
+def _pick_fresh(uid, cands, rng):
+    """오래 안 만난 사람부터. 하루 안에 만난 적 없는 사람이 먼저다.
+
+    여기까지 온 사람은 모두 레벨이 맞는 상대다. 그중에서 무작위로
+    고르면 후보가 서른 명이어도 같은 얼굴이 자꾸 나온다.
+    """
+    met = _last_met(uid, FRESH_WINDOW_MIN)
+    fresh = [u for u in cands if u not in met]
+    if fresh:
+        return rng.choice(fresh)
+    # 다 만나 본 사람뿐이면 그중 가장 오래된 쪽
+    return min(cands, key=lambda u: met.get(u) or "")
 
 
 def can_start(uid):

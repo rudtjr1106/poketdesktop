@@ -228,6 +228,48 @@ def main():
         chk("지워도 순위표에 그대로 있다",
             any(x["name"] == "zz_pvp_a" for x in pvp.ranking()), pvp.ranking())
 
+        print("\n=== 상대 고르기 — 레벨이 비슷한 사람만 ===")
+        # 이 DB 에는 다른 검사가 만든 사람도 있을 수 있다. 그래서 '누구를
+        # 골랐나' 를 이름으로 박지 않고, 고른 사람이 규칙을 지키는지만 본다.
+        lo = mkuser('zz_mm_lo', 3, 10)
+        lo2 = mkuser('zz_mm_lo2', 3, 12)
+        mid = mkuser('zz_mm_mid', 3, 22)
+        hi = mkuser('zz_mm_hi', 3, 60)
+        lv = pvp._avg_levels()
+
+        def near(uid, band):
+            return [u for u, x in lv.items()
+                    if u != uid and abs(x - lv[uid]) <= band]
+
+        op = pvp.find_opponent(lo)
+        chk('Lv10 에게 상대를 찾아 준다', op is not None, op)
+        chk('고른 상대는 레벨 차이가 %d 이내' % pvp.LEVEL_BAND,
+            op is not None and abs(lv[op] - lv[lo]) <= pvp.LEVEL_BAND,
+            (lv.get(op), lv[lo]))
+
+        # Lv22 는 +-5 안에 아무도 없다. 한 번만 넓혀서 +-10 까지 본다.
+        op = pvp.find_opponent(mid)
+        chk('+-5 에 없으면 +-10 까지만 넓힌다',
+            (op is None and not near(mid, pvp.LEVEL_BAND_MAX))
+            or (op is not None
+                and abs(lv[op] - lv[mid]) <= pvp.LEVEL_BAND_MAX),
+            (lv.get(op), lv[mid]))
+
+        # 혼자 동떨어져 있으면 억지로 붙이지 않는다. 예전에는 칸을 끝까지
+        # 넓혀서 Lv60 이 Lv5 를 때렸다.
+        op = pvp.find_opponent(hi)
+        chk('가까운 사람이 없으면 안 붙인다',
+            (op is None) == (not near(hi, pvp.LEVEL_BAND_MAX)),
+            (op, [lv[u] for u in near(hi, pvp.LEVEL_BAND_MAX)]))
+
+        # 방금 붙은 사람은 한동안 다시 안 고른다.
+        pvp.run_match(lo, lo2, kind='random', seed=11)
+        op = pvp.find_opponent(lo)
+        chk('방금 붙은 사람은 다시 안 고른다', op != lo2, op)
+        chk('그래도 규칙 밖의 사람을 데려오지는 않는다',
+            op is None or abs(lv[op] - lv[lo]) <= pvp.LEVEL_BAND_MAX,
+            (lv.get(op), lv[lo]))
+
         print("\n=== 로그 정리 ===")
         n0 = db.q1("SELECT COUNT(*) c FROM pvp_match")["c"]
         pvp.prune(days=0)
@@ -244,7 +286,8 @@ def main():
             len(pvp.records(b, 100)))
     finally:
         for n in ("zz_pvp_a", "zz_pvp_b", "zz_pvp_c", "zz_pvp_d",
-                  "zz_pvp_e", "zz_pvp_f"):
+                  "zz_pvp_e", "zz_pvp_f", "zz_mm_lo", "zz_mm_lo2",
+                  "zz_mm_mid", "zz_mm_hi"):
             db.run("DELETE FROM users WHERE username=?", (n,))
 
     print("\n======================================================")
