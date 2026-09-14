@@ -547,6 +547,19 @@ def main():
         pump(root, lambda: gw.data and gw.by_region.get(won_region, {}).get("cleared"), 5),
         gw.data and gw.data["cleared"])
 
+    print("\n=== 쓰러진 채 닫았다가 이어 하기 ===")
+    api.region = name_of["지우"]
+    api.tb = TB.TrainerBattle(dex, [dict(m) for m in party], api.by_region[api.region], random.Random(3))
+    api.tb.start()
+    api.tb.me_team[api.tb.mi].hp = 0                # 내 선수가 쓰러졌고
+    api.tb.need_switch = True                       # 서버는 교체를 기다린다
+    rb = GB.GymBattleWindow(app, api._out([]))      # 이벤트 없음 = 이어 하기
+    root.update()
+    chk("이어 하면 교체 화면부터", rb.mode == "switch" and not any("돌아가기" in t for t in texts(rb.left)),
+        (rb.mode, texts(rb.left)[:3]))
+    rb.close()
+    api.tb = None
+
     print("\n=== 기권 (이스터에그) ===")
     region = name_of["나여조경석"]
     gw.challenge(region)

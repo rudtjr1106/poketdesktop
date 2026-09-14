@@ -198,8 +198,14 @@ class GymBattleWindow(object):
             self.play(events, data)
         else:
             self.sync_view(self.view)
-            self.show_commands()
-            self.say("승부를 이어서 합니다.")
+            # 쓰러진 채로 창을 닫았다가 다시 들어오면 교체부터 해야 한다. 기술 칸을
+            # 보여 주면 누를 때마다 서버가 거절한다.
+            if self.view.get("needSwitch"):
+                self.open_switch(forced=True)
+                self.say("승부를 이어서 합니다. 다음 포켓몬을 고르세요.")
+            else:
+                self.show_commands()
+                self.say("승부를 이어서 합니다.")
         self.focus()
 
     # ---------------- 틀 ----------------
