@@ -480,6 +480,21 @@ def main():
         chk("%s 이름표가 장면 안에 있다" % who, inside, (bb, cv.winfo_width()))
     inside, bb = canvas_inside(cv, b.box["me"]["hp"])
     chk("내 체력 숫자가 장면 안에 있다", inside and cv.itemcget(b.box["me"]["hp"], "text"), bb)
+    foe = b.shown.get("foe") or {}
+    foe_hp = cv.itemcget(b.box["foe"]["hp"], "text")
+    chk("상대 체력도 숫자로 보인다", foe_hp == "%d / %d" % (foe.get("hp", -1), foe.get("maxhp", -1)),
+        (foe_hp, foe.get("hp"), foe.get("maxhp")))
+    fb, hb = cv.bbox(b.box["foe"]["bg"]), cv.bbox(b.box["foe"]["hp"])
+    chk("상대 체력 숫자가 이름표 안에 있다",
+        hb and fb[0] <= hb[0] and hb[2] <= fb[2] and fb[1] <= hb[1] and hb[3] <= fb[3], (hb, fb))
+    last_ball = cv.bbox(b.box["foe"]["balls"][-1])
+    chk("상대 체력 숫자가 몬스터볼과 안 겹친다", last_ball and last_ball[2] < hb[0], (last_ball, hb))
+    bar = cv.bbox(b.box["foe"]["bar"])
+    chk("상대 체력 숫자가 체력 막대 아래", bar and bar[3] <= hb[1], (bar, hb))
+    b._bar("foe", 7, foe.get("maxhp") or 1)
+    chk("상대 체력 숫자가 막대와 같이 줄어든다",
+        cv.itemcget(b.box["foe"]["hp"], "text") == "7 / %d" % (foe.get("maxhp") or 1))
+    b._bar("foe", foe.get("hp", 0), foe.get("maxhp") or 1)
     chk("포켓몬 그림이 선다", pump(root, lambda: all(cv.itemcget(b.sprite[w], "image") for w in ("me", "foe")), 10))
     chk("트레이너 도트가 선다", pump(root, lambda: cv.itemcget(b.trainer_item, "image"), 10))
     cells = b.left.winfo_children()[0].winfo_children()

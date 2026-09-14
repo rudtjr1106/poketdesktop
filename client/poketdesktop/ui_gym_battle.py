@@ -263,8 +263,9 @@ class GymBattleWindow(object):
         items["bar_bg"] = cv.create_rectangle(bx0, by0, bx0 + bw, by0 + s(10), fill="#2a3147", outline="")
         items["bar"] = cv.create_rectangle(bx0, by0, bx0 + bw, by0 + s(10), fill="#5fd97a", outline="")
         items["bar_geom"] = (bx0, by0, bw, s(10))
-        items["hp"] = cv.create_text(x + w - s(14), y + s(76), anchor="e", fill="#c9cfdf",
-                                     font=(U.FAMILY, U.pt(9)), text="") if mine else None
+        # 체력 숫자. 상대 이름표는 낮아서 몬스터볼 줄 오른쪽 끝에 둔다.
+        items["hp"] = cv.create_text(x + w - s(14), y + (s(76) if mine else h - s(14)), anchor="e",
+                                     fill="#c9cfdf", font=(U.FAMILY, U.pt(9)), text="")
         items["balls"] = []
         for i in range(6):
             cx = x + s(22) + i * s(20)
