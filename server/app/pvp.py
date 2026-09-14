@@ -82,6 +82,10 @@ LEVEL_BAND_MAX = 10
 RANDOM_REPEAT_MIN = 180
 # 이 안에 만난 적이 없는 사람을 먼저 고른다.
 FRESH_WINDOW_MIN = 60 * 24
+# 매칭 레벨에 넣지 않는 '깍두기'. 파티에서 가장 높은 레벨보다 이만큼 넘게 낮은
+# 포켓몬은 평균에서 뺀다. Lv.60 다섯에 Lv.1 하나를 끼워 평균을 50 으로 낮추고
+# 아래 레벨 사람과 붙는 것을 막는다 (Lv.1 은 판에서 하는 일이 없다).
+FILLER_GAP = 20
 
 # 다 본 대전 로그를 며칠이나 들고 있을지. 로그는 보고 나면 값이 없어지는
 # 자료인데 한 판에 수십 KB 라 Turso 용량을 제일 먼저 먹는다.
@@ -288,11 +292,30 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
 
 # ---------------------------------------------------------------- 상대 고르기
 
+def match_level(levels):
+    """매칭에 쓰는 파티 레벨.
+
+    그냥 평균이면 낮은 포켓몬을 끼워 넣어 평균을 깎을 수 있다. 가장 높은
+    레벨에서 FILLER_GAP 넘게 낮은 것은 빼고 평균을 낸다.
+
+        [60, 60, 60, 60, 60, 1]   -> 60   (평균 50 이 아니다)
+        [70, 5, 5, 5, 5, 5]       -> 70   (혼자 쓸어 담는 한 마리)
+        [70, 50, 50, 50, 50, 50]  -> 53.3 (정상적인 파티는 그대로)
+    """
+    levels = [int(v) for v in levels if v is not None]
+    if not levels:
+        return None
+    top = max(levels)
+    kept = [v for v in levels if v >= top - FILLER_GAP]
+    return sum(kept) / float(len(kept))
+
+
 def _avg_levels():
-    """사람마다 데리고 다니는 포켓몬의 평균 레벨. 한 번에 다 가져온다."""
-    return dict((r["user_id"], r["lv"]) for r in db.q(
-        "SELECT user_id, AVG(level) lv, COUNT(*) n FROM pokemon"
-        " WHERE on_desktop=1 GROUP BY user_id HAVING n > 0"))
+    """사람마다 매칭 레벨 (match_level). 한 번에 다 가져온다."""
+    by = {}
+    for r in db.q("SELECT user_id, level FROM pokemon WHERE on_desktop=1"):
+        by.setdefault(r["user_id"], []).append(r["level"])
+    return dict((uid, match_level(lv)) for uid, lv in by.items() if lv)
 
 
 def _last_met(uid, minutes):

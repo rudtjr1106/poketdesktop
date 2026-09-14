@@ -198,6 +198,24 @@ def main():
         chk("친구 배틀도 걸려온 쪽은 전적에 안 남는다",
             se["friendWins"] + se["friendLosses"] + se["friendDraws"] == 0, se)
 
+        print("\n=== 매칭 레벨 (깍두기로 평균 깎기) ===")
+        chk("Lv.60 다섯 + Lv.1 하나는 60 으로 본다", pvp.match_level([60, 60, 60, 60, 60, 1]) == 60,
+            pvp.match_level([60, 60, 60, 60, 60, 1]))
+        chk("혼자 센 한 마리 + 약한 다섯은 그 한 마리로", pvp.match_level([70, 5, 5, 5, 5, 5]) == 70)
+        chk("정상적인 파티는 평균 그대로", abs(pvp.match_level([70, 50, 50, 50, 50, 50]) - 53.33) < 0.01,
+            pvp.match_level([70, 50, 50, 50, 50, 50]))
+        chk("딱 20 차이까지는 평균에 넣는다", pvp.match_level([60, 40]) == 50)
+        chk("깍두기를 끼워도 Lv.50 파티와는 +-5 띠에 안 들어간다",
+            abs(pvp.match_level([60, 60, 60, 60, 60, 1]) - pvp.match_level([50] * 6)) > pvp.LEVEL_BAND)
+        chk("포켓몬이 없으면 None", pvp.match_level([]) is None)
+        # 실제 DB 에서도: 깍두기를 끼운 사람은 위 칸 사람과 붙는다
+        pad = mkuser("zz_pvp_pad", 5, 60)
+        db.run("UPDATE pokemon SET level=60 WHERE user_id=?", (pad,))
+        filler = mkuser("zz_pvp_pad_filler", 1, 1)
+        db.run("UPDATE pokemon SET user_id=?, slot=5 WHERE user_id=?", (pad, filler))
+        lv = pvp._avg_levels()
+        chk("DB 에서 읽어도 깍두기는 빠진다", abs(lv.get(pad, 0) - 60) < 0.01, lv.get(pad))
+
         print("\n=== 못 붙이는 경우 ===")
         f1 = mkuser("zz_pvp_f", 0)
         try:
