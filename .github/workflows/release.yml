@@ -95,6 +95,8 @@ jobs:
           python client/test_popup_close.py
           python client/test_gift_dialog.py
           python client/test_learn_dialog.py
+          python client/test_gym_map.py
+          python client/test_gym_ui.py
           python client/test_autostart.py
 
       # 폴더형(--onedir)으로 낸다. 단일 exe 는 실행할 때 자기를 임시
@@ -151,6 +153,8 @@ jobs:
           python client/test_popup_close.py
           python client/test_gift_dialog.py
           python client/test_learn_dialog.py
+          python client/test_gym_map.py
+          python client/test_gym_ui.py
           python client/test_battle_ui.py
           python client/test_boot_retry.py
           python client/test_autostart_mac.py

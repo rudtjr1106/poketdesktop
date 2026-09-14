@@ -646,7 +646,8 @@ class App(object):
             return
         # 배틀이나 진화 연출 중이면 기다린다. 창이 겹치면 무엇을 고르는
         # 중인지 알 수 없다.
-        if self.battle or self.arena or getattr(self, "evolving", None):
+        if (self.battle or self.arena or getattr(self, "evolving", None)
+                or getattr(self, "gym_battle", None)):
             return self.root.after(1500, self._ask_learn)
         self._learn_asking = True
         mon_id, name = self._learn_queue[0]
@@ -729,6 +730,9 @@ class App(object):
 
     def open_pvp(self):
         self.pvp_window = self._tab("pvp")
+
+    def open_gym(self):
+        self.gym_window = self._tab("gym")
 
     # ---------------- 유저 배틀 ----------------
     # 대전은 비동기다. 상대가 켜져 있지 않아도 그 사람의 지금 파티를
@@ -946,6 +950,13 @@ class App(object):
     def close_windows(self):
         """열려 있는 창을 전부 닫는다. 로그아웃·탈퇴·종료 때 부른다."""
         self.close_arena()
+        gb = getattr(self, "gym_battle", None)
+        if gb:
+            try:
+                gb.close()          # 판은 서버에 남는다. 다시 들어오면 이어서 한다
+            except Exception:                               # noqa: BLE001
+                pass
+            self.gym_battle = None
         if self.hub:
             try:
                 self.hub.close()

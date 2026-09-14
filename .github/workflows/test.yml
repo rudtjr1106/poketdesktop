@@ -87,6 +87,12 @@ jobs:
         run: python client/test_float_stack.py
       - name: PC 박스 거르기
         run: python client/test_box_filter.py
+      # 특성·6:6 교체 규칙·저장/복원, 256명 로스터가 엔진에 맞는지, 256판이 끝나는지
+      - name: 관장 배틀 (엔진)
+        run: python common/test_trainer_battle.py
+      # 먼 섬(울릉군·백령도·추자도)을 원래 쪽으로 당겨 그리는가, 이름표 자리
+      - name: 관장 지도 배치
+        run: python client/test_gym_map.py
 
       # 바뀐 것을 두 곳에 적으면 갈라진다. 앱 안의 '새로운 기능' 창과
       # 릴리스 본문이 어긋난 채로 나가면, 받은 사람은 자기가 받은 판에
@@ -186,6 +192,10 @@ jobs:
           python client/test_popup_close.py
           python client/test_gift_dialog.py
           python client/test_learn_dialog.py
+      # 배틀 장면이 창 밖으로 잘리고, 트레이너 카드의 '도전하기' 가 통째로
+      # 잘려 있었다. 글꼴이 다른 두 OS 에서 다 재 본다.
+      - name: 관장 지도·배틀 창 (진짜 Tk)
+        run: python client/test_gym_ui.py
       # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
@@ -229,6 +239,8 @@ jobs:
           python client/test_popup_close.py
           python client/test_gift_dialog.py
           python client/test_learn_dialog.py
+      - name: 관장 지도·배틀 창 (진짜 Tk)
+        run: python client/test_gym_ui.py
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
       # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
@@ -340,6 +352,8 @@ jobs:
           python server/test_held_api.py http://127.0.0.1:8788
           # 이벤트 검사는 풀숲 시각을 되돌리려고 DB 를 직접 만진다.
           python server/test_event.py http://127.0.0.1:8788 /tmp/poket-test.db
+          # 관장 검사도 이기는 판을 보려고 DB 에 Lv.100 뮤츠를 넣는다.
+          python server/test_gym.py http://127.0.0.1:8788 /tmp/poket-test.db
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

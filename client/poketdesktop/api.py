@@ -333,6 +333,38 @@ class Api(object):
     def sell(self, item, count=1):
         return self._call("POST", "/api/shop/sell", {"item": item, "count": count})
 
+    # ---------------- 관장 도전 ----------------
+    # 판정은 전부 서버가 한다. 여기서 보내는 것은 '무엇을 할지' 뿐이다.
+    def gym(self):
+        """256곳 요약과 내가 이긴 곳, 진행 중인 판."""
+        return self._call("GET", "/api/gym")
+
+    def gym_map(self):
+        """시·도/시·군·구 경계. 700KB 라 부르는 쪽이 요약값으로 캐시한다."""
+        return self._call("GET", "/api/gym/map", timeout=WAKE_TIMEOUT)
+
+    def gym_trainer(self, region):
+        return self._call("GET", "/api/gym/trainer/%s" % region)
+
+    def gym_sprite(self, key):
+        """트레이너 도트 원본 바이트. 없으면 None."""
+        url = "%s/api/gym/sprite/%s" % (self.base, key)
+        try:
+            r = self.session.get(url, timeout=20)
+        except requests.RequestException:
+            return None
+        return r.content if r.status_code == 200 and r.content else None
+
+    def gym_start(self, region):
+        return self._call("POST", "/api/gym/%s/start" % region)
+
+    def gym_battle(self):
+        return self._call("GET", "/api/gym/battle")
+
+    def gym_act(self, bid, kind, move="", slot=-1):
+        return self._call("POST", "/api/gym/battle/%d/act" % int(bid),
+                          {"kind": kind, "move": move, "slot": int(slot), "hour": _hour()})
+
     # ---------------- 기술머신 ----------------
     # 사고팔 수 없고 쓴다고 없어지지도 않는다. 그래서 개수를 주고받는
     # 자리가 없다 - 가졌는지 아닌지만 있다.

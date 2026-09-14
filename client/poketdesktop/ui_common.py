@@ -447,6 +447,14 @@ def install_wheel(top):
         except Exception:                                   # noqa: BLE001
             return None
         while w is not None:
+            # 굴리는 대신 제 일을 하는 캔버스 (관장 지도의 확대)
+            handler = getattr(w, "wheel_handler", None)
+            if handler:
+                try:
+                    handler(e)
+                except Exception:                           # noqa: BLE001
+                    pass
+                return "break"
             div = getattr(w, "wheel_div", 0)
             if div:
                 try:
