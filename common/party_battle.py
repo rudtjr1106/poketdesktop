@@ -28,7 +28,12 @@ Battle 이 내는 "over" 는 1:1 기준이라(한 라운드가 끝날 때마다 
 """
 import random
 
+from . import abilities as A
 from . import battle as B
+
+# 특성을 켠다 (관장 배틀과 같은 common/abilities.py). 끄면 예전 판과 한 글자도
+# 안 다른 로그가 나온다 - 저장된 판은 로그를 그대로 재생하므로 켜도 옛 판은 그대로다.
+ABILITIES = True
 
 # 한 라운드(1:1)에 쓸 수 있는 턴 수. 야생의 80 보다 훨씬 짧다.
 # 6:6 이면 최대 여섯 라운드라, 라운드마다 80턴을 주면 한 판이 480턴까지
@@ -75,14 +80,22 @@ class PartyBattle(object):
         self.dex = dex
         self.seed = random.randrange(1 << 30) if seed is None else int(seed)
         self.rng = random.Random(self.seed)
-        self.a = [B.Fighter(dex, m) for m in a_mons]
-        self.b = [B.Fighter(dex, m) for m in b_mons]
+        self.a = [self._fighter(dex, m) for m in a_mons]
+        self.b = [self._fighter(dex, m) for m in b_mons]
+        # 이번 라운드에 새로 링에 오른 쪽. 나올 때 발동하는 특성(위협 ...)을 여기서 본다.
+        self.entered = {"me": True, "foe": True}
         self.ia = self.ib = 0          # 지금 나와 있는 선수의 자리
         self.events = []
         self.turns = 0
         self.winner = None
 
     # ---------------- 도구 ----------------
+    @staticmethod
+    def _fighter(dex, mon):
+        f = B.Fighter(dex, mon)
+        f.ability_on = ABILITIES
+        return f
+
     def _alive(self, team, start):
         """start 부터 살아 있는 첫 자리. 없으면 None."""
         for i in range(start, len(team)):
@@ -100,15 +113,17 @@ class PartyBattle(object):
         기술을 실제로 보고 판단한다. 타입만 보면 '불꽃이 풀에게 유리' 인데
         정작 불꽃 기술이 하나도 없는 경우를 놓친다.
         """
-        foe_types = (foe.species or {}).get("types", []) or []
-        my_types = (mine.species or {}).get("types", []) or []
+        foe_types = foe.types()
+        my_types = mine.types()
 
+        # 특성으로 막히는 기술(부유에 땅, 저수에 물 ...)은 없는 셈 치고,
+        # 스킨 특성으로 바뀌는 타입까지 본다 (특성이 꺼져 있으면 그대로다).
         atk = 0.0
         for key in mine.moves:
             md = self.dex.move(key) or {}
-            if not md.get("power"):
+            if not md.get("power") or A.would_block(mine, foe, md):
                 continue                       # 변화기는 상성과 무관하다
-            e = B.effectiveness(self.dex, md.get("type"), foe_types)
+            e = B.effectiveness(self.dex, A.move_type(mine, md), foe_types)
             if e > atk:
                 atk = e
         if atk <= 0:
@@ -117,9 +132,9 @@ class PartyBattle(object):
         dfn = 0.0
         for key in foe.moves:
             md = self.dex.move(key) or {}
-            if not md.get("power"):
+            if not md.get("power") or A.would_block(foe, mine, md):
                 continue
-            e = B.effectiveness(self.dex, md.get("type"), my_types)
+            e = B.effectiveness(self.dex, A.move_type(foe, md), my_types)
             if e > dfn:
                 dfn = e
         if dfn <= 0:
@@ -197,6 +212,7 @@ class PartyBattle(object):
     def _one_round(self):
         """한 라운드를 끝까지. 누가 쓰러졌는지("me"/"foe"/"both") 돌려준다."""
         bt = self._round_battle()
+        self._entry_abilities(bt)
         while not bt.over:
             ev = bt.take_turn(bt.choose_mine())
             self.turns += 1
@@ -217,6 +233,24 @@ class PartyBattle(object):
         # 링에 남은 채로 다음 선수와 겹친다.
         return "both"
 
+    def _entry_abilities(self, bt):
+        """새로 링에 오른 쪽의 '나올 때' 특성. 빠른 쪽부터 (관장 배틀과 같다)."""
+        pair = [(who, f) for who, f in (("me", bt.me), ("foe", bt.foe)) if self.entered.get(who)]
+        pair.sort(key=lambda p: -p[1].stat("spe"))
+        for who, f in pair:
+            if f.alive():
+                team = self.a if who == "me" else self.b
+                f.ab["down"] = sum(1 for x in team if not x.alive())
+                A.on_switch_in(bt, f, who, self.events)
+        self.entered = {"me": False, "foe": False}
+
+    def _retire(self, f):
+        """쓰러지지 않고 물러난다 (턴 상한 무승부). 재생력·자연회복이 여기서 돈다."""
+        if f.alive():
+            A.on_switch_out(f)
+            f.stages = dict((k, 0) for k in B.STAGE_KEYS)
+            f.types_override = None
+
     def _advance(self, side):
         """쓰러진 쪽의 다음 선수를 내보낸다. 판이 끝났으면 True.
 
@@ -233,17 +267,21 @@ class PartyBattle(object):
         # 고른다. 완전히 공평하진 않지만 **결정적**이고, 서로를 보고
         # 무한히 다시 고르는 것을 피한다.
         if side in ("me", "both"):
+            self._retire(self.a[self.ia])
             nxt = self._pick_against(self.a, self.b[self.ib])
             if nxt is None:
                 a_out = True
             else:
                 self.ia = nxt
+                self.entered["me"] = True
         if side in ("foe", "both"):
+            self._retire(self.b[self.ib])
             nxt = self._pick_against(self.b, self.a[self.ia])
             if nxt is None:
                 b_out = True
             else:
                 self.ib = nxt
+                self.entered["foe"] = True
 
         if a_out and b_out:
             self.winner = "draw"

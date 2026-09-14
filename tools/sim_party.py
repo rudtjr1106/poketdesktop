@@ -98,6 +98,28 @@ def main():
     chk("선수 소개도 뒤바뀐다",
         f_round["me"] == r_round["foe"] and f_round["foe"] == r_round["me"])
 
+    print("\n=== 특성 ===")
+    # 위협: 링에 오르는 순간 상대 공격이 한 단계 떨어진다
+    gy = dict(team(dex, random.Random(5), 1, 60, 60)[0], species="GYARADOS", ability="INTIMIDATE",
+              moves=["WATERFALL"])
+    ma = dict(team(dex, random.Random(6), 1, 60, 60)[0], species="MACHAMP", ability="GUTS",
+              moves=["CROSSCHOP"])
+    r = PB.simulate(dex, [gy], [ma], seed=7)
+    ab = [e for e in r["events"] if e.get("t") == "ability"]
+    drop = [e for e in r["events"] if e.get("t") == "stat" and e.get("who") == "foe" and e.get("stat") == "atk"]
+    chk("위협이 발동한다", ab and ab[0].get("ability") == "INTIMIDATE", ab[:1])
+    chk("상대 공격이 떨어진다", drop and drop[0].get("change") == -1, drop[:1])
+    first_move = next(i for i, e in enumerate(r["events"]) if e.get("t") == "move")
+    chk("나오자마자 (첫 기술 전에)", r["events"].index(ab[0]) < first_move if ab else False)
+    # 스위치 하나로 예전 로그와 같은 판을 낼 수 있어야 한다
+    old = PB.ABILITIES
+    try:
+        PB.ABILITIES = False
+        r_off = PB.simulate(dex, [gy], [ma], seed=7)
+    finally:
+        PB.ABILITIES = old
+    chk("특성을 끄면 특성 이벤트가 없다", not any(e.get("t") == "ability" for e in r_off["events"]))
+
     print("\n=== %d판 돌리기 ===" % rounds)
     win = collections.Counter()
     turns = []

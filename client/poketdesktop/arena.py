@@ -485,6 +485,9 @@ class Arena(object):
                             or _short(ev.get("text")), "#c9a0ff")
         if t == "cure" and src:
             self.float_over(src, _short(ev.get("text")), "#7bffa0")
+        # 특성 발동 ("[갸라도스의 위협]"). 이 줄이 없는 옛 판은 이 이벤트를 그냥 넘긴다.
+        if t == "ability" and src:
+            self.float_over(src, ev.get("abilityKr") or _short(ev.get("text")), "#ffd66b")
         if t == "immune":
             side = self.active.get(who)
             if side:

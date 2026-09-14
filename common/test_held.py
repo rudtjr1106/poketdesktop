@@ -92,11 +92,18 @@ def t_도구_없으면_그대로(dex):
     print("-- 도구 없는 판은 예전과 같다")
     A = party(dex, 101, [4, 25, 133, 7, 1, 52], 32)
     Bm = party(dex, 202, [52, 54, 95, 37, 63, 74], 30)
+    # **특성은 끄고 잰다.** PvP 에 특성을 켠 뒤로는(1.2.x) 판이 달라지는 게 맞다.
+    # 이 검사가 보려는 것은 '도구가 없으면 도구 코드가 판에 손대지 않는가' 다.
     h = hashlib.sha256()
-    for s in range(1, 31):
-        out = PB.simulate(dex, A, Bm, seed=s)
-        h.update(json.dumps(out["events"], sort_keys=True,
-                            ensure_ascii=False).encode())
+    old = PB.ABILITIES
+    try:
+        PB.ABILITIES = False
+        for s in range(1, 31):
+            out = PB.simulate(dex, A, Bm, seed=s)
+            h.update(json.dumps(out["events"], sort_keys=True,
+                                ensure_ascii=False).encode())
+    finally:
+        PB.ABILITIES = old
     chk("파티전 30판 요약값이 1.0.20 과 같다", h.hexdigest() == PARTY_DIGEST,
         h.hexdigest())
     h2 = hashlib.sha256()
@@ -339,11 +346,32 @@ def t_효과(dex):
     chk("평온의방울은 친밀도 1.5배", H.happiness_mult("SOOTHEBELL") == 1.5)
 
 
+def t_설명():
+    """가방·상점에 붙는 '몇 배인가' 한 줄이 실제 표와 같은가."""
+    print("-- 설명 (지녔을 때 몇 배인가)")
+    chk("목탄: 불꽃 20% (1.2배)", H.effect_note("CHARCOAL") == "불꽃 타입 기술의 위력이 20% 올라간다 (1.2배)",
+        H.effect_note("CHARCOAL"))
+    chk("주먹플레이트: 격투 20%", "격투" in H.effect_note("FISTPLATE") and "20%" in H.effect_note("FISTPLATE"))
+    # 표의 배율을 바꾸면 설명도 따라 바뀐다 (숫자를 따로 적지 않았다)
+    old = H.TYPE_BOOST_MULT
+    try:
+        H.TYPE_BOOST_MULT = 1.3
+        chk("배율을 바꾸면 설명도 바뀐다", "30%" in H.effect_note("CHARCOAL"), H.effect_note("CHARCOAL"))
+    finally:
+        H.TYPE_BOOST_MULT = old
+    chk("구애스카프 조사", H.effect_note("CHOICESCARF").startswith("스피드가 50%"), H.effect_note("CHOICESCARF"))
+    no_note = sorted(k for k in H.ALL if not H.effect_note(k))
+    # 연막탄은 배틀에서 하는 일이 없다 (도망은 이 게임에 없다)
+    chk("지닐 수 있는 도구는 연막탄 말고 모두 설명이 있다", no_note == ["SMOKEBALL"], no_note)
+    chk("모르는 도구는 빈 글자", H.effect_note("NOPE") == "" and H.effect_note(None) == "")
+
+
 def main():
     dex = load_dex()
     t_도구_없으면_그대로(dex)
     t_카탈로그와_맞는다()
     t_효과(dex)
+    t_설명()
     print()
     print("======================================================")
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))
