@@ -163,6 +163,9 @@ def effect_note(it):
         # 한 줄을 그대로 쓴다("밤에 잘 통한다" 같은).
         return it["note"]
     note = eff.get("note") or ""
+    if (it or {}).get("heldNote"):
+        # 지녔을 때 실제로 몇 배인지 (본가 설명에는 숫자가 없다)
+        return it["heldNote"]
     if kind == "iv":
         note = note or "레벨이 어느 정도 오른 포켓몬만 단련할 수 있다"
     elif kind == "ev":

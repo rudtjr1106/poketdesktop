@@ -504,3 +504,109 @@ def load(f, d):
     f.last_move = d.get("last")
     f.metro = int(d.get("metro") or 0)
     f.armed = bool(d.get("armed"))
+
+
+# ---------------------------------------------------------------- 설명
+_TYPE_KR = {"NORMAL": "노말", "FIRE": "불꽃", "WATER": "물", "ELECTRIC": "전기", "GRASS": "풀",
+            "ICE": "얼음", "FIGHTING": "격투", "POISON": "독", "GROUND": "땅", "FLYING": "비행",
+            "PSYCHIC": "에스퍼", "BUG": "벌레", "ROCK": "바위", "GHOST": "고스트", "DRAGON": "드래곤",
+            "DARK": "악", "STEEL": "강철", "FAIRY": "페어리"}
+_STAT_KR = {"hp": "HP", "atk": "공격", "def": "방어", "spa": "특수공격", "spd": "특수방어", "spe": "스피드"}
+_STATUS_KR = {"paralysis": "마비", "sleep": "잠듦", "poison": "독", "burn": "화상", "freeze": "얼음",
+              "*": "모든 상태이상"}
+
+
+def _josa(text):
+    from .korean import natural
+    return natural(text)
+
+
+def _pct(mult):
+    return int(round((mult - 1.0) * 100))
+
+
+def effect_note(item_id):
+    """지녔을 때 **실제로 몇 배인지** 한 줄. 모르는 도구는 빈 글자.
+
+    가방·상점의 설명은 본가 문장이라 "위력이 올라간다" 까지만 있다. 얼마나
+    오르는지는 이 파일의 표에만 있어서, 표를 그대로 읽어 말로 만든다 -
+    숫자를 설명에 따로 적어 두면 표를 고칠 때 설명과 어긋난다.
+    """
+    h = normalize(item_id)
+    if not h:
+        return ""
+    t = TYPE_BOOST.get(h)
+    if t:
+        return "%s 타입 기술의 위력이 %d%% 올라간다 (%.1f배)" % (_TYPE_KR.get(t, t), _pct(TYPE_BOOST_MULT),
+                                                     TYPE_BOOST_MULT)
+    fixed = {
+        "MUSCLEBAND": "물리 기술의 위력이 10% 올라간다 (1.1배)",
+        "WISEGLASSES": "특수 기술의 위력이 10% 올라간다 (1.1배)",
+        "EXPERTBELT": "효과가 굉장한 기술의 위력이 20% 올라간다 (1.2배)",
+        "LIFEORB": "기술의 위력이 30% 올라간다 (1.3배). 대신 공격할 때마다 최대 HP의 10%가 줄어든다",
+        "METRONOME": "같은 기술을 이어 쓸 때마다 위력이 20%씩 올라간다 (최대 2배)",
+        "LEFTOVERS": "매 턴 끝에 최대 HP의 1/16(약 6%)을 회복한다",
+        "BLACKSLUDGE": "독 타입이면 매 턴 최대 HP의 1/16을 회복하고, 아니면 1/8이 줄어든다",
+        "STICKYBARB": "매 턴 끝에 최대 HP의 1/8이 줄어든다",
+        "SHELLBELL": "상대에게 준 데미지의 1/8만큼 회복한다",
+        "BIGROOT": "HP를 흡수하는 기술의 회복량이 30% 늘어난다 (1.3배)",
+        "WIDELENS": "기술의 명중률이 10% 올라간다 (1.1배)",
+        "ZOOMLENS": "상대보다 나중에 움직이면 명중률이 20% 올라간다 (1.2배)",
+        "QUICKCLAW": "20% 확률로 같은 우선도에서 먼저 움직인다",
+        "FOCUSBAND": "쓰러질 데미지를 받아도 10% 확률로 HP 1이 남는다",
+        "FOCUSSASH": "HP가 가득할 때 쓰러질 데미지를 받으면 한 번 HP 1로 버틴다",
+        "TOXICORB": "턴 끝에 스스로 독 상태가 된다",
+        "FLAMEORB": "턴 끝에 스스로 화상 상태가 된다",
+        "WHITEHERB": "능력치가 떨어지면 한 번 원래대로 되돌린다",
+        "LEPPABERRY": "기술의 PP가 바닥나면 한 번 10 회복한다",
+        "ENIGMABERRY": "효과가 굉장한 기술에 맞으면 최대 HP의 1/4을 회복한다 (한 번)",
+        "JABOCABERRY": "물리 기술에 맞으면 상대 최대 HP의 1/8만큼 되갚는다 (한 번)",
+        "ROWAPBERRY": "특수 기술에 맞으면 상대 최대 HP의 1/8만큼 되갚는다 (한 번)",
+        "CUSTAPBERRY": "HP가 1/4 이하일 때 한 번 먼저 움직인다",
+        "LUCKYEGG": "배틀에서 받는 경험치가 %d%% 늘어난다 (%.1f배)" % (_pct(EXP_ITEMS["LUCKYEGG"]), EXP_ITEMS["LUCKYEGG"]),
+        "SOOTHEBELL": "친밀도가 %d%% 더 오른다 (%.1f배)" % (_pct(HAPPINESS_ITEMS["SOOTHEBELL"]),
+                                                   HAPPINESS_ITEMS["SOOTHEBELL"]),
+        "LAGGINGTAIL": "같은 우선도에서 늘 나중에 움직인다",
+        "FULLINCENSE": "같은 우선도에서 늘 나중에 움직인다",
+        "IRONBALL": "스피드가 절반이 된다",
+        "MACHOBRACE": "쓰러뜨리면 받는 노력치가 2배가 된다. 대신 스피드가 절반이 된다",
+    }
+    if h in fixed:
+        return fixed[h]
+    if h in CHOICE:
+        return _josa("%s이(가) 50%% 올라간다 (1.5배). 대신 처음 쓴 기술만 계속 쓸 수 있다" % _STAT_KR[CHOICE[h]])
+    if h in POWER_EV:
+        return "쓰러뜨리면 %s 노력치가 8 더 오른다. 대신 스피드가 절반이 된다" % _STAT_KR[POWER_EV[h]]
+    if h in CRIT_UP:
+        return "급소에 맞을 확률이 한 단계 올라간다"
+    if h in FLINCH_10:
+        return "공격할 때 10% 확률로 상대를 풀죽게 한다"
+    if h in EVADE:
+        return "상대 기술의 명중률이 10% 떨어진다 (0.9배)"
+    t = RESIST_BERRY.get(h)
+    if t:
+        if h == "CHILANBERRY":
+            return "노말 타입 기술의 데미지를 한 번 절반으로 줄인다"
+        return "효과가 굉장한 %s 타입 기술의 데미지를 한 번 절반으로 줄인다" % _TYPE_KR.get(t, t)
+    c = CURE_BERRY.get(h)
+    if c:
+        return "%s에 걸리면 바로 고친다 (한 번)" % _STATUS_KR.get(c, c)
+    spec = HEAL_BERRY.get(h)
+    if spec:
+        thr, kind, amt = spec
+        when = "HP가 절반 이하" if thr == 0.5 else "HP가 1/4 이하"
+        how = ("HP를 %d 회복한다" % amt) if kind == "flat" else \
+            ("최대 HP의 %s을 회복한다" % ("1/4" if abs(amt - 0.25) < 1e-6 else "1/3"))
+        return "%s가 되면 %s (한 번)" % (when, how)
+    spec = PINCH_BERRY.get(h)
+    if spec:
+        kind, stat = spec
+        if kind == "stat":
+            return _josa("HP가 1/4 이하가 되면 %s이(가) 한 단계 올라간다 (한 번)" % _STAT_KR[stat])
+        if kind == "random":
+            return "HP가 1/4 이하가 되면 능력 하나가 두 단계 올라간다 (한 번)"
+        if kind == "crit":
+            return "HP가 1/4 이하가 되면 급소에 맞을 확률이 두 단계 올라간다"
+        if kind == "acc":
+            return "HP가 1/4 이하가 되면 다음 기술의 명중률이 20% 올라간다"
+    return ""

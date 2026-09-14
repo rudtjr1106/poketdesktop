@@ -84,9 +84,16 @@ def public_list():
             # 지닐 수 있는가. 분류가 아니라 common/held.py 의 목록으로 본다 -
             # 금속코트처럼 돌이면서 지닐 수 있는 것이 있다.
             "holdable": is_holdable(it["id"]),
+            # 지녔을 때 실제 배율 ("불꽃 타입 기술의 위력이 20% 올라간다 (1.2배)")
+            "heldNote": held_note(it["id"]),
         })
     out.sort(key=lambda x: (x["cat"], x["cost"], x["kr"]))
     return out
+
+
+def held_note(item_id):
+    from common import held as H
+    return H.effect_note(item_id)
 
 
 def is_holdable(item_id):

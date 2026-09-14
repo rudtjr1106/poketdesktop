@@ -225,6 +225,10 @@ def main():
     chk("도구가 90종 넘는다", len(by) > 90, len(by))
     chk("몬스터볼 가격이 본가와 같다(200)", by["POKEBALL"]["cost"] == 200,
         by["POKEBALL"]["cost"])
+    # 본가 설명은 "위력이 올라간다" 까지라, 몇 배인지를 따로 붙여 보낸다
+    chk("목탄 설명에 몇 % 오르는지", "20%" in (by.get("CHARCOAL") or {}).get("heldNote", ""),
+        (by.get("CHARCOAL") or {}).get("heldNote"))
+    chk("몬스터볼에는 지닌 도구 설명이 없다", not by["POKEBALL"].get("heldNote"), by["POKEBALL"].get("heldNote"))
     chk("파는 값은 사는 값의 절반", by["POKEBALL"]["sell"] == 100,
         by["POKEBALL"]["sell"])
     chk("한국어 이름이 정식 명칭", by["BOTTLECAP"]["kr"] == "은색병뚜껑",

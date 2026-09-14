@@ -147,12 +147,18 @@ def item_desc(item):
         # 무슨 일을 하는지 가방에서는 알 길이 없다.
         if item.get("holdable") and item.get("desc"):
             out += "\n\n지니게 하면: " + item["desc"]
+            if item.get("heldNote"):
+                out += "\n" + item["heldNote"]
         return out
     if kind == "noevolve":
         return "진화를 막는다. 한 번 더 쓰면 다시 진화할 수 있게 된다."
     if kind == "held":
         # 본가 설명 그대로 (서버가 items.json 에서 실어 보낸다)
-        return item.get("desc") or "포켓몬에게 지니게 하는 도구다. 배틀에서 효과가 난다."
+        out = item.get("desc") or "포켓몬에게 지니게 하는 도구다. 배틀에서 효과가 난다."
+        # 본가 문장은 "위력이 올라간다" 까지만 있다. 몇 배인지는 서버가 붙여 보낸다.
+        if item.get("heldNote"):
+            out += "\n\n" + item["heldNote"]
+        return out
     if kind == "ball":
         return "야생 포켓몬을 만났을 때 던지는 볼이다. 가방에서는 쓸 수 없다."
     if kind == "sell":
