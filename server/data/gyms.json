@@ -1,5 +1,5 @@
 {
- "digest": "b77a63356f0f7b54",
+ "digest": "1d43751da4ff9eac",
  "regions": {
   "11110": "cynthia",
   "11140": "rose",
@@ -14850,20 +14850,20 @@
      "species": "NATU"
     },
     {
-     "ability": "PRESSURE",
+     "ability": "ROCKHEAD",
      "ev": 0,
-     "gender": "N",
-     "held": "LEFTOVERS",
+     "gender": "M",
+     "held": "FOCUSSASH",
      "iv": 6,
      "level": 22,
      "moves": [
-      "PSYSHOCK",
-      "AEROBLAST",
-      "CALMMIND",
-      "RECOVER"
+      "EARTHQUAKE",
+      "ICEFANG",
+      "ROCKSLIDE",
+      "PROTECT"
      ],
      "nature": "HARDY",
-     "species": "LUGIA"
+     "species": "AERODACTYL"
     },
     {
      "ability": "KEENEYE",

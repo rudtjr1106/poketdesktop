@@ -596,7 +596,11 @@ class Dex(object):
 
 
 # ---------------------------------------------------------------- 팀
-def pick_team(dex, title, parties, special=None):
+# 배틀시설이 본업인 사람들. 이들은 시설 팀이 곧 자기 팀이다.
+FACILITY_ROLES = ("프런티어브레인", "타워타이쿤", "아케이드스타", "캐슬발레", "서브웨이마스터", "블랙타워")
+
+
+def pick_team(dex, title, parties, special=None, facility_ok=False):
     """(에이스를 맨 뒤에 둔) 종 목록과, 종마다 원작에 있던 기술·특성·도구."""
     info = collections.OrderedDict()
     if special:
@@ -629,6 +633,20 @@ def pick_team(dex, title, parties, special=None):
                            "held": m["held"], "gender": m.get("gender", "")}
     if not count:
         return [], info, [], None
+    # **시설 팀에만 나오는 전설은 뺀다** (시설이 본업인 사람은 빼지 않는다).
+    # B2W2 월드 토너먼트의 다운로드 대회('The Battle Between Legendary Pokémon')에서
+    # 비상이 루기아를 쓴다. 본래 팀이 세 마리뿐인 초반 관장은 모자란 칸을 시설 팀으로
+    # 채우다 보니 Lv.20 관장이 루기아를 들고 나왔다.
+    if not facility_ok:
+        own = set()
+        for party in parties:
+            if not party["facility"]:
+                own.update((dex.species(m) or {}).get("internal") for m in party["mons"])
+        for k in list(count):
+            if dex.by_key[k].get("legendary") and k not in own:
+                del count[k]
+        if not count:
+            return [], info, [], None
     main = [p for p in parties if not p["facility"]] or parties
     best = max(main, key=lambda p: (p["avg"], len(p["mons"])))
     ace_mon = max(enumerate(best["mons"]), key=lambda im: (im[1]["level"], im[0]))[1]
@@ -924,7 +942,8 @@ def build(pages, cats, dex, districts, sprites):
         if not kr:
             skipped.append((title, "한국어 이름 없음"))
             continue
-        order, info, extra, spec = pick_team(dex, title, parties, special)
+        order, info, extra, spec = pick_team(dex, title, parties, special,
+                                             facility_ok=role in FACILITY_ROLES)
         if not order:
             skipped.append((title, "도감에 맞는 포켓몬 없음"))
             continue
