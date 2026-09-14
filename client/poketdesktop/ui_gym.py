@@ -190,7 +190,9 @@ class GymWindow(object):
         # 나머지는 넘치면 굴린다 (에이스가 맨 아래 줄이라 잘리면 안 된다)
         wrap = tk.Frame(self.side, bg=U.BG2)
         wrap.pack(fill="both", expand=True, padx=(16, 4), pady=(0, 8))
-        self.card_cv = tk.Canvas(wrap, bg=U.BG2, highlightthickness=0, bd=0)
+        # width=1: 캔버스 기본 요청 폭(10cm ≈ 378px)이 윈도우의 좁은 옆 칸보다 커서,
+        # 나중에 붙이는 스크롤 막대가 설 자리가 없어 pack 이 막대를 숨겼다.
+        self.card_cv = tk.Canvas(wrap, bg=U.BG2, highlightthickness=0, bd=0, width=1)
         self.card_sb = tk.Scrollbar(wrap, orient="vertical", command=self.card_cv.yview)
         self.card_cv.configure(yscrollcommand=self.card_sb.set)
         self.card_cv.pack(side="left", fill="both", expand=True)
@@ -201,21 +203,33 @@ class GymWindow(object):
             self.card_cv.itemconfigure(self._card_id, width=e.width - U.h(12)), self._fit_card()))
         U.scrollable(self.card_cv, 60)
 
-    def _fit_card(self):
-        """카드가 칸보다 짧으면 굴릴 것도 막대도 없다."""
+    def _fit_card(self, again=True):
+        """카드가 칸보다 짧으면 굴릴 것도 막대도 없다.
+
+        막대를 붙이거나 떼면 캔버스 폭이 바뀌고, 글자가 새 폭으로 다시 접히는 것은
+        그 뒤의 일이다. 그래서 바꿨으면 조금 뒤에 한 번 더 잰다 (윈도우 CI 에서
+        카드가 6px 넘치는데 막대가 없는 채로 끝났다).
+        """
         try:
             need = self.card.winfo_reqheight()
             view = self.card_cv.winfo_height()
             w = self.card_cv.winfo_width()
+            changed = False
             if need <= view:
                 self.card_cv.configure(scrollregion=(0, 0, w, view))
                 self.card_cv.yview_moveto(0)
                 if self.card_sb.winfo_ismapped():
                     self.card_sb.pack_forget()
+                    changed = True
             else:
                 self.card_cv.configure(scrollregion=(0, 0, w, need))
                 if not self.card_sb.winfo_ismapped():
-                    self.card_sb.pack(side="right", fill="y")
+                    changed = True
+                    # 캔버스보다 **앞에** 담는다. 뒤에 담으면 캔버스가 자리를 다 먹은 뒤라
+                    # 막대가 0px 이 되어 안 보인다.
+                    self.card_sb.pack(side="right", fill="y", before=self.card_cv)
+            if changed and again and self.alive:
+                self.root.after(120, lambda: self.alive and self._fit_card(again=False))
         except tk.TclError:
             pass
 

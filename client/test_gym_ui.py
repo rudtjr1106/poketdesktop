@@ -331,9 +331,11 @@ def main():
     chk("가장 작은 창에서도 도전 단추가 보인다",
         btn.winfo_height() >= btn.winfo_reqheight() and btn.winfo_rooty() + btn.winfo_height() <= side_bottom,
         (btn.winfo_height(), btn.winfo_reqheight()))
+    # 줄바꿈과 막대 붙이기가 몇 번 오갈 수 있어서, 자리가 잡힐 때까지 기다린다
+    pump(root, lambda: bool(gw.card_sb.winfo_ismapped()) == (gw.card.winfo_reqheight() > gw.card_cv.winfo_height()), 3)
     need, view = gw.card.winfo_reqheight(), gw.card_cv.winfo_height()
     chk("가장 작은 창: 카드가 넘치면 스크롤 막대가 보인다 (안 넘치면 없다)",
-        gw.card_sb.winfo_ismapped() == (need > view), (need, view, gw.card_sb.winfo_ismapped()))
+        bool(gw.card_sb.winfo_ismapped()) == (need > view), (need, view, gw.card_sb.winfo_ismapped()))
     gw.win.geometry("1040x700")
     pump(root, lambda: False, 0.6)
 
