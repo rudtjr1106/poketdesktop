@@ -266,8 +266,11 @@ def give_evs(uid, mon_id, yields):
                 if after[k] != before[k])
 
 
-def award(dex, uid, foe, participant_id, hour=None):
-    """싸운 포켓몬은 전부, 파티의 나머지는 학습장치 몫."""
+def award(dex, uid, foe, participant_id, hour=None, rate=1.0):
+    """싸운 포켓몬은 전부, 파티의 나머지는 학습장치 몫.
+
+    rate 는 트레이너전 배율(관장 도전은 1.5). 야생은 1.0 이라 예전과 같다.
+    """
     out = []
     foe_sp = dex.get(foe.mon["species"]) or {}
     ev_yield = foe_sp.get("ev") or {}
@@ -275,7 +278,7 @@ def award(dex, uid, foe, participant_id, hour=None):
     part = db.q1("SELECT level, held FROM pokemon WHERE id=?", (participant_id,))
     lv = part["level"] if part else 5
     held = (part["held"] if part and "held" in part.keys() else None)
-    main = B.exp_gain(dex, foe, lv)
+    main = int(B.exp_gain(dex, foe, lv) * rate)
     # 행복의알은 경험치 1.5배, 교정깁스·파워 시리즈는 노력치를 더 준다.
     # 싸운 그 한 마리만 본다 - 학습장치 몫은 도구와 무관하다.
     main = int(main * HELD.exp_mult(held))
@@ -291,7 +294,7 @@ def award(dex, uid, foe, participant_id, hour=None):
             if m["id"] == participant_id:
                 continue
             amt = B.exp_gain(dex, foe, m["level"], shared=True)
-            amt = int(amt * config.EXP_SHARE_RATE / 50.0)   # 기본 50% 기준
+            amt = int(amt * config.EXP_SHARE_RATE / 50.0 * rate)   # 기본 50% 기준
             share_ev = give_evs(uid, m["id"], ev_yield) if config.EV_SHARE else None
             g = grant_exp(dex, uid, m["id"], amt, hour)
             if g:

@@ -29,7 +29,7 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from . import (auth, battle_routes, config, db, deps, item_routes,  # noqa: E402
                errors, items, migrations, pvp, pvp_routes,
-               social_routes, tm_routes, tms, walk)
+               gym_routes, social_routes, tm_routes, tms, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
@@ -37,6 +37,7 @@ app.include_router(item_routes.router)
 app.include_router(pvp_routes.router)
 app.include_router(social_routes.router)
 app.include_router(tm_routes.router)
+app.include_router(gym_routes.router)
 
 RNG = deps.RNG
 

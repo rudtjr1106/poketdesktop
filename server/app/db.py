@@ -199,6 +199,37 @@ CREATE TABLE IF NOT EXISTS tm_owned (
     PRIMARY KEY (user_id, no)
 );
 
+-- 관장 도전 한 판. 턴마다 TrainerBattle.dump() 를 data 에 통째로 쓴다.
+-- rev 는 같은 턴이 두 번 들어오는 것(창을 두 개 띄웠거나 요청이 겹친 것)을
+-- 막는다 - UPDATE ... WHERE rev=? 가 0줄이면 누가 먼저 썼다는 뜻이다.
+CREATE TABLE IF NOT EXISTS gym_battle (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    region      TEXT NOT NULL,          -- 시군구 코드
+    trainer     TEXT NOT NULL,          -- gyms.json 의 트레이너 id
+    state       TEXT NOT NULL,          -- active / done
+    result      TEXT,                   -- won / lost / draw / forfeit / expired
+    turn        INTEGER NOT NULL DEFAULT 0,
+    rev         INTEGER NOT NULL DEFAULT 0,
+    data        TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gym_battle_user ON gym_battle(user_id, state);
+
+-- 이긴 곳. 256곳 중 몇 곳을 이겼는지가 곧 진행도다.
+CREATE TABLE IF NOT EXISTS gym_clear (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    region      TEXT NOT NULL,
+    trainer     TEXT NOT NULL,
+    wins        INTEGER NOT NULL DEFAULT 1,
+    best_turns  INTEGER,
+    first_at    TEXT NOT NULL,
+    last_at     TEXT NOT NULL,
+    paid_on     TEXT,                   -- 다시 이긴 상금을 마지막으로 받은 날 (KST 날짜)
+    PRIMARY KEY (user_id, region)
+);
+
 -- 리피트볼이 "이미 잡아본 종" 을 봐야 해서 남긴다. 도감 역할도 겸한다.
 CREATE TABLE IF NOT EXISTS seen (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -442,6 +473,14 @@ SELECT
     s.*, u.username,
     datetime(s.updated_at, '+9 hours') AS updated_at_kst
 FROM rank_stat s JOIN users u ON u.id = s.user_id;
+
+DROP VIEW IF EXISTS v_gym_clear;
+CREATE VIEW v_gym_clear AS
+SELECT
+    c.*, u.username,
+    datetime(c.first_at, '+9 hours') AS first_at_kst,
+    datetime(c.last_at, '+9 hours') AS last_at_kst
+FROM gym_clear c JOIN users u ON u.id = c.user_id;
 
 DROP VIEW IF EXISTS v_server_error;
 CREATE VIEW v_server_error AS

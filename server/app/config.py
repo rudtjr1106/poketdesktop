@@ -137,6 +137,22 @@ ALLOW_FORCE_WILD = _bool("POKET_ALLOW_FORCE_WILD", False)
 # 처음 며칠은 이걸 켜두면 "그림이 안 뜨는" 일이 거의 없어진다.
 WARM_SPRITES = _bool("POKET_WARM_SPRITES", True)
 
+# ---- 관장 도전 ----
+GYMS_PATH = os.environ.get("POKET_GYMS", os.path.join(ROOT, "data", "gyms.json"))
+KOREA_MAP_PATH = os.environ.get("POKET_KOREA_MAP", os.path.join(ROOT, "data", "korea_map.json"))
+TRAINER_SPRITE_DIR = os.environ.get("POKET_TRAINER_SPRITES",
+                                    os.path.join(ROOT, "data", "trainer_sprites"))
+# 처음 이기면 레벨 x 50원 (Lv.20 1,000원 ~ Lv.100 5,000원). 원작 상금 느낌.
+# 다시 이기면 레벨 x 5원을 **하루 한 번** 준다. 약한 곳을 돌며 돈을 찍어
+# 내는 것을 막으면서도, 다시 붙을 이유는 남긴다.
+GYM_PRIZE_PER_LEVEL = _int("POKET_GYM_PRIZE_PER_LEVEL", 50)
+GYM_REPEAT_PER_LEVEL = _int("POKET_GYM_REPEAT_PER_LEVEL", 5)
+# 손을 놓고 이만큼 지나면 판을 접는다(초). 앱을 끄고 사라져도 판이 영원히
+# 남아 새 도전을 막지 않게.
+GYM_BATTLE_TTL = _int("POKET_GYM_BATTLE_TTL", 3600)
+# 경험치. 원작 트레이너전은 야생의 1.5배다.
+GYM_EXP_RATE = _float("POKET_GYM_EXP_RATE", 1.5)
+
 # ---- 도구 / 돈 ----
 ITEMS_PATH = os.environ.get("POKET_ITEMS", os.path.join(ROOT, "data", "items.json"))
 MONEY_START = _int("POKET_MONEY_START", 3000)     # 처음 주는 돈
