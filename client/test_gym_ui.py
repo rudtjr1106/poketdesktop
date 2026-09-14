@@ -211,6 +211,14 @@ def main():
     root.withdraw()
     U.init_fonts(root)
     U.apply_theme(root)
+    # 콜백 안에서 난 예외는 tk 가 찍기만 하고 넘어간다. 검사가 그걸 모르고 통과하지 않게
+    # 모아 뒀다가 끝에서 본다 (창을 닫은 뒤 도는 기술 연출이 없어진 캔버스를 지우다 났다).
+    callback_errors = []
+
+    def on_callback_error(exc, val, tb):
+        import traceback
+        callback_errors.append("".join(traceback.format_exception(exc, val, tb))[-300:])
+    root.report_callback_exception = on_callback_error
     print("글꼴 %s / 본문 %dpt (BASE_PT=%d) / 화면 %dx%d"
           % (U.FAMILY, U.FONT[1], U.BASE_PT, root.winfo_screenwidth(), root.winfo_screenheight()))
 
@@ -323,7 +331,9 @@ def main():
     chk("가장 작은 창에서도 도전 단추가 보인다",
         btn.winfo_height() >= btn.winfo_reqheight() and btn.winfo_rooty() + btn.winfo_height() <= side_bottom,
         (btn.winfo_height(), btn.winfo_reqheight()))
-    chk("가장 작은 창에서는 카드를 굴린다", gw.card_sb.winfo_ismapped())
+    need, view = gw.card.winfo_reqheight(), gw.card_cv.winfo_height()
+    chk("가장 작은 창: 카드가 넘치면 스크롤 막대가 보인다 (안 넘치면 없다)",
+        gw.card_sb.winfo_ismapped() == (need > view), (need, view, gw.card_sb.winfo_ismapped()))
     gw.win.geometry("1040x700")
     pump(root, lambda: False, 0.6)
 
@@ -550,9 +560,19 @@ def main():
     pump(root, lambda: False, 0.3)
     chk("기권 결과에 눌린 것이 없다", not squeezed(b.win), squeezed(b.win)[:4])
     chk("기권은 상금이 없다", not any("상금" in t for t in texts(b.left)), texts(b.left))
+    # 기술 연출이 도는 **도중에** 창을 닫는다. CI 러너가 느려서 실제로 났던 일이다 -
+    # 안전 타이머가 먼저 넘어가 연출 참조를 놓치면 닫을 때 못 멈추고, 연출이 없어진
+    # 캔버스를 지우다 TclError 를 냈다.
+    md = dex.moves["FLAMETHROWER"]
+    b._pending_data = {"battle": b.view}
+    b._play_fx({"t": "move", "who": "me", "move": md["kr"], "moveType": md["type"], "cat": md["cat"]},
+               "me", "foe")
+    b.fx = None                              # 안전 타이머가 먼저 넘어간 것과 같은 상태
     b.close()
 
     gw.close()
+    pump(root, lambda: False, 2.0)          # 닫은 뒤에도 남은 연출·예약이 다 돌 때까지
+    chk("콜백에서 난 예외가 없다", not callback_errors, callback_errors[:2])
     root.destroy()
     print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))

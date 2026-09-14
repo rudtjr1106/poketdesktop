@@ -140,8 +140,10 @@ class GymWindow(object):
         h.pack_propagate(False)
         inner = tk.Frame(h, bg=U.BG2)
         inner.pack(fill="both", expand=True, padx=16)
+        # 위아래 여백을 숫자로 박지 않는다. 틀 높이 안에서 pack 이 가운데로 놓는다 -
+        # pady=17 로 두었더니 윈도우(글꼴 10pt)에서 틀이 62px 라 글자가 6px 눌렸다.
         tk.Label(inner, text="관장", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", pady=17)
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left")
         self.sub = tk.Label(inner, text="불러오는 중...", bg=U.BG2, fg=U.FG_DIM, font=U.FONT_S)
         self.sub.pack(side="left", padx=(12, 0))
         self.back_btn = U.ghost_button(inner, "전국 지도", self.to_nation, height=32)
@@ -848,25 +850,28 @@ class GymWindow(object):
         if t.get("why"):
             why = tk.Label(self.card, text=t["why"], bg=U.BG2, fg=U.ACCENT, font=U.FONT_S,
                            justify="left", anchor="w")
-            why.pack(fill="x", pady=(8, 0))
+            why.pack(fill="x", pady=(6, 0))
             U.wrap_to_width(why)
 
-        U.marker_label(self.card, "데리고 있는 포켓몬", bg=U.BG2).pack(anchor="w", pady=(12, 4))
+        U.marker_label(self.card, "데리고 있는 포켓몬", bg=U.BG2).pack(anchor="w", pady=(10, 3))
         team = tk.Frame(self.card, bg=U.BG2)
         team.pack(fill="x")
         for i, m in enumerate(t["team"]):
-            row = tk.Frame(team, bg=U.BG3 if i == len(t["team"]) - 1 else U.BG2, height=U.h(30))
+            # 그림(28px)이 들어가는 줄이라 글꼴 배율만 따르면 윈도우(배율 1.0)에서 30px 로
+            # 모자란다. 그림 높이보다 작아지지 않게 한다.
+            row_h = max(U.h(30), 32)
+            row = tk.Frame(team, bg=U.BG3 if i == len(t["team"]) - 1 else U.BG2, height=row_h)
             row.pack(fill="x", pady=1)
             row.pack_propagate(False)
             bg = row["bg"]
-            slot = tk.Frame(row, bg=bg, width=U.h(34), height=U.h(30))
+            slot = tk.Frame(row, bg=bg, width=max(U.h(34), 34), height=row_h)
             slot.pack(side="left")
             slot.pack_propagate(False)
             th = thumbs.get(m["num"])
             if th is not None:
                 ph = ImageTk.PhotoImage(th)
                 self.photos["t%d" % i] = ph
-                tk.Label(slot, image=ph, bg=bg).pack(expand=True)
+                tk.Label(slot, image=ph, bg=bg, bd=0, highlightthickness=0).pack(expand=True)
             tk.Label(row, text=m["kr"] or m["species"], bg=bg, fg=U.FG, font=U.FONT_B,
                      anchor="w").pack(side="left", padx=(6, 0))
             if i == len(t["team"]) - 1:
@@ -877,7 +882,7 @@ class GymWindow(object):
 
         act = (self.data or {}).get("active")
         btn_row = tk.Frame(self.action, bg=U.BG2)
-        btn_row.pack(fill="x", pady=(8, 0))
+        btn_row.pack(fill="x", pady=(6, 0))
         if act and act["region"] == code:
             label = "승부 이어하기"
         elif act:

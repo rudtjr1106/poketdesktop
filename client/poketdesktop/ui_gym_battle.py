@@ -159,6 +159,7 @@ class GymBattleWindow(object):
         self.after_flow_done = False
 
         self.fx = None
+        self.effects = []            # 돌고 있는 연출 전부 (닫을 때 모두 멈춘다)
         self._moves_by_name = None
         t = self.view["trainer"]
         self.win = tk.Toplevel(self.root)
@@ -472,6 +473,10 @@ class GymBattleWindow(object):
             (sx, sy), (tx, ty) = self._center(who), self._center(other)
             self.fx = FX.Effect(_FxStage(self, k), self._find_move(ev), (sx / k, sy / k), (tx / k, ty / k),
                                 done, who=who)
+            # 안전 타이머가 먼저 다음으로 넘기면 self.fx 는 비지만 연출은 아직 돈다.
+            # 참조를 따로 들고 있어야 창을 닫을 때 멈출 수 있다 (안 멈추면 없어진
+            # 캔버스를 지우려다 TclError 가 난다).
+            self.effects = [e for e in self.effects if not e.dead] + [self.fx]
             # 연출이 어디서 멈춰도 판은 흘러가야 한다
             self.later(2600, done)
             self.fx.play()
@@ -966,12 +971,13 @@ class GymBattleWindow(object):
         if not self.alive:
             return
         self.alive = False
-        if self.fx is not None:
+        for e in self.effects + ([self.fx] if self.fx is not None else []):
             try:
-                self.fx.stop()
+                e.stop()
             except Exception:                              # noqa: BLE001
                 pass
-            self.fx = None
+        self.effects = []
+        self.fx = None
         for who in ("me", "foe"):
             self._stop_anim(who)
         for j in self.jobs:
