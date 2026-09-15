@@ -10,10 +10,10 @@
 
 ## 무엇을 넣었나
 
-날씨와 필드는 엔진에 없다(사용자가 빼기로 했다). 그래서 날씨를 부르거나
-날씨에 기대는 특성(가뭄·잔비·쓱쓱·엽록소·모래숨기 ...)은 **아무 일도 안
-한다.** 교체·더블배틀·도구 뺏기처럼 이 엔진에 없는 개념에 걸린 것도 뺐다.
-IMPLEMENTED 에 들어 있는 것만 동작한다.
+처음에는 날씨와 필드를 엔진에서 뺐다. 변화기 144개를 넣으면서(common/statusmoves.py)
+날씨·필드가 생겼으므로, 날씨를 부르거나 날씨에 기대는 특성(가뭄·잔비·모래날림·
+눈퍼뜨리기·쓱쓱·엽록소·모래숨기·선파워·고대활성 ...)도 이제 동작한다.
+더블배틀에만 뜻이 있는 것은 뺐다. IMPLEMENTED 에 들어 있는 것만 동작한다.
 
 ## 규칙
 
@@ -112,7 +112,15 @@ IMPLEMENTED = (
        "CORROSION", "CONTRARY", "SIMPLE", "MIRRORARMOR", "DEFIANT", "COMPETITIVE",
        "SERENEGRACE", "SHIELDDUST", "INNERFOCUS", "STEADFAST", "STENCH", "SKILLLINK",
        "ROCKHEAD", "MAGICGUARD", "SPEEDBOOST", "POISONHEAL", "SHEDSKIN", "MOODY",
-       "GUARDDOG", "OWNTEMPO", "OBLIVIOUS"})
+       "GUARDDOG", "OWNTEMPO", "OBLIVIOUS",
+       # 날씨·필드 (statusmoves 가 부르거나 본다)
+       "DROUGHT", "DRIZZLE", "SANDSTREAM", "SNOWWARNING", "ORICHALCUMPULSE", "HADRONENGINE",
+       "ELECTRICSURGE", "GRASSYSURGE", "MISTYSURGE", "PSYCHICSURGE", "CLOUDNINE", "AIRLOCK",
+       "SWIFTSWIM", "CHLOROPHYLL", "SANDRUSH", "SLUSHRUSH", "SOLARPOWER", "SANDFORCE",
+       "SANDVEIL", "SNOWCLOAK", "RAINDISH", "ICEBODY", "DRYSKIN", "HYDRATION", "LEAFGUARD",
+       "PROTOSYNTHESIS", "QUARKDRIVE",
+       # 변화기와 맞물리는 것
+       "MAGICBOUNCE", "INFILTRATOR", "SUCTIONCUPS", "STICKYHOLD", "AROMAVEIL"})
 
 STAGE_STATS = ("atk", "def", "spa", "spd", "spe")
 
@@ -123,7 +131,27 @@ OPP_TARGETS = {6, 8, 9, 10, 11, 14}
 
 # ---------------------------------------------------------------- 도우미
 def on(f):
-    return bool(f is not None and getattr(f, "ability_on", False) and f.ability)
+    # 위액을 맞으면 특성이 없는 것과 같다
+    return bool(f is not None and getattr(f, "ability_on", False) and f.ability
+                and not (getattr(f, "cond", None) or {}).get("gastro"))
+
+
+def _weather(f):
+    fl = getattr(f, "field", None)
+    return None if fl is None or fl.suppressed else fl.weather
+
+
+def _terrain(f):
+    fl = getattr(f, "field", None)
+    return fl.terrain if fl is not None else None
+
+
+def _forced_grounded(f):
+    """중력·뿌리박기·떨어뜨리기·검은철구: 부유여도 땅 기술을 맞는다 (statusmoves.forced_grounded 와 같다)."""
+    fl = getattr(f, "field", None)
+    c = getattr(f, "cond", None) or {}
+    return bool((fl is not None and fl.room("gravity")) or c.get("ingrain") or c.get("smackdown")
+                or f.held == "IRONBALL")
 
 
 def has(f, *keys):
@@ -236,6 +264,21 @@ def stat_mult(f, key):
             return 1.5
         if a == "FURCOAT":
             return 2.0
+    w = _weather(f)
+    if key == "spe":
+        if (a == "SWIFTSWIM" and w == "rain") or (a == "CHLOROPHYLL" and w == "sun") \
+                or (a == "SANDRUSH" and w == "sand") or (a == "SLUSHRUSH" and w in ("hail", "snow")):
+            return 2.0
+    if key == "spa" and a == "SOLARPOWER" and w == "sun":
+        return 1.5
+    if key == "atk" and a == "ORICHALCUMPULSE" and w == "sun":
+        return 5461 / 4096.0
+    if key == "spa" and a == "HADRONENGINE" and _terrain(f) == "electric":
+        return 5461 / 4096.0
+    if (a == "PROTOSYNTHESIS" and w == "sun") or (a == "QUARKDRIVE" and _terrain(f) == "electric"):
+        top = max(("atk", "def", "spa", "spd", "spe"), key=lambda s: f.base.get(s, 0))
+        if key == top:
+            return 1.5 if key == "spe" else 1.3
     if key == "spe":
         if a == "QUICKFEET" and f.status:
             return 1.5
@@ -284,6 +327,9 @@ def acc_mult(user, target, move):
     g = guard(user, target)
     if g == "WONDERSKIN" and is_status(move) and (move.get("acc") or 0) > 50:
         m *= 50.0 / move["acc"]
+    w = _weather(target)
+    if (g == "SANDVEIL" and w == "sand") or (g == "SNOWCLOAK" and w in ("hail", "snow")):
+        m *= 0.8
     return m
 
 
@@ -413,6 +459,9 @@ def blocks(bt, user, uwho, target, twho, move, key, ev):
         return False
     fl = flags(move)
     wk = key_of(move)
+    if g == "LEVITATE" and _forced_grounded(target):
+        g = None                               # 중력·뿌리박기로 땅에 붙었다
+        return False
     if g in ABSORB and mtype == ABSORB[g][0]:
         what = ABSORB[g][1]
         if what == "immune":
@@ -467,6 +516,8 @@ def would_block(user, target, move):
         return False
     mtype = move_type(user, move)
     fl = flags(move)
+    if g == "LEVITATE" and _forced_grounded(target):
+        return False
     if g in ABSORB and mtype == ABSORB[g][0]:
         return not (ABSORB[g][1] == "immune" and is_status(move))
     if g == "WINDRIDER" and key_of(move) in WIND:

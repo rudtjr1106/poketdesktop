@@ -507,11 +507,12 @@ def t_상대_AI(dex, gyms):
     chk("Lv.20 은 가끔(10% 안팎) 두 번째 기술", 0.04 <= second_rate(20) <= 0.16, second_rate(20))
 
     # 자료
-    chk("아무 일도 안 하는 기술을 가려낸다",
-        [TB.works(dex.move(k)) for k in ("PROTECT", "SUBSTITUTE", "RAINDANCE", "SWAGGER",
+    chk("관장 AI 가 쓸 수 있는 기술을 가려낸다 (1:1 에서 실패하는 것·AI 가 쓸 일 없는 것은 뺀다)",
+        [TB.works(dex.move(k)) for k in ("HELPINGHAND", "SPLASH", "INSTRUCT", "SKETCH",
                                          "SWORDSDANCE", "WILLOWISP", "GROWL", "RECOVER",
-                                         "HEAVYSLAM", "NIGHTSHADE", "LEECHSEED", "COUNTER")]
-        == [False, False, False, False, True, True, True, True, True, True, True, True])
+                                         "HEAVYSLAM", "NIGHTSHADE", "LEECHSEED", "COUNTER",
+                                         "PROTECT", "SUBSTITUTE", "RAINDANCE", "STEALTHROCK")]
+        == [False, False, False, False] + [True] * 12)
     dead = [(t["name"], m["species"], k) for t in gyms["trainers"] for m in t["team"]
             for k in m["moves"] if not TB.works(dex.move(k))]
     chk("관장 포켓몬에 헛기술이 없다", not dead, dead[:5])

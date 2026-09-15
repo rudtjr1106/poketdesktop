@@ -191,6 +191,12 @@ def act(bid: int, body: ActIn, ctx=Depends(deps.current)):
     except ValueError as e:
         raise HTTPException(409, str(e))
 
+    # 스케치로 배운 기술은 영원하다 - 포켓몬에 적는다 (저장본에 남기기 전에 표시를 뗀다)
+    for f in tb.me_team:
+        if f.mon.pop("_sketched", None) and f.mon.get("id"):
+            db.run("UPDATE pokemon SET moves=? WHERE id=? AND user_id=?",
+                   (json.dumps(f.mon.get("moves") or []), f.mon["id"], uid))
+
     state = "done" if tb.over else "active"
     cur = db.run("UPDATE gym_battle SET data=?, turn=?, rev=rev+1, state=?, result=?,"
                  " updated_at=? WHERE id=? AND rev=?",

@@ -34,6 +34,7 @@ from common import abilities as A              # noqa: E402
 from common import battle as B                 # noqa: E402
 from common import movecalc as MC              # noqa: E402
 from common import pokelogic as P              # noqa: E402
+from common import statusmoves as SM           # noqa: E402
 from common import trainer_battle as TB        # noqa: E402
 
 import build_gyms as G                         # noqa: E402
@@ -122,7 +123,7 @@ def threat(tb, mine):
 
 def pick_switch(tb, forced):
     best, best_sc = None, None
-    for i in tb.valid_switches() if not forced else [i for i, f in enumerate(tb.me_team) if f.alive()]:
+    for i in tb.valid_switches():
         f = tb.me_team[i]
         taken = threat(tb, f)
         dealt = best_hit(tb.bt, f, tb.foe)[0] / float(tb.foe.hp or 1)
@@ -144,7 +145,8 @@ def play(tb, rng):
         # 한 방에 쓰러질 판인데 내가 먼저 못 쓰러뜨리면, 버틸 포켓몬으로 바꾼다
         slower = foe.stat("spe") >= me.stat("spe")
         my_ko = best_hit(tb.bt, me, foe)[0] >= foe.hp
-        if threat(tb, me) >= 1.0 and slower and not my_ko and tb.valid_switches():
+        if threat(tb, me) >= 1.0 and slower and not my_ko and tb.valid_switches() \
+                and not SM.trapped(tb.bt, me):
             slot = pick_switch(tb, False)
             if slot is not None and threat(tb, tb.me_team[slot]) < 0.5:
                 tb.act("switch", slot)

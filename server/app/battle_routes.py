@@ -16,8 +16,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from common import battle as B
+from common import field as FD
 from common import held as HELD
 from common import pokelogic as P
+from common import statusmoves as SM
 
 from . import auth, config, db, deps, items, tms, walk
 
@@ -127,9 +129,33 @@ def _dump(f):
             "vol": f.volatile()}
 
 
+def _battle(d, row, me, foe, rng=None):
+    """저장본으로 Battle 을 되살린다. 날씨·필드·진영은 야생 쪽 저장본에 같이 적혀 있다.
+
+    (내 쪽은 교체하면 칸을 통째로 갈아 끼우지만 야생 쪽은 판 내내 그대로라 거기에 둔다)
+    """
+    try:
+        fld = json.loads(row["foe"]).get("field")
+    except (TypeError, ValueError, KeyError):
+        fld = None
+    bt = B.Battle(d, me, foe, rng, field=FD.Field.load(fld))
+    bt.turn_no = row["turn"]
+    return bt
+
+
+def _persist_sketch(uid, mon_id, f):
+    """스케치로 배운 기술은 영원하다 (원작과 같다). 판 저장본이 아니라 포켓몬에 적는다."""
+    if not f.mon.pop("_sketched", None):
+        return
+    db.run("UPDATE pokemon SET moves=? WHERE id=? AND user_id=?",
+           (json.dumps(f.mon.get("moves") or []), mon_id, uid))
+
+
 def _save(row_id, bt, result=None, state=None):
+    foe = _dump(bt.foe)
+    foe["field"] = bt.field.dump()
     db.run("UPDATE battle SET turn=?, me=?, foe=?, state=?, result=? WHERE id=?",
-           (bt.turn_no, json.dumps(_dump(bt.me)), json.dumps(_dump(bt.foe)),
+           (bt.turn_no, json.dumps(_dump(bt.me)), json.dumps(foe),
             state or ("done" if bt.over else "active"),
             result or bt.result, row_id))
 
@@ -324,12 +350,16 @@ def spare_for(uid, foe, pref):
     return False
 
 
-def foe_only_turn(d, me, foe, ev):
-    """볼을 던지거나 도망에 실패했을 때 상대만 한 번 움직인다."""
-    bt = B.Battle(d, me, foe, deps.RNG)
+def foe_only_turn(bt, ev):
+    """볼을 던지거나 도망에 실패했을 때 상대만 한 번 움직인다.
+
+    턴 끝 데미지(독·씨앗)는 없다 - 예전 그대로. 잡기 모드로 멈춘 동안 던지다가
+    독 데미지로 쓰러뜨리면 안 된다. 상대가 울부짖기·순간이동을 쓰면 판이 끝난다.
+    """
+    bt.begin_turn()
     key = bt.choose_ai()
-    if key and foe.alive():
-        bt._use("foe", foe, me, key, ev)
+    if key and bt.foe.alive():
+        bt._use("foe", bt.foe, bt.me, key, ev)
     return key
 
 
@@ -366,8 +396,7 @@ def start(wid: int, ctx=Depends(deps.current)):
     if old:
         if old["wild_id"] == wid:
             me, foe = _fighters(d, old)
-            bt = B.Battle(d, me, foe)
-            bt.turn_no = old["turn"]
+            bt = _battle(d, old, me, foe)
             return {"battle": _view(d, old, bt), "resumed": True}
         db.run("UPDATE battle SET state='done', result='fled' WHERE id=?",
                (old["id"],))
@@ -398,7 +427,7 @@ def start(wid: int, ctx=Depends(deps.current)):
            " ON CONFLICT(user_id) DO UPDATE SET battles=battles+1", (uid,))
 
     row = db.q1("SELECT * FROM battle WHERE id=?", (cur.lastrowid,))
-    bt = B.Battle(d, me, foe)
+    bt = _battle(d, row, me, foe)
     return {"battle": _view(d, row, bt), "resumed": False,
             "ballOptions": ball_options(uid, ctx["user"], bt, row),
             "intro": "앗! 야생 %s 이(가) 튀어나왔다!" % foe.name}
@@ -413,10 +442,32 @@ def current_battle(ctx=Depends(deps.current)):
         return {"battle": None}
     d = deps.dex()
     me, foe = _fighters(d, row)
-    bt = B.Battle(d, me, foe)
-    bt.turn_no = row["turn"]
+    bt = _battle(d, row, me, foe)
     return {"battle": _view(d, row, bt),
             "ballOptions": ball_options(uid, ctx["user"], bt, row)}
+
+
+def _lost(uid, row, out):
+    """내 포켓몬이 쓰러졌다. 다음에 낼 수 있는 파티를 실어 보낸다."""
+    # 쓰러진 그 한 마리만 조금 깎인다. 본가와 같은 방향이되 훨씬 약하다.
+    walk.on_faint(uid, row["mine_id"])
+    # **이 판에서 쓰러진 애들을 다 적어 둔다.** 예전에는 방금 쓰러진
+    # 한 마리만 후보에서 뺐다. 그래서 1번이 지고 2번이 나오고, 2번이
+    # 지면 1번이 다시 나와서 끝없이 돌았다.
+    down = _fainted(row)
+    if row["mine_id"] not in down:
+        down.append(row["mine_id"])
+    db.run("UPDATE battle SET fainted=? WHERE id=?",
+           (json.dumps(down), row["id"]))
+    nxt = _next_ups(uid, down)
+    out["canSwitch"] = bool(nxt)
+    out["party"] = [deps.decorate(m) for m in nxt]
+    out["fainted"] = down
+    if not nxt:
+        # 데리고 다니는 여섯을 다 썼다. 야생은 그냥 가 버린다.
+        out["allDown"] = True
+        db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
+        reschedule(uid)
 
 
 @router.post("/api/battle/{bid}/move")
@@ -426,8 +477,7 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
     d = deps.dex()
     row = _load(ctx, bid)
     me, foe = _fighters(d, row)
-    bt = B.Battle(d, me, foe, deps.RNG)
-    bt.turn_no = row["turn"]
+    bt = _battle(d, row, me, foe, deps.RNG)
     # 집단폭행: 이 판에서 아직 안 쓰러진 파티 (나와 있는 애는 지금 상태 그대로).
     # 그 기술이 있을 때만 파티를 읽는다 - 턴마다 DB 를 한 번 더 두드릴 이유가 없다.
     if "BEATUP" in me.moves:
@@ -480,29 +530,13 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
         db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
         reschedule(uid)
     elif bt.over and bt.result == "lost":
-        # 쓰러진 그 한 마리만 조금 깎인다. 본가와 같은 방향이되 훨씬 약하다.
-        walk.on_faint(uid, row["mine_id"])
-        # **이 판에서 쓰러진 애들을 다 적어 둔다.** 예전에는 방금 쓰러진
-        # 한 마리만 후보에서 뺐다. 그래서 1번이 지고 2번이 나오고, 2번이
-        # 지면 1번이 다시 나와서 끝없이 돌았다.
-        down = _fainted(row)
-        if row["mine_id"] not in down:
-            down.append(row["mine_id"])
-        db.run("UPDATE battle SET fainted=? WHERE id=?",
-               (json.dumps(down), row["id"]))
-        nxt = _next_ups(uid, down)
-        out["canSwitch"] = bool(nxt)
-        out["party"] = [deps.decorate(m) for m in nxt]
-        out["fainted"] = down
-        if not nxt:
-            # 데리고 다니는 여섯을 다 썼다. 야생은 그냥 가 버린다.
-            out["allDown"] = True
-            db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
-            reschedule(uid)
+        _lost(uid, row, out)
     elif bt.over and bt.result == "fled":
+        # 도망쳤거나, 울부짖기·날려버리기·순간이동으로 판이 끝났다
         db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
         reschedule(uid)
 
+    _persist_sketch(uid, row["mine_id"], me)
     _save(row["id"], bt)
     row = db.q1("SELECT * FROM battle WHERE id=?", (row["id"],))
     out["battle"] = _view(d, row, bt)
@@ -550,14 +584,22 @@ def switch(bid: int, body: SwitchIn, ctx=Depends(deps.current)):
     if not foe.alive():
         raise HTTPException(409, "상대가 이미 쓰러졌습니다.")
     new_me = B.Fighter(d, db.row_to_mon(mine))
-    bt = B.Battle(d, new_me, foe, deps.RNG)
-    bt.turn_no = row["turn"]
-    db.run("UPDATE battle SET mine_id=?, me=?, state='active', result=NULL"
-           " WHERE id=?", (mine["id"], json.dumps(_dump(new_me)), row["id"]))
+    bt = _battle(d, row, new_me, foe, deps.RNG)
+    events = [{"t": "send", "who": "me", "name": new_me.name,
+               "text": "가라, %s!" % new_me.name}]
+    SM.on_leave(bt, "me")                      # 쓰러진 포켓몬이 걸어 둔 것
+    bt.enter("me", events)                     # 압정·스텔스록 (야생이 깔아 둔 것)
+    db.run("UPDATE battle SET mine_id=?, state='active', result=NULL"
+           " WHERE id=?", (mine["id"], row["id"]))
     row = db.q1("SELECT * FROM battle WHERE id=?", (row["id"],))
-    return {"battle": _view(d, row, bt),
-            "events": [{"t": "send", "who": "me", "name": new_me.name,
-                        "text": "가라, %s!" % new_me.name}]}
+    out = {"events": events}
+    if not new_me.alive():
+        bt._check_faint(events)
+        _lost(uid, row, out)
+    _save(row["id"], bt)
+    row = db.q1("SELECT * FROM battle WHERE id=?", (row["id"],))
+    out["battle"] = _view(d, row, bt)
+    return out
 
 
 @router.post("/api/battle/{bid}/ball")
@@ -592,14 +634,18 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
                           "아앗! 조금만 더 하면 잡을 수 있었는데!",
                           "아깝다! 다 잡았다고 생각했는데!"][min(shakes, 3)]
         ev = []
-        foe_only_turn(d, me, foe, ev)          # 볼을 던진 턴에도 상대는 움직인다
+        bt = _battle(d, row, me, foe, deps.RNG)
+        foe_only_turn(bt, ev)                  # 볼을 던진 턴에도 상대는 움직인다
         out["events"] = ev
-        bt = B.Battle(d, me, foe, deps.RNG)
         bt.turn_no = row["turn"] + 1
-        if not me.alive():
+        if bt.over and bt.result == "fled":
+            db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
+            reschedule(uid)
+        elif not me.alive():
             bt.over, bt.result = True, "lost"
-            ev.append({"t": "faint", "who": "me",
-                       "text": "%s 은(는) 쓰러졌다!" % me.name})
+            if not any(e.get("t") == "faint" and e.get("who") == "me" for e in ev):
+                ev.append({"t": "faint", "who": "me",
+                           "text": "%s 은(는) 쓰러졌다!" % me.name})
         _save(row["id"], bt)
         row = db.q1("SELECT * FROM battle WHERE id=?", (row["id"],))
         out["battle"] = _view(d, row, bt)
@@ -640,9 +686,11 @@ def run_away(bid: int, ctx=Depends(deps.current)):
     d = deps.dex()
     row = _load(ctx, bid)
     me, foe = _fighters(d, row)
-    bt = B.Battle(d, me, foe, deps.RNG)
-    bt.turn_no = row["turn"]
+    bt = _battle(d, row, me, foe, deps.RNG)
 
+    if SM.trapped(bt, me):
+        ev = [{"t": "msg", "text": "%s 은(는) 붙잡혀 있어서 도망칠 수 없다!" % me.name}]
+        return {"escaped": False, "events": ev, "battle": _view(d, row, bt)}
     if bt.try_run():
         bt.over, bt.result = True, "fled"
         _save(row["id"], bt)
@@ -654,11 +702,15 @@ def run_away(bid: int, ctx=Depends(deps.current)):
                 "battle": _view(d, row, bt)}
 
     ev = [{"t": "msg", "text": "도망칠 수 없었다!"}]
-    foe_only_turn(d, me, foe, ev)
+    foe_only_turn(bt, ev)
     bt.turn_no += 1
-    if not me.alive():
+    if bt.over and bt.result == "fled":
+        db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
+        reschedule(uid)
+    elif not me.alive():
         bt.over, bt.result = True, "lost"
-        ev.append({"t": "faint", "who": "me", "text": "%s 은(는) 쓰러졌다!" % me.name})
+        if not any(e.get("t") == "faint" and e.get("who") == "me" for e in ev):
+            ev.append({"t": "faint", "who": "me", "text": "%s 은(는) 쓰러졌다!" % me.name})
     _save(row["id"], bt)
     row = db.q1("SELECT * FROM battle WHERE id=?", (row["id"],))
     return {"escaped": False, "events": ev, "battle": _view(d, row, bt)}

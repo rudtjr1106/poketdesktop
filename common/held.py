@@ -491,14 +491,15 @@ def ev_yield(held, yields):
 # 야생 배틀은 턴마다 서버를 오가서 Fighter 가 DB 에 잤다 깬다. 먹은
 # 열매·구애 잠금이 턴 사이에 잊히면 열매를 매 턴 먹는다.
 def state(f):
-    if not f.held:
+    # 금제·매직룸 동안에는 f.held 가 None 이다. 그래도 먹은 열매·잠금은 남겨야 한다.
+    if not getattr(f, "_held", f.held):
         return None
     return {"used": f.used, "locked": f.locked, "last": f.last_move,
             "metro": f.metro, "armed": f.armed}
 
 
 def load(f, d):
-    if not d or not f.held:
+    if not d or not getattr(f, "_held", f.held):
         return
     f.used = bool(d.get("used"))
     f.locked = d.get("locked")

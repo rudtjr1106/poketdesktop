@@ -30,7 +30,9 @@ import random
 
 from . import abilities as A
 from . import battle as B
+from . import field as FD
 from . import movecalc as MC
+from . import statusmoves as SM
 
 # 특성을 켠다 (관장 배틀과 같은 common/abilities.py). 끄면 예전 판과 한 글자도
 # 안 다른 로그가 나온다 - 저장된 판은 로그를 그대로 재생하므로 켜도 옛 판은 그대로다.
@@ -89,6 +91,10 @@ class PartyBattle(object):
         self.events = []
         self.turns = 0
         self.winner = None
+        # 날씨·필드·진영은 한 판 내내 간다 (라운드마다 Battle 은 새로 만든다)
+        self.field = FD.Field()
+        self.round_no = 0
+        self.bt = None
 
     # ---------------- 도구 ----------------
     @staticmethod
@@ -175,12 +181,52 @@ class PartyBattle(object):
         # 고르기 때문에, 빠뜨리면 a 가 머리를 쓰고 b 는 아무 기술이나
         # 쓰는 판이 된다. 실제로 600판을 돌려 보니 a 가 69% 를 이겼다.
         bt = B.Battle(self.dex, self.a[self.ia], self.b[self.ib], self.rng,
-                      ai="trainer")
+                      ai="trainer", field=self.field)
         # 상대가 야생이 아니다. 문구에서 '야생' 을 뗀다.
         bt.foe_prefix = ""
         bt.max_turns = ROUND_TURNS
         bt.teams = {"me": self.a, "foe": self.b}     # 집단폭행이 세는 같은 편
+        bt.kind = "pvp"
+        bt.switcher = self._move_switch
+        self.bt = bt
         return bt
+
+    def _move_switch(self, who, mode, ev, key, state=None):
+        """라운드 도중에 기술로 바뀐다 (울부짖기·유턴·배턴터치 ...). 해냈으면 True.
+
+        화면은 "round" 이벤트를 받으면 살아 있는 채로 바뀌는 선수를 물러나게 하고
+        새 선수를 링에 세운다 (상성 교체와 같은 길). 쓰러진 게 아니므로 "ko" 는 안 낸다.
+        """
+        bt = self.bt
+        team = self.a if who == "me" else self.b
+        cur = self.ia if who == "me" else self.ib
+        others = [i for i, f in enumerate(team) if f.alive() and i != cur]
+        if not others or bt is None:
+            return False
+        opp = bt.fighter("foe" if who == "me" else "me")
+        if mode == "drag":
+            nxt = self.rng.choice(others)
+        else:
+            nxt = max(others, key=lambda i: (self._matchup(team[i], opp), -i))
+        old = team[cur]
+        self._retire(old)
+        SM.on_leave(bt, who)
+        if who == "me":
+            self.ia = nxt
+            bt.me = team[nxt]
+        else:
+            self.ib = nxt
+            bt.foe = team[nxt]
+        if mode in ("pass", "shed"):
+            SM.apply_pass(team[nxt], state, shed=mode == "shed")
+        ev.append({"t": "round", "n": self.round_no, "mi": self.ia, "fi": self.ib,
+                   "me": _side_view(self.a[self.ia]), "foe": _side_view(self.b[self.ib])})
+        bt.enter(who, ev)
+        if team[nxt].alive():
+            team[nxt].ab["down"] = sum(1 for x in team if not x.alive())
+            A.on_switch_in(bt, team[nxt], who, ev)
+            SM.on_enter_abilities(bt, team[nxt], who, ev)
+        return True
 
     # ---------------- 진행 ----------------
     def run(self):
@@ -192,6 +238,7 @@ class PartyBattle(object):
                             "me": [_side_view(f) for f in self.a],
                             "foe": [_side_view(f) for f in self.b]})
         for n in range(1, MAX_ROUNDS + 1):
+            self.round_no = n
             # **자리 번호를 같이 보낸다.** 예전에는 화면이 "쓰러지지 않은
             # 첫 자리" 로 스스로 계산했는데, 그러면 서버가 순서를 바꿔
             # 내보내는 순간 다른 포켓몬이 나온다. 오류도 안 난다.
@@ -214,8 +261,11 @@ class PartyBattle(object):
     def _one_round(self):
         """한 라운드를 끝까지. 누가 쓰러졌는지("me"/"foe"/"both") 돌려준다."""
         bt = self._round_battle()
+        for who in ("me", "foe"):
+            if self.entered.get(who):
+                bt.enter(who, self.events)          # 압정·스텔스록 (첫 라운드는 아무것도 없다)
         self._entry_abilities(bt)
-        while not bt.over:
+        while not bt.over and bt.me.alive() and bt.foe.alive():
             ev = bt.take_turn(bt.choose_mine())
             self.turns += 1
             # Battle 의 "over" 는 1:1 기준이라 라운드마다 나온다.
@@ -244,6 +294,7 @@ class PartyBattle(object):
                 team = self.a if who == "me" else self.b
                 f.ab["down"] = sum(1 for x in team if not x.alive())
                 A.on_switch_in(bt, f, who, self.events)
+                SM.on_enter_abilities(bt, f, who, self.events)
         self.entered = {"me": False, "foe": False}
 
     def _retire(self, f):
@@ -251,8 +302,8 @@ class PartyBattle(object):
         if f.alive():
             A.on_switch_out(f)
             f.stages = dict((k, 0) for k in B.STAGE_KEYS)
-            f.types_override = None
             f.clear_volatile()
+            f.types_override = None
 
     def _advance(self, side):
         """쓰러진 쪽의 다음 선수를 내보낸다. 판이 끝났으면 True.

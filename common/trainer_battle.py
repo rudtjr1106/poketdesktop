@@ -55,8 +55,10 @@ import random
 
 from . import abilities as A
 from . import battle as B
+from . import field as FD
 from . import held as H
 from . import movecalc as MC
+from . import statusmoves as SM
 
 TEAM_MAX = 6
 MAX_TURNS = 400
@@ -75,7 +77,10 @@ def works(md):
     """
     if not md:
         return False
-    if MC.attacks(md) or md.get("heal"):
+    k = MC.key(md)
+    if k in SM.AI_DEAD:
+        return False                      # 1:1 에서 실패하거나 AI 가 쓸 일이 없는 것
+    if k in SM.HANDLERS or MC.attacks(md) or md.get("heal"):
         return True
     if md.get("ail") in B.HANDLED_STATUS or md.get("ail") == "leech-seed":
         return True
@@ -134,10 +139,7 @@ class TrainerBattle(object):
         self.foe_team = [self._fighter(trainer_mon(e)) for e in trainer["team"][:TEAM_MAX]]
         self.mi = next(i for i, f in enumerate(self.me_team) if f.alive())
         self.fi = 0
-        self.bt = Duel(dex, self.me_team[self.mi], self.foe_team[self.fi], self.rng, ai="trainer")
-        self.bt.teams = {"me": self.me_team, "foe": self.foe_team}    # 집단폭행
-        self.bt.foe_prefix = "상대 "
-        self.bt.max_turns = 10 ** 9            # 끝내는 건 여기서 한다
+        self._make_duel(FD.Field())
         self.turn = 0
         self.over = False
         self.result = None                     # won / lost / draw / forfeit
@@ -148,8 +150,19 @@ class TrainerBattle(object):
         self.started = False
         # 누가 누구를 쓰러뜨렸나. 서버가 경험치를 줄 때 본다 (내 자리가 받는다).
         self.kos = []
+        # 내 포켓몬이 유턴·배턴터치·순간이동으로 물러난다 - 턴이 끝나면 사람이 고른다
+        self.pending_out = None
 
     # ---------------- 만들기 ----------------
+    def _make_duel(self, field):
+        self.bt = Duel(self.dex, self.me_team[self.mi], self.foe_team[self.fi], self.rng, ai="trainer",
+                       field=field)
+        self.bt.teams = {"me": self.me_team, "foe": self.foe_team}    # 집단폭행·치료방울·회생의기도
+        self.bt.foe_prefix = "상대 "
+        self.bt.max_turns = 10 ** 9            # 끝내는 건 여기서 한다
+        self.bt.kind = "gym"
+        self.bt.switcher = self._move_switch
+
     def _fighter(self, mon):
         f = B.Fighter(self.dex, mon)
         f.ability_on = True
@@ -205,6 +218,7 @@ class TrainerBattle(object):
             if f.alive():
                 self._count_down(f, who)
                 A.on_switch_in(self.bt, f, who, ev)
+                SM.on_enter_abilities(self.bt, f, who, ev)     # 가뭄·잔비·일렉트릭메이커 ...
                 if not fresh:
                     f.ab["fresh"] = False
 
@@ -213,19 +227,24 @@ class TrainerBattle(object):
         f.ab["down"] = sum(1 for x in team if not x.alive())
 
     # ---------------- 교체 ----------------
-    def _switch(self, who, slot, ev, trigger=True, fresh=True):
+    def _switch(self, who, slot, ev, trigger=True, fresh=True, carry=None, dragged=False):
+        """carry: 배턴터치·꼬리자르기로 넘길 것 (statusmoves.pass_state)."""
         team = self.me_team if who == "me" else self.foe_team
         old = self.me if who == "me" else self.foe
         if old.alive():
             A.on_switch_out(old)
-            ev.append({"t": "recall", "who": who,
-                       "text": ("%s, 돌아와!" % old.name) if who == "me"
-                       else ("상대는 %s 을(를) 불러들였다!" % old.name)})
+            if dragged:
+                ev.append({"t": "recall", "who": who, "text": "%s 은(는) 끌려 나갔다!" % old.name})
+            else:
+                ev.append({"t": "recall", "who": who,
+                           "text": ("%s, 돌아와!" % old.name) if who == "me"
+                           else ("상대는 %s 을(를) 불러들였다!" % old.name)})
+        SM.on_leave(self.bt, who)               # 상대에게 걸어 둔 헤롱헤롱·검은눈빛이 풀린다
         old.stages = dict((k, 0) for k in B.STAGE_KEYS)
         old.flinched = False
         old.locked = None
+        old.clear_volatile()                    # 씨뿌리기·참기·비축·혼란·대타출동 ... 은 물러나면 풀린다
         old.types_override = None
-        old.clear_volatile()                    # 씨뿌리기·참기·비축은 물러나면 풀린다
         if who == "me":
             self.mi = slot
             self.bt.me = team[slot]
@@ -233,10 +252,40 @@ class TrainerBattle(object):
             self.fi = slot
             self.bt.foe = team[slot]
             self.seen.add(slot)
+        if carry:
+            SM.apply_pass(team[slot], carry.get("state"), shed=carry.get("mode") == "shed")
         ev.append(self._out_event(who, slot))
-        if trigger:
+        self.bt.enter(who, ev)                  # 압정·스텔스록·치유소원
+        if trigger and team[slot].alive():
             # 턴 사이에 들어온 것(쓰러진 뒤 교체)은 다음 턴 끝에 가속이 붙는다.
             self._entry_abilities(ev, fresh=fresh, only=(who,))
+
+    def _move_switch(self, who, mode, ev, key, state=None):
+        """기술이 부른 교체 (Battle.request_switch 가 부른다). 해냈으면 True."""
+        team = self.me_team if who == "me" else self.foe_team
+        cur = self.mi if who == "me" else self.fi
+        others = [i for i, f in enumerate(team) if f.alive() and i != cur]
+        if not others:
+            return False
+        carry = {"mode": mode, "state": state} if mode in ("pass", "shed") else None
+        if mode == "drag":
+            slot = self.rng.choice(others)
+            self._switch(who, slot, ev, carry=None, dragged=True)
+            return True
+        if who == "foe":
+            opp = self.me
+            best, best_sc = None, None
+            for i in others:
+                sc = self._standing(team[i], opp) if opp.alive() else 0
+                if best_score_better(sc, best_sc):
+                    best, best_sc = i, sc
+            self._switch("foe", best, ev, carry=carry)
+            self.foe_switched_last = True
+            return True
+        # 내 포켓몬: 누구를 낼지 사람이 고른다. 이 턴이 끝난 뒤에 묻는다.
+        self.pending_out = {"mode": mode, "state": state, "key": key}
+        ev.append({"t": "msg", "who": "me", "text": "%s 은(는) 돌아갈 준비를 한다!" % self.me.name})
+        return True
 
     # ---------------- 상대 AI ----------------
     def _est(self, user, target, key):
@@ -347,6 +396,9 @@ class TrainerBattle(object):
         """변화기의 값을 '한 대 때린 것' 과 같은 단위로. 쓸모없으면 0."""
         if not works(md):
             return 0.0
+        v = SM.value(self.bt, MC.key(md), md, user, target, "foe", base)
+        if v is not None:
+            return v * self._acc(md)
         if their_d * KO_ROLL >= user.hp and not self._first(user, target, md, their_md):
             return 0.0                                      # 쓰기 전에 쓰러진다
         if A.aims_at_foe(md) and A.would_block(user, target, md):
@@ -470,7 +522,7 @@ class TrainerBattle(object):
 
     def _foe_wants_switch(self):
         """상대가 이번 턴에 바꾸고 싶은 자리. 안 바꾸면 None."""
-        if self.foe_switched_last:
+        if self.foe_switched_last or SM.trapped(self.bt, self.foe):
             return None
         others = [i for i, f in enumerate(self.foe_team) if f.alive() and i != self.fi]
         if not others:
@@ -528,14 +580,26 @@ class TrainerBattle(object):
             if kind != "switch" or value not in self.valid_switches():
                 raise ValueError("다음 포켓몬을 골라야 합니다.")
             self.need_switch = False
-            self._switch("me", value, ev, trigger=not self.pending_entry, fresh=False)
+            out, self.pending_out = self.pending_out, None
+            carry = {"mode": out["mode"], "state": out.get("state")} if out and out["mode"] in ("pass", "shed") else None
+            self._switch("me", value, ev, trigger=not self.pending_entry, fresh=False, carry=carry)
             if self.pending_entry:
                 self.pending_entry = False
                 self._entry_abilities(ev, fresh=False)
+            if not self.me.alive():                 # 압정에 쓰러졌다
+                self.bt._check_faint(ev)
+                self._settle(ev)
             return ev
 
         if kind == "switch" and value not in self.valid_switches():
             raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
+        if kind == "switch" and SM.trapped(self.bt, self.me):
+            raise ValueError("%s 은(는) 붙잡혀 있어서 교체할 수 없습니다." % self.me.name)
+        if kind == "move" and value and value != B.STRUGGLE:
+            why = SM.restricted(self.bt, self.me, value)
+            enc = self.me.cond.get("encore")
+            if why and not (enc and enc.get("move") == value):
+                raise ValueError(why)
 
         self.turn += 1
         self.bt.turn_no = self.turn
@@ -551,6 +615,8 @@ class TrainerBattle(object):
 
         if kind == "switch":
             self._switch("me", value, ev)
+            if not self.me.alive():
+                self.bt._check_faint(ev)
         else:
             me = self.me
             me_move = value
@@ -579,11 +645,16 @@ class TrainerBattle(object):
         me.moved_second = bool(order) and order[0] != "me"
         foe.moved_second = bool(order) and order[0] != "foe"
 
+        acting = {"me": self.me, "foe": self.foe}
         for who in order:
             user, target = (self.me, self.foe) if who == "me" else (self.foe, self.me)
+            if user is not acting[who]:
+                continue                        # 이번 턴에 끌려 나온 포켓몬은 움직이지 않는다
             if not user.alive() or not target.alive():
                 continue
             bt._use(who, user, target, me_move if who == "me" else foe_move, ev)
+            if not self.foe.alive() and not any(k["foe"] == self.fi for k in self.kos):
+                self.kos.append({"foe": self.fi, "by": self.mi, "turn": self.turn})
 
         if self.me.alive() or self.foe.alive():
             bt._end_of_turn(ev)
@@ -591,6 +662,12 @@ class TrainerBattle(object):
         if not self.foe.alive() and not any(k["foe"] == self.fi for k in self.kos):
             self.kos.append({"foe": self.fi, "by": self.mi, "turn": self.turn})
         self._settle(ev)
+        if self.pending_out and not self.over and not self.need_switch:
+            if self.me.alive() and self.valid_switches():
+                self.need_switch = True
+                ev.append({"t": "choose", "who": "me", "text": "교체할 포켓몬을 고르세요."})
+            else:
+                self.pending_out = None
         if not self.over and self.turn >= MAX_TURNS:
             self._by_headcount(ev)
         return ev
@@ -616,8 +693,12 @@ class TrainerBattle(object):
             if me_down:
                 self.pending_entry = True
             self.foe_switched_last = False
+            if not self.foe.alive():                # 압정에 쓰러졌다 - 다음을 또 낸다
+                self.bt._check_faint(ev)
+                return self._settle(ev)
         if me_down:
             self.need_switch = True
+            self.pending_out = None
             ev.append({"t": "choose", "who": "me", "text": "다음 포켓몬을 고르세요."})
 
     def _finish(self, result, ev):
@@ -666,7 +747,8 @@ class TrainerBattle(object):
                               "typeKr": dex.type_name(md.get("type")), "cat": md.get("cat"),
                               "power": md.get("power"), "acc": md.get("acc"),
                               "pp": f.pp.get(m, 0), "maxpp": md.get("pp", 0),
-                              "desc": md.get("desc", "")})
+                              "desc": md.get("desc", ""),
+                              "blocked": SM.restricted(self.bt, f, m) if f is self.me else None})
             if not any(x["pp"] > 0 for x in moves):
                 moves.append({"key": B.STRUGGLE, "kr": "몸부림", "type": "NORMAL",
                               "typeKr": "노말", "cat": "physical", "power": 50, "acc": 0,
@@ -716,6 +798,7 @@ class TrainerBattle(object):
             "pendingEntry": self.pending_entry, "foeSwitchedLast": self.foe_switched_last,
             "seen": sorted(self.seen), "started": self.started, "kos": self.kos,
             "rng": [st[0], list(st[1]), st[2]],
+            "field": self.bt.field.dump(), "pendingOut": self.pending_out,
         }
 
     @classmethod
@@ -729,10 +812,8 @@ class TrainerBattle(object):
         self.me_team = [self._load_fighter(x) for x in d["me"]]
         self.foe_team = [self._load_fighter(x) for x in d["foe"]]
         self.mi, self.fi = d["mi"], d["fi"]
-        self.bt = Duel(dex, self.me_team[self.mi], self.foe_team[self.fi], self.rng, ai="trainer")
-        self.bt.teams = {"me": self.me_team, "foe": self.foe_team}    # 집단폭행
-        self.bt.foe_prefix = "상대 "
-        self.bt.max_turns = 10 ** 9
+        self._make_duel(FD.Field.load(d.get("field")))
+        self.pending_out = d.get("pendingOut")
         self.turn = d["turn"]
         self.bt.turn_no = self.turn
         self.over = d["over"]

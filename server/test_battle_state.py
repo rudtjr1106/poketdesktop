@@ -35,6 +35,8 @@ import random                                               # noqa: E402
 from common import battle as B                             # noqa: E402
 from common import pokelogic as P                          # noqa: E402
 
+from common import statusmoves as SM                       # noqa: E402
+
 from app import battle_routes as R                         # noqa: E402
 from app import deps                                       # noqa: E402
 
@@ -92,6 +94,41 @@ def main():
     me3, foe3 = R._fighters(dex, old)
     chk("옛 저장본도 읽는다 (씨앗·비축 없음)", not foe3.seeded and me3.stockpile == 0 and not me3.item_gone)
     chk("아무것도 안 걸렸으면 vol 은 비워 둔다", R._dump(B.Fighter(dex, mon(dex, "PIKACHU", 5, ["TACKLE"])))["vol"] is None)
+
+    # 변화기가 남긴 것: 혼란·대타출동(포켓몬) + 날씨·압정(판). 날씨와 압정은 야생 쪽 저장본에 같이 적는다.
+    from common import field as FD
+    me = B.Fighter(dex, mon(dex, "GENGAR", 40, ["CONFUSERAY", "SUBSTITUTE", "SUNNYDAY", "SPIKES"]))
+    foe = B.Fighter(dex, mon(dex, "RATTATA", 40, ["TACKLE"]))
+    bt = B.Battle(dex, me, foe, random.Random(3))
+    ev = []
+    for k in ("SUBSTITUTE", "SUNNYDAY", "SPIKES"):
+        bt._use("me", me, foe, k, ev)
+    foe.cond["confused"] = 3
+    foe_dump = R._dump(foe)
+    foe_dump["field"] = bt.field.dump()
+    row = {"me": json.dumps(R._dump(me)), "foe": json.dumps(foe_dump), "turn": 4}
+    me4, foe4 = R._fighters(dex, row)
+    bt4 = R._battle(dex, row, me4, foe4)
+    chk("대타출동·혼란이 남는다", me4.cond.get("sub") and foe4.cond.get("confused") == 3, (me4.cond, foe4.cond))
+    chk("날씨(쾌청)와 압정이 남는다", bt4.field.weather == "sun" and bt4.field.side("foe").get("spikes") == 1,
+        bt4.field.dump())
+    chk("되살린 포켓몬이 되살린 판에 붙는다 (날씨가 능력치·데미지에 반영된다)", me4.field is bt4.field)
+    chk("판 턴 수도 이어진다", bt4.turn_no == 4)
+    old_row = {"me": json.dumps(R._dump(me)), "foe": json.dumps(R._dump(foe)), "turn": 1}
+    chk("날씨 칸이 없는 옛 저장본도 읽는다", R._battle(dex, old_row, *R._fighters(dex, old_row)).field.weather is None)
+
+    # 야생이 울부짖기·순간이동을 쓰면 판이 끝난다 (볼을 던진 턴에도)
+    me = B.Fighter(dex, mon(dex, "PIKACHU", 40, ["TACKLE"]))
+    foe = B.Fighter(dex, mon(dex, "ABRA", 40, ["TELEPORT"]))
+    bt = B.Battle(dex, me, foe, random.Random(1))
+    ev = []
+    R.foe_only_turn(bt, ev)
+    chk("볼을 던진 턴에 캐이시가 순간이동하면 판이 끝난다", bt.over and bt.result == "fled", [e.get("text") for e in ev])
+    me = B.Fighter(dex, mon(dex, "PIKACHU", 40, ["TACKLE"]))
+    foe = B.Fighter(dex, mon(dex, "UMBREON", 40, ["MEANLOOK"]))
+    bt = B.Battle(dex, me, foe, random.Random(1))
+    bt._use("foe", foe, me, "MEANLOOK", [])
+    chk("검은눈빛에 걸리면 도망칠 수 없다", SM.trapped(bt, me))
 
     print()
     print("======================================================")
