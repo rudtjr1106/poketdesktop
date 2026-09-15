@@ -151,8 +151,9 @@ GYM_REPEAT_PER_LEVEL = _int("POKET_GYM_REPEAT_PER_LEVEL", 5)
 # 남아 새 도전을 막지 않게.
 GYM_BATTLE_TTL = _int("POKET_GYM_BATTLE_TTL", 3600)
 # 경험치 배율. 원작 트레이너전은 야생의 1.5배지만, 여기서는 여섯 마리를 연달아
-# 잡는 판이라 1.5배면 레벨이 너무 빨리 올랐다 (1.3.0 배포 뒤 1.2배로 낮췄다).
-GYM_EXP_RATE = _float("POKET_GYM_EXP_RATE", 1.2)
+# 잡는 판이라 레벨이 너무 빨리 올랐다. 1.5 -> 1.2 (1.3.0 배포 뒤) -> 1.0 (1.3.2 배포 뒤,
+# 야생과 같다).
+GYM_EXP_RATE = _float("POKET_GYM_EXP_RATE", 1.0)
 
 # ---- 도구 / 돈 ----
 ITEMS_PATH = os.environ.get("POKET_ITEMS", os.path.join(ROOT, "data", "items.json"))

@@ -274,7 +274,7 @@ def give_evs(uid, mon_id, yields):
 def award(dex, uid, foe, participant_id, hour=None, rate=1.0):
     """싸운 포켓몬은 전부, 파티의 나머지는 학습장치 몫.
 
-    rate 는 트레이너전 배율(관장 도전은 1.5). 야생은 1.0 이라 예전과 같다.
+    rate 는 트레이너전 배율(관장 도전은 config.GYM_EXP_RATE). 야생은 1.0.
     """
     out = []
     foe_sp = dex.get(foe.mon["species"]) or {}
