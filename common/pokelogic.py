@@ -457,7 +457,27 @@ class Pokedex(object):
             return None
         lo = max(min_level, s.get("minLevel", 1))
         lo = min(lo, max_level)
-        return make_pokemon(s, rng.randint(lo, max_level), rng, **kw)
+        level = rng.randint(lo, max_level)
+        return make_pokemon(self.grown_form(s, level, rng), level, rng, **kw)
+
+    def grown_form(self, s, level, rng=None):
+        """이 레벨이면 이미 진화했을 모습.
+
+        야생은 종의 최소 레벨만 보고 뽑아서, Lv.36 에 진화하는 파쪼옥이
+        Lv.100 으로 나왔다. 진화 판정은 레벨이 오를 때 하므로 그런 개체는
+        영영 진화하지 못한다. 레벨로 진화하는 갈래의 레벨을 이미 넘었으면
+        진화한 종으로 바꾼다 (두 번 진화하는 종은 두 번). 친밀도·돌로
+        진화하는 종은 그대로 둔다 - 레벨과 상관없이 나중에 진화할 수 있다.
+        """
+        rng = rng or random.Random()
+        for _ in range(3):
+            opts = [b for b in (s.get("evo") or [])
+                    if b.get("mode") == "level" and b.get("level")
+                    and int(b["level"]) <= int(level) and self.get(b.get("to"))]
+            if not opts:
+                break
+            s = self.get(rng.choice(opts)["to"])
+        return s
 
     # ---- 개체 요약 ----
     def stats_of(self, mon):

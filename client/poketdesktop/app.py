@@ -745,17 +745,32 @@ class App(object):
     # 대전은 비동기다. 상대가 켜져 있지 않아도 그 사람의 지금 파티를
     # 가져와 붙인다. 그래서 누르면 그 자리에서 끝나고, 상대는 다음에
     # 켤 때 결과를 받는다.
-    def pvp_random(self):
-        self._pvp(lambda: self.api.pvp_random())
+    def pvp_random(self, on_done=None):
+        self._pvp(lambda: self.api.pvp_random(), on_done)
 
-    def pvp_challenge(self, uid):
-        self._pvp(lambda: self.api.pvp_challenge(uid))
+    def pvp_challenge(self, uid, on_done=None):
+        self._pvp(lambda: self.api.pvp_challenge(uid), on_done)
 
-    def _pvp(self, fn):
-        if getattr(self, "_pvp_busy", False) or self.arena:
-            return
+    def _pvp(self, fn, on_done=None):
+        """대전을 건다. on_done(결과, 오류 문구) 는 **어떤 길로 끝나든 한 번** 부른다.
+
+        대전·랭킹 창은 누르는 순간 '상대를 찾는 중...' 을 적는다. 끝났다는
+        소식을 못 받으면 그 글이 영영 남는다 (1.4.0 까지 그랬다 - 창이 2.5초
+        뒤에 목록만 다시 불러오고 글은 안 지웠다).
+        """
+        def tell(r, why):
+            if on_done:
+                try:
+                    on_done(r, why)
+                except Exception:                           # noqa: BLE001
+                    pass
+        if getattr(self, "_pvp_busy", False):
+            return tell(None, "이미 상대를 찾는 중입니다.")
+        if self.arena:
+            return tell(None, "보고 있는 대전이 끝난 뒤에 해주세요.")
         if self.battle:
-            return self.notify("야생 배틀이 끝난 뒤에 해주세요.")
+            self.notify("야생 배틀이 끝난 뒤에 해주세요.")
+            return tell(None, "야생 배틀이 끝난 뒤에 해주세요.")
         self._pvp_busy = True
         # 상대를 찾고 판을 다 계산해서 받기까지 몇 초 걸린다. 그동안
         # 화면에 아무 변화가 없으면 눌린 건지 아닌지를 알 수가 없다.
@@ -765,9 +780,41 @@ class App(object):
             self._pvp_busy = False
             wait.close()
             if err:
-                return self.notify(getattr(err, "message", str(err)))
+                msg = getattr(err, "message", str(err))
+                self.notify(msg)
+                return tell(None, msg)
             self.show_pvp_result(r)
+            tell(r, None)
         run_async(self.root, fn, done)
+
+    # ---------------- 진화 알림 ----------------
+    def show_evolutions(self, infos, parent=None):
+        """사냥이 아닌 길(가방의 이상한사탕·진화의 돌, 관장 배틀)로 진화했을 때.
+
+        바탕화면에 있는 포켓몬은 그 자리에서 진화 연출을 한다(야생 배틀 뒤와
+        같은 것). 박스에 있어서 연출할 도트가 없으면 전/후 도트를 보여 주는
+        창을 띄운다. 1.4.0 까지 가방은 창만 띄워서 바탕화면에서는 아무 일도
+        안 일어났다.
+        """
+        from .desktop_battle import play_evolutions
+        infos = [i for i in (infos or []) if i]
+        if not infos:
+            return
+        ov = self.overlay
+        desk, box = [], []
+        for i in infos:
+            pet = ov.pets.get(i.get("pokemonId")) if ov is not None else None
+            (desk if pet is not None and not ov.hidden else box).append(i)
+        for i in box:
+            try:
+                from .ui_bag import announce_evolve
+                announce_evolve(parent or self.root, self, i)
+            except Exception as e:                          # noqa: BLE001
+                config.log("진화 창을 못 띄웠습니다: %s" % e)
+            if i.get("pendingIds"):
+                self.want_learn(i.get("pokemonId"), i.get("toKr", ""))
+        if desk:
+            play_evolutions(self, desk)
 
     def watch_match(self, mid):
         """대전 한 판을 투기장에서 재생한다.

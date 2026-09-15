@@ -256,6 +256,58 @@ def main():
     del old1
 
     print()
+    print("=== 진화 레벨을 넘긴 포켓몬 (Lv.100 파쪼옥) ===")
+    import random as _random
+    from common import pokelogic as P
+    rng = _random.Random(5)
+    chk("Lv.100 파쪼옥은 전툴라로 나온다",
+        d.grown_form(d.get("JOLTIK"), 100, rng)["internal"] == "GALVANTULA")
+    chk("Lv.20 파쪼옥은 그대로", d.grown_form(d.get("JOLTIK"), 20, rng)["internal"] == "JOLTIK")
+    chk("두 번 진화하는 종은 두 번 (Lv.40 파이리 -> 리자몽)",
+        d.grown_form(d.get("CHARMANDER"), 40, rng)["internal"] == "CHARIZARD")
+    chk("친밀도로 진화하는 종은 그대로 (피츄)",
+        d.grown_form(d.get("PICHU"), 100, rng)["internal"] == "PICHU")
+    stuck = []
+    for i in range(3000):
+        m = d.roll_wild(60, 100, rng, shiny_rate=10 ** 9)
+        if m is None:
+            continue
+        sp = d.get(m["species"])
+        if any(b.get("mode") == "level" and b.get("level") and b["level"] <= m["level"]
+               for b in (sp.get("evo") or [])):
+            stuck.append((m["species"], m["level"]))
+    chk("야생 3000마리 중 진화 레벨을 넘긴 채 나온 것이 없다", not stuck, stuck[:5])
+
+    uid4 = mkuser("evo_stuck")
+    me4 = {"user": {"id": uid4}}
+    jolt = mkmon(uid4, "JOLTIK")
+    db.run("UPDATE pokemon SET level=100, exp=? WHERE id=?",
+           (P.exp_for_level(d.get("JOLTIK")["growth"], 100), jolt))
+    g = deps.grant_exp(uid4, jolt, 500, hour=12)
+    chk("Lv.100 이라 레벨은 안 올라도 경험치를 받으면 진화한다",
+        g and not g["leveledUp"] and (g.get("evolve") or {}).get("to") == "GALVANTULA", g)
+    chk("DB 에서도 전툴라", species_of(jolt) == "GALVANTULA", species_of(jolt))
+    keep = mkmon(uid4, "JOLTIK")
+    db.run("UPDATE pokemon SET level=100, no_evolve=1 WHERE id=?", (keep,))
+    g = deps.grant_exp(uid4, keep, 500, hour=12)
+    chk("변함없는돌을 쓴 포켓몬은 그대로", species_of(keep) == "JOLTIK" and not g.get("evolve"),
+        species_of(keep))
+
+    jolt2 = mkmon(uid4, "JOLTIK")
+    db.run("UPDATE pokemon SET level=100 WHERE id=?", (jolt2,))
+    items.bag_add(uid4, "RARECANDY", 2)
+    r = R.use(R.UseIn(item="RARECANDY", pokemon=jolt2, hour=12), me4)
+    chk("Lv.100 에게 이상한사탕을 쓰면 진화한다",
+        (r.get("evolve") or {}).get("to") == "GALVANTULA" and species_of(jolt2) == "GALVANTULA",
+        r.get("evolve"))
+    chk("그때 사탕은 하나 준다", items.bag_count(uid4, "RARECANDY") == 1,
+        items.bag_count(uid4, "RARECANDY"))
+    code = status_of(lambda: R.use(R.UseIn(item="RARECANDY", pokemon=jolt2, hour=12), me4))
+    chk("진화할 것도 없는 Lv.100 이면 400", code == 400, code)
+    chk("그때는 사탕을 안 쓴다", items.bag_count(uid4, "RARECANDY") == 1,
+        items.bag_count(uid4, "RARECANDY"))
+
+    print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0
 

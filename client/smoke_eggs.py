@@ -90,10 +90,11 @@ class FakeApp(object):
         self.synced += 1
 
 
-def egg(eid, kind="legendary", got=3600, need=48 * 3600, hatched=False, mon=None):
+def egg(eid, kind="legendary", got=3600, need=48 * 3600, hatched=False, mon=None,
+        on=True):
     name = "전설의 포켓몬 알" if kind == "legendary" else "환상의 포켓몬 알"
     e = {"id": eid, "kind": kind, "name": name, "gotSec": got, "needSec": need,
-         "leftSec": max(0, need - got), "hatched": hatched}
+         "leftSec": max(0, need - got), "hatched": hatched, "onDesktop": on}
     if mon:
         e["pokemon"] = mon
     return e
@@ -145,6 +146,12 @@ def main():
     ov.sync_eggs([egg(1, got=7200)])
     chk("목록에서 빠진 알은 치운다", sorted(ov.eggs) == [1], list(ov.eggs))
     chk("남은 알은 새 값으로", ov.eggs[1].egg["gotSec"] == 7200)
+    ov.sync_eggs([egg(1, got=7200), egg(3, "mythical", on=False)])
+    chk("박스에 넣어 둔 알은 바탕화면에 안 선다 (1.4.1)", sorted(ov.eggs) == [1], list(ov.eggs))
+    ov.sync_eggs([egg(1, got=7200, on=False)])
+    chk("데리고 다니던 알을 박스에 넣으면 치운다", ov.eggs == {}, list(ov.eggs))
+    ov.sync_eggs([egg(1, got=7200)])
+    chk("다시 데리고 다니면 선다", sorted(ov.eggs) == [1], list(ov.eggs))
 
     print("\n=== 숨기기 · 다시 그리기 ===")
     ov.set_hidden(True)

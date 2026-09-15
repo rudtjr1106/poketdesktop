@@ -579,6 +579,31 @@ def _pick_fresh(uid, cands, rng, ratings=None, my_mmr=BASE_RATING):
     return min((c[1] for c in cands), key=lambda u: met.get(u) or "")
 
 
+def random_cooldown_left(uid):
+    """랜덤 배틀을 다시 걸 수 있을 때까지 남은 초. 0 이면 지금 된다.
+
+    랜덤 배틀을 연달아 누르면 한 판을 다 보기도 전에 다음 판이 계산돼서
+    하루 도전 수가 금방 동난다. 내가 건 랜덤 배틀만 센다 - 걸려온 판과
+    친구 배틀은 상관없다.
+    """
+    wait = int(config.RANDOM_COOLDOWN_SEC)
+    if wait <= 0:
+        return 0
+    r = db.q1("SELECT MAX(ended_at) last FROM battle_record WHERE user_id=?"
+              " AND started=1 AND kind='random'", (uid,))
+    last = r["last"] if r else None
+    if not last:
+        return 0
+    try:
+        t = datetime.datetime.fromisoformat(last)
+    except ValueError:
+        return 0
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=datetime.timezone.utc)
+    left = wait - (_now() - t).total_seconds()
+    return max(0, int(left + 0.999))
+
+
 def can_start(uid, kind="random"):
     """내 쪽 조건만. 상대를 고르기 전에 먼저 본다.
 
@@ -591,6 +616,10 @@ def can_start(uid, kind="random"):
     used = row["fought"] if row["fought_day"] == _today() else 0
     if used >= DAILY_BATTLES:
         return "오늘은 %d판까지 걸 수 있습니다. 내일 다시 해주세요." % DAILY_BATTLES
+    if kind == "random":
+        left = random_cooldown_left(uid)
+        if left:
+            return "랜덤 배틀은 %d초 뒤에 다시 걸 수 있습니다." % left
     return None
 
 
@@ -627,7 +656,9 @@ def fight_status(uid):
     today = _today()
     used = row["fought"] if row["fought_day"] == today else 0
     return {"foughtToday": used, "dailyBattles": DAILY_BATTLES,
-            "left": max(0, DAILY_BATTLES - used)}
+            "left": max(0, DAILY_BATTLES - used),
+            "randomCooldownSec": int(config.RANDOM_COOLDOWN_SEC),
+            "randomCooldownLeft": random_cooldown_left(uid)}
 
 
 # ---------------------------------------------------------------- 조회

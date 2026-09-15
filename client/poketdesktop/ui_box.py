@@ -58,10 +58,45 @@ def _text_width(widget, text, font):
 def _row_sig(mon):
     """줄에 그려지는 값. 다시 불러왔을 때 이게 같으면 줄을 그대로 쓴다."""
     info = mon.get("info") or {}
+    if mon.get("isEgg"):
+        e = mon.get("egg") or {}
+        return ("egg", e.get("kind"), info.get("name"), bool(mon.get("onDesktop")),
+                box_filter.egg_progress(e))
     return (mon.get("num"), mon.get("species"), info.get("name"),
             bool(mon.get("shiny")), mon.get("gender"), mon.get("level"),
             info.get("nature"), info.get("ivPercent"),
             bool(mon.get("onDesktop")))
+
+
+# 알 (1.4.1). 목록의 타입 칸과 상세 칸에 적는다.
+EGG_KIND = {"legendary": "전설", "mythical": "환상"}
+EGG_SUB = {"legendary": "전설의 포켓몬이 들어 있는 알",
+           "mythical": "환상의 포켓몬이 들어 있는 알"}
+
+
+def _egg_color(kind):
+    from . import eggs_ui
+    return eggs_ui.EGG_COLOR.get(kind, U.ACCENT)
+
+
+def _hm(sec):
+    """12시간 20분 / 48시간 / 5분."""
+    sec = max(0, int(sec or 0))
+    h, m = sec // 3600, (sec % 3600) // 60
+    if h and m:
+        return "%d시간 %d분" % (h, m)
+    if h:
+        return "%d시간" % h
+    return "%d분" % m
+
+
+def _local_day(iso):
+    """서버 시각(UTC) -> 이 PC 날짜. 못 읽으면 앞 열 글자."""
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(iso).astimezone().strftime("%Y-%m-%d")
+    except Exception:                                       # noqa: BLE001
+        return (iso or "")[:10]
 
 
 # 진화 칸에 적는 조건. 시간은 서버(evolution._time_ok)가 실제로 보는 것만
@@ -160,6 +195,8 @@ class Row(object):
         self.selected = False
         info = mon.get("info", {})
         self.party = bool(mon.get("onDesktop"))
+        # 알 줄 (1.4.1). 종·성별·성격이 없다. 그 칸에 종류·남은 시간·자란 정도.
+        self.egg = mon.get("egg") if mon.get("isEgg") else None
         base = U.BG if self.party else "#10131c"
         self.base = base
 
@@ -176,13 +213,15 @@ class Row(object):
         shiny = mon.get("shiny")
         if shiny:
             name = "★ " + name
-        g = U.gender_mark(mon.get("gender"))
+        g = None if self.egg else U.gender_mark(mon.get("gender"))
 
         self.cells = []
-        self._cell("%04d" % mon.get("num", 0), COLS[0], U.FG_FAINT, U.FONT_XS)
-        self.name_cell = self._cell(name, COLS[1],
-                                    U.SHINY if shiny else (U.FG if self.party else dim),
-                                    U.FONT_S)
+        self._cell("알" if self.egg else "%04d" % mon.get("num", 0), COLS[0],
+                   U.FG_FAINT, U.FONT_XS)
+        self.name_cell = self._cell(
+            name, COLS[1],
+            self._egg_fg() or (U.SHINY if shiny else (U.FG if self.party else dim)),
+            U.FONT_S)
         if g:
             # 글자 수로 어림하면 한글에서 어긋난다. 글꼴에 실제 폭을 물어본다.
             try:
@@ -197,21 +236,35 @@ class Row(object):
             self.cells.append(self.gender)
         else:
             self.gender = None
-        self._cell(str(mon.get("level", "")), COLS[2],
+        self._cell("-" if self.egg else str(mon.get("level", "")), COLS[2],
                    U.FG if self.party else dim, U.FONT_B)
 
         self.types = tk.Frame(self.f, bg=base)
         self.types.place(x=COLS[3][1], rely=0.5, anchor="w")
-        sp = dex.get(mon["species"]) if dex else None
-        for i, t in enumerate((sp or {}).get("types", [])):
-            U.chip(self.types, dex.type_name(t), U.TYPE_COLOR.get(t, U.BG3),
-                   padx=6).pack(side="left", padx=(0, 3))
+        if self.egg:
+            kind = self.egg.get("kind")
+            U.chip(self.types, EGG_KIND.get(kind, "알"), _egg_color(kind),
+                   padx=6).pack(side="left")
+        else:
+            sp = dex.get(mon["species"]) if dex else None
+            for i, t in enumerate((sp or {}).get("types", [])):
+                U.chip(self.types, dex.type_name(t), U.TYPE_COLOR.get(t, U.BG3),
+                       padx=6).pack(side="left", padx=(0, 3))
         self.cells.append(self.types)
 
-        self._cell(info.get("nature", ""), COLS[4], dim, U.FONT_XS)
-        iv = info.get("ivPercent", 0)
-        self._cell("%.0f%%" % iv, COLS[5],
-                   U.GOOD if iv >= 75 else (U.FG if self.party else dim), U.FONT_XS)
+        if self.egg:
+            pct, hours = box_filter.egg_progress(self.egg)
+            # 성격 칸에는 남은 시간, 개체값 칸에는 자란 정도.
+            self._cell("%d시간" % hours if hours else "곧!", COLS[4], dim, U.FONT_XS)
+            self._cell("%d%%" % pct, COLS[5],
+                       U.GOOD if pct >= 90 else (U.FG if self.party else dim),
+                       U.FONT_XS)
+        else:
+            self._cell(info.get("nature", ""), COLS[4], dim, U.FONT_XS)
+            iv = info.get("ivPercent", 0)
+            self._cell("%.0f%%" % iv, COLS[5],
+                       U.GOOD if iv >= 75 else (U.FG if self.party else dim),
+                       U.FONT_XS)
         self._cell("따라다님" if self.party else "박스", COLS[6],
                    U.GOOD if self.party else U.FG_FAINT, U.FONT_XS)
 
@@ -230,6 +283,10 @@ class Row(object):
             w.bind("<Leave>", self._hover_out)
         if selected:
             self.set_selected(True)
+
+    def _egg_fg(self):
+        """알 줄의 이름 색. 알이 아니면 None."""
+        return _egg_color(self.egg.get("kind")) if self.egg else None
 
     def _cell(self, text, col, fg, font):
         title, x, w, anchor = col
@@ -283,8 +340,8 @@ class Row(object):
         else:
             self._paint(self.base, self.base)
             self.name_cell.configure(
-                fg=U.SHINY if self.mon.get("shiny")
-                else (U.FG if self.party else U.FG_DIM),
+                fg=self._egg_fg() or (U.SHINY if self.mon.get("shiny")
+                                      else (U.FG if self.party else U.FG_DIM)),
                 font=U.FONT_S)
 
 
@@ -504,6 +561,15 @@ class BoxWindow(object):
         self.d_types = tk.Frame(p, bg=U.BG2)
         self.d_types.pack(anchor="w", pady=(8, 0))
 
+        # 알을 고르면 (1.4.1) 이 아래 포켓몬 칸(특성 ~ 기술)을 통째로 빼고
+        # 알 칸을 대신 담는다. 둘 다 상세 칸의 맨 끝이라 뺐다 담아도 순서가
+        # 안 꼬인다.
+        self._d_egg = tk.Frame(p, bg=U.BG2)
+        self._egg_panel(self._d_egg)
+        self._d_mon = tk.Frame(p, bg=U.BG2)
+        self._d_mon.pack(fill="x")
+        p = self._d_mon
+
         # 특성과 성격이 무슨 뜻인지. 이름만 있으면 알 수가 없다 - '고집'
         # 이 무엇을 올리는지, '맹화' 가 언제 발동하는지는 본가를 오래 한
         # 사람만 안다. 설명은 도감이 들고 온다 (pokelogic.describe 의
@@ -646,6 +712,73 @@ class BoxWindow(object):
         self._move_cells = []
         self._move_pick = None
 
+    def _egg_panel(self, parent):
+        """알 칸. 알의 상태(말 한 줄, 자란 막대, 켜 둔 시간, 남은 시간)와
+        자라는 곳(데리고 다니는지)을 보여준다."""
+        box_bg = "#101623"
+        sb = tk.Frame(parent, bg=box_bg, highlightthickness=2,
+                      highlightbackground=U.LINE)
+        sb.pack(fill="x", pady=(10, 0))
+        top = tk.Frame(sb, bg=box_bg)
+        top.pack(fill="x", padx=11, pady=(8, 4))
+        U.marker_label(top, "알의 상태", bg=box_bg).pack(side="left")
+        self.d_egg_mood = tk.Label(sb, text="", bg=box_bg, fg=U.FG, font=U.FONT_XS,
+                                   anchor="w", justify="left",
+                                   wraplength=DETAIL_W - 60)
+        self.d_egg_mood.pack(fill="x", padx=11)
+        self.d_egg_mood.bind("<Configure>", self._fit_note)
+        self._egg_ratio = 0.0
+        self._egg_fill_color = U.ACCENT
+        self.d_egg_bar = tk.Canvas(sb, height=8, bg="#232b3d",
+                                   highlightthickness=0, bd=0)
+        self.d_egg_bar.pack(fill="x", padx=11, pady=(8, 0))
+        self.d_egg_bar.bind("<Configure>", lambda _e: self._draw_egg_bar())
+        self.d_egg_time = tk.Label(sb, text="", bg=box_bg, fg=U.FG_DIM,
+                                   font=U.FONT_XS, anchor="w")
+        self.d_egg_time.pack(fill="x", padx=11, pady=(3, 0))
+        self.d_egg_left = tk.Label(sb, text="", bg=box_bg, fg=U.ACCENT_TEXT,
+                                   font=U.FONT_B, anchor="w")
+        self.d_egg_left.pack(fill="x", padx=11, pady=(4, 8))
+
+        wb = tk.Frame(parent, bg=box_bg, highlightthickness=2,
+                      highlightbackground=U.LINE)
+        wb.pack(fill="x", pady=(10, 0))
+        top = tk.Frame(wb, bg=box_bg)
+        top.pack(fill="x", padx=11, pady=(8, 4))
+        U.marker_label(top, "자라는 곳", bg=box_bg).pack(side="left")
+        self.d_egg_where = tk.Label(wb, text="", bg=box_bg, fg=U.FG, font=U.FONT_XS,
+                                    anchor="w", justify="left",
+                                    wraplength=DETAIL_W - 60)
+        self.d_egg_where.pack(fill="x", padx=11)
+        self.d_egg_where.bind("<Configure>", self._fit_note)
+        self.d_egg_note = tk.Label(
+            wb, text=natural("알도 데리고 다니는 여섯 자리 중 하나를 차지합니다. "
+                             "알을 데리고 다니는 동안에는 포켓몬이 그만큼 적게 "
+                             "따라다닙니다."),
+            bg=box_bg, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left",
+            wraplength=DETAIL_W - 60)
+        self.d_egg_note.pack(fill="x", padx=11, pady=(4, 0))
+        self.d_egg_note.bind("<Configure>", self._fit_note)
+        self.d_egg_day = tk.Label(wb, text="", bg=box_bg, fg=U.FG_FAINT,
+                                  font=U.FONT_XS, anchor="w")
+        self.d_egg_day.pack(fill="x", padx=11, pady=(4, 8))
+
+    def _draw_egg_bar(self):
+        cv = getattr(self, "d_egg_bar", None)
+        if cv is None:
+            return
+        try:
+            cv.delete("all")
+            w = cv.winfo_width()
+            if w <= 1:
+                return
+            fill = int(w * self._egg_ratio)
+            if fill > 0:
+                cv.create_rectangle(0, 0, fill, 8, fill=self._egg_fill_color,
+                                    outline="")
+        except Exception:                                   # noqa: BLE001
+            pass
+
     # ---------------- 바닥 ----------------
     def _bottom(self):
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x", side="bottom")
@@ -690,11 +823,14 @@ class BoxWindow(object):
             self._wait = ui_loading.Overlay(self.win, "포켓몬을 불러오는 중")
 
         def work():
-            mons = self.app.api.pokemon()
+            from . import eggs_ui
+            api = self.app.api
+            mons, eggs = api.pokemon_and_eggs()
             sprite_cache.ensure_many(
-                self.app.api,
-                [(m.get("num"), m.get("shiny")) for m in mons if m.get("onDesktop")])
-            return mons
+                api, [(m.get("num"), m.get("shiny")) for m in mons if m.get("onDesktop")])
+            eggs_ui.fetch_icons(api, eggs)
+            # 알도 한 줄씩 (1.4.1). 파티는 자리 순서, 박스는 알이 먼저.
+            return box_filter.merge_eggs(mons, eggs)
         U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, mons, err):
@@ -887,8 +1023,16 @@ class BoxWindow(object):
         # 행이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게
         # 여기서 다시 맞춘다.
         self.fit_scroll()
-        self.count.configure(text="보유 %d마리  ·  데리고 다니는 중 %d마리"
-                                  % (len(self.mons), len(party)))
+        n_egg = sum(1 for m in self.mons if m.get("isEgg"))
+        party_egg = sum(1 for m in party if m.get("isEgg"))
+        if n_egg:
+            self.count.configure(
+                text="보유 %d마리 · 알 %d개  ·  데리고 다니는 중 %d마리 + 알 %d개"
+                     % (len(self.mons) - n_egg, n_egg, len(party) - party_egg,
+                        party_egg))
+        else:
+            self.count.configure(text="보유 %d마리  ·  데리고 다니는 중 %d마리"
+                                      % (len(self.mons), len(party)))
         shown = want["party"] + want["box"]
         if keep and keep in wanted:
             self.select(keep)
@@ -1114,6 +1258,10 @@ class BoxWindow(object):
             self.set_buttons(True)
             self.btn_party.configure(
                 text="박스로 보내기" if m.get("onDesktop") else "데리고 다니기")
+            if m.get("isEgg"):
+                # 알에는 별명을 못 짓고 놓아줄 수도 없다.
+                self.btn_nick.configure(state="disabled")
+                self.btn_release.configure(state="disabled")
 
     # ---------------- 상세 그리기 ----------------
     def _draw_exp_bar(self):
@@ -1247,6 +1395,12 @@ class BoxWindow(object):
         U.run_async(self.root, work, done)
 
     def show_detail(self, m):
+        if m.get("isEgg"):
+            return self._show_egg(m)
+        if self._d_egg.winfo_manager():
+            self._d_egg.pack_forget()
+        if not self._d_mon.winfo_manager():
+            self._d_mon.pack(fill="x")
         info = m.get("info", {})
         dex = self.app.dex
         self.d_num.configure(text="No.%04d" % m.get("num", 0))
@@ -1340,6 +1494,64 @@ class BoxWindow(object):
 
         self.load_art(m)
 
+    def _show_egg(self, m):
+        """알을 골랐다. 전설인지 환상인지, 얼마나 자랐는지, 부화까지 얼마나
+        남았는지, 지금 자라고 있는지(데리고 다니는지)를 보여준다."""
+        from . import eggs_ui
+        e = m.get("egg") or {}
+        kind = e.get("kind")
+        color = _egg_color(kind)
+        pct, _hours = box_filter.egg_progress(e)
+        need = max(1, int(e.get("needSec") or 1))
+        got = max(0, min(need, int(e.get("gotSec") or 0)))
+
+        self.d_num.configure(text="알")
+        self.d_name.configure(text=e.get("name") or "포켓몬 알", fg=color)
+        self.d_gender.configure(text="")
+        self.d_lv.configure(text="%d%%" % pct)
+        self.d_sub.configure(text=EGG_SUB.get(kind, "무엇이 태어날까?"))
+        for w in self.d_types.winfo_children():
+            w.destroy()
+        U.chip(self.d_types, EGG_KIND.get(kind, "알"), color, font=U.FONT_S,
+               padx=10, pady=2).pack(side="left")
+
+        if self._d_mon.winfo_manager():
+            self._d_mon.pack_forget()
+        if not self._d_egg.winfo_manager():
+            self._d_egg.pack(fill="x")
+
+        self.d_egg_mood.configure(text=eggs_ui.mood(e))
+        self._egg_ratio = got / float(need)
+        self._egg_fill_color = color
+        self._draw_egg_bar()
+        self.d_egg_time.configure(text="켜 둔 시간 %s / %s  (%d%%)"
+                                       % (_hm(got), _hm(need), pct))
+        self.d_egg_left.configure(text=eggs_ui.hours_text(e.get("leftSec")))
+        if e.get("onDesktop"):
+            self.d_egg_where.configure(
+                text="데리고 다니는 중 - 게임을 켜 둔 시간만큼 자랍니다.", fg=U.GOOD)
+        else:
+            self.d_egg_where.configure(
+                text=natural("박스에 있어 자라지 않습니다. 데리고 다녀야 "
+                             "부화까지의 시간이 흐릅니다."), fg=U.DANGER)
+        day = _local_day(e.get("createdAt"))
+        self.d_egg_day.configure(text=("받은 날 %s" % day) if day else "")
+        self._egg_art(kind)
+
+    def _egg_art(self, kind):
+        """상세 칸 그림 - 알 도구 그림을 크게. 받은 게 없으면 글자로."""
+        from . import eggs_ui
+        self.stop_anim()
+        self._art_gen += 1          # 늦게 온 포켓몬 도트가 알 위에 붙지 않게
+        try:
+            ph = item_icons.photo(eggs_ui.EGG_ITEM.get(kind, "LEGENDEGG"), ART_H - 20)
+        except Exception:                                   # noqa: BLE001
+            ph = None
+        if ph is None:
+            self.d_art.configure(image="", text="알", fg=_egg_color(kind))
+        else:
+            self.d_art.configure(image=ph, text="")
+
     def _moves_by_kr(self, dex):
         """한글 기술 이름 -> 기술. 도감이 그대로면 한 번만 만든다.
 
@@ -1389,7 +1601,9 @@ class BoxWindow(object):
             view = self.d_canvas.winfo_height()
             if total <= view:
                 return          # 다 보인다. 굴릴 것이 없다
-            bottom = self.d_move_box.winfo_y() + self.d_move_box.winfo_height()
+            # 기술 칸은 포켓몬 칸(_d_mon) 안에 있다. 그 칸의 자리만큼 더한다.
+            bottom = (self._d_mon.winfo_y() + self.d_move_box.winfo_y()
+                      + self.d_move_box.winfo_height())
             if bottom <= self.d_canvas.canvasy(0) + view:
                 return          # 이미 보인다. 건드리면 오히려 튄다
             # 여유를 넉넉히 둔다. 딱 맞춰 굴리면 바깥 여백(pady) 때문에
@@ -1491,12 +1705,17 @@ class BoxWindow(object):
             return
         on = not m.get("onDesktop")
         self.say("적용하는 중...")
+        if m.get("isEgg"):
+            msg = ("알을 데리고 다닙니다. 이제부터 자랍니다." if on
+                   else "알을 박스에 넣었습니다. 박스에서는 자라지 않습니다.")
+        else:
+            msg = "데리고 다닙니다." if on else "박스로 보냈습니다."
         U.run_async(self.root, lambda: self.app.api.set_desktop(m["id"], on),
-                    self._after("데리고 다닙니다." if on else "박스로 보냈습니다."))
+                    self._after(msg))
 
     def do_nickname(self):
         m = self.current()
-        if not m:
+        if not m or m.get("isEgg"):
             return
         val = ask_text(self.win, "별명 짓기",
                        "%s 의 별명을 지어주세요." % m["info"]["species"],
@@ -1509,7 +1728,7 @@ class BoxWindow(object):
 
     def do_release(self):
         m = self.current()
-        if not m:
+        if not m or m.get("isEgg"):
             return
         if not confirm_release(self.win, self.app, m):
             return

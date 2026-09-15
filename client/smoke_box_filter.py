@@ -126,6 +126,7 @@ def mon(dex, num, pid, on=False, nickname=None, held=None):
 class FakeApi(object):
     def __init__(self, mons):
         self.mons = mons
+        self.eggs = []
         self.calls = []
         self.gate = threading.Event()     # pokemon() 을 잠깐 붙잡는다
         self.gate.set()
@@ -133,6 +134,21 @@ class FakeApi(object):
     def pokemon(self):
         self.gate.wait(10)
         return self.mons
+
+    def pokemon_and_eggs(self):
+        return self.pokemon(), list(self.eggs)
+
+    def set_desktop(self, pid, on):
+        self.calls.append(("desktop", pid, on))
+        return {"ok": True}
+
+    def set_order(self, ids):
+        self.calls.append(("order", list(ids)))
+        return {"ok": True}
+
+    def item_sprite(self, item_id):
+        p = os.path.join(HERE, "..", "server", "data", "item_sprites", "%s.png" % item_id)
+        return open(p, "rb").read() if os.path.exists(p) else None
 
     def shop(self):
         return {"money": 0, "bag": {"ORANBERRY": 2, "POKEBALL": 5, "FIRESTONE": 1},
@@ -350,6 +366,8 @@ def main():
     chk("벗기기가 unhold 를 부른다", ("unhold", 1) in app.api.calls, app.api.calls)
     settle_rows(root, win)
 
+    eggs_in_box(root, win, app)
+
     try:
         win.close()
     except Exception:                                       # noqa: BLE001
@@ -366,6 +384,117 @@ def main():
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))
     print("======================================================")
     return 1 if FAIL else 0
+
+
+def eggs_in_box(root, win, app):
+    """알도 포켓몬처럼 - 줄이 서고, 정보 칸, 데리고 다니기/박스 (1.4.1)."""
+    from poketdesktop import eggs_ui
+    print("-- 알")
+    for m, slot in zip(app.api.mons[:3], (0, 2, 3)):
+        m["slot"] = slot
+    app.api.eggs = [
+        {"id": 11, "kind": "legendary", "name": "전설의 포켓몬 알", "gotSec": 12 * 3600,
+         "needSec": 48 * 3600, "leftSec": 36 * 3600, "hatched": False,
+         "onDesktop": True, "slot": 1, "createdAt": "2026-09-15T16:40:28+00:00"},
+        {"id": 12, "kind": "mythical", "name": "환상의 포켓몬 알", "gotSec": 0,
+         "needSec": 36 * 3600, "leftSec": 36 * 3600, "hatched": False,
+         "onDesktop": False, "slot": None, "createdAt": "2026-09-15T16:40:28+00:00"}]
+    win.reload()
+    wait_for(root, lambda: -11 in win._by_id)
+    settle_rows(root, win)
+    chk("알이 자리 순서대로 파티에 끼고, 박스 알은 박스 맨 앞",
+        shown(win) == [1, -11, 2, 3, -12, 4, 5, 6], shown(win))
+    chk("줄 사이 선과 머리까지 제자리",
+        layout(win) == full_layout([1, -11, 2, 3], [-12, 4, 5, 6]), layout(win))
+    txt = win.count.cget("text")
+    chk("머릿수: 포켓몬 여섯 · 알 둘 · 데리고 다니는 셋 + 알 하나",
+        "보유 6마리" in txt and "알 2개" in txt and "3마리 + 알 1개" in txt, txt)
+    r = win.rows[-11]
+    cells = [c.cget("text") for c in r.cells if isinstance(c, tk.Label)]
+    chk("알 줄: 도감 칸 '알', 이름, 레벨 '-'",
+        cells[:3] == ["알", "전설의 포켓몬 알", "-"], cells)
+    chk("알 줄: 남은 시간 · 자란 정도 · 따라다님", cells[3:] == ["36시간", "25%", "따라다님"], cells)
+    chk("알 줄 이름은 알 색", r.name_cell.cget("fg") == eggs_ui.EGG_COLOR["legendary"],
+        r.name_cell.cget("fg"))
+    chips = [c.cget("text") for c in r.types.winfo_children()]
+    chk("타입 칸에 '전설'", chips == ["전설"], chips)
+    chk("박스 알 줄은 '박스' · '환상'",
+        win.rows[-12].cells[-1].cget("text") == "박스"
+        and [c.cget("text") for c in win.rows[-12].types.winfo_children()] == ["환상"])
+
+    win.select(-11)
+    settle(root)
+    chk("알 정보: 이름 · 자란 정도 · 무엇이 들었는지",
+        win.d_name.cget("text") == "전설의 포켓몬 알" and win.d_lv.cget("text") == "25%"
+        and "전설의 포켓몬" in win.d_sub.cget("text"),
+        (win.d_name.cget("text"), win.d_lv.cget("text"), win.d_sub.cget("text")))
+    chk("포켓몬 칸(특성~기술)은 빠지고 알 칸이 담긴다",
+        win._d_mon.winfo_manager() == "" and win._d_egg.winfo_manager() == "pack")
+    chk("켜 둔 시간", win.d_egg_time.cget("text") == "켜 둔 시간 12시간 / 48시간  (25%)",
+        win.d_egg_time.cget("text"))
+    chk("부화까지 남은 시간", win.d_egg_left.cget("text") == "부화까지 약 36시간",
+        win.d_egg_left.cget("text"))
+    chk("데리고 다니면 자란다고 말한다", "데리고 다니는 중" in win.d_egg_where.cget("text"),
+        win.d_egg_where.cget("text"))
+    chk("받은 날 (이 PC 날짜)", win.d_egg_day.cget("text").startswith("받은 날 2026-09-1"),
+        win.d_egg_day.cget("text"))
+    chk("알 그림이 붙는다", bool(str(win.d_art.cget("image"))), win.d_art.cget("text"))
+    chk("알 상태 한 줄", win.d_egg_mood.cget("text") == eggs_ui.mood(app.api.eggs[0]))
+    chk("박스로 보내기는 되고, 별명 · 놓아주기는 안 된다",
+        win.btn_party.enabled and not win.btn_nick.enabled and not win.btn_release.enabled
+        and win.btn_party.label.cget("text") == "박스로 보내기")
+    win.do_release()                     # 알이면 아무 일도 없어야 한다 (확인 창도 안 뜬다)
+    win.do_nickname()
+
+    win.select(-12)
+    settle(root)
+    chk("박스 알은 자라지 않는다고 말한다 (빨간 글씨)",
+        "자라지 않습니다" in win.d_egg_where.cget("text")
+        and win.d_egg_where.cget("fg") == ui_box.U.DANGER, win.d_egg_where.cget("text"))
+    chk("박스 알 단추는 '데리고 다니기'", win.btn_party.label.cget("text") == "데리고 다니기")
+
+    win.select(2)
+    settle(root)
+    chk("포켓몬을 고르면 포켓몬 칸이 돌아온다",
+        win._d_mon.winfo_manager() == "pack" and win._d_egg.winfo_manager() == "")
+    chk("별명 · 놓아주기 단추도 돌아온다", win.btn_nick.enabled and win.btn_release.enabled)
+    chk("포켓몬 이름 색으로", win.d_name.cget("fg") == ui_box.U.ACCENT_TEXT)
+
+    win._set_type("FIRE")
+    settle_rows(root, win)
+    chk("타입을 고르면 박스 알은 숨고 파티 알은 그대로",
+        shown(win) == [1, -11, 2, 3, 6], shown(win))
+    win._set_type(None)
+    win.f_query.set("알")
+    settle_rows(root, win)
+    chk("이름 '알' 로 박스 알을 찾는다", shown(win) == [1, -11, 2, 3, -12], shown(win))
+    win.f_query.set("")
+    settle_rows(root, win)
+
+    n = len(app.api.calls)
+    win.select(-11)
+    win.toggle_party()
+    wait_for(root, lambda: len(app.api.calls) > n)
+    settle(root)
+    chk("알을 박스로 보내면 음수 id 로 부른다", app.api.calls[n:n + 1] == [("desktop", -11, False)],
+        app.api.calls[n:])
+    settle_rows(root, win)
+
+    n = len(app.api.calls)
+    win._apply_drop(-12, 2)              # 박스 알 -> 꼬부기 자리
+    wait_for(root, lambda: len(app.api.calls) >= n + 3)
+    chk("맞바꾸기: 꼬부기를 내리고 알을 올리고 순서 (알은 음수)",
+        app.api.calls[n:n + 3] == [("desktop", 2, False), ("desktop", -12, True),
+                                   ("order", [1, -11, -12, 3])], app.api.calls[n:])
+    settle_rows(root, win)
+    app.api.eggs = []
+    for m in app.api.mons[:3]:
+        m.pop("slot", None)
+    win.reload()
+    wait_for(root, lambda: -11 not in win._by_id)
+    settle_rows(root, win)
+    chk("알이 없어지면 (부화) 줄도 없어지고 머릿수가 원래대로",
+        -11 not in win.rows and "알" not in win.count.cget("text"), win.count.cget("text"))
 
 
 def many(root, dex):

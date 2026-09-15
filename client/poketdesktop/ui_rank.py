@@ -422,9 +422,19 @@ class RankWindow(object):
 
     # ---------------- 동작 ----------------
     def _random(self):
-        self.say("상대를 찾는 중...")
-        self.app.pvp_random()
-        self.root.after(2500, self.reload)
+        self.say("상대를 찾는 중...", U.FG_FAINT)
+        self.app.pvp_random(on_done=self._battle_done)
+
+    def _battle_done(self, r, why):
+        """대전이 끝났다 (성사됐든 막혔든). '찾는 중' 글을 걷는다."""
+        try:
+            if why:
+                self.say(why, U.DANGER)
+            else:
+                self.say("")
+                self.reload()
+        except Exception:                                   # noqa: BLE001
+            pass                                            # 그사이 창을 닫았다
 
     def _team(self):
         S.TeamWindow(self.app, on_saved=self.reload)

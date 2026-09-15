@@ -163,14 +163,24 @@ class Api(object):
     def pokemon(self):
         return self._call("GET", "/api/pokemon")["pokemon"]
 
+    def pokemon_and_eggs(self):
+        """(포켓몬, 안 깬 알). 관리 창이 둘을 한 목록에 섞어 보여준다."""
+        r = self._call("GET", "/api/pokemon")
+        return r.get("pokemon") or [], r.get("eggs") or []
+
     def desktop(self):
         return self._call("GET", "/api/pokemon/desktop")["pokemon"]
 
     def set_desktop(self, pid, on):
+        # **음수 id 는 알이다.** 관리 창은 알을 -알id 로 들고 있다
+        # (box_filter.egg_row). 순서 목록(set_order)도 같은 약속을 쓴다.
+        if int(pid) < 0:
+            return self._call("POST", "/api/eggs/%d/desktop" % -int(pid),
+                              {"on": bool(on)})
         return self._call("POST", "/api/pokemon/%d/desktop" % pid, {"on": bool(on)})
 
     def set_order(self, ids):
-        """데리고 다니는 순서. 화면에 보이는 차례대로 넘긴다."""
+        """데리고 다니는 순서. 화면에 보이는 차례대로 넘긴다 (음수는 알)."""
         return self._call("POST", "/api/pokemon/order",
                           {"ids": [int(i) for i in ids]})
 

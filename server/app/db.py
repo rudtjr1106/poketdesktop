@@ -403,7 +403,11 @@ CREATE TABLE IF NOT EXISTS egg (
     created_at  TEXT NOT NULL,
     hatched_at  TEXT,
     pokemon_id  INTEGER,
-    announced   INTEGER NOT NULL DEFAULT 0
+    announced   INTEGER NOT NULL DEFAULT 0,
+    -- 파티에 올려 뒀나 (1.4.1). 알도 파티 한 자리를 차지하고, 올려 둔
+    -- 동안에만 자란다. slot 은 포켓몬과 같은 0~5 자리 번호다.
+    on_desktop  INTEGER NOT NULL DEFAULT 1,
+    slot        INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_egg_user ON egg(user_id, hatched_at);
 
@@ -622,6 +626,10 @@ MIGRATIONS = [
      "ALTER TABLE battle_record ADD COLUMN rp INTEGER NOT NULL DEFAULT 0"),
     ("battle_record", "rp_delta",
      "ALTER TABLE battle_record ADD COLUMN rp_delta INTEGER NOT NULL DEFAULT 0"),
+    # 알도 파티 자리를 차지한다 (1.4.1)
+    ("egg", "on_desktop",
+     "ALTER TABLE egg ADD COLUMN on_desktop INTEGER NOT NULL DEFAULT 1"),
+    ("egg", "slot", "ALTER TABLE egg ADD COLUMN slot INTEGER"),
 ]
 
 

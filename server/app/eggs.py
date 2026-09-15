@@ -12,8 +12,9 @@
 **알 속의 종은 받는 순간 정해진다.** 부화할 때 굴리면 기다리는 동안 몇 번
 이고 새로 굴린 셈이 되고, 무엇이 나올지는 서버만 안다(목록에 안 싣는다).
 
-알은 파티 자리를 차지하지 않는다. 여섯 마리를 데리고 다니는 사람이 알을
-받자고 한 마리를 내려놓게 만들 이유가 없다. 배틀에도 안 나간다.
+**알은 파티 한 자리를 차지한다** (1.4.1). 포켓몬 관리 창에서 박스에 넣거나
+데리고 다닐 수 있고, 데리고 다니는 동안에만 자란다. 알이 있으면 포켓몬은
+다섯 마리까지 데리고 다닌다. 배틀에는 안 나간다.
 """
 import datetime
 import random
@@ -88,18 +89,42 @@ def give(uid, kind, rng=None, now=None):
     if kind not in KINDS:
         raise ValueError("그런 알이 없습니다.")
     species = give_species(kind, rng)
+    # 자리가 있으면 바로 데리고 다닌다. 꽉 찼으면 박스로 - 받자마자 누구를
+    # 억지로 내리지 않는다. 관리 창에서 옮기면 그때부터 자란다.
+    slot = deps.free_slot(uid)
     return db.run(
-        "INSERT INTO egg (user_id, kind, species, need_sec, got_sec, created_at)"
-        " VALUES (?,?,?,?,0,?)",
-        (uid, kind, species, KINDS[kind][1], now or _now_iso())).lastrowid
+        "INSERT INTO egg (user_id, kind, species, need_sec, got_sec, created_at,"
+        " on_desktop, slot) VALUES (?,?,?,?,0,?,?,?)",
+        (uid, kind, species, KINDS[kind][1], now or _now_iso(),
+         1 if slot is not None else 0, slot)).lastrowid
+
+
+def set_desktop(uid, egg_id, on):
+    """알을 데리고 다니거나(on) 박스에 넣는다."""
+    r = db.q1("SELECT * FROM egg WHERE id=? AND user_id=? AND hatched_at IS NULL",
+              (egg_id, uid))
+    if not r:
+        raise LookupError("그런 알이 없습니다.")
+    if not on:
+        db.run("UPDATE egg SET on_desktop=0, slot=NULL WHERE id=?", (egg_id,))
+        return
+    if r["on_desktop"]:
+        return
+    slot = deps.free_slot(uid, exclude_egg=egg_id)
+    if slot is None:
+        raise ValueError("데리고 다닐 수 있는 건 알까지 합쳐 최대 %d마리입니다."
+                         % config.MAX_PARTY)
+    db.run("UPDATE egg SET on_desktop=1, slot=? WHERE id=?", (slot, egg_id))
 
 
 def add_time(uid, seconds):
     """켜 둔 시간을 알에 더한다. walk.settle 이 부른다."""
     if seconds <= 0:
         return
+    # 데리고 다니는 알만. 박스에 넣어 둔 알은 멈춰 있다.
     db.run("UPDATE egg SET got_sec = MIN(need_sec, got_sec + ?)"
-           " WHERE user_id=? AND hatched_at IS NULL", (int(seconds), uid))
+           " WHERE user_id=? AND hatched_at IS NULL AND on_desktop=1",
+           (int(seconds), uid))
 
 
 def hatch_ready(uid, rng=None, now=None):
@@ -118,13 +143,14 @@ def hatch_ready(uid, rng=None, now=None):
                      (now, r["id"]))
         if getattr(cur, "rowcount", 1) == 0:
             continue
-        pid = _make_mon(uid, r["species"], rng, now)
+        pid = _make_mon(uid, r["species"], rng, now,
+                        r["slot"] if r["on_desktop"] else None)
         db.run("UPDATE egg SET pokemon_id=? WHERE id=?", (pid, r["id"]))
         out.append(r["id"])
     return out
 
 
-def _make_mon(uid, species, rng, now):
+def _make_mon(uid, species, rng, now, egg_slot=None):
     rng = rng or random.SystemRandom()
     sp = deps.dex().get(species)
     mon = P.make_pokemon(sp, HATCH_LEVEL, rng, shiny_rate=config.SHINY_RATE)
@@ -132,8 +158,15 @@ def _make_mon(uid, species, rng, now):
         mon["ivs"][s] = P.IV_MAX
     mon["happiness"] = max(int(mon.get("happiness") or 0), HATCH_HAPPINESS)
     pid = db.insert_mon(uid, mon, now)
-    # 자리가 있으면 바로 데리고 다닌다. 태어난 걸 박스에서 찾게 하지 않는다.
+    # 알이 있던 자리에서 태어난다 (알은 방금 깼으니 그 자리가 비었다). 그 번호가
+    # 어긋나 있으면 아무 빈 자리, 그것도 없으면 박스.
     slot = deps.free_slot(uid)
+    if slot is not None and egg_slot is not None:
+        taken = set(x["slot"] for x in db.q(
+            "SELECT slot FROM pokemon WHERE user_id=? AND on_desktop=1 AND id<>?",
+            (uid, pid)))
+        if egg_slot not in taken and egg_slot not in deps._egg_slots(uid):
+            slot = egg_slot
     if slot is not None:
         db.run("UPDATE pokemon SET on_desktop=1, slot=? WHERE id=?", (slot, pid))
     items.mark_seen(uid, species, True, now)
@@ -153,7 +186,9 @@ def public(uid):
         e = {"id": r["id"], "kind": r["kind"], "name": name,
              "gotSec": r["got_sec"], "needSec": r["need_sec"],
              "leftSec": max(0, r["need_sec"] - r["got_sec"]),
-             "hatched": r["hatched_at"] is not None}
+             "hatched": r["hatched_at"] is not None,
+             "onDesktop": bool(r["on_desktop"]), "slot": r["slot"],
+             "createdAt": r["created_at"]}
         if r["hatched_at"] is not None and r["pokemon_id"]:
             m = db.q1("SELECT * FROM pokemon WHERE id=? AND user_id=?",
                       (r["pokemon_id"], uid))
@@ -161,6 +196,11 @@ def public(uid):
                 e["pokemon"] = deps.decorate(db.row_to_mon(m))
         out.append(e)
     return out
+
+
+def box_list(uid):
+    """포켓몬 관리 창에 보일 알 (아직 안 깬 것만)."""
+    return [e for e in public(uid) if not e["hatched"]]
 
 
 def mark_announced(uid, egg_id):

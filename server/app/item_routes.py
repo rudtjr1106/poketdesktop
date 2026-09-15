@@ -230,9 +230,23 @@ def _use_iv(uid, it, eff, mon, stat):
 
 
 def _use_level(uid, it, eff, mon, dex, hour):
-    """이상한사탕 — 레벨 +1. 올라간 레벨로 진화 조건도 같이 본다."""
+    """이상한사탕 — 레벨 +1. 올라간 레벨로 진화 조건도 같이 본다.
+
+    최고 레벨이면 레벨은 못 올리지만 **진화할 수 있으면 진화시킨다** (본가
+    8세대부터 같다). Lv.100 으로 잡혀 진화를 못 한 포켓몬을 풀어 주는 길이다.
+    진화할 것도 없으면 사탕을 안 쓴다.
+    """
     if mon["level"] >= P.LEVEL_MAX:
-        raise HTTPException(400, "이미 최고 레벨입니다.")
+        b = evolution.check_level(dex, mon, hour)
+        if not b:
+            raise HTTPException(400, "이미 최고 레벨입니다.")
+        before = mon["species"]
+        got = evolution.apply(uid, mon, b, dex, _now())
+        info = evolution.public(dex, before, b["to"], got.get("learned") or [],
+                                got.get("pendingIds") or [])
+        return {"ok": True, "level": mon["level"], "learned": [], "evolve": info,
+                "message": "축하합니다! %s은(는) %s(으)로 진화했다!"
+                           % (info["fromKr"], info["toKr"])}
     got = deps.set_level(uid, mon["id"],
                          mon["level"] + int(eff.get("amount", 1)), hour)
     if got is None:

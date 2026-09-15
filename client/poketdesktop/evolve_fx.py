@@ -230,6 +230,12 @@ class Evolution(object):
 
     # ---------------- 시작 ----------------
     def start(self):
+        # 창(가방·관장·허브)을 보던 중에 진화하면 도트가 그 창 뒤에 깔려 있을 수
+        # 있다. 연출하는 도트를 맨 위로 올린다.
+        try:
+            PLAT.raise_above(self.pet.win)
+        except Exception:                                  # noqa: BLE001
+            pass
         self.freeze()
         base = self.base_frame()
         if base is None:

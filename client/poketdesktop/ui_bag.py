@@ -1023,7 +1023,8 @@ class BagWindow(object):
 
         if kind == "level":
             if level >= P.LEVEL_MAX:
-                return False, True, "최고 레벨", U.FG_FAINT
+                # 레벨은 못 올려도 진화 조건이 되면 진화한다 (서버가 본다)
+                return False, False, "최고 레벨 · 진화할 수 있으면 진화", U.FG_DIM
             return False, False, "Lv.%d → %d" % (
                 level, min(P.LEVEL_MAX, level + int(eff.get("amount", 1)))), U.INFO
 
@@ -1245,7 +1246,12 @@ class BagWindow(object):
             self.reload()
             self.app.request_sync()          # 바탕화면 도트도 바뀔 수 있다
             if r.get("evolve"):
-                announce_evolve(self.win, self.app, r["evolve"])
+                info = dict(r["evolve"], pokemonId=pid)
+                show = getattr(self.app, "show_evolutions", None)
+                if show is not None:
+                    show([info], self.win)     # 바탕화면에 있으면 진화 연출
+                else:
+                    announce_evolve(self.win, self.app, info)
         U.run_async(self.root, work, done)
 
     # ---------------- 끝내기 ----------------
@@ -1392,7 +1398,9 @@ def announce_gifts(parent, app, gifts):
     if kinds & {"item", "money", "balls"}:
         bits.append("가방에 넣어 두었습니다.")
     if "egg" in kinds:
-        bits.append("알은 바탕화면에 놓였습니다. 게임을 켜 둔 시간만큼 자라서 부화합니다.")
+        # 1.4.1 부터 알도 파티 한 자리를 차지한다. 꽉 차 있으면 박스로 간다.
+        bits.append("알은 데리고 다니는 동안 게임을 켜 둔 시간만큼 자라서 부화합니다. "
+                    "자리가 없으면 박스에 들어가니 포켓몬 관리에서 데리고 다니세요.")
     if kinds & {"title", "frame"}:
         bits.append("칭호·명패는 랭킹 탭에서 바꿀 수 있습니다.")
     footer = " ".join(bits) or "가방에 넣어 두었습니다."

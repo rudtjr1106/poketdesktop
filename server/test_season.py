@@ -140,6 +140,25 @@ def main():
         set(m["level"] for m in teams["me"]) == {80})
     chk("친구 배틀 다시보기에는 상한이 없다", v2["levelCap"] is None)
 
+    print("\n=== 랜덤 배틀 30초 쿨타임 ===")
+    chk("쿨타임은 30초", config.RANDOM_COOLDOWN_SEC == 30, config.RANDOM_COOLDOWN_SEC)
+    left = pvp.random_cooldown_left(hi)
+    chk("방금 랜덤 배틀을 걸었으면 남은 초가 있다", 0 < left <= 30, left)
+    why = pvp.can_start(hi, "random")
+    chk("다시 걸면 막히고 몇 초 남았는지 알려준다", why and "초 뒤에" in why, why)
+    chk("친구 배틀은 쿨타임과 상관없다", pvp.can_start(hi, "friend") is None,
+        pvp.can_start(hi, "friend"))
+    chk("걸려온 쪽(hi2)은 쿨타임이 없다", pvp.random_cooldown_left(hi2) == 0)
+    import datetime as _dt
+    old = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(seconds=31)).isoformat()
+    db.run("UPDATE battle_record SET ended_at=? WHERE user_id=? AND kind='random'",
+           (old, hi))
+    chk("30초가 지나면 다시 걸 수 있다", pvp.can_start(hi, "random") is None,
+        pvp.can_start(hi, "random"))
+    fs = pvp.fight_status(hi)
+    chk("남은 도전 정보에 쿨타임", fs["randomCooldownSec"] == 30
+        and fs["randomCooldownLeft"] == 0, fs)
+
     print("\n=== 랜덤 배틀 뒤처리 — RP ===")
     rs = stat(hi)
     chk("건 쪽 RP 가 결과대로 움직였다",
@@ -436,10 +455,44 @@ def main():
 
     print("\n=== 포켓몬 알 ===")
     from app import walk
-    eg = mkuser("ss_egg", 6, 20)
+    eg = mkuser("ss_egg", 4, 20)
     rng = random.Random(4)
     lid = eggs.give(eg, "legendary", rng)
     mid_ = eggs.give(eg, "mythical", rng)
+    rows = dict((r["id"], r) for r in db.q("SELECT * FROM egg WHERE user_id=?", (eg,)))
+    chk("자리가 있으면 알은 데리고 다닌다 (4마리 + 알 둘)",
+        rows[lid]["on_desktop"] == 1 and rows[mid_]["on_desktop"] == 1
+        and {rows[lid]["slot"], rows[mid_]["slot"]} == {4, 5},
+        [(rows[i]["on_desktop"], rows[i]["slot"]) for i in (lid, mid_)])
+    chk("알도 파티 한 자리를 차지한다", deps.party_count(eg) == 6
+        and deps.free_slot(eg) is None, deps.party_count(eg))
+    third = eggs.give(eg, "legendary", rng)
+    chk("파티가 꽉 차면 알은 박스로",
+        db.q1("SELECT on_desktop FROM egg WHERE id=?", (third,))["on_desktop"] == 0)
+    try:
+        eggs.set_desktop(eg, third, True)
+        chk("꽉 찼으면 박스 알을 못 올린다", False, "예외가 안 났다")
+    except ValueError as e:
+        chk("꽉 찼으면 박스 알을 못 올린다", "알까지 합쳐" in str(e), str(e))
+    party_mon = db.q1("SELECT id FROM pokemon WHERE user_id=? AND on_desktop=1", (eg,))["id"]
+    cid = db.run("INSERT INTO pokemon (user_id, species, level, exp, nature, ivs, evs,"
+                 " moves, met_level, caught_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                 (eg, "PIKACHU", 5, 0, "HARDY", "{}", "{}", "[]", 5, "2026")).lastrowid
+    from app import main as _main
+    try:
+        _main.set_desktop(cid, _main.DesktopIn(on=True), {"user": {"id": eg}})
+        chk("알 둘 + 포켓몬 넷이면 포켓몬도 못 올린다", False, "막히지 않았다")
+    except HTTPException as e:
+        chk("알 둘 + 포켓몬 넷이면 포켓몬도 못 올린다 (409)", e.status_code == 409, e.status_code)
+    listed = _main.list_pokemon({"user": {"id": eg}})
+    chk("포켓몬 목록에 알이 따로 실린다 (안 깬 셋)",
+        sorted(e["id"] for e in listed["eggs"]) == sorted([lid, mid_, third])
+        and all("species" not in e for e in listed["eggs"]), listed["eggs"])
+    _main.set_order(_main.OrderIn(ids=[-mid_, party_mon]), {"user": {"id": eg}})
+    chk("순서 목록의 음수는 알 (알이 맨 앞 자리로)",
+        db.q1("SELECT slot FROM egg WHERE id=?", (mid_,))["slot"] == 0, None)
+    db.run("UPDATE egg SET slot=5 WHERE id=?", (mid_,))
+    db.run("UPDATE pokemon SET slot=0 WHERE id=?", (party_mon,))
     rows = dict((r["id"], r) for r in db.q("SELECT * FROM egg WHERE user_id=?", (eg,)))
     chk("전설의 알 속은 전설 목록에서", rows[lid]["species"] in eggs.pool("legendary"),
         rows[lid]["species"])
@@ -478,7 +531,7 @@ def main():
     chk("화면에 가는 목록에 알 속 종이 없다",
         all("species" not in e and "pokemon" not in e for e in pub), pub)
     chk("전설 48시간 · 환상 36시간",
-        [e["needSec"] for e in pub] == [48 * 3600, 36 * 3600], pub)
+        [e["needSec"] for e in pub] == [48 * 3600, 36 * 3600, 48 * 3600], pub)
 
     # 켜 둔 시간: walk.settle 이 20분 단위로 준다. 걸음 시각을 과거로 돌려 흉내 낸다.
     import datetime as DT
@@ -490,6 +543,7 @@ def main():
     got = dict((e["id"], e["gotSec"]) for e in eggs.public(eg))
     chk("한 번에 몰아 주는 것은 40분까지 (앱을 꺼 둔 시간은 안 쳐준다)",
         got[lid] == 2 * walk.TICK, got)
+    chk("박스에 넣어 둔 알은 안 자란다", got[third] == 0, got)
     chk("아직 부화 안 함", eggs.hatch_ready(eg) == [])
     db.run("UPDATE egg SET got_sec = need_sec - 600 WHERE id=?", (mid_,))
     db.run("UPDATE wild_state SET walk_at=? WHERE user_id=?", (ago(1300), eg))
@@ -509,14 +563,21 @@ def main():
     chk("개체값 셋 이상이 최고", sum(1 for v in mon["ivs"].values() if v == 31) >= 3,
         mon["ivs"])
     chk("친밀도 120 이상", mon["happiness"] >= 120, mon["happiness"])
-    chk("파티가 꽉 차 있으면 박스로", not mon["onDesktop"], mon["onDesktop"])
+    chk("알이 있던 자리에서 태어난다 (자리 5)", mon["onDesktop"] and mon["slot"] == 5,
+        (mon["onDesktop"], mon["slot"]))
     chk("도감에 잡음으로 오른다", items.has_caught(eg, mon["species"]))
     pub = eggs.public(eg)
     h = [e for e in pub if e["id"] == mid_][0]
     chk("부화한 알은 알릴 때까지 목록에 남고 태어난 포켓몬이 붙는다",
         h["hatched"] and h["pokemon"]["species"] == mon["species"], h)
     chk("알리면 목록에서 빠진다", eggs.mark_announced(eg, mid_)
-        and [e["id"] for e in eggs.public(eg)] == [lid])
+        and [e["id"] for e in eggs.public(eg)] == [lid, third])
+    eggs.set_desktop(eg, lid, False)
+    chk("알을 박스에 넣을 수 있다",
+        db.q1("SELECT on_desktop, slot FROM egg WHERE id=?", (lid,))["on_desktop"] == 0)
+    eggs.set_desktop(eg, third, True)
+    chk("자리가 나면 박스 알을 데리고 다닌다",
+        db.q1("SELECT on_desktop FROM egg WHERE id=?", (third,))["on_desktop"] == 1)
     chk("안 부화한 알은 알림 표시가 안 된다", not eggs.mark_announced(eg, lid))
     chk("남의 알은 못 건드린다", not eggs.mark_announced(g, mid_))
     free = mkuser("ss_egg_free", 2, 20)
@@ -530,6 +591,25 @@ def main():
            " created_at) VALUES (?,?,?,?,?,?,?)",
            (free, "egg", "nope", 1, "t", "m", "2026-09-15"))
     chk("모르는 알 선물은 지급하지 않는다", items.gift_claim(free) == [])
+
+    print("\n=== 1.4.0 알에 자리 주기 (손질 0270) ===")
+    full = mkuser("ss_egg_old_full", 6, 20)
+    roomy = mkuser("ss_egg_old_roomy", 2, 20)
+    for u in (full, roomy):
+        db.run("INSERT INTO egg (user_id, kind, species, need_sec, got_sec, created_at,"
+               " on_desktop, slot) VALUES (?,?,?,?,?,?,1,NULL)",
+               (u, "mythical", "MEW", 36 * 3600, 3600, "2026-09-15"))
+    conn = db.connect()
+    note = migrations._egg_slots(conn)
+    conn.commit()
+    print("  (%s)" % note)
+    ef = db.q1("SELECT on_desktop, slot FROM egg WHERE user_id=?", (full,))
+    er = db.q1("SELECT on_desktop, slot FROM egg WHERE user_id=?", (roomy,))
+    chk("여섯 마리를 데리고 다니던 사람의 알은 박스로 (포켓몬을 안 내린다)",
+        ef["on_desktop"] == 0 and ef["slot"] is None, dict(ef))
+    chk("자리가 있으면 빈 자리를 준다", er["on_desktop"] == 1 and er["slot"] == 2, dict(er))
+    chk("손질 목록에 올라 있다",
+        any(n == "0270-egg-slots" for n, _f in migrations.ONCE))
 
     print("\n======================================================")
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))

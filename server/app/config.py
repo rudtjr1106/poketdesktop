@@ -65,6 +65,8 @@ MAX_BOX = _int("POKET_MAX_BOX", 300)                   # 보유 상한
 # 데리고 다니는 포켓몬 수. 이 숫자가 곧 바탕화면에 나오는 수이기도 하다.
 # 넘치면 PC 박스로 들어간다.
 MAX_PARTY = _int("POKET_MAX_PARTY", 6)
+# 랜덤 배틀을 한 판 걸고 다음 판을 걸기까지 (초). 1.4.1
+RANDOM_COOLDOWN_SEC = _int("POKET_RANDOM_COOLDOWN_SEC", 30)
 MAX_DESKTOP = MAX_PARTY
 # 야생 레벨은 파티 수준을 따라간다.
 # 고정해두면 시작하자마자 도저히 못 이기는 상대를 만나 재미가 없다.

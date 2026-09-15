@@ -73,15 +73,32 @@ def decorate(mon):
 
 
 def party_count(uid):
-    return db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=? AND on_desktop=1",
-                 (uid,))["c"]
+    """파티 머릿수. **데리고 다니는 알도 한 자리로 센다** (1.4.1)."""
+    return (db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=? AND on_desktop=1",
+                  (uid,))["c"]
+            + len(_egg_slots(uid)))
 
 
-def free_slot(uid, exclude=None):
-    """비어 있는 파티 자리 번호. 자리가 없으면 None."""
-    used = set(r["slot"] for r in db.q(
+def _egg_slots(uid, exclude_egg=None):
+    """파티에 올려 둔 (아직 안 깬) 알의 자리 번호 목록. 번호가 없는 옛 알은 None."""
+    return [r["slot"] for r in db.q(
+        "SELECT slot FROM egg WHERE user_id=? AND on_desktop=1 AND hatched_at IS NULL"
+        " AND id IS NOT ?", (uid, exclude_egg))]
+
+
+def free_slot(uid, exclude=None, exclude_egg=None):
+    """비어 있는 파티 자리 번호. 자리가 없으면 None.
+
+    포켓몬과 알이 같은 여섯 자리를 나눠 쓴다. exclude / exclude_egg 는 지금
+    옮기려는 그 포켓몬·알을 빼고 센다는 뜻이다.
+    """
+    mons = [r["slot"] for r in db.q(
         "SELECT slot FROM pokemon WHERE user_id=? AND on_desktop=1 AND id IS NOT ?",
-        (uid, exclude)))
+        (uid, exclude))]
+    eggs = _egg_slots(uid, exclude_egg)
+    if len(mons) + len(eggs) >= config.MAX_PARTY:
+        return None
+    used = set(mons) | set(eggs)
     for i in range(config.MAX_PARTY):
         if i not in used:
             return i
@@ -170,10 +187,13 @@ def grant_exp(uid, mon_id, amount, hour=None):
         "pending": [d.move_name(m) for m in pending],
         "pendingIds": list(pending),
     }
-    if lv > before:
-        ev = try_evolve(uid, mon_id, hour)
-        if ev:
-            out["evolve"] = ev
+    # **레벨이 안 올라도 진화 판정을 한다.** 진화 레벨을 넘긴 채로 잡힌
+    # 포켓몬(Lv.100 파쪼옥)은 레벨이 더 오를 일이 없어서 영영 진화하지
+    # 못했다. 배틀에서 경험치를 받으면 그때 본다. 진화를 막고 싶으면
+    # 변함없는돌(noEvolve) 이 있다.
+    ev = try_evolve(uid, mon_id, hour)
+    if ev:
+        out["evolve"] = ev
     return out
 
 

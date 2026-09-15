@@ -122,6 +122,35 @@ def main():
         chk("거름망이 뭐든 파티는 그대로 (%s / %r)" % (t, q),
             [m["num"] for m in _p] == [7, 4, 1])
 
+    print("-- 알도 한 줄 (1.4.1)")
+    ms = [dict(mon(dex, 7), onDesktop=True, slot=0), dict(mon(dex, 4), onDesktop=True, slot=2),
+          mon(dex, 1), mon(dex, 25)]
+    eggs = [{"id": 3, "kind": "legendary", "name": "전설의 포켓몬 알", "gotSec": 12 * 3600,
+             "needSec": 48 * 3600, "leftSec": 36 * 3600, "onDesktop": True, "slot": 1},
+            {"id": 4, "kind": "mythical", "name": "환상의 포켓몬 알", "gotSec": 0,
+             "needSec": 36 * 3600, "leftSec": 36 * 3600, "onDesktop": False, "slot": None},
+            {"id": 5, "kind": "mythical", "name": "환상의 포켓몬 알", "gotSec": 36 * 3600,
+             "needSec": 36 * 3600, "leftSec": 0, "hatched": True, "onDesktop": True, "slot": 3}]
+    rows = F.merge_eggs(ms, eggs)
+    chk("파티는 자리 순서 (꼬부기 · 알 · 파이리), 박스는 알이 먼저, 깬 알은 없다",
+        [m["id"] for m in rows] == [ms[0]["id"], -3, ms[1]["id"], -4, ms[2]["id"], ms[3]["id"]],
+        [m["id"] for m in rows])
+    er = rows[1]
+    chk("알 줄: id 는 음수, 알 표시, 데리고 다님",
+        er["id"] == -3 and er["isEgg"] and er["onDesktop"] and er["egg"] is eggs[0], er)
+    party, box = F.split(rows)
+    chk("나누기에도 그대로 (파티 셋 · 박스 셋)", len(party) == 3 and len(box) == 3)
+    chk("이름 '알' 로 찾힌다 (박스 알)",
+        [m["id"] for m in F.apply_box(rows, dex, query="알")[1]] == [-4])
+    chk("타입을 고르면 알은 빠진다", -4 not in [m["id"] for m in F.apply_box(rows, dex, "GRASS")[1]])
+    chk("알에는 타입이 없다", F.types_present([er], dex) == [])
+    chk("자란 정도 25%% · 36시간", F.egg_progress(eggs[0]) == (25, 36), F.egg_progress(eggs[0]))
+    chk("남은 시간은 올림 (1초 남아도 1시간)",
+        F.egg_progress({"gotSec": 3599, "needSec": 3600, "leftSec": 1}) == (99, 1))
+    chk("다 자란 알 (100%%, 0시간)", F.egg_progress(eggs[2]) == (100, 0))
+    chk("값이 비어도 안 터진다", F.egg_progress({}) == (0, 1), F.egg_progress({}))
+    chk("알이 없으면 목록 그대로", F.merge_eggs(ms, None) == ms)
+
     print("-- 도감이 없어도 안 터진다")
     chk("dex None 이면 타입 거르기는 전부 걸러진다", F.apply(mons, None, type_id="FIRE") == [])
     chk("dex None 이어도 이름으로는 찾는다", [m["num"] for m in F.apply(mons, None, query="불꽃이")] == [4])

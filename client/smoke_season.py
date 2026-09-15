@@ -156,8 +156,10 @@ class FakeApp(object):
         self.pvp_window = None
         self.said = []
 
-    def pvp_random(self):
-        pass
+    def pvp_random(self, on_done=None):
+        self.random_calls = getattr(self, "random_calls", 0) + 1
+        if on_done:
+            on_done(None, "랜덤 배틀은 12초 뒤에 다시 걸 수 있습니다.")
 
     def notify(self, msg):
         self.said.append(msg)
@@ -210,6 +212,14 @@ def main():
     chk("레벨 상한 규칙", "Lv.50 상한" in t)
     chk("시즌 끝나는 날", "10월 27일까지" in rw.sub.cget("text"), rw.sub.cget("text"))
     chk("명예의 전당", "시즌 1 명예의 전당" in t)
+    rw._random()
+    pump(root, lambda: "초 뒤에" in rw.status._label.cget("text"))
+    chk("랜덤 배틀이 막히면 '찾는 중' 대신 이유를 적는다",
+        "초 뒤에" in rw.status._label.cget("text"), rw.status._label.cget("text"))
+    rw._battle_done({"matchId": 1}, None)
+    pump(root, lambda: False, 0.2)
+    chk("끝나면 '찾는 중' 글을 걷는다", rw.status._label.cget("text") == "",
+        rw.status._label.cget("text"))
     app.api.old_server = True
     rw.reload()
     pump(root, lambda: not rw.busy and "1200" in texts(rw.win))
@@ -270,6 +280,47 @@ def main():
     chk("요약에 티어와 RP", "몬스터볼 40 RP" in pw.sub.cget("text"), pw.sub.cget("text"))
     pw.close()
 
+    print("진화 알림 (가방·관장)")
+    from poketdesktop import app as APP, desktop_battle, ui_bag as UB
+
+    class EvoApp(object):
+        show_evolutions = APP.App.show_evolutions
+
+        def __init__(self, root):
+            self.root = root
+            self.learn = []
+
+            class Ov(object):
+                hidden = False
+                pets = {7: object()}
+            self.overlay = Ov()
+
+        def want_learn(self, pid, name):
+            self.learn.append(pid)
+    played, boxed = [], []
+    orig_play, orig_box = desktop_battle.play_evolutions, UB.announce_evolve
+    desktop_battle.play_evolutions = lambda a, infos: played.extend(infos)
+    UB.announce_evolve = lambda parent, a, info: boxed.append(info)
+    try:
+        ea = EvoApp(root)
+        ea.show_evolutions([{"pokemonId": 7, "fromKr": "파이리", "toKr": "리자드"},
+                            {"pokemonId": 8, "fromKr": "꼬부기", "toKr": "어니부기",
+                             "pendingIds": ["BITE"]}])
+        chk("바탕화면에 있는 포켓몬은 진화 연출", [i["pokemonId"] for i in played] == [7], played)
+        chk("박스에 있는 포켓몬은 진화 창", [i["pokemonId"] for i in boxed] == [8], boxed)
+        chk("박스에 있어도 배울 기술은 묻는다", ea.learn == [8], ea.learn)
+        played[:] = []
+        boxed[:] = []
+        ea.overlay.hidden = True
+        ea.show_evolutions([{"pokemonId": 7, "fromKr": "파이리", "toKr": "리자드"}])
+        chk("도트를 숨겨 둔 중이면 창으로", not played and len(boxed) == 1, (played, boxed))
+    finally:
+        desktop_battle.play_evolutions, UB.announce_evolve = orig_play, orig_box
+    from poketdesktop import ui_gym_battle as GBW
+    import inspect as _inspect
+    chk("관장은 결과가 뜨는 순간 진화를 시작한다",
+        "_after_flow" in _inspect.getsource(GBW.GymBattleWindow.show_result))
+
     print("가방 · 선물")
     candy = {"id": "SHINYCANDY", "kr": "이로치사탕", "cat": "misc",
              "effect": {"kind": "shiny"}, "desc": "먹이면 이로치가 된다."}
@@ -325,7 +376,7 @@ def main():
     if t:
         chk("칭호 줄과 사탕 줄", "칭호 · 시즌 1 사천왕" in t and "이로치사탕 ×2" in t, t)
         chk("칭호는 랭킹 탭에서 바꾼다고 알린다", "랭킹 탭" in t, t)
-        chk("알 줄과 알 안내", "환상의 포켓몬 알" in t and "바탕화면에 놓였습니다" in t, t)
+        chk("알 줄과 알 안내", "환상의 포켓몬 알" in t and "데리고 다니는 동안" in t, t)
 
     print("투기장 이름표")
     from poketdesktop import arena

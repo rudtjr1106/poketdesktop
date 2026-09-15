@@ -841,7 +841,10 @@ class Overlay(object):
         때까지는 둔다). 그림을 아직 못 받았으면 다음 동기화 때 세운다.
         """
         from . import eggs_ui
-        want = dict((e["id"], e) for e in (eggs or []) if e.get("id") is not None)
+        # 박스에 넣어 둔 알은 바탕화면에 없다 (1.4.1). 부화한 알은 어디 있었든
+        # 연출을 보여준다 - 태어난 포켓몬은 알이 있던 자리로 온다.
+        want = dict((e["id"], e) for e in (eggs or []) if e.get("id") is not None
+                    and (e.get("hatched") or e.get("onDesktop", True)))
         for eid in list(self.eggs):
             p = self.eggs[eid]
             if eid not in want and not getattr(p, "hatching", False):

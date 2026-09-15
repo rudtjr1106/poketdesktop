@@ -229,11 +229,44 @@ def _season2_open(conn):
             % (len(rows), gifts, n_eggs, candies, n_all))
 
 
+def _egg_slots(conn):
+    """1.4.0 에 받은 알에 파티 자리를 준다.
+
+    1.4.0 의 알은 파티 자리와 상관없이 늘 바탕화면에 있었다. 1.4.1 부터 알이
+    한 자리를 차지하므로, 자리가 남는 사람은 빈 자리를 주고, 이미 여섯 마리를
+    데리고 다니는 사람의 알은 박스로 옮긴다 (누구를 억지로 내리지 않는다).
+    """
+    rows = conn.execute("SELECT id, user_id FROM egg WHERE hatched_at IS NULL"
+                        " ORDER BY id").fetchall()
+    party = box = 0
+    for r in rows:
+        eid, uid = r[0], r[1]
+        used = set(x[0] for x in conn.execute(
+            "SELECT slot FROM pokemon WHERE user_id=? AND on_desktop=1", (uid,)))
+        used |= set(x[0] for x in conn.execute(
+            "SELECT slot FROM egg WHERE user_id=? AND on_desktop=1 AND hatched_at IS NULL"
+            " AND slot IS NOT NULL AND id<>?", (uid, eid)))
+        n = conn.execute("SELECT COUNT(*) FROM pokemon WHERE user_id=? AND on_desktop=1",
+                         (uid,)).fetchone()[0]
+        n += conn.execute("SELECT COUNT(*) FROM egg WHERE user_id=? AND on_desktop=1"
+                          " AND hatched_at IS NULL AND slot IS NOT NULL AND id<>?",
+                          (uid, eid)).fetchone()[0]
+        free = next((i for i in range(6) if i not in used), None)
+        if n < 6 and free is not None:
+            conn.execute("UPDATE egg SET on_desktop=1, slot=? WHERE id=?", (free, eid))
+            party += 1
+        else:
+            conn.execute("UPDATE egg SET on_desktop=0, slot=NULL WHERE id=?", (eid,))
+            box += 1
+    return "알 %d개 파티, %d개 박스" % (party, box)
+
+
 ONCE = [
     ("0140-refund-heals", _refund_heals),
     ("0190-season1-reset", _season1_reset),
     ("0250-dex-evolved", _dex_evolved),
     ("0260-season2-open", _season2_open),
+    ("0270-egg-slots", _egg_slots),
 ]
 
 

@@ -10,7 +10,9 @@
   · 다 보여준 뒤 /api/eggs/{id}/seen 을 부른다. 그전에 앱이 꺼지면 다음에
     켤 때 다시 보여준다.
 
-알은 포켓몬이 아니다. 걸어다니지 않고, 이름표·오른쪽 메뉴·배틀이 없다.
+알은 걸어다니지 않고, 이름표·오른쪽 메뉴·배틀이 없다. 다만 1.4.1 부터는
+포켓몬처럼 파티 한 자리를 차지하고 박스에 넣을 수 있다 (포켓몬 관리 창,
+box_filter.egg_row). 박스에 넣은 알은 바탕화면에 안 서고 자라지도 않는다.
 """
 import random
 import tkinter as tk
@@ -78,7 +80,7 @@ class EggPet(Pet):
 
     def tip_text(self):
         e = self.egg
-        return "%s\n%s\n%s\n(게임을 켜 둔 시간만큼 자랍니다)" % (
+        return "%s\n%s\n%s\n(데리고 다니는 동안 켜 둔 시간만큼 자랍니다)" % (
             e.get("name") or "알", mood(e), hours_text(e.get("leftSec")))
 
     def set_egg(self, egg):

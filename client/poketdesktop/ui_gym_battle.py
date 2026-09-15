@@ -903,6 +903,10 @@ class GymBattleWindow(object):
 
     # ---------------- 끝 ----------------
     def show_result(self):
+        # **결과가 뜨는 순간 진화 연출을 시작한다.** 전에는 창을 닫아야
+        # 시작해서, 결과를 보는 동안에는 아무 일도 없어 진화 연출이 안 뜨는
+        # 것처럼 보였다. 기술 배우기 창은 앱이 이 창이 닫힐 때까지 기다린다.
+        self.root.after(600, self._after_flow)
         self.hide_commands()
         res = self.view.get("result")
         title = {"won": "승리!", "lost": "패배...", "draw": "무승부", "forfeit": "기권"}.get(res, "끝")
@@ -966,8 +970,12 @@ class GymBattleWindow(object):
                     pass
         evolves = [dict(e["evolve"], pokemonId=e.get("id")) for e in self.exp if e.get("evolve")]
         if evolves:
-            from .desktop_battle import play_evolutions
-            self.root.after(400, lambda: play_evolutions(self.app, evolves))
+            show = getattr(self.app, "show_evolutions", None)
+            if show is not None:
+                self.root.after(400, lambda: show(evolves))
+            else:
+                from .desktop_battle import play_evolutions
+                self.root.after(400, lambda: play_evolutions(self.app, evolves))
         elif self.exp:
             try:
                 self.app.request_sync()

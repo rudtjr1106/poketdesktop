@@ -886,6 +886,22 @@ def me(ctx=Depends(current)):
     }
 
 
+class EggDesktopIn(BaseModel):
+    on: bool = True
+
+
+@app.post("/api/eggs/{egg_id}/desktop")
+def egg_desktop(egg_id: int, body: EggDesktopIn, ctx=Depends(current)):
+    """알을 데리고 다니거나 박스에 넣는다. 데리고 다니는 동안에만 자란다."""
+    try:
+        eggs.set_desktop(ctx["user"]["id"], egg_id, body.on)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {"ok": True}
+
+
 @app.post("/api/eggs/{egg_id}/seen")
 def egg_seen(egg_id: int, ctx=Depends(current)):
     """부화를 화면에 알렸다. 이제 /api/me 에 안 싣는다."""
@@ -908,7 +924,11 @@ _decorate = deps.decorate
 
 @app.get("/api/pokemon")
 def list_pokemon(ctx=Depends(current)):
-    return {"pokemon": [_decorate(m) for m in _mons(ctx["user"]["id"])]}
+    uid = ctx["user"]["id"]
+    # 알은 따로 싣는다. 포켓몬 목록에 섞으면 옛 클라이언트가 알을 포켓몬으로
+    # 그리려다 터진다. 새 관리 창이 둘을 합쳐 보여준다.
+    return {"pokemon": [_decorate(m) for m in _mons(uid)],
+            "eggs": eggs.box_list(uid)}
 
 
 @app.get("/api/pokemon/desktop")
@@ -928,20 +948,11 @@ def set_desktop(pid: int, body: DesktopIn, ctx=Depends(current)):
     uid = ctx["user"]["id"]
     _own(uid, pid)
     if body.on:
-        cnt = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=? AND on_desktop=1"
-                    " AND id<>?", (uid, pid))["c"]
-        if cnt >= config.MAX_PARTY:
-            raise HTTPException(409, "데리고 다닐 수 있는 건 최대 %d마리입니다."
-                                % config.MAX_PARTY)
-        used = set(r["slot"] for r in db.q(
-            "SELECT slot FROM pokemon WHERE user_id=? AND on_desktop=1 AND id<>?",
-            (uid, pid)))
-        # next() 는 빈 자리가 없으면 StopIteration 을 던진다. 그건 잡히지
-        # 않고 본문 없는 500 으로 나가서, 사용자는 "서버 응답을 이해할 수
-        # 없습니다" 만 본다. 자리 수가 어긋나 있어도 말이 되는 답을 준다.
-        slot = next((i for i in range(config.MAX_PARTY) if i not in used), None)
+        # 알도 한 자리를 차지한다 (deps.free_slot). 빈 자리가 없으면 None 이다 -
+        # 예전의 next() 는 StopIteration 이 본문 없는 500 으로 나갔다.
+        slot = deps.free_slot(uid, exclude=pid)
         if slot is None:
-            raise HTTPException(409, "데리고 다닐 수 있는 건 최대 %d마리입니다."
+            raise HTTPException(409, "데리고 다닐 수 있는 건 알까지 합쳐 최대 %d마리입니다."
                                 % config.MAX_PARTY)
         db.run("UPDATE pokemon SET on_desktop=1, slot=? WHERE id=?", (slot, pid))
     else:
@@ -973,10 +984,16 @@ def set_order(body: OrderIn, ctx=Depends(current)):
 
     # 내 것이고 지금 데리고 다니는 것만 자리를 준다. 남의 것을 섞어 보내도
     # 조용히 무시된다(조건이 WHERE 에 들어 있다).
+    # **음수는 알이다** (1.4.1). 포켓몬 관리 창은 알을 -알id 로 목록에 섞어
+    # 보낸다 - 같은 여섯 자리에서 순서를 맞바꾸기 때문이다.
     moved = 0
     for i, pid in enumerate(ids):
-        cur = db.run("UPDATE pokemon SET slot=? WHERE id=? AND user_id=?"
-                     " AND on_desktop=1", (i, pid, uid))
+        if pid < 0:
+            cur = db.run("UPDATE egg SET slot=? WHERE id=? AND user_id=?"
+                         " AND on_desktop=1 AND hatched_at IS NULL", (i, -pid, uid))
+        else:
+            cur = db.run("UPDATE pokemon SET slot=? WHERE id=? AND user_id=?"
+                         " AND on_desktop=1", (i, pid, uid))
         moved += cur.rowcount
     return {"ok": True, "moved": moved}
 
