@@ -17,7 +17,7 @@ Battle.me / Battle.foe 에 끼워 넣고, 바꿀 때 갈아 끼운다.
 ## 한 턴
 
     내가 고른 것      기술(move) 또는 교체(switch)
-    상대가 고른 것    기술, 가끔 교체 (높은 레벨일수록 머리를 쓴다)
+    상대가 고른 것    기술, 가끔 교체 (아래 '상대 AI')
 
     1. 교체가 먼저 일어난다 (내 쪽 -> 상대 쪽)
     2. 남은 기술들을 우선도·스피드 순으로 쓴다
@@ -25,6 +25,24 @@ Battle.me / Battle.foe 에 끼워 넣고, 바꿀 때 갈아 끼운다.
     4. 쓰러진 쪽 정리
          상대가 쓰러지면 상대는 **바로** 다음을 내보낸다
          내가 쓰러지면 **다음 입력은 교체만** 받는다 (need_switch)
+
+## 상대 AI
+
+PvP 와 야생은 battle.Battle.choose_for 를 쓴다. 관장은 **여기서 따로 고른다** -
+그쪽을 고치면 유저 배틀의 결과와 test_held 의 요약값이 바뀐다.
+
+    기술    데미지를 셈하되 **누가 먼저 움직이는지**를 본다. 먼저 쓰러뜨릴 수
+            있으면 끝내고, 내가 먼저 맞고 쓰러질 판이면 선공기를 쓴다.
+    변화기  걸리지 않을 상태이상(불꽃에게 도깨비불, 이미 잠든 상대)은 안 쓴다.
+            화상은 물리형에게, 마비는 나보다 빠른 상대에게 값을 더 친다.
+            랭크업은 두 대 넘게 버틸 때만, +2 까지만 쌓는다.
+            회복기는 반 넘게 깎였고 회복량이 맞는 양보다 많을 때만.
+    교체    지금 포켓몬이 이번 턴에 쓰러질 판이거나 아무것도 못 하는 판이면,
+            들어오면서 덜 맞고 상대를 더 때리는 포켓몬으로 바꾼다.
+    다음    쓰러지면 지금 상대에게 가장 강한 포켓몬을 내보낸다.
+
+트레이너 레벨이 높을수록 실수가 적고(Lv.20 10% -> Lv.100 0%) 교체를 잘 한다
+(Lv.20 35% -> Lv.100 90%). 셈은 급소·난수 없이 한다.
 
 ## 저장
 
@@ -41,22 +59,51 @@ from . import held as H
 
 TEAM_MAX = 6
 MAX_TURNS = 400
-SWITCH_MARGIN = 1.5
 STATS = ("hp", "atk", "def", "spa", "spd", "spe")
+IV_GYM = 31                 # 관장 포켓몬의 개체값 (tools/build_gyms.py)
+
+# 추정 데미지(EST_RNG 는 난수 0.977 쯤)를 평균 난수(0.925)로 낮춰 "쓰러뜨릴 수 있나" 를 본다
+KO_ROLL = 0.95
+
+
+def works(md):
+    """이 엔진에서 뭔가 일어나는 기술인가.
+
+    방어·대타출동·잠자기·씨뿌리기·날씨·도발, 위력이 정해지지 않은 기술(헤비봄버·
+    은혜갚기·풀묶기)은 battle.py 가 처리하지 않아서 턴만 버린다.
+    """
+    if not md:
+        return False
+    if md.get("power") or md.get("heal"):
+        return True
+    if md.get("ail") in B.HANDLED_STATUS:
+        return True
+    self_target = bool(md.get("statSelf"))
+    # 나를 올리거나 상대를 내리는 것. 재주넘기처럼 상대를 올리는 것은 손해다.
+    return any((change > 0) == self_target for _stat, change in (md.get("stat") or []))
 
 
 def trainer_mon(entry):
-    """gyms.json 의 한 줄 -> Fighter 가 먹는 mon."""
-    iv = int(entry.get("iv", 31))
+    """gyms.json 의 한 줄 -> Fighter 가 먹는 mon.
+
+    노력치는 능력마다 따로(evs) 적는다. 예전 자료의 한 숫자(ev)도 읽는다.
+    """
+    iv = int(entry.get("iv", IV_GYM))
     ev = int(entry.get("ev", 0))
+    evs = entry.get("evs") or {}
     return {
         "species": entry["species"], "level": int(entry["level"]),
-        "ivs": dict((s, iv) for s in STATS), "evs": dict((s, ev) for s in STATS),
+        "ivs": dict((s, iv) for s in STATS),
+        "evs": dict((s, int(evs.get(s, ev))) for s in STATS),
         "nature": entry.get("nature") or "HARDY", "ability": entry.get("ability"),
         "moves": list(entry.get("moves") or []), "held": entry.get("held"),
         "gender": entry.get("gender") or "N", "shiny": False, "nickname": None,
         "statBoost": entry.get("boost"),
     }
+
+
+def best_score_better(sc, best):
+    return best is None or sc > best
 
 
 class Duel(B.Battle):
@@ -113,10 +160,18 @@ class TrainerBattle(object):
     def foe(self):
         return self.foe_team[self.fi]
 
-    def smartness(self):
-        """상대 AI 가 불리할 때 바꿀 확률. 레벨이 높은 트레이너일수록 크다."""
+    def skill(self):
+        """0(Lv.20) ~ 1(Lv.100)."""
         lv = int(self.trainer.get("level") or 50)
-        return 0.15 + max(0, min(80, lv - 20)) / 80.0 * 0.35
+        return max(0.0, min(1.0, (lv - 20) / 80.0))
+
+    def smartness(self):
+        """상대가 불리할 때 실제로 바꿀 확률. 레벨이 높은 트레이너일수록 크다."""
+        return 0.35 + 0.55 * self.skill()
+
+    def mistake(self):
+        """가장 좋은 수 대신 두 번째 수를 둘 확률."""
+        return 0.10 * (1.0 - self.skill())
 
     # ---------------- 시작 ----------------
     def start(self):
@@ -179,37 +234,212 @@ class TrainerBattle(object):
             # 턴 사이에 들어온 것(쓰러진 뒤 교체)은 다음 턴 끝에 가속이 붙는다.
             self._entry_abilities(ev, fresh=fresh, only=(who,))
 
-    def _matchup(self, mine, foe):
-        """party_battle._matchup 과 같은 셈. 특성으로 무효가 되는 것까지 본다."""
-        foe_types = foe.types()
-        my_types = mine.types()
-        atk = 0.0
-        for key in mine.moves:
-            md = self.dex.move(key) or {}
-            if not md.get("power") or A.would_block(mine, foe, md):
+    # ---------------- 상대 AI ----------------
+    def _est(self, user, target, key):
+        """급소·난수 없이 이 기술이 줄 데미지. 명중률은 곱하지 않는다."""
+        md = self.bt.move_of(key)
+        if not md.get("power") or A.would_block(user, target, md):
+            return 0.0
+        d, _crit, _eff = B.damage(self.dex, md, user, target, B.EST_RNG, crit=False)
+        lo, hi = ((md.get("hits") or [1, 1]) + [1, 1])[:2]
+        if hi > 1:
+            d *= B.HITS_AVG if (lo, hi) == (2, 5) else (lo + hi) / 2.0
+        return float(d)
+
+    @staticmethod
+    def _acc(md):
+        return ((md or {}).get("acc") or 100) / 100.0
+
+    def _pool(self, f):
+        pool = self.bt.usable(f)
+        return H.lock_pool(f, pool) if f.held else pool
+
+    def _best(self, user, target):
+        """(명중률을 곱한 데미지, 기술) — user 가 target 에게 쓸 가장 아픈 기술."""
+        best, best_k = 0.0, None
+        if not user.alive() or not target.alive():
+            return best, best_k
+        for k in self._pool(user):
+            d = self._est(user, target, k) * self._acc(self.bt.move_of(k))
+            if d > best:
+                best, best_k = d, k
+        return best, best_k
+
+    def _first(self, user, target, md, their_md=None):
+        """user 가 이 기술로 target 보다 먼저 움직이나. 같으면 늦는 것으로 친다."""
+        up = (md.get("pri") or 0) + A.priority_bonus(user, md)
+        tp = ((their_md.get("pri") or 0) + A.priority_bonus(target, their_md)) if their_md else 0
+        if up != tp:
+            return up > tp
+        return user.stat("spe") > target.stat("spe")
+
+    def _foe_move(self):
+        """상대 트레이너가 이번 턴에 쓸 기술."""
+        bt = self.bt
+        user, target = self.foe, self.me
+        pool = self._pool(user)
+        if pool == [B.STRUGGLE]:
+            return B.STRUGGLE
+        their_d, their_k = self._best(target, user)
+        their_md = bt.move_of(their_k) if their_k else None
+        their_ko = their_k is not None and their_d * KO_ROLL >= user.hp
+
+        rows, dmg_best, main = [], 0.0, None
+        for k in pool:
+            md = bt.move_of(k)
+            if not md.get("power"):
+                rows.append([k, None, md])
                 continue
-            atk = max(atk, B.effectiveness(self.dex, A.move_type(mine, md), foe_types))
-        dfn = 0.0
-        for key in foe.moves:
-            md = self.dex.move(key) or {}
-            if not md.get("power") or A.would_block(foe, mine, md):
+            d = self._est(user, target, k)
+            if d <= 0:
+                rows.append([k, 0.0, md])
                 continue
-            dfn = max(dfn, B.effectiveness(self.dex, A.move_type(foe, md), my_types))
-        atk = atk or 0.25
-        dfn = dfn or 0.25
-        health = 0.6 + 0.4 * (mine.hp / float(mine.maxhp or 1))
-        return (atk / dfn) * health
+            acc = self._acc(md)
+            first = self._first(user, target, md, their_md)
+            dealt = min(d, target.hp)
+            score = dealt * acc
+            back = md.get("drain") or 0
+            if back < 0:                                   # 반동기
+                hurt = dealt * (-back) / 100.0
+                score = score * 0.25 if hurt >= user.hp else score - hurt * 0.5
+            elif back > 0:                                 # 흡수기
+                score += dealt * back / 100.0 * 0.3
+            if md.get("statSelf") and any(c < 0 for _st, c in (md.get("stat") or [])):
+                score *= 0.9                               # 인파이트·용성군 (내 능력이 떨어진다)
+            if d * KO_ROLL >= target.hp:
+                score = target.hp * acc * (3.0 if first else 1.6)
+            if their_ko and not first:
+                score *= 0.35                              # 쓰기 전에 쓰러질 공산이 크다
+            if dealt * acc > dmg_best:
+                dmg_best, main = dealt * acc, ("atk" if md.get("cat") == "physical" else "spa")
+            rows.append([k, score, md])
+
+        base = max(dmg_best, target.maxhp * 0.12)
+        for row in rows:
+            if row[1] is None:
+                row[1] = self._status_value(user, target, row[2], base, dmg_best, main,
+                                            their_d, their_md)
+
+        scored = sorted([(s, i, k) for i, (k, s, _md) in enumerate(rows) if s and s > 0],
+                        key=lambda x: (-x[0], x[1]))
+        if not scored:
+            return bt.choose_for(user, target, "trainer")
+        if len(scored) > 1 and self.rng.random() < self.mistake():
+            return scored[1][2]
+        return scored[0][2]
+
+    def _status_value(self, user, target, md, base, dmg_best, main, their_d, their_md):
+        """변화기의 값을 '한 대 때린 것' 과 같은 단위로. 쓸모없으면 0."""
+        if not works(md):
+            return 0.0
+        if their_d * KO_ROLL >= user.hp and not self._first(user, target, md, their_md):
+            return 0.0                                      # 쓰기 전에 쓰러진다
+        if A.aims_at_foe(md) and A.would_block(user, target, md):
+            return 0.0
+        can_ko = dmg_best * KO_ROLL >= target.hp
+        value = 0.0
+        ail = md.get("ail")
+        if ail in B.HANDLED_STATUS and not can_ko:
+            value += self._ail_value(user, target, ail, base)
+        if md.get("stat") and not can_ko:
+            value += self._stat_value(user, target, md, base, main, their_d, their_md)
+        heal = md.get("heal") or 0
+        if heal and user.hp < user.maxhp:
+            amount = min(user.maxhp - user.hp, user.maxhp * heal / 100.0)
+            left = user.hp / float(user.maxhp)
+            if left <= 0.55 and amount > their_d:           # 회복해도 그만큼 다시 맞으면 제자리
+                value += base * (amount / float(user.maxhp)) * 4.0 * (1.0 - left)
+        return value * self._acc(md)
+
+    def _ail_value(self, user, target, ail, base):
+        if target.status:
+            return 0.0
+        types = target.types()
+        corrode = ail == "poison" and A.can_poison_types(user)
+        immune = {"burn": "FIRE", "poison": "POISON", "paralysis": "ELECTRIC", "freeze": "ICE"}
+        if not corrode and (immune.get(ail) in types or (ail == "poison" and "STEEL" in types)):
+            return 0.0
+        if A.status_blocked(target, ail, user):
+            return 0.0
+        if ail in ("sleep", "freeze"):
+            v = 1.5
+        elif ail == "paralysis":
+            ts, us = target.stat("spe"), user.stat("spe")
+            v = 1.2 if ts > us and ts * 0.5 < us else 0.6    # 마비로 내가 먼저 움직이게 된다
+        elif ail == "burn":
+            v = 1.2 if target.base["atk"] > target.base["spa"] else 0.35
+        else:                                               # 독 - 오래 가는 판에서 값을 한다
+            v = 1.0 if base < target.maxhp * 0.25 else 0.4
+        if ail in ("burn", "paralysis", "poison") and A.has(target, "SYNCHRONIZE") and not user.status:
+            v *= 0.4
+        left = target.hp / float(target.maxhp or 1)
+        return base * v * (0.4 + 0.6 * min(1.0, left * 1.3))
+
+    def _stat_value(self, user, target, md, base, main, their_d, their_md):
+        v = 0.0
+        self_target = bool(md.get("statSelf"))
+        their_def = "def" if (their_md or {}).get("cat") == "physical" else "spd"
+        for stat, change in md.get("stat") or []:
+            if self_target and change > 0:
+                cur = user.stages.get(stat, 0)
+                if cur >= 2:
+                    continue                                # +2 넘게는 쌓지 않는다
+                new = min(2, cur + change)
+                if stat == main:
+                    v += B.stage_mult(new) / B.stage_mult(cur) - 1.0
+                elif stat == "spe":
+                    us, ts = user.stat("spe"), target.stat("spe")
+                    after = us * B.stage_mult(new) / B.stage_mult(cur)
+                    v += 0.8 if us <= ts < after else 0.1
+                elif stat == their_def:
+                    v += 0.3 * (new - cur)
+                elif stat == "eva":
+                    v += 0.15 * (new - cur)
+            elif not self_target and change < 0:
+                cur = target.stages.get(stat, 0)
+                if cur <= -2:
+                    continue
+                if stat in ("atk", "spa") and their_md and stat == ("atk" if their_md.get("cat") == "physical" else "spa"):
+                    v += 0.25 * min(2, -change)
+                elif stat == "spe":
+                    us, ts = user.stat("spe"), target.stat("spe")
+                    v += 0.5 if ts >= us > ts * B.stage_mult(change) else 0.05
+                elif main and stat == ("def" if main == "atk" else "spd"):
+                    v += 0.25 * min(2, -change)
+                elif stat == "acc":
+                    v += 0.1
+            elif self_target and change < 0:
+                v -= 0.1 * (-change)                        # 껍질깨기의 방어 하락
+        if v <= 0:
+            return 0.0
+        # 올려 놓고 때릴 시간이 있어야 한다. 이번 턴에 한 대 맞고도 두 대 넘게 버틸 때만.
+        lasts = user.hp / their_d if their_d > 0 else 9.0
+        room = max(0.0, min(1.0, (lasts - 1.5) / 2.0))
+        return base * v * 2.0 * room
+
+    def _standing(self, f, foe_mon):
+        """f 가 foe_mon 과 붙었을 때의 점수. 클수록 f 에게 유리하다."""
+        deal, dk = self._best(f, foe_mon)
+        take, tk = self._best(foe_mon, f)
+        sc = min(1.0, deal / float(foe_mon.hp or 1)) - 0.7 * min(1.0, take / float(f.hp or 1))
+        if dk and deal * KO_ROLL >= foe_mon.hp and self._first(f, foe_mon, self.bt.move_of(dk),
+                                                              self.bt.move_of(tk) if tk else None):
+            sc += 0.6
+        elif tk and take * KO_ROLL >= f.hp and not (dk and self._first(
+                f, foe_mon, self.bt.move_of(dk), self.bt.move_of(tk))):
+            sc -= 0.4
+        return sc
 
     def _pick(self, team, against, cur=None):
-        best, best_score = None, None
+        """쓰러진 뒤 내보낼 자리. 상대도 쓰러져 곧 바꿀 거면 남은 상대 전부를 두고 본다."""
+        rivals = [against] if against.alive() else [f for f in self.me_team if f.alive()]
+        best, best_sc = None, None
         for i, f in enumerate(team):
             if not f.alive():
                 continue
-            sc = self._matchup(f, against)
-            if cur is not None and i == cur:
-                sc *= SWITCH_MARGIN
-            if best_score is None or sc > best_score:
-                best, best_score = i, sc
+            sc = sum(self._standing(f, r) for r in rivals) / float(len(rivals) or 1)
+            if best_score_better(sc, best_sc):
+                best, best_sc = i, sc
         return best
 
     def _foe_wants_switch(self):
@@ -219,11 +449,34 @@ class TrainerBattle(object):
         others = [i for i, f in enumerate(self.foe_team) if f.alive() and i != self.fi]
         if not others:
             return None
-        cur = self._matchup(self.foe, self.me)
-        best = self._pick(self.foe_team, self.me, cur=self.fi)
-        if best is None or best == self.fi:
+        foe, me = self.foe, self.me
+        their_d, their_k = self._best(me, foe)
+        if their_k is None:
             return None
-        if self._matchup(self.foe_team[best], self.me) < cur * 2.0:
+        their_md = self.bt.move_of(their_k)
+        our_d, our_k = self._best(foe, me)
+        if our_k and our_d * KO_ROLL >= me.hp and self._first(foe, me, self.bt.move_of(our_k), their_md):
+            return None                                     # 먼저 쓰러뜨리면 된다
+        danger = their_d * KO_ROLL >= foe.hp
+        walled = our_d < me.maxhp * 0.12 and their_d >= foe.hp * 0.35
+        if not (danger or walled):
+            return None
+        stay = min(1.0, our_d / float(me.hp)) - 0.7 * min(1.0, their_d / float(foe.hp))
+        best, best_sc = None, None
+        for i in others:
+            f = self.foe_team[i]
+            # 들어오면서 사람이 고를 기술(지금 포켓몬에게 가장 아픈 것)을 맞는다
+            taken = self._est(me, f, their_k) * self._acc(their_md)
+            if taken >= f.hp * 0.6:
+                continue
+            left = f.hp - taken
+            deal, _dk = self._best(f, me)
+            nxt, _nk = self._best(me, f)
+            sc = (min(1.0, deal / float(me.hp)) - 0.7 * min(1.0, nxt / float(left))
+                  - 0.3 * taken / float(f.maxhp))
+            if best_score_better(sc, best_sc):
+                best, best_sc = i, sc
+        if best is None or best_sc < stay + 0.25:
             return None
         if self.rng.random() >= self.smartness():
             return None
@@ -267,7 +520,7 @@ class TrainerBattle(object):
         # 상대가 무엇을 할지 먼저 정한다 (내 선택을 보지 않는다)
         foe_slot = self._foe_wants_switch()
         if foe_slot is None:
-            foe_move = bt.choose_for(self.foe, self.me, "trainer")
+            foe_move = self._foe_move()
 
         if kind == "switch":
             self._switch("me", value, ev)

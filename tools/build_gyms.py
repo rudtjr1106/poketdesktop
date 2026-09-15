@@ -67,6 +67,7 @@ sys.path.insert(0, ROOT)
 
 from common import held as H          # noqa: E402
 from common import pokelogic as P     # noqa: E402
+from common import trainer_battle as TB  # noqa: E402
 
 CACHE = os.path.join(ROOT, "tools", "_cache", "bulbapedia")
 DEX_PATH = os.path.join(ROOT, "server", "data", "pokedex.json")
@@ -729,18 +730,32 @@ def filler(dex, spec, gen, level, taken_fams, n, legendary_ok=False):
 
 
 def moveset(dex, sp, level, canon):
+    """원작 기술을 먼저, **이 엔진에서 아무 일도 안 하는 기술은 뺀다.**
+
+    방어·대타출동·잠자기·씨뿌리기·날씨, 위력이 정해지지 않은 기술(헤비봄버·
+    은혜갚기·풀묶기) 같은 것은 배틀 엔진이 처리하지 않는다. 원작 팀을 그대로
+    옮겼더니 1536마리 중 537마리가 이런 기술을 들고 있었고, 13마리는 때리는
+    기술이 하나도 없었다. 빈 칸은 그 레벨까지 배우는 기술로 채운다.
+    """
     moves = []
     for mv in canon or []:
         k = key(mv)
-        if k in dex.moves and k not in moves and k not in SELF_KO:
+        if k in dex.moves and k not in moves and k not in SELF_KO and TB.works(dex.moves[k]):
             moves.append(k)
         if len(moves) == 4:
-            return moves
+            break
+    # 원작 기술이 변화기뿐이면 때리는 기술이 둘은 되게 자리를 비운다
+    hits = [k for k in moves if dex.moves[k].get("power")]
+    while len(moves) == 4 and len(hits) < 2 and any(k not in hits for k in moves):
+        moves.remove([k for k in moves if k not in hits][-1])
+        hits = [k for k in moves if dex.moves[k].get("power")]
+    if len(moves) == 4:
+        return moves
     stab = set(sp["types"])
     cands = []
     for k in P.learnable_moves(sp, level):
         md = dex.moves.get(k)
-        if not md or k in moves or k in SELF_KO:
+        if not md or k in moves or k in SELF_KO or not TB.works(md):
             continue
         pw = md.get("power") or 0
         acc = md.get("acc") or 100
@@ -768,7 +783,97 @@ def moveset(dex, sp, level, canon):
         if len(moves) >= 4:
             break
         moves.append(k)
+    if not any(dex.moves[k].get("power") for k in moves):
+        moves = (moves + fallback_moves(dex, sp, level))[-4:]
     return moves[:4]
+
+
+def fallback_moves(dex, sp, level):
+    """배우는 기술로는 때릴 수가 없을 때 (딜리버드의 프레젠트, 루브도의 스케치).
+
+    제 타입의 공격 기술을 레벨에 맞는 위력(40 + 레벨) 안에서 고른다. 스케치로
+    무엇이든 배우는 루브도는 타입을 가리지 않고 서로 다른 타입 넷을 고른다.
+    """
+    anything = "SKETCH" in P.learnable_moves(sp, level)
+    phys = sp["base"]["atk"] >= sp["base"]["spa"]
+    cap = 40 + level
+    # 전용기·다이맥스기는 뺀다: 세 종 이상이 레벨업으로 배우는 기술만
+    learners = collections.Counter(k for x in dex.raw["species"] for k in set(m for _lv, m in x.get("moves") or []))
+    best = {}
+    for k, md in sorted(dex.moves.items()):
+        pw = md.get("power") or 0
+        if not pw or pw > cap or k in SELF_KO or (md.get("hits") or [1, 1])[-1] > 1:
+            continue
+        if learners[k] < 3:
+            continue
+        if not anything and md.get("type") not in sp["types"]:
+            continue
+        if md.get("cat") != ("physical" if phys else "special") or (md.get("drain") or 0) < 0:
+            continue
+        val = pw * ((md.get("acc") or 100) / 100.0)
+        if md.get("type") not in best or val > best[md["type"]][0]:
+            best[md["type"]] = (val, k)
+    picked = sorted(best.values(), reverse=True)
+    return [k for _v, k in picked[:4]]
+
+
+# 노력치 510 을 어디에 둘지와 성격. (주 공격 능력, 빠른가, 섞어 쓰는가) -> 성격
+NATURE_FOR = {
+    ("atk", True): "JOLLY", ("spa", True): "TIMID",       # 스피드 올리고 안 쓰는 공격 내림
+    ("atk", False): "ADAMANT", ("spa", False): "MODEST",  # 공격 올리고 안 쓰는 공격 내림
+}
+MIXED_NATURE = {("atk", "def"): "LONELY", ("atk", "spd"): "NAUGHTY",
+                ("spa", "def"): "MILD", ("spa", "spd"): "RASH"}
+FAST_BASE = 70
+
+
+def ev_share(tier):
+    """노력치를 얼마나 채우나. Lv.20 은 0, Lv.100 은 절반(252 -> 126).
+
+    tools/sim_gym.py 로 정했다. 개체값 31 에 노력치까지 꽉 채우면, 같은 레벨로
+    잘 키운 팀의 승률이 83% 에서 21% 로 떨어져 벽이 된다. 절반까지만 채우면
+    51%, 레벨이 5 높으면 77% 다.
+    """
+    return 0.5 * max(0.0, min(1.0, (tier - 20) / 80.0))
+
+
+def spread(dex, sp, moves, share=1.0):
+    """관장 포켓몬의 노력치와 성격. 들고 있는 기술에 맞춘다.
+
+    주 공격 능력(물리/특수)은 기술 위력 x 그 능력의 종족값으로 정한다.
+    스피드 종족값이 70 이상이면 스피드에, 아니면 HP 에 나머지 252 를 준다.
+    물리·특수를 섞어 쓰면 안 쓰는 공격을 내릴 수 없으니 약한 방어 쪽을 내린다.
+    """
+    base = sp["base"]
+    phys = spec = 0.0
+    for k in moves:
+        md = dex.moves.get(k) or {}
+        pw = md.get("power") or 0
+        if not pw:
+            continue
+        v = pw * (1.5 if md.get("type") in sp["types"] else 1.0)
+        if md.get("cat") == "physical":
+            phys += v * base["atk"]
+        elif md.get("cat") == "special":
+            spec += v * base["spa"]
+    evs = dict((s, 0) for s in P.STATS)
+    weak = "def" if base["def"] <= base["spd"] else "spd"
+    if not phys and not spec:                 # 변화기만 쓰는 포켓몬 - 버틴다
+        evs["hp"], evs[weak] = 252, 252
+        evs["spd" if weak == "def" else "def"] = 6
+        evs = dict((k, int(v * share)) for k, v in evs.items())
+        return evs, ("BOLD" if weak == "def" else "CALM")
+    main = "atk" if phys >= spec else "spa"
+    fast = base["spe"] >= FAST_BASE
+    evs[main] = 252
+    if fast:
+        evs["spe"], evs["hp"] = 252, 6
+    else:
+        evs["hp"], evs[weak] = 252, 6
+    evs = dict((k, int(v * share)) for k, v in evs.items())
+    if min(phys, spec) >= 0.5 * max(phys, spec):
+        return evs, MIXED_NATURE[(main, weak)]
+    return evs, NATURE_FOR[(main, fast)]
 
 
 def ability_of(dex, sp, canon):
@@ -992,18 +1097,20 @@ def build(pages, cats, dex, districts, sprites):
             chosen = add + chosen                      # 채운 것은 앞에, 에이스는 여전히 뒤
         chosen = chosen[-TEAM:]
         team = []
-        iv = min(31, 6 + (tier - 20) * 25 // 80)
-        ev = 0 if tier < 60 else int(round((tier - 60) / 40.0 * 85))
         for i, k in enumerate(chosen):
             level = lv[i]
             sp = dex.legal_at(dex.by_key[k], level)
             canon = p["info"].get(k, {})
             item = H.normalize(canon.get("held"))
+            moves = moveset(dex, sp, level, canon.get("moves"))
+            # 개체값은 전부 31. 레벨만 트레이너마다 다르다 - 관장은 잘 키운 포켓몬을 데려온다.
+            evs, nature = spread(dex, sp, moves, ev_share(tier))
+            evs = dict((k, v) for k, v in evs.items() if v)      # 0 은 적지 않는다 (trainer_mon 이 0 으로 읽는다)
             team.append({
                 "species": sp["internal"], "level": level,
                 "ability": ability_of(dex, sp, canon.get("ability")),
-                "moves": moveset(dex, sp, level, canon.get("moves") if sp["internal"] == k else canon.get("moves")),
-                "held": item, "iv": iv, "ev": ev, "nature": "HARDY",
+                "moves": moves,
+                "held": item, "iv": TB.IV_GYM, "evs": evs, "nature": nature,
                 "gender": ("N" if sp.get("femaleRatio") is None
                            else ("F" if sp.get("femaleRatio", 0.5) >= 0.5 else "M")),
             })

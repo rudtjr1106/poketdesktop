@@ -15,6 +15,7 @@
    실수를 막는다. 특성이 있는 판과 없는 판을 같은 시드로 붙여 비교한다.
 4. **특성을 끈 판은 예전과 같다.** (야생·PvP) test_held 의 요약값이 따로 지킨다.
 """
+import collections
 import json
 import os
 import random
@@ -399,6 +400,135 @@ def t_로스터(dex, gyms):
     chk("다른 트레이너에게는 배율이 없다", not boosted, boosted)
 
 
+# ---------------------------------------------------------------- 5. 상대 AI
+def gym(level, *team):
+    """(종, 레벨, 기술, 특성) 들로 트레이너 하나."""
+    return {"id": "t", "name": "시험", "role": "관장", "sprite": "t", "level": level,
+            "team": [{"species": sp, "level": lv, "moves": mv, "ability": ab, "held": None,
+                      "iv": 31, "evs": {}, "nature": "HARDY", "gender": "M"}
+                     for sp, lv, mv, ab in team]}
+
+
+def ai_battle(dex, trainer, mine, seed=1):
+    tb = TB.TrainerBattle(dex, mine, trainer, random.Random(seed))
+    tb.start()
+    return tb
+
+
+def picks(tb, n=40):
+    out = collections.Counter()
+    for s in range(n):
+        tb.rng = random.Random(s)
+        out[tb._foe_move()] += 1
+    return out
+
+
+def t_상대_AI(dex, gyms):
+    print("-- 상대 AI")
+    # 먼저 쓰러뜨릴 수 있으면 끝낸다 (칼춤을 안 춘다)
+    tb = ai_battle(dex, gym(100, ("GARCHOMP", 60, ["SWORDSDANCE", "DRAGONCLAW", "EARTHQUAKE"], "ROUGHSKIN")),
+                   [mon(dex, "HEATRAN", 60, "FLASHFIRE", ["FLAMETHROWER"])])
+    got = picks(tb)
+    chk("한 방에 끝낼 수 있으면 그 기술 (지진 -> 히드런)", got["EARTHQUAKE"] == 40, got)
+
+    # 먼저 맞고 쓰러질 판이면 선공기
+    tb = ai_battle(dex, gym(100, ("SCIZOR", 50, ["XSCISSOR", "BULLETPUNCH", "SWORDSDANCE"], "TECHNICIAN")),
+                   [mon(dex, "ARCANINE", 50, "INTIMIDATE", ["FLAMETHROWER"])])
+    tb.me.hp = max(1, tb.me.maxhp // 12)
+    got = picks(tb)
+    chk("느린데 먼저 맞고 쓰러질 판이면 선공기로 끝낸다 (불릿펀치)", got["BULLETPUNCH"] == 40, got)
+
+    # 걸리지 않을 상태이상은 안 건다
+    t = gym(100, ("SABLEYE", 50, ["WILLOWISP", "SHADOWSNEAK"], "KEENEYE"))
+    got = picks(ai_battle(dex, t, [mon(dex, "ARCANINE", 50, "INTIMIDATE", ["BITE"])]))
+    chk("불꽃 타입에게 도깨비불을 안 쓴다", not got["WILLOWISP"], got)
+    tb = ai_battle(dex, t, [mon(dex, "MACHAMP", 50, "GUTS", ["CROSSCHOP"])])
+    got = picks(tb)
+    chk("물리형 격투에게는 도깨비불", got.most_common(1)[0][0] == "WILLOWISP", got)
+    tb.me.status = "paralysis"
+    got = picks(tb)
+    chk("이미 상태이상이면 도깨비불을 안 쓴다", not got["WILLOWISP"], got)
+
+    # 랭크업은 안전할 때만, +2 까지만
+    t = gym(100, ("GARCHOMP", 60, ["SWORDSDANCE", "DRAGONCLAW"], "ROUGHSKIN"))
+    tb = ai_battle(dex, t, [mon(dex, "BLISSEY", 60, "NATURALCURE", ["POUND"])])
+    chk("아프게 못 때리는 상대 앞에서는 칼춤", picks(tb).most_common(1)[0][0] == "SWORDSDANCE", picks(tb))
+    tb.foe.stages["atk"] = 2
+    got = picks(tb)
+    chk("+2 가 되면 더 안 쌓고 때린다", not got["SWORDSDANCE"], got)
+    tb = ai_battle(dex, t, [mon(dex, "MAMOSWINE", 60, "OBLIVIOUS", ["ICICLECRASH"])])
+    got = picks(tb)
+    chk("한 방에 쓰러질 상대 앞에서는 칼춤을 안 춘다", not got["SWORDSDANCE"], got)
+
+    # 회복은 깎였을 때만
+    t = gym(100, ("SLOWBRO", 60, ["SLACKOFF", "PSYCHIC"], "OWNTEMPO"))
+    tb = ai_battle(dex, t, [mon(dex, "BLISSEY", 60, "NATURALCURE", ["POUND"])])
+    chk("체력이 가득하면 회복기를 안 쓴다", not picks(tb)["SLACKOFF"], picks(tb))
+    tb.foe.hp = tb.foe.maxhp * 3 // 10
+    chk("깎였고 회복이 맞는 양보다 크면 회복기", picks(tb).most_common(1)[0][0] == "SLACKOFF", picks(tb))
+    tb.me.moves, tb.me.pp = ["DOUBLEEDGE"], {"DOUBLEEDGE": 15}
+    tb.me.stages["atk"] = 6
+    got = picks(tb)
+    chk("회복해도 그만큼 다시 맞으면 회복기를 안 쓴다", not got["SLACKOFF"], got)
+
+    # 교체: 이번 턴에 쓰러질 판이면 버티는 포켓몬으로. 레벨이 높을수록 잘 한다.
+    def switch_rate(level):
+        n = 0
+        for s in range(60):
+            tb = ai_battle(dex, gym(level, ("GARCHOMP", 60, ["DRAGONCLAW", "EARTHQUAKE"], "ROUGHSKIN"),
+                                    ("METAGROSS", 60, ["METEORMASH", "ZENHEADBUTT"], "CLEARBODY")),
+                           [mon(dex, "WEAVILE", 62, "PRESSURE", ["ICEPUNCH"])], seed=s)
+            n += tb._foe_wants_switch() == 1
+        return n / 60.0
+    hi, lo = switch_rate(100), switch_rate(20)
+    chk("Lv.100 트레이너는 쓰러질 판에서 거의 바꾼다 (얼음 -> 메타그로스)", hi >= 0.75, hi)
+    chk("Lv.20 트레이너는 덜 바꾼다", lo < hi and lo >= 0.2, (lo, hi))
+    t = gym(100, ("GARCHOMP", 60, ["DRAGONCLAW", "EARTHQUAKE"], "ROUGHSKIN"),
+            ("METAGROSS", 60, ["METEORMASH", "ZENHEADBUTT"], "CLEARBODY"))
+    kept = [ai_battle(dex, t, [mon(dex, "HEATRAN", 60, "FLASHFIRE", ["FLAMETHROWER"])], seed=s)._foe_wants_switch()
+            for s in range(20)]
+    chk("유리한 판(지진으로 먼저 끝낸다)에서는 안 바꾼다", kept == [None] * 20, kept)
+
+    # 쓰러진 뒤에는 상대에게 강한 포켓몬
+    tb = ai_battle(dex, gym(100, ("PIKACHU", 30, ["THUNDERBOLT"], "STATIC"),
+                            ("RATICATE", 60, ["HYPERFANG"], "GUTS"),
+                            ("LAPRAS", 60, ["ICEBEAM", "SURF"], "WATERABSORB"),
+                            ("SNORLAX", 60, ["BODYSLAM"], "THICKFAT")),
+                   [mon(dex, "GARCHOMP", 60, "ROUGHSKIN", ["EARTHQUAKE", "DRAGONCLAW"])])
+    chk("쓰러지면 상대(한카리아스)에게 강한 라프라스를 낸다", tb._pick(tb.foe_team, tb.me) == 2,
+        tb._pick(tb.foe_team, tb.me))
+
+    # 실수: Lv.100 은 안 하고 Lv.20 은 가끔
+    def second_rate(level):
+        tb = ai_battle(dex, gym(level, ("MACHAMP", 60, ["CROSSCHOP", "KNOCKOFF"], "GUTS")),
+                       [mon(dex, "SNORLAX", 60, "THICKFAT", ["BODYSLAM"])])
+        return picks(tb, 400)["KNOCKOFF"] / 400.0
+    chk("Lv.100 은 더 약한 기술을 안 고른다", second_rate(100) == 0, second_rate(100))
+    chk("Lv.20 은 가끔(10% 안팎) 두 번째 기술", 0.04 <= second_rate(20) <= 0.16, second_rate(20))
+
+    # 자료
+    chk("아무 일도 안 하는 기술을 가려낸다",
+        [TB.works(dex.move(k)) for k in ("PROTECT", "SUBSTITUTE", "HEAVYSLAM", "SWAGGER", "SWORDSDANCE", "WILLOWISP", "GROWL", "RECOVER")]
+        == [False, False, False, False, True, True, True, True])
+    dead = [(t["name"], m["species"], k) for t in gyms["trainers"] for m in t["team"]
+            for k in m["moves"] if not TB.works(dex.move(k))]
+    chk("관장 포켓몬에 헛기술이 없다", not dead, dead[:5])
+    nohit = [(t["name"], m["species"]) for t in gyms["trainers"] for m in t["team"]
+             if not any((dex.move(k) or {}).get("power") for k in m["moves"])]
+    chk("모두 때리는 기술이 있다", not nohit, nohit[:5])
+    chk("개체값은 모두 31", all(m["iv"] == 31 for t in gyms["trainers"] for m in t["team"]))
+    lo20 = [sum(m["evs"].values()) for t in gyms["trainers"] if t["level"] == 20 for m in t["team"]]
+    hi100 = [sum(m["evs"].values()) for t in gyms["trainers"] if t["level"] == 100 for m in t["team"]]
+    chk("노력치: Lv.20 은 0, Lv.100 은 절반쯤", max(lo20) == 0 and 240 <= min(hi100) and max(hi100) <= 256,
+        (max(lo20), min(hi100), max(hi100)))
+    natures = collections.Counter(m["nature"] for t in gyms["trainers"] for m in t["team"])
+    chk("성격을 포켓몬에 맞춘다 (무보정 없음)", "HARDY" not in natures and len(natures) >= 4, natures)
+    f = TB.trainer_mon({"species": "PIKACHU", "level": 50, "iv": 31, "evs": {"spe": 126, "spa": 126}})
+    chk("능력마다 따로 적은 노력치를 읽는다", f["evs"]["spe"] == 126 and f["evs"]["atk"] == 0, f["evs"])
+    f = TB.trainer_mon({"species": "PIKACHU", "level": 50, "iv": 20, "ev": 40})
+    chk("예전 자료(숫자 하나)도 읽는다", f["evs"]["hp"] == 40 and f["ivs"]["spe"] == 20, f)
+
+
 def main():
     dex = load_dex()
     with open(os.path.join(ROOT, "server", "data", "gyms.json"), encoding="utf-8") as f:
@@ -407,6 +537,7 @@ def main():
     t_교체_규칙(dex, gyms)
     t_저장했다_되살려도_같다(dex, gyms)
     t_로스터(dex, gyms)
+    t_상대_AI(dex, gyms)
     t_끝까지_돈다(dex, gyms)
     print()
     print("======================================================")
