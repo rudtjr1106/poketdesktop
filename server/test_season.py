@@ -100,21 +100,24 @@ def main():
     chk("3연패 뒤에는 절반만 깎인다", d == -8 and notes, (d, notes))
     new, d, notes = season.rp_change("lose", 1000, 1000, 0, False, 5, 5)
     chk("0 아래로는 안 내려간다", new == 0 and d == -5, (new, d))
-    new, d, notes = season.rp_change("lose", 1000, 1000, 0, False, 310, 320)
-    chk("슈퍼볼에 올랐으면 300 아래로 안 내려간다", new == 300, new)
-    new, d, notes = season.rp_change("lose", 1000, 1000, 0, False, 710, 720)
-    chk("하이퍼볼에서는 슈퍼볼로 떨어질 수 있다", new == 695, new)
+    new, d, notes = season.rp_change("lose", 1000, 1000, 0, False, 160, 170)
+    chk("슈퍼볼에 올랐으면 150 아래로 안 내려간다", new == 150, new)
+    new, d, notes = season.rp_change("lose", 1000, 1000, 0, False, 360, 370)
+    chk("하이퍼볼에서는 슈퍼볼로 떨어질 수 있다", new == 345, new)
     new, d, notes = season.rp_change("draw", 1000, 1000, 0, False, 50, 50)
     chk("비기면 그대로", d == 0 and new == 50, (new, d))
 
     print("\n=== 티어 ===")
     chk("0 은 몬스터볼", season.tier_of(0) == "monster")
-    chk("299 는 몬스터볼, 300 은 슈퍼볼",
-        season.tier_of(299) == "monster" and season.tier_of(300) == "super")
-    chk("700 하이퍼볼 · 1200 마스터볼",
-        season.tier_of(700) == "hyper" and season.tier_of(1200) == "master")
-    chk("다음 티어까지 남은 RP", season.next_tier(250) == ("super", 50),
-        season.next_tier(250))
+    chk("149 는 몬스터볼, 150 은 슈퍼볼",
+        season.tier_of(149) == "monster" and season.tier_of(150) == "super")
+    chk("350 하이퍼볼 · 600 마스터볼",
+        season.tier_of(350) == "hyper" and season.tier_of(600) == "master")
+    chk("다음 티어까지 남은 RP", season.next_tier(100) == ("super", 50),
+        season.next_tier(100))
+    chk("화면에 가는 규칙표도 같은 경계",
+        [t.get("rp") for t in season.rules_public()["tiers"][:4]] == [0, 150, 350, 600]
+        and season.rules_public()["safeRp"] == 150)
     chk("마스터볼 위는 자리라 RP 로 안 오른다", season.next_tier(5000) == (None, 0))
 
     print("\n=== 랭크 배틀은 Lv.50 상한, 친구 배틀은 그대로 ===")
@@ -271,7 +274,7 @@ def main():
 
     print("\n=== 자리 (사천왕·챔피언) ===")
     seat_users = []
-    for i, rp in enumerate((1500, 1400, 1300, 1250, 1210, 1205, 800)):
+    for i, rp in enumerate((1500, 1400, 1300, 1250, 1210, 1205, 500)):
         u = mkuser("ss_seat_%d" % i)
         pvp._rating_row(u)
         db.run("UPDATE rank_stat SET rp=?, peak_rp=?, ranked=1, games=10"
@@ -289,7 +292,7 @@ def main():
         and board[0]["tierKr"] == "챔피언", board[0])
     sm = pvp.summary(seat_users[6])
     chk("내 요약에 티어·다음 티어", sm["tier"] == "hyper"
-        and sm["nextTier"] == "master" and sm["rpToNext"] == 400, sm)
+        and sm["nextTier"] == "master" and sm["rpToNext"] == 100, sm)
 
     print("\n=== 칭호·명패 선물 ===")
     g = mkuser("ss_gift")
