@@ -261,12 +261,30 @@ def _egg_slots(conn):
     return "알 %d개 파티, %d개 박스" % (party, box)
 
 
+def _mmr_recenter(conn):
+    """숨은 점수를 1000 으로 맞춘다 (기대 승률에 전력을 넣으면서).
+
+    지금까지의 숨은 점수는 전력을 모르는 Elo 라 **전력 우위가 이미 쌓여 있다**
+    (운영 76명: 숨은 점수와 팀 전력의 상관 0.59). 이제 기대 승률이 숨은 점수에
+    전력비를 따로 곱하므로(season.expected), 그대로 두면 센 팀은 전력을 두 번
+    세어 이겨도 거의 못 받고 지면 크게 잃는다. 1000 에서 다시 쌓으면 숨은
+    점수에는 전력으로 설명 안 되는 팀 실력만 남는다 (K=32 라 며칠이면 자리 잡는다).
+
+    **건드리지 않는 것.** RP·최고 RP·티어·승패·연승 - 보이는 것은 그대로다.
+    best 는 시즌 1 까지 쓰던 칸이라 같이 맞춘다.
+    """
+    n = conn.execute("SELECT COUNT(*) FROM rank_stat WHERE rating<>1000").fetchone()[0]
+    conn.execute("UPDATE rank_stat SET rating=1000, best=1000")
+    return "%d명 숨은 점수 1000" % n
+
+
 ONCE = [
     ("0140-refund-heals", _refund_heals),
     ("0190-season1-reset", _season1_reset),
     ("0250-dex-evolved", _dex_evolved),
     ("0260-season2-open", _season2_open),
     ("0270-egg-slots", _egg_slots),
+    ("0280-mmr-recenter", _mmr_recenter),
 ]
 
 

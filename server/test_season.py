@@ -37,7 +37,7 @@ os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
 
 from fastapi import HTTPException                          # noqa: E402
 
-from app import config, db, deps, eggs, items, migrations, pvp, season  # noqa: E402
+from app import config, db, deps, eggs, items, migrations, pvp, season, social  # noqa: E402
 
 OK = FAIL = 0
 
@@ -107,6 +107,46 @@ def main():
     new, d, notes = season.rp_change("draw", 1000, 1000, 0, False, 50, 50)
     chk("비기면 그대로", d == 0 and new == 50, (new, d))
 
+    print("\n=== 기대 승률에 두 팀 전력 ===")
+    import math as _m
+
+    def logit(p):
+        return _m.log(p / (1 - p))
+    chk("전력이 같으면 예전 식과 같다 (반반)", abs(season.expected(1000, 1000, 1.0) - 0.5) < 1e-12)
+    chk("전력비를 안 주면 1 로 본다",
+        season.expected(1200, 1000) == season.expected(1200, 1000, 1.0)
+        == 1.0 / (1.0 + 10 ** (-200 / 400.0)))
+    e125 = season.expected(1000, 1000, 1.25)
+    chk("전력비 1.25 면 센 쪽 기대치 약 83%", 0.82 < e125 < 0.835, e125)
+    chk("한쪽을 뒤집으면 합이 1 (숨은 점수 · 전력비 둘 다 뒤집어서)",
+        abs(season.expected(1100, 950, 1.2) + season.expected(950, 1100, 1 / 1.2) - 1) < 1e-12)
+    chk("숨은 점수와 전력은 로짓으로 더해진다",
+        abs(logit(season.expected(1100, 1000, 1.1))
+            - logit(season.expected(1100, 1000, 1.0)) - logit(season.expected(1000, 1000, 1.1))) < 1e-9)
+    chk("전력비가 0 · 음수 · None · 글자이면 1 로 본다",
+        all(season.expected(1000, 1000, x) == 0.5 for x in (0, -2, None, "x", float("nan"))))
+    chk("몇백만 배 차이가 와도 안 넘치고 0~1 안",
+        0.0 <= season.expected(0, 5000, 1e9) <= 1.0 and 0.0 <= season.expected(5000, 0, 1e-9) <= 1.0)
+    new, d, _ = season.rp_change("win", 1000, 1000, 0, False, 0, 0, 1.14)
+    chk("약한 팀(전력 0.88배)을 이기면 덜 받는다 (+20 -> +16)", d == 16, d)
+    new, d, _ = season.rp_change("lose", 1000, 1000, 0, False, 100, 100, 1.14)
+    chk("약한 팀에게 지면 더 잃는다 (-15 -> -19)", d == -19, d)
+    new, d, _ = season.rp_change("win", 1000, 1000, 0, False, 0, 0, 1 / 1.15)
+    chk("센 팀을 이기면 더 받는다 (+25)", d == 25, d)
+    new, d, _ = season.rp_change("lose", 1000, 1000, 0, False, 100, 100, 1 / 1.15)
+    chk("센 팀에게 지면 덜 잃는다 (-10)", d == -10, d)
+    lo_w = season.rp_change("win", 1000, 1000, 0, False, 0, 0, 1000.0)[1]
+    hi_w = season.rp_change("win", 1000, 1000, 0, False, 0, 0, 0.001)[1]
+    lo_l = season.rp_change("lose", 1000, 1000, 0, False, 100, 100, 0.001)[1]
+    hi_l = season.rp_change("lose", 1000, 1000, 0, False, 100, 100, 1000.0)[1]
+    chk("범위는 그대로 (+10~30, -5~25)", (lo_w, hi_w, lo_l, hi_l) == (10, 30, -5, -25),
+        (lo_w, hi_w, lo_l, hi_l))
+    new, d, _ = season.rp_change("win", 1000, 1000, 0, True, 0, 0, 1.14)
+    chk("첫 승 보너스는 전력과 상관없이 +10", d == 26, d)
+    new, d, _ = season.rp_change("lose", 1000, 1000, -3, False, 100, 100, 1.14)
+    chk("연패 보호도 그대로 (절반)", d == -10, d)
+    chk("규칙표에 전력 무게가 실린다", season.rules_public()["rp"]["powerK"] == season.POWER_K)
+
     print("\n=== 티어 ===")
     chk("0 은 몬스터볼", season.tier_of(0) == "monster")
     chk("149 는 몬스터볼, 150 은 슈퍼볼",
@@ -165,15 +205,120 @@ def main():
         (r["a"]["result"] == "win" and rs["rp"] >= 20)
         or (r["a"]["result"] != "win" and rs["rp"] == 0), (r["a"], rs["rp"]))
     chk("RP 가 결과에 실려 온다", r["a"]["rp"] == rs["rp"], r["a"])
+    ratio_hi = pvp.power_ratio(pvp.capped(pvp.ranked_team(hi)), pvp.capped(pvp.ranked_team(hi2)))
     if r["a"]["result"] == "win":
-        chk("첫 승이라 첫 승 보너스가 붙었다", r["a"]["rpDelta"] == 30
-            and rs["win_day"] == pvp._today(), (r["a"]["rpDelta"], rs["win_day"]))
+        want = season.rp_change("win", 1000, 1000, 0, True, 0, 0, ratio_hi)[1]
+        chk("첫 승이라 첫 승 보너스가 붙었다 (전력비 %.2f 로 잰 값)" % ratio_hi,
+            r["a"]["rpDelta"] == want and want >= 20
+            and rs["win_day"] == pvp._today(), (r["a"]["rpDelta"], want, rs["win_day"]))
     chk("걸려온 쪽 RP 는 그대로", stat(hi2)["rp"] == 0, stat(hi2)["rp"])
     chk("최고 RP 를 기억한다", rs["peak_rp"] == rs["rp"], (rs["peak_rp"], rs["rp"]))
     rec = pvp.records(hi)
     rand = [x for x in rec if x["kind"] == "random"][0]
     chk("전적에 RP 변화가 남는다", rand["rpDelta"] == r["a"]["rpDelta"], rand)
     chk("친구 배틀은 RP 를 안 건드린다", r2["a"]["rpDelta"] == 0, r2["a"])
+
+    print("\n=== 전력비가 RP 와 숨은 점수에 들어간다 (run_match) ===")
+    strong = mkuser("ss_pw_strong", 6, 50, species="GARCHOMP")
+    weak = mkuser("ss_pw_weak", 6, 47, species="GARCHOMP")
+    ratio = pvp.power_ratio(pvp.capped(pvp.ranked_team(strong)),
+                            pvp.capped(pvp.ranked_team(weak)))
+    chk("같은 종 Lv.50 여섯 vs Lv.47 여섯 = 전력비 (50/47)^1.5",
+        abs(ratio - (50 / 47.0) ** 1.5) < 1e-9, ratio)
+    # 진 판의 RP 도 보이게 바닥(0)에서 떼어 둔다. 안 그러면 진 판은 늘 0 == 0 이다.
+    for u in (strong, weak):
+        stat(u)
+        db.run("UPDATE rank_stat SET rp=100, peak_rp=100 WHERE user_id=?", (u,))
+    seen = {}
+    # 같은 종이면 레벨 높은 쪽이 늘 이겨서 네 길(센/약한 x 승/패)이 다 안 나온다.
+    # 엔진은 그대로 돌리고 **승패만 정해 준다** - 점수 뒤처리는 winner 만 본다.
+    real_sim = pvp.PB.simulate
+
+    def forced_sim(winner):
+        def sim(*a, **kw):
+            out = real_sim(*a, **kw)
+            out["winner"] = winner
+            return out
+        return sim
+    plan = [(att, dfn, rr, w) for w in ("me", "foe", "me", "foe")
+            for att, dfn, rr in ((strong, weak, ratio), (weak, strong, 1 / ratio))]
+    for i, (att, dfn, rr, w) in enumerate(plan):
+        if True:
+            before, before_d = stat(att), stat(dfn)
+            db.run("UPDATE rank_stat SET win_day='2000-01-01', streak=0, rp=100, peak_rp=100"
+                   " WHERE user_id=?", (att,))
+            before = stat(att)
+            pvp.PB.simulate = forced_sim(w)
+            try:
+                res = pvp.run_match(att, dfn, kind="random", seed=4000 + i)
+            finally:
+                pvp.PB.simulate = real_sim
+            e = season.expected(before["rating"], before_d["rating"], rr)
+            got = res["a"]
+            want_mmr = int(round(pvp.K * (pvp._score(got["result"]) - e)))
+            want_rp = season.rp_change(got["result"], before["rating"], before_d["rating"], 0,
+                                       got["result"] == "win", before["rp"] or 0,
+                                       before["peak_rp"] or 0, rr)[1]
+            key = ("strong" if att == strong else "weak", got["result"])
+            ok = got["delta"] == want_mmr and got["rpDelta"] == want_rp
+            seen.setdefault(key, []).append((ok, got["rpDelta"], want_rp, got["delta"], want_mmr))
+            chk_ok = ok and res["b"]["delta"] == 0 and stat(dfn)["rating"] == before_d["rating"]
+            if not chk_ok:
+                chk("판마다 RP·숨은 점수가 전력비 넣은 식과 같다 (%s)" % (key,), False,
+                    (got, want_rp, want_mmr))
+                break
+    chk("판마다 RP·숨은 점수가 전력비 넣은 식과 같다 (%d판, 걸려온 쪽은 그대로)"
+        % sum(len(v) for v in seen.values()),
+        all(ok for v in seen.values() for ok, *_ in v), seen)
+    chk("넷 다 나왔다 (센 팀 승·패, 약한 팀 승·패) - 식 비교가 네 길을 다 지난다",
+        sorted(seen) == [("strong", "lose"), ("strong", "win"), ("weak", "lose"), ("weak", "win")],
+        sorted(seen))
+    sw = seen.get(("strong", "win"), [])
+    chk("센 팀이 약한 팀을 이기면 첫 승을 빼고 +20 보다 적게",
+        sw and all(rpd - 10 < 20 for _ok, rpd, *_ in sw), sw)
+    sl = seen.get(("strong", "lose"), [])
+    chk("센 팀이 약한 팀에게 지면 -15 보다 더 잃는다",
+        sl and all(rpd < -15 for _ok, rpd, *_ in sl), sl)
+    wl = seen.get(("weak", "lose"), [])
+    chk("약한 팀이 센 팀에게 지면 -15 보다 덜 잃는다",
+        wl and all(-15 < rpd < 0 for _ok, rpd, *_ in wl), wl)
+    ww = seen.get(("weak", "win"), [])
+    chk("약한 팀이 센 팀을 이기면 첫 승을 빼고 +20 보다 많이",
+        ww and all(rpd - 10 > 20 for _ok, rpd, *_ in ww), ww)
+    fr = pvp.run_match(strong, weak, kind="friend", seed=99)
+    chk("친구 배틀은 여전히 점수를 안 건드린다", fr["a"]["delta"] == 0 and fr["a"]["rpDelta"] == 0)
+
+    print("\n=== 전적 목록에 시즌 2 숨은 점수를 싣지 않는다 ===")
+    floor_u = mkuser("ss_floor", 6, 40, species="GARCHOMP")
+    stat(floor_u)
+    lost = None
+    for i in range(10):
+        db.run("UPDATE rank_stat SET rp=0, peak_rp=0 WHERE user_id=?", (floor_u,))
+        res = pvp.run_match(floor_u, strong, kind="random", seed=7000 + i)
+        if res["a"]["result"] == "lose":
+            lost = res
+            break
+    stored = db.q1("SELECT delta, rp, rp_delta FROM battle_record WHERE user_id=?"
+                   " AND started=1 ORDER BY id DESC LIMIT 1", (floor_u,))
+    rec0 = pvp.records(floor_u)[0]
+    chk("바닥(RP 0)에서 진 판: 기록에는 숨은 점수 변화가 있고 RP 변화는 0",
+        lost is not None and stored["delta"] != 0 and stored["rp_delta"] == 0, dict(stored))
+    chk("전적 목록에는 숨은 점수 변화·숨은 점수를 싣지 않는다 ('점수 -N' 이 안 뜬다)",
+        rec0["delta"] == 0 and rec0["rating"] is None and rec0["rpDelta"] == 0, rec0)
+    db.run("INSERT INTO battle_record (user_id, foe_id, foe_name, kind, result, rating, delta,"
+           " reward, turns, my_left, foe_left, started, ended_at, rp, rp_delta)"
+           " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+           (floor_u, strong, "옛상대", "random", "win", 1016, 16, 0, 5, 1, 0, 1,
+            "2026-09-01T00:00:00+00:00", 0, 0))
+    old = [x for x in pvp.records(floor_u) if x["at"].startswith("2026-09-01")]
+    chk("시즌 1 판은 그때 보이던 점수를 그대로", old and old[0]["delta"] == 16
+        and old[0]["rating"] == 1016, old)
+
+    print("\n=== 친구 찾기 카드의 점수는 RP ===")
+    db.run("UPDATE rank_stat SET rating=1450, rp=234, ranked=1 WHERE user_id=?", (strong,))
+    found = social.find(weak, "ss_pw_strong")
+    chk("찾기 결과의 점수 칸은 숨은 점수가 아니라 RP", found.get("rating") == 234
+        and found.get("rp") == 234 and found.get("tierKr"), found)
 
     print("\n=== 랭크 팀 ===")
     t = mkuser("ss_team", 6, 20)
@@ -592,6 +737,24 @@ def main():
            (free, "egg", "nope", 1, "t", "m", "2026-09-15"))
     chk("모르는 알 선물은 지급하지 않는다", items.gift_claim(free) == [])
 
+    print("\n=== 숨은 점수 1000 으로 맞추기 (손질 0280) ===")
+    db.run("UPDATE rank_stat SET rating=1404, best=1500, rp=321, peak_rp=400 WHERE user_id=?",
+           (strong,))
+    before_rows = dict((r["user_id"], (r["rp"], r["peak_rp"], r["wins"], r["losses"], r["streak"]))
+                       for r in db.q("SELECT * FROM rank_stat"))
+    conn = db.connect()
+    note = migrations._mmr_recenter(conn)
+    conn.commit()
+    print("  (%s)" % note)
+    rows = db.q("SELECT * FROM rank_stat")
+    chk("모두 숨은 점수 1000", rows and all(r["rating"] == 1000 and r["best"] == 1000 for r in rows),
+        [(r["user_id"], r["rating"]) for r in rows if r["rating"] != 1000][:5])
+    chk("RP · 최고 RP · 승패 · 연승은 그대로",
+        all(before_rows[r["user_id"]] == (r["rp"], r["peak_rp"], r["wins"], r["losses"], r["streak"])
+            for r in rows))
+    chk("손질 목록에 올라 있다 (0270 뒤)",
+        [n for n, _f in migrations.ONCE][-2:] == ["0270-egg-slots", "0280-mmr-recenter"])
+
     print("\n=== 1.4.0 알에 자리 주기 (손질 0270) ===")
     full = mkuser("ss_egg_old_full", 6, 20)
     roomy = mkuser("ss_egg_old_roomy", 2, 20)
@@ -610,6 +773,25 @@ def main():
     chk("자리가 있으면 빈 자리를 준다", er["on_desktop"] == 1 and er["slot"] == 2, dict(er))
     chk("손질 목록에 올라 있다",
         any(n == "0270-egg-slots" for n, _f in migrations.ONCE))
+
+    # 맨 끝에 둔다 - run() 은 앞의 손질(시즌 전환 등)까지 이 DB 에 전부 돌린다.
+    print("\n=== 손질은 run() 으로 한 번만 돈다 (0280) ===")
+    # 앞의 손질은 끝났다고 적어 두고 0280 만 돌게 한다 (0190 이 점수를 1000 으로
+    # 돌려놓으면 0280 이 안 돌아도 이 검사가 통과해 버린다).
+    for n, _f in migrations.ONCE:
+        if n != "0280-mmr-recenter":
+            db.run("INSERT OR IGNORE INTO meta (k, v) VALUES (?, 'test')", ("mig:" + n,))
+    db.run("DELETE FROM meta WHERE k='mig:0280-mmr-recenter'")
+    stat(strong)                        # 앞 절(시즌 전환)이 줄을 비웠을 수 있다
+    db.run("UPDATE rank_stat SET rating=1234 WHERE user_id=?", (strong,))
+    chk("준비: 숨은 점수 1234 인 사람이 있다", stat(strong)["rating"] == 1234, stat(strong)["rating"])
+    migrations.run()
+    chk("run() 뒤 0280 이 끝났다고 적혀 있다",
+        db.q1("SELECT v FROM meta WHERE k='mig:0280-mmr-recenter'") is not None)
+    chk("run() 이 숨은 점수를 1000 으로 맞췄다", stat(strong)["rating"] == 1000, stat(strong)["rating"])
+    db.run("UPDATE rank_stat SET rating=1234 WHERE user_id=?", (strong,))
+    migrations.run()
+    chk("다시 켜도(run 한 번 더) 안 돈다", stat(strong)["rating"] == 1234, stat(strong)["rating"])
 
     print("\n======================================================")
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))

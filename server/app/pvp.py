@@ -115,8 +115,9 @@ def unpack(blob):
 
 
 # ---------------------------------------------------------------- 점수
-def _expected(mine, theirs):
-    return 1.0 / (1.0 + 10 ** ((theirs - mine) / 400.0))
+def _expected(mine, theirs, power_ratio=1.0):
+    """숨은 점수와 전력비로 본 기대 승률. RP 와 같은 식을 쓴다 (season.expected)."""
+    return season.expected(mine, theirs, power_ratio)
 
 
 def _rating_row(uid):
@@ -331,13 +332,16 @@ def run_match(a_uid, b_uid, kind="random", seed=None):
     left_b = _left(out["events"], "foe", len(b_mons))
     lead_a = a_mons[0]["species"]
     lead_b = b_mons[0]["species"]
+    # 실제로 싸운 두 팀(랭크 팀, 상한 걸린 레벨)의 전력비. 점수 기대치에 들어간다.
+    ratio_a = power_ratio(a_mons, b_mons)
 
     fin_a = _settle(a_uid, row_a, b_uid, b_name, kind, res_a, pay_a, day,
                     used_a, out["turns"], left_a, left_b, lead_a, lead_b,
-                    mid, row_b["rating"])
+                    mid, row_b["rating"], power_ratio=ratio_a)
     fin_b = _settle(b_uid, row_b, a_uid, a_name, kind, res_b, pay_b, day,
                     used_b, out["turns"], left_b, left_a, lead_b, lead_a,
-                    mid, row_a["rating"], started=False)
+                    mid, row_a["rating"], started=False,
+                    power_ratio=1.0 / ratio_a)
 
     return {"matchId": mid, "winner": winner_id, "turns": out["turns"],
             "kind": kind, "seed": seed, "a": fin_a, "b": fin_b}
@@ -350,9 +354,15 @@ def _left(events, side, total):
     return max(0, total - down)
 
 
+def power_ratio(mine, theirs):
+    """내 팀 전력 / 상대 팀 전력. 어느 쪽이든 못 재면 1."""
+    a, b = team_power(mine), team_power(theirs)
+    return (a / b) if (a > 0 and b > 0) else 1.0
+
+
 def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
             turns, my_left, foe_left, lead, foe_lead, mid, foe_rating,
-            started=True):
+            started=True, power_ratio=1.0):
     """한 사람 몫의 뒤처리 — 돈, 전적, 점수.
 
     started 는 **내가 걸었는가**다. 걸려온 쪽은 전적에 남기기만 하고
@@ -381,7 +391,10 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
     first_win = False
     counts = started and kind == "random"
     if counts:
-        exp = _expected(row["rating"], foe_rating)
+        # 숨은 점수도 RP 와 **같은 기대치**(숨은 점수 + 전력비)로 움직인다. 숨은
+        # 점수만 전력을 모른 채 오르내리면, 전력이 센 사람의 숨은 점수에 전력이
+        # 다시 쌓여서 기대치에 전력이 두 번 들어간다.
+        exp = _expected(row["rating"], foe_rating, power_ratio)
         delta = int(round(K * (_score(result) - exp)))
         rating = max(0, row["rating"] + delta)
         # RP 는 **이 판 전의** 숨은 점수로 잰다. 방금 오른 점수로 재면 이긴
@@ -389,7 +402,7 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
         first_win = result == "win" and row["win_day"] != today
         rp, rp_delta, notes = season.rp_change(
             result, row["rating"], foe_rating, row["streak"], first_win,
-            rp, peak)
+            rp, peak, power_ratio)
         peak = max(peak, rp)
 
     db.run("INSERT INTO battle_record (user_id, foe_id, foe_name, kind,"
@@ -752,6 +765,7 @@ def records(uid, limit=30):
     """
     rows = db.q("SELECT * FROM battle_record WHERE user_id=?"
                 " ORDER BY id DESC LIMIT ?", (uid, limit))
+    s2 = _season2_opened()
     # 같은 상대가 여러 번 나오므로 판정을 한 번만 하고 돌려 쓴다.
     why = {}
     out = []
@@ -759,12 +773,17 @@ def records(uid, limit=30):
         fid = r["foe_id"]
         if fid is not None and fid not in why:
             why[fid] = can_fight(uid, fid)
+        # **시즌 2 판의 숨은 점수 변화는 싣지 않는다.** 1.4.1 전적 목록은 RP 변화가
+        # 0 이고 RP 도 0 이면(바닥에서 진 판) delta 를 '점수 -N' 으로 적어서, 안
+        # 보여야 할 숨은 점수가 드러났다. 시즌 1 판은 그때 보이던 점수라 둔다.
+        hide = (r["ended_at"] or "") >= s2
         out.append({"id": r["id"], "foe": r["foe_name"], "foeId": fid,
                     "kind": r["kind"], "result": r["result"],
                     # 내가 건 판인가. 걸려온 판은 점수·승패·돈에 안 들어가서
                     # 화면에서도 그렇게 보여야 한다.
                     "started": bool(r["started"]),
-                    "rating": r["rating"], "delta": r["delta"],
+                    "rating": None if hide else r["rating"],
+                    "delta": 0 if hide else r["delta"],
                     "rp": r["rp"], "rpDelta": r["rp_delta"],
                     "reward": r["reward"], "turns": r["turns"],
                     "myLeft": r["my_left"], "foeLeft": r["foe_left"],
@@ -774,6 +793,15 @@ def records(uid, limit=30):
                     "whyNot": why.get(fid) if fid is not None
                               else "상대가 누구인지 남아 있지 않습니다."})
     return out
+
+
+def _season2_opened():
+    """시즌 2 가 열린 시각 (손질 0260 이 돈 때). 모르면 시즌 시작 날짜."""
+    try:
+        r = db.q1("SELECT v FROM meta WHERE k='mig:0260-season2-open'")
+    except Exception:                                        # noqa: BLE001
+        r = None
+    return (r["v"] if r and r["v"] else season.SEASON_STARTS)
 
 
 def clear_records(uid, rid=None):

@@ -215,8 +215,15 @@ def find(uid, name):
     out = {"found": True, "id": u["id"], "name": u["username"],
            "online": is_online(u["id"]), "relation": relation(uid, u["id"])}
     if st:
-        out.update({"rating": st["rating"], "ranked": bool(st["ranked"]),
+        # **'점수' 칸에는 보이는 점수(RP)를 싣는다.** 시즌 2 부터 rating 은 숨은
+        # 점수인데, 검색 카드(1.4.1 클라이언트)는 이 칸을 "N점" 으로 그대로
+        # 적는다. 친구 목록·랭킹은 이미 RP 를 보여 준다.
+        out.update({"rating": int(st["rp"] or 0), "ranked": bool(st["ranked"]),
                     "wins": st["wins"], "losses": st["losses"]})
+        d = season.deco_map([u["id"]]).get(u["id"]) or {}
+        for k in ("rp", "tier", "tierKr", "title", "frame", "frameColor"):
+            if d.get(k) is not None:
+                out[k] = d[k]
     return out
 
 

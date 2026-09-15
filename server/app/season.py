@@ -3,8 +3,10 @@
 
 시즌 2 부터 숫자가 둘로 나뉜다.
 
-  · **숨은 점수(MMR)** — rank_stat.rating. 전과 같은 Elo 다. 화면에는 안
-    보이고, 한 판에서 RP 가 얼마나 움직일지를 정하는 데만 쓴다.
+  · **숨은 점수(MMR)** — rank_stat.rating. Elo 다. 화면에는 안 보이고, 한
+    판에서 RP 가 얼마나 움직일지를 정하는 데 쓴다. 기대 승률에는 **두 팀의
+    전력도 같이 넣는다** (expected, POWER_K). 그래서 숨은 점수에는 전력으로
+    설명되지 않는 몫(기술·타입·지닌 도구로 짠 팀 실력)만 남는다.
   · **랭크 포인트(RP)** — rank_stat.rp. 보이는 숫자이고 티어를 정한다.
     이기면 크게 오르고 지면 조금 내려간다. 반반으로 싸우면 판마다 조금씩
     오르므로, 판을 한 만큼 올라간다.
@@ -54,7 +56,7 @@ SAFE_RP = 150                # 슈퍼볼 경계와 같다
 ELITE_SEATS = 4
 
 # ---- RP ----
-# 이기면 10~30, 지면 5~25. 기대 승률(숨은 점수로 잰다)에 따라 갈린다.
+# 이기면 10~30, 지면 5~25. 기대 승률(숨은 점수 + 두 팀 전력)에 따라 갈린다.
 # 비슷한 상대면 +20 / -15 라 반반만 해도 판마다 2.5 씩 오른다.
 WIN_BASE, WIN_SWING = 10, 20
 LOSS_BASE, LOSS_SWING = 5, 20
@@ -62,6 +64,27 @@ LOSS_BASE, LOSS_SWING = 5, 20
 FIRST_WIN_RP = 10
 # 이만큼 연달아 진 뒤에는 져도 절반만 깎는다.
 LOSS_GUARD = 3
+
+# 기대 승률에 넣는 전력의 무게. 기대 승률 = 1 / (1 + 10^((상대-나)/400) x (상대 전력/내 전력)^K)
+#
+# 전에는 숨은 점수만 봤다. 그러면 전력이 제일 센 팀은 더 센 상대가 없어서
+# 매칭이 25% 띠까지 넓어지고, 약한 팀을 이기면서도 비슷한 상대를 이긴 만큼
+# RP 를 받았다 (시즌 2 첫날 13승 4패, 상대 전력 중앙값 0.87배).
+#
+# 7 은 재어서 정했다. 전력비 0.8~1.25 인 판에서
+#   · 실제 랜덤 배틀 1,043판 (9/2~9/16): 7.07
+#   · 지금 랭크 팀 108개를 엔진으로 붙인 15,660판: 6.93
+# 매칭은 '상대/나' 를 ±25% 로 보므로 거는 쪽 전력비는 0.8~1.33 까지 나온다.
+# 0.7~1.43 으로 넓혀 맞춰도 6.9(실제) / 6.6(엔진)이라 7 에서 벗어나지 않는다.
+# 전력비 1.10 이면 센 쪽이 66%, 1.25 면 83% 를 이긴다. 비슷한 상대(1.0)는
+# 그대로 +20 / -15 다.
+#
+# **알아 둘 것.** RP 한 판 = (이기면 +10, 지면 -5) + 0.625 x 숨은 점수 변화
+# (숨은 점수가 같은 기대치를 쓰므로 반올림 빼고 늘 같다). 그래서 기대치를 어떻게
+# 잡든 시즌 전체 RP 는 '15 x 승 - 5 x 판 + 0.625 x 숨은 점수 이동' 이다. 전력비는
+# 마지막 항만 바꾼다 - 센 팀이 약한 팀을 자주 만나 **많이 이기는 것** 자체는
+# 매칭(pvp.POWER_BANDS)과 RP 식의 몫이다.
+POWER_K = 7.0
 
 # ---- 칭호 · 명패 ----
 TITLES = {
@@ -140,16 +163,31 @@ def floor_rp(peak):
     return SAFE_RP if peak >= SAFE_RP else 0
 
 
-def expected(mine, theirs):
-    return 1.0 / (1.0 + 10 ** ((theirs - mine) / 400.0))
+def expected(mine, theirs, power_ratio=1.0):
+    """내가 이길 기대치 (0~1).
+
+    mine/theirs 는 숨은 점수, power_ratio 는 **내 전력 / 상대 전력** (pvp.team_power,
+    Lv.50 상한으로 잰 것). 둘을 곱해서(로짓으로는 더해서) 본다. 전력을 모르면 1.
+    """
+    try:
+        r = float(power_ratio)
+    except (TypeError, ValueError):
+        r = 1.0
+    if not r > 0:
+        r = 1.0
+    # 지나치게 벌어진 전력비는 자른다 (매칭은 25% 안에서만 붙인다). 안 자르면
+    # 친구 배틀처럼 전력이 몇 배 차이 나는 값이 들어와도 넘치지 않는다.
+    r = max(1e-3, min(1e3, r))
+    return 1.0 / (1.0 + 10 ** ((theirs - mine) / 400.0) * r ** -POWER_K)
 
 
-def rp_change(result, my_mmr, foe_mmr, streak, first_win, rp, peak):
+def rp_change(result, my_mmr, foe_mmr, streak, first_win, rp, peak, power_ratio=1.0):
     """한 판으로 움직일 RP. (새 RP, 변화량, 붙은 말들) 을 돌려준다.
 
-    streak 은 **이 판 전의** 연승(+)/연패(-) 다.
+    streak 은 **이 판 전의** 연승(+)/연패(-) 다. power_ratio 는 내 전력 / 상대 전력.
+    약한 팀을 이기면 덜 받고, 약한 팀에게 지면 더 잃는다.
     """
-    exp = expected(my_mmr, foe_mmr)
+    exp = expected(my_mmr, foe_mmr, power_ratio)
     notes = []
     if result == "win":
         d = WIN_BASE + int(round(WIN_SWING * (1.0 - exp)))
@@ -294,7 +332,8 @@ def rules_public():
         "safeRp": SAFE_RP,
         "rp": {"win": [WIN_BASE, WIN_BASE + WIN_SWING],
                "lose": [LOSS_BASE, LOSS_BASE + LOSS_SWING],
-               "firstWin": FIRST_WIN_RP, "lossGuard": LOSS_GUARD},
+               "firstWin": FIRST_WIN_RP, "lossGuard": LOSS_GUARD,
+               "powerK": POWER_K},
         "rewards": [{"tier": t, "tierKr": TIER_KR[t],
                      "title": TITLES[title],
                      "frame": FRAMES[frame][0] if frame else None,
