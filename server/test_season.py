@@ -411,6 +411,29 @@ def main():
         len(eggs.pool("legendary")) == len(eggs.LEGENDARY_POOL)
         and len(eggs.pool("mythical")) >= len(eggs.MYTHICAL_POOL) - 1,
         (len(eggs.pool("legendary")), len(eggs.pool("mythical"))))
+    chk("본가의 전설 71종 · 환상 23종 전부",
+        len(set(eggs.LEGENDARY_POOL)) == 71 and len(set(eggs.MYTHICAL_POOL)) == 23)
+    chk("전설과 환상이 겹치지 않는다",
+        not set(eggs.LEGENDARY_POOL) & set(eggs.MYTHICAL_POOL))
+    dexd = deps.dex()
+    flagged = set(sp["num"] for sp in dexd.species if sp.get("legendary"))
+    chk("둘 다 도감에서 전설 표시가 있는 종", set(eggs.LEGENDARY_POOL + eggs.MYTHICAL_POOL)
+        <= flagged)
+    # 도감의 전설 표시 중 알에 없는 것은 울트라비스트·패러독스뿐이어야 한다.
+    # 새 전설이 도감에 들어오면 여기서 빨개진다 - 목록에 넣을지 정하라는 뜻이다.
+    rest = sorted(flagged - set(eggs.LEGENDARY_POOL) - set(eggs.MYTHICAL_POOL))
+    ub_paradox = set(list(range(793, 800)) + list(range(803, 807))
+                     + list(range(984, 996)) + [1005, 1006, 1009, 1010]
+                     + list(range(1020, 1024)))
+    chk("빠진 것은 울트라비스트 11종 · 패러독스 20종뿐", set(rest) == ub_paradox,
+        sorted(set(rest) ^ ub_paradox))
+    picks = set(eggs.give_species("legendary", random.Random(k)) for k in range(400))
+    chk("여러 번 뽑으면 여러 종이 나온다 (400번에 50종 넘게)", len(picks) > 50, len(picks))
+    from common import pokelogic as P
+    no_moves = [sp for sp in eggs.pool("legendary") + eggs.pool("mythical")
+                if not P.make_pokemon(dexd.get(sp), eggs.HATCH_LEVEL,
+                                      random.Random(1))["moves"]]
+    chk("어느 종이 태어나도 Lv.5 에 쓸 기술이 있다", not no_moves, no_moves)
     pub = eggs.public(eg)
     chk("화면에 가는 목록에 알 속 종이 없다",
         all("species" not in e and "pokemon" not in e for e in pub), pub)
