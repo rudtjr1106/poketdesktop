@@ -278,6 +278,21 @@ def main():
     st = ui_bag.BagWindow._target_state(None, candy, {"shiny": False, "info": {}})
     chk("아니면 쓸 수 있다", not st[1], st)
     chk("가방에서 쓸 수 있는 도구", "shiny" in ui_bag.USABLE)
+    from poketdesktop import ui_shop
+    chk("상점 탭도 '쓸 수 없는 물건' 이라고 안 적는다",
+        "쓸 수 없" not in ui_shop.effect_text(candy)
+        and "이로치" in ui_shop.effect_text(candy), ui_shop.effect_text(candy))
+    # 도구 목록에 있는 모든 종류를 두 창이 다 아는가. 새 종류를 넣고 한쪽을
+    # 빠뜨리면 여기서 걸린다 (이로치사탕이 그랬다).
+    import json as _json
+    cat = _json.load(open(os.path.join(os.path.dirname(HERE), "server", "data",
+                                       "items.json"), encoding="utf-8"))["items"]
+    kinds = sorted(set((it.get("effect") or {}).get("kind") for it in cat.values()))
+    unknown = [k for k in kinds
+               if ui_shop.effect_text({"effect": {"kind": k}}) == "아직 쓸 수 없는 물건"
+               or ui_bag.item_desc({"effect": {"kind": k}}) == "아직 쓸 수 없는 도구다."]
+    chk("도구 목록의 모든 종류를 상점·가방이 설명한다 (%s)" % ", ".join(kinds),
+        not unknown, unknown)
     chk("설명에 되돌릴 수 없다", "되돌릴 수 없다" in ui_bag.item_desc(candy))
     chk("선물 줄: 칭호", ui_bag.gift_line({"kind": "title", "name": "시즌 1 사천왕",
                                           "count": 1}) == "칭호 · 시즌 1 사천왕")

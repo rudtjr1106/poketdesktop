@@ -151,6 +151,11 @@ def effect_text(it):
         # {"kind": "held"} 뿐이라 이게 설명의 전부다.
         return (it or {}).get("desc") or "포켓몬에게 지니게 하면 배틀에서 효과가 난다"
 
+    if kind == "shiny":
+        # 1.4.0 에서 이 칸이 빠져 있어서 상점 탭이 "아직 쓸 수 없는 물건" 이라고
+        # 적었다. 가방에서는 멀쩡히 쓰이는데 막아 둔 것처럼 보였다.
+        return "먹이면 몸 색이 바뀌어 이로치가 된다 (가방에서 포켓몬에게 쓴다)"
+
     return "아직 쓸 수 없는 물건"
 
 
@@ -166,7 +171,9 @@ def effect_note(it):
     if (it or {}).get("heldNote"):
         # 지녔을 때 실제로 몇 배인지 (본가 설명에는 숫자가 없다)
         return it["heldNote"]
-    if kind == "iv":
+    if kind == "shiny":
+        note = note or "랭크 시즌 보상으로만 받는다. 겉모습만 바뀌고 능력은 그대로다"
+    elif kind == "iv":
         note = note or "레벨이 어느 정도 오른 포켓몬만 단련할 수 있다"
     elif kind == "ev":
         note = note or "능력 하나에 252, 전부 합쳐 510 까지"
