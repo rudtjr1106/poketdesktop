@@ -164,6 +164,8 @@ def use(body: UseIn, me=Depends(deps.current)):
         out = _use_stone(uid, it, mon, dex, hour)
     elif kind == "noevolve":
         out = _use_everstone(uid, it, mon)
+    elif kind == "shiny":
+        out = _use_shiny(uid, it, mon)
     else:
         raise HTTPException(400, "%s은(는) 아직 쓸 수 없습니다." % it["kr"])
 
@@ -269,6 +271,24 @@ def _use_everstone(uid, it, mon):
     return {"ok": True, "noEvolve": on, "keep": True,
             "message": ("%s은(는) 이제 진화하지 않는다." % name) if on
                        else ("%s의 진화를 다시 허락했다." % name)}
+
+
+def _use_shiny(uid, it, mon):
+    """이로치사탕 — 몸 색만 이로치로 바꾼다. 능력은 그대로다.
+
+    시즌 보상으로만 준다(상점·드랍에 없다). 이미 이로치면 사탕을 안 쓴다.
+    **UPDATE 에 shiny=0 을 건다** - 두 창에서 같은 포켓몬에게 동시에 쓰면
+    한쪽만 바뀌고 다른 쪽은 여기서 막혀 사탕이 남는다.
+    """
+    name = mon.get("nickname") or deps.dex().name(mon["species"])
+    if mon.get("shiny"):
+        raise HTTPException(400, "%s은(는) 이미 이로치다." % name)
+    cur = db.run("UPDATE pokemon SET shiny=1 WHERE id=? AND user_id=? AND shiny=0",
+                 (mon["id"], uid))
+    if getattr(cur, "rowcount", 1) == 0:
+        raise HTTPException(400, "%s은(는) 이미 이로치다." % name)
+    return {"ok": True, "shiny": True,
+            "message": "%s의 몸 색이 바뀌었다! 반짝이는 이로치가 되었다!" % name}
 
 
 # ---------------------------------------------------------------- 거들기

@@ -198,23 +198,20 @@ def main():
         chk("친구 배틀도 걸려온 쪽은 전적에 안 남는다",
             se["friendWins"] + se["friendLosses"] + se["friendDraws"] == 0, se)
 
-        print("\n=== 매칭 레벨 (깍두기로 평균 깎기) ===")
-        chk("Lv.60 다섯 + Lv.1 하나는 60 으로 본다", pvp.match_level([60, 60, 60, 60, 60, 1]) == 60,
-            pvp.match_level([60, 60, 60, 60, 60, 1]))
-        chk("혼자 센 한 마리 + 약한 다섯은 그 한 마리로", pvp.match_level([70, 5, 5, 5, 5, 5]) == 70)
-        chk("정상적인 파티는 평균 그대로", abs(pvp.match_level([70, 50, 50, 50, 50, 50]) - 53.33) < 0.01,
-            pvp.match_level([70, 50, 50, 50, 50, 50]))
-        chk("딱 20 차이까지는 평균에 넣는다", pvp.match_level([60, 40]) == 50)
-        chk("깍두기를 끼워도 Lv.50 파티와는 +-5 띠에 안 들어간다",
-            abs(pvp.match_level([60, 60, 60, 60, 60, 1]) - pvp.match_level([50] * 6)) > pvp.LEVEL_BAND)
-        chk("포켓몬이 없으면 None", pvp.match_level([]) is None)
-        # 실제 DB 에서도: 깍두기를 끼운 사람은 위 칸 사람과 붙는다
+        print("\n=== 매칭 전력 (깍두기로 전력 깎기) ===")
+        # 시즌 2 부터 평균 레벨이 아니라 팀 전력으로 붙인다. Lv.1 을 끼워 넣어도
+        # 전력은 거의 그대로라 아래 사람과 붙지 못한다.
         pad = mkuser("zz_pvp_pad", 5, 60)
         db.run("UPDATE pokemon SET level=60 WHERE user_id=?", (pad,))
         filler = mkuser("zz_pvp_pad_filler", 1, 1)
         db.run("UPDATE pokemon SET user_id=?, slot=5 WHERE user_id=?", (pad, filler))
-        lv = pvp._avg_levels()
-        chk("DB 에서 읽어도 깍두기는 빠진다", abs(lv.get(pad, 0) - 60) < 0.01, lv.get(pad))
+        teams = pvp._all_teams()
+        full = pvp.team_power(teams[pad])
+        five = pvp.team_power(teams[pad][:5] if teams[pad][0]["level"] > 1
+                              else teams[pad][1:])
+        chk("Lv.1 하나를 끼워도 전력은 1% 도 안 는다", full / five < 1.01, full / five)
+        chk("여섯 마리가 됐으니 여섯 마리 팀과 붙을 수 있다",
+            pvp.can_defend(len(teams[pad]), 6))
 
         print("\n=== 못 붙이는 경우 ===")
         f1 = mkuser("zz_pvp_f", 0)
@@ -246,47 +243,18 @@ def main():
         chk("지워도 순위표에 그대로 있다",
             any(x["name"] == "zz_pvp_a" for x in pvp.ranking()), pvp.ranking())
 
-        print("\n=== 상대 고르기 — 레벨이 비슷한 사람만 ===")
-        # 이 DB 에는 다른 검사가 만든 사람도 있을 수 있다. 그래서 '누구를
-        # 골랐나' 를 이름으로 박지 않고, 고른 사람이 규칙을 지키는지만 본다.
+        print("\n=== 상대 고르기 — 전력이 비슷한 사람만 ===")
+        # 자세한 규칙은 test_season.py 가 본다. 여기서는 방금 붙은 사람을
+        # 다시 안 고르는 것만.
         lo = mkuser('zz_mm_lo', 3, 10)
-        lo2 = mkuser('zz_mm_lo2', 3, 12)
-        mid = mkuser('zz_mm_mid', 3, 22)
-        hi = mkuser('zz_mm_hi', 3, 60)
-        lv = pvp._avg_levels()
-
-        def near(uid, band):
-            return [u for u, x in lv.items()
-                    if u != uid and abs(x - lv[uid]) <= band]
-
-        op = pvp.find_opponent(lo)
-        chk('Lv10 에게 상대를 찾아 준다', op is not None, op)
-        chk('고른 상대는 레벨 차이가 %d 이내' % pvp.LEVEL_BAND,
-            op is not None and abs(lv[op] - lv[lo]) <= pvp.LEVEL_BAND,
-            (lv.get(op), lv[lo]))
-
-        # Lv22 는 +-5 안에 아무도 없다. 한 번만 넓혀서 +-10 까지 본다.
-        op = pvp.find_opponent(mid)
-        chk('+-5 에 없으면 +-10 까지만 넓힌다',
-            (op is None and not near(mid, pvp.LEVEL_BAND_MAX))
-            or (op is not None
-                and abs(lv[op] - lv[mid]) <= pvp.LEVEL_BAND_MAX),
-            (lv.get(op), lv[mid]))
-
-        # 혼자 동떨어져 있으면 억지로 붙이지 않는다. 예전에는 칸을 끝까지
-        # 넓혀서 Lv60 이 Lv5 를 때렸다.
-        op = pvp.find_opponent(hi)
-        chk('가까운 사람이 없으면 안 붙인다',
-            (op is None) == (not near(hi, pvp.LEVEL_BAND_MAX)),
-            (op, [lv[u] for u in near(hi, pvp.LEVEL_BAND_MAX)]))
-
-        # 방금 붙은 사람은 한동안 다시 안 고른다.
+        lo2 = mkuser('zz_mm_lo2', 3, 10)
         pvp.run_match(lo, lo2, kind='random', seed=11)
         op = pvp.find_opponent(lo)
         chk('방금 붙은 사람은 다시 안 고른다', op != lo2, op)
+        teams = pvp._all_teams()
         chk('그래도 규칙 밖의 사람을 데려오지는 않는다',
-            op is None or abs(lv[op] - lv[lo]) <= pvp.LEVEL_BAND_MAX,
-            (lv.get(op), lv[lo]))
+            op is None or abs(pvp.team_power(teams[op]) / pvp.team_power(teams[lo]) - 1)
+            <= pvp.POWER_BANDS[-1], op)
 
         print("\n=== 로그 정리 ===")
         n0 = db.q1("SELECT COUNT(*) c FROM pvp_match")["c"]
@@ -305,7 +273,7 @@ def main():
     finally:
         for n in ("zz_pvp_a", "zz_pvp_b", "zz_pvp_c", "zz_pvp_d",
                   "zz_pvp_e", "zz_pvp_f", "zz_mm_lo", "zz_mm_lo2",
-                  "zz_mm_mid", "zz_mm_hi"):
+                  "zz_mm_mid", "zz_mm_hi", "zz_pvp_pad", "zz_pvp_pad_filler"):
             db.run("DELETE FROM users WHERE username=?", (n,))
 
     print("\n======================================================")

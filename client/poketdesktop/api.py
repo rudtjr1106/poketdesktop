@@ -322,6 +322,28 @@ class Api(object):
     def pvp_pending(self):
         return self._call("GET", "/api/pvp/pending")
 
+    # 랭크 팀 (시즌 2). 등록하지 않았으면 바탕화면 파티로 싸운다.
+    def pvp_team(self):
+        return self._call("GET", "/api/pvp/team")
+
+    def pvp_set_team(self, ids):
+        """빈 목록이면 등록을 푼다."""
+        return self._call("PUT", "/api/pvp/team",
+                          {"ids": [int(i) for i in ids]})
+
+    # 칭호 · 명패
+    def rewards(self):
+        return self._call("GET", "/api/rewards")
+
+    def equip_reward(self, title=None, frame=None):
+        """None 은 그대로, "" 은 뗀다."""
+        body = {}
+        if title is not None:
+            body["title"] = title
+        if frame is not None:
+            body["frame"] = frame
+        return self._call("POST", "/api/rewards/equip", body)
+
     # ---------------- 가방 · 상점 ----------------
     def bag(self):
         return self._call("GET", "/api/bag")

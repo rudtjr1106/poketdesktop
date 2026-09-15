@@ -3675,6 +3675,20 @@
    "sell": 4000,
    "weight": 14
   },
+  "SHINYCANDY": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "desc": "먹이면 몸 색이 바뀌어 이로치가 되는 신비한 사탕. 겉모습만 바뀌고 능력은 그대로다.",
+   "effect": {
+    "kind": "shiny"
+   },
+   "en": "Shiny Candy",
+   "id": "SHINYCANDY",
+   "ident": "shiny-candy",
+   "kr": "이로치사탕",
+   "sell": 0
+  },
   "SHINYSTONE": {
    "cat": "stone",
    "chance": 0.00143,

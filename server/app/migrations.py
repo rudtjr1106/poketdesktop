@@ -112,10 +112,114 @@ def _dex_evolved(conn):
     return "도감 잡음 %d -> %d" % (before, after)
 
 
+# 시즌 1 보상표. **여기 숫자를 적는다** (규칙 2) - season.py 의 표가 나중에
+# 바뀌어도 이미 끝난 시즌 1 의 보상은 그때 정한 그대로여야 한다.
+# (첫 등수, 끝 등수, 칭호, 명패, 이로치사탕)
+S1_REWARDS = [
+    (1, 1, "s1_champion", "gold", 3),
+    (2, 5, "s1_elite", "silver", 2),
+    (6, 10, "s1_top10", "bronze", 1),
+    (11, 30, "s1_top30", None, 1),
+    (31, 100000, "s1_player", None, 0),
+]
+S1_TITLE_KR = {
+    "s1_champion": "시즌 1 챔피언", "s1_elite": "시즌 1 사천왕",
+    "s1_top10": "시즌 1 TOP 10", "s1_top30": "시즌 1 상위권",
+    "s1_player": "시즌 1 도전자",
+}
+S1_FRAME_KR = {"gold": "금빛 명패", "silver": "은빛 명패", "bronze": "동빛 명패"}
+S1_GIFT_TITLE = "시즌 1 보상"
+
+
+def _v(row, key, i):
+    return row[key] if not isinstance(row, (tuple, list)) else row[i]
+
+
+def _season2_open(conn):
+    """시즌 1 을 닫고 시즌 2 를 연다.
+
+    순서가 곧 안전장치다 (규칙 1 — 먼저 주고 나중에 지운다).
+      1) 시즌 1 순위표를 season_result 에 옮긴다
+      2) 순위대로 보상을 선물(gift)로 넣는다. 칭호·명패·이로치사탕은 사용자가
+         다음에 켤 때 /api/me 가 지급하면서 '선물이 도착했습니다' 로 알린다
+      3) 그다음에 점수를 비운다
+
+    **숨은 점수(MMR)는 절반만 남긴다.** 1000 + (옛 점수 - 1000) x 0.5.
+    전부 1000 으로 돌리면 시즌 초에 RP 가 실력과 상관없이 튄다. 그대로 두면
+    시즌 1 의 인플레(판을 많이 건 사람이 높았다)가 그대로 넘어온다.
+    RP 는 0 부터. 친구 전적·하루 상금 상한·전적 목록은 건드리지 않는다
+    (시즌 1 초기화와 같은 이유).
+
+    한 번에 커밋한다 - 중간에 터지면 run() 이 되돌리고 다음에 다시 한다.
+    선물을 넣기 전에 같은 제목의 선물이 있는지 보므로 두 번 돌아도 두 번
+    안 준다.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0).isoformat()
+    rows = conn.execute(
+        "SELECT r.user_id, u.username, r.rating, r.games, r.wins, r.losses,"
+        " r.draws FROM rank_stat r JOIN users u ON u.id=r.user_id"
+        " WHERE r.ranked=1 ORDER BY r.rating DESC, r.wins DESC").fetchall()
+
+    gifts = candies = 0
+    for i, r in enumerate(rows, 1):
+        uid = _v(r, "user_id", 0)
+        title = frame = None
+        n = 0
+        for lo, hi, t, f, c in S1_REWARDS:
+            if lo <= i <= hi:
+                title, frame, n = t, f, c
+                break
+        conn.execute(
+            "INSERT INTO season_result (season, user_id, rank, name, rating,"
+            " rp, tier, games, wins, losses, draws, title, at)"
+            " VALUES (1,?,?,?,?,0,NULL,?,?,?,?,?,?)"
+            " ON CONFLICT(season, user_id) DO NOTHING",
+            (uid, i, _v(r, "username", 1), _v(r, "rating", 2),
+             _v(r, "games", 3), _v(r, "wins", 4), _v(r, "losses", 5),
+             _v(r, "draws", 6), title, now))
+        if conn.execute("SELECT 1 FROM gift WHERE user_id=? AND title=?",
+                        (uid, S1_GIFT_TITLE)).fetchone():
+            continue
+        bits = ["칭호 '%s'" % S1_TITLE_KR[title]]
+        if frame:
+            bits.append(S1_FRAME_KR[frame])
+        if n:
+            bits.append("이로치사탕 %d개" % n)
+        msg = "시즌 1 을 %d위로 마쳤습니다. %s을(를) 드립니다. %s은(는) 랭킹 탭에서 바꿀 수 있습니다." % (
+            i, ", ".join(bits), "칭호와 명패" if frame else "칭호")
+        if n:
+            msg += " 이로치사탕은 가방에서 포켓몬에게 먹이면 이로치가 됩니다."
+        # 한 창에 모여 뜬다. 창의 제목·말은 첫 줄 것을 쓰므로 모든 줄에 같은
+        # 말을 적어 둔다.
+        lines = [("title", title, 1)]
+        if frame:
+            lines.append(("frame", frame, 1))
+        if n:
+            lines.append(("item", "SHINYCANDY", n))
+            candies += n
+        for kind, rid, cnt in lines:
+            conn.execute(
+                "INSERT INTO gift (user_id, kind, item_id, count, title,"
+                " message, created_at) VALUES (?,?,?,?,?,?,?)",
+                (uid, kind, rid, cnt, S1_GIFT_TITLE, msg, now))
+            gifts += 1
+
+    n_all = conn.execute("SELECT COUNT(*) FROM rank_stat").fetchone()[0]
+    conn.execute(
+        "UPDATE rank_stat SET rating = 1000 + CAST((rating - 1000) / 2 AS INTEGER),"
+        " games=0, wins=0, losses=0, draws=0, streak=0, ranked=0,"
+        " rp=0, peak_rp=0, win_day='', updated_at=?", (now,))
+    conn.execute("UPDATE rank_stat SET best = rating")
+    return ("시즌 1 순위 %d명 보관, 선물 %d줄 (이로치사탕 %d개), %d명 점수 전환"
+            % (len(rows), gifts, candies, n_all))
+
+
 ONCE = [
     ("0140-refund-heals", _refund_heals),
     ("0190-season1-reset", _season1_reset),
     ("0250-dex-evolved", _dex_evolved),
+    ("0260-season2-open", _season2_open),
 ]
 
 
@@ -140,5 +244,12 @@ def run():
             print("[migrate] %s 완료 (%s)" % (name, note or ""))
         except Exception as e:                              # noqa: BLE001
             # 손질 하나가 터졌다고 서버가 안 뜨면 더 나쁘다. 다음에 다시 해본다.
+            # **반쯤 한 것은 되돌린다.** 커밋 안 한 쓰기가 이 연결에 남아
+            # 있으면 다음 db.run 의 커밋에 딸려 들어간다 - 선물은 넣었는데
+            # '끝냈다' 는 표시가 없어서 다음에 또 넣는 일이 생긴다.
+            try:
+                conn.rollback()
+            except Exception:                               # noqa: BLE001
+                pass
             print("[migrate] %s 실패: %s" % (name, e))
             return

@@ -99,6 +99,10 @@ class Arena(object):
         self.fx = None
         self.foes = []                # ArenaPet 6마리
         self.mine = []                # 내 Pet 6마리 (이미 화면에 있는 것)
+        # 명단이 바탕화면 도트와 다를 때 새로 세운 내 쪽 도트, 그동안 숨긴
+        # 바탕화면 도트 (_my_side)
+        self.made_mine = []
+        self.hidden = []
         self.home = {}                # 원래 자리 {id: (x, y)}
         self.active = {"me": None, "foe": None}
         self.slot = {"me": 0, "foe": 0}
@@ -188,12 +192,8 @@ class Arena(object):
         # self.layer 가 None 이어도 도는 길이 있다.
         self.layer = FL.open_layer(self.root, rect)
 
-        # 내 팀 = 이미 걸어다니던 도트. 자리만 기억해 두면 복귀가 끝난다.
-        self.mine = list(ov.pets.values())[:len(teams.get("me") or [])]
-        for p in self.mine:
-            self.home[id(p)] = (p.x, p.y)
-            p.battling = True
         self.roster = {"me": teams.get("me") or [], "foe": teams.get("foe") or []}
+        self._my_side(ov, self.roster["me"])
 
         try:
             self._name_plates()
@@ -217,9 +217,22 @@ class Arena(object):
         # 로그인 전이거나 시험용 앱이면 username 이 아예 없을 수 있다.
         # 이름표 때문에 재생 전체가 접히면 안 된다.
         # 내 이름은 안 적는다. 내가 누군지는 이미 알고 있다.
-        foe = (self.view.get("foe") or {}).get("name") or "상대"
-        _x1, _y1, x2, y2 = self.ring["rect"]
-        self._plate(x2 - 10, y2 - 10, foe, "#ffb0b0", anchor="se")
+        info = self.view.get("foe") or {}
+        foe = info.get("name") or "상대"
+        # 티어와 칭호를 같이 적는다. 명패를 단 사람은 그 색으로.
+        if info.get("tierKr"):
+            foe = "%s  %s" % (info["tierKr"], foe)
+        if info.get("title"):
+            foe = "%s  ·  %s" % (foe, info["title"])
+        x1, _y1, x2, y2 = self.ring["rect"]
+        self._plate(x2 - 10, y2 - 10, foe, info.get("frameColor") or "#ffb0b0",
+                    anchor="se")
+        # 랭크 배틀은 레벨 상한을 걸고 싸운다. 안 적으면 "내 Lv.80 이 왜
+        # Lv.50 이지" 가 된다.
+        cap = self.view.get("levelCap")
+        if cap:
+            self._plate(x1 + 10, y2 - 10, "랭크 배틀 · Lv.%d 상한" % cap,
+                        "#b9c2dc", anchor="sw")
 
     def _plate(self, sx, sy, text, color, anchor="center"):
         cv = self.cv
@@ -238,6 +251,64 @@ class Arena(object):
             self.plates.extend([r, t])
         else:
             self.plates.append(t)
+
+    @staticmethod
+    def same_team(pets, roster):
+        """바탕화면 도트가 명단과 같은 포켓몬들인가 (자리 순서까지)."""
+        if not roster or len(pets) < len(roster):
+            return False
+        return ([p.mon.get("num") for p in pets[:len(roster)]]
+                == [m.get("num") for m in roster])
+
+    def _my_side(self, ov, roster):
+        """내 쪽 선수를 세운다.
+
+        명단이 바탕화면에 걸어다니던 도트와 같으면 그 도트가 그대로 싸우러
+        나온다 - 자리만 기억해 두면 복귀가 끝난다.
+
+        **다르면 명단대로 새로 세운다.** 랜덤 배틀은 랭크 팀으로 싸워서
+        바탕화면 파티와 다를 수 있고, 걸려온 판을 나중에 보면 그사이 파티를
+        바꿨을 수도 있다. 예전에는 바탕화면 도트를 앞에서부터 가져다 써서,
+        피카츄가 리자몽 자리에서 싸우거나 두 마리만 나오고 나머지 자리가
+        비었다. 그동안 바탕화면 도트는 숨겨 둔다 (cleanup 에서 되살린다).
+        """
+        pets = list(ov.pets.values())
+        if self.same_team(pets, roster):
+            self.mine = pets[:len(roster)]
+            for p in self.mine:
+                self.home[id(p)] = (p.x, p.y)
+                p.battling = True
+            return
+        for p in pets:
+            try:
+                p.battling = True
+                p.win.withdraw()
+                self.hidden.append(p)
+            except Exception:                               # noqa: BLE001
+                pass
+        n = max(1, len(roster))
+        for i, mon in enumerate(roster):
+            try:
+                pet = ov.make({
+                    "id": -2000 - i,
+                    "num": mon.get("num"),
+                    "shiny": bool(mon.get("shiny")),
+                    "info": {"name": mon.get("name"),
+                             "species": mon.get("species"),
+                             "level": mon.get("level"),
+                             "types": []},
+                }, cls=ArenaPet)
+            except Exception as e:                          # noqa: BLE001
+                config.log("내 쪽 도트 실패: %s" % e)
+                pet = None
+            if pet is None:
+                continue
+            ov.extra.append(pet)
+            ex, ey = L.entry_point(self.ring, "me", i, n)
+            pet.x, pet.y = L.feet_to_topleft(ex, ey, pet.fw, pet.fh)
+            pet.place()
+            self.made_mine.append(pet)
+            self.mine.append(pet)
 
     def _pace(self):
         """판이 길면 간격을 줄인다. 짧으면 그대로 둔다.
@@ -628,6 +699,8 @@ class Arena(object):
         bits = []
         if self.view.get("reward"):
             bits.append("%s원" % format(self.view["reward"], ","))
+        if self.view.get("rpDelta"):
+            bits.append("RP %+d" % self.view["rpDelta"])
         self.app.notify("%s 와(과)의 대전 — %s%s"
                         % (foe, msg, ("  (" + " · ".join(bits) + ")")
                            if bits else ""))
@@ -647,7 +720,14 @@ class Arena(object):
                 continue
             ex, ey = L.entry_point(self.ring, "foe", i, n)
             self._walk(p, ex, ey, LEAVE_MS)
-        for p in self.mine:
+        n = max(1, len(self.mine))
+        for i, p in enumerate(self.mine):
+            if p in self.made_mine:
+                # 명단대로 새로 세운 도트는 들어온 쪽으로 나간다
+                if not getattr(p, "down", False):
+                    ex, ey = L.entry_point(self.ring, "me", i, n)
+                    self._walk(p, ex, ey, LEAVE_MS)
+                continue
             hx, hy = self.home.get(id(p), (p.x, p.y))
             self._walk(p, hx + p.fw / 2.0, hy + p.fh, LEAVE_MS)
         self.after(LEAVE_MS + 120, self.cleanup)
@@ -691,6 +771,8 @@ class Arena(object):
         self.foes = []
 
         for p in self.mine:
+            if p in self.made_mine:
+                continue
             try:
                 p.battling = False
                 p.state = "idle"
@@ -702,6 +784,25 @@ class Arena(object):
             except Exception:                               # noqa: BLE001
                 pass
         self.mine = []
+        for p in list(self.made_mine):
+            try:
+                if ov and p in ov.extra:
+                    ov.extra.remove(p)
+                p.destroy()
+            except Exception:                               # noqa: BLE001
+                pass
+        self.made_mine = []
+        # 명단과 달라서 숨겨 둔 바탕화면 도트를 제자리에 되살린다
+        for p in self.hidden:
+            try:
+                p.battling = False
+                p.state = "idle"
+                if not getattr(ov, "hidden", False):   # 사용자가 도트를 숨겨 둔 중이면 그대로
+                    PLAT.show_again(p.win)
+                p.place()
+            except Exception:                               # noqa: BLE001
+                pass
+        self.hidden = []
 
         for b in self.bars.values():
             try:

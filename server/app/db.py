@@ -61,7 +61,10 @@ CREATE TABLE IF NOT EXISTS users (
     money       INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL,
     last_login  TEXT,
-    last_ip     TEXT
+    last_ip     TEXT,
+    -- 달고 있는 칭호와 명패 (season.TITLES / FRAMES 의 열쇠). 없으면 NULL.
+    title       TEXT,
+    frame       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -324,7 +327,10 @@ CREATE TABLE IF NOT EXISTS battle_record (
     -- 세지 않는다(pvp._settle). 남이 자는 나에게 몇 번 걸었느냐로 내
     -- 등수가 정해지면 안 된다.
     started     INTEGER NOT NULL DEFAULT 1,
-    ended_at    TEXT NOT NULL
+    ended_at    TEXT NOT NULL,
+    -- 시즌 2 부터 보이는 점수는 RP 다. rating/delta 는 숨은 점수(MMR).
+    rp          INTEGER NOT NULL DEFAULT 0,
+    rp_delta    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_record_user ON battle_record(user_id, id DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_record_once ON battle_record(match_id, user_id);
@@ -350,9 +356,58 @@ CREATE TABLE IF NOT EXISTS rank_stat (
     -- 있으면 아침에 점수가 바닥나 있게 된다.
     fought_day  TEXT NOT NULL DEFAULT '',
     fought      INTEGER NOT NULL DEFAULT 0,
-    updated_at  TEXT NOT NULL
+    updated_at  TEXT NOT NULL,
+    -- 시즌 2: 보이는 랭크 포인트와 이번 시즌 가장 높았던 값(보상과
+    -- '안 떨어지는 칸' 을 정한다), 오늘 첫 승을 받은 날.
+    rp          INTEGER NOT NULL DEFAULT 0,
+    peak_rp     INTEGER NOT NULL DEFAULT 0,
+    win_day     TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_rank_board ON rank_stat(ranked, rating DESC);
+
+-- 랭크 팀. 랜덤(랭크) 배틀에서 걸 때도 걸려올 때도 이 팀으로 싸운다.
+-- 등록하지 않았으면 바탕화면에 데리고 다니는 파티로 싸운다.
+--
+-- 따로 두는 이유: 받는 쪽은 자고 있는 사람이라 **산책시키던 파티 그대로**
+-- 붙었다. 판을 거는 사람은 싸울 준비를 마친 팀으로 거는데, 받는 쪽은
+-- 한두 마리만 데리고 다니다 걸리는 일이 잦았다(시즌 1 에서 16%).
+--
+-- 포켓몬을 놓아주면 그 줄은 같이 지워진다(ON DELETE CASCADE).
+CREATE TABLE IF NOT EXISTS rank_team (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pos         INTEGER NOT NULL,
+    pokemon_id  INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, pos)
+);
+
+-- 가진 칭호와 명패. 한 번 받으면 시즌이 바뀌어도 남는다.
+CREATE TABLE IF NOT EXISTS user_reward (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind     TEXT NOT NULL,          -- title / frame
+    rid      TEXT NOT NULL,
+    season   INTEGER NOT NULL DEFAULT 0,
+    got_at   TEXT NOT NULL,
+    PRIMARY KEY (user_id, kind, rid)
+);
+
+-- 끝난 시즌의 순위표. rank_stat 은 시즌이 바뀌면 비우므로 여기 옮겨 둔다.
+-- 이름은 그때의 닉네임을 베낀다(전적과 같은 이유).
+CREATE TABLE IF NOT EXISTS season_result (
+    season   INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    rank     INTEGER NOT NULL,
+    name     TEXT NOT NULL,
+    rating   INTEGER NOT NULL DEFAULT 0,
+    rp       INTEGER NOT NULL DEFAULT 0,
+    tier     TEXT,
+    games    INTEGER NOT NULL DEFAULT 0,
+    wins     INTEGER NOT NULL DEFAULT 0,
+    losses   INTEGER NOT NULL DEFAULT 0,
+    draws    INTEGER NOT NULL DEFAULT 0,
+    title    TEXT,
+    at       TEXT NOT NULL,
+    PRIMARY KEY (season, user_id)
+);
 
 -- 서버에서 난 예상 못 한 오류.
 --
@@ -537,6 +592,19 @@ MIGRATIONS = [
     # '내가 건 것' 과 구분이 없었다. 어차피 시즌 1 로 점수를 초기화한다.
     ("battle_record", "started",
      "ALTER TABLE battle_record ADD COLUMN started INTEGER NOT NULL DEFAULT 1"),
+    # 시즌 2 (1.4.0)
+    ("users", "title", "ALTER TABLE users ADD COLUMN title TEXT"),
+    ("users", "frame", "ALTER TABLE users ADD COLUMN frame TEXT"),
+    ("rank_stat", "rp",
+     "ALTER TABLE rank_stat ADD COLUMN rp INTEGER NOT NULL DEFAULT 0"),
+    ("rank_stat", "peak_rp",
+     "ALTER TABLE rank_stat ADD COLUMN peak_rp INTEGER NOT NULL DEFAULT 0"),
+    ("rank_stat", "win_day",
+     "ALTER TABLE rank_stat ADD COLUMN win_day TEXT NOT NULL DEFAULT ''"),
+    ("battle_record", "rp",
+     "ALTER TABLE battle_record ADD COLUMN rp INTEGER NOT NULL DEFAULT 0"),
+    ("battle_record", "rp_delta",
+     "ALTER TABLE battle_record ADD COLUMN rp_delta INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

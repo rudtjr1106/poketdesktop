@@ -94,6 +94,8 @@ class PvpWindow(object):
                        height=32).pack(side="right", pady=15)
         U.ghost_button(inner, "기록 지우기", self._clear,
                        height=32).pack(side="right", padx=(0, 8), pady=15)
+        U.ghost_button(inner, "랭크 팀", self._team,
+                       height=32).pack(side="right", padx=(0, 8), pady=15)
         U.ghost_button(inner, "랜덤 배틀", self._random,
                        height=32).pack(side="right", padx=(0, 8), pady=15)
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
@@ -176,7 +178,10 @@ class PvpWindow(object):
         left = self.fight.get("left")
         bits = ["%d전 %d승 %d패 %d무" % (s.get("games", 0), s.get("wins", 0),
                                       s.get("losses", 0), s.get("draws", 0))]
-        if s.get("ranked"):
+        if s.get("tierKr") and "rp" in s:
+            # 시즌 2: 보이는 점수는 RP 와 티어다 (숨은 점수는 안 보인다)
+            bits.append("%s %s RP" % (s["tierKr"], format(int(s.get("rp") or 0), ",")))
+        elif s.get("ranked"):
             bits.append("점수 %d" % s.get("rating", 0))
         if left is not None:
             bits.append("오늘 %d판 더 걸 수 있음" % left)
@@ -272,7 +277,10 @@ class PvpWindow(object):
                 "%d턴" % (r.get("turns") or 0),
                 "남은 %d : %d" % (r.get("myLeft") or 0, r.get("foeLeft") or 0)]
         d = r.get("delta") or 0
-        if d:
+        if r.get("rpDelta"):
+            bits.append("RP %+d" % r["rpDelta"])
+        elif d and not r.get("rp"):
+            # 시즌 1 기록. 그때는 점수 하나로 셌다.
             bits.append("점수 %+d" % d)
         if r.get("reward"):
             bits.append("%s원" % format(r["reward"], ","))
@@ -315,6 +323,10 @@ class PvpWindow(object):
         self.say("상대를 찾는 중...")
         self.app.pvp_random()
         self.root.after(2500, self.reload)
+
+    def _team(self):
+        from . import ui_season
+        ui_season.TeamWindow(self.app, on_saved=self.reload)
 
     def _clear(self):
         """전적을 통째로 지운다.

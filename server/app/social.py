@@ -17,7 +17,7 @@ import datetime
 
 from fastapi import HTTPException
 
-from . import db
+from . import db, season
 
 MAX_FRIENDS = 30
 MAX_PENDING = 10           # 동시에 보내 둘 수 있는 신청 수
@@ -155,6 +155,7 @@ def listing(uid):
     names = _names(list(ids))
     online = _online_map([o for o, _ in friends])
     stats = _stats([o for o, _ in friends])
+    decos = season.deco_map([o for o, _ in friends])
 
     def brief(other, r):
         st = stats.get(other)
@@ -168,6 +169,10 @@ def listing(uid):
                         "draws": st["draws"],
                         "friendWins": st["fr_wins"],
                         "friendLosses": st["fr_losses"]})
+        d = decos.get(other) or {}
+        for k in ("rp", "tier", "tierKr", "title", "frame", "frameColor"):
+            if d.get(k) is not None:
+                out[k] = d[k]
         return out
 
     return {
@@ -350,6 +355,10 @@ def profile(uid, other):
                     "wins": st["wins"], "losses": st["losses"],
                     "draws": st["draws"], "streak": st["streak"],
                     "best": st["best"]})
+    d = season.deco(other)
+    for k in ("rp", "tier", "tierKr", "title", "frame", "frameColor"):
+        if d.get(k) is not None:
+            out[k] = d[k]
     # 최근 전적과 **마지막 접속 시각**은 나 자신이나 친구에게만 보여준다.
     # 모르는 사람의 기록을 마음대로 볼 수 있으면 그것도 정보 수집이 된다.
     # 특히 "언제 컴퓨터 앞에 있었나" 는 접속 중 표시(초 단위가 아닌 3분

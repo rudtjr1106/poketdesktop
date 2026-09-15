@@ -335,13 +335,25 @@ class FriendsWindow(object):
     def _friend_row(self, f):
         row = self._card()
         self._dot(row, f.get("online"))
-        tk.Label(row, text=f["name"], bg=U.BG3, fg=U.FG,
+        tk.Label(row, text=f["name"], bg=U.BG3,
+                 fg=f.get("frameColor") or U.FG,
                  font=U.FONT_B).pack(side="left", padx=(8, 8))
+        if f.get("title"):
+            tk.Label(row, text=f["title"], bg=U.BG3,
+                     fg=f.get("frameColor") or U.ACCENT_TEXT,
+                     font=U.FONT_XS).pack(side="left", padx=(0, 8))
         text, color = self._seen_text(f)
         if text:
             tk.Label(row, text=text, bg=U.BG3, fg=color,
                      font=U.FONT_XS).pack(side="left", padx=(0, 8))
-        if f.get("ranked"):
+        if f.get("tierKr") and f.get("ranked"):
+            from . import ui_season
+            chip = ui_season.tier_chip(row, f.get("tier"), f["tierKr"])
+            if chip:
+                chip.pack(side="left", padx=(0, 4))
+            tk.Label(row, text="%s RP" % format(int(f.get("rp") or 0), ","),
+                     bg=U.BG3, fg=U.ACCENT, font=U.FONT_S).pack(side="left")
+        elif f.get("ranked"):
             tk.Label(row, text="%d점" % f.get("rating", 0), bg=U.BG3,
                      fg=U.ACCENT, font=U.FONT_S).pack(side="left")
         w, l = f.get("wins", 0), f.get("losses", 0)

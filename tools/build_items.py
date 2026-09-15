@@ -93,6 +93,15 @@ EXTRA = [
                 " 그 포켓몬은 반드시 잡을 수 있다.",
         "effect": {"kind": "ball", "mult": 1.0, "cond": "event_target"},
     },
+    # 랭크 시즌 보상 (1.4.0). 상점·드랍에 없다 - 순위로만 받는다.
+    {
+        "id": "SHINYCANDY", "ident": "shiny-candy",
+        "kr": "이로치사탕", "en": "Shiny Candy",
+        "cat": "misc", "cost": 0, "sell": 0, "buyable": False,
+        "desc": "먹이면 몸 색이 바뀌어 이로치가 되는 신비한 사탕."
+                " 겉모습만 바뀌고 능력은 그대로다.",
+        "effect": {"kind": "shiny"},
+    },
 ]
 
 

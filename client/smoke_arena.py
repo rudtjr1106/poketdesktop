@@ -297,6 +297,56 @@ def main():
         state_of(ov))
     ov.clear()
 
+    print("\n=== 명단이 바탕화면 도트와 다를 때 (랭크 팀) ===")
+    # 랜덤 배틀은 랭크 팀으로 싸워서 바탕화면 파티와 다를 수 있다. 예전에는
+    # 바탕화면 도트를 앞에서부터 가져다 써서 엉뚱한 포켓몬이 싸우거나 자리가
+    # 비었다. 명단대로 새로 세우고, 바탕화면 도트는 숨겼다가 되살려야 한다.
+    if len(NUMS) >= 2:
+        ov = desktop(root, dex, NUMS[-1:])
+        # 앱은 재생 전에 양쪽 명단의 도트를 받아 overlay 에 넣는다 (watch_match)
+        ov.paths.update(paths_for(NUMS))
+        ov.walks.update(walks_for(NUMS))
+        want = len(ov.pets)
+        app = FakeApp(root, dex)
+        app.overlay = ov
+        ar = A.Arena(app, make_match(dex, rng, NUMS[:-1]))
+        seen = {}
+
+        def peek2():
+            if ar.closed:
+                return
+            if ar.mine and "mine" not in seen:
+                seen["mine"] = len(ar.mine)
+                seen["made"] = len(ar.made_mine)
+                seen["desk"] = [p.win.state() for p in ov.pets.values()]
+            root.after(300, peek2)
+        ar.start()
+        root.after(500, peek2)
+        run_until(root, 150, stop=lambda: ar.closed)
+        chk("명단대로 내 쪽을 새로 세운다 (%s)" % seen.get("mine"),
+            seen.get("mine") == len(NUMS) - 1 and seen.get("made") == len(NUMS) - 1,
+            seen)
+        chk("그동안 바탕화면 도트는 숨긴다",
+            seen.get("desk") and all(s == "withdrawn" for s in seen["desk"]), seen)
+        chk("끝까지 돌고 닫힌다", ar.closed)
+        st = state_of(ov)
+        chk("새로 세운 도트가 남지 않는다", st["extra"] == 0, st)
+        chk("바탕화면 도트가 다시 보인다",
+            all(p.win.state() == "normal" for p in ov.pets.values()),
+            [p.win.state() for p in ov.pets.values()])
+        chk("바탕화면 도트가 다시 걸어다닌다",
+            st["pets"] == want and all(not p.battling for p in ov.pets.values()), st)
+        ov.clear()
+    chk("same_team: 번호와 순서가 같아야 같은 팀",
+        A.Arena.same_team([type("P", (), {"mon": {"num": 1}})(),
+                           type("P", (), {"mon": {"num": 2}})()],
+                          [{"num": 1}, {"num": 2}])
+        and not A.Arena.same_team([type("P", (), {"mon": {"num": 2}})(),
+                                   type("P", (), {"mon": {"num": 1}})()],
+                                  [{"num": 1}, {"num": 2}])
+        and not A.Arena.same_team([type("P", (), {"mon": {"num": 1}})()],
+                                  [{"num": 1}, {"num": 2}]))
+
     print("\n=== 명단 없는 로그 ===")
     ov = desktop(root, dex, NUMS)
     app = FakeApp(root, dex)

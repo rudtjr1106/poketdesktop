@@ -9,16 +9,19 @@
 가져와 붙인다. 그래서 대기열도 도전장도 수락도 없다 - 누르면 그 자리에서
 끝나고, 상대는 다음에 켤 때 결과를 본다.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
 
-from . import deps, pvp, social
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
+from . import config, db, deps, pvp, season, social
 
 router = APIRouter()
 
 
 def _fight(uid, other, kind):
     """실제로 붙인다. 규칙 확인 -> 계산 -> 횟수 기록."""
-    why = pvp.can_fight(uid, other)
+    why = pvp.can_fight(uid, other, kind)
     if why:
         raise HTTPException(409, why)
     out = pvp.run_match(uid, other, kind=kind)
@@ -39,7 +42,7 @@ def random_battle(ctx=Depends(deps.current)):
     uid = ctx["user"]["id"]
     # 내 쪽 조건을 먼저 본다. 상대까지 골라 놓고 막히면 애먼 사람의
     # 쿨다운만 태우게 된다.
-    why = pvp.can_start(uid)
+    why = pvp.can_start(uid, "random")
     if why:
         raise HTTPException(409, why)
     other = pvp.find_opponent(uid)
@@ -111,6 +114,76 @@ def clear_record(rid: int, ctx=Depends(deps.current)):
 @router.get("/api/pvp/ranking")
 def ranking(limit: int = 50, ctx=Depends(deps.current)):
     uid = ctx["user"]["id"]
+    me = pvp.summary(uid)
+    d = season.deco(uid)
+    me.update({"title": d.get("title"), "frame": d.get("frame"),
+               "frameColor": d.get("frameColor")})
     return {"ranking": pvp.ranking(max(1, min(100, limit)), uid),
-            "me": pvp.summary(uid), "season": pvp.SEASON,
-            "placement": pvp.PLACEMENT}
+            "me": me, "season": pvp.SEASON,
+            "placement": pvp.PLACEMENT,
+            "rules": season.rules_public(),
+            # 지난 시즌 명예의 전당. 시즌 1 은 티어가 없던 시즌이라 순위만 있다.
+            "hall": {"season": pvp.SEASON - 1,
+                     "rows": season.hall(pvp.SEASON - 1)}}
+
+
+# ---------------------------------------------------------------- 랭크 팀
+class TeamIn(BaseModel):
+    ids: List[int] = []
+
+
+def _team_view(uid):
+    team = pvp.ranked_team(uid)
+    return {"registered": bool(pvp.team_ids(uid)),
+            "ids": [m["id"] for m in team],
+            "pokemon": [deps.decorate(m) for m in team],
+            "levelCap": season.LEVEL_CAP,
+            "maxParty": config.MAX_PARTY}
+
+
+@router.get("/api/pvp/team")
+def get_team(ctx=Depends(deps.current)):
+    """랭크 팀. 등록하지 않았으면 바탕화면 파티가 그 자리에 온다."""
+    return _team_view(ctx["user"]["id"])
+
+
+@router.put("/api/pvp/team")
+def put_team(body: TeamIn, ctx=Depends(deps.current)):
+    """랭크 팀을 등록한다. 빈 목록이면 등록을 풀고 바탕화면 파티로 싸운다."""
+    uid = ctx["user"]["id"]
+    try:
+        pvp.set_team(uid, body.ids or [])
+    except ValueError as e:
+        raise HTTPException(400, str(e) or "잘못된 팀입니다.")
+    return _team_view(uid)
+
+
+# ---------------------------------------------------------------- 칭호 · 명패
+class EquipIn(BaseModel):
+    title: Optional[str] = None
+    frame: Optional[str] = None
+
+
+def _rewards_view(uid):
+    titles, frames = season.owned(uid)
+    u = db.q1("SELECT title, frame FROM users WHERE id=?", (uid,))
+    return {"titles": titles, "frames": frames,
+            "equipped": {"title": u["title"] if u else None,
+                         "frame": u["frame"] if u else None},
+            "deco": season.deco(uid)}
+
+
+@router.get("/api/rewards")
+def rewards(ctx=Depends(deps.current)):
+    return _rewards_view(ctx["user"]["id"])
+
+
+@router.post("/api/rewards/equip")
+def equip(body: EquipIn, ctx=Depends(deps.current)):
+    """칭호·명패를 단다. 보내지 않은 칸은 그대로, 빈 글자는 뗀다."""
+    uid = ctx["user"]["id"]
+    try:
+        season.equip(uid, title=body.title, frame=body.frame)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return _rewards_view(uid)

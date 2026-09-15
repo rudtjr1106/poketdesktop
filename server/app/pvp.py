@@ -24,7 +24,7 @@ import random
 from common import party_battle as PB
 from common.version import VERSION
 
-from . import config, db, deps, items
+from . import config, db, deps, items, season
 
 # ---- 상금 ----
 # 경험치는 주지 않는다(사용자가 정했다). 돈만 준다.
@@ -45,11 +45,12 @@ FRIEND_RATE = 0.5
 DAILY_CAP = 6000
 
 # ---- 점수 ----
-# 시즌. 올릴 때는 migrations 에 초기화 한 벌을 같이 넣어야 한다
-# (숫자만 올리면 지난 시즌 점수가 그대로 남는다).
-SEASON = 1
+# 시즌 번호와 티어·RP 규칙은 season.py 가 들고 있다. 올릴 때는 migrations 에
+# 전환 한 벌을 같이 넣어야 한다 (숫자만 올리면 지난 시즌 점수가 그대로 남는다).
+SEASON = season.SEASON
 
-# 흔히 쓰는 값. 32면 한 판에 최대 32점이 움직인다.
+# 숨은 점수(MMR)의 Elo. 32면 한 판에 최대 32점이 움직인다. 시즌 2 부터 이
+# 숫자는 화면에 안 나오고, RP 가 얼마나 움직일지를 정하는 데만 쓴다.
 K = 32
 BASE_RATING = 1000
 # 이만큼 치러야 랭킹에 오른다. 한두 판 이기고 승률 100% 로 1등이 되는 걸 막는다.
@@ -64,17 +65,19 @@ DAILY_BATTLES = 20          # 하루에 내가 걸 수 있는 도전 수
 
 # 랜덤 배틀에서 상대를 고를 때만 쓰는 값들.
 #
-# **레벨이 비슷한 사람부터 찾는다.** 전에는 파티 평균 레벨을 스무 단위로
-# 끊어 같은 칸이면 아무나 붙였다. 그런데 지금 사람들의 절반이 Lv0~19 한
-# 칸에 몰려 있어서 Lv2 가 Lv19 를 만났다. 이레치 기록을 보니 평균 레벨
-# 차이가 10 이상인 판이 54%였고, 그런 판은 높은 쪽이 85% 이겼다. 차이가
-# 2 이하면 54% 로 반반이다 - 즉 레벨 차이가 승패를 거의 정하고 있었다.
+# **팀 전력이 비슷한 사람과 붙인다.** 시즌 1 은 파티 평균 레벨로 붙였다.
+# 그런데 거는 쪽이 66.7% 를 이겼다 - 엔진은 공평했다(자리만 바꿔 2,140판:
+# 50.6%). 평균 레벨은 마릿수와 종족을 안 봐서, Lv.30 세 마리가 Lv.30 여섯
+# 마리와 같은 상대로 잡혔다. 판 시작 때의 두 팀으로 재어 보니 거는 쪽 전력이
+# 25% 넘게 센 판이 33% 였고 그런 판은 96% 를 이겼다. 전력이 비슷하면(0.95~1.05)
+# 52% 로 반반이었다.
 #
-# 좁혀도 상대는 남는다. 파티가 있는 92명으로 재어 보면 +-5 안에 중앙값
-# 26명이 있다. 그래도 못 찾으면 **안 붙인다** - 기울어진 판을 억지로
-# 만드는 것보다 '지금은 상대가 없다' 가 낫다.
-LEVEL_BAND = 5
-LEVEL_BAND_MAX = 10
+# 전력 = 포켓몬마다 (종족값 합 x 레벨) 을 더한 것. 레벨은 랭크 상한(50)으로
+# 자른 값이다. 가까운 띠부터 보고, 그 안에서 가장 가까운 몇 명 중에 고른다.
+POWER_BANDS = (0.10, 0.25)
+PICK_CLOSEST = 3
+# 전력이 같으면 숨은 점수도 가까운 사람을. 400점 차이를 전력 10% 차이로 친다.
+MMR_WEIGHT = 0.10 / 400.0
 
 # 랜덤 배틀 상대를 고를 때는 최근에 붙은 사람을 이만큼 건너뛴다.
 # 직접 지목하는 쪽(PAIR_COOLDOWN_MIN)보다 길게 본다 - 후보가 서른 명
@@ -82,10 +85,6 @@ LEVEL_BAND_MAX = 10
 RANDOM_REPEAT_MIN = 180
 # 이 안에 만난 적이 없는 사람을 먼저 고른다.
 FRESH_WINDOW_MIN = 60 * 24
-# 매칭 레벨에 넣지 않는 '깍두기'. 파티에서 가장 높은 레벨보다 이만큼 넘게 낮은
-# 포켓몬은 평균에서 뺀다. Lv.60 다섯에 Lv.1 하나를 끼워 평균을 50 으로 낮추고
-# 아래 레벨 사람과 붙는 것을 막는다 (Lv.1 은 판에서 하는 일이 없다).
-FILLER_GAP = 20
 
 # 다 본 대전 로그를 며칠이나 들고 있을지. 로그는 보고 나면 값이 없어지는
 # 자료인데 한 판에 수십 KB 라 Turso 용량을 제일 먼저 먹는다.
@@ -152,10 +151,75 @@ def _reward_for(uid, row, kind, result):
 
 # ---------------------------------------------------------------- 한 판
 def _party(uid):
-    """바탕화면에 데리고 있는 포켓몬. 이게 곧 배틀 파티다."""
+    """바탕화면에 데리고 있는 포켓몬. 친구 배틀은 이 파티로 싸운다."""
     rows = db.q("SELECT * FROM pokemon WHERE user_id=? AND on_desktop=1"
                 " ORDER BY slot, id LIMIT ?", (uid, config.MAX_PARTY))
     return [db.row_to_mon(r) for r in rows]
+
+
+def team_ids(uid):
+    """등록한 랭크 팀의 포켓몬 id (자리 순). 없으면 빈 목록.
+
+    내 것인지를 한 번 더 본다 - 줄은 포켓몬이 지워질 때 같이 지워지지만,
+    주인이 바뀌는 길이 생겨도 남의 포켓몬으로 싸우는 일은 없어야 한다.
+    """
+    rows = db.q("SELECT t.pokemon_id FROM rank_team t JOIN pokemon p"
+                " ON p.id=t.pokemon_id AND p.user_id=t.user_id"
+                " WHERE t.user_id=? ORDER BY t.pos", (uid,))
+    return [r["pokemon_id"] for r in rows]
+
+
+def ranked_team(uid):
+    """랜덤(랭크) 배틀에서 이 사람이 싸우는 팀.
+
+    랭크 팀을 등록했으면 그 팀, 아니면 바탕화면 파티. 레벨은 **아직 자르지
+    않은** 원래 값이다 - 자르는 것은 싸우기 직전(capped)에 한다.
+    """
+    ids = team_ids(uid)
+    if not ids:
+        return _party(uid)
+    marks = ",".join("?" * len(ids))
+    rows = dict((r["id"], r) for r in db.q(
+        "SELECT * FROM pokemon WHERE user_id=? AND id IN (%s)" % marks,
+        (uid,) + tuple(ids)))
+    return [db.row_to_mon(rows[i]) for i in ids if i in rows]
+
+
+def set_team(uid, ids):
+    """랭크 팀을 등록한다. 빈 목록이면 등록을 푼다(바탕화면 파티로 싸운다)."""
+    clean = []
+    for i in ids or []:
+        i = int(i)
+        if i not in clean:
+            clean.append(i)
+    if len(clean) > config.MAX_PARTY:
+        raise ValueError("랭크 팀은 최대 %d마리입니다." % config.MAX_PARTY)
+    if clean:
+        marks = ",".join("?" * len(clean))
+        mine = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=? AND id IN (%s)"
+                     % marks, (uid,) + tuple(clean))["c"]
+        if mine != len(clean):
+            raise ValueError("내 포켓몬만 넣을 수 있습니다.")
+    db.run("DELETE FROM rank_team WHERE user_id=?", (uid,))
+    for pos, pid in enumerate(clean):
+        db.run("INSERT INTO rank_team (user_id, pos, pokemon_id) VALUES (?,?,?)",
+               (uid, pos, pid))
+    return clean
+
+
+def capped(mons, cap=season.LEVEL_CAP):
+    """랭크 배틀용 사본. 상한보다 높은 레벨만 상한으로 내린다.
+
+    원본을 고치지 않는다. 경험치·배운 기술은 그대로라, 높은 레벨에서 배운
+    기술을 50 에서도 쓴다 (본가 레이팅 배틀과 같다).
+    """
+    out = []
+    for m in mons:
+        m = dict(m)
+        if int(m.get("level") or 1) > cap:
+            m["level"] = cap
+        out.append(m)
+    return out
 
 
 def _name(uid):
@@ -168,10 +232,16 @@ def run_match(a_uid, b_uid, kind="random", seed=None):
 
     돌려주는 것: {"matchId", "winner"(user_id 또는 None), "turns",
                   "a": {...}, "b": {...}}
-    양쪽의 dict 에는 result / reward / rating / delta 가 들어 있다.
+    양쪽의 dict 에는 result / reward / rating / delta / rp / rpDelta 가 들어 있다.
+
+    랜덤 배틀은 랭크 팀으로, 레벨 상한을 걸고 싸운다. 친구 배틀은 지금까지처럼
+    바탕화면 파티를 원래 레벨 그대로 쓴다 - 키운 보람은 거기서 보여 준다.
     """
     dex = deps.dex()
-    a_mons, b_mons = _party(a_uid), _party(b_uid)
+    if kind == "random":
+        a_mons, b_mons = capped(ranked_team(a_uid)), capped(ranked_team(b_uid))
+    else:
+        a_mons, b_mons = _party(a_uid), _party(b_uid)
     if not a_mons or not b_mons:
         raise ValueError("양쪽 다 데리고 다니는 포켓몬이 있어야 합니다.")
 
@@ -245,25 +315,38 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
     # 그대로 둔다.
     rating = row["rating"]
     delta = 0
+    rp = row["rp"] or 0
+    rp_delta = 0
+    peak = row["peak_rp"] or 0
+    notes = []
+    today = _today()
+    first_win = False
     counts = started and kind == "random"
     if counts:
         exp = _expected(row["rating"], foe_rating)
         delta = int(round(K * (_score(result) - exp)))
         rating = max(0, row["rating"] + delta)
+        # RP 는 **이 판 전의** 숨은 점수로 잰다. 방금 오른 점수로 재면 이긴
+        # 판의 RP 가 스스로 깎인다.
+        first_win = result == "win" and row["win_day"] != today
+        rp, rp_delta, notes = season.rp_change(
+            result, row["rating"], foe_rating, row["streak"], first_win,
+            rp, peak)
+        peak = max(peak, rp)
 
     db.run("INSERT INTO battle_record (user_id, foe_id, foe_name, kind,"
            " result, rating, delta, reward, turns, my_left, foe_left,"
-           " lead, foe_lead, match_id, started, ended_at)"
-           " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+           " lead, foe_lead, match_id, started, ended_at, rp, rp_delta)"
+           " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
            (uid, foe_id, foe_name, kind, result, rating, delta, pay, turns,
             my_left, foe_left, lead, foe_lead, mid, 1 if started else 0,
-            _iso()))
+            _iso(), rp, rp_delta))
 
     if not started:
         # 걸려온 판은 여기서 끝. 점수·승패·하루 상한 어느 것도 안 건드린다.
         return {"userId": uid, "result": result, "reward": 0,
-                "rating": rating, "delta": 0, "started": False,
-                "myLeft": my_left, "foeLeft": foe_left}
+                "rating": rating, "delta": 0, "rp": rp, "rpDelta": 0,
+                "started": False, "myLeft": my_left, "foeLeft": foe_left}
 
     won = 1 if result == "win" else 0
     lost = 1 if result == "lose" else 0
@@ -275,9 +358,10 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
         db.run(
             "UPDATE rank_stat SET rating=?, games=?, wins=wins+?, losses=losses+?,"
             " draws=draws+?, streak=?, best=?, ranked=?, earned_day=?, earned=?,"
-            " updated_at=? WHERE user_id=?",
+            " rp=?, peak_rp=?, win_day=?, updated_at=? WHERE user_id=?",
             (rating, games, won, lost, drew, streak, max(row["best"], rating),
-             1 if games >= PLACEMENT else 0, day, used + pay, _iso(), uid))
+             1 if games >= PLACEMENT else 0, day, used + pay, rp, peak,
+             today if first_win else row["win_day"], _iso(), uid))
     else:
         db.run(
             "UPDATE rank_stat SET fr_wins=fr_wins+?, fr_losses=fr_losses+?,"
@@ -285,37 +369,60 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
             " WHERE user_id=?",
             (won, lost, drew, day, used + pay, _iso(), uid))
 
-    return {"userId": uid, "result": result, "reward": pay,
-            "rating": rating, "delta": delta, "started": True,
-            "myLeft": my_left, "foeLeft": foe_left}
+    out = {"userId": uid, "result": result, "reward": pay,
+           "rating": rating, "delta": delta, "rp": rp, "rpDelta": rp_delta,
+           "rpNotes": notes, "started": True,
+           "myLeft": my_left, "foeLeft": foe_left}
+    if counts:
+        out.update(season.tier_public(season.tier_of(rp)))
+    return out
 
 
 # ---------------------------------------------------------------- 상대 고르기
+# 전력은 포켓몬마다 (종족값 합 x 레벨) 을 1.5 제곱해서 더한다. 그냥 더하면
+# 센 한 마리와 약한 다섯이 고른 여섯과 같게 잡히는데, 실제로는 센 한 마리가
+# 줄줄이 쓸어 담는다. 실제 파티 900판으로 재어 보니 '전력이 높은 쪽이 이긴다'
+# 가 그냥 더하면 82%, 1.5 제곱이면 86% 맞았다 (2 제곱도 86%).
+POWER_EXP = 1.5
+_BST = {}
 
-def match_level(levels):
-    """매칭에 쓰는 파티 레벨.
 
-    그냥 평균이면 낮은 포켓몬을 끼워 넣어 평균을 깎을 수 있다. 가장 높은
-    레벨에서 FILLER_GAP 넘게 낮은 것은 빼고 평균을 낸다.
+def _bst(species):
+    v = _BST.get(species)
+    if v is None:
+        sp = deps.dex().get(species) or {}
+        v = sum((sp.get("base") or {}).values()) or 300
+        _BST[species] = v
+    return v
 
-        [60, 60, 60, 60, 60, 1]   -> 60   (평균 50 이 아니다)
-        [70, 5, 5, 5, 5, 5]       -> 70   (혼자 쓸어 담는 한 마리)
-        [70, 50, 50, 50, 50, 50]  -> 53.3 (정상적인 파티는 그대로)
+
+def team_power(mons, cap=season.LEVEL_CAP):
+    """팀 전력. 레벨은 상한으로 잘라서 잰다."""
+    return sum((_bst(m["species"]) * min(cap, int(m["level"] or 1))) ** POWER_EXP
+               for m in mons)
+
+
+def _all_teams():
+    """사람마다 랭크 배틀에서 싸울 팀의 (종, 레벨) 목록. 한 번에 다 가져온다.
+
+    쿼리 둘이면 끝난다 - 등록한 팀 한 번, 바탕화면 파티 한 번. 등록한 팀이
+    있는 사람은 바탕화면 파티를 안 본다.
     """
-    levels = [int(v) for v in levels if v is not None]
-    if not levels:
-        return None
-    top = max(levels)
-    kept = [v for v in levels if v >= top - FILLER_GAP]
-    return sum(kept) / float(len(kept))
-
-
-def _avg_levels():
-    """사람마다 매칭 레벨 (match_level). 한 번에 다 가져온다."""
-    by = {}
-    for r in db.q("SELECT user_id, level FROM pokemon WHERE on_desktop=1"):
-        by.setdefault(r["user_id"], []).append(r["level"])
-    return dict((uid, match_level(lv)) for uid, lv in by.items() if lv)
+    teams = {}
+    for r in db.q("SELECT t.user_id, p.species, p.level FROM rank_team t"
+                  " JOIN pokemon p ON p.id=t.pokemon_id AND p.user_id=t.user_id"
+                  " ORDER BY t.user_id, t.pos"):
+        teams.setdefault(r["user_id"], []).append(
+            {"species": r["species"], "level": r["level"]})
+    party = {}
+    for r in db.q("SELECT user_id, species, level FROM pokemon"
+                  " WHERE on_desktop=1 ORDER BY user_id, slot, id"):
+        party.setdefault(r["user_id"], []).append(
+            {"species": r["species"], "level": r["level"]})
+    for uid, mons in party.items():
+        if uid not in teams:
+            teams[uid] = mons[:config.MAX_PARTY]
+    return teams
 
 
 def _last_met(uid, minutes):
@@ -342,52 +449,83 @@ def _blocked_ids(uid):
     return out
 
 
+def can_defend(my_count, foe_count):
+    """상대를 받는 쪽으로 세워도 되는가 — 마릿수만 본다.
+
+    **받는 쪽이 거는 쪽보다 적으면 안 붙인다.** 시즌 1 에서 거는 쪽 마릿수가
+    더 많은 판은 거는 쪽이 93% 를 이겼다. 여섯 마리로 거는 사람은 여섯 마리
+    팀만 만난다. 두 마리뿐인 사람은 두 마리 이상인 팀과 붙는다 - 받는 쪽을
+    '여섯 마리만' 으로 막으면 이제 막 시작한 사람이 붙을 상대가 없다.
+    """
+    return foe_count >= min(config.MAX_PARTY, my_count)
+
+
 def find_opponent(uid, rng=None):
     """랜덤 배틀 상대 하나. 없으면 None.
 
-    접속 여부는 보지 않는다. 상대가 꺼져 있어도 그 사람의 지금 파티를
-    가져와 붙인다 - 친구 몇 명이 하는 서버라 '둘 다 켜져 있을 때' 를
-    기다리면 배틀이 거의 안 성사된다.
+    접속 여부는 보지 않는다. 상대가 꺼져 있어도 그 사람의 랭크 팀(없으면
+    지금 파티)을 가져와 붙인다 - 친구 몇 명이 하는 서버라 '둘 다 켜져 있을
+    때' 를 기다리면 배틀이 거의 안 성사된다.
     """
     rng = rng or random
-    levels = _avg_levels()
-    if uid not in levels:
+    teams = _all_teams()
+    mine = teams.get(uid)
+    if not mine:
         return None
     skip = _recent_foes(uid, RANDOM_REPEAT_MIN) | _blocked_ids(uid)
     skip.add(uid)
 
-    my = levels[uid]
-    pool = [(u, lv) for u, lv in levels.items() if u not in skip]
+    my_power = team_power(mine) or 1.0
+    ratings = dict((r["user_id"], r["rating"]) for r in
+                   db.q("SELECT user_id, rating FROM rank_stat"))
+    my_mmr = ratings.get(uid, BASE_RATING)
+
+    pool = []
+    for other, mons in teams.items():
+        if other in skip or not can_defend(len(mine), len(mons)):
+            continue
+        gap = abs(team_power(mons) / my_power - 1.0)
+        pool.append((gap, other))
     if not pool:
         return None
-    # 가까운 띠부터. 한 번만 넓히고, 그래도 없으면 안 붙인다.
-    for band in (LEVEL_BAND, LEVEL_BAND_MAX):
-        near = [u for u, lv in pool if abs(lv - my) <= band]
+    # 가까운 띠부터. 넓혀도 없으면 안 붙인다 - 기울어진 판을 억지로
+    # 만드는 것보다 '지금은 상대가 없다' 가 낫다.
+    for band in POWER_BANDS:
+        near = [(g, u) for g, u in pool if g <= band]
         if near:
-            return _pick_fresh(uid, near, rng)
+            return _pick_fresh(uid, near, rng, ratings, my_mmr)
     return None
 
 
-def _pick_fresh(uid, cands, rng):
-    """오래 안 만난 사람부터. 하루 안에 만난 적 없는 사람이 먼저다.
+def _pick_fresh(uid, cands, rng, ratings=None, my_mmr=BASE_RATING):
+    """오래 안 만난 사람 중에서, 가장 가까운 몇 명 중 하나.
 
-    여기까지 온 사람은 모두 레벨이 맞는 상대다. 그중에서 무작위로
-    고르면 후보가 서른 명이어도 같은 얼굴이 자꾸 나온다.
+    cands 는 (전력 차이, user_id) 목록이다. 하루 안에 만난 적 없는 사람이
+    먼저다. 가까운 순으로 줄 세우고 앞의 몇 명 중에서 고른다 - 제일 가까운
+    한 명만 고르면 같은 얼굴이 계속 나오고, 아무나 고르면 띠 끝의 기울어진
+    판이 잦아진다.
     """
+    ratings = ratings or {}
     met = _last_met(uid, FRESH_WINDOW_MIN)
-    fresh = [u for u in cands if u not in met]
+
+    def dist(c):
+        gap, other = c
+        return gap + abs(ratings.get(other, BASE_RATING) - my_mmr) * MMR_WEIGHT
+
+    fresh = sorted((c for c in cands if c[1] not in met), key=dist)
     if fresh:
-        return rng.choice(fresh)
+        return rng.choice(fresh[:PICK_CLOSEST])[1]
     # 다 만나 본 사람뿐이면 그중 가장 오래된 쪽
-    return min(cands, key=lambda u: met.get(u) or "")
+    return min((c[1] for c in cands), key=lambda u: met.get(u) or "")
 
 
-def can_start(uid):
+def can_start(uid, kind="random"):
     """내 쪽 조건만. 상대를 고르기 전에 먼저 본다.
 
     상대까지 골라 놓고 막히면, 애먼 사람의 쿨다운만 태우게 된다.
     """
-    if not _party(uid):
+    team = ranked_team(uid) if kind == "random" else _party(uid)
+    if not team:
         return "데리고 다니는 포켓몬이 없습니다."
     row = _rating_row(uid)
     used = row["fought"] if row["fought_day"] == _today() else 0
@@ -396,18 +534,18 @@ def can_start(uid):
     return None
 
 
-def can_fight(uid, other):
+def can_fight(uid, other, kind="friend"):
     """지금 저 사람에게 걸 수 있는가. 안 되면 이유를 돌려준다."""
     if uid == other:
         return "자기 자신과는 싸울 수 없습니다."
-    why = can_start(uid)
+    why = can_start(uid, kind)
     if why:
         return why
     if not db.q1("SELECT 1 x FROM users WHERE id=?", (other,)):
         return "그런 트레이너가 없습니다."
     if other in _blocked_ids(uid):
         return "이 트레이너와는 싸울 수 없습니다."
-    if not _party(other):
+    if not (ranked_team(other) if kind == "random" else _party(other)):
         return "상대가 데리고 다니는 포켓몬이 없습니다."
     if other in _recent_foes(uid):
         return ("같은 상대에게는 %d분에 한 번만 걸 수 있습니다."
@@ -475,12 +613,27 @@ def match_view(uid, mid):
         events = PB.flip_log(events)
     result = ("draw" if m["winner"] is None else
               "win" if m["winner"] == uid else "lose")
+    foe_id = m["b_id"] if mine_is_a else m["a_id"]
+    foe = {"name": m["b_name"] if mine_is_a else m["a_name"]}
+    # 칭호·명패·티어는 **지금** 값이다(판 때의 값을 따로 남기지 않는다).
+    # 투기장 이름표에 붙는 장식이라 지난 판을 다시 볼 때 지금 것이 떠도 된다.
+    d = season.deco(foe_id)
+    for k in ("title", "frame", "frameColor", "tier", "tierKr"):
+        if d.get(k):
+            foe[k] = d[k]
+    rec = db.q1("SELECT rp_delta, rp FROM battle_record WHERE match_id=?"
+                " AND user_id=?", (mid, uid))
     return {
         "id": m["id"], "kind": m["kind"], "result": result,
         "turns": m["turns"], "events": events,
         "me": {"name": m["a_name"] if mine_is_a else m["b_name"]},
-        "foe": {"name": m["b_name"] if mine_is_a else m["a_name"]},
+        "foe": foe,
         "reward": m["a_reward"] if mine_is_a else m["b_reward"],
+        # 랭크 배틀은 레벨 상한을 걸고 싸웠다. 화면이 알려야 "내 Lv.80 이
+        # 왜 50 이지" 가 안 된다.
+        "levelCap": season.LEVEL_CAP if m["kind"] == "random" else None,
+        "rpDelta": rec["rp_delta"] if rec else 0,
+        "rp": rec["rp"] if rec else None,
     }
 
 
@@ -521,6 +674,7 @@ def records(uid, limit=30):
                     # 화면에서도 그렇게 보여야 한다.
                     "started": bool(r["started"]),
                     "rating": r["rating"], "delta": r["delta"],
+                    "rp": r["rp"], "rpDelta": r["rp_delta"],
                     "reward": r["reward"], "turns": r["turns"],
                     "myLeft": r["my_left"], "foeLeft": r["foe_left"],
                     "matchId": r["match_id"], "at": r["ended_at"],
@@ -547,28 +701,53 @@ def clear_records(uid, rid=None):
 
 def summary(uid):
     r = _rating_row(uid)
-    return {"rating": r["rating"], "games": r["games"], "wins": r["wins"],
-            "losses": r["losses"], "draws": r["draws"],
-            "friendWins": r["fr_wins"], "friendLosses": r["fr_losses"],
-            "friendDraws": r["fr_draws"], "streak": r["streak"],
-            "best": r["best"], "ranked": bool(r["ranked"]),
-            "placementLeft": max(0, PLACEMENT - r["games"]),
-            "earnedToday": r["earned"] if r["earned_day"] == _today() else 0,
-            "dailyCap": DAILY_CAP, "season": SEASON,
-            "winReward": REWARD["win"]}
+    rp = r["rp"] or 0
+    tier = season.tier_for(r, season.seats())
+    nxt, need = season.next_tier(rp)
+    ids = team_ids(uid)
+    out = {"rating": r["rating"], "games": r["games"], "wins": r["wins"],
+           "losses": r["losses"], "draws": r["draws"],
+           "friendWins": r["fr_wins"], "friendLosses": r["fr_losses"],
+           "friendDraws": r["fr_draws"], "streak": r["streak"],
+           "best": r["best"], "ranked": bool(r["ranked"]),
+           "placementLeft": max(0, PLACEMENT - r["games"]),
+           "earnedToday": r["earned"] if r["earned_day"] == _today() else 0,
+           "dailyCap": DAILY_CAP, "season": SEASON,
+           "winReward": REWARD["win"],
+           # 시즌 2
+           "rp": rp, "peakRp": r["peak_rp"] or 0,
+           "peakTier": season.tier_of(r["peak_rp"] or 0),
+           "nextTier": nxt,
+           "nextTierKr": season.TIER_KR.get(nxt) if nxt else None,
+           "rpToNext": need, "floorRp": season.floor_rp(r["peak_rp"] or 0),
+           "firstWinToday": r["win_day"] == _today(),
+           "teamRegistered": bool(ids),
+           "teamSize": len(ids) if ids else len(_party(uid)),
+           "levelCap": season.LEVEL_CAP}
+    out.update(season.tier_public(tier))
+    return out
 
 
 def ranking(limit=50, uid=None):
-    """순위표. 배치를 마친 사람만 오른다."""
+    """순위표. 배치를 마친 사람만 오른다. RP 순이다 (시즌 2).
+
+    숨은 점수(rating)는 같은 RP 끼리 줄 세울 때만 쓴다.
+    """
     rows = db.q(
-        "SELECT r.user_id, r.rating, r.games, r.wins, r.losses, r.draws,"
+        "SELECT r.user_id, r.rating, r.rp, r.games, r.wins, r.losses, r.draws,"
         " r.streak, u.username FROM rank_stat r JOIN users u ON u.id=r.user_id"
-        " WHERE r.ranked=1 ORDER BY r.rating DESC, r.wins DESC LIMIT ?",
-        (limit,))
+        " WHERE r.ranked=1 ORDER BY r.rp DESC, r.rating DESC, r.wins DESC"
+        " LIMIT ?", (limit,))
+    deco = season.deco_map([r["user_id"] for r in rows])
     out = []
     for i, r in enumerate(rows, 1):
+        d = deco.get(r["user_id"], {})
         out.append({"rank": i, "userId": r["user_id"], "name": r["username"],
-                    "rating": r["rating"], "games": r["games"],
+                    "rating": r["rating"], "rp": r["rp"] or 0,
+                    "tier": d.get("tier"), "tierKr": d.get("tierKr"),
+                    "title": d.get("title"), "frame": d.get("frame"),
+                    "frameColor": d.get("frameColor"),
+                    "games": r["games"],
                     "wins": r["wins"], "losses": r["losses"],
                     "draws": r["draws"], "streak": r["streak"],
                     "me": uid is not None and r["user_id"] == uid})

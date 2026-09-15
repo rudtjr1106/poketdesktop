@@ -62,7 +62,7 @@ CAT_COLOR = {"held": U.ACCENT, "stone": U.PINK, "ev": U.GOOD, "iv": U.SHINY,
 # /api/bag/use 가 받아주는 효과. 나머지(볼, 파는 물건)는 여기서 쓸 수 없다.
 # "held" 는 use 가 아니라 /api/pokemon/{id}/hold 로 간다 - 대상을 고르는
 # 흐름은 같아서 여기서 같이 다룬다.
-USABLE = ("ev", "iv", "level", "stone", "noevolve", "held")
+USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny")
 
 ROW_BG = "#10131c"      # 목록 한 줄 바탕
 SEL_BG = "#2b2417"      # 고른 줄
@@ -152,6 +152,9 @@ def item_desc(item):
         return out
     if kind == "noevolve":
         return "진화를 막는다. 한 번 더 쓰면 다시 진화할 수 있게 된다."
+    if kind == "shiny":
+        return (item.get("desc") or "먹이면 이로치가 된다.") + \
+            "\n\n랭크 시즌 보상으로만 받는다. 한 번 먹이면 되돌릴 수 없다."
     if kind == "held":
         # 본가 설명 그대로 (서버가 items.json 에서 실어 보낸다)
         out = item.get("desc") or "포켓몬에게 지니게 하는 도구다. 배틀에서 효과가 난다."
@@ -179,6 +182,8 @@ def target_hint(item):
         return "레벨이 오르면서 기술도 배운다"
     if kind == "noevolve":
         return "한 마리씩 껐다 켰다 한다"
+    if kind == "shiny":
+        return "이미 이로치인 포켓몬에게는 못 쓴다"
     if kind == "held":
         return "한 마리에 하나. 이미 지닌 것은 가방으로 돌아온다"
     return ""
@@ -1027,6 +1032,11 @@ class BagWindow(object):
                 return True, False, "진화 잠금 중 · 풀기", U.PINK
             return False, False, "진화를 막는다", U.FG_DIM
 
+        if kind == "shiny":
+            if mon.get("shiny"):
+                return False, True, "이미 이로치", U.FG_FAINT
+            return False, False, "이로치로 바꾸기", U.SHINY
+
         return False, True, "쓸 수 없다", U.FG_FAINT
 
     def pick_mon(self, pid, quiet=False):
@@ -1199,6 +1209,14 @@ class BagWindow(object):
             return
         if self.stat_needed and not self.stat:
             return self.say("어느 능력을 단련할지 골라 주세요.", U.ACCENT, U.FG_DIM)
+        # 이로치사탕은 시즌 보상이라 다시 구할 길이 없다. 한 번 묻는다.
+        if (it.get("effect") or {}).get("kind") == "shiny":
+            name = (mon.get("info") or {}).get("name") or "이 포켓몬"
+            if not ui_box.confirm(
+                    self.win, "이로치사탕",
+                    "%s에게 이로치사탕을 먹입니다. 몸 색이 이로치로 바뀌고 "
+                    "되돌릴 수 없습니다." % name, danger=False, ok_text="먹이기"):
+                return
 
         api = self.app.api
         item_id, pid, stat = it["id"], mon["id"], self.stat or ""
@@ -1293,6 +1311,11 @@ def gift_line(g):
     n = int(g.get("count", 1) or 0)
     if g.get("kind") == "money":
         return "%s원" % format(n, ",")
+    # 칭호·명패는 개수가 없다 (시즌 보상)
+    if g.get("kind") == "title":
+        return "칭호 · %s" % (g.get("name") or "?")
+    if g.get("kind") == "frame":
+        return "명패 · %s" % (g.get("name") or "?")
     return "%s ×%d" % (g.get("name") or "?", n)
 
 
@@ -1356,7 +1379,13 @@ def announce_gifts(parent, app, gifts):
         tk.Label(inner, text="그 밖 %d개" % (n - 8), bg=PANEL,
                  fg=U.FG_FAINT, font=U.FONT_XS).pack(anchor="w", pady=(4, 0))
 
-    tk.Label(f, text="가방에 넣어 두었습니다.", bg=U.BG, fg=U.FG_DIM,
+    # 칭호·명패는 가방이 아니라 랭킹 탭에서 단다 (시즌 보상)
+    only_badges = all(g.get("kind") in ("title", "frame") for g in gifts)
+    some_badges = any(g.get("kind") in ("title", "frame") for g in gifts)
+    footer = ("랭킹 탭의 '칭호·명패' 에서 바꿀 수 있습니다." if only_badges else
+              "가방에 넣어 두었습니다. 칭호·명패는 랭킹 탭에서 바꿀 수 있습니다."
+              if some_badges else "가방에 넣어 두었습니다.")
+    tk.Label(f, text=footer, bg=U.BG, fg=U.FG_DIM,
              font=U.FONT_S, wraplength=360,
              justify="left").pack(anchor="w", pady=(10, 0))
 

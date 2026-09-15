@@ -245,6 +245,14 @@ def gift_claim(uid, now=None):
         elif kind == "balls":
             db.run("UPDATE users SET balls=balls+? WHERE id=?", (n, uid))
             name = "몬스터볼"
+        elif kind in ("title", "frame") and r["item_id"]:
+            # 시즌 보상. 개수가 없는 물건이라 가방이 아니라 user_reward 로 간다.
+            from . import season
+            season.grant(uid, kind, r["item_id"], _season_of(r["item_id"]),
+                         now=now)
+            table = season.TITLES if kind == "title" else dict(
+                (k, v[0]) for k, v in season.FRAMES.items())
+            name = table.get(r["item_id"]) or r["item_id"]
         else:
             continue          # 모르는 종류. 지급하지 않는다
         out.append({
@@ -256,6 +264,14 @@ def gift_claim(uid, now=None):
             "message": r["message"] or "",
         })
     return out
+
+
+def _season_of(rid):
+    """'s1_champion' -> 1. 명패처럼 시즌이 안 붙은 것은 0."""
+    head = (rid or "").split("_", 1)[0]
+    if head[:1] == "s" and head[1:].isdigit():
+        return int(head[1:])
+    return 0
 
 
 def _now_iso():

@@ -839,7 +839,9 @@ class App(object):
         bits = []
         if mine.get("reward"):
             bits.append("%s원" % format(mine["reward"], ","))
-        if mine.get("delta"):
+        if mine.get("rpDelta"):
+            bits.append("RP %+d" % mine["rpDelta"])
+        elif mine.get("delta") and "rp" not in mine:
             bits.append("%+d점" % mine["delta"])
         if mine.get("myLeft") is not None:
             bits.append("%d대 %d 남음"
