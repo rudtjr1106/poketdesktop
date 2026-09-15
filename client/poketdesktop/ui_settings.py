@@ -173,7 +173,37 @@ class SettingsWindow(object):
                      anchor="w", justify="left",
                      wraplength=W - 60).pack(fill="x", padx=(22, 0),
                                              pady=(0, 6))
+        self._catch_row(box, s)
         self._autostart_row(box)
+
+    CATCH_CHOICES = (("new", "아직 안 잡은 포켓몬만"),
+                     ("always", "항상"),
+                     ("off", "끄기 (늘 끝까지 싸운다)"))
+
+    def _catch_row(self, box, s):
+        """야생 배틀의 잡기 모드 (desktop_battle 맨 위 설명)."""
+        tk.Label(box, text="야생 배틀에서 잡기 좋게 싸우기", bg=U.BG, fg=U.FG,
+                 font=U.FONT_S, anchor="w").pack(fill="x", pady=(4, 0))
+        self.catch = tk.StringVar(value=config.catch_mode(s))
+        for value, label in self.CATCH_CHOICES:
+            tk.Radiobutton(
+                box, text=label, value=value, variable=self.catch,
+                bg=U.BG, fg=U.FG, selectcolor=U.INK, activebackground=U.BG,
+                activeforeground=U.FG, font=U.FONT_S, anchor="w",
+                highlightthickness=0, bd=0,
+                command=self._set_catch).pack(fill="x", padx=(22, 0))
+        note = tk.Label(box, text="체력을 조금 남기고 멈춰서 볼을 던질 틈을 줍니다. "
+                                  "10초 안에 안 던지거나 야생 포켓몬을 왼쪽 클릭하면 "
+                                  "끝까지 싸웁니다. 색이 다른 포켓몬은 잡은 적이 있어도 "
+                                  "이렇게 합니다.",
+                        bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
+                        justify="left", wraplength=W - 60)
+        note.pack(fill="x", padx=(22, 0), pady=(0, 6))
+        # 다른 설명보다 길어서 상수 폭(W-60)으로는 스크롤바 옆에서 끝이 잘렸다
+        U.wrap_to_width(note)
+
+    def _set_catch(self):
+        self._set("catchMode", config.catch_mode({"catchMode": self.catch.get()}))
 
     def show_grass(self):
         """지금 설정대로 표시를 맞춘다.

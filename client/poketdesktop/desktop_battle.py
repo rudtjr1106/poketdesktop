@@ -8,6 +8,16 @@
     야생 포켓몬 왼쪽 클릭   배틀을 건다
     야생 포켓몬 오른쪽 클릭  몬스터볼을 던진다
 
+## 잡기 모드 (설정 catchMode)
+
+그냥 두면 자동 전투가 오른쪽 클릭하기 전에 쓰러뜨려 버린다. 그래서
+
+    - 볼 메뉴가 열려 있는 동안은 다음 턴을 안 보낸다
+    - 서버를 기다리거나 연출이 도는 중에 던지면 버리지 않고 이번 턴 뒤에 던진다
+    - 잡기 모드면 서버가 체력을 남기고 싸우다가 멈추라고(hold) 한다.
+      10초 동안 '지금 던지세요' 를 띄우고 기다린다. 왼쪽 클릭하거나 10초가
+      지나면 그 판은 끝까지 싸운다(finish). 던졌다가 놓치면 다시 10초.
+
 기술 버튼은 없다. 무슨 기술을 쓸지는 서버가 알아서 고른다.
 도트 위에 작은 체력바만 띄우고, 나머지는 도트의 움직임과 이펙트,
 급소/효과 같은 짧은 글씨로 보여준다.
@@ -28,6 +38,8 @@ APPROACH_GAP = 96          # 붙어 서는 간격 (가로)
 WALK_MS = 22               # 다가가는 속도
 TURN_GAP = 620             # 한 턴 끝나고 다음 턴까지
 RESULT_MS = 1100
+HOLD_MS = 10000            # 잡기 모드로 멈췄다가 다시 싸우기까지
+HINT_MS = 2500             # 멈춘 동안 '지금 던지세요' 를 다시 띄우는 간격
 
 
 def on_screen(pet):
@@ -70,6 +82,15 @@ class DesktopBattle(object):
         # 이름표를 막아 둔 Overlay. begin() 이 막고, finish_cleanup() 이
         # 같은 곳을 한 번만 푼다.
         self._names_ov = None
+        # 잡기 모드와 볼 던지기 (맨 위 설명)
+        self.menu_open = False     # 볼 메뉴가 떠 있다 -> 턴을 안 보낸다
+        self.holding = False       # 서버가 멈추라고 했다 -> 던지기를 기다린다
+        self.hold_job = None
+        self.hint_job = None
+        self.finish = False        # 멈췄다가 다시 싸우기로 했다 -> 이 판은 끝까지
+        self.pending_ball = None   # 바쁠 때 던진 볼 ("" 은 마지막에 쓴 볼)
+        self.playing = False       # 받은 이벤트를 그리는 중
+        self.stalled = False       # 멈춘 동안 다음 턴을 건너뛰었다
 
         self.setup(intro)
 
@@ -240,7 +261,20 @@ class DesktopBattle(object):
     def next_turn(self):
         if self.closed or self.busy or not self.b or self.b.get("over"):
             return
+        if self.playing:
+            # 연출이 도는 중이다 (볼이 흔들리는 중 포함). 끝나면 turn_done 이 다시 부른다.
+            # 예전에는 볼을 던지기 전에 걸어 둔 턴이 흔들리는 볼 뒤에서 그대로 나갔다.
+            return
+        if self.pending_ball is not None:
+            ball, self.pending_ball = self.pending_ball, None
+            return self._do_throw(ball or None)
+        if self.menu_open or self.holding:
+            self.stalled = True             # 풀릴 때 다시 부른다
+            return
+        self.stalled = False
         self.busy = True
+        catch = config.catch_mode(self.app.settings)
+        finish = self.finish
 
         def done(r, err):
             self.busy = False
@@ -250,10 +284,11 @@ class DesktopBattle(object):
                 return self.abort(getattr(err, "message", str(err)))
             self.play(r.get("events") or [], r)
         run_async(self.root,
-                  lambda: self.app.api.battle_move(self.b["id"], ""),
+                  lambda: self.app.api.battle_move(self.b["id"], "", catch, finish),
                   lambda r, err: self._safe(done, r, err))
 
     def play(self, events, result):
+        self.playing = True
         q = list(events)
 
         def nxt():
@@ -303,6 +338,7 @@ class DesktopBattle(object):
         self.after(220, done)
 
     def turn_done(self, result):
+        self.playing = False
         if self.closed:
             return
         b = result.get("battle")
@@ -311,9 +347,76 @@ class DesktopBattle(object):
             self.sync_bars()
         if result.get("ballOptions") is not None:
             self.ball_opts = result["ballOptions"]
-        if not b or not b.get("over"):
-            return self.after(TURN_GAP, self.next_turn)
-        self.show_result(result)
+        if b and b.get("over"):
+            return self.show_result(result)
+        if result.get("hold") or self.holding:
+            # 서버가 멈추라고 했거나, 멈춘 채 던졌다가 놓쳤다
+            return self.start_hold(result.get("hold"))
+        if self.pending_ball is not None:
+            return self.after(120, self.next_turn)
+        return self.after(TURN_GAP, self.next_turn)
+
+    # ---------------- 잡기 모드 ----------------
+    def start_hold(self, reason=None):
+        """싸움을 멈추고 볼을 던질 틈을 준다. 이미 멈춘 중이면 10초를 새로 센다."""
+        if self.closed:
+            return
+        first = not self.holding
+        self.holding = True
+        self._cancel_hold_jobs()
+        if self.pending_ball is not None:           # 멈추기 전에 던져 둔 볼
+            return self.after(120, self.next_turn)
+        if first:
+            head = ("더 때리면 쓰러뜨릴 것 같다!" if reason == "nosafe"
+                    else "잡기 좋은 때다!")
+            self.app.notify(head + " 오른쪽 클릭으로 볼을 던지세요."
+                            " (10초 뒤 다시 싸웁니다 · 왼쪽 클릭하면 바로 싸웁니다)")
+        self._hint()
+        if not self.menu_open:
+            self.hold_job = self.after(HOLD_MS, self.fight_on)
+
+    def _hint(self):
+        self.hint_job = None
+        if self.closed or not self.holding or self.menu_open or not self.foe:
+            return
+        if on_screen(self.foe):
+            self.float_over(self.foe, "지금 던지세요!", "#ffd447")
+        self.hint_job = self.after(HINT_MS, self._hint)
+
+    def _cancel_hold_jobs(self):
+        for name in ("hold_job", "hint_job"):
+            j = getattr(self, name)
+            setattr(self, name, None)
+            if j is not None:
+                try:
+                    self.root.after_cancel(j)
+                except Exception:                           # noqa: BLE001
+                    pass
+
+    def fight_on(self):
+        """멈춘 것을 풀고 이 판은 끝까지 싸운다. 10초가 지났거나 야생을 왼쪽 클릭했다."""
+        if self.closed or not self.holding:
+            return
+        if self.busy or self.menu_open:
+            # 볼이 날아가는 중이거나 고르는 중이다. 결과를 보고 다시 센다.
+            return
+        self.holding = False
+        self.finish = True
+        self._cancel_hold_jobs()
+        self.after(120, self.next_turn)
+
+    def _menu_opened(self):
+        self.menu_open = True
+        self._cancel_hold_jobs()            # 고르는 동안은 10초를 안 센다
+
+    def _menu_closed(self):
+        if self.closed or not self.menu_open:
+            return
+        self.menu_open = False
+        if self.holding:
+            self.start_hold(None)           # 안 골랐으면 10초를 새로 센다
+        elif self.stalled and not self.busy and not self.playing:
+            self.after(120, self.next_turn)
 
     # ---------------- 결과 ----------------
     def show_result(self, result):
@@ -387,6 +490,9 @@ class DesktopBattle(object):
     def switch_to(self, mon):
         """쓰러지면 다음 포켓몬이 자동으로 나온다."""
         self.busy = True
+        # 멈춰 있던 것은 푼다. 새 포켓몬으로 다시 부르면 서버가 또 멈추라고 한다.
+        self.holding = False
+        self._cancel_hold_jobs()
 
         def done(r, err):
             self.busy = False
@@ -433,20 +539,31 @@ class DesktopBattle(object):
         어떤 볼을 던질지 고를 수 있다. 야생 화면에는 있던 것이 배틀에는
         없어서, 정작 제일 잘 잡히는 상황에서 마지막에 쓴 볼만 던져야 했다.
         """
-        if self.closed or self.busy:
+        if self.closed:
             return
         opts = self.ball_opts
         if e is not None and opts:
-            return ball_menu.popup(self.root, e, opts, self._do_throw,
-                                   on_shop=self.app.open_shop)
+            # **고르는 동안 싸움을 멈춘다.** 안 그러면 볼을 고르는 사이에 쓰러뜨린다.
+            self._menu_opened()
+            try:
+                return ball_menu.popup(self.root, e, opts, self._do_throw,
+                                       on_shop=self.app.open_shop,
+                                       on_close=lambda: self._safe(self._menu_closed))
+            except Exception:
+                self._menu_closed()
+                raise
         self._do_throw(None)
 
     def _do_throw(self, ball=None):
-        if self.closed or self.busy:
+        if self.closed:
             return
         ball = ball or (self.app.settings.get("lastBall") or "POKEBALL")
         if ball == "POKEBALL" and self.app.balls <= 0:
             return self.app.notify("몬스터볼이 없습니다.")
+        if self.busy or self.playing:
+            # 서버를 기다리거나 이번 턴을 그리는 중이다. 버리지 않고 턴이 끝나면 던진다.
+            self.pending_ball = ball
+            return
         self.busy = True
         self.app.settings["lastBall"] = ball
         config.save_settings(self.app.settings)
@@ -456,7 +573,10 @@ class DesktopBattle(object):
             if self.closed:
                 return
             if err:
-                return self.app.notify(getattr(err, "message", str(err)))
+                self.app.notify(getattr(err, "message", str(err)))
+                # 못 던졌어도 판은 이어져야 한다 (멈춘 중이면 다시 기다린다)
+                return self.turn_done({})
+            self.playing = True             # 볼 연출이 끝나면 after_ball -> turn_done 이 푼다
             self.app.balls = r.get("balls", self.app.balls)
             if r.get("ballOptions") is not None:
                 self.ball_opts = r["ballOptions"]

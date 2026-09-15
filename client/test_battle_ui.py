@@ -137,6 +137,9 @@ class 가짜배틀(object):
     sync_bars = DB.DesktopBattle.sync_bars
     apply_hp = DB.DesktopBattle.apply_hp
     switch_to = DB.DesktopBattle.switch_to
+    _cancel_hold_jobs = DB.DesktopBattle._cancel_hold_jobs
+    holding = False
+    hold_job = hint_job = None
     _safe = DB.DesktopBattle._safe
     approach = lambda self: None
 
@@ -583,6 +586,261 @@ def t_투기장은_제자리로_돌아온_뒤에_한_번_푼다():
     chk("다시 불러도 한 번만 푼다", ov.푼수 == 1, ov.푼수)
 
 
+# ---------------------------------------------------------------- 잡기 모드
+class 시간시계(object):
+    """after 를 시각 순서대로 돌리는 시계. advance(ms) 만큼 시간을 흘린다."""
+
+    def __init__(self):
+        self.now = 0
+        self.jobs = {}
+        self.n = 0
+
+    def after(self, ms, fn):
+        self.n += 1
+        self.jobs[self.n] = (self.now + ms, self.n, fn)
+        return self.n
+
+    def after_cancel(self, j):
+        self.jobs.pop(j, None)
+
+    def advance(self, ms):
+        end = self.now + ms
+        while True:
+            due = [v for v in self.jobs.values() if v[0] <= end]
+            if not due:
+                break
+            t, n, fn = min(due)
+            self.jobs.pop(n)
+            self.now = max(self.now, t)
+            fn()
+        self.now = end
+
+
+class 가짜서버(object):
+    def __init__(self):
+        self.moves = []            # (catch, finish)
+        self.balls = []
+        self.move_answers = []
+        self.ball_answers = []
+
+    def battle_move(self, bid, move, catch="", finish=False):
+        self.moves.append((catch, finish))
+        if self.move_answers:
+            return self.move_answers.pop(0)
+        return {"events": [{"t": "move", "who": "me"}], "battle": {"id": bid, "over": False}}
+
+    def battle_ball(self, bid, ball):
+        self.balls.append(ball)
+        if self.ball_answers:
+            return self.ball_answers.pop(0)
+        return {"caught": False, "balls": 5, "events": [], "battle": {"id": bid, "over": False}}
+
+
+class 가짜야생(object):
+    def play_catch(self, r, on_done=None):
+        on_done()
+
+
+class 가짜잡기앱(object):
+    def __init__(self, mode="new"):
+        self.api = 가짜서버()
+        self.settings = {"catchMode": mode, "lastBall": "POKEBALL"}
+        self.balls = 5
+        self.wild = 가짜야생()
+        self.말 = []
+
+    def notify(self, m):
+        self.말.append(m)
+
+    def refresh_tray(self):
+        pass
+
+    def open_shop(self):
+        pass
+
+
+class 잡기판(object):
+    """next_turn 부터 볼 던지기까지 진짜 메서드를 그대로 빌려 끼운다. 연출은 바로 끝난다."""
+
+    def __init__(self, mode="new"):
+        self.app = 가짜잡기앱(mode)
+        self.root = 시간시계()
+        self.b = {"id": 7, "over": False}
+        self.ball_opts = [{"id": "POKEBALL", "count": 5}]
+        self.closed = False
+        self.busy = False
+        self.jobs = []
+        self.fx = None
+        self.texts = []
+        self.layer = None
+        self.bars = None
+        self.mine = 가짜도트(1)
+        self.foe = 가짜도트(9)
+        self.떠오른글씨 = []
+        self.결과 = []
+        self.menu_open = self.holding = self.finish = self.playing = self.stalled = False
+        self.hold_job = self.hint_job = None
+        self.pending_ball = None
+
+    for _name in ("next_turn", "play", "turn_done", "start_hold", "_hint", "_cancel_hold_jobs",
+                  "fight_on", "_menu_opened", "_menu_closed", "throw_ball", "_do_throw",
+                  "after_ball", "after", "_safe", "abort"):
+        locals()[_name] = getattr(DB.DesktopBattle, _name)
+
+    def render(self, ev, done):
+        done()
+
+    def sync_bars(self, snap=False):
+        pass
+
+    def float_over(self, pet, text, color):
+        self.떠오른글씨.append(text)
+
+    def show_result(self, result):
+        self.결과.append(result)
+
+    def finish_cleanup(self):
+        self.closed = True
+
+
+class 이벤트(object):
+    x_root = y_root = 10
+
+
+def 잡기_준비(mode="new"):
+    menus = []
+    real_async, real_popup = DB.run_async, DB.ball_menu.popup
+    DB.run_async = lambda root, fn, cb: cb(fn(), None)
+    DB.ball_menu.popup = lambda root, e, opts, pick, on_shop=None, on_close=None: menus.append((pick, on_close))
+
+    def 되돌리기():
+        DB.run_async, DB.ball_menu.popup = real_async, real_popup
+    return 잡기판(mode), menus, 되돌리기
+
+
+def t_턴마다_잡기_설정을_보낸다():
+    for mode, want in (("new", "new"), ("off", "off"), ("이상한값", "new")):
+        d, _m, undo = 잡기_준비(mode)
+        try:
+            d.next_turn()
+        finally:
+            undo()
+        chk("설정 %s -> 서버에 %s" % (mode, want), d.app.api.moves[:1] == [(want, False)], d.app.api.moves)
+
+
+def t_멈추라고_하면_10초_기다렸다가_끝까지_싸운다():
+    d, _m, undo = 잡기_준비()
+    try:
+        d.app.api.move_answers = [{"events": [{"t": "move", "who": "me"}], "hold": "low",
+                                   "battle": {"id": 7, "over": False}}]
+        d.next_turn()
+        chk("멈춘다", d.holding, d.holding)
+        chk("던지라고 알린다", any("던지세요" in m for m in d.app.말), d.app.말)
+        d.root.advance(9900)
+        chk("10초 안에는 다음 턴을 안 보낸다", len(d.app.api.moves) == 1, d.app.api.moves)
+        chk("멈춘 동안 '지금 던지세요' 를 되풀이해 띄운다", d.떠오른글씨.count("지금 던지세요!") >= 3, d.떠오른글씨)
+        d.root.advance(200 + 120)
+        chk("10초가 지나면 끝까지 싸우기로 (finish) 다시 부른다",
+            len(d.app.api.moves) == 2 and d.app.api.moves[1] == ("new", True), d.app.api.moves)
+        chk("더는 멈춰 있지 않다", not d.holding)
+        d.root.advance(5000)
+        chk("그 뒤로도 finish 로 싸운다", all(f for _c, f in d.app.api.moves[1:]), d.app.api.moves)
+    finally:
+        undo()
+
+
+def t_왼쪽_클릭하면_바로_싸운다():
+    d, _m, undo = 잡기_준비()
+    try:
+        d.app.api.move_answers = [{"events": [], "hold": "nosafe", "battle": {"id": 7, "over": False}}]
+        d.next_turn()
+        chk("쓰러뜨릴 것 같다고 알린다", any("쓰러뜨릴 것 같다" in m for m in d.app.말), d.app.말)
+        d.fight_on()
+        d.root.advance(200)
+        chk("바로 finish 로 부른다", d.app.api.moves[-1] == ("new", True), d.app.api.moves)
+    finally:
+        undo()
+
+
+def t_볼_메뉴가_열린_동안은_싸우지_않는다():
+    d, menus, undo = 잡기_준비()
+    try:
+        d.next_turn()                                   # 한 턴 -> 620ms 뒤 다음 턴이 걸려 있다
+        d.throw_ball(이벤트())
+        chk("메뉴가 뜬다", len(menus) == 1, menus)
+        d.root.advance(5000)
+        chk("메뉴가 열린 동안 턴을 안 보낸다", len(d.app.api.moves) == 1, d.app.api.moves)
+        pick, on_close = menus[0]
+        on_close()                                      # 안 고르고 닫았다
+        d.root.advance(200)
+        chk("닫으면 다시 싸운다", len(d.app.api.moves) == 2, d.app.api.moves)
+
+        d.throw_ball(이벤트())
+        pick, on_close = menus[1]
+        on_close()                                      # PopupMenu 는 닫고 나서 고른 명령을 부른다
+        pick("GREATBALL")
+        chk("고르면 그 볼을 던진다", d.app.api.balls == ["GREATBALL"], d.app.api.balls)
+    finally:
+        undo()
+
+
+def t_바쁠_때_던진_볼은_턴이_끝나고_던진다():
+    d, _m, undo = 잡기_준비()
+    try:
+        d.busy = True
+        d._do_throw("ULTRABALL")
+        chk("서버를 기다리는 중이면 예약만 한다", d.pending_ball == "ULTRABALL" and not d.app.api.balls,
+            (d.pending_ball, d.app.api.balls))
+        d.busy = False
+        d.turn_done({"battle": {"id": 7, "over": False}})
+        d.root.advance(200)
+        chk("턴이 끝나면 예약한 볼을 던진다", d.app.api.balls == ["ULTRABALL"], d.app.api.balls)
+        chk("볼을 던지는 동안 턴을 끼워 보내지 않았다", d.app.api.moves == [], d.app.api.moves)
+
+        d.playing = True
+        d._do_throw(None)
+        chk("연출 중에 두 번 클릭해도 예약 (마지막에 쓴 하이퍼볼)", d.pending_ball == "ULTRABALL", d.pending_ball)
+        d.next_turn()
+        chk("연출 중에는 턴을 안 보낸다", d.app.api.moves == [], d.app.api.moves)
+    finally:
+        undo()
+
+
+def t_멈춘_채_던졌다가_놓치면_10초를_새로_센다():
+    d, menus, undo = 잡기_준비()
+    try:
+        d.app.api.move_answers = [{"events": [], "hold": "low", "battle": {"id": 7, "over": False}}]
+        d.next_turn()
+        d.root.advance(6000)
+        d.throw_ball(이벤트())
+        d.root.advance(20000)
+        chk("볼을 고르는 동안은 10초를 안 센다", len(d.app.api.moves) == 1 and d.holding, d.app.api.moves)
+        pick, on_close = menus[0]
+        on_close()
+        pick("POKEBALL")
+        chk("놓쳤다", d.app.api.balls == ["POKEBALL"] and d.holding, (d.app.api.balls, d.holding))
+        d.root.advance(9500)
+        chk("놓친 뒤 다시 10초를 기다린다", len(d.app.api.moves) == 1, d.app.api.moves)
+        d.root.advance(1000)
+        chk("그래도 안 던지면 끝까지 싸운다", d.app.api.moves[-1] == ("new", True), d.app.api.moves)
+    finally:
+        undo()
+
+
+def t_잡으면_끝낸다():
+    d, _m, undo = 잡기_준비()
+    try:
+        d.app.api.move_answers = [{"events": [], "hold": "low", "battle": {"id": 7, "over": False}}]
+        d.app.api.ball_answers = [{"caught": True, "balls": 4, "message": "신난다!"}]
+        d.next_turn()
+        d._do_throw("POKEBALL")
+        d.root.advance(1000)
+        chk("잡으면 배틀을 정리한다", d.closed, d.closed)
+        chk("잡은 뒤에는 턴을 안 보낸다", len(d.app.api.moves) == 1, d.app.api.moves)
+    finally:
+        undo()
+
+
 def main():
     for fn in (t_체력을_그대로_반영한다, t_교체하면_새_포켓몬_체력으로_바뀐다,
                t_숨은_도트의_체력바는_안_그린다, t_맞는_순간_그_쪽만_준다,
@@ -590,7 +848,11 @@ def main():
                t_배틀_동안_이름표를_막고_끝나면_한_번_푼다,
                t_막기_전에_끝나면_안_푼다, t_연출이_터져도_배틀을_접는다,
                t_내_도트_창이_없어져도_정리는_끝난다, t_쓰러지면_이름표도_치운다,
-               t_투기장은_제자리로_돌아온_뒤에_한_번_푼다):
+               t_투기장은_제자리로_돌아온_뒤에_한_번_푼다,
+               t_턴마다_잡기_설정을_보낸다, t_멈추라고_하면_10초_기다렸다가_끝까지_싸운다,
+               t_왼쪽_클릭하면_바로_싸운다, t_볼_메뉴가_열린_동안은_싸우지_않는다,
+               t_바쁠_때_던진_볼은_턴이_끝나고_던진다, t_멈춘_채_던졌다가_놓치면_10초를_새로_센다,
+               t_잡으면_끝낸다):
         print("-- %s" % fn.__name__[2:])
         fn()
     print()

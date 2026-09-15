@@ -179,7 +179,15 @@ class WildPet(Pet):
         d = getattr(self, "_down", None)
         moved = bool(d) and (abs(e.x_root - d[0]) > 4 or abs(e.y_root - d[1]) > 4)
         Pet.on_release(self, e)
-        if moved or self.ctl.app.battle:   # 끌었거나 이미 싸우는 중이면 무시
+        if moved:
+            return
+        battle = self.ctl.app.battle
+        if battle:
+            # 잡기 모드로 멈춰 있으면 왼쪽 클릭 = 바로 다시 싸우기. 두 번 클릭(바로
+            # 던지기)의 첫 클릭일 수 있으니 배틀 열기와 같이 조금 기다린다.
+            if getattr(battle, "holding", False):
+                self._cancel_battle_job()
+                self._battle_job = self.ctl.app.root.after(_double_ms(), self._fight_on)
             return
         # **바로 배틀을 열면 두 번 클릭이 죽는다.** 첫 클릭이 배틀을
         # 시작하면서 throwing 을 잠그는데, 두 번째 클릭은 그때 도착해서
@@ -197,6 +205,12 @@ class WildPet(Pet):
             except Exception:                               # noqa: BLE001
                 pass
         self._battle_job = None
+
+    def _fight_on(self):
+        self._battle_job = None
+        battle = self.ctl.app.battle
+        if battle and getattr(battle, "holding", False):
+            battle.fight_on()
 
     def _go_battle(self):
         self._battle_job = None

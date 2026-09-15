@@ -84,6 +84,13 @@ DEFAULTS = {
     "areaMargin": 4,
     # --- 동작 ---
     "syncSeconds": 90,       # 서버와 목록을 맞추는 주기(초)
+    # 야생 배틀에서 잡기 좋게 싸울지 (desktop_battle 의 잡기 모드).
+    #   new     아직 안 잡은 종과 색이 다른 포켓몬만 (기본)
+    #   always  언제나
+    #   off     늘 끝까지 싸운다 (예전과 같다)
+    # 체력을 조금 남기고 멈춰서 10초 동안 볼을 던질 틈을 준다. 자동으로
+    # 싸우다 보면 오른쪽 클릭하기 전에 쓰러뜨려 버리던 것을 막는다.
+    "catchMode": "new",
     # 마지막에 던진 볼. 두 번 누르면 이걸로 바로 던진다.
     # 게임 상태가 아니라 취향이라 서버에 두지 않는다.
     "lastBall": "POKEBALL",
@@ -117,6 +124,15 @@ DEFAULTS = {
     # 다시 물어보지 않기 위해서다. 다음에 새로 켤 때는 다시 묻는다.
     "updateSkipped": "",
 }
+
+
+CATCH_MODES = ("new", "always", "off")
+
+
+def catch_mode(settings):
+    """설정의 잡기 모드. 모르는 값이면 기본(new)."""
+    v = (settings or {}).get("catchMode")
+    return v if v in CATCH_MODES else DEFAULTS["catchMode"]
 
 
 def load_settings():

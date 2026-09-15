@@ -213,9 +213,11 @@ class Api(object):
     def battle_current(self):
         return self._call("GET", "/api/battle")
 
-    def battle_move(self, bid, move):
+    def battle_move(self, bid, move, catch="", finish=False):
+        """catch: 잡기 모드 설정(new/always/off). finish: 멈췄다가 끝까지 싸우기로 했다."""
         return self._call("POST", "/api/battle/%d/move" % bid,
-                          {"move": move, "hour": _hour()})
+                          {"move": move, "hour": _hour(), "catch": catch or "",
+                           "finish": bool(finish)})
 
     def battle_switch(self, bid, pid):
         return self._call("POST", "/api/battle/%d/switch" % bid, {"pokemon": pid})

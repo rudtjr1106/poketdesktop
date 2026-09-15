@@ -90,6 +90,9 @@ jobs:
       # 특성·6:6 교체 규칙·저장/복원, 256명 로스터가 엔진에 맞는지, 256판이 끝나는지
       - name: 관장 배틀 (엔진)
         run: python common/test_trainer_battle.py
+      # 야생 자동 전투의 잡기 모드: 쓰러뜨리지 않고 멈추는가, 잠재우기·마비를 먼저 거는가
+      - name: 잡기 모드 (엔진)
+        run: python common/test_spare.py
       # 먼 섬(울릉군·백령도·추자도)을 원래 쪽으로 당겨 그리는가, 이름표 자리
       - name: 관장 지도 배치
         run: python client/test_gym_map.py

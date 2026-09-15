@@ -63,6 +63,27 @@ class _EstRng(object):
 
 EST_RNG = _EstRng()
 
+
+class _MaxRng(object):
+    """난수 보정을 가장 크게(1.0) 주는 가짜 rng. '아무리 세게 들어가도' 를 셀 때."""
+
+    @staticmethod
+    def uniform(a, b):
+        return b
+
+
+MAX_RNG = _MaxRng()
+
+# 잡기 모드: 상대 체력이 이만큼 이하가 되면 멈추고 볼을 던질 틈을 준다
+SPARE_LOW = 0.25
+# 안전한 기술이 이것보다 덜 깎으면 한참 걸리니 그냥 멈춘다 (최대 체력 대비)
+SPARE_MIN_HIT = 0.04
+# 체력이 이보다 많이 남았으면 '급소만 아니면 안 쓰러지는' 기술도 쓴다
+SPARE_RISK_ABOVE = 0.4
+# 잡기 모드에서 먼저 거는 상태이상. 포획률이 잠듦 2배, 마비 1.5배.
+# 화상·독은 턴마다 체력을 깎아 쓰러뜨릴 수 있어서 안 건다.
+SPARE_STATUS = ("sleep", "paralysis")
+
 # 쓸 기술이 하나도 없을 때 쓰는 몸부림.
 # 이게 없으면 양쪽 다 PP 가 떨어졌을 때 아무도 못 때려서 배틀이 안 끝난다.
 STRUGGLE = "STRUGGLE"
@@ -411,6 +432,80 @@ class Battle(object):
         if self.rng.random() < 0.15:        # 완벽하지 않게
             return self.rng.choice([m for m, _s in pool2])
         return max(pool2, key=lambda x: x[1])[0]
+
+    def spare_plan(self, user, target):
+        """잡기 모드. 상대를 쓰러뜨리지 않고 잡기 좋게 만든다.
+
+        (쓸 기술, 멈출 이유) 를 돌려준다. 둘 중 하나만 채워진다.
+
+            1. 상대가 상태이상이 아니면 잠재우기·마비 기술부터
+            2. 체력이 SPARE_LOW 이하면 멈춘다            -> "low"
+            3. **급소에 최대 난수로 맞아도** 안 쓰러지는 기술 중 가장 많이
+               깎는 것. 없으면, 체력이 40% 넘게 남았을 때만 급소가 아니면
+               안 쓰러지는 기술. 그것도 없거나 너무 약하면 멈춘다 -> "nosafe"
+
+        몸부림만 남았으면 멈춘다. 몸부림은 상대를 쓰러뜨릴 수 있다.
+        choose_for 와 따로 둔다 - 야생 무작위·PvP·관장 AI 는 그대로다.
+        """
+        pool = self.usable(user)
+        if user.held:
+            pool = H.lock_pool(user, pool)
+        if pool == [STRUGGLE]:
+            return None, "nosafe"
+        if not target.status:
+            types = target.types() if target.ability_on else ((target.species or {}).get("types") or [])
+            for ail in SPARE_STATUS:
+                cands = []
+                for m in pool:
+                    md = self.move_of(m)
+                    if md.get("power") or md.get("ail") != ail:
+                        continue
+                    if ail == "paralysis" and "ELECTRIC" in types:
+                        continue
+                    if target.ability_on and (A.would_block(user, target, md)
+                                              or A.status_blocked(target, ail, user)):
+                        continue
+                    cands.append(((md.get("acc") or 100), m))
+                if cands:
+                    return max(cands)[1], None
+        if target.hp <= target.maxhp * SPARE_LOW:
+            return None, "low"
+        best_m = self._spare_hit(pool, user, target, crit=True)
+        if best_m is None and target.hp > target.maxhp * SPARE_RISK_ABOVE:
+            # 급소까지 막으면 절반쯤에서 멈춰 버린다 (400판 중 185판). 체력이 넉넉하면
+            # **급소가 아니면 안 쓰러지는** 기술까지 쓴다. 급소는 1/24 이다.
+            best_m = self._spare_hit(pool, user, target, crit=False)
+        if best_m is None:
+            return None, "nosafe"
+        return best_m, None
+
+    def _spare_hit(self, pool, user, target, crit):
+        """쓰러뜨리지 않는 공격 기술 중 가장 많이 깎는 것. 없거나 너무 약하면 None."""
+        best, best_m = 0.0, None
+        for m in pool:
+            md = self.move_of(m)
+            if not md.get("power"):
+                continue
+            if user.ability_on and A.would_block(user, target, md):
+                continue
+            if not crit and md.get("crit"):
+                continue                        # 급소율이 높은 기술은 급소를 무시할 수 없다
+            worst, _c, _e = damage(self.dex, md, user, target, MAX_RNG, crit=crit)
+            lo, hi = ((md.get("hits") or [1, 1]) + [1, 1])[:2]
+            worst *= max(1, hi)
+            # 화상·독이 걸려 있거나 걸 수 있으면 턴 끝에 깎이는 몫까지 친다
+            if target.status in ("burn", "poison") or md.get("ail") in ("burn", "poison"):
+                worst += target.maxhp // 8
+            if worst >= target.hp:
+                continue
+            d, _c, _e = damage(self.dex, md, user, target, EST_RNG, crit=False)
+            d *= (lo + hi) / 2.0 if hi > 1 else 1
+            d *= (md.get("acc") or 100) / 100.0
+            if d > best:
+                best, best_m = d, m
+        if best_m is None or best < target.maxhp * SPARE_MIN_HIT:
+            return None
+        return best_m
 
     def _status_score(self, md, best_dmg, user=None, target=None):
         """변화기가 지금 쓸 만한지. 효과가 이미 걸려 있으면 0."""

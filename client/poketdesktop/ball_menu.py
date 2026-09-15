@@ -119,15 +119,20 @@ def rows(options, on_pick, on_shop=None):
     return out
 
 
-def popup(root, event, options, on_pick, on_shop=None):
+def popup(root, event, options, on_pick, on_shop=None, on_close=None):
+    """on_close: 메뉴가 닫히면(골랐든 안 골랐든) 한 번 부른다. 배틀이 그동안 멈춘다."""
     from . import platform_os as PLAT
     if not PLAT.NATIVE_MENU:
         # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
         return U.PopupMenu(root, rows(options, on_pick, on_shop),
-                           event.x_root, event.y_root, width=290)
+                           event.x_root, event.y_root, width=290,
+                           on_close=on_close)
     m = build(root, options, on_pick, on_shop)
     try:
+        # 윈도우의 tk_popup 은 메뉴가 닫힐 때까지 돌아오지 않는다
         m.tk_popup(event.x_root, event.y_root)
     finally:
         m.grab_release()
+        if on_close:
+            on_close()
     return m

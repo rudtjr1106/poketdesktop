@@ -1032,11 +1032,12 @@ class PopupMenu(object):
     W = 250
     _open = []          # 지금 떠 있는 것들. 새로 열 때 먼저 닫는다.
 
-    def __init__(self, root, rows, x, y, width=None, anchor="nw"):
+    def __init__(self, root, rows, x, y, width=None, anchor="nw", on_close=None):
         self.root = root
         self.win = self.catcher = None
         self.width = width or self.W
         self._watch_job = None
+        self._on_close = on_close
         self._was_down = PLAT.mouse_buttons_down()
         close_all()
         self._build(rows)
@@ -1191,6 +1192,14 @@ class PopupMenu(object):
             PopupMenu._open.remove(self)
         except ValueError:
             pass
+        # 닫힌 것을 알린다 (한 번만). 고른 줄의 명령보다 **먼저** 불린다 - click 이
+        # 메뉴를 먼저 닫고 명령을 부르기 때문이다.
+        fn, self._on_close = self._on_close, None
+        if fn:
+            try:
+                fn()
+            except Exception:                               # noqa: BLE001
+                pass
 
     def alive(self):
         return self.win is not None

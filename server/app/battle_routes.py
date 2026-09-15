@@ -27,6 +27,11 @@ router = APIRouter()
 class MoveIn(BaseModel):
     move: str = ""
     hour: int = -1        # 클라이언트의 시각 (이브이 낮/밤 진화용)
+    # 잡기 모드 (자동 전투일 때만). new = 아직 안 잡은 종·색이 다른 것만,
+    # always = 늘, off/빈 값 = 쓰러뜨린다. **빈 값이 기본**이라 이 값을 모르는
+    # 옛 클라이언트는 예전과 똑같이 싸운다 - 멈춘다는 답을 받아도 처리할 줄 모른다.
+    catch: str = ""
+    finish: bool = False  # 멈췄다가 다시 싸우기로 했다 -> 이 판은 끝까지 싸운다
 
 
 class SwitchIn(BaseModel):
@@ -305,6 +310,15 @@ def award(dex, uid, foe, participant_id, hour=None, rate=1.0):
     return out
 
 
+def spare_for(uid, foe, pref):
+    """이 야생에게 잡기 모드로 싸우나."""
+    if pref == "always":
+        return True
+    if pref == "new":
+        return bool(foe.mon.get("shiny")) or not items.has_caught(uid, foe.mon["species"])
+    return False
+
+
 def foe_only_turn(d, me, foe, ev):
     """볼을 던지거나 도망에 실패했을 때 상대만 한 번 움직인다."""
     bt = B.Battle(d, me, foe, deps.RNG)
@@ -415,10 +429,26 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
 
     # 기술을 안 보내면(자동 전투) 서버가 골라준다.
     pick = body.move
-    if not pick or pick == "AUTO":
+    auto = not pick or pick == "AUTO"
+    spare = auto and not body.finish and spare_for(uid, foe, body.catch)
+    if spare:
+        pick, reason = bt.spare_plan(me, foe)
+        if reason:
+            # **턴을 쓰지 않고 멈춘다.** 클라이언트가 볼을 던질 틈(10초)을 주고,
+            # 안 던지면 finish 로 다시 부른다.
+            return {"events": [], "hold": reason, "spare": True,
+                    "battle": _view(d, row, bt),
+                    "ballOptions": ball_options(uid, ctx["user"], bt, row, hour)}
+    elif auto:
         pick = bt.choose_mine()
     out = {"myMove": pick, "myMoveKr": bt.move_name(pick),
-           "events": bt.take_turn(pick)}
+           "events": bt.take_turn(pick), "spare": spare}
+    if spare and not bt.over:
+        # 다음 턴에 멈출 판이면 지금 알려 준다. 한 번 더 불러서 빈 답을 받는 사이
+        # 0.6초가 그냥 흐른다. (잠재우기가 남았으면 멈추지 않는다 - 같은 판단)
+        _next, again = bt.spare_plan(me, foe)
+        if again:
+            out["hold"] = again
 
     if bt.over and bt.result == "won":
         db.run("INSERT INTO wild_state (user_id, wins) VALUES (?,1)"

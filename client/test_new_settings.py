@@ -604,6 +604,49 @@ def test_names_default():
     finally:
         config.SETTINGS_PATH = saved_path
 
+def test_catch_mode():
+    """야생 배틀의 잡기 모드 설정. 기본은 '아직 안 잡은 포켓몬만'."""
+    print("잡기 모드 설정")
+    from poketdesktop import ui_settings
+
+    saved_path = config.SETTINGS_PATH
+    config.SETTINGS_PATH = os.path.join(
+        tempfile.mkdtemp(prefix="poket-test-catch-"), "settings.json")
+    try:
+        chk("기본은 new (아직 안 잡은 포켓몬만)", config.load_settings()["catchMode"] == "new")
+        with open(config.SETTINGS_PATH, "w", encoding="utf-8") as f:
+            json.dump({"showNames": True}, f)
+        chk("잡기 모드가 없던 옛 설정에도 채운다", config.load_settings()["catchMode"] == "new")
+        chk("모르는 값은 기본으로 읽는다",
+            config.catch_mode({"catchMode": "hmm"}) == "new"
+            and config.catch_mode({}) == "new" and config.catch_mode({"catchMode": "off"}) == "off")
+        chk("설정 창의 선택지가 세 값을 모두 담는다",
+            sorted(v for v, _l in ui_settings.SettingsWindow.CATCH_CHOICES) == sorted(config.CATCH_MODES))
+
+        class Var(object):
+            def __init__(self, v):
+                self.v = v
+
+            def get(self):
+                return self.v
+
+        class FakeSettingsWin(object):
+            _save = ui_settings.SettingsWindow._save
+            _set = ui_settings.SettingsWindow._set
+            _set_catch = ui_settings.SettingsWindow._set_catch
+
+        win = FakeSettingsWin()
+        win.app = FakeApp()
+        win.app.settings = config.load_settings()
+        win.catch = Var("always")
+        win._set_catch()
+        with open(config.SETTINGS_PATH, encoding="utf-8") as f:
+            chk("고르면 바로 저장한다", json.load(f).get("catchMode") == "always")
+        chk("앱 설정에도 들어간다", win.app.settings["catchMode"] == "always")
+    finally:
+        config.SETTINGS_PATH = saved_path
+
+
 def main():
     os.makedirs(TMP, exist_ok=True)
     test_grass()
@@ -613,6 +656,7 @@ def main():
     test_highlights()
     test_tray_menu()
     test_names_default()
+    test_catch_mode()
     print()
     print("통과 %d, 실패 %d" % (OK, FAIL))
     return 1 if FAIL else 0

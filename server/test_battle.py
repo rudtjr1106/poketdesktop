@@ -110,6 +110,67 @@ def fresh_wild():
     return wd
 
 
+def my_ko(events):
+    """급소가 아닌 내 기술로 상대를 쓰러뜨린 hit 이벤트."""
+    return [e for e in events if e.get("t") == "hit" and e.get("who") == "me"
+            and e.get("hp") == 0 and not e.get("crit")]
+
+
+def catch_mode_checks():
+    """자동 전투 + catch 설정. 옛 클라이언트(catch 없음)는 예전처럼 싸운다."""
+    for _try in range(4):
+        wd = fresh_wild()
+        if not wd:
+            continue
+        st, r = call("POST", "/api/wild/%d/battle" % wd["id"], {})
+        if st != 200:
+            continue
+        bid = r["battle"]["id"]
+        st, r = call("POST", "/api/battle/%d/move" % bid, {"move": ""})
+        chk("catch 를 안 보내면(옛 클라이언트) 멈추지 않는다", st == 200 and not r.get("hold"), r.get("hold"))
+        if r["battle"]["over"]:
+            continue
+        killed, held, last = [], None, r
+        for _n in range(40):
+            st, r = call("POST", "/api/battle/%d/move" % bid, {"move": "", "catch": "always"})
+            if st != 200:
+                chk("잡기 모드 턴 오류", False, (st, r))
+                return
+            killed += my_ko(r.get("events") or [])
+            last = r
+            if r.get("hold"):
+                held = r
+                break
+            if r["battle"]["over"]:
+                break
+        chk("잡기 모드에서는 (급소가 아니면) 내 기술로 쓰러뜨리지 않는다", not killed, killed)
+        if not held:
+            print("       이번 판은 멈추기 전에 끝났다 (%s)" % last["battle"].get("result"))
+            continue
+        foe = held["battle"]["foe"]
+        chk("멈출 때 야생은 살아 있다", foe["hp"] > 0 and not held["battle"]["over"], foe)
+        chk("멈추는 이유는 low 또는 nosafe", held["hold"] in ("low", "nosafe"), held["hold"])
+        if held["hold"] == "low":
+            chk("low 는 체력 1/4 이하", foe["hp"] <= foe["maxhp"] * 0.25, foe)
+        print("       %s: 야생 체력 %d/%d 에서 멈춤" % (held["hold"], foe["hp"], foe["maxhp"]))
+        chk("볼 목록을 같이 준다", held.get("ballOptions") is not None, list(held.keys()))
+        turn = held["battle"]["turn"]
+        st, r = call("POST", "/api/battle/%d/move" % bid, {"move": "", "catch": "always"})
+        chk("멈춘 채 다시 부르면 턴을 쓰지 않는다",
+            st == 200 and r.get("hold") and r.get("events") == [] and r["battle"]["turn"] == turn,
+            (r.get("hold"), r.get("events"), r.get("battle", {}).get("turn"), turn))
+        st, r = call("POST", "/api/battle/%d/move" % bid, {"move": "", "catch": "always", "finish": True})
+        chk("finish 면 멈추지 않고 싸운다", st == 200 and not r.get("hold") and r.get("events"),
+            (r.get("hold"), r.get("events")))
+        guard = 0
+        while not r["battle"]["over"] and guard < 60:
+            guard += 1
+            st, r = call("POST", "/api/battle/%d/move" % bid, {"move": "", "catch": "always", "finish": True})
+        chk("finish 로 끝까지 간다", r["battle"]["over"], r["battle"].get("result"))
+        return
+    print("       멈추는 판을 못 만났다 (야생이 매번 먼저 끝났다)")
+
+
 def main():
     global TOKEN
     user = "b%06d" % random.randrange(1000000)
@@ -275,6 +336,9 @@ def main():
                 else:
                     chk("실패하면 상대가 반격", "events" in r, list(r.keys()))
                     print("       %s" % r["message"])
+
+    section("잡기 모드 (체력을 남기고 멈춘다)")
+    catch_mode_checks()
 
     section("도망")
     wd = fresh_wild()
