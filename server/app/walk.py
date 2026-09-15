@@ -81,6 +81,10 @@ def settle(uid, st=None):
     db.run("UPDATE wild_state SET walk_at=? WHERE user_id=?",
            (nxt.isoformat(), uid))
 
+    # 알도 같은 시계로 자란다. 켜 둔 시간이 곧 품은 시간이다.
+    from . import eggs
+    eggs.add_time(uid, ticks * TICK)
+
     got = ticks * GAIN
     # 데리고 다니는 애들만 오른다. 박스에 있는 건 같이 걷지 않는다.
     # 럭셔리볼로 잡은 개체는 두 배로 오른다(본가와 같다).

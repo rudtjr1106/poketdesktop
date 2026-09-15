@@ -215,7 +215,10 @@ jobs:
         run: python client/smoke_nameplate.py
       # 시즌 2 화면 (랭킹·랭크 팀·칭호·이로치사탕). 가짜 API 로 진짜 창을 만든다.
       - name: 랭크 시즌 화면
-        run: python client/smoke_season.py
+        run: |
+          python client/smoke_season.py
+          python client/smoke_eggs.py
+          python client/test_walk_shiny.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
         run: python client/smoke_box_filter.py
       # 기술머신 창의 포켓몬 도트가 잘려 있었다 (Label width=3 이 3px 로 읽혔다).
@@ -261,7 +264,10 @@ jobs:
         run: python client/smoke_nameplate.py
       # 시즌 2 화면 (랭킹·랭크 팀·칭호·이로치사탕). 가짜 API 로 진짜 창을 만든다.
       - name: 랭크 시즌 화면
-        run: python client/smoke_season.py
+        run: |
+          python client/smoke_season.py
+          python client/smoke_eggs.py
+          python client/test_walk_shiny.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
         run: python client/smoke_box_filter.py
       - name: 기술머신 창 도트·목록 (진짜 Tk)

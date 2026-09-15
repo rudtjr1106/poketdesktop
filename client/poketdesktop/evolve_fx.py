@@ -254,7 +254,7 @@ class Evolution(object):
                 # **걷는 도트를 먼저 본다.** overlay.make 와 같은 순서다.
                 # 여기서 배틀 도트만 받으면 진화한 그 순간부터 그 포켓몬만
                 # 정면으로 굳어서 혼자 안 걷는다 - 다른 애들은 걸어다니는데.
-                sheet, meta = walk_cache.ensure(api, num)
+                sheet, meta = walk_cache.ensure(api, num, shiny=bool(shiny))
                 if sheet and meta:
                     try:
                         anim = sprites.load_walk(
@@ -300,7 +300,7 @@ class Evolution(object):
                 # Overlay.make 는 self.walks 만 본다. 여기 넣어두지 않으면
                 # 설정을 한 번 건드리는 순간 걷던 진화체가 배틀 도트로
                 # 되돌아간다 - 다음 폴링이 채워줄 때까지.
-                self.app.overlay.walks[num] = walk_new
+                self.app.overlay.walks[walk_cache.key(num, shiny)] = walk_new
             self.open_layer()
             self.after(HOLD_MS, lambda: self.blink(0))
 

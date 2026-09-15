@@ -341,7 +341,8 @@ class Pet(object):
             return got
         if not self.walking_sprite:
             return None                   # 배틀 도트로 대신하는 종
-        key = (self.mon.get("num"), name)
+        key = walk_cache.sheet_key(self.mon.get("num"), name,
+                                   bool(self.mon.get("shiny")))
         if key in self.miss:
             return None
         ent = self.ov.sheets.get(key)
@@ -481,13 +482,16 @@ class Pet(object):
         # 맥판(platform_mac)의 reserve 는 일부러 아무것도 안 한다.
         # 거기서는 칸을 키우면 그만큼 마우스를 가로채기 때문이다.
         num = self.mon.get("num")
+        shiny = bool(self.mon.get("shiny"))
         scale = self.base_scale or 1.0
         bw, bh = self.fw, self.fh
         for name in ("Walk",) + tuple(walk_cache.ANIMS):
-            ent = self.ov.sheets.get((num, name))
+            ent = self.ov.sheets.get(walk_cache.sheet_key(num, name, shiny))
             if ent is None:
                 # 아직 안 물어본 동작. 받아 둔 것이 있으면 meta 만 읽는다.
-                ent = walk_cache.local(num, name)
+                ent = walk_cache.local(num, name, shiny)
+                if shiny and not (ent and ent[0]):
+                    ent = walk_cache.local(num, name)
             meta = ent[1] if ent else None
             if not meta or not meta.get("ok"):
                 continue
@@ -750,6 +754,12 @@ class Overlay(object):
         # 마리를 여기 넣는다. sync() 는 여기를 건드리지 않으므로 서버가
         # 준 목록과 섞이지 않고, _tick 은 여기도 같이 움직여 준다.
         self.extra = []
+        # 포켓몬 알 {알 id: EggPet} (eggs_ui). pets 와 따로 둔다 - 알은 서버의
+        # 포켓몬 목록에 없어서 sync() 가 지운다. 걸어다니지도 싸우지도 않는다.
+        self.eggs = {}
+        # 부화 연출을 이미 보여 준 알. 서버는 seen 을 받을 때까지 그 알을 계속
+        # 실어 보내는데, 그때마다 알을 다시 세우면 태어난 뒤에도 알이 남는다.
+        self.eggs_done = set()
         # 투기장이 화면을 쥐고 있는 동안 켠다. 켜져 있으면 sync() 가
         # 도트를 새로 배치하지 않는다 - 싸우는 중에 서버 목록이 와서
         # 자리를 흐트러뜨리면 안 된다.
@@ -824,6 +834,41 @@ class Overlay(object):
                         pass
         return added
 
+    def sync_eggs(self, eggs):
+        """서버가 알려 준 알 목록과 바탕화면의 알을 맞춘다.
+
+        부화 연출 중인 알은 건드리지 않는다 (목록에서 빠져도 연출이 끝날
+        때까지는 둔다). 그림을 아직 못 받았으면 다음 동기화 때 세운다.
+        """
+        from . import eggs_ui
+        want = dict((e["id"], e) for e in (eggs or []) if e.get("id") is not None)
+        for eid in list(self.eggs):
+            p = self.eggs[eid]
+            if eid not in want and not getattr(p, "hatching", False):
+                self.eggs.pop(eid).destroy()
+        for eid, e in want.items():
+            if eid in self.eggs:
+                self.eggs[eid].set_egg(e)
+                continue
+            if eid in self.eggs_done:
+                continue
+            if e.get("hatched") and not e.get("pokemon"):
+                continue
+            anim = eggs_ui.egg_anim(self, e.get("kind"))
+            if anim is None:
+                continue
+            try:
+                pet = eggs_ui.EggPet(self, e, anim)
+            except Exception as ex:                        # noqa: BLE001
+                config.log("알을 못 세웠습니다: %s" % ex)
+                continue
+            self.eggs[eid] = pet
+            if self.hidden:
+                try:
+                    pet.win.withdraw()
+                except Exception:                          # noqa: BLE001
+                    pass
+
     def path_for(self, mon):
         k = (mon.get("num"), bool(mon.get("shiny")))
         return self.paths.get(k) or self.paths.get((mon.get("num"), False))
@@ -834,7 +879,9 @@ class Overlay(object):
 
         # 걷는 도트가 있으면 그걸 먼저 쓴다. 4방향에 걷기 프레임이 있어서
         # 위로 가면 등이 보이고 걸을 때 발이 바뀐다.
-        sheet, meta = self.walks.get(mon.get("num")) or (None, None)
+        # 이로치는 이로치 시트부터. 아직 안 받았으면 보통 색으로라도 걷는다.
+        sheet, meta = (self.walks.get(walk_cache.key(mon.get("num"), mon.get("shiny")))
+                       or self.walks.get(mon.get("num")) or (None, None))
         if sheet and meta:
             try:
                 anim = sprites.load_walk(sheet, meta, s["targetHeight"],
@@ -871,6 +918,12 @@ class Overlay(object):
             except Exception:                            # noqa: BLE001
                 pass
         self.extra = []
+        for p in list(self.eggs.values()):
+            try:
+                p.destroy()
+            except Exception:                            # noqa: BLE001
+                pass
+        self.eggs = {}
         self.locked = False
         # 막아 둔 쪽(배틀)도 여기서 같이 끝난다. 로그아웃·종료는 clear()
         # 뒤에 배틀을 닫는데, 그때 푸는 것은 0 아래로 안 내려가서 괜찮다.
@@ -879,6 +932,14 @@ class Overlay(object):
     def set_hidden(self, hidden):
         """배틀 중처럼 잠깐 치워야 할 때. 목록은 그대로 두고 창만 감춘다."""
         self.hidden = bool(hidden)
+        for p in list(self.eggs.values()):
+            try:
+                p.hide_tip()
+                if getattr(p, "hatching", False):
+                    continue
+                p.win.withdraw() if hidden else PLAT.show_again(p.win)
+            except Exception:                            # noqa: BLE001
+                pass
         for p in list(self.pets.values()):
             for w in (p.win, p.name_win):
                 if not w:
@@ -976,10 +1037,12 @@ class Overlay(object):
         # clear() 가 0 으로 되돌리면 다시 만든 도트에 이름표가 붙어 체력바와
         # 겹친다. 막은 쪽은 끝날 때 어차피 한 번 푼다.
         block = self._names_block
+        eggs = [p.egg for p in self.eggs.values()]
         self.clear()
         self._names_block = block
         sprites.clear_cache()
         self.sync(mons, {})
+        self.sync_eggs(eggs)
 
     # ---------------- 루프 ----------------
     def start(self):
@@ -1003,7 +1066,7 @@ class Overlay(object):
                 cx, cy = self.root.winfo_pointerxy()
             except Exception:                               # noqa: BLE001
                 cx = cy = None
-        for p in list(self.pets.values()) + list(self.extra):
+        for p in list(self.pets.values()) + list(self.extra) + list(self.eggs.values()):
             try:
                 p.update(ms)
                 if cx is not None:

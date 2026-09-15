@@ -390,6 +390,23 @@ CREATE TABLE IF NOT EXISTS user_reward (
     PRIMARY KEY (user_id, kind, rid)
 );
 
+-- 포켓몬 알 (eggs.py). 바탕화면에 켜 둔 시간(got_sec)이 need_sec 에 닿으면
+-- 부화한다. species 는 받는 순간 정해 두고 화면에는 안 보낸다.
+-- announced: 부화했다고 화면에 알렸나. 알리기 전에는 /api/me 에 계속 실린다.
+CREATE TABLE IF NOT EXISTS egg (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind        TEXT NOT NULL,          -- legendary / mythical
+    species     TEXT NOT NULL,
+    need_sec    INTEGER NOT NULL,
+    got_sec     INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    hatched_at  TEXT,
+    pokemon_id  INTEGER,
+    announced   INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_egg_user ON egg(user_id, hatched_at);
+
 -- 끝난 시즌의 순위표. rank_stat 은 시즌이 바뀌면 비우므로 여기 옮겨 둔다.
 -- 이름은 그때의 닉네임을 베낀다(전적과 같은 이유).
 CREATE TABLE IF NOT EXISTS season_result (

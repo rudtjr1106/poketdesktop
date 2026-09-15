@@ -173,7 +173,7 @@ def run_evolution(pre_anim, walk_for_new, battle_path, to_num=2):
 
     evolve_fx.U.run_async = run_async
     evolve_fx.sprite_cache.ensure = lambda api, num, shiny: battle_path
-    evolve_fx.walk_cache.ensure = lambda api, num: walk_for_new
+    evolve_fx.walk_cache.ensure = lambda api, num, *a, **kw: walk_for_new
     try:
         ev = evolve_fx.Evolution(app, pet, {"toNum": to_num, "toKr": "이상해풀"})
         ev.open_layer = lambda: None          # 캔버스는 안 만든다

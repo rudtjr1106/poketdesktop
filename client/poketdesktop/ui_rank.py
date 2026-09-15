@@ -300,7 +300,9 @@ class RankWindow(object):
                 chip = S.tier_chip(grid, rw.get("tier"), rw.get("tierKr"))
                 if chip:
                     chip.grid(row=i, column=0, sticky="w", pady=1)
-                bits = ["칭호 '%s'" % rw["title"]] if rw.get("title") else []
+                bits = [rw["egg"]] if rw.get("egg") else []
+                if rw.get("title"):
+                    bits.append("칭호 '%s'" % rw["title"])
                 if rw.get("frame"):
                     bits.append(rw["frame"])
                 if rw.get("shiny"):

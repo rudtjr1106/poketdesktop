@@ -27,7 +27,7 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
 
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
-from . import (auth, battle_routes, config, db, deps, item_routes,  # noqa: E402
+from . import (auth, battle_routes, config, db, deps, eggs, item_routes,  # noqa: E402
                errors, items, migrations, pvp, pvp_routes,
                gym_routes, social_routes, tm_routes, tms, walk)
 
@@ -379,10 +379,18 @@ ROWMAP_PMD = {"down": 0, "downright": 1, "right": 2, "upright": 3,
 ROWMAP_FOLLOW = {"down": 0, "left": 1, "right": 2, "up": 3}
 
 
-def _anim_paths(num, name):
-    d = os.path.join(WALK_DIR, "%04d" % num)
+def _anim_paths(num, name, shiny=False):
+    # 이로치는 옆 폴더(0025s)에 둔다. 같은 폴더에 섞으면 옛 캐시를 옮기는
+    # _migrate_old_walk 가 헷갈린다.
+    d = os.path.join(WALK_DIR, "%04d%s" % (num, "s" if shiny else ""))
     return (os.path.join(d, "%s.png" % name),
             os.path.join(d, "%s.json" % name))
+
+
+# SpriteCollab 은 폼 0000 아래 0001 에 이로치 시트를 둔다 (sprite/0025/0000/0001/).
+# 동작 이름·AnimData 규격은 보통 시트와 같다. 없는 종은 클라이언트가 보통
+# 색으로 대신 걷는다.
+SHINY_SUBDIR = "0000/0001/"
 
 
 def _png_size(data):
@@ -463,19 +471,22 @@ def _pick_anim(root, name):
     return fw, fh, durs, png_name
 
 
-def _anim_fetch(num, name):
+def _anim_fetch(num, name, shiny=False):
     """스프라이트시트와 메타를 한 번만 받아 디스크에 남긴다.
 
     걷기가 없는 종(57마리)만 두 번째 출처로 넘어간다. 나머지 동작은
     거기에 아예 없으므로 없다고 적어 둔다.
+
+    이로치는 두 번째 출처가 없다. 그리고 **404 일 때만** 없다고 적는다 -
+    잠깐 끊긴 사이에 물어본 종이 영영 보통 색으로 걷게 되면 안 된다.
     """
     import urllib.error
     import urllib.request
     import xml.etree.ElementTree as ET
 
-    png_path, meta_path = _anim_paths(num, name)
+    png_path, meta_path = _anim_paths(num, name, shiny)
     os.makedirs(os.path.dirname(png_path), exist_ok=True)
-    base = "%s/%04d/" % (WALK_BASE, num)
+    base = "%s/%04d/%s" % (WALK_BASE, num, SHINY_SUBDIR if shiny else "")
 
     def grab(fn):
         with urllib.request.urlopen(base + fn, timeout=12) as r:
@@ -490,7 +501,18 @@ def _anim_fetch(num, name):
         png = grab("%s-Anim.png" % png_name)
         if not png:
             raise ValueError("빈 파일")
-    except (urllib.error.URLError, OSError, ValueError, ET.ParseError, TypeError):
+    except (urllib.error.URLError, OSError, ValueError, ET.ParseError, TypeError) as e:
+        if shiny:
+            if isinstance(e, urllib.error.HTTPError):
+                if e.code != 404:
+                    return None             # 저쪽이 잠깐 안 된다. 다음에 다시
+            elif isinstance(e, OSError):
+                return None                 # 끊김·시간초과. 없는 종인지 모른다
+            if name == "Walk" and (_anim_meta(num, "Walk") or {}).get("src") == "follow":
+                # 보통 걷기도 두 번째 출처에서 온 종이면 이로치도 거기서. 보통은
+                # SpriteCollab 인데 이로치만 followers 로 받으면 그림체가 바뀐다.
+                return _walk_fetch_follow(num, png_path, meta_path, shiny=True)
+            return _mark_missing(meta_path)
         if name == "Walk":
             # 걷기가 없다. 두 번째 출처를 본다.
             return _walk_fetch_follow(num, png_path, meta_path)
@@ -510,6 +532,10 @@ def _anim_fetch(num, name):
     meta = {"ok": True, "frameW": fw, "frameH": fh,
             "durations": durs, "frames": len(durs), "rows": rows,
             "rowmap": ROWMAP_PMD, "src": "pmd", "anim": name}
+    if shiny:
+        # 클라이언트는 이 표시가 있어야 이로치 시트로 믿는다. 옛 서버는
+        # ?shiny=1 을 모르고 보통 시트를 주는데, 그걸 이로치로 굳히면 안 된다.
+        meta["shiny"] = True
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f)
     return meta
@@ -525,7 +551,7 @@ def _mark_missing(meta_path):
     return None
 
 
-def _walk_fetch_follow(num, png_path, meta_path):
+def _walk_fetch_follow(num, png_path, meta_path, shiny=False):
     """SpriteCollab 에 없는 종을 followers 저장소에서 찾는다.
 
     128x128 한 장에 32x32 칸이 가로 4프레임 x 세로 4행으로 들어 있다.
@@ -535,7 +561,8 @@ def _walk_fetch_follow(num, png_path, meta_path):
     import urllib.error
     import urllib.request
     try:
-        url = "%s/%d-b-n.png" % (FOLLOW_BASE, num)
+        # -b-n 이 보통, -b-s 가 이로치다.
+        url = "%s/%d-b-%s.png" % (FOLLOW_BASE, num, "s" if shiny else "n")
         with urllib.request.urlopen(url, timeout=12) as r:
             png = r.read()
         if not png or len(png) < 100:
@@ -559,22 +586,24 @@ def _walk_fetch_follow(num, png_path, meta_path):
     meta = {"ok": True, "frameW": 32, "frameH": 32,
             "durations": [9, 9, 9, 9], "frames": 4, "rows": 4,   # 1/60초 틱
             "rowmap": ROWMAP_FOLLOW, "src": "follow", "anim": "Walk"}
+    if shiny:
+        meta["shiny"] = True
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f)
     return meta
 
 
-def _anim_meta(num, name):
-    if name == "Walk":
+def _anim_meta(num, name, shiny=False):
+    if name == "Walk" and not shiny:
         _migrate_old_walk(num)
-    _png, meta_path = _anim_paths(num, name)
+    _png, meta_path = _anim_paths(num, name, shiny)
     if os.path.exists(meta_path):
         try:
             with open(meta_path, encoding="utf-8") as f:
                 return json.load(f)
         except (OSError, ValueError):
             pass
-    return _anim_fetch(num, name)
+    return _anim_fetch(num, name, shiny)
 
 
 def _check_anim(num, name):
@@ -584,8 +613,8 @@ def _check_anim(num, name):
         raise HTTPException(404, "그런 동작이 없습니다.")
 
 
-def _meta_response(num, name):
-    meta = _anim_meta(num, name)
+def _meta_response(num, name, shiny=False):
+    meta = _anim_meta(num, name, shiny)
     if meta is None:
         # 지금은 알 수 없다(저쪽이 잠깐 안 된다). 클라이언트가 '없는 종'
         # 으로 굳혀 버리지 않게 구분해서 알려준다.
@@ -595,10 +624,10 @@ def _meta_response(num, name):
     return meta
 
 
-def _sheet_response(num, name):
-    png_path, _m = _anim_paths(num, name)
+def _sheet_response(num, name, shiny=False):
+    png_path, _m = _anim_paths(num, name, shiny)
     if not os.path.exists(png_path):
-        if not (_anim_meta(num, name) or {}).get("ok"):
+        if not (_anim_meta(num, name, shiny) or {}).get("ok"):
             raise HTTPException(404, "그 동작의 도트가 없는 종입니다.")
     if not os.path.exists(png_path):
         raise HTTPException(404, "도트를 받지 못했습니다.")
@@ -609,17 +638,21 @@ def _sheet_response(num, name):
 
 
 @app.get("/api/anim/{num}/{name}.json")
-def anim_meta(num: int, name: str):
-    """이 종에 이 동작이 있는지, 있으면 어떻게 잘라야 하는지."""
+def anim_meta(num: int, name: str, shiny: bool = False):
+    """이 종에 이 동작이 있는지, 있으면 어떻게 잘라야 하는지.
+
+    shiny=true 면 이로치 시트 (1.4.0). 없으면 ok:false - 클라이언트가 보통
+    색 시트로 대신한다.
+    """
     _check_anim(num, name)
-    return _meta_response(num, name)
+    return _meta_response(num, name, shiny)
 
 
 @app.get("/api/anim/{num}/{name}.png")
-def anim_sheet(num: int, name: str):
+def anim_sheet(num: int, name: str, shiny: bool = False):
     """그 동작의 스프라이트시트."""
     _check_anim(num, name)
-    return _sheet_response(num, name)
+    return _sheet_response(num, name, shiny)
 
 
 # 아래 둘은 1.0.15 까지의 클라이언트가 부른다. 걷기 전용이던 시절의
@@ -798,14 +831,17 @@ def me(ctx=Depends(current)):
     uid = u["id"]
     # 두 숫자를 한 번에 센다. Turso 는 원격이라 왕복 한 번이 100ms 다 -
     # 나눠 물어볼 이유가 없다.
-    c = db.q1("SELECT COUNT(*) c, SUM(on_desktop) d FROM pokemon"
-              " WHERE user_id=?", (uid,))
-    box = c["c"] or 0
-    desk = c["d"] or 0
     st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
     # 걸어다닌 만큼 친밀도를 올린다. 이 라우트가 이미 wild_state 를 읽고
     # 있어서 조회가 늘지 않고, 20분에 한 번만 쓰기 두 문장이 나간다.
     walked = walk.settle(uid, st)
+    # 다 자란 알은 여기서 부화한다. 태어난 포켓몬이 아래 목록·자리 계산에
+    # 들어가야 하므로 세기 전에 한다.
+    hatched = eggs.hatch_ready(uid)
+    c = db.q1("SELECT COUNT(*) c, SUM(on_desktop) d FROM pokemon"
+              " WHERE user_id=?", (uid,))
+    box = c["c"] or 0
+    desk = c["d"] or 0
 
     # **선물을 먼저 지급하고 지갑을 읽는다.** 순서를 바꾸면 "5000원을
     # 받았습니다" 라고 알리면서 화면의 소지금은 받기 전 값이 된다 -
@@ -842,8 +878,20 @@ def me(ctx=Depends(current)):
         # 알리려면 지급과 알림이 한 흐름이어야 한다. 대전 수와 같은
         # 이유로 폴링을 새로 두지 않고 여기에 얹는다.
         "gifts": gifts,
+        # 포켓몬 알. 바탕화면에 띄우고, hatched 인 것은 부화 연출을 한 뒤
+        # /api/eggs/{id}/seen 을 부른다. 그전까지는 계속 실려 온다.
+        "eggs": eggs.public(uid),
+        "hatchedNow": hatched,
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
+
+
+@app.post("/api/eggs/{egg_id}/seen")
+def egg_seen(egg_id: int, ctx=Depends(current)):
+    """부화를 화면에 알렸다. 이제 /api/me 에 안 싣는다."""
+    if not eggs.mark_announced(ctx["user"]["id"], egg_id):
+        raise HTTPException(404, "그런 알이 없습니다.")
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------- 포켓몬

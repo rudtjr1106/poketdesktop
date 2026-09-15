@@ -114,19 +114,21 @@ def _dex_evolved(conn):
 
 # 시즌 1 보상표. **여기 숫자를 적는다** (규칙 2) - season.py 의 표가 나중에
 # 바뀌어도 이미 끝난 시즌 1 의 보상은 그때 정한 그대로여야 한다.
-# (첫 등수, 끝 등수, 칭호, 명패, 이로치사탕)
+#
+# 급은 알로 가른다 (1위 전설, 2~5위 환상). 이로치사탕은 1~10위에 하나씩만 -
+# 많이 뿌리면 이로치가 흔해진다. 31위부터는 보상이 없다.
+# (첫 등수, 끝 등수, 칭호, 명패, 이로치사탕, 알)
 S1_REWARDS = [
-    (1, 1, "s1_champion", "gold", 3),
-    (2, 5, "s1_elite", "silver", 2),
-    (6, 10, "s1_top10", "bronze", 1),
-    (11, 30, "s1_top30", None, 1),
-    (31, 100000, "s1_player", None, 0),
+    (1, 1, "s1_champion", "gold", 1, "legendary"),
+    (2, 5, "s1_elite", "silver", 1, "mythical"),
+    (6, 10, "s1_top10", "bronze", 1, None),
+    (11, 30, "s1_top30", None, 0, None),
 ]
 S1_TITLE_KR = {
     "s1_champion": "시즌 1 챔피언", "s1_elite": "시즌 1 사천왕",
     "s1_top10": "시즌 1 TOP 10", "s1_top30": "시즌 1 상위권",
-    "s1_player": "시즌 1 도전자",
 }
+S1_EGG_KR = {"legendary": "전설의 포켓몬 알", "mythical": "환상의 포켓몬 알"}
 S1_FRAME_KR = {"gold": "금빛 명패", "silver": "은빛 명패", "bronze": "동빛 명패"}
 S1_GIFT_TITLE = "시즌 1 보상"
 
@@ -161,14 +163,14 @@ def _season2_open(conn):
         " r.draws FROM rank_stat r JOIN users u ON u.id=r.user_id"
         " WHERE r.ranked=1 ORDER BY r.rating DESC, r.wins DESC").fetchall()
 
-    gifts = candies = 0
+    gifts = candies = n_eggs = 0
     for i, r in enumerate(rows, 1):
         uid = _v(r, "user_id", 0)
-        title = frame = None
+        title = frame = egg = None
         n = 0
-        for lo, hi, t, f, c in S1_REWARDS:
+        for lo, hi, t, f, c, e in S1_REWARDS:
             if lo <= i <= hi:
-                title, frame, n = t, f, c
+                title, frame, n, egg = t, f, c, e
                 break
         conn.execute(
             "INSERT INTO season_result (season, user_id, rank, name, rating,"
@@ -178,10 +180,15 @@ def _season2_open(conn):
             (uid, i, _v(r, "username", 1), _v(r, "rating", 2),
              _v(r, "games", 3), _v(r, "wins", 4), _v(r, "losses", 5),
              _v(r, "draws", 6), title, now))
+        if title is None:
+            continue            # 31위부터는 보관만 하고 보상은 없다
         if conn.execute("SELECT 1 FROM gift WHERE user_id=? AND title=?",
                         (uid, S1_GIFT_TITLE)).fetchone():
             continue
-        bits = ["칭호 '%s'" % S1_TITLE_KR[title]]
+        bits = []
+        if egg:
+            bits.append(S1_EGG_KR[egg])
+        bits.append("칭호 '%s'" % S1_TITLE_KR[title])
         if frame:
             bits.append(S1_FRAME_KR[frame])
         if n:
@@ -190,9 +197,16 @@ def _season2_open(conn):
             i, ", ".join(bits), "칭호와 명패" if frame else "칭호")
         if n:
             msg += " 이로치사탕은 가방에서 포켓몬에게 먹이면 이로치가 됩니다."
+        if egg:
+            msg += (" 알은 바탕화면에 나타나고, 게임을 켜 둔 시간만큼 자라서 "
+                    "부화합니다.")
         # 한 창에 모여 뜬다. 창의 제목·말은 첫 줄 것을 쓰므로 모든 줄에 같은
-        # 말을 적어 둔다.
-        lines = [("title", title, 1)]
+        # 말을 적어 둔다. 알이 제일 큰 보상이라 맨 위에 둔다.
+        lines = []
+        if egg:
+            lines.append(("egg", egg, 1))
+            n_eggs += 1
+        lines.append(("title", title, 1))
         if frame:
             lines.append(("frame", frame, 1))
         if n:
@@ -211,8 +225,8 @@ def _season2_open(conn):
         " games=0, wins=0, losses=0, draws=0, streak=0, ranked=0,"
         " rp=0, peak_rp=0, win_day='', updated_at=?", (now,))
     conn.execute("UPDATE rank_stat SET best = rating")
-    return ("시즌 1 순위 %d명 보관, 선물 %d줄 (이로치사탕 %d개), %d명 점수 전환"
-            % (len(rows), gifts, candies, n_all))
+    return ("시즌 1 순위 %d명 보관, 선물 %d줄 (알 %d개, 이로치사탕 %d개), %d명 점수 전환"
+            % (len(rows), gifts, n_eggs, candies, n_all))
 
 
 ONCE = [

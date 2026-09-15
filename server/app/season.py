@@ -13,8 +13,9 @@
 싸우는 재미' 와 '한 만큼 올라가는 보람' 이 서로를 깎는다 - 공평하게 붙이면
 점수가 안 오르고, 점수가 오르게 두면 약한 사람만 골라 때리게 된다.
 
-위쪽의 자랑은 힘이 아니라 **보이는 것**으로 준다(칭호·명패·이로치사탕).
-배틀에서 유리해지는 것을 주면 격차가 굳어서 아래쪽이 떠난다.
+위쪽의 자랑은 주로 **보이는 것**으로 준다(칭호·명패·이로치사탕). 배틀에서
+유리해지는 것을 넓게 주면 격차가 굳어서 아래쪽이 떠난다. 예외는 맨 위 다섯
+자리의 알(eggs.py)이다 - 전설·환상은 Lv.5 로 태어나서 키워야 쓸모가 있다.
 """
 import datetime
 
@@ -64,13 +65,11 @@ TITLES = {
     "s1_elite": "시즌 1 사천왕",
     "s1_top10": "시즌 1 TOP 10",
     "s1_top30": "시즌 1 상위권",
-    "s1_player": "시즌 1 도전자",
     "s2_champion": "시즌 2 챔피언",
     "s2_elite": "시즌 2 사천왕",
     "s2_master": "시즌 2 마스터볼",
     "s2_hyper": "시즌 2 하이퍼볼",
     "s2_super": "시즌 2 슈퍼볼",
-    "s2_player": "시즌 2 도전자",
 }
 # 이름 둘레의 색. 랭킹·친구·투기장에서 남에게 보인다.
 FRAMES = {
@@ -81,26 +80,31 @@ FRAMES = {
 }
 
 SHINY_ITEM = "SHINYCANDY"
+EGG_KR = {"legendary": "전설의 포켓몬 알", "mythical": "환상의 포켓몬 알"}
 
-# 시즌 1 은 티어가 없던 시즌이라 마지막 순위로 나눈다.
-# (첫 등수, 끝 등수, 칭호, 명패, 이로치사탕)
+# 보상의 급을 가르는 것은 **알**이다. 1위는 전설, 2~5위는 환상. 이로치사탕은
+# 한 사람에 하나까지만, 위쪽에만 준다 - 많이 뿌리면 이로치가 흔해진다.
+#
+# 시즌 1 은 티어가 없던 시즌이라 마지막 순위로 나눈다. 이미 끝난 시즌의 표라
+# 실제로 나가는 숫자는 migrations 에 적혀 있다 (여기는 보여 주기용이다).
+# (첫 등수, 끝 등수, 칭호, 명패, 이로치사탕, 알)
 S1_REWARDS = [
-    (1, 1, "s1_champion", "gold", 3),
-    (2, 5, "s1_elite", "silver", 2),
-    (6, 10, "s1_top10", "bronze", 1),
-    (11, 30, "s1_top30", None, 1),
-    (31, 100000, "s1_player", None, 0),
+    (1, 1, "s1_champion", "gold", 1, "legendary"),
+    (2, 5, "s1_elite", "silver", 1, "mythical"),
+    (6, 10, "s1_top10", "bronze", 1, None),
+    (11, 30, "s1_top30", None, 0, None),
 ]
 
 # 시즌 2 가 끝날 때 줄 것. **도달한 최고 티어**로 준다 - 마지막 점수로 주면
 # 막판에 안 하고 버티게 된다. 사천왕·챔피언은 자리라 끝날 때의 자리로 본다.
+# 몬스터볼에 머문 사람은 보상이 없다.
+# (티어, 칭호, 명패, 이로치사탕, 알)
 S2_REWARDS = [
-    ("champion", "s2_champion", "gold", 5),
-    ("elite", "s2_elite", "silver", 3),
-    ("master", "s2_master", "master", 2),
-    ("hyper", "s2_hyper", None, 1),
-    ("super", "s2_super", None, 0),
-    ("monster", "s2_player", None, 0),
+    ("champion", "s2_champion", "gold", 1, "legendary"),
+    ("elite", "s2_elite", "silver", 1, "mythical"),
+    ("master", "s2_master", "master", 1, None),
+    ("hyper", "s2_hyper", None, 0, None),
+    ("super", "s2_super", None, 0, None),
 ]
 
 
@@ -291,7 +295,8 @@ def rules_public():
                      "title": TITLES[title],
                      "frame": FRAMES[frame][0] if frame else None,
                      "frameColor": FRAMES[frame][1] if frame else None,
-                     "shiny": n} for t, title, frame, n in S2_REWARDS],
+                     "shiny": n, "egg": EGG_KR.get(egg)}
+                    for t, title, frame, n, egg in S2_REWARDS],
     }
 
 
@@ -307,7 +312,7 @@ def hall(season, limit=10):
 
 
 def s1_reward_for(rank):
-    for lo, hi, title, frame, n in S1_REWARDS:
+    for lo, hi, title, frame, n, egg in S1_REWARDS:
         if lo <= rank <= hi:
-            return title, frame, n
-    return None, None, 0
+            return title, frame, n, egg
+    return None, None, 0, None

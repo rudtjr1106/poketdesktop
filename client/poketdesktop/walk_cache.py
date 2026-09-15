@@ -14,6 +14,11 @@ ok:false 로 적어 두고 부르는 쪽이 대신할 것을 고른다.
 
 **걷는 도트가 아예 없는 종도 있다**(1025 중 57마리, 대부분 9세대).
 그건 배틀 도트로 대신하고, 다른 동작도 쓸 수 없다.
+
+**이로치는 옆 폴더(0025s)에 따로 받는다** (1.4.0). 이로치 시트가 없는 종은
+보통 색 시트로 걷는다 - 배틀 도트로 굳는 것보다 낫다. 받은 시트를 담는
+사전의 열쇠는 key() 로 만든다. 보통은 번호(25) 그대로, 이로치는 (25, True)
+라서 예전 코드가 번호로 찾던 자리는 그대로 돈다.
 """
 import json
 import os
@@ -38,8 +43,20 @@ def walk_dir():
     return d
 
 
-def _paths(num, name="Walk"):
-    d = os.path.join(walk_dir(), "%04d" % int(num))
+def key(num, shiny=False):
+    """overlay.walks 의 열쇠. 보통은 번호, 이로치는 (번호, True)."""
+    if not num:
+        return num
+    return (int(num), True) if shiny else int(num)
+
+
+def sheet_key(num, name, shiny=False):
+    """overlay.sheets 의 열쇠. 보통은 (번호, 동작), 이로치는 (번호, 동작, True)."""
+    return (num, name, True) if shiny else (num, name)
+
+
+def _paths(num, name="Walk", shiny=False):
+    d = os.path.join(walk_dir(), "%04d%s" % (int(num), "s" if shiny else ""))
     return (os.path.join(d, "%s.png" % name),
             os.path.join(d, "%s.json" % name))
 
@@ -77,15 +94,15 @@ def _migrate_old(num):
         pass
 
 
-def local(num, name="Walk"):
+def local(num, name="Walk", shiny=False):
     """이미 받아둔 게 있으면 (시트경로, meta). 없으면 (None, None).
 
     meta 가 ok:false 면 '이 종에 이 동작이 없다' 는 뜻이라
     (None, {"ok": False}) 를 준다.
     """
-    if name == "Walk":
+    if name == "Walk" and not shiny:
         _migrate_old(num)
-    png, meta_path = _paths(num, name)
+    png, meta_path = _paths(num, name, shiny)
     if not os.path.exists(meta_path):
         return None, None
     try:
@@ -100,21 +117,39 @@ def local(num, name="Walk"):
     return None, None
 
 
-def ensure(api, num, name="Walk"):
+def ensure(api, num, name="Walk", shiny=False):
     """그 동작의 도트를 마련한다. **작업 스레드에서 부를 것.**
 
     돌려주는 값은 (시트경로, meta). 이 종에 그 동작이 없으면 (None, None).
+    shiny 인데 이로치 시트가 없으면 보통 색 시트를 준다.
     """
     if not num:
         return None, None
     num = int(num)
-    png, meta = local(num, name)
+    if shiny:
+        got = _ensure_one(api, num, name, True)
+        if got[0]:
+            return got
+        return _ensure_one(api, num, name, False)
+    return _ensure_one(api, num, name, False)
+
+
+def _takes_shiny(fn):
+    try:
+        import inspect
+        return "shiny" in inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _ensure_one(api, num, name, shiny):
+    png, meta = local(num, name, shiny)
     if png:
         return png, meta
     if meta is not None and not meta.get("ok"):
         return None, None          # 없다고 이미 확인해 둔 것
 
-    fkey = (num, name)
+    fkey = (num, name, shiny)
     with _lock:
         t = _failed.get(fkey)
         if t is not None:
@@ -123,13 +158,25 @@ def ensure(api, num, name="Walk"):
             del _failed[fkey]
 
     try:
-        meta = api.anim_meta(num, name)
+        if shiny:
+            if not _takes_shiny(api.anim_meta):
+                return None, None          # 시험용 가짜 API 등
+            meta = api.anim_meta(num, name, shiny=True)
+        else:
+            meta = api.anim_meta(num, name)
     except Exception:                                   # noqa: BLE001
         with _lock:
             _failed[fkey] = time.time()
         return None, None
 
-    png_path, meta_path = _paths(num, name)
+    if shiny and meta and meta.get("ok") and not meta.get("shiny"):
+        # 옛 서버는 ?shiny=1 을 모르고 보통 시트를 준다. 그걸 이로치 폴더에
+        # 굳혀 두면 서버가 새로 바뀐 뒤에도 영영 보통 색으로 걷는다.
+        with _lock:
+            _failed[fkey] = time.time()
+        return None, None
+
+    png_path, meta_path = _paths(num, name, shiny)
     try:
         os.makedirs(os.path.dirname(png_path), exist_ok=True)
     except OSError:
@@ -150,7 +197,8 @@ def ensure(api, num, name="Walk"):
         return None, None
 
     try:
-        data = api.anim_sheet(num, name)
+        data = (api.anim_sheet(num, name, shiny=True) if shiny
+                else api.anim_sheet(num, name))
     except Exception:                                   # noqa: BLE001
         data = None
     if not data:
@@ -171,10 +219,19 @@ def ensure(api, num, name="Walk"):
 
 
 def ensure_many(api, nums, name="Walk"):
-    """여러 종을 한 번에. {번호: (시트경로, meta)} 를 준다."""
+    """여러 종을 한 번에. {key(): (시트경로, meta)} 를 준다.
+
+    nums 에는 번호나 (번호, 이로치) 를 섞어 넣을 수 있다.
+    """
     out = {}
     for n in nums:
-        if not n or n in out:
+        shiny = False
+        if isinstance(n, (tuple, list)):
+            n, shiny = n[0], bool(n[1])
+        if not n:
             continue
-        out[n] = ensure(api, n, name)
+        k = key(n, shiny)
+        if k in out:
+            continue
+        out[k] = ensure(api, n, name, shiny)
     return out

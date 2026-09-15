@@ -514,12 +514,16 @@ class App(object):
                 self.api, [(m.get("num"), m.get("shiny")) for m in mons])
             # 걷는 도트도 같이 받아 둔다. 없는 종은 알아서 건너뛴다.
             walks = walk_cache.ensure_many(
-                self.api, [m.get("num") for m in mons])
+                self.api, [(m.get("num"), m.get("shiny")) for m in mons])
             me = None
             try:
                 me = self.api.me()
             except Exception:
                 pass
+            if me and me.get("eggs"):
+                # 알 그림도 여기서 받아 둔다 (tk 스레드에서 받으면 멈춘다)
+                from . import eggs_ui
+                eggs_ui.fetch_icons(self.api, me.get("eggs"))
             # 친구 요청은 바탕화면에 아무 자국도 남지 않는다. 여기에
             # 얹어서 같이 받아 온다 - 이걸 위해 폴링을 새로 두지 않는다.
             # 실패해도 동기화 전체를 망치지 않는다(알림은 있으면 좋은
@@ -552,6 +556,9 @@ class App(object):
                 self.announce_gifts(me.get("gifts") or [])
             if self.overlay:
                 added = self.overlay.sync(mons or [], paths or {}, walks or {})
+                if me is not None and "eggs" in me:
+                    self.overlay.sync_eggs(me.get("eggs") or [])
+                    self.announce_hatch(me.get("eggs") or [])
                 self._prefetch_anims(mons or [])
                 # 배틀 중에 새 도트가 생기면(창에서 바탕화면에 올렸을 때)
                 # '항상 위' 맨 위에 놓여 체력바 층을 가린다. 체력바 틱은 더
@@ -778,12 +785,12 @@ class App(object):
             nums = []
             for e in view.get("events") or []:
                 if e.get("t") == "teams":
-                    nums = [x.get("num") for x in
+                    nums = [(x.get("num"), bool(x.get("shiny"))) for x in
                             (e.get("me") or []) + (e.get("foe") or [])]
                     break
             paths = sprite_cache.ensure_many(
-                self.api, [(n, False) for n in nums if n])
-            walks = walk_cache.ensure_many(self.api, [n for n in nums if n])
+                self.api, [(n, s) for n, s in nums if n])
+            walks = walk_cache.ensure_many(self.api, [(n, s) for n, s in nums if n])
             return view, paths, walks
 
         def done(r, err):
@@ -863,6 +870,66 @@ class App(object):
         if n:
             config.log("확인하지 않은 대전 %d개" % n)
         self.refresh_tray()
+
+    def announce_hatch(self, eggs):
+        """부화한 알을 하나씩 보여준다. 배틀·진화·선물 창이 끝난 뒤에.
+
+        서버는 알릴 때까지(seen) 계속 실어 보낸다. 보여주는 중인 알은 다음
+        동기화가 또 실어 와도 한 번만 띄운다.
+        """
+        showing = getattr(self, "_hatch_showing", None)
+        if showing is None:
+            showing = self._hatch_showing = set()
+        for e in eggs or []:
+            if not e.get("hatched") or e.get("id") in showing:
+                continue
+            showing.add(e.get("id"))
+            self.root.after(300, lambda egg=e: self._show_hatch(egg))
+
+    def _show_hatch(self, egg):
+        if self._quitting or not self.api:
+            return
+        if (self.battle or self.arena or getattr(self, "evolving", None)
+                or getattr(self, "_gift_showing", False)
+                or getattr(self, "_hatching_now", False)):
+            return self.root.after(1500, lambda: self._show_hatch(egg))
+        from . import eggs_ui
+        self._hatching_now = True
+        eid = egg.get("id")
+
+        def finished():
+            self._hatching_now = False
+            run_async(self.root, lambda: self.api.egg_seen(eid),
+                      lambda _r, err: self._hatch_seen(eid, err))
+
+        def reveal():
+            if self.overlay:
+                self.overlay.eggs_done.add(eid)
+            pet = self.overlay.eggs.pop(eid, None) if self.overlay else None
+            if pet is not None:
+                try:
+                    pet.destroy()
+                except Exception:                          # noqa: BLE001
+                    pass
+            try:
+                win = eggs_ui.announce_hatch(self.root, self, egg,
+                                             on_close=finished)
+                win.lift()
+            except Exception as ex:                        # noqa: BLE001
+                config.log("부화 창을 못 띄웠습니다: %s" % ex)
+                finished()
+            self.sync()
+
+        pet = self.overlay.eggs.get(eid) if self.overlay else None
+        if pet is not None and not self.overlay.hidden:
+            pet.hatch(reveal)
+        else:
+            reveal()
+
+    def _hatch_seen(self, eid, err):
+        if err:
+            # 못 알렸으면 다음 동기화 때 다시 보여준다
+            getattr(self, "_hatch_showing", set()).discard(eid)
 
     def announce_gifts(self, gifts):
         """선물이 왔다고 알린다. 창은 배틀·진화가 끝난 뒤에 띄운다.
@@ -1300,22 +1367,25 @@ class App(object):
             return
         nums = []
         for m in mons:
-            n = m.get("num")
+            n, sh = m.get("num"), bool(m.get("shiny"))
             # 걷는 도트가 없는 종은 다른 동작도 없다. 물어볼 것도 없다.
-            if n and n not in nums and self.overlay.walks.get(n):
-                nums.append(n)
-        want = [(n, a) for n in nums for a in self.ANIM_ORDER
-                if (n, a) not in self.overlay.sheets]
+            if (n and (n, sh) not in nums
+                    and (self.overlay.walks.get(walk_cache.key(n, sh))
+                         or self.overlay.walks.get(n))):
+                nums.append((n, sh))
+        want = [(n, sh, a) for n, sh in nums for a in self.ANIM_ORDER
+                if walk_cache.sheet_key(n, a, sh) not in self.overlay.sheets]
         if not want:
             return
         self._anim_job = True
 
         def work():
             got = {}
-            for n, a in want:
+            for n, sh, a in want:
                 if self._quitting:
                     break
-                got[(n, a)] = walk_cache.ensure(self.api, n, a)
+                got[walk_cache.sheet_key(n, a, sh)] = walk_cache.ensure(
+                    self.api, n, a, shiny=sh)
             return got
 
         def done(r, err):

@@ -238,14 +238,16 @@ class Api(object):
             return None
         return r.content if r.status_code == 200 and r.content else None
 
-    def anim_meta(self, num, name="Walk"):
+    def anim_meta(self, num, name="Walk", shiny=False):
         """이 종에 이 동작이 있는지, 있으면 어떻게 잘라야 하는지."""
-        return self._call("GET", "/api/anim/%d/%s.json" % (int(num), name),
+        return self._call("GET", "/api/anim/%d/%s.json%s"
+                          % (int(num), name, "?shiny=true" if shiny else ""),
                           auth=False, timeout=30)
 
-    def anim_sheet(self, num, name="Walk"):
+    def anim_sheet(self, num, name="Walk", shiny=False):
         """그 동작의 스프라이트시트 원본 바이트. 없으면 None."""
-        url = "%s/api/anim/%d/%s.png" % (self.base, int(num), name)
+        url = "%s/api/anim/%d/%s.png%s" % (self.base, int(num), name,
+                                           "?shiny=true" if shiny else "")
         try:
             r = self.session.get(url, timeout=40)
         except requests.RequestException:
@@ -330,6 +332,11 @@ class Api(object):
         """빈 목록이면 등록을 푼다."""
         return self._call("PUT", "/api/pvp/team",
                           {"ids": [int(i) for i in ids]})
+
+    # 포켓몬 알. 목록은 /api/me 에 실려 온다.
+    def egg_seen(self, egg_id):
+        """부화를 화면에 알렸다."""
+        return self._call("POST", "/api/eggs/%d/seen" % int(egg_id), {})
 
     # 칭호 · 명패
     def rewards(self):

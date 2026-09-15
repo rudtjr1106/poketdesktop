@@ -1316,6 +1316,8 @@ def gift_line(g):
         return "칭호 · %s" % (g.get("name") or "?")
     if g.get("kind") == "frame":
         return "명패 · %s" % (g.get("name") or "?")
+    if g.get("kind") == "egg":
+        return g.get("name") or "포켓몬 알"
     return "%s ×%d" % (g.get("name") or "?", n)
 
 
@@ -1373,6 +1375,11 @@ def announce_gifts(parent, app, gifts):
         icon.pack(expand=True)
         if g.get("kind") == "item" and g.get("item"):
             _gift_icon(parent, app, icon, g["item"], keep, i)
+        elif g.get("kind") == "egg" and g.get("item"):
+            from . import eggs_ui
+            egg_item = eggs_ui.EGG_ITEM.get(g["item"])
+            if egg_item:
+                _gift_icon(parent, app, icon, egg_item, keep, i)
         tk.Label(row, text=gift_line(g), bg=PANEL, fg=U.FG, font=U.FONT_B,
                  anchor="w").pack(side="left")
     if n > 8:
@@ -1380,11 +1387,15 @@ def announce_gifts(parent, app, gifts):
                  fg=U.FG_FAINT, font=U.FONT_XS).pack(anchor="w", pady=(4, 0))
 
     # 칭호·명패는 가방이 아니라 랭킹 탭에서 단다 (시즌 보상)
-    only_badges = all(g.get("kind") in ("title", "frame") for g in gifts)
-    some_badges = any(g.get("kind") in ("title", "frame") for g in gifts)
-    footer = ("랭킹 탭의 '칭호·명패' 에서 바꿀 수 있습니다." if only_badges else
-              "가방에 넣어 두었습니다. 칭호·명패는 랭킹 탭에서 바꿀 수 있습니다."
-              if some_badges else "가방에 넣어 두었습니다.")
+    kinds = set(g.get("kind") for g in gifts)
+    bits = []
+    if kinds & {"item", "money", "balls"}:
+        bits.append("가방에 넣어 두었습니다.")
+    if "egg" in kinds:
+        bits.append("알은 바탕화면에 놓였습니다. 게임을 켜 둔 시간만큼 자라서 부화합니다.")
+    if kinds & {"title", "frame"}:
+        bits.append("칭호·명패는 랭킹 탭에서 바꿀 수 있습니다.")
+    footer = " ".join(bits) or "가방에 넣어 두었습니다."
     tk.Label(f, text=footer, bg=U.BG, fg=U.FG_DIM,
              font=U.FONT_S, wraplength=360,
              justify="left").pack(anchor="w", pady=(10, 0))

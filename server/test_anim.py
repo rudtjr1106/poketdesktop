@@ -130,6 +130,77 @@ def main():
     chk("ok:false 로 남는다",
         json.load(io.open(mp, encoding="utf-8")) == {"ok": False})
 
+    print("\n=== 이로치 걷는 도트 (1.4.0) ===")
+    png_n, meta_n = M._anim_paths(25, "Walk")
+    png_s, meta_s = M._anim_paths(25, "Walk", shiny=True)
+    chk("이로치는 옆 폴더(0025s)에 둔다",
+        os.path.basename(os.path.dirname(png_s)) == "0025s"
+        and os.path.dirname(png_n) != os.path.dirname(png_s), (png_n, png_s))
+    import urllib.error
+    import urllib.request
+    real = urllib.request.urlopen
+    calls = []
+
+    def fake(url, timeout=0):
+        calls.append(url)
+        raise fake.err
+    urllib.request.urlopen = fake
+    try:
+        fake.err = urllib.error.URLError("끊김")
+        chk("끊겼을 때는 없다고 적지 않는다 (다음에 다시)",
+            M._anim_fetch(4, "Idle", shiny=True) is None
+            and not os.path.exists(M._anim_paths(4, "Idle", True)[1]), calls[-1:])
+        chk("이로치 주소는 폼 0000/0001 아래",
+            calls and "/0004/0000/0001/AnimData.xml" in calls[-1], calls[-1:])
+        fake.err = urllib.error.HTTPError(calls[-1], 503, "busy", None, None)
+        chk("503 도 없다고 적지 않는다", M._anim_fetch(4, "Idle", shiny=True) is None
+            and not os.path.exists(M._anim_paths(4, "Idle", True)[1]))
+        fake.err = urllib.error.HTTPError(calls[-1], 404, "nope", None, None)
+        M._anim_fetch(4, "Idle", shiny=True)
+        chk("404 면 없다고 적는다 (클라이언트가 보통 색으로 걷는다)",
+            json.load(io.open(M._anim_paths(4, "Idle", True)[1], encoding="utf-8"))
+            == {"ok": False})
+        chk("보통 걷기가 SpriteCollab 인 종은 두 번째 출처(followers)로 안 간다",
+            not any("followers" in c for c in calls), calls)
+        # 보통 걷기부터 followers 에서 온 종: 이로치도 followers 의 -b-s 로
+        pn, mn = M._anim_paths(906, "Walk")
+        os.makedirs(os.path.dirname(mn), exist_ok=True)
+        with io.open(mn, "w", encoding="utf-8") as f:
+            json.dump({"ok": True, "src": "follow", "frameW": 32, "frameH": 32,
+                       "durations": [9], "frames": 1, "rows": 4}, f)
+
+        class Resp(object):
+            def __init__(self, data):
+                self.data = data
+
+            def read(self):
+                return self.data
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def fake2(url, timeout=0):
+            calls.append(url)
+            if "followsprites" in url:
+                return Resp(b"\x89PNG" + b"0" * 200)
+            raise urllib.error.HTTPError(url, 404, "nope", None, None)
+        urllib.request.urlopen = fake2
+        m = M._anim_fetch(906, "Walk", shiny=True)
+        chk("followers 종의 이로치는 -b-s 로 받는다",
+            m and m.get("shiny") and m.get("src") == "follow"
+            and calls[-1].endswith("/906-b-s.png"), (m, calls[-1:]))
+    finally:
+        urllib.request.urlopen = real
+    os.makedirs(os.path.dirname(meta_s), exist_ok=True)
+    with io.open(meta_s, "w", encoding="utf-8") as f:
+        json.dump({"ok": True, "frameW": 32, "frameH": 40, "durations": [8],
+                   "frames": 1, "rows": 8, "shiny": True}, f)
+    chk("받아 둔 이로치 메타를 그대로 준다",
+        M._meta_response(25, "Walk", shiny=True).get("shiny") is True)
+
     print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0

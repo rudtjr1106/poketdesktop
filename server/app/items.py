@@ -245,6 +245,14 @@ def gift_claim(uid, now=None):
         elif kind == "balls":
             db.run("UPDATE users SET balls=balls+? WHERE id=?", (n, uid))
             name = "몬스터볼"
+        elif kind == "egg" and r["item_id"]:
+            # 포켓몬 알. 개수만큼 알을 만든다 (보통 하나).
+            from . import eggs
+            if r["item_id"] not in eggs.KINDS:
+                continue
+            for _ in range(max(1, n)):
+                eggs.give(uid, r["item_id"], now=now)
+            name = eggs.KINDS[r["item_id"]][0]
         elif kind in ("title", "frame") and r["item_id"]:
             # 시즌 보상. 개수가 없는 물건이라 가방이 아니라 user_reward 로 간다.
             from . import season

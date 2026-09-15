@@ -62,9 +62,10 @@ RULES = {
     "safeRp": 300,
     "rp": {"win": [10, 30], "lose": [5, 25], "firstWin": 10, "lossGuard": 3},
     "rewards": [{"tier": "champion", "tierKr": "챔피언", "title": "시즌 2 챔피언",
-                 "frame": "금빛 명패", "frameColor": "#ffc043", "shiny": 5},
-                {"tier": "monster", "tierKr": "몬스터볼", "title": "시즌 2 도전자",
-                 "frame": None, "frameColor": None, "shiny": 0}],
+                 "frame": "금빛 명패", "frameColor": "#ffc043", "shiny": 1,
+                 "egg": "전설의 포켓몬 알"},
+                {"tier": "super", "tierKr": "슈퍼볼", "title": "시즌 2 슈퍼볼",
+                 "frame": None, "frameColor": None, "shiny": 0, "egg": None}],
 }
 
 
@@ -200,7 +201,8 @@ def main():
     chk("RP 가 뜬다", "1,500 RP" in t and "320 RP" in t)
     chk("다음 티어까지", "하이퍼볼까지 380 RP" in t)
     chk("칭호가 뜬다", "시즌 1 챔피언" in t)
-    chk("보상표에 이로치사탕", "이로치사탕 5개" in t)
+    chk("보상표에 알과 이로치사탕", "전설의 포켓몬 알 · 칭호 '시즌 2 챔피언'" in t
+        and "이로치사탕 1개" in t, t)
     chk("레벨 상한 규칙", "Lv.50 상한" in t)
     chk("시즌 끝나는 날", "10월 27일까지" in rw.sub.cget("text"), rw.sub.cget("text"))
     chk("명예의 전당", "시즌 1 명예의 전당" in t)
@@ -269,8 +271,13 @@ def main():
                                           "count": 1}) == "칭호 · 시즌 1 사천왕")
     chk("선물 줄: 명패", ui_bag.gift_line({"kind": "frame", "name": "은빛 명패",
                                           "count": 1}) == "명패 · 은빛 명패")
-    gifts = [{"kind": "title", "name": "시즌 1 사천왕", "count": 1,
-              "title": "시즌 1 보상", "message": "시즌 1 을 3위로 마쳤습니다."},
+    chk("선물 줄: 알", ui_bag.gift_line({"kind": "egg", "item": "mythical",
+                                        "name": "환상의 포켓몬 알",
+                                        "count": 1}) == "환상의 포켓몬 알")
+    gifts = [{"kind": "egg", "item": "mythical", "name": "환상의 포켓몬 알",
+              "count": 1, "title": "시즌 1 보상",
+              "message": "시즌 1 을 3위로 마쳤습니다."},
+             {"kind": "title", "name": "시즌 1 사천왕", "count": 1},
              {"kind": "frame", "name": "은빛 명패", "count": 1},
              {"kind": "item", "item": "SHINYCANDY", "name": "이로치사탕", "count": 2}]
     before = set(root.winfo_children())
@@ -291,6 +298,7 @@ def main():
     if t:
         chk("칭호 줄과 사탕 줄", "칭호 · 시즌 1 사천왕" in t and "이로치사탕 ×2" in t, t)
         chk("칭호는 랭킹 탭에서 바꾼다고 알린다", "랭킹 탭" in t, t)
+        chk("알 줄과 알 안내", "환상의 포켓몬 알" in t and "바탕화면에 놓였습니다" in t, t)
 
     print("투기장 이름표")
     from poketdesktop import arena

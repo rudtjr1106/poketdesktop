@@ -770,8 +770,12 @@ class Arena(object):
                 pass
         self.foes = []
 
+        # 정리는 어떤 상태에서 불려도 돌아야 한다. 준비가 반쯤에서 멈췄으면
+        # (또는 시험용 껍데기면) 아래 두 목록이 아예 없을 수 있다.
+        made = list(getattr(self, "made_mine", None) or [])
+        hidden = list(getattr(self, "hidden", None) or [])
         for p in self.mine:
-            if p in self.made_mine:
+            if p in made:
                 continue
             try:
                 p.battling = False
@@ -784,7 +788,7 @@ class Arena(object):
             except Exception:                               # noqa: BLE001
                 pass
         self.mine = []
-        for p in list(self.made_mine):
+        for p in made:
             try:
                 if ov and p in ov.extra:
                     ov.extra.remove(p)
@@ -793,7 +797,7 @@ class Arena(object):
                 pass
         self.made_mine = []
         # 명단과 달라서 숨겨 둔 바탕화면 도트를 제자리에 되살린다
-        for p in self.hidden:
+        for p in hidden:
             try:
                 p.battling = False
                 p.state = "idle"

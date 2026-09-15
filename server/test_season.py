@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""랭크 시즌 2 — RP·티어, 랭크 팀, 전력 매칭, 칭호·명패, 이로치사탕, 시즌 전환.
+"""랭크 시즌 2 — RP·티어, 랭크 팀, 전력 매칭, 칭호·명패, 이로치사탕, 알, 시즌 전환.
 
     python server/test_season.py
 
@@ -13,6 +13,8 @@
   5. 칭호·명패는 선물로 받아 달 수 있고, 가진 것만 달 수 있다.
   6. 이로치사탕은 한 번 쓰면 이로치가 되고, 이미 이로치면 안 쓴다.
   7. 시즌 전환은 순위대로 보상을 넣고, 두 번 돌아도 두 번 안 준다.
+     1위 전설의 알, 2~5위 환상의 알, 이로치사탕은 1~10위에 하나씩, 31위부터 없음.
+  8. 알은 켜 둔 시간(walk.settle)만큼만 자라고, 다 차면 한 번만 부화한다.
 """
 import json
 import os
@@ -35,7 +37,7 @@ os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
 
 from fastapi import HTTPException                          # noqa: E402
 
-from app import db, deps, items, migrations, pvp, season   # noqa: E402
+from app import config, db, deps, eggs, items, migrations, pvp, season  # noqa: E402
 
 OK = FAIL = 0
 
@@ -331,23 +333,31 @@ def main():
     def gifts_of(u):
         return [(r["kind"], r["item_id"], r["count"]) for r in
                 db.q("SELECT * FROM gift WHERE user_id=? ORDER BY id", (u,))]
-    chk("1위: 챔피언 칭호 + 금빛 명패 + 사탕 3",
-        gifts_of(s1[0]) == [("title", "s1_champion", 1), ("frame", "gold", 1),
-                            ("item", "SHINYCANDY", 3)], gifts_of(s1[0]))
-    chk("2~5위: 사천왕 + 은빛 + 사탕 2",
-        all(gifts_of(u) == [("title", "s1_elite", 1), ("frame", "silver", 1),
-                            ("item", "SHINYCANDY", 2)] for u in s1[1:5]), gifts_of(s1[4]))
+    chk("1위: 전설의 알 + 챔피언 칭호 + 금빛 명패 + 사탕 1",
+        gifts_of(s1[0]) == [("egg", "legendary", 1), ("title", "s1_champion", 1),
+                            ("frame", "gold", 1), ("item", "SHINYCANDY", 1)],
+        gifts_of(s1[0]))
+    chk("2~5위: 환상의 알 + 사천왕 + 은빛 + 사탕 1",
+        all(gifts_of(u) == [("egg", "mythical", 1), ("title", "s1_elite", 1),
+                            ("frame", "silver", 1), ("item", "SHINYCANDY", 1)]
+            for u in s1[1:5]), gifts_of(s1[4]))
     chk("6~10위: TOP 10 + 동빛 + 사탕 1",
         all(gifts_of(u) == [("title", "s1_top10", 1), ("frame", "bronze", 1),
                             ("item", "SHINYCANDY", 1)] for u in s1[5:10]), gifts_of(s1[9]))
-    chk("11~30위: 상위권 + 사탕 1",
-        all(gifts_of(u) == [("title", "s1_top30", 1), ("item", "SHINYCANDY", 1)]
-            for u in s1[10:30]), gifts_of(s1[29]))
-    chk("31위부터: 도전자 칭호만",
-        all(gifts_of(u) == [("title", "s1_player", 1)] for u in s1[30:]), gifts_of(s1[30]))
+    chk("11~30위: 상위권 칭호만 (사탕 없음)",
+        all(gifts_of(u) == [("title", "s1_top30", 1)] for u in s1[10:30]),
+        gifts_of(s1[29]))
+    chk("31위부터: 보상 없음",
+        all(gifts_of(u) == [] for u in s1[30:]), gifts_of(s1[30]))
+    chk("31위부터도 순위는 보관한다", res[s1[34]]["rank"] == 35, dict(res[s1[34]]))
+    n_candy = db.q1("SELECT SUM(count) c FROM gift WHERE item_id='SHINYCANDY'")["c"]
+    chk("이로치사탕은 모두 10개 (1~10위에 하나씩)", n_candy == 10, n_candy)
     chk("배치를 못 마친 사람은 없다", gifts_of(un) == [])
     msg = db.q1("SELECT message FROM gift WHERE user_id=?", (s1[12],))["message"]
     chk("안내에 순위가 들어간다", "13위" in msg and "명패" not in msg, msg)
+    msg = db.q1("SELECT message FROM gift WHERE user_id=?", (s1[0],))["message"]
+    chk("알을 받은 사람에게는 알 안내", "전설의 포켓몬 알" in msg and "켜 둔 시간" in msg,
+        msg)
     st = stat(s1[0])
     chk("숨은 점수는 절반만 남는다 (1800 -> 1400)", st["rating"] == 1400, st["rating"])
     chk("1000 아래도 절반 (900 -> 950)", stat(un)["rating"] == 950, stat(un)["rating"])
@@ -361,8 +371,12 @@ def main():
     chk("두 번 돌아도 선물을 또 넣지 않는다",
         db.q1("SELECT COUNT(*) c FROM gift")["c"] == n_gift, n_gift)
     got = items.gift_claim(s1[0])
-    chk("1위가 켜면 세 줄을 받는다", [x["kind"] for x in got] == ["title", "frame", "item"], got)
+    chk("1위가 켜면 네 줄을 받는다",
+        [x["kind"] for x in got] == ["egg", "title", "frame", "item"], got)
+    chk("알 이름이 실려 온다", got[0]["name"] == "전설의 포켓몬 알", got[0])
     chk("받자마자 칭호가 달린다", season.deco(s1[0])["title"] == "시즌 1 챔피언")
+    e = eggs.public(s1[0])
+    chk("전설의 알이 하나 생겼다", len(e) == 1 and e[0]["kind"] == "legendary", e)
     hall = season.hall(1)
     chk("명예의 전당 10명", len(hall) == 10 and hall[0]["name"] == "s1_00", hall[:1])
 
@@ -370,7 +384,89 @@ def main():
     rules = season.rules_public()
     chk("티어 여섯 칸", [t["tier"] for t in rules["tiers"]] ==
         ["monster", "super", "hyper", "master", "elite", "champion"])
-    chk("보상표에 이로치사탕", rules["rewards"][0]["shiny"] == 5, rules["rewards"][0])
+    chk("보상표: 챔피언은 전설의 알 + 사탕 1",
+        rules["rewards"][0]["egg"] == "전설의 포켓몬 알"
+        and rules["rewards"][0]["shiny"] == 1, rules["rewards"][0])
+    chk("보상표: 사천왕은 환상의 알",
+        rules["rewards"][1]["egg"] == "환상의 포켓몬 알", rules["rewards"][1])
+    chk("보상표: 사탕은 한 사람에 하나까지",
+        all(r["shiny"] <= 1 for r in rules["rewards"]), rules["rewards"])
+    chk("보상표: 몬스터볼은 보상 없음",
+        "monster" not in [r["tier"] for r in rules["rewards"]])
+
+    print("\n=== 포켓몬 알 ===")
+    from app import walk
+    eg = mkuser("ss_egg", 6, 20)
+    rng = random.Random(4)
+    lid = eggs.give(eg, "legendary", rng)
+    mid_ = eggs.give(eg, "mythical", rng)
+    rows = dict((r["id"], r) for r in db.q("SELECT * FROM egg WHERE user_id=?", (eg,)))
+    chk("전설의 알 속은 전설 목록에서", rows[lid]["species"] in eggs.pool("legendary"),
+        rows[lid]["species"])
+    chk("환상의 알 속은 환상 목록에서", rows[mid_]["species"] in eggs.pool("mythical"),
+        rows[mid_]["species"])
+    chk("이벤트 종은 알에서 안 나온다",
+        config.EVENT_SPECIES not in eggs.pool("mythical") + eggs.pool("legendary"))
+    chk("목록의 종이 전부 도감에 있다",
+        len(eggs.pool("legendary")) == len(eggs.LEGENDARY_POOL)
+        and len(eggs.pool("mythical")) >= len(eggs.MYTHICAL_POOL) - 1,
+        (len(eggs.pool("legendary")), len(eggs.pool("mythical"))))
+    pub = eggs.public(eg)
+    chk("화면에 가는 목록에 알 속 종이 없다",
+        all("species" not in e and "pokemon" not in e for e in pub), pub)
+    chk("전설 48시간 · 환상 36시간",
+        [e["needSec"] for e in pub] == [48 * 3600, 36 * 3600], pub)
+
+    # 켜 둔 시간: walk.settle 이 20분 단위로 준다. 걸음 시각을 과거로 돌려 흉내 낸다.
+    import datetime as DT
+    def ago(sec):
+        return (DT.datetime.now(DT.timezone.utc) - DT.timedelta(seconds=sec)).isoformat()
+    walk.settle(eg)                       # 처음이면 시각만 적는다
+    db.run("UPDATE wild_state SET walk_at=? WHERE user_id=?", (ago(3 * 3600), eg))
+    walk.settle(eg)
+    got = dict((e["id"], e["gotSec"]) for e in eggs.public(eg))
+    chk("한 번에 몰아 주는 것은 40분까지 (앱을 꺼 둔 시간은 안 쳐준다)",
+        got[lid] == 2 * walk.TICK, got)
+    chk("아직 부화 안 함", eggs.hatch_ready(eg) == [])
+    db.run("UPDATE egg SET got_sec = need_sec - 600 WHERE id=?", (mid_,))
+    db.run("UPDATE wild_state SET walk_at=? WHERE user_id=?", (ago(1300), eg))
+    walk.settle(eg)
+    chk("다 차면 need 에서 멈춘다",
+        db.q1("SELECT got_sec, need_sec FROM egg WHERE id=?", (mid_,))["got_sec"]
+        == 36 * 3600)
+    n_before = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=?", (eg,))["c"]
+    hatched = eggs.hatch_ready(eg, rng)
+    chk("다 자란 알만 부화한다", hatched == [mid_], hatched)
+    chk("두 번 불러도 한 마리", eggs.hatch_ready(eg, rng) == [] and
+        db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=?", (eg,))["c"] == n_before + 1)
+    r = db.q1("SELECT * FROM egg WHERE id=?", (mid_,))
+    mon = db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (r["pokemon_id"],)))
+    chk("알에 정해 둔 종이 태어난다", mon["species"] == r["species"], (mon["species"], r["species"]))
+    chk("Lv.5 로 태어난다", mon["level"] == eggs.HATCH_LEVEL, mon["level"])
+    chk("개체값 셋 이상이 최고", sum(1 for v in mon["ivs"].values() if v == 31) >= 3,
+        mon["ivs"])
+    chk("친밀도 120 이상", mon["happiness"] >= 120, mon["happiness"])
+    chk("파티가 꽉 차 있으면 박스로", not mon["onDesktop"], mon["onDesktop"])
+    chk("도감에 잡음으로 오른다", items.has_caught(eg, mon["species"]))
+    pub = eggs.public(eg)
+    h = [e for e in pub if e["id"] == mid_][0]
+    chk("부화한 알은 알릴 때까지 목록에 남고 태어난 포켓몬이 붙는다",
+        h["hatched"] and h["pokemon"]["species"] == mon["species"], h)
+    chk("알리면 목록에서 빠진다", eggs.mark_announced(eg, mid_)
+        and [e["id"] for e in eggs.public(eg)] == [lid])
+    chk("안 부화한 알은 알림 표시가 안 된다", not eggs.mark_announced(eg, lid))
+    chk("남의 알은 못 건드린다", not eggs.mark_announced(g, mid_))
+    free = mkuser("ss_egg_free", 2, 20)
+    fid = eggs.give(free, "legendary", rng)
+    db.run("UPDATE egg SET got_sec=need_sec WHERE id=?", (fid,))
+    eggs.hatch_ready(free, rng)
+    pid = db.q1("SELECT pokemon_id FROM egg WHERE id=?", (fid,))["pokemon_id"]
+    chk("자리가 있으면 바로 데리고 다닌다",
+        db.q1("SELECT on_desktop FROM pokemon WHERE id=?", (pid,))["on_desktop"] == 1)
+    db.run("INSERT INTO gift (user_id, kind, item_id, count, title, message,"
+           " created_at) VALUES (?,?,?,?,?,?,?)",
+           (free, "egg", "nope", 1, "t", "m", "2026-09-15"))
+    chk("모르는 알 선물은 지급하지 않는다", items.gift_claim(free) == [])
 
     print("\n======================================================")
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))

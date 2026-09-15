@@ -675,7 +675,8 @@ class WildController(object):
         # 배틀 도트로 서 있으면 둘이 다른 게임에서 온 것처럼 보인다.
         # (ov.make 가 하는 것과 같은 순서다)
         anim = None
-        sheet, meta = ov.walks.get(mon.get("num")) or (None, None)
+        sheet, meta = (ov.walks.get(walk_cache.key(mon.get("num"), mon.get("shiny")))
+                       or ov.walks.get(mon.get("num")) or (None, None))
         if sheet and meta:
             try:
                 anim = sprites.load_walk(sheet, meta, s["targetHeight"],
@@ -751,7 +752,8 @@ class WildController(object):
                                             bool(mon.get("shiny")))] = path
                 sheet, meta = (r or {}).get("_walk") or (None, None)
                 if sheet and meta:
-                    self.app.overlay.walks[mon.get("num")] = (sheet, meta)
+                    self.app.overlay.walks[walk_cache.key(
+                        mon.get("num"), mon.get("shiny"))] = (sheet, meta)
                 self.show_wild(mon)
                 self.arm_expiry(w.get("expiresAt"))
 
@@ -765,7 +767,8 @@ class WildController(object):
                 # 채워지기 때문에, 이걸 안 하면 야생만 옛날 배틀 도트로
                 # 서 있게 된다.
                 try:
-                    r["_walk"] = walk_cache.ensure(self.app.api, mon["num"])
+                    r["_walk"] = walk_cache.ensure(self.app.api, mon["num"],
+                                                   shiny=bool(mon.get("shiny")))
                 except Exception:                          # noqa: BLE001
                     r["_walk"] = (None, None)
             return r
