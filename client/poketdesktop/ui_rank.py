@@ -237,6 +237,9 @@ class RankWindow(object):
         team = ("랭크 팀 %d마리" % me.get("teamSize", 0) if me.get("teamRegistered")
                 else "랭크 팀 없음 · 바탕화면 파티 %d마리로 싸움" % me.get("teamSize", 0))
         lines.append(team)
+        if me.get("restrictedDropped"):
+            lines.append("전설·환상은 %d마리까지라 %d마리는 빠지고 싸움"
+                         % (me.get("restrictedMax") or 1, me["restrictedDropped"]))
         tk.Label(inner, text="  ·  ".join(lines), bg=U.BG2, fg=U.FG_DIM,
                  font=U.FONT_XS, anchor="w", justify="left",
                  wraplength=W - 90).pack(fill="x", pady=(6, 0))
@@ -284,6 +287,8 @@ class RankWindow(object):
         if r.get("levelCap"):
             text.append("랜덤 배틀은 Lv.%d 상한 · 랭크 팀으로 싸움 · 전력이 비슷한 상대와 붙음"
                         % r["levelCap"])
+        if r.get("restrictedMax"):
+            text.append("랭크 배틀에 나가는 전설·환상 포켓몬은 %d마리까지" % r["restrictedMax"])
         text.append("내가 건 랜덤 배틀만 점수에 들어갑니다")
         tk.Label(inner, text="\n".join(text), bg=CARD_BG, fg=U.FG_DIM,
                  font=U.FONT_XS, anchor="w", justify="left",

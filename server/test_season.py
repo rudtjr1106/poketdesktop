@@ -184,6 +184,43 @@ def main():
     chk("빈 목록이면 등록이 풀린다", pvp.team_ids(t) == []
         and len(pvp.ranked_team(t)) == 6)
 
+    print("\n=== 전설·환상은 1마리까지 ===")
+    lg = mkuser("ss_legend", 6, 40)
+    rows = db.q("SELECT id FROM pokemon WHERE user_id=? ORDER BY slot", (lg,))
+    ids = [r["id"] for r in rows]
+    db.run("UPDATE pokemon SET species='MEWTWO' WHERE id=?", (ids[1],))
+    db.run("UPDATE pokemon SET species='MEW' WHERE id=?", (ids[3],))
+    db.run("UPDATE pokemon SET species=? WHERE id=?", (config.EVENT_SPECIES, ids[4]))
+    names = pvp.restricted_species()
+    chk("전설·환상 목록은 94종 (이벤트 종 포함)", len(names) == 94
+        and config.EVENT_SPECIES in names and "MEWTWO" in names, len(names))
+    chk("울트라비스트·패러독스는 제한이 아니다",
+        "NIHILEGO" not in names and "GREATTUSK" not in names)
+    team = pvp.ranked_team(lg)
+    chk("바탕화면 파티로 싸우면 앞의 전설 하나만 나간다",
+        [m["id"] for m in team] == [ids[0], ids[1], ids[2], ids[5]],
+        [m["id"] for m in team])
+    sm = pvp.summary(lg)
+    chk("요약에 빠진 마릿수", sm["restrictedDropped"] == 2 and sm["teamSize"] == 4, sm)
+    chk("매칭 전력도 빠진 팀으로 잰다", len(pvp._all_teams()[lg]) == 4)
+    try:
+        pvp.set_team(lg, [ids[0], ids[1], ids[3]])
+        chk("랭크 팀에 전설·환상 두 마리는 못 넣는다", False, "예외가 안 났다")
+    except ValueError as e:
+        chk("랭크 팀에 전설·환상 두 마리는 못 넣는다", "1마리" in str(e), str(e))
+    chk("실패하면 등록이 안 된다", pvp.team_ids(lg) == [])
+    pvp.set_team(lg, [ids[0], ids[1], ids[2]])
+    chk("한 마리면 된다", pvp.team_ids(lg) == [ids[0], ids[1], ids[2]])
+    r = pvp.run_match(lg, hi, kind="random", seed=9)
+    v = pvp.match_view(lg, r["matchId"])
+    tm = [e for e in v["events"] if e["t"] == "teams"][0]["me"]
+    chk("판에 나간 전설·환상도 하나", sum(1 for m in tm if m["species"] in names) == 1, tm)
+    pvp.set_team(lg, [])
+    from app import pvp_routes
+    tv = pvp_routes._team_view(lg)
+    chk("팀 창에 제한 정보", tv["restrictedMax"] == 1 and 150 in tv["restrictedNums"]
+        and tv["restrictedDropped"] == 2 and len(tv["ids"]) == 6, tv["restrictedDropped"])
+
     print("\n=== 받는 쪽 마릿수 ===")
     chk("여섯으로 걸면 여섯만 받는다",
         pvp.can_defend(6, 6) and not pvp.can_defend(6, 5))

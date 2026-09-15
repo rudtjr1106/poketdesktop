@@ -69,6 +69,8 @@ class TeamWindow(object):
         self.max = 6
         self.cap = 50
         self.rows = {}
+        self.restricted = set()        # 전설·환상 도감 번호
+        self.restricted_max = 1
 
         self.win = U.panel(None, self.root, "랭크 팀", 560, 660, 460, 520,
                            self.close)
@@ -141,6 +143,8 @@ class TeamWindow(object):
         team = team or {}
         self.max = int(team.get("maxParty") or 6)
         self.cap = int(team.get("levelCap") or 50)
+        self.restricted = set(int(n) for n in team.get("restrictedNums") or [])
+        self.restricted_max = int(team.get("restrictedMax") or 1)
         self.registered = bool(team.get("registered"))
         self.picked = [int(i) for i in team.get("ids") or []]
         # 레벨 높은 순. 랭크 팀은 대개 제일 센 애들로 짠다.
@@ -150,14 +154,20 @@ class TeamWindow(object):
             "랜덤 배틀에서 걸 때도 걸려올 때도 이 팀으로 싸웁니다. "
             "등록하지 않으면 바탕화면에 데리고 다니는 파티로 싸웁니다.\n"
             "Lv.%d 넘는 포켓몬은 Lv.%d(으)로 싸웁니다. %d마리로 걸면 %d마리 "
-            "팀만 만나고, 받는 쪽도 거는 쪽보다 적은 팀이면 안 붙습니다."
-            % (self.cap, self.cap, self.max, self.max)))
+            "팀만 만나고, 받는 쪽도 거는 쪽보다 적은 팀이면 안 붙습니다. "
+            "전설·환상 포켓몬은 %d마리까지 넣을 수 있습니다."
+            % (self.cap, self.cap, self.max, self.max, self.restricted_max)))
         if self.registered:
             self.unreg_btn.pack(side="left", padx=(8, 0))
         for m in self.mons:
             self._row(m)
         self.fit.schedule()
         self._paint()
+        extra = self._restricted_count(self.picked) - self.restricted_max
+        if extra > 0:
+            self.say("전설·환상이 %d마리 더 있어 랭크 배틀에는 앞의 %d마리만 나갑니다. "
+                     "등록하려면 %d마리를 빼세요." % (extra, self.restricted_max, extra),
+                     U.ACCENT)
 
     def _row(self, m):
         info = m.get("info") or {}
@@ -184,6 +194,9 @@ class TeamWindow(object):
         if m.get("onDesktop"):
             tk.Label(line, text="데리고 다님", bg=U.INK, fg=U.INFO,
                      font=U.FONT_XS).pack(side="right")
+        if self._is_restricted(m):
+            tk.Label(line, text="전설·환상", bg=U.INK, fg=U.SHINY,
+                     font=U.FONT_XS).pack(side="right", padx=(0, 8))
         tk.Frame(self.inner, bg="#1a1f2e", height=U.h(1)).pack(fill="x")
         pid = m["id"]
         for w in (f, line) + tuple(line.winfo_children()):
@@ -227,6 +240,13 @@ class TeamWindow(object):
         else:
             self.say("")
 
+    def _is_restricted(self, m):
+        return bool(m) and m.get("num") in self.restricted
+
+    def _restricted_count(self, ids):
+        by = dict((m["id"], m) for m in self.mons)
+        return sum(1 for i in ids if self._is_restricted(by.get(i)))
+
     def toggle(self, pid):
         if pid in self.picked:
             self.picked.remove(pid)
@@ -234,6 +254,11 @@ class TeamWindow(object):
             return self.say("%d마리까지입니다. 뺄 포켓몬을 먼저 누르세요."
                             % self.max, U.ACCENT)
         else:
+            by = dict((m["id"], m) for m in self.mons)
+            if (self._is_restricted(by.get(pid))
+                    and self._restricted_count(self.picked) >= self.restricted_max):
+                return self.say("전설·환상 포켓몬은 %d마리까지 넣을 수 있습니다."
+                                % self.restricted_max, U.ACCENT)
             self.picked.append(pid)
         self._paint()
 
@@ -241,7 +266,14 @@ class TeamWindow(object):
         party = [m for m in self.mons if m.get("onDesktop")]
         party.sort(key=lambda m: (m.get("slot") if m.get("slot") is not None
                                   else 99, m["id"]))
-        self.picked = [m["id"] for m in party][:self.max]
+        picked, legends = [], 0
+        for m in party:
+            if self._is_restricted(m):
+                if legends >= self.restricted_max:
+                    continue            # 두 마리째 전설·환상은 건너뛴다
+                legends += 1
+            picked.append(m["id"])
+        self.picked = picked[:self.max]
         self._paint()
 
     def clear(self):

@@ -104,12 +104,16 @@ class FakeApi(object):
                      "losses": 12, "title": "시즌 1 챔피언"}]}}
 
     def pvp_team(self):
-        return {"registered": False, "ids": [1, 2], "levelCap": 50, "maxParty": 6}
+        return {"registered": False, "ids": [1, 2], "levelCap": 50, "maxParty": 6,
+                "restrictedMax": 1, "restrictedNums": [150, 151]}
 
     def pokemon(self):
-        return [mon(1, "피카츄", 80, desk=True, slot=0),
-                mon(2, "이브이", 30, desk=True, slot=1),
-                mon(3, "리자몽", 55), mon(4, "잉어킹", 5, shiny=True)]
+        out = [mon(1, "피카츄", 80, desk=True, slot=0),
+               mon(2, "이브이", 30, desk=True, slot=1),
+               mon(3, "리자몽", 55), mon(4, "잉어킹", 5, shiny=True),
+               mon(5, "뮤츠", 50), mon(6, "뮤", 40)]
+        out[4]["num"], out[5]["num"] = 150, 151
+        return out
 
     def pvp_set_team(self, ids):
         self.sent_team.append(list(ids))
@@ -215,8 +219,16 @@ def main():
 
     print("랭크 팀")
     tw = ui_season.TeamWindow(app)
-    pump(root, lambda: len(tw.rows) == 4)
-    chk("내 포켓몬이 다 뜬다", len(tw.rows) == 4, len(tw.rows))
+    pump(root, lambda: len(tw.rows) == 6)
+    chk("내 포켓몬이 다 뜬다", len(tw.rows) == 6, len(tw.rows))
+    chk("전설·환상 표시", "전설·환상" in texts(tw.win))
+    tw.toggle(5)
+    tw.toggle(6)
+    chk("전설·환상 두 마리째는 안 들어간다", 5 in tw.picked and 6 not in tw.picked,
+        tw.picked)
+    chk("왜 안 되는지 말한다", "1마리까지" in tw.status._label.cget("text"),
+        tw.status._label.cget("text"))
+    tw.toggle(5)
     chk("처음에는 지금 파티가 골라져 있다", tw.picked == [1, 2], tw.picked)
     chk("레벨 상한이 줄에 적힌다", "Lv.80 → 50" in texts(tw.win))
     tw.toggle(3)

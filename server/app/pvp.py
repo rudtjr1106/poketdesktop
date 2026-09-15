@@ -157,6 +157,55 @@ def _party(uid):
     return [db.row_to_mon(r) for r in rows]
 
 
+# ---- 전설·환상 제한 ----
+# 랭크 배틀에 나가는 팀에는 전설·환상을 한 마리까지만. 본가 랭크 배틀의 '금지급
+# 한 마리' 와 같은 생각이다. 시즌마다 1~5위가 알을 받으므로 그대로 두면 같은
+# 사람에게 전설이 쌓인다. 한 마리일 때는 시뮬레이션으로 재어 보니 매칭이
+# 상쇄해서 승률이 거의 안 오른다 (가장 센 종도 +5%p, 야생 한카리아스와 비슷).
+#
+# 등록한 랭크 팀은 두 마리째를 넣을 수 없다 (set_team). 등록하지 않아서 바탕화면
+# 파티로 싸우는 사람은 **앞에 있는 한 마리만 나가고 나머지는 빠진다** (restrict).
+RESTRICTED_MAX = 1
+
+
+def restricted_species():
+    """전설·환상 종 (내부 이름). 알의 목록과 같은 본가 분류다.
+
+    알에서는 빼는 이벤트 종도 여기에는 들어간다 - 야생에서 잡은 것도 환상이다.
+    """
+    global _RESTRICTED
+    if _RESTRICTED is None:
+        from . import eggs
+        dex = deps.dex()
+        names = set()
+        for n in tuple(eggs.LEGENDARY_POOL) + tuple(eggs.MYTHICAL_POOL):
+            sp = dex.get(n)
+            if sp:
+                names.add(sp["internal"])
+        _RESTRICTED = names
+    return _RESTRICTED
+
+
+_RESTRICTED = None
+
+
+def restrict(mons):
+    """랭크 배틀에 실제로 나가는 팀. (팀, 빠진 마릿수).
+
+    전설·환상은 앞에서부터 RESTRICTED_MAX 마리만 남긴다. 순서는 그대로다.
+    """
+    names = restricted_species()
+    out, seen, dropped = [], 0, 0
+    for m in mons:
+        if m.get("species") in names:
+            if seen >= RESTRICTED_MAX:
+                dropped += 1
+                continue
+            seen += 1
+        out.append(m)
+    return out, dropped
+
+
 def team_ids(uid):
     """등록한 랭크 팀의 포켓몬 id (자리 순). 없으면 빈 목록.
 
@@ -175,6 +224,11 @@ def ranked_team(uid):
     랭크 팀을 등록했으면 그 팀, 아니면 바탕화면 파티. 레벨은 **아직 자르지
     않은** 원래 값이다 - 자르는 것은 싸우기 직전(capped)에 한다.
     """
+    return restrict(_ranked_source(uid))[0]
+
+
+def _ranked_source(uid):
+    """전설·환상 제한을 걸기 전의 팀 (등록한 팀, 없으면 바탕화면 파티)."""
     ids = team_ids(uid)
     if not ids:
         return _party(uid)
@@ -196,10 +250,14 @@ def set_team(uid, ids):
         raise ValueError("랭크 팀은 최대 %d마리입니다." % config.MAX_PARTY)
     if clean:
         marks = ",".join("?" * len(clean))
-        mine = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=? AND id IN (%s)"
-                     % marks, (uid,) + tuple(clean))["c"]
-        if mine != len(clean):
+        rows = db.q("SELECT id, species FROM pokemon WHERE user_id=? AND id IN (%s)"
+                    % marks, (uid,) + tuple(clean))
+        if len(rows) != len(clean):
             raise ValueError("내 포켓몬만 넣을 수 있습니다.")
+        names = restricted_species()
+        if sum(1 for r in rows if r["species"] in names) > RESTRICTED_MAX:
+            raise ValueError("랭크 팀에는 전설·환상 포켓몬을 %d마리까지 넣을 수 있습니다."
+                             % RESTRICTED_MAX)
     db.run("DELETE FROM rank_team WHERE user_id=?", (uid,))
     for pos, pid in enumerate(clean):
         db.run("INSERT INTO rank_team (user_id, pos, pokemon_id) VALUES (?,?,?)",
@@ -422,7 +480,9 @@ def _all_teams():
     for uid, mons in party.items():
         if uid not in teams:
             teams[uid] = mons[:config.MAX_PARTY]
-    return teams
+    # 싸울 때와 같은 팀으로 잰다. 빠질 전설까지 전력에 넣으면 실제보다 센
+    # 상대와 붙는다.
+    return dict((uid, restrict(mons)[0]) for uid, mons in teams.items())
 
 
 def _last_met(uid, minutes):
@@ -705,6 +765,7 @@ def summary(uid):
     tier = season.tier_for(r, season.seats())
     nxt, need = season.next_tier(rp)
     ids = team_ids(uid)
+    fighting, dropped = restrict(_ranked_source(uid))
     out = {"rating": r["rating"], "games": r["games"], "wins": r["wins"],
            "losses": r["losses"], "draws": r["draws"],
            "friendWins": r["fr_wins"], "friendLosses": r["fr_losses"],
@@ -722,7 +783,9 @@ def summary(uid):
            "rpToNext": need, "floorRp": season.floor_rp(r["peak_rp"] or 0),
            "firstWinToday": r["win_day"] == _today(),
            "teamRegistered": bool(ids),
-           "teamSize": len(ids) if ids else len(_party(uid)),
+           "teamSize": len(fighting),
+           "restrictedMax": RESTRICTED_MAX,
+           "restrictedDropped": dropped,
            "levelCap": season.LEVEL_CAP}
     out.update(season.tier_public(tier))
     return out

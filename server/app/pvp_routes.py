@@ -121,7 +121,8 @@ def ranking(limit: int = 50, ctx=Depends(deps.current)):
     return {"ranking": pvp.ranking(max(1, min(100, limit)), uid),
             "me": me, "season": pvp.SEASON,
             "placement": pvp.PLACEMENT,
-            "rules": season.rules_public(),
+            "rules": dict(season.rules_public(),
+                          restrictedMax=pvp.RESTRICTED_MAX),
             # 지난 시즌 명예의 전당. 시즌 1 은 티어가 없던 시즌이라 순위만 있다.
             "hall": {"season": pvp.SEASON - 1,
                      "rows": season.hall(pvp.SEASON - 1)}}
@@ -133,12 +134,20 @@ class TeamIn(BaseModel):
 
 
 def _team_view(uid):
-    team = pvp.ranked_team(uid)
+    source = pvp._ranked_source(uid)
+    team, dropped = pvp.restrict(source)
+    dex = deps.dex()
     return {"registered": bool(pvp.team_ids(uid)),
-            "ids": [m["id"] for m in team],
+            # 고르는 창에는 제한 전의 팀을 준다 (등록한 그대로 보여야 한다).
+            "ids": [m["id"] for m in source],
             "pokemon": [deps.decorate(m) for m in team],
             "levelCap": season.LEVEL_CAP,
-            "maxParty": config.MAX_PARTY}
+            "maxParty": config.MAX_PARTY,
+            # 전설·환상 제한. 창이 두 마리째를 미리 막는다 (서버도 막는다).
+            "restrictedMax": pvp.RESTRICTED_MAX,
+            "restrictedNums": sorted(dex.get(s)["num"] for s in pvp.restricted_species()
+                                     if dex.get(s)),
+            "restrictedDropped": dropped}
 
 
 @router.get("/api/pvp/team")
