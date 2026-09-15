@@ -81,6 +81,13 @@ def _move_desc(ident, got):
     return MOVE_KR.get(ident) or got or ""
 
 
+def _removed_text(s):
+    """9세대에서 빠진 기술에 붙은 '쓸 수 없다' 문장, 또는 자리만 채운 'Dummy Data' 인가."""
+    t = " ".join((s or "").split())
+    return (t.startswith("사용할 수 없는 기술") or "can’t be used" in t or "can't be used" in t
+            or t == "Dummy Data")
+
+
 def _has_hangul(s):
     return bool(re.search(r"[가-힣]", s or ""))
 
@@ -236,6 +243,10 @@ def build():
     # 한국어는 6세대(X·Y)부터 있고, 소드·실드까지 826개가 있다. 그 뒤에
     # 나온 기술(레전드 아르세우스·9세대)은 한국어가 아직 없어서 영어로
     # 대신한다 - 빈칸으로 두는 것보다는 낫다.
+    #
+    # **스칼렛·바이올렛에서 빠진 기술은 그 판의 문장이 "사용할 수 없는 기술입니다" 다.**
+    # 이 게임에서는 쓸 수 있는 기술이라 그 문장을 고르면 안 된다 - 146개가 그렇게
+    # 나와서 멀쩡한 태권당수·거품까지 못 쓰는 기술로 보였다. 그 문장은 맨 뒤로 민다.
     move_desc = {}
     for r in rows("move_flavor_text.csv"):
         # 이 표만 칸 이름이 language_id 다 (다른 표는 local_language_id).
@@ -243,8 +254,11 @@ def build():
         if lang not in (KO, EN):
             continue
         mid, vg = as_int(r["move_id"]), as_int(r["version_group_id"])
-        # (한국어인가, 판 번호) 로 견준다. 한국어면 무조건 영어를 이긴다.
-        rank = (1 if lang == KO else 0, vg)
+        removed = _removed_text(r["flavor_text"])
+        # (한국어인가, 빠진 기술 문장이 아닌가, 판 번호) 로 견준다. 한국어면 무조건
+        # 영어를 이긴다. 한국어가 그 문장뿐인 것(Z기술의 특수 쪽)은 그대로 둔다 -
+        # 이 게임에서도 실제로 못 쓰는 기술이다.
+        rank = (1 if lang == KO else 0, 0 if removed else 1, vg)
         if mid not in move_desc or rank > move_desc[mid][0]:
             # 게임 글상자에 맞춘 줄바꿈이라 화면에서는 방해만 된다.
             move_desc[mid] = (rank, " ".join(r["flavor_text"].split()))
@@ -443,7 +457,9 @@ def build():
             "prevo": as_int(r["evolves_from_species_id"], 0) or None,
             "evo": evo_from.get(sid, []),
             "height": as_int(poke_row[pid].get("height")) / 10.0,
-            "weight": as_int(poke_row[pid].get("weight")) / 10.0,
+            # 몸무게(kg). 안다리걸기·풀묶기·헤비봄버·히트스탬프가 쓴다.
+            # "weight" 는 아래 annotate 가 **야생 등장 가중치**로 덮어쓴다 (이름이 겹친다).
+            "kg": as_int(poke_row[pid].get("weight")) / 10.0,
             "legendary": legendary,
         })
 

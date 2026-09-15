@@ -1,5 +1,5 @@
 {
- "digest": "2f3f41b7f2e68b99",
+ "digest": "f681e86a2b60ba2e",
  "regions": {
   "11110": "cynthia",
   "11140": "rose",
@@ -363,7 +363,7 @@
       "EARTHQUAKE",
       "STONEEDGE",
       "MEGAHORN",
-      "ROCKWRECKER"
+      "HEATCRASH"
      ],
      "nature": "ADAMANT",
      "species": "RHYPERIOR"
@@ -854,8 +854,8 @@
      "moves": [
       "GIGADRAIN",
       "SURF",
-      "DOUBLETEAM",
-      "BUBBLEBEAM"
+      "LEECHSEED",
+      "DOUBLETEAM"
      ],
      "nature": "TIMID",
      "species": "LUDICOLO"
@@ -986,9 +986,9 @@
      "level": 100,
      "moves": [
       "AVALANCHE",
+      "HEAVYSLAM",
       "EARTHQUAKE",
-      "BODYPRESS",
-      "DOUBLEEDGE"
+      "BODYPRESS"
      ],
      "nature": "ADAMANT",
      "species": "AVALUGG"
@@ -1863,12 +1863,12 @@
      "iv": 31,
      "level": 93,
      "moves": [
+      "GYROBALL",
       "EARTHQUAKE",
       "PAYBACK",
-      "ROCKSLIDE",
-      "FUTURESIGHT"
+      "ROCKSLIDE"
      ],
-     "nature": "LONELY",
+     "nature": "ADAMANT",
      "species": "BRONZONG"
     }
    ],
@@ -1999,7 +1999,7 @@
       "SURF",
       "BODYSLAM",
       "BLIZZARD",
-      "ICEBEAM"
+      "SHEERCOLD"
      ],
      "nature": "MODEST",
      "species": "WALREIN"
@@ -2358,7 +2358,7 @@
       "SHADOWCLAW",
       "ICICLECRASH",
       "EARTHQUAKE",
-      "CRUSHCLAW"
+      "GYROBALL"
      ],
      "nature": "ADAMANT",
      "species": "SANDSLASH"
@@ -2489,9 +2489,9 @@
      "level": 86,
      "moves": [
       "PLAYROUGH",
-      "IRONHEAD",
+      "HEAVYSLAM",
       "SUPERPOWER",
-      "HIGHHORSEPOWER"
+      "IRONHEAD"
      ],
      "nature": "ADAMANT",
      "species": "COPPERAJAH"
@@ -2601,10 +2601,10 @@
      "iv": 31,
      "level": 94,
      "moves": [
+      "LEECHSEED",
       "PSYSHOCK",
       "SOLARBEAM",
-      "STOMP",
-      "BARRAGE"
+      "STOMP"
      ],
      "nature": "MODEST",
      "species": "EXEGGUTOR"
@@ -2716,8 +2716,8 @@
      "moves": [
       "THUNDERBOLT",
       "SWIFT",
-      "DISCHARGE",
-      "THUNDERPUNCH"
+      "LOWKICK",
+      "DISCHARGE"
      ],
      "nature": "TIMID",
      "species": "ELECTIVIRE"
@@ -2956,7 +2956,7 @@
       "ANCIENTPOWER",
       "TACKLE",
       "SMACKDOWN",
-      "ROCKPOLISH"
+      "FLAIL"
      ],
      "nature": "LONELY",
      "species": "CARBINK"
@@ -3049,9 +3049,9 @@
      "level": 38,
      "moves": [
       "EARTHQUAKE",
+      "HORNDRILL",
       "HEADSMASH",
-      "ROCKSLIDE",
-      "DRAGONCLAW"
+      "ROCKSLIDE"
      ],
      "nature": "ADAMANT",
      "species": "TYRUNT"
@@ -3289,9 +3289,9 @@
      "level": 67,
      "moves": [
       "PSYCHIC",
+      "TRUMPCARD",
       "HEALPULSE",
-      "SURF",
-      "WATERPULSE"
+      "SURF"
      ],
      "nature": "MODEST",
      "species": "SLOWKING"
@@ -3556,10 +3556,10 @@
      "moves": [
       "WOODHAMMER",
       "BLIZZARD",
-      "ICEPUNCH",
-      "RAZORLEAF"
+      "SHEERCOLD",
+      "ICEPUNCH"
      ],
-     "nature": "ADAMANT",
+     "nature": "LONELY",
      "species": "ABOMASNOW"
     },
     {
@@ -3647,9 +3647,9 @@
      "iv": 31,
      "level": 59,
      "moves": [
+      "GYROBALL",
       "OVERHEAT",
       "STONEEDGE",
-      "EARTHPOWER",
       "FLAMETHROWER"
      ],
      "nature": "MODEST",
@@ -3740,9 +3740,9 @@
      "level": 27,
      "moves": [
       "THUNDERBOLT",
+      "GRASSKNOT",
       "QUICKATTACK",
-      "THUNDERWAVE",
-      "THUNDERSHOCK"
+      "THUNDERWAVE"
      ],
      "nature": "MODEST",
      "species": "PICHU"
@@ -3761,7 +3761,7 @@
       "THUNDERBOLT",
       "FOULPLAY",
       "TACKLE",
-      "SCREECH"
+      "SONICBOOM"
      ],
      "nature": "MILD",
      "species": "VOLTORB"
@@ -3925,8 +3925,8 @@
      "moves": [
       "DOUBLETEAM",
       "BRAVEBIRD",
-      "UTURN",
-      "AIRSLASH"
+      "ENDEAVOR",
+      "UTURN"
      ],
      "nature": "JOLLY",
      "species": "SWELLOW"
@@ -4608,10 +4608,10 @@
      "iv": 31,
      "level": 53,
      "moves": [
-      "IRONHEAD",
+      "HEAVYSLAM",
       "ANCIENTPOWER",
       "TAKEDOWN",
-      "TACKLE"
+      "IRONHEAD"
      ],
      "nature": "ADAMANT",
      "species": "BASTIODON"
@@ -4792,9 +4792,9 @@
      "iv": 31,
      "level": 28,
      "moves": [
+      "GRASSKNOT",
       "RAZORLEAF",
       "BITE",
-      "TACKLE",
       "MEGADRAIN"
      ],
      "nature": "ADAMANT",
@@ -4812,8 +4812,8 @@
      "level": 29,
      "moves": [
       "FOCUSPUNCH",
+      "LEECHSEED",
       "SPORE",
-      "HEADBUTT",
       "FORCEPALM"
      ],
      "nature": "JOLLY",
@@ -4832,10 +4832,10 @@
      "moves": [
       "GIGADRAIN",
       "SLEEPPOWDER",
-      "ACROBATICS",
-      "MEGADRAIN"
+      "LEECHSEED",
+      "ACROBATICS"
      ],
-     "nature": "TIMID",
+     "nature": "MILD",
      "species": "JUMPLUFF"
     },
     {
@@ -4903,10 +4903,10 @@
      "moves": [
       "WATERPULSE",
       "DOUBLETEAM",
-      "EARTHQUAKE",
-      "AQUATAIL"
+      "FISSURE",
+      "EARTHQUAKE"
      ],
-     "nature": "ADAMANT",
+     "nature": "NAUGHTY",
      "species": "WHISCASH"
     },
     {
@@ -4921,10 +4921,10 @@
      "iv": 31,
      "level": 58,
      "moves": [
+      "GUILLOTINE",
       "DOUBLETEAM",
       "CRABHAMMER",
-      "CRUNCH",
-      "RAZORSHELL"
+      "CRUNCH"
      ],
      "nature": "ADAMANT",
      "species": "CRAWDAUNT"
@@ -4943,10 +4943,10 @@
      "moves": [
       "WATERPULSE",
       "BODYSLAM",
-      "ICEBEAM",
-      "LIQUIDATION"
+      "SHEERCOLD",
+      "ICEBEAM"
      ],
-     "nature": "MILD",
+     "nature": "MODEST",
      "species": "WALREIN"
     },
     {
@@ -4962,7 +4962,7 @@
      "level": 61,
      "moves": [
       "WATERPULSE",
-      "TAKEDOWN",
+      "FLAIL",
       "DRAININGKISS",
       "HYDROPUMP"
      ],
@@ -5218,10 +5218,10 @@
      "iv": 31,
      "level": 32,
      "moves": [
+      "GUILLOTINE",
       "STONEEDGE",
       "IRONHEAD",
-      "XSCISSOR",
-      "BUGBITE"
+      "XSCISSOR"
      ],
      "nature": "JOLLY",
      "species": "DURANT"
@@ -5483,7 +5483,7 @@
     {
      "ability": "LIGHTNINGROD",
      "evs": {
-      "spa": 23,
+      "atk": 23,
       "spe": 23
      },
      "gender": "F",
@@ -5493,10 +5493,10 @@
      "moves": [
       "WILDCHARGE",
       "OVERHEAT",
-      "QUICKATTACK",
-      "DISCHARGE"
+      "RETURN",
+      "QUICKATTACK"
      ],
-     "nature": "MILD",
+     "nature": "LONELY",
      "species": "ZEBSTRIKA"
     }
    ],
@@ -5708,9 +5708,9 @@
      "level": 31,
      "moves": [
       "EARTHQUAKE",
+      "RETURN",
       "ROCKSLIDE",
-      "STOMP",
-      "TACKLE"
+      "STOMP"
      ],
      "nature": "JOLLY",
      "species": "TAUROS"
@@ -6032,9 +6032,9 @@
      "level": 37,
      "moves": [
       "DIVE",
-      "AURORABEAM",
+      "SHEERCOLD",
       "HEADBUTT",
-      "GROWL"
+      "AURORABEAM"
      ],
      "nature": "LONELY",
      "species": "DEWGONG"
@@ -6050,10 +6050,10 @@
      "iv": 31,
      "level": 38,
      "moves": [
+      "LOWKICK",
       "NIGHTSLASH",
       "ICEPUNCH",
-      "FAKEOUT",
-      "ASSURANCE"
+      "FAKEOUT"
      ],
      "nature": "JOLLY",
      "species": "WEAVILE"
@@ -6686,12 +6686,12 @@
      "iv": 31,
      "level": 34,
      "moves": [
+      "HEATCRASH",
       "BODYPRESS",
       "EARTHQUAKE",
-      "LAVAPLUME",
-      "FLAMEWHEEL"
+      "LAVAPLUME"
      ],
-     "nature": "ADAMANT",
+     "nature": "NAUGHTY",
      "species": "TORKOAL"
     },
     {
@@ -7006,7 +7006,7 @@
       "TRAILBLAZE",
       "WOODHAMMER",
       "HEADSMASH",
-      "STONEEDGE"
+      "LOWKICK"
      ],
      "nature": "ADAMANT",
      "species": "SUDOWOODO"
@@ -7037,9 +7037,9 @@
      "level": 47,
      "moves": [
       "ICESHARD",
+      "SHEERCOLD",
       "FLASHCANNON",
-      "BLIZZARD",
-      "FREEZEDRY"
+      "BLIZZARD"
      ],
      "nature": "TIMID",
      "species": "CRYOGONAL"
@@ -7077,9 +7077,9 @@
      "level": 49,
      "moves": [
       "EARTHQUAKE",
+      "SUPERFANG",
       "AQUATAIL",
-      "AVALANCHE",
-      "ICEBEAM"
+      "AVALANCHE"
      ],
      "nature": "ADAMANT",
      "species": "WALREIN"
@@ -7494,7 +7494,7 @@
       "FOULPLAY",
       "THUNDER",
       "TACKLE",
-      "SCREECH"
+      "SONICBOOM"
      ],
      "nature": "MILD",
      "species": "ELECTRODE"
@@ -7600,9 +7600,9 @@
      "level": 24,
      "moves": [
       "BUGBITE",
+      "GYROBALL",
       "STONEEDGE",
-      "TAKEDOWN",
-      "RAPIDSPIN"
+      "TAKEDOWN"
      ],
      "nature": "ADAMANT",
      "species": "PINECO"
@@ -7894,7 +7894,7 @@
       "FOCUSBLAST",
       "SWIFT",
       "THUNDERBOLT",
-      "POUND"
+      "GRASSKNOT"
      ],
      "nature": "TIMID",
      "species": "CINCCINO"
@@ -7911,9 +7911,9 @@
      "level": 33,
      "moves": [
       "HYPNOSIS",
-      "CRUNCH",
-      "TACKLE",
-      "BITE"
+      "SUPERFANG",
+      "FLAIL",
+      "CRUNCH"
      ],
      "nature": "JOLLY",
      "species": "WATCHOG"
@@ -8249,7 +8249,7 @@
       "FAKEOUT",
       "CLOSECOMBAT",
       "KNOCKOFF",
-      "FOCUSPUNCH"
+      "HEAVYSLAM"
      ],
      "nature": "ADAMANT",
      "species": "HARIYAMA"
@@ -8286,8 +8286,8 @@
      "moves": [
       "CROSSCHOP",
       "ROCKSLIDE",
-      "THRASH",
-      "KARATECHOP"
+      "PUNISHMENT",
+      "THRASH"
      ],
      "nature": "JOLLY",
      "species": "PRIMEAPE"
@@ -8464,7 +8464,7 @@
      "moves": [
       "HORNLEECH",
       "SHADOWCLAW",
-      "TACKLE",
+      "LEECHSEED",
       "PHANTOMFORCE"
      ],
      "nature": "ADAMANT",
@@ -8806,7 +8806,7 @@
       "BUGBUZZ",
       "THUNDERBOLT",
       "AIRSLASH",
-      "DISCHARGE"
+      "GUILLOTINE"
      ],
      "nature": "MODEST",
      "species": "VIKAVOLT"
@@ -8826,7 +8826,7 @@
       "STONEEDGE",
       "STEAMROLLER",
       "THUNDERPUNCH",
-      "EARTHQUAKE"
+      "HEAVYSLAM"
      ],
      "nature": "ADAMANT",
      "species": "GOLEM"
@@ -9057,10 +9057,10 @@
      "iv": 31,
      "level": 42,
      "moves": [
+      "HEATCRASH",
       "ROCKBLAST",
       "BODYPRESS",
-      "EARTHQUAKE",
-      "ANCIENTPOWER"
+      "EARTHQUAKE"
      ],
      "nature": "ADAMANT",
      "species": "COALOSSAL"
@@ -9284,10 +9284,10 @@
      "moves": [
       "BODYSLAM",
       "CRUNCH",
-      "HYPERBEAM",
-      "DOUBLEEDGE"
+      "HEAVYSLAM",
+      "HYPERBEAM"
      ],
-     "nature": "ADAMANT",
+     "nature": "LONELY",
      "species": "SNORLAX"
     },
     {
@@ -9510,8 +9510,8 @@
      "moves": [
       "SLUDGEBOMB",
       "MEGADRAIN",
-      "AMNESIA",
-      "SOLARBEAM"
+      "LEECHSEED",
+      "AMNESIA"
      ],
      "nature": "TIMID",
      "species": "VENUSAUR"
@@ -9950,7 +9950,7 @@
       "BOOMBURST",
       "HURRICANE",
       "DRAGONPULSE",
-      "AIRSLASH"
+      "SUPERFANG"
      ],
      "nature": "TIMID",
      "species": "NOIVERN"
@@ -10123,7 +10123,7 @@
       "THUNDERPUNCH",
       "STONEEDGE",
       "EARTHQUAKE",
-      "ROCKTHROW"
+      "HEAVYSLAM"
      ],
      "nature": "ADAMANT",
      "species": "GOLEM"
@@ -10527,10 +10527,10 @@
      "iv": 31,
      "level": 78,
      "moves": [
+      "HEAVYSLAM",
       "EARTHQUAKE",
       "PAYBACK",
-      "ROCKSLIDE",
-      "HIGHHORSEPOWER"
+      "ROCKSLIDE"
      ],
      "nature": "ADAMANT",
      "species": "MUDSDALE"
@@ -10603,7 +10603,7 @@
       "STONEEDGE",
       "XSCISSOR",
       "EARTHQUAKE",
-      "ROCKWRECKER"
+      "FLAIL"
      ],
      "nature": "ADAMANT",
      "species": "CRUSTLE"
@@ -10860,9 +10860,9 @@
      "level": 76,
      "moves": [
       "PHANTOMFORCE",
+      "HEAVYSLAM",
       "MEGAPUNCH",
-      "EARTHQUAKE",
-      "HIGHHORSEPOWER"
+      "RETURN"
      ],
      "nature": "ADAMANT",
      "species": "GOLURK"
@@ -10870,8 +10870,8 @@
     {
      "ability": "WHITESMOKE",
      "evs": {
+      "atk": 86,
       "hp": 86,
-      "spa": 86,
       "spd": 2
      },
      "gender": "F",
@@ -10882,9 +10882,9 @@
       "LAVAPLUME",
       "STONEEDGE",
       "BODYSLAM",
-      "ERUPTION"
+      "RETURN"
      ],
-     "nature": "RASH",
+     "nature": "NAUGHTY",
      "species": "TORKOAL"
     },
     {
@@ -10902,7 +10902,7 @@
       "PSYCHIC",
       "AIRSLASH",
       "COSMICPOWER",
-      "SKYATTACK"
+      "RETURN"
      ],
      "nature": "TIMID",
      "species": "SIGILYPH"
@@ -10992,10 +10992,10 @@
      "iv": 31,
      "level": 86,
      "moves": [
+      "GYROBALL",
       "POWERWHIP",
       "BODYPRESS",
-      "FLASHCANNON",
-      "IRONHEAD"
+      "FLASHCANNON"
      ],
      "nature": "ADAMANT",
      "species": "FERROTHORN"
@@ -11032,10 +11032,10 @@
      "iv": 31,
      "level": 88,
      "moves": [
+      "HEAVYSLAM",
       "IRONHEAD",
       "ZENHEADBUTT",
-      "SUPERPOWER",
-      "HIGHHORSEPOWER"
+      "SUPERPOWER"
      ],
      "nature": "ADAMANT",
      "species": "COPPERAJAH"
@@ -11703,8 +11703,8 @@
      "moves": [
       "ERUPTION",
       "DOUBLEEDGE",
-      "FLAMETHROWER",
-      "LAVAPLUME"
+      "GYROBALL",
+      "FLAMETHROWER"
      ],
      "nature": "TIMID",
      "species": "TYPHLOSION"
@@ -12492,8 +12492,8 @@
      "moves": [
       "HYPERBEAM",
       "HURRICANE",
-      "SLAM",
-      "WRAP"
+      "DRAGONRAGE",
+      "SLAM"
      ],
      "nature": "TIMID",
      "species": "DRAGONITE"
@@ -13098,7 +13098,7 @@
       "ACROBATICS",
       "STONEEDGE",
       "DRAGONCLAW",
-      "THRASH"
+      "ENDEAVOR"
      ],
      "nature": "JOLLY",
      "species": "ARCHEOPS"
@@ -13156,9 +13156,9 @@
      "level": 100,
      "moves": [
       "EARTHQUAKE",
+      "GUILLOTINE",
       "OUTRAGE",
-      "DRAGONDANCE",
-      "GIGAIMPACT"
+      "DRAGONDANCE"
      ],
      "nature": "JOLLY",
      "species": "HAXORUS"
@@ -13554,10 +13554,10 @@
      "iv": 31,
      "level": 93,
      "moves": [
+      "GUILLOTINE",
       "NIGHTSLASH",
       "XSCISSOR",
-      "AERIALACE",
-      "IRONHEAD"
+      "AERIALACE"
      ],
      "nature": "JOLLY",
      "species": "BISHARP"
@@ -14539,9 +14539,9 @@
      "level": 83,
      "moves": [
       "ROCKPOLISH",
+      "HEAVYSLAM",
       "EARTHQUAKE",
-      "STONEEDGE",
-      "ROCKTHROW"
+      "STONEEDGE"
      ],
      "nature": "ADAMANT",
      "species": "GOLEM"
@@ -14561,7 +14561,7 @@
       "DOUBLEEDGE",
       "HEADSMASH",
       "SUCKERPUNCH",
-      "STONEEDGE"
+      "LOWKICK"
      ],
      "nature": "ADAMANT",
      "species": "SUDOWOODO"
@@ -14672,9 +14672,9 @@
      "level": 83,
      "moves": [
       "PHANTOMFORCE",
+      "HEAVYSLAM",
       "EARTHQUAKE",
-      "POWERWHIP",
-      "ENERGYBALL"
+      "POWERWHIP"
      ],
      "nature": "ADAMANT",
      "species": "DHELMISE"
@@ -15090,9 +15090,9 @@
      "iv": 31,
      "level": 84,
      "moves": [
+      "LEECHSEED",
       "PAYBACK",
       "NEEDLEARM",
-      "PINMISSILE",
       "ENERGYBALL"
      ],
      "nature": "LONELY",
@@ -15225,8 +15225,8 @@
      "moves": [
       "AIRSLASH",
       "DRAGONPULSE",
-      "BOOMBURST",
-      "HURRICANE"
+      "SUPERFANG",
+      "BOOMBURST"
      ],
      "nature": "TIMID",
      "species": "NOIVERN"
@@ -15246,7 +15246,7 @@
       "DRAGONRUSH",
       "SEEDBOMB",
       "AERIALACE",
-      "DRAGONPULSE"
+      "LEECHSEED"
      ],
      "nature": "JOLLY",
      "species": "FLAPPLE"
@@ -15851,7 +15851,7 @@
       "ICEBEAM",
       "HYDROPUMP",
       "FLASHCANNON",
-      "WAVECRASH"
+      "GRASSKNOT"
      ],
      "nature": "MODEST",
      "species": "EMPOLEON"
@@ -15948,10 +15948,10 @@
      "iv": 31,
      "level": 98,
      "moves": [
+      "HARDPRESS",
       "ICEPUNCH",
       "ZENHEADBUTT",
-      "BRICKBREAK",
-      "PSYCHIC"
+      "BRICKBREAK"
      ],
      "nature": "JOLLY",
      "species": "METAGROSS"
@@ -16562,9 +16562,9 @@
      "level": 56,
      "moves": [
       "SWALLOW",
+      "SPITUP",
       "IRONHEAD",
-      "PLAYROUGH",
-      "CRUNCH"
+      "PLAYROUGH"
      ],
      "nature": "ADAMANT",
      "species": "MAWILE"
@@ -16757,8 +16757,8 @@
      "moves": [
       "BLIZZARD",
       "HYDROPUMP",
-      "WATERGUN",
-      "WITHDRAW"
+      "SEISMICTOSS",
+      "WATERGUN"
      ],
      "nature": "MODEST",
      "species": "OMANYTE"
@@ -16773,6 +16773,7 @@
      "moves": [
       "EARTHQUAKE",
       "SCARYFACE",
+      "HORNDRILL",
       "HORNATTACK"
      ],
      "nature": "ADAMANT",
@@ -16871,7 +16872,7 @@
      "moves": [
       "FAKEOUT",
       "DIZZYPUNCH",
-      "BITE",
+      "REVERSAL",
       "MEGAPUNCH"
      ],
      "nature": "JOLLY",
@@ -16909,8 +16910,8 @@
      "moves": [
       "HEADCHARGE",
       "MEGAHORN",
-      "PURSUIT",
-      "HORNATTACK"
+      "REVERSAL",
+      "PURSUIT"
      ],
      "nature": "ADAMANT",
      "species": "BOUFFALANT"
@@ -16979,7 +16980,8 @@
      "moves": [
       "BULKUP",
       "LEER",
-      "KARATECHOP"
+      "KARATECHOP",
+      "LOWKICK"
      ],
      "nature": "ADAMANT",
      "species": "MACHOP"
@@ -17073,8 +17075,8 @@
      "moves": [
       "ARMTHRUST",
       "VITALTHROW",
-      "BULKUP",
-      "FORCEPALM"
+      "REVERSAL",
+      "BULKUP"
      ],
      "nature": "ADAMANT",
      "species": "MAKUHITA"
@@ -17435,8 +17437,8 @@
      "moves": [
       "HYDROPUMP",
       "BLIZZARD",
-      "FEATHERDANCE",
-      "BUBBLEBEAM"
+      "GRASSKNOT",
+      "FEATHERDANCE"
      ],
      "nature": "MODEST",
      "species": "EMPOLEON"
@@ -17487,7 +17489,7 @@
       "KARATECHOP",
       "STRENGTH",
       "ROCKTOMB",
-      "LEER"
+      "LOWKICK"
      ],
      "nature": "ADAMANT",
      "species": "MACHOKE"
@@ -17642,8 +17644,8 @@
      "moves": [
       "DOUBLETEAM",
       "FACADE",
-      "WINGATTACK",
-      "QUICKATTACK"
+      "ENDEAVOR",
+      "WINGATTACK"
      ],
      "nature": "JOLLY",
      "species": "TAILLOW"
@@ -17721,8 +17723,8 @@
      "level": 42,
      "moves": [
       "THUNDERBOLT",
+      "SONICBOOM",
       "THUNDERWAVE",
-      "SWIFT",
       "THUNDERSHOCK"
      ],
      "nature": "MODEST",
@@ -17779,8 +17781,8 @@
      "moves": [
       "EARTHQUAKE",
       "TOXIC",
-      "BUGBITE",
-      "TAKEDOWN"
+      "GYROBALL",
+      "BUGBITE"
      ],
      "nature": "ADAMANT",
      "species": "FORRETRESS"
@@ -17903,7 +17905,7 @@
       "XSCISSOR",
       "ROCKTOMB",
       "EARTHQUAKE",
-      "VICEGRIP"
+      "GUILLOTINE"
      ],
      "nature": "JOLLY",
      "species": "PINSIR"
@@ -18279,8 +18281,8 @@
      "moves": [
       "BOUNCE",
       "TOXIC",
-      "POISONJAB",
-      "BUGBITE"
+      "NIGHTSHADE",
+      "POISONJAB"
      ],
      "nature": "ADAMANT",
      "species": "ARIADOS"
@@ -18516,9 +18518,9 @@
      "level": 23,
      "moves": [
       "POWERWHIP",
-      "FLASHCANNON",
-      "TACKLE",
-      "METALCLAW"
+      "LEECHSEED",
+      "GYROBALL",
+      "FLASHCANNON"
      ],
      "nature": "ADAMANT",
      "species": "FERROSEED"
@@ -18555,7 +18557,7 @@
      "moves": [
       "GIGADRAIN",
       "HURRICANE",
-      "FAIRYWIND",
+      "LEECHSEED",
       "RAZORLEAF"
      ],
      "nature": "MODEST",
@@ -18572,9 +18574,9 @@
      "iv": 31,
      "level": 27,
      "moves": [
+      "LEECHSEED",
       "COTTONGUARD",
       "GIGADRAIN",
-      "SLEEPPOWDER",
       "MEGADRAIN"
      ],
      "nature": "TIMID",
@@ -18947,7 +18949,7 @@
       "LAVAPLUME",
       "BODYPRESS",
       "SOLARBEAM",
-      "ERUPTION"
+      "GYROBALL"
      ],
      "nature": "MODEST",
      "species": "TORKOAL"
@@ -19517,10 +19519,10 @@
      "moves": [
       "BODYSLAM",
       "CRUNCH",
-      "HYPERBEAM",
-      "DOUBLEEDGE"
+      "HEAVYSLAM",
+      "HYPERBEAM"
      ],
-     "nature": "ADAMANT",
+     "nature": "LONELY",
      "species": "SNORLAX"
     }
    ],
@@ -19723,8 +19725,8 @@
      "moves": [
       "MEGAHORN",
       "ROCKTOMB",
-      "CLOSECOMBAT",
-      "THRASH"
+      "REVERSAL",
+      "CLOSECOMBAT"
      ],
      "nature": "JOLLY",
      "species": "HERACROSS"
@@ -19782,8 +19784,8 @@
      "level": 83,
      "moves": [
       "SHADOWBALL",
+      "RETURN",
       "AERIALACE",
-      "DIG",
       "PHANTOMFORCE"
      ],
      "nature": "ADAMANT",
@@ -19875,9 +19877,9 @@
      "level": 81,
      "moves": [
       "DRAGONDANCE",
-      "HYPERBEAM",
+      "RETURN",
       "HYDROPUMP",
-      "BITE"
+      "HYPERBEAM"
      ],
      "nature": "TIMID",
      "species": "GYARADOS"
@@ -19949,8 +19951,8 @@
      "moves": [
       "LASTRESORT",
       "DISARMINGVOICE",
-      "DOUBLEEDGE",
-      "TAKEDOWN"
+      "FLING",
+      "DOUBLEEDGE"
      ],
      "nature": "LONELY",
      "species": "BLISSEY"
@@ -20048,9 +20050,9 @@
      "level": 83,
      "moves": [
       "ICEBEAM",
+      "HORNDRILL",
       "HYDROPUMP",
-      "BODYSLAM",
-      "WATERGUN"
+      "BODYSLAM"
      ],
      "nature": "MODEST",
      "species": "LAPRAS"
@@ -20272,7 +20274,7 @@
       "DRAGONPULSE",
       "AIRSLASH",
       "DARKPULSE",
-      "WINGATTACK"
+      "SUPERFANG"
      ],
      "nature": "MODEST",
      "species": "NOIBAT"
@@ -20398,10 +20400,10 @@
      "moves": [
       "HEADBUTT",
       "POISONPOWDER",
-      "MEGADRAIN",
-      "SEEDBOMB"
+      "LEECHSEED",
+      "MEGADRAIN"
      ],
-     "nature": "ADAMANT",
+     "nature": "LONELY",
      "species": "SHROOMISH"
     },
     {
@@ -20525,10 +20527,10 @@
      "moves": [
       "HEADBUTT",
       "POISONPOWDER",
-      "MEGADRAIN",
-      "SEEDBOMB"
+      "LEECHSEED",
+      "MEGADRAIN"
      ],
-     "nature": "ADAMANT",
+     "nature": "LONELY",
      "species": "SHROOMISH"
     },
     {
@@ -21198,7 +21200,7 @@
       "HYDROPUMP",
       "FLASHCANNON",
       "ICEBEAM",
-      "BUBBLEBEAM"
+      "GRASSKNOT"
      ],
      "nature": "MODEST",
      "species": "PRINPLUP"
@@ -21734,10 +21736,10 @@
      "iv": 31,
      "level": 22,
      "moves": [
+      "RETURN",
       "DREAMEATER",
       "PSYCHIC",
-      "PSYBEAM",
-      "STOREDPOWER"
+      "PSYBEAM"
      ],
      "nature": "MODEST",
      "species": "MUNNA"
@@ -21753,10 +21755,10 @@
      "iv": 31,
      "level": 23,
      "moves": [
+      "RETURN",
       "ICEFANG",
       "SURF",
-      "WILDCHARGE",
-      "RETALIATE"
+      "WILDCHARGE"
      ],
      "nature": "ADAMANT",
      "species": "HERDIER"
@@ -21772,10 +21774,10 @@
      "iv": 31,
      "level": 24,
      "moves": [
+      "RETURN",
       "SHADOWBALL",
       "OVERHEAT",
-      "PSYCHIC",
-      "HEX"
+      "PSYCHIC"
      ],
      "nature": "MODEST",
      "species": "LITWICK"
@@ -21791,10 +21793,10 @@
      "iv": 31,
      "level": 26,
      "moves": [
+      "RETURN",
       "DRAINPUNCH",
       "UTURN",
-      "FAKEOUT",
-      "FORCEPALM"
+      "FAKEOUT"
      ],
      "nature": "ADAMANT",
      "species": "MIENFOO"
@@ -21802,20 +21804,20 @@
     {
      "ability": "GLUTTONY",
      "evs": {
-      "hp": 7,
-      "spa": 7
+      "atk": 7,
+      "hp": 7
      },
      "gender": "M",
      "held": null,
      "iv": 31,
      "level": 27,
      "moves": [
+      "RETURN",
       "FLAMETHROWER",
       "ROCKSLIDE",
-      "BRICKBREAK",
-      "FLAMEBURST"
+      "BRICKBREAK"
      ],
-     "nature": "MILD",
+     "nature": "LONELY",
      "species": "PANSEAR"
     },
     {
@@ -21829,10 +21831,10 @@
      "iv": 31,
      "level": 28,
      "moves": [
+      "RETURN",
       "AERIALACE",
       "XSCISSOR",
-      "AQUATAIL",
-      "RAZORSHELL"
+      "AQUATAIL"
      ],
      "nature": "ADAMANT",
      "species": "DEWOTT"
@@ -21904,8 +21906,8 @@
      "moves": [
       "NIGHTDAZE",
       "HYPERVOICE",
-      "FOULPLAY",
-      "NIGHTSLASH"
+      "GRASSKNOT",
+      "FOULPLAY"
      ],
      "nature": "MILD",
      "species": "ZOROARK"
@@ -22037,8 +22039,8 @@
      "moves": [
       "HAMMERARM",
       "EARTHQUAKE",
-      "CRUNCH",
-      "HYPERBEAM"
+      "HEAVYSLAM",
+      "CRUNCH"
      ],
      "nature": "ADAMANT",
      "species": "SNORLAX"
@@ -22303,8 +22305,8 @@
     {
      "ability": "POISONPOINT",
      "evs": {
-      "hp": 7,
-      "spa": 7
+      "atk": 7,
+      "hp": 7
      },
      "gender": "F",
      "held": "BRIGHTPOWDER",
@@ -22312,11 +22314,11 @@
      "level": 26,
      "moves": [
       "SHADOWBALL",
+      "LEECHSEED",
       "PETALBLIZZARD",
-      "POISONJAB",
-      "VENOSHOCK"
+      "POISONJAB"
      ],
-     "nature": "MILD",
+     "nature": "LONELY",
      "species": "BUDEW"
     },
     {
@@ -22441,7 +22443,7 @@
       "CHARM",
       "PLAYROUGH",
       "FEINTATTACK",
-      "DOUBLEEDGE"
+      "RETURN"
      ],
      "nature": "JOLLY",
      "species": "DELCATTY"
@@ -22830,8 +22832,8 @@
      "moves": [
       "CRUNCH",
       "HYPERFANG",
-      "TACKLE",
-      "BITE"
+      "SUPERFANG",
+      "TACKLE"
      ],
      "nature": "ADAMANT",
      "species": "GUMSHOOS"
@@ -23843,8 +23845,8 @@
     {
      "ability": "TANGLEDFEET",
      "evs": {
-      "atk": 126,
       "hp": 3,
+      "spa": 126,
       "spe": 126
      },
      "gender": "F",
@@ -23852,12 +23854,12 @@
      "iv": 31,
      "level": 100,
      "moves": [
+      "RETURN",
       "DOUBLETEAM",
       "AIRSLASH",
-      "STEELWING",
-      "WINGATTACK"
+      "STEELWING"
      ],
-     "nature": "NAUGHTY",
+     "nature": "RASH",
      "species": "PIDGEOT"
     },
     {
@@ -23986,11 +23988,11 @@
      "level": 72,
      "moves": [
       "ICEPUNCH",
+      "LEECHSEED",
       "LEAFSTORM",
-      "EARTHQUAKE",
-      "WOODHAMMER"
+      "EARTHQUAKE"
      ],
-     "nature": "ADAMANT",
+     "nature": "LONELY",
      "species": "ABOMASNOW"
     },
     {
@@ -24167,9 +24169,9 @@
      "iv": 31,
      "level": 17,
      "moves": [
+      "SUPERFANG",
       "HOWL",
       "SUCKERPUNCH",
-      "TACKLE",
       "BITE"
      ],
      "nature": "ADAMANT",
@@ -25212,7 +25214,7 @@
       "CROSSPOISON",
       "ZENHEADBUTT",
       "XSCISSOR",
-      "AIRSLASH"
+      "SUPERFANG"
      ],
      "nature": "JOLLY",
      "species": "CROBAT"
@@ -25917,8 +25919,8 @@
      "moves": [
       "PSYSHOCK",
       "PSYBEAM",
-      "CONFUSION",
-      "CHARM"
+      "ENDEAVOR",
+      "CONFUSION"
      ],
      "nature": "MODEST",
      "species": "SOLOSIS"
@@ -26160,10 +26162,10 @@
      "iv": 31,
      "level": 61,
      "moves": [
+      "SUPERFANG",
       "THUNDER",
       "DAZZLINGGLEAM",
-      "CHARM",
-      "PLAYROUGH"
+      "CHARM"
      ],
      "nature": "TIMID",
      "species": "DEDENNE"
@@ -26497,6 +26499,7 @@
      "moves": [
       "VINEWHIP",
       "TACKLE",
+      "LEECHSEED",
       "GROWL"
      ],
      "nature": "ADAMANT",
@@ -26679,9 +26682,9 @@
      "iv": 31,
      "level": 47,
      "moves": [
+      "GYROBALL",
       "EXTRASENSORY",
       "PAYBACK",
-      "WEATHERBALL",
       "CONFUSION"
      ],
      "nature": "MODEST",
@@ -27950,9 +27953,9 @@
      "iv": 31,
      "level": 49,
      "moves": [
+      "GYROBALL",
       "EXTRASENSORY",
       "SHADOWBALL",
-      "PAYBACK",
       "FUTURESIGHT"
      ],
      "nature": "MODEST",
@@ -28625,8 +28628,8 @@
      "moves": [
       "FLAMETHROWER",
       "CLEARSMOG",
-      "LAVAPLUME",
-      "FIREPUNCH"
+      "LOWKICK",
+      "LAVAPLUME"
      ],
      "nature": "TIMID",
      "species": "MAGMORTAR"
@@ -28890,9 +28893,9 @@
      "level": 71,
      "moves": [
       "HURRICANE",
+      "SUPERFANG",
       "DRAGONPULSE",
-      "FLAMETHROWER",
-      "BOOMBURST"
+      "FLAMETHROWER"
      ],
      "nature": "TIMID",
      "species": "NOIVERN"
@@ -29037,10 +29040,10 @@
      "iv": 31,
      "level": 42,
      "moves": [
+      "NIGHTSHADE",
       "WINGATTACK",
       "ASTONISH",
-      "PURSUIT",
-      "FOULPLAY"
+      "PURSUIT"
      ],
      "nature": "JOLLY",
      "species": "MURKROW"
@@ -29152,7 +29155,7 @@
       "EARTHPOWER",
       "EXTRASENSORY",
       "ANCIENTPOWER",
-      "HYPERBEAM"
+      "GRASSKNOT"
      ],
      "nature": "TIMID",
      "species": "CLAYDOL"
@@ -29563,12 +29566,12 @@
      "iv": 31,
      "level": 27,
      "moves": [
+      "GYROBALL",
       "EXTRASENSORY",
       "ROCKSLIDE",
-      "PAYBACK",
       "CONFUSION"
      ],
-     "nature": "MILD",
+     "nature": "MODEST",
      "species": "BRONZOR"
     },
     {
@@ -29695,10 +29698,10 @@
      "iv": 31,
      "level": 82,
      "moves": [
+      "CRUSHGRIP",
       "EARTHQUAKE",
       "STONEEDGE",
-      "DRAINPUNCH",
-      "GIGAIMPACT"
+      "DRAINPUNCH"
      ],
      "nature": "JOLLY",
      "species": "REGIGIGAS"
@@ -29848,10 +29851,10 @@
      "iv": 31,
      "level": 98,
      "moves": [
+      "HEAVYSLAM",
       "PLAYROUGH",
       "SUPERPOWER",
-      "IRONHEAD",
-      "HIGHHORSEPOWER"
+      "IRONHEAD"
      ],
      "nature": "ADAMANT",
      "species": "COPPERAJAH"
@@ -30066,6 +30069,7 @@
      "moves": [
       "SHADOWPUNCH",
       "LICK",
+      "NIGHTSHADE",
       "HYPNOSIS"
      ],
      "nature": "JOLLY",
@@ -30307,9 +30311,9 @@
      "iv": 31,
      "level": 64,
      "moves": [
+      "HEAVYSLAM",
       "AMNESIA",
       "EARTHQUAKE",
-      "DOUBLEEDGE",
       "DIG"
      ],
      "nature": "ADAMANT",
@@ -30535,7 +30539,7 @@
      "moves": [
       "HYDROPUMP",
       "RECOVER",
-      "DRAGONTAIL",
+      "FLAIL",
       "SURF"
      ],
      "nature": "TIMID",
@@ -30553,10 +30557,10 @@
      "iv": 31,
      "level": 78,
      "moves": [
+      "LEECHSEED",
       "PETALDANCE",
       "STUNSPORE",
-      "LEAFSTORM",
-      "ENERGYBALL"
+      "LEAFSTORM"
      ],
      "nature": "TIMID",
      "species": "LILLIGANT"
@@ -30725,7 +30729,7 @@
       "SEEDBOMB",
       "BITE",
       "FURYSWIPES",
-      "VINEWHIP"
+      "LEECHSEED"
      ],
      "nature": "ADAMANT",
      "species": "PANSAGE"
@@ -30852,7 +30856,7 @@
       "SEEDBOMB",
       "BITE",
       "FURYSWIPES",
-      "VINEWHIP"
+      "LEECHSEED"
      ],
      "nature": "ADAMANT",
      "species": "PANSAGE"
@@ -30961,8 +30965,8 @@
      "level": 74,
      "moves": [
       "EXTRASENSORY",
+      "GYROBALL",
       "HYPNOSIS",
-      "PAYBACK",
       "FUTURESIGHT"
      ],
      "nature": "MODEST",
@@ -31052,6 +31056,7 @@
      "iv": 31,
      "level": 22,
      "moves": [
+      "PRESENT",
       "AIRCUTTER",
       "FROSTBREATH"
      ],
@@ -31069,10 +31074,10 @@
      "iv": 31,
      "level": 23,
      "moves": [
+      "PUNISHMENT",
       "ROOST",
       "PLUCK",
-      "GUST",
-      "LEER"
+      "GUST"
      ],
      "nature": "NAUGHTY",
      "species": "VULLABY"
@@ -31128,8 +31133,8 @@
      "moves": [
       "SOLARBEAM",
       "CHARM",
-      "GIGADRAIN",
-      "MAGICALLEAF"
+      "LEECHSEED",
+      "GIGADRAIN"
      ],
      "nature": "MODEST",
      "species": "PETILIL"
@@ -31554,9 +31559,9 @@
      "level": 77,
      "moves": [
       "ZENHEADBUTT",
+      "REVERSAL",
       "FAKEOUT",
-      "HIGHJUMPKICK",
-      "AXEKICK"
+      "HIGHJUMPKICK"
      ],
      "nature": "JOLLY",
      "species": "MEDICHAM"
@@ -31564,9 +31569,9 @@
     {
      "ability": "PRESSURE",
      "evs": {
+      "atk": 94,
       "def": 2,
-      "hp": 94,
-      "spa": 94
+      "hp": 94
      },
      "gender": "F",
      "held": null,
@@ -31574,11 +31579,11 @@
      "level": 78,
      "moves": [
       "SHADOWPUNCH",
+      "FLING",
       "WILLOWISP",
-      "FUTURESIGHT",
       "SHADOWBALL"
      ],
-     "nature": "MILD",
+     "nature": "LONELY",
      "species": "DUSKNOIR"
     },
     {
@@ -31728,10 +31733,10 @@
      "moves": [
       "FIREFANG",
       "THUNDERFANG",
-      "FOULPLAY",
-      "FLAMETHROWER"
+      "REVERSAL",
+      "FOULPLAY"
      ],
-     "nature": "LONELY",
+     "nature": "JOLLY",
      "species": "HOUNDOOM"
     },
     {
@@ -31786,9 +31791,9 @@
      "iv": 31,
      "level": 83,
      "moves": [
+      "ENDEAVOR",
       "AERIALACE",
       "QUICKATTACK",
-      "CLOSECOMBAT",
       "BRAVEBIRD"
      ],
      "nature": "JOLLY",
@@ -31922,7 +31927,7 @@
       "CLOSECOMBAT",
       "STONEEDGE",
       "EARTHQUAKE",
-      "FOCUSPUNCH"
+      "HEAVYSLAM"
      ],
      "nature": "ADAMANT",
      "species": "HARIYAMA"
@@ -32008,7 +32013,8 @@
      "moves": [
       "HYPNOSIS",
       "LICK",
-      "SHADOWPUNCH"
+      "SHADOWPUNCH",
+      "NIGHTSHADE"
      ],
      "nature": "JOLLY",
      "species": "HAUNTER"
@@ -32043,10 +32049,10 @@
      "iv": 31,
      "level": 38,
      "moves": [
+      "SONICBOOM",
       "ROLLOUT",
       "SCREECH",
-      "THUNDER",
-      "TACKLE"
+      "THUNDER"
      ],
      "nature": "TIMID",
      "species": "ELECTRODE"
@@ -32097,9 +32103,9 @@
      "level": 63,
      "moves": [
       "EARTHQUAKE",
+      "HEAVYSLAM",
       "STONEEDGE",
-      "BODYPRESS",
-      "HIGHHORSEPOWER"
+      "BODYPRESS"
      ],
      "nature": "ADAMANT",
      "species": "MUDSDALE"
@@ -32399,11 +32405,11 @@
      "level": 67,
      "moves": [
       "BODYPRESS",
+      "LEECHSEED",
       "GIGADRAIN",
-      "BODYSLAM",
       "PETALDANCE"
      ],
-     "nature": "MILD",
+     "nature": "TIMID",
      "species": "MEGANIUM"
     },
     {
@@ -32772,8 +32778,8 @@
      "level": 71,
      "moves": [
       "PSYCHIC",
+      "GRASSKNOT",
       "SHADOWBALL",
-      "POUND",
       "FUTURESIGHT"
      ],
      "nature": "MODEST",
@@ -32812,9 +32818,9 @@
      "level": 73,
      "moves": [
       "THUNDER",
+      "GRASSKNOT",
       "FOCUSBLAST",
-      "SURF",
-      "THUNDERPUNCH"
+      "SURF"
      ],
      "nature": "TIMID",
      "species": "RAICHU"
@@ -32865,9 +32871,9 @@
      "level": 73,
      "moves": [
       "TEMPERFLARE",
+      "HEAVYSLAM",
       "BODYPRESS",
-      "STONEEDGE",
-      "ANCIENTPOWER"
+      "STONEEDGE"
      ],
      "nature": "ADAMANT",
      "species": "COALOSSAL"
@@ -32884,10 +32890,10 @@
      "iv": 31,
      "level": 74,
      "moves": [
+      "HEAVYSLAM",
       "BODYPRESS",
       "STONEEDGE",
-      "EARTHQUAKE",
-      "ROCKSLIDE"
+      "EARTHQUAKE"
      ],
      "nature": "JOLLY",
      "species": "STONJOURNER"
@@ -33040,7 +33046,7 @@
       "DRAGONPULSE",
       "AIRSLASH",
       "SHADOWBALL",
-      "BOOMBURST"
+      "SUPERFANG"
      ],
      "nature": "TIMID",
      "species": "NOIVERN"
@@ -33378,8 +33384,8 @@
      "moves": [
       "LASTRESORT",
       "DISARMINGVOICE",
-      "DOUBLEEDGE",
-      "TAKEDOWN"
+      "FLING",
+      "DOUBLEEDGE"
      ],
      "nature": "LONELY",
      "species": "BLISSEY"

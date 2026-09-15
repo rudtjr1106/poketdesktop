@@ -23,6 +23,7 @@ IMPLEMENTED 에 들어 있는 것만 동작한다.
   · 특성이 발동하면 {"t": "ability"} 이벤트를 먼저 낸다. 화면이 "[갸라도스의
     위협]" 처럼 띄운다.
 """
+from . import movecalc as MC
 
 MOLD_BREAKERS = {"MOLDBREAKER", "TERAVOLT", "TURBOBLAZE"}
 
@@ -168,7 +169,7 @@ def aims_at_foe(move):
 
 
 def is_status(move):
-    return (move.get("cat") == "status") or not move.get("power")
+    return (move.get("cat") == "status") or not MC.attacks(move)
 
 
 def has_secondary(move):
@@ -709,7 +710,7 @@ def flinch_immune(user, target):
 
 
 def stench(user, move):
-    return has(user, "STENCH") and move.get("power") and not move.get("flinch")
+    return has(user, "STENCH") and MC.attacks(move) and not move.get("flinch")
 
 
 def on_flinch(bt, f, who, ev):

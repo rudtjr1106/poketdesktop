@@ -21,6 +21,7 @@ PokeAPI 는 도구의 **이름·설명·가격**만 준다. 무엇을 하는지�
 훅은 battle.Battle 이 정해진 자리에서 부른다. 각 훅은 먼저 도구가
 있는지만 보고 없으면 바로 돌아간다 - 위 규칙 1 이다.
 """
+from . import movecalc as MC
 
 # 도구 id -> 한글 이름. 로그의 문구에 쓴다. 서버의 items.json 과 같은
 # 출처(PokeAPI CSV)라 build_items 가 어긋나면 검사에서 잡힌다.
@@ -353,7 +354,7 @@ def after_hit(bt, user, who, target, who_t, move, eff, total, ev):
 
 def flinch(bt, user, target, move):
     """왕의징표석·예리한이빨. 기술에 이미 풀죽음이 있으면 안 겹친다."""
-    if user.held in FLINCH_10 and target.alive() and move.get("power") \
+    if user.held in FLINCH_10 and target.alive() and MC.attacks(move) \
             and not move.get("flinch") and bt.rng.random() < 0.1:
         target.flinched = True
 

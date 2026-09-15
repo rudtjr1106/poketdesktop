@@ -56,6 +56,7 @@ import random
 from . import abilities as A
 from . import battle as B
 from . import held as H
+from . import movecalc as MC
 
 TEAM_MAX = 6
 MAX_TURNS = 400
@@ -69,14 +70,14 @@ KO_ROLL = 0.95
 def works(md):
     """이 엔진에서 뭔가 일어나는 기술인가.
 
-    방어·대타출동·잠자기·씨뿌리기·날씨·도발, 위력이 정해지지 않은 기술(헤비봄버·
-    은혜갚기·풀묶기)은 battle.py 가 처리하지 않아서 턴만 버린다.
+    방어·대타출동·잠자기·날씨·도발 같은 것은 battle.py 가 처리하지 않아서 턴만 버린다.
+    위력이 공식으로 정해지는 기술(안다리걸기·나이트헤드 ...)과 씨뿌리기는 이제 된다.
     """
     if not md:
         return False
-    if md.get("power") or md.get("heal"):
+    if MC.attacks(md) or md.get("heal"):
         return True
-    if md.get("ail") in B.HANDLED_STATUS:
+    if md.get("ail") in B.HANDLED_STATUS or md.get("ail") == "leech-seed":
         return True
     self_target = bool(md.get("statSelf"))
     # 나를 올리거나 상대를 내리는 것. 재주넘기처럼 상대를 올리는 것은 손해다.
@@ -99,6 +100,7 @@ def trainer_mon(entry):
         "moves": list(entry.get("moves") or []), "held": entry.get("held"),
         "gender": entry.get("gender") or "N", "shiny": False, "nickname": None,
         "statBoost": entry.get("boost"),
+        "happiness": 255,           # 잘 키운 포켓몬 - 은혜갚기가 제 위력(102)으로 들어간다
     }
 
 
@@ -133,6 +135,7 @@ class TrainerBattle(object):
         self.mi = next(i for i, f in enumerate(self.me_team) if f.alive())
         self.fi = 0
         self.bt = Duel(dex, self.me_team[self.mi], self.foe_team[self.fi], self.rng, ai="trainer")
+        self.bt.teams = {"me": self.me_team, "foe": self.foe_team}    # 집단폭행
         self.bt.foe_prefix = "상대 "
         self.bt.max_turns = 10 ** 9            # 끝내는 건 여기서 한다
         self.turn = 0
@@ -222,6 +225,7 @@ class TrainerBattle(object):
         old.flinched = False
         old.locked = None
         old.types_override = None
+        old.clear_volatile()                    # 씨뿌리기·참기·비축은 물러나면 풀린다
         if who == "me":
             self.mi = slot
             self.bt.me = team[slot]
@@ -238,10 +242,12 @@ class TrainerBattle(object):
     def _est(self, user, target, key):
         """급소·난수 없이 이 기술이 줄 데미지. 명중률은 곱하지 않는다."""
         md = self.bt.move_of(key)
-        if not md.get("power") or A.would_block(user, target, md):
+        if not MC.attacks(md) or A.would_block(user, target, md):
             return 0.0
         d, _crit, _eff = B.damage(self.dex, md, user, target, B.EST_RNG, crit=False)
         lo, hi = ((md.get("hits") or [1, 1]) + [1, 1])[:2]
+        if MC.key(md) == "BEATUP" or MC.key(md) in MC.FIXED:
+            hi = 1
         if hi > 1:
             d *= B.HITS_AVG if (lo, hi) == (2, 5) else (lo + hi) / 2.0
         return float(d)
@@ -249,6 +255,12 @@ class TrainerBattle(object):
     @staticmethod
     def _acc(md):
         return ((md or {}).get("acc") or 100) / 100.0
+
+    def _hit_rate(self, md, user, target):
+        """맞힐 확률. 일격기는 레벨 차이로 정해진다."""
+        if MC.key(md) in MC.OHKO:
+            return MC.ohko_accuracy(md, user, target) / 100.0
+        return self._acc(md)
 
     def _pool(self, f):
         pool = self.bt.usable(f)
@@ -260,7 +272,7 @@ class TrainerBattle(object):
         if not user.alive() or not target.alive():
             return best, best_k
         for k in self._pool(user):
-            d = self._est(user, target, k) * self._acc(self.bt.move_of(k))
+            d = self._est(user, target, k) * self._hit_rate(self.bt.move_of(k), user, target)
             if d > best:
                 best, best_k = d, k
         return best, best_k
@@ -287,14 +299,15 @@ class TrainerBattle(object):
         rows, dmg_best, main = [], 0.0, None
         for k in pool:
             md = bt.move_of(k)
-            if not md.get("power"):
+            if not MC.attacks(md):
                 rows.append([k, None, md])
                 continue
             d = self._est(user, target, k)
             if d <= 0:
                 rows.append([k, 0.0, md])
                 continue
-            acc = self._acc(md)
+            acc = self._hit_rate(md, user, target)
+            ohko = MC.key(md) in MC.OHKO
             first = self._first(user, target, md, their_md)
             dealt = min(d, target.hp)
             score = dealt * acc
@@ -306,7 +319,9 @@ class TrainerBattle(object):
                 score += dealt * back / 100.0 * 0.3
             if md.get("statSelf") and any(c < 0 for _st, c in (md.get("stat") or [])):
                 score *= 0.9                               # 인파이트·용성군 (내 능력이 떨어진다)
-            if d * KO_ROLL >= target.hp:
+            if ohko:
+                score = target.hp * acc                    # 맞으면 끝, 명중률이 곧 값이다
+            elif d * KO_ROLL >= target.hp:
                 score = target.hp * acc * (3.0 if first else 1.6)
             if their_ko and not first:
                 score *= 0.35                              # 쓰기 전에 쓰러질 공산이 크다
@@ -343,6 +358,17 @@ class TrainerBattle(object):
             value += self._ail_value(user, target, ail, base)
         if md.get("stat") and not can_ko:
             value += self._stat_value(user, target, md, base, main, their_d, their_md)
+        if md.get("ail") == "leech-seed" and not can_ko:
+            types = target.types()
+            if not target.seeded and "GRASS" not in types:
+                # 턴마다 1/8 을 빼앗는다. 판이 길수록 값을 한다.
+                lasts = user.hp / their_d if their_d > 0 else 9.0
+                value += base * 0.7 * max(0.0, min(1.0, (lasts - 1.0) / 2.0))
+        mk = MC.key(md)
+        if mk == "SWALLOW" and not user.stockpile:
+            return 0.0
+        if mk == "STOCKPILE" and user.stockpile >= 3:
+            return 0.0
         heal = md.get("heal") or 0
         if heal and user.hp < user.maxhp:
             amount = min(user.maxhp - user.hp, user.maxhp * heal / 100.0)
@@ -514,6 +540,7 @@ class TrainerBattle(object):
         self.turn += 1
         self.bt.turn_no = self.turn
         bt = self.bt
+        bt.begin_turn()
         me_move = None
         foe_move = None
 
@@ -666,7 +693,7 @@ class TrainerBattle(object):
     def _dump_fighter(f):
         return {"mon": f.mon, "hp": f.hp, "pp": f.pp, "status": f.status,
                 "stages": f.stages, "sleep": f.sleep_turns, "held": f.held_state(),
-                "abil": A.state(f)}
+                "abil": A.state(f), "vol": f.volatile()}
 
     def _load_fighter(self, d):
         f = B.Fighter(self.dex, d["mon"], d["hp"], d["pp"], d["status"])
@@ -675,6 +702,7 @@ class TrainerBattle(object):
         f.load_held(d.get("held"))
         f.ability_on = True
         A.load(f, d.get("abil"))
+        f.load_volatile(d.get("vol"))
         return f
 
     def dump(self):
@@ -702,6 +730,7 @@ class TrainerBattle(object):
         self.foe_team = [self._load_fighter(x) for x in d["foe"]]
         self.mi, self.fi = d["mi"], d["fi"]
         self.bt = Duel(dex, self.me_team[self.mi], self.foe_team[self.fi], self.rng, ai="trainer")
+        self.bt.teams = {"me": self.me_team, "foe": self.foe_team}    # 집단폭행
         self.bt.foe_prefix = "상대 "
         self.bt.max_turns = 10 ** 9
         self.turn = d["turn"]

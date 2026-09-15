@@ -93,6 +93,9 @@ jobs:
       # 야생 자동 전투의 잡기 모드: 쓰러뜨리지 않고 멈추는가, 잠재우기·마비를 먼저 거는가
       - name: 잡기 모드 (엔진)
         run: python common/test_spare.py
+      # 위력이 공식으로 정해지는 기술(안다리걸기·나이트헤드·카운터 ...)과 씨뿌리기
+      - name: 원작 공식 기술 (엔진)
+        run: python common/test_special_moves.py
       # 먼 섬(울릉군·백령도·추자도)을 원래 쪽으로 당겨 그리는가, 이름표 자리
       - name: 관장 지도 배치
         run: python client/test_gym_map.py
@@ -286,6 +289,7 @@ jobs:
           python test_anim.py
           python test_tms.py
           python test_evolution.py
+          python test_battle_state.py
 
       - name: 서버 띄우기
         env:

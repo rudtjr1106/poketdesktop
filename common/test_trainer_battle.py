@@ -508,8 +508,10 @@ def t_상대_AI(dex, gyms):
 
     # 자료
     chk("아무 일도 안 하는 기술을 가려낸다",
-        [TB.works(dex.move(k)) for k in ("PROTECT", "SUBSTITUTE", "HEAVYSLAM", "SWAGGER", "SWORDSDANCE", "WILLOWISP", "GROWL", "RECOVER")]
-        == [False, False, False, False, True, True, True, True])
+        [TB.works(dex.move(k)) for k in ("PROTECT", "SUBSTITUTE", "RAINDANCE", "SWAGGER",
+                                         "SWORDSDANCE", "WILLOWISP", "GROWL", "RECOVER",
+                                         "HEAVYSLAM", "NIGHTSHADE", "LEECHSEED", "COUNTER")]
+        == [False, False, False, False, True, True, True, True, True, True, True, True])
     dead = [(t["name"], m["species"], k) for t in gyms["trainers"] for m in t["team"]
             for k in m["moves"] if not TB.works(dex.move(k))]
     chk("관장 포켓몬에 헛기술이 없다", not dead, dead[:5])

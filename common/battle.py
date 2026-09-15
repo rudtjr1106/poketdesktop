@@ -18,6 +18,7 @@ import random
 
 from . import abilities as A
 from . import held as H
+from . import movecalc as MC
 from . import pokelogic as P
 
 # ---------------------------------------------------------------- 상수
@@ -149,10 +150,47 @@ class Fighter(object):
         self.ability_on = False
         self.ab = {}                 # 이 판에서 특성이 기억할 것 (타오르는불꽃, 탈 ...)
         self.types_override = None   # 변환자재가 바꾼 타입
+        # 기술이 남기는 것 (volatile() 로 저장한다)
+        self.seeded = False          # 씨뿌리기에 걸렸다. 물러나면 풀린다
+        self.bide = None             # 참기: {"left": 남은 턴, "sum": 모은 데미지}
+        self.stockpile = 0           # 비축하기 횟수 (0~3)
+        self.item_gone = False       # 내던지기·자연의은혜로 도구를 썼다 (이 판에서만)
+        # 이 턴에 상대에게 맞은 데미지 (카운터·미러코트·메탈버스트, 눈사태·리벤지).
+        # 턴이 시작할 때 비운다 - 저장하지 않는다.
+        self.hurt = None
 
     # ---- 상태 ----
     def alive(self):
         return self.hp > 0
+
+    def volatile(self):
+        """기술이 남긴 상태. 턴마다 잤다 깨는 배틀(야생·관장)이 같이 저장한다."""
+        out = {}
+        if self.seeded:
+            out["seeded"] = True
+        if self.bide:
+            out["bide"] = dict(self.bide)
+        if self.stockpile:
+            out["stockpile"] = self.stockpile
+        if self.item_gone:
+            out["itemGone"] = True
+        return out or None
+
+    def load_volatile(self, d):
+        d = d or {}
+        self.seeded = bool(d.get("seeded"))
+        self.bide = dict(d["bide"]) if d.get("bide") else None
+        self.stockpile = int(d.get("stockpile") or 0)
+        self.item_gone = bool(d.get("itemGone"))
+        if self.item_gone:
+            self.held = None                 # 이 판에서는 도구 효과도 없다 (DB 의 도구는 그대로)
+
+    def clear_volatile(self):
+        """물러날 때 풀리는 것. 던진 도구는 돌아오지 않는다."""
+        self.seeded = False
+        self.bide = None
+        self.stockpile = 0
+        self.hurt = None
 
     def dex_move_name(self, key):
         return self._dex.move_name(key)
@@ -219,12 +257,28 @@ def accuracy_check(dex, move, user, target, rng):
 
 
 def damage(dex, move, user, target, rng, crit=None):
-    """(데미지, 급소여부, 상성배율) 을 돌려준다."""
+    """(데미지, 급소여부, 상성배율) 을 돌려준다.
+
+    위력이 원작 공식으로 정해지는 기술(안다리걸기·바둥바둥 ...)은 movecalc 가
+    위력을 정하고, 고정 데미지 기술(나이트헤드·분노의앞니·일격기·카운터 ...)은
+    타입 무효만 보고 그 값을 그대로 준다 - 급소·자속·상성 배율이 없다.
+    """
+    move = MC.resolve(move, user, target)
+    abil = user.ability_on or target.ability_on
+    fixed = MC.fixed(move, user, target, rng)
+    if fixed is not None:
+        mtype = A.move_type(user, move) if abil else move.get("type")
+        ttypes = target.types() if abil else ((target.species or {}).get("types") or [])
+        if abil and A.ghost_bypass(user, mtype) and "GHOST" in ttypes:
+            ttypes = [t for t in ttypes if t != "GHOST"]
+        eff = effectiveness(dex, mtype, ttypes)
+        if eff == 0:
+            return 0, False, 0.0
+        return max(0, int(fixed)), False, eff
     power = move.get("power") or 0
     if power <= 0:
         return 0, False, 1.0
     phys = move.get("cat") == "physical"
-    abil = user.ability_on or target.ability_on
     mtype = A.move_type(user, move) if abil else move.get("type")
     if crit is None:
         chance = CRIT_CHANCE
@@ -263,16 +317,17 @@ def damage(dex, move, user, target, rng, crit=None):
             ttypes = [t for t in ttypes if t != "GHOST"]
         eff = effectiveness(dex, mtype, ttypes)
     else:
-        if user.species and move.get("type") in (user.species.get("types") or []):
+        if user.species and mtype in (user.species.get("types") or []):
             mult *= STAB
-        eff = effectiveness(dex, move.get("type"), (target.species or {}).get("types", []))
+        eff = effectiveness(dex, mtype, (target.species or {}).get("types", []))
     mult *= eff
     if crit:
         mult *= CRIT_MULT
         if abil:
             mult *= A.crit_mult(user)
     mult *= rng.uniform(0.85, 1.0)
-    if user.status == "burn" and phys and not (abil and A.ignores_burn(user)):
+    if user.status == "burn" and phys and not (abil and A.ignores_burn(user)) \
+            and MC.key(move) != "FACADE":          # 객기는 화상이어도 반감되지 않는다
         mult *= 0.5
     if user.held:
         mult *= H.damage_mult(user, move, eff)
@@ -367,7 +422,7 @@ class Battle(object):
             weights = []
             for m in pool:
                 md = self.move_of(m)
-                if md.get("power"):
+                if MC.attacks(md):
                     weights.append(2.0)
                 elif self._status_score(md, 1, user, target) > 0:
                     weights.append(1.0)
@@ -386,18 +441,23 @@ class Battle(object):
         best_dmg = 0
         for m in pool:
             md = self.move_of(m)
+            mk = MC.key(md)
             acc = (md.get("acc") or 100) / 100.0
+            if mk in MC.OHKO:
+                acc = MC.ohko_accuracy(md, user, target) / 100.0
             if user.ability_on and A.would_block(user, target, md):
                 # 상대 특성에 빨려 들어가는 기술 (저수에 물 기술, 부유에 땅 기술)
                 scored.append([m, 0.01, md])
                 continue
-            if md.get("power"):
+            if MC.attacks(md):
                 d, _c, _e = damage(self.dex, md, user, target,
                                    EST_RNG, crit=False)
                 # 연속기는 한 번 때리는 게 아니다. 씨앗기관총(위력 25)이
                 # 위력 25 짜리로 평가되어 늘 뒷전으로 밀렸다.
                 hits = md.get("hits") or [1, 1]
                 lo, hi = (hits + [1, 1])[:2]
+                if mk == "BEATUP" or mk in MC.FIXED:
+                    lo = hi = 1                 # 한 대 몫이 아니라 통째로 센다
                 if hi > 1:
                     d *= HITS_AVG if (lo, hi) == (2, 5) else (lo + hi) / 2.0
                 score = d * acc
@@ -414,7 +474,7 @@ class Battle(object):
                 # best_dmg 에 3배가 섞이면 아래 변화기 기준선이 부풀어서
                 # 변화기를 실제보다 덜 쓰게 된다.
                 best_dmg = max(best_dmg, score)
-                if d >= target.hp:          # 이걸로 끝낼 수 있으면 최우선
+                if d >= target.hp and mk not in MC.OHKO:   # 이걸로 끝낼 수 있으면 최우선 (일격기는 명중률이 곧 값이다)
                     score *= 3
             else:
                 score = -1                  # 변화기는 아래에서 다시 매긴다
@@ -458,7 +518,7 @@ class Battle(object):
                 cands = []
                 for m in pool:
                     md = self.move_of(m)
-                    if md.get("power") or md.get("ail") != ail:
+                    if MC.attacks(md) or md.get("ail") != ail:
                         continue
                     if ail == "paralysis" and "ELECTRIC" in types:
                         continue
@@ -484,7 +544,11 @@ class Battle(object):
         best, best_m = 0.0, None
         for m in pool:
             md = self.move_of(m)
-            if not md.get("power"):
+            if not MC.attacks(md):
+                continue
+            mk = MC.key(md)
+            if mk in MC.COUNTERS or mk in MC.PER_USE or mk in ("BIDE", "FINALGAMBIT"):
+                # 고를 때는 얼마나 들어갈지 모른다 (맞은 만큼·무작위·파티 수). 잡을 때는 안 쓴다.
                 continue
             if user.ability_on and A.would_block(user, target, md):
                 continue
@@ -493,8 +557,10 @@ class Battle(object):
             worst, _c, _e = damage(self.dex, md, user, target, MAX_RNG, crit=crit)
             lo, hi = ((md.get("hits") or [1, 1]) + [1, 1])[:2]
             worst *= max(1, hi)
-            # 화상·독이 걸려 있거나 걸 수 있으면 턴 끝에 깎이는 몫까지 친다
+            # 화상·독·씨뿌리기가 걸려 있거나 걸 수 있으면 턴 끝에 깎이는 몫까지 친다
             if target.status in ("burn", "poison") or md.get("ail") in ("burn", "poison"):
+                worst += target.maxhp // 8
+            if target.seeded:
                 worst += target.maxhp // 8
             if worst >= target.hp:
                 continue
@@ -512,6 +578,16 @@ class Battle(object):
         user = user or self.foe
         target = target or self.me
         useful = False
+        mk = MC.key(md)
+        if mk == "SWALLOW" and (not user.stockpile or user.hp >= user.maxhp):
+            return 0.0                      # 비축한 게 없거나 체력이 가득하면 실패한다
+        if mk == "STOCKPILE" and user.stockpile >= 3:
+            return 0.0
+        if md.get("ail") == "leech-seed":
+            types = target.types() if target.ability_on else ((target.species or {}).get("types") or [])
+            if target.seeded or "GRASS" in types:
+                return 0.0
+            useful = True
         ail = md.get("ail")
         if ail in HANDLED_STATUS:
             if target.status:               # 이미 상태이상이면 소용없다
@@ -561,6 +637,7 @@ class Battle(object):
             return [{"t": "over", "result": self.result}]
         self.turn_no += 1
         ev = []
+        self.begin_turn()
         foe_move = self.choose_ai()
 
         if my_move != STRUGGLE and (my_move not in self.me.pp
@@ -619,9 +696,19 @@ class Battle(object):
         return ["me", "foe"] if self.rng.random() < 0.5 else ["foe", "me"]
 
     # ---------------- 기술 사용 ----------------
+    def team_of(self, who):
+        """집단폭행이 세는 같은 편. 관장·유저 배틀은 teams 를 채워 준다."""
+        teams = getattr(self, "teams", None) or {}
+        return teams.get(who) or [self.me if who == "me" else self.foe]
+
+    def _fail(self, who, ev, text="하지만 실패했다!"):
+        ev.append({"t": "msg", "who": who, "text": text})
+
     def _use(self, who, user, target, key, ev):
         if key is None:
             key = STRUGGLE
+        if user.bide and key != STRUGGLE:
+            key = "BIDE"                     # 참는 동안은 다른 기술을 못 쓴다
         move = self.move_of(key)
 
         if not self._can_move(who, user, ev):
@@ -629,29 +716,62 @@ class Battle(object):
 
         abil = user.ability_on or target.ability_on
         tw = "foe" if who == "me" else "me"
-        if key != STRUGGLE:
+        k = MC.key(move) if key != STRUGGLE else STRUGGLE
+        charging = k == "BIDE" and bool(user.bide)
+        if key != STRUGGLE and not charging:
             cost = A.pp_cost(user, target) if abil else 1
             user.pp[key] = max(0, user.pp.get(key, 0) - cost)
             if user.held:
                 H.restore_pp(user, key, move.get("pp"), who, ev)   # 과사열매
-        ev.append({"t": "move", "who": who, "name": user.name,
-                   "move": self.move_name(key), "moveType": move.get("type"),
-                   "cat": move.get("cat"),
-                   "text": "%s 의 %s!" % (user.name, self.move_name(key))})
-        if abil and key != STRUGGLE:
+        if not charging:
+            ev.append({"t": "move", "who": who, "name": user.name,
+                       "move": self.move_name(key), "moveType": MC.move_type(move, user),
+                       "cat": move.get("cat"),
+                       "text": "%s 의 %s!" % (user.name, self.move_name(key))})
+        if abil and key != STRUGGLE and not charging:
             A.before_move(self, user, who, move, ev)
             if A.blocks(self, user, who, target, tw, move, key, ev):
                 return
 
-        if not accuracy_check(self.dex, move, user, target, self.rng):
+        # ---- 원작 공식 기술: 쓰기 전에 정해지거나 실패하는 것 ----
+        move = self._before_special(k, move, who, user, target, tw, ev)
+        if move is None:
+            return
+
+        if k in MC.OHKO:
+            if abil and A.always_hit(user, target):
+                hit = True
+            else:
+                hit = self.rng.uniform(0, 100) < MC.ohko_accuracy(move, user, target)
+        else:
+            hit = accuracy_check(self.dex, move, user, target, self.rng)
+        if not hit:
             ev.append({"t": "miss", "who": who, "text": "하지만 빗나갔다!"})
             return
 
+        if k == "PRESENT" and self.rng.random() < 0.2:
+            # 프레젠트는 20% 로 상대를 회복시킨다
+            if target.hp >= target.maxhp:
+                return self._fail(who, ev, "%s 은(는) 체력이 가득해서 받을 수 없다!" % target.name)
+            amount = max(1, target.maxhp // 4)
+            target.hp = min(target.maxhp, target.hp + amount)
+            ev.append({"t": "heal", "who": tw, "amount": amount, "hp": target.hp,
+                       "maxhp": target.maxhp, "text": "%s 의 체력이 회복되었다!" % target.name})
+            return
+        if k == "PRESENT":
+            roll = self.rng.random()
+            move = dict(move, _power=40 if roll < 0.5 else (80 if roll < 0.875 else 120))
+
         total = 0
-        if move.get("power"):
+        fixed_move = k in MC.FIXED or move.get("_fixed") is not None
+        if MC.attacks(move):
             lo, hi = (move.get("hits") or [1, 1])[:2]
             times = 1
-            if hi > 1:
+            members = []
+            if k == "BEATUP":
+                members = [m for m in self.team_of(who) if m.alive() and not m.status] or [user]
+                times = len(members)
+            elif hi > 1:
                 forced = A.hit_count(user, lo, hi) if abil else None
                 if forced:
                     times = forced
@@ -662,7 +782,10 @@ class Battle(object):
             for i in range(times):
                 if not target.alive():
                     break
-                dmg, crit, eff = damage(self.dex, move, user, target, self.rng)
+                hit_move = dict(move, _power=MC.beat_up_power(members[i])) if members else move
+                dmg, crit, eff = damage(self.dex, hit_move, user, target, self.rng)
+                if fixed_move and eff != 0 and dmg <= 0:
+                    return self._fail(who, ev)       # 카운터로 돌려줄 것이 없다 ...
                 if key == STRUGGLE and eff == 0:      # 몸부림은 무효가 없다
                     eff = 1.0
                     dmg = max(1, dmg or 1)
@@ -677,15 +800,17 @@ class Battle(object):
                     return
                 if target.held:
                     # 반감 열매, 기합의띠. 맞는 쪽 도구가 데미지를 고친다.
+                    # 고정 데미지에는 상성이 없어서 반감 열매가 안 먹힌다.
                     dmg = H.on_incoming(self, target, "foe" if who == "me" else "me",
-                                        move, eff, dmg, ev)
+                                        move, 1.0 if fixed_move else eff, dmg, ev)
                 if abil:
                     dmg = A.survive(self, user, who, target, tw, move, dmg, ev)
                 hp_before = target.hp
                 target.hp = max(0, target.hp - dmg)
                 total += dmg
+                self._note_hurt(target, move, hp_before - target.hp, who)
                 ev.append({"t": "hit", "who": who, "target": "foe" if who == "me" else "me",
-                           "damage": dmg, "crit": crit, "eff": eff,
+                           "damage": dmg, "crit": crit, "eff": 1.0 if fixed_move else eff,
                            "hp": target.hp, "maxhp": target.maxhp})
                 if crit:
                     ev.append({"t": "msg", "text": "급소에 맞았다!"})
@@ -695,10 +820,15 @@ class Battle(object):
                         break
             if times > 1:
                 ev.append({"t": "msg", "text": "%d번 맞았다!" % min(times, i + 1)})
-            if eff > 1:
+            if k in MC.OHKO and total and not target.alive():
+                ev.append({"t": "msg", "text": "일격필살!"})
+            elif fixed_move:
+                pass                                 # 고정 데미지에는 상성 문구가 없다
+            elif eff > 1:
                 ev.append({"t": "msg", "text": "효과가 굉장했다!"})
             elif 0 < eff < 1:
                 ev.append({"t": "msg", "text": "효과가 별로인 듯하다..."})
+            self._after_special(k, move, who, user, target, tw, total, ev)
             if user.held or target.held:
                 # 생명의구슬 반동, 조개껍질방울, 자보·애터·의문열매, 그리고
                 # 체력이 줄어 발동하는 열매들.
@@ -729,6 +859,16 @@ class Battle(object):
 
         # 회복기
         heal = move.get("heal") or 0
+        if k == "SWALLOW":
+            if not user.stockpile or user.hp >= user.maxhp:
+                return self._fail(who, ev)
+            heal = {1: 25, 2: 50, 3: 100}[min(3, user.stockpile)]
+            self._spend_stockpile(user, who, ev)
+        if k == "STOCKPILE":
+            if user.stockpile >= 3:
+                return self._fail(who, ev)
+            user.stockpile += 1
+            ev.append({"t": "msg", "who": who, "text": "%s 은(는) %d개 비축했다!" % (user.name, user.stockpile)})
         if heal > 0 and user.hp < user.maxhp:
             amount = max(1, int(user.maxhp * heal / 100.0))
             user.hp = min(user.maxhp, user.hp + amount)
@@ -763,6 +903,10 @@ class Battle(object):
                         self._change_stat(dst, stat, change, ev,
                                           "me" if dst is self.me else "foe")
 
+        # 씨뿌리기
+        if move.get("ail") == "leech-seed" and target.alive():
+            self._seed(target, who, tw, ev)
+
         # 상태이상
         ail = move.get("ail")
         if ail in HANDLED_STATUS and target.alive():
@@ -790,6 +934,123 @@ class Battle(object):
             H.note_move(user, key)                      # 구애 잠금·메트로놈
 
         self._check_faint(ev)
+
+    # ---------------- 원작 공식 기술 ----------------
+    def _before_special(self, k, move, who, user, target, tw, ev):
+        """맞히기 전에 정해지는 것. 실패하면 None, 아니면 (고친) 기술."""
+        if k == "BIDE":
+            if not user.bide:
+                user.bide = {"left": 2, "sum": 0}
+                ev.append({"t": "msg", "who": who, "text": "%s 은(는) 참기 시작했다!" % user.name})
+                return None
+            user.bide["left"] -= 1
+            if user.bide["left"] > 0:
+                ev.append({"t": "msg", "who": who, "text": "%s 은(는) 참고 있다!" % user.name})
+                return None
+            got, user.bide = user.bide["sum"], None
+            ev.append({"t": "move", "who": who, "name": user.name, "move": self.move_name("BIDE"),
+                       "moveType": move.get("type"), "cat": move.get("cat"),
+                       "text": "%s 의 참기가 풀렸다!" % user.name})
+            if not got:
+                self._fail(who, ev)
+                return None
+            return dict(move, _fixed=got * 2, acc=0)
+        if k in MC.OHKO:
+            types = target.types() if target.ability_on else ((target.species or {}).get("types") or [])
+            if target.level > user.level or (k == "SHEERCOLD" and "ICE" in types):
+                ev.append({"t": "immune", "who": who,
+                           "text": "%s 에게는 효과가 없는 것 같다..." % target.name})
+                return None
+            if target.ability_on and A.has(target, "STURDY") and not A.breaks(user):
+                A.pop(self, target, tw, ev)
+                ev.append({"t": "immune", "who": who,
+                           "text": "%s 은(는) 옹골참으로 버텼다!" % target.name})
+                return None
+        if k == "ENDEAVOR" and target.hp <= user.hp:
+            self._fail(who, ev)
+            return None
+        if k == "SPITUP":
+            if not user.stockpile:
+                self._fail(who, ev)
+                return None
+            n = min(3, user.stockpile)
+            self._spend_stockpile(user, who, ev)
+            return dict(move, _power=100 * n)
+        if k == "MAGNITUDE":
+            roll = self.rng.uniform(0, 100)
+            size, pw = next((m, p) for cut, m, p in MC.MAGNITUDES if roll < cut)
+            ev.append({"t": "msg", "who": who, "text": "매그니튜드 %d!" % size})
+            return dict(move, _power=pw)
+        if k == "FLING":
+            if not MC.item_on(user) or not MC.FLING_POWER.get(user.held):
+                self._fail(who, ev)
+                return None
+            ev.append({"t": "msg", "who": who,
+                       "text": "%s 은(는) %s 을(를) 내던졌다!" % (user.name, H.name(user.held))})
+            return dict(move, _power=MC.FLING_POWER[user.held], _item=user.held)
+        if k == "NATURALGIFT":
+            gift = MC.NATURAL_GIFT.get(user.held) if MC.item_on(user) else None
+            if not gift:
+                self._fail(who, ev)
+                return None
+            return dict(move, _power=gift[1] + MC.NATURAL_GIFT_BONUS, type=gift[0], _item=user.held)
+        return move
+
+    def _after_special(self, k, move, who, user, target, tw, total, ev):
+        """때리고 난 뒤 (도구가 없어진다, 스스로 쓰러진다, 잠·마비가 풀린다)."""
+        if move.get("_item"):
+            user.item_gone = True
+            user.held = None                 # 던지거나 먹은 도구는 이 판에서 효과도 없다
+            fx = MC.FLING_EFFECT.get(move["_item"]) if k == "FLING" else None
+            if fx and target.alive() and total:
+                if fx == "flinch":
+                    target.flinched = True
+                else:
+                    self._apply_status(target, fx, ev, source=user if user.ability_on else None)
+        if k == "FINALGAMBIT" and total:
+            user.hp = 0
+        if k == "WAKEUPSLAP" and target.status == "sleep" and total and target.alive():
+            target.status, target.sleep_turns = None, 0
+            ev.append({"t": "cure", "who": tw, "text": "%s 은(는) 잠에서 깼다!" % target.name})
+        if k == "SMELLINGSALTS" and target.status == "paralysis" and total and target.alive():
+            target.status = None
+            ev.append({"t": "cure", "who": tw, "text": "%s 의 마비가 풀렸다!" % target.name})
+
+    def _spend_stockpile(self, user, who, ev):
+        """토해내기·꿀꺽 뒤에 비축으로 오른 방어·특수방어를 되돌린다."""
+        n, user.stockpile = user.stockpile, 0
+        for stat in ("def", "spd"):
+            before = user.stages.get(stat, 0)
+            user.stages[stat] = max(STAGE_MIN, before - n)
+        ev.append({"t": "msg", "who": who, "text": "%s 의 비축이 사라졌다!" % user.name})
+
+    def _note_hurt(self, target, move, dmg, who):
+        """이 턴에 맞은 데미지를 적어 둔다 (카운터·미러코트·메탈버스트·참기·눈사태)."""
+        if dmg <= 0:
+            return
+        h = target.hurt or {"physical": 0, "special": 0, "by": who}
+        cat = move.get("cat") if move.get("cat") in ("physical", "special") else "physical"
+        h[cat] = h.get(cat, 0) + dmg
+        h["by"] = who
+        target.hurt = h
+        if target.bide:
+            target.bide["sum"] = target.bide.get("sum", 0) + dmg
+
+    def _seed(self, target, who, tw, ev):
+        types = target.types() if target.ability_on else ((target.species or {}).get("types") or [])
+        if "GRASS" in types:
+            ev.append({"t": "immune", "who": who,
+                       "text": "%s 에게는 효과가 없는 것 같다..." % target.name})
+        elif target.seeded:
+            self._fail(who, ev)
+        else:
+            target.seeded = True
+            ev.append({"t": "msg", "who": tw, "text": "%s 에게 씨앗을 심었다!" % target.name})
+
+    def begin_turn(self):
+        """턴 시작. 지난 턴에 맞은 데미지는 이번 턴의 카운터에 안 쓴다."""
+        self.me.hurt = None
+        self.foe.hurt = None
 
     def _can_move(self, who, user, ev):
         """상태이상 때문에 못 움직이는지."""
@@ -908,11 +1169,33 @@ class Battle(object):
                 ev.append({"t": "chip", "who": who, "damage": d, "hp": f.hp,
                            "maxhp": f.maxhp,
                            "text": "%s 은(는) 독 때문에 데미지를 입었다!" % f.name})
+            if f.seeded and f.alive() and not A.has(f, "MAGICGUARD"):
+                self._drain_seed(f, who, ev)
             if f.held:
                 H.end_of_turn(self, f, who, ev)     # 먹다남은음식, 맹독구슬 ...
             if f.ability_on:
                 A.end_of_turn(self, f, who, ev)     # 가속, 탈피, 변덕쟁이 ...
         self._check_faint(ev)
+
+    def _drain_seed(self, f, who, ev):
+        """씨뿌리기: 최대 체력의 1/8 을 빼앗아 맞은편에 준다."""
+        other_who = "foe" if who == "me" else "me"
+        other = self.foe if who == "me" else self.me
+        d = min(f.hp, max(1, f.maxhp // 8))
+        f.hp -= d
+        ev.append({"t": "chip", "who": who, "damage": d, "hp": f.hp, "maxhp": f.maxhp,
+                   "text": "씨뿌리기가 %s 의 체력을 빼앗는다!" % f.name})
+        if not other.alive():
+            return
+        amount = max(1, int(d * H.drain_mult(other))) if other.held else d
+        if A.has(f, "LIQUIDOOZE"):
+            other.hp = max(0, other.hp - amount)
+            ev.append({"t": "chip", "who": other_who, "damage": amount, "hp": other.hp,
+                       "maxhp": other.maxhp, "text": "%s 은(는) 해감액을 흡수했다!" % other.name})
+        elif other.hp < other.maxhp:
+            other.hp = min(other.maxhp, other.hp + amount)
+            ev.append({"t": "heal", "who": other_who, "amount": amount, "hp": other.hp,
+                       "maxhp": other.maxhp, "text": "%s 은(는) 체력을 흡수했다!" % other.name})
 
     def _check_faint(self, ev):
         if not self.foe.alive():

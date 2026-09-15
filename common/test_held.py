@@ -33,9 +33,16 @@ from common import pokelogic as P                           # noqa: E402
 
 OK = FAIL = 0
 
-# 도구를 넣기 **전** 엔진(1.0.20)으로 뜬 값. 같은 파티·같은 시드다.
-PARTY_DIGEST = "c59229ab7dcfaeff764a290d45fb8f00ca2e9082cd04c49f162ef128a7f956f5"
-SOLO_DIGEST = "67bf05ec978317a0b3ce9314c18d2975e43cb9bb46344b26e28382e38a795758"
+# 도구 코드가 판에 손대지 않는지 보는 값. 같은 파티·같은 시드다.
+#
+# 처음 값은 도구를 넣기 **전** 엔진(1.0.20)으로 떴다
+#   c59229ab... / 67bf05ec...
+# 1.3.2 뒤에 **원작 공식 기술과 씨뿌리기**를 넣으면서 판이 달라져 다시 떴다. 이 파티의
+# 이상해씨가 씨뿌리기를 든다 - 예전에는 턴만 버리던 기술이다.
+# 달라진 까닭이 그것뿐인지는 확인했다: movecalc 를 옛 동작(위력 0 이면 안 때린다)으로
+# 되돌리고 씨뿌리기를 빼면 옛 값 둘이 그대로 나온다.
+PARTY_DIGEST = "ffadc218a6df48ddff69c8acd4907c932a3e4593c63ae038f42d3913567ab989"
+SOLO_DIGEST = "16b4532bf4e4123a0ad1140f8c46466cfb546628918686db17ec5aefe4d0eac0"
 
 
 def chk(name, cond, got=""):
@@ -104,7 +111,7 @@ def t_도구_없으면_그대로(dex):
                                 ensure_ascii=False).encode())
     finally:
         PB.ABILITIES = old
-    chk("파티전 30판 요약값이 1.0.20 과 같다", h.hexdigest() == PARTY_DIGEST,
+    chk("파티전 30판 요약값이 그대로다", h.hexdigest() == PARTY_DIGEST,
         h.hexdigest())
     h2 = hashlib.sha256()
     for s in range(1, 31):
@@ -115,7 +122,7 @@ def t_도구_없으면_그대로(dex):
         while not bt.over:
             evs.extend(bt.take_turn(bt.choose_mine()))
         h2.update(json.dumps(evs, sort_keys=True, ensure_ascii=False).encode())
-    chk("야생전 30판 요약값이 1.0.20 과 같다", h2.hexdigest() == SOLO_DIGEST,
+    chk("야생전 30판 요약값이 그대로다", h2.hexdigest() == SOLO_DIGEST,
         h2.hexdigest())
     f = B.Fighter(dex, A[0])
     chk("held 가 None", f.held is None and f.held_state() is None)

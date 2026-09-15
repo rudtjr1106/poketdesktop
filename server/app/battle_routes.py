@@ -107,19 +107,24 @@ def _fighters(dex, row):
     me.stages = me_raw.get("stages") or me.stages
     me.sleep_turns = me_raw.get("sleep", 0)
     me.load_held(me_raw.get("held"))
+    me.load_volatile(me_raw.get("vol"))
     foe = B.Fighter(dex, foe_raw["mon"], foe_raw["hp"], foe_raw["pp"],
                     foe_raw["status"])
     foe.stages = foe_raw.get("stages") or foe.stages
     foe.sleep_turns = foe_raw.get("sleep", 0)
     foe.load_held(foe_raw.get("held"))
+    foe.load_volatile(foe_raw.get("vol"))
     return me, foe
 
 
 def _dump(f):
     # held 는 지닌 도구의 '이 판에서 벌어진 일'(먹은 열매, 구애 잠금)이다.
     # 턴마다 DB 에 잤다 깨는 구조라 이걸 안 남기면 열매를 매 턴 먹는다.
+    # vol 은 기술이 남긴 것(씨뿌리기·참기·비축·내던진 도구). 이것도 안 남기면
+    # 다음 턴에 씨앗이 사라진다.
     return {"mon": f.mon, "hp": f.hp, "pp": f.pp, "status": f.status,
-            "stages": f.stages, "sleep": f.sleep_turns, "held": f.held_state()}
+            "stages": f.stages, "sleep": f.sleep_turns, "held": f.held_state(),
+            "vol": f.volatile()}
 
 
 def _save(row_id, bt, result=None, state=None):
@@ -423,6 +428,13 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
     me, foe = _fighters(d, row)
     bt = B.Battle(d, me, foe, deps.RNG)
     bt.turn_no = row["turn"]
+    # 집단폭행: 이 판에서 아직 안 쓰러진 파티 (나와 있는 애는 지금 상태 그대로).
+    # 그 기술이 있을 때만 파티를 읽는다 - 턴마다 DB 를 한 번 더 두드릴 이유가 없다.
+    if "BEATUP" in me.moves:
+        down = set(_fainted(row))
+        bt.teams = {"me": [me] + [B.Fighter(d, m) for m in _party(uid)
+                                  if m["id"] != row["mine_id"] and m["id"] not in down],
+                    "foe": [foe]}
     # 예전에는 이 값을 아래 조건문 안에서만 만들었다. 볼 목록에도 필요해서
     # 위로 올린다 (다크볼은 밤인지를 본다).
     hour = body.hour if 0 <= body.hour <= 23 else None

@@ -67,6 +67,7 @@ sys.path.insert(0, ROOT)
 
 from common import held as H          # noqa: E402
 from common import pokelogic as P     # noqa: E402
+from common import movecalc as MC      # noqa: E402
 from common import trainer_battle as TB  # noqa: E402
 
 CACHE = os.path.join(ROOT, "tools", "_cache", "bulbapedia")
@@ -79,6 +80,9 @@ TEAM = 6
 OFFSETS = [-3, -2, -1, 1, 2, 3]                       # 합이 0 -> 평균이 정확히 그 레벨
 SELF_KO = {"SELFDESTRUCT", "EXPLOSION", "MEMENTO", "FINALGAMBIT", "HEALINGWISH",
            "LUNARDANCE", "MISTYEXPLOSION", "DESTINYBOND", "PERISHSONG"}
+# 관장 AI 가 쓸 줄 모르는 기술. 카운터·미러코트·메탈버스트는 **고를 때** 얼마나 돌려줄지
+# 모르고(맞은 뒤에야 안다), 참기는 세 턴을 묶는다. 넣어 두면 한 칸을 버린다.
+AI_UNUSABLE = set(MC.COUNTERS) | {"BIDE"}
 SOURCE = "Bulbapedia (CC BY-NC-SA 2.5) — 본편 게임의 트레이너 파티"
 
 # ---------------------------------------------------------------- 사람
@@ -740,7 +744,8 @@ def moveset(dex, sp, level, canon):
     moves = []
     for mv in canon or []:
         k = key(mv)
-        if k in dex.moves and k not in moves and k not in SELF_KO and TB.works(dex.moves[k]):
+        if (k in dex.moves and k not in moves and k not in SELF_KO and k not in AI_UNUSABLE
+                and TB.works(dex.moves[k])):
             moves.append(k)
         if len(moves) == 4:
             break
@@ -755,7 +760,7 @@ def moveset(dex, sp, level, canon):
     cands = []
     for k in P.learnable_moves(sp, level):
         md = dex.moves.get(k)
-        if not md or k in moves or k in SELF_KO or not TB.works(md):
+        if not md or k in moves or k in SELF_KO or k in AI_UNUSABLE or not TB.works(md):
             continue
         pw = md.get("power") or 0
         acc = md.get("acc") or 100

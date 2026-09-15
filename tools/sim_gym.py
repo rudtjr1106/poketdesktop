@@ -32,6 +32,7 @@ sys.path.insert(0, HERE)
 
 from common import abilities as A              # noqa: E402
 from common import battle as B                 # noqa: E402
+from common import movecalc as MC              # noqa: E402
 from common import pokelogic as P              # noqa: E402
 from common import trainer_battle as TB        # noqa: E402
 
@@ -89,7 +90,7 @@ def trained_team(dex, gdex, level, rng):
 # ---------------------------------------------------------------- 유저 봇
 def est(bt, user, target, key):
     md = bt.move_of(key)
-    if not md.get("power"):
+    if not MC.attacks(md) or MC.key(md) in MC.COUNTERS:
         return 0.0
     if user.ability_on and A.would_block(user, target, md):
         return 0.0

@@ -30,6 +30,7 @@ import random
 
 from . import abilities as A
 from . import battle as B
+from . import movecalc as MC
 
 # 특성을 켠다 (관장 배틀과 같은 common/abilities.py). 끄면 예전 판과 한 글자도
 # 안 다른 로그가 나온다 - 저장된 판은 로그를 그대로 재생하므로 켜도 옛 판은 그대로다.
@@ -121,7 +122,7 @@ class PartyBattle(object):
         atk = 0.0
         for key in mine.moves:
             md = self.dex.move(key) or {}
-            if not md.get("power") or A.would_block(mine, foe, md):
+            if not MC.attacks(md) or A.would_block(mine, foe, md):
                 continue                       # 변화기는 상성과 무관하다
             e = B.effectiveness(self.dex, A.move_type(mine, md), foe_types)
             if e > atk:
@@ -132,7 +133,7 @@ class PartyBattle(object):
         dfn = 0.0
         for key in foe.moves:
             md = self.dex.move(key) or {}
-            if not md.get("power") or A.would_block(foe, mine, md):
+            if not MC.attacks(md) or A.would_block(foe, mine, md):
                 continue
             e = B.effectiveness(self.dex, A.move_type(foe, md), my_types)
             if e > dfn:
@@ -178,6 +179,7 @@ class PartyBattle(object):
         # 상대가 야생이 아니다. 문구에서 '야생' 을 뗀다.
         bt.foe_prefix = ""
         bt.max_turns = ROUND_TURNS
+        bt.teams = {"me": self.a, "foe": self.b}     # 집단폭행이 세는 같은 편
         return bt
 
     # ---------------- 진행 ----------------
@@ -250,6 +252,7 @@ class PartyBattle(object):
             A.on_switch_out(f)
             f.stages = dict((k, 0) for k in B.STAGE_KEYS)
             f.types_override = None
+            f.clear_volatile()
 
     def _advance(self, side):
         """쓰러진 쪽의 다음 선수를 내보낸다. 판이 끝났으면 True.
