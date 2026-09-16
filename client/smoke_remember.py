@@ -85,6 +85,7 @@ def run_dialog(root, d, action, hold=400):
         box["texts"] = texts(d.win)
         box["seen"] = d.canvas.winfo_height()
         box["need"] = d.box.winfo_reqheight()
+        box["cap"] = d._cap()
         action(d, box)
     root.after(hold, go)
     box["result"] = d.show()
@@ -111,12 +112,54 @@ def dialog_checks(root, dex):
     chk("공짜 안내가 보인다 (공짜 기술이 있을 때)", any("무료입니다" in t for t in tx))
     for want in ("Lv.1", "진화", "Lv.44 · 무료", "배우려던 기술 · 무료", "Lv.30"):
         chk("꼬리표 '%s'" % want, want in tx, want)
-    cap = root.winfo_screenheight() - ui_learn.SCREEN_PAD
-    if got["size"][1] < cap:
-        chk("다섯 줄이 다 보인다 (굴릴 필요 없다)", got["seen"] >= got["need"],
-            (got["seen"], got["need"]))
+    chk("창 높이가 상한을 안 넘는다", got["size"][1] <= got["cap"] + 2,
+        (got["size"], got["cap"]))
     chk("창이 화면 안에 있다", got["size"][1] <= root.winfo_screenheight(), got["size"])
     chk("그냥 닫으면 None", got["result"] is None, got["result"])
+
+    print("\n=== 떠올리기 창 - 기술이 스무 개 (화면을 꽉 채우지 않고 굴린다)")
+    sp = dex.get("AMPHAROS")
+    many = []
+    for lv, mv in sp["moves"]:
+        if mv not in [e["move"] for e in many] and dex.move(mv):
+            many.append(entry(dex, mv, lv))
+    chk("  기술이 열다섯 개 넘게 있다", len(many) > 15, len(many))
+    sh = root.winfo_screenheight()
+
+    def measure(d, b):
+        root.update_idletasks()
+        w = d.win
+        b["y"], b["bottom"] = w.winfo_rooty(), w.winfo_rooty() + w.winfo_height()
+        hold = d.ok_btn.holder
+        b["btn_bottom"] = hold.winfo_rooty() + hold.winfo_height()
+        b["btn_h"] = hold.winfo_height()
+        cv = d.canvas
+        before = cv.yview()[0]
+        cv.event_generate("<MouseWheel>", delta=-120,
+                          x=cv.winfo_width() // 2, y=cv.winfo_height() // 2,
+                          rootx=cv.winfo_rootx() + cv.winfo_width() // 2,
+                          rooty=cv.winfo_rooty() + cv.winfo_height() // 2, when="now")
+        root.update()
+        b["wheel"] = (before, cv.yview()[0])
+        b["wheel_div"] = getattr(cv, "wheel_div", 0)
+        d._cancel()
+    got = run_dialog(root, ui_remember.RememberAsk(root, "전룡", many, 5000, 15100, dex),
+                     measure, hold=600)
+    h = got["size"][1]
+    chk("화면을 꽉 채우지 않는다 (화면의 65% 이하)",
+        h <= int(sh * ui_remember.SCREEN_SHARE) + 2, (h, sh))
+    chk("  상한(520) 이하", h <= got["cap"] + 2 and got["cap"] <= ui_remember.MAX_H,
+        (h, got["cap"]))
+    chk("  그래도 줄 서너 개는 보인다", got["seen"] >= U.h(240), got["seen"])
+    chk("  창 아래가 화면 안", got["bottom"] <= sh, (got["y"], got["bottom"], sh))
+    chk("  '떠올리기' 단추가 창 안에 보인다",
+        got["btn_bottom"] <= got["bottom"] and got["btn_h"] >= 30,
+        (got["btn_bottom"], got["bottom"], got["btn_h"]))
+    chk("  내용이 창보다 길어서 굴린다", got["need"] > got["seen"],
+        (got["need"], got["seen"]))
+    chk("  눌린 것이 없다", not got["sq"], got["sq"][:4])
+    chk("  휠이 걸려 있다", got["wheel_div"] > 0, got["wheel_div"])
+    chk("  휠로 아래로 굴러간다", got["wheel"][1] > got["wheel"][0], got["wheel"])
 
     print("\n=== 떠올리기 창 - 고르기와 돈")
     ents = [entry(dex, "GROWL", 1), entry(dex, "TAKEDOWN", 44, free=True),

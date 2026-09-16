@@ -115,6 +115,7 @@ class ForgetAsk(object):
         # 움직이지 않는다(_scroller 가 그렇게 만든다).
         from .ui_bag import _scroller
         self.canvas, self.box = _scroller(f, U.BG)
+        self._wheel()
         box = self.box
         for mv in self.known:
             self._row(box, mv, is_new=False)
@@ -201,6 +202,19 @@ class ForgetAsk(object):
             name.configure(fg=U.ACCENT_TEXT if on else U.FG)
             cat.configure(fg=MT.cat_color(md))
 
+    def _wheel(self):
+        """굴러가는 칸을 휠로 굴린다.
+
+        **안 걸면 휠이 아예 안 먹는다.** 스크롤바를 손으로 끌어야만
+        내려가서, 기술이 많은 떠올리기 창에서는 아래가 없는 줄 안다.
+        """
+        U.scrollable(self.canvas, 60)
+        U.install_wheel(self.win)
+
+    def _cap(self):
+        """창 높이의 상한. 기술 다섯 개는 한눈에 보이게 화면 높이까지 쓴다."""
+        return self.win.winfo_screenheight() - SCREEN_PAD
+
     def _resize(self, h):
         """창 높이를 h 로 못 박는다.
 
@@ -215,7 +229,12 @@ class ForgetAsk(object):
         """
         self.win.minsize(W, h)
         self.win.maxsize(W, h)
-        self.win.geometry("%dx%d" % (W, h))
+        # **자리도 같이 잡는다.** 크기만 주면 창이 처음 자리(작은 높이로
+        # 가운데 잡은 곳)에서 아래로만 늘어나서, 큰 창은 아래 단추가 화면
+        # 밖(맥은 Dock 뒤)으로 나갔다.
+        sw, sh = self.win.winfo_screenwidth(), self.win.winfo_screenheight()
+        self.win.geometry("%dx%d+%d+%d" % (W, h, max(0, (sw - W) // 2),
+                                           max(0, (sh - h) // 3)))
         # **update_idletasks 로는 모자란다.** 창 크기는 창 관리자가
         # 나중에 알려 준다(ConfigureNotify). idle 만 돌리면 그 소식을
         # 못 받아서, 바로 재면 옛 크기가 나온다.
@@ -249,7 +268,7 @@ class ForgetAsk(object):
             self.canvas.configure(height=max(1, need))
             self.win.update_idletasks()
 
-            cap = self.win.winfo_screenheight() - SCREEN_PAD
+            cap = self._cap()
             want = self.win.winfo_reqheight()
             if want > cap:
                 # **넘친 만큼 캔버스에서 덜어낸다.** 안 그러면 굴러가는
