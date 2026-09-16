@@ -109,6 +109,7 @@ class ForgetAsk(object):
         self.ok_btn = U.PushButton(row, "결정", self._ok, height=34,
                                    font=U.FONT_B)
         self.ok_btn.pack(side="right")
+        self._hint_label(row)
 
         # 굴러가는 영역에 담는다. 다섯 개가 화면에 다 들어가면 스크롤바는
         # 움직이지 않는다(_scroller 가 그렇게 만든다).
@@ -275,10 +276,25 @@ class ForgetAsk(object):
         except Exception:                                  # noqa: BLE001
             pass
 
+    def _hint_label(self, row):
+        """'결정' 옆의 한 줄. 누른 결과가 없을 때 까닭을 적는다.
+
+        **말없이 무시하면 고장으로 읽힌다.** 줄을 누르기 전에 '결정' 을
+        누르면 아무 일도 안 일어났는데, 사용자는 기술을 못 배운다고
+        알려 왔다(버릴 것을 줄에서 눌러 골라야 한다는 걸 몰랐다).
+        """
+        self.hint = tk.Label(row, text="", bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,
+                             anchor="w", justify="left", wraplength=W - 180)
+        self.hint.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+    def _hint(self, text, color=None):
+        self.hint.configure(text=natural(text or ""), fg=color or U.FG_DIM)
+
     # ---------------- 답 ----------------
     def _ok(self):
         if self.picked is None:
-            return                    # 아직 아무것도 안 골랐다
+            # 아직 아무것도 안 골랐다. 닫지 않고 무엇을 해야 하는지 적는다.
+            return self._hint("버릴 기술을 눌러서 고르세요.", U.ACCENT)
         # 새 기술을 골랐으면 '안 배운다' 는 뜻이다.
         self.result = "" if self.picked == self.new else self.picked
         self.win.destroy()

@@ -9,6 +9,8 @@
   3. **써도 없어지지 않는다.** 영구제라 개수를 깎지 않는다.
   4. **팔거나 살 수 없다.** 상점 목록에 아예 없다.
   5. 네 개가 차 있으면 **말없이 밀어내지 않는다.** 기다렸다 물어본다.
+  6. 기술 떠올리기는 **지금 레벨 이하 기술만, 한 번에 5,000원**. 거절하면
+     돈을 안 받고, 기다리던 기술은 공짜다.
 
 서버를 띄우지 않는다. DB 와 모듈만 직접 쓴다.
 """
@@ -57,6 +59,142 @@ def mkmon(uid, species, moves, level=50):
         "shiny": False, "happiness": 70, "ivs": {}, "evs": {},
         "moves": list(moves), "hyper": {}, "noEvolve": False,
         "luxury": False, "held": None}, "2026-01-01")
+
+
+def refused(fn, code=400):
+    """HTTPException(code) 로 거절되나."""
+    try:
+        fn()
+    except Exception as e:                                  # noqa: BLE001
+        return getattr(e, "status_code", None) == code
+    return False
+
+
+def remember_checks(d, R, Body):
+    """기술 떠올리기 - 5,000원, 지금 레벨 이하 기술만, 기다리던 기술은 공짜."""
+    from app import config
+
+    print("\n=== 기술 떠올리기 ===")
+    cost = config.REMEMBER_COST
+    chk("한 번에 5,000원", cost == 5000, cost)
+    uid = mkuser("remember")
+    me = {"user": {"id": uid}}
+    money = lambda: items.money(uid)                       # noqa: E731
+    row = lambda pid: db.q1("SELECT * FROM pokemon WHERE id=?", (pid,))  # noqa: E731
+    moves_of = lambda pid: json.loads(row(pid)["moves"])   # noqa: E731
+
+    sp = d.get("BULBASAUR")
+    low = set(mv for lv, mv in sp["moves"] if lv <= 34)
+    high = set(mv for lv, mv in sp["moves"] if lv > 34) - low
+    pid = mkmon(uid, "BULBASAUR", ["TACKLE"], level=34)
+
+    lst = R.remember_list(pid, me)
+    got = [x["move"] for x in lst["remember"]]
+    chk("지금 레벨 이하 기술이 전부 나온다",
+        sorted(got) == sorted(low - {"TACKLE"}), (got, sorted(low)))
+    chk("아는 기술은 안 나온다", "TACKLE" not in got, got)
+    chk("높은 레벨 기술은 안 나온다", not (high & set(got)), high & set(got))
+    lvs = [x["level"] for x in lst["remember"]]
+    chk("레벨 순서", lvs == sorted(lvs), lvs)
+    chk("한글 이름이 붙는다",
+        all(x["kr"] == d.move_name(x["move"]) for x in lst["remember"]))
+    chk("값과 가진 돈을 같이 준다", lst["cost"] == cost and lst["money"] == 0,
+        (lst["cost"], lst["money"]))
+    chk("기다리던 기술이 없으면 공짜도 없다",
+        not any(x["free"] for x in lst["remember"]))
+    chk("남의 포켓몬은 못 본다",
+        refused(lambda: R.remember_list(pid, {"user": {"id": uid + 999}}), 404))
+
+    first = got[0]
+    chk("돈이 없으면 못 떠올린다",
+        refused(lambda: R.remember(Body(pokemon=pid, move=first, forget=""), me)))
+    chk("  기술도 그대로", moves_of(pid) == ["TACKLE"], moves_of(pid))
+
+    items.money_add(uid, 12000)
+    r = R.remember(Body(pokemon=pid, move=first, forget=""), me)
+    chk("자리가 있으면 그냥 떠올린다",
+        r["ok"] and moves_of(pid) == ["TACKLE", first], (r, moves_of(pid)))
+    chk("5,000원을 받는다", money() == 7000 and r["money"] == 7000, money())
+    chk("  받은 값을 알려준다", r["cost"] == cost, r.get("cost"))
+    chk("떠올렸다는 말", "떠올렸다" in r["message"], r["message"])
+
+    if high:
+        up = sorted(high)[0]
+        chk("레벨이 모자란 기술은 못 떠올린다",
+            refused(lambda: R.remember(Body(pokemon=pid, move=up, forget=""), me)))
+    chk("이미 아는 기술은 못 떠올린다",
+        refused(lambda: R.remember(Body(pokemon=pid, move=first, forget=""), me)))
+    chk("도감에 없는 기술은 못 떠올린다",
+        refused(lambda: R.remember(Body(pokemon=pid, move="NOPE", forget=""), me)))
+    chk("  거절에는 돈을 안 받는다", money() == 7000, money())
+
+    rest = [m for m in got if m != first]
+    four = ["TACKLE", first, rest[0], rest[1]]
+    db.run("UPDATE pokemon SET moves=? WHERE id=?", (json.dumps(four), pid))
+    target = rest[2]
+    r = R.remember(Body(pokemon=pid, move=target, forget=""), me)
+    chk("네 개면 무엇을 잊을지 묻는다", r.get("needForget") and not r["ok"], r)
+    chk("  묻기만 하고 돈은 안 받는다", money() == 7000, money())
+    chk("  기술도 그대로", moves_of(pid) == four, moves_of(pid))
+    chk("없는 기술을 잊으라면 거절",
+        refused(lambda: R.remember(Body(pokemon=pid, move=target,
+                                        forget="HYPERBEAM"), me)))
+    chk("  돈은 그대로", money() == 7000, money())
+
+    r = R.remember(Body(pokemon=pid, move=target, forget="TACKLE"), me)
+    chk("잊고 떠올린다",
+        moves_of(pid) == [target, first, rest[0], rest[1]], moves_of(pid))
+    chk("  자리는 잊은 기술 자리", r["moves"][0] == target, r["moves"])
+    chk("  잊은 기술을 알려준다", r["forgot"] == d.move_name("TACKLE"), r["forgot"])
+    chk("  5,000원을 또 받는다", money() == 2000, money())
+
+    chk("돈이 모자라면 못 떠올린다",
+        refused(lambda: R.remember(Body(pokemon=pid, move="TACKLE",
+                                        forget=first), me)))
+    chk("  기술도 돈도 그대로",
+        money() == 2000 and moves_of(pid) == [target, first, rest[0], rest[1]])
+
+    print("\n=== 떠올리기 - 기다리던 기술은 공짜 ===")
+    owed = rest[3]
+    db.run("UPDATE pokemon SET pending=? WHERE id=?",
+           (json.dumps([owed, "SPLASH"]), pid))
+    lst = R.remember_list(pid, me)
+    free = dict((x["move"], x) for x in lst["remember"] if x["free"])
+    chk("기다리던 기술은 공짜로 표시", owed in free, sorted(free))
+    chk("지금 표에 없는 기다리던 기술도 나온다 (레벨 없음)",
+        "SPLASH" in free and free["SPLASH"]["level"] is None, free.get("SPLASH"))
+    r = R.remember(Body(pokemon=pid, move=owed, forget=first), me)
+    chk("돈이 모자라도 기다리던 기술은 떠올린다", r["ok"] and owed in r["moves"], r)
+    chk("  돈을 안 받는다", money() == 2000 and r["cost"] == 0, (money(), r["cost"]))
+    chk("  기다리는 목록에서 빠진다",
+        json.loads(row(pid)["pending"]) == ["SPLASH"], row(pid)["pending"])
+
+    print("\n=== 떠올리기 - 그사이 기술이 바뀌면 돈을 돌려준다 ===")
+    items.money_add(uid, 8000)
+    stale = row(pid)
+    before = money()
+    db.run("UPDATE pokemon SET moves=? WHERE id=?",
+           (json.dumps(["TACKLE", "GROWL"]), pid))
+    real_mon = R._mon
+    R._mon = lambda _uid, _pid: stale
+    try:
+        cand = [x["move"] for x in R.remember_list(pid, me)["remember"]
+                if not x["free"] and x["move"] not in ("TACKLE", "GROWL")][0]
+        ok = refused(lambda: R.remember(Body(pokemon=pid, move=cand,
+                                             forget=target), me), 409)
+    finally:
+        R._mon = real_mon
+    chk("두 번 누른 것처럼 어긋나면 거절 (409)", ok)
+    chk("  돈을 돌려준다", money() == before, (money(), before))
+    chk("  기술은 바뀐 그대로", moves_of(pid) == ["TACKLE", "GROWL"], moves_of(pid))
+
+    print("\n=== 떠올리기 - 진화할 때 배우는 기술 ===")
+    zard = d.get("CHARIZARD")
+    evo = [mv for lv, mv in zard["moves"] if lv == 0]
+    cz = mkmon(uid, "CHARIZARD", ["SCRATCH"], level=36)
+    got = dict((x["move"], x["level"]) for x in R.remember_list(cz, me)["remember"])
+    chk("레벨 0(진화) 기술도 떠올린다",
+        evo and all(got.get(m) == 0 for m in evo), (evo, got))
 
 
 def main():
@@ -283,6 +421,8 @@ def main():
         tms.give(uid3, n)
     full = [tms.roll_drop(rng, species_num=1, uid=uid3) for _ in range(500)]
     chk("다 모았으면 안 나온다", all(f is None for f in full))
+
+    remember_checks(d, R, Body)
 
     print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))

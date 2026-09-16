@@ -693,9 +693,24 @@ class BoxWindow(object):
             iv.grid(row=i, column=3, sticky="e", padx=(0, 2))
             self.bars[k] = (val, cv, iv)
 
-        U.marker_label(p, "기술", bg=U.BG2).pack(anchor="w", pady=(11, 5))
+        # 기술 머리줄. 오른쪽에 '기술 떠올리기' - 바꾸는 것이 바로 아래
+        # 기술 칸이라 그 옆에 둔다. 알을 고르면 이 칸째로 빠져서 같이 숨는다.
+        mh = tk.Frame(p, bg=U.BG2)
+        mh.pack(fill="x", pady=(11, 5))
+        U.marker_label(mh, "기술", bg=U.BG2).pack(side="left")
+        self.btn_remember = U.ghost_button(mh, "기술 떠올리기", self.do_remember,
+                                           height=28)
+        self.btn_remember.pack(side="right")
+        self.btn_remember.configure(state="normal" if self.sel else "disabled")
         self.d_moves = tk.Frame(p, bg=U.BG2)
         self.d_moves.pack(fill="x")
+        # 레벨업 때 자리가 없어 못 배운 기술. 있을 때만 기술 칸 바로 아래에
+        # 담는다. 떠올리기에서 공짜로 배울 수 있다는 것까지 적는다 - 안
+        # 적으면 5,000원을 내야 하는 줄 안다.
+        self.d_pending = tk.Label(p, text="", bg=U.BG2, fg=U.GOOD,
+                                  font=U.FONT_XS, anchor="w", justify="left",
+                                  wraplength=DETAIL_W - 46)
+        self.d_pending.bind("<Configure>", self._fit_note)
 
         # 기술을 누르면 여기에 설명이 뜬다. 본가에 실제로 실린 문장이다
         # (도감의 desc — tools/build_pokedex.py 가 PokeAPI 에서 가져온다).
@@ -806,8 +821,11 @@ class BoxWindow(object):
         self.set_buttons(False)
 
     def set_buttons(self, on):
-        for b in (self.btn_party, self.btn_nick, self.btn_release):
-            b.configure(state="normal" if on else "disabled")
+        # 떠올리기 단추는 상세 칸에 있어서 바닥보다 나중에 만들어진다.
+        rem = getattr(self, "btn_remember", None)
+        for b in (self.btn_party, self.btn_nick, self.btn_release, rem):
+            if b is not None:
+                b.configure(state="normal" if on else "disabled")
 
     # ---------------- 데이터 ----------------
     def say(self, msg, color=None):
@@ -842,7 +860,9 @@ class BoxWindow(object):
         try:
             self.mons = mons or []
             self._refresh_filter_bar()
-            self.say("")
+            # 다시 불러온 까닭(떠올리기 결과 같은 것)이 있으면 지우지 않고 남긴다.
+            note, self._note = getattr(self, "_note", None), None
+            self.say(*(note or ("",)))
             self._render(self.sel)
         finally:
             if w:
@@ -1489,6 +1509,7 @@ class BoxWindow(object):
             self._move_cells.append((cell, col))
         for c in (0, 1):
             self.d_moves.grid_columnconfigure(c, weight=1)
+        self._paint_pending(m, dex)
         # 포켓몬을 바꾸면 아까 고른 기술의 설명이 남아 있으면 안 된다.
         self.pick_move(None, None, None)
 
@@ -1567,6 +1588,87 @@ class BoxWindow(object):
             table.setdefault(x.get("kr"), x)
         self._kr_moves = (moves, table)
         return table
+
+    def _paint_pending(self, m, dex):
+        """레벨업 때 자리가 없어 못 배운 기술을 기술 칸 아래에 적는다."""
+        pending = [dex.move_name(k) if dex else k for k in (m.get("pending") or [])]
+        if not pending:
+            self.d_pending.pack_forget()
+            return
+        self.d_pending.configure(text=natural(
+            "배우려던 기술: %s  ·  기술 떠올리기에서 무료로 배울 수 있습니다."
+            % ", ".join(pending)))
+        self.d_pending.pack(fill="x", pady=(5, 0), after=self.d_moves)
+
+    # ---------------- 기술 떠올리기 ----------------
+    def do_remember(self):
+        """떠올릴 기술을 받아 와서 고르게 하고, 네 개면 무엇을 잊을지도 묻는다.
+
+        목록·값·가진 돈은 **누를 때마다 서버에 묻는다.** 상세 칸에 들고 있는
+        것은 오래됐을 수 있다(그사이 배틀로 레벨이 올랐거나 돈이 들어왔다).
+        """
+        m = self.current()
+        if not m or m.get("isEgg"):
+            return
+        pid = m["id"]
+        self.say("떠올릴 수 있는 기술을 불러오는 중...")
+
+        def listed(r, err):
+            if not self._alive():
+                return
+            if err:
+                return self.say(getattr(err, "message", str(err)), U.DANGER)
+            cur = self.current()
+            if not cur or cur["id"] != pid:
+                return self.say("")          # 그사이 다른 포켓몬을 골랐다
+            self.say("")
+            self._ask_remember(pid, r)
+
+        U.run_async(self.root, lambda: self.app.api.remember_list(pid), listed)
+
+    def _ask_remember(self, pid, r):
+        from .ui_learn import ask_forget
+        from .ui_remember import ask_remember
+
+        dex = getattr(self.app, "dex", None)
+        name = r.get("name") or "포켓몬"
+        pick = ask_remember(self.win, name, r.get("remember") or [],
+                            r.get("cost", 0), r.get("money", 0), dex)
+        if not pick:
+            return
+        moves = r.get("moves") or []
+        forget = ""
+        if len(moves) >= 4:
+            got = ask_forget(self.win, name, pick, moves, dex)
+            if not got:
+                # 닫았거나(None) 떠올릴 기술 쪽을 골랐다("") - 돈을 안 낸다.
+                return self.say("떠올리지 않았습니다.")
+            forget = got
+        self.say("떠올리는 중...")
+
+        def done(res, err):
+            if not self._alive():
+                return
+            if err:
+                return self.say(getattr(err, "message", str(err)), U.DANGER)
+            if res.get("needForget"):
+                # 그사이 기술이 네 개가 됐다. 목록부터 다시 받는다.
+                return self.say("기술이 네 개가 됐습니다. 다시 눌러 주세요.", U.DANGER)
+            msg = res.get("message") or "떠올렸습니다."
+            if res.get("cost"):
+                msg += "  (%s원)" % "{:,}".format(int(res["cost"]))
+            self.say(msg, U.GOOD)
+            self._note = (msg, U.GOOD)
+            self.reload()
+            self.app.request_sync()
+
+        U.run_async(self.root, lambda: self.app.api.remember(pid, pick, forget), done)
+
+    def _alive(self):
+        try:
+            return bool(self.win.winfo_exists())
+        except Exception:                                   # noqa: BLE001
+            return False
 
     def pick_move(self, idx, md, name):
         """기술 하나를 골라 설명을 띄운다. idx 가 None 이면 접는다."""

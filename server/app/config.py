@@ -172,6 +172,10 @@ DROP_ON_WIN = _float("POKET_DROP_ON_WIN", 0.45)
 # 이로치는 기념이니 좋은 것을 준다 (가중치가 낮은 쪽에서 다시 뽑는다).
 DROP_SHINY_BONUS = _int("POKET_DROP_SHINY_BONUS", 3)
 SELL_RATE = _float("POKET_SELL_RATE", 0.5)
+# 기술 떠올리기 한 번 값. 본가 9세대는 공짜지만 여기서는 돈을 쓸 곳으로 둔다.
+# 이상한사탕(10,000원)의 절반. 레벨업 때 자리가 없어 못 배운 기술(pending)은
+# 이미 받을 몫이라 안 받는다.
+REMEMBER_COST = _int("POKET_REMEMBER_COST", 5000)
 
 # ---- 노력치 / 개체값 ----
 EV_STAT_MAX = _int("POKET_EV_STAT_MAX", 252)      # 6세대 이후 기준

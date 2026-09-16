@@ -435,6 +435,17 @@ class Api(object):
                           body={"pokemon": int(pokemon), "move": move,
                                 "forget": forget, "skip": bool(skip)})
 
+    # ---------------- 기술 떠올리기 ----------------
+    def remember_list(self, pokemon):
+        """떠올릴 수 있는 기술, 한 번 값, 가진 돈."""
+        return self._call("GET", "/api/pokemon/%d/remember" % int(pokemon))
+
+    def remember(self, pokemon, move, forget=""):
+        """떠올린다. 기술이 네 개면 forget 없이 부르면 needForget 이 온다."""
+        return self._call("POST", "/api/pokemon/remember",
+                          body={"pokemon": int(pokemon), "move": move,
+                                "forget": forget})
+
     def use_item(self, item, pokemon=0, stat=""):
         return self._call("POST", "/api/bag/use",
                           {"item": item, "pokemon": pokemon, "stat": stat,
