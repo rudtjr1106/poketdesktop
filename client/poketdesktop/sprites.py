@@ -190,6 +190,21 @@ def load_animation(path, target_height=48, min_scale=0.25, max_scale=2.5,
     return anim
 
 
+def load_battle_walker(path, target_height=48, min_scale=0.25, max_scale=2.5):
+    """걷는 도트가 없는 종이 **바탕화면을 걸을 때** 쓰는 배틀 도트.
+
+    **쇼다운 배틀 도트는 왼쪽을 본다.** load_animation 은 원본을 RIGHT,
+    뒤집은 것을 LEFT 에 담는다(관장 창은 그걸 알고 내 쪽에 LEFT 를 쓴다).
+    그런데 바탕화면의 도트는 '오른쪽으로 가면 RIGHT' 로 고르므로, 그대로 쓰면
+    오른쪽으로 걸을 때 왼쪽을 보고 **뒷걸음질** 쳤다(크라파 제보, 걷는 도트가
+    없는 57종 전부). 여기서 좌우를 바꿔 RIGHT 가 오른쪽을 보게 한다.
+
+    load_animation 이 캐시한 것은 건드리지 않는다 - 관장 창·목록이 같이 쓴다.
+    """
+    a = load_animation(path, target_height, min_scale, max_scale)
+    return Animation(a.frames[LEFT], a.frames[RIGHT], a.durations, a.w, a.h, a.scale, a.key)
+
+
 def to_rgba(img, key):
     """투명색으로 칠해둔 도트를 알파 있는 그림으로 되돌린다.
 

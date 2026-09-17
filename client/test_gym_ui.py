@@ -496,6 +496,23 @@ def main():
         cv.itemcget(b.box["foe"]["hp"], "text") == "7 / %d" % (foe.get("maxhp") or 1))
     b._bar("foe", foe.get("hp", 0), foe.get("maxhp") or 1)
     chk("포켓몬 그림이 선다", pump(root, lambda: all(cv.itemcget(b.sprite[w], "image") for w in ("me", "foe")), 10))
+    # 옆으로 긴 도트: 스토마(98x15)는 높이에 맞추면 392px 로 받침 밖까지 넘쳤다.
+    wide = Image.new("RGBA", (98, 15), (0, 0, 0, 0))
+    ImageDraw.Draw(wide).rectangle((0, 0, 97, 14), fill=(200, 160, 90, 255))
+    buf = io.BytesIO()
+    wide.save(buf, "PNG")
+    keep_png, api.png = api.png, buf.getvalue()
+    was = dict(b.shown["foe"])
+    b.set_mon("foe", dict(was, num=9998))              # 다른 검사와 캐시가 안 겹치는 번호
+    pump(root, lambda: b.anims.get("foe") and b.anims["foe"][0][0].width() > 200, 10)
+    wbb = cv.bbox(b.sprite["foe"])
+    cap = U.h(GB.MON_W["foe"])
+    chk("옆으로 긴 도트는 받침 폭(%dpx)을 안 넘는다" % cap,
+        wbb is not None and wbb[2] - wbb[0] <= cap + 1, wbb)
+    chk("  그래도 화면 안에 있다", canvas_inside(cv, b.sprite["foe"])[0], wbb)
+    api.png = keep_png
+    b.set_mon("foe", was)
+    pump(root, lambda: b.anims.get("foe") and b.anims["foe"][0][0].width() < 200, 10)
     chk("트레이너 도트가 선다", pump(root, lambda: cv.itemcget(b.trainer_item, "image"), 10))
     cells = b.left.winfo_children()[0].winfo_children()
     chk("기술 네 칸", len(cells) == 4, len(cells))

@@ -1612,8 +1612,11 @@ class BoxWindow(object):
             return
         pid = m["id"]
         self.say("떠올릴 수 있는 기술을 불러오는 중...")
+        wait = ui_loading.Overlay(self.win, "떠올릴 수 있는 기술을 불러오는 중",
+                                  slow=ui_loading.LEARN_SLOW)
 
         def listed(r, err):
+            wait.close()
             if not self._alive():
                 return
             if err:
@@ -1645,10 +1648,15 @@ class BoxWindow(object):
                 return self.say("떠올리지 않았습니다.")
             forget = got
         self.say("떠올리는 중...")
+        # **끝날 때까지 창을 덮는다.** 두 번 눌리지 않고, 느린 인터넷에서도 눌린 게 보인다.
+        wait = ui_loading.Overlay(self.win, "기술을 떠올리는 중", slow=ui_loading.LEARN_SLOW)
 
         def done(res, err):
+            wait.close()
             if not self._alive():
                 return
+            if err and not getattr(err, "status", 0):
+                return self._remember_failed(pid, name, pick, err)
             if err:
                 return self.say(getattr(err, "message", str(err)), U.DANGER)
             if res.get("needForget"):
@@ -1663,6 +1671,36 @@ class BoxWindow(object):
             self.app.request_sync()
 
         U.run_async(self.root, lambda: self.app.api.remember(pid, pick, forget), done)
+
+    def _remember_failed(self, pid, name, pick, err):
+        """응답이 안 왔다(인터넷). 서버에서는 떠올렸을 수도 있으니 먼저 확인한다.
+
+        돈은 서버가 기술을 바꾸는 순간에만 받으므로, 기술이 안 바뀌었으면 돈도
+        그대로다.
+        """
+        dex = getattr(self.app, "dex", None)
+        kr = dex.move_name(pick) if dex else pick
+        wait = ui_loading.Overlay(self.win, "결과를 확인하는 중", slow=ui_loading.LEARN_SLOW)
+
+        def done(r, e2):
+            wait.close()
+            if not self._alive():
+                return
+            if not e2 and pick in ((r or {}).get("moves") or []):
+                msg = natural("%s이(가) %s을(를) 떠올렸다!" % (name, kr))
+                self._note = (msg, U.GOOD)
+                self.say(msg, U.GOOD)
+                self.reload()
+                self.app.request_sync()
+                return
+            if e2:
+                return self.say(natural("인터넷 연결이 불안정합니다. 기술 칸이 바뀌지 않았으면 "
+                                        "다시 눌러 주세요. (%s)" % getattr(err, "message", err)),
+                                U.DANGER)
+            self.say(natural("%s을(를) 떠올리지 못했습니다. 돈은 나가지 않았습니다. 다시 눌러 주세요."
+                             % kr), U.DANGER)
+
+        U.run_async(self.root, lambda: self.app.api.remember_list(pid), done)
 
     def _alive(self):
         try:

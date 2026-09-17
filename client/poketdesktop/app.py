@@ -702,29 +702,88 @@ class App(object):
                 self._learn_queue.pop(0)
             return
 
+        self._send_learn(mon_id, name, move, pick)
+
+    def _send_learn(self, mon_id, name, move, pick):
+        """고른 답을 서버에 보낸다. **끝날 때까지 기다림 창을 띄운다.**
+
+        전에는 창을 닫자마자 뒤에서 보내고, 실패하면 로그에만 적었다. 인터넷이
+        느리면 15초 만에 끊겨서, 사용자는 기술이 그냥 안 배워진 줄 알았다.
+        이제 끝날 때까지 기다리고(api.LEARN_TIMEOUT), 실패하면 _learn_failed 가
+        정말 안 배워졌는지 서버에 다시 확인한다.
+        """
+        wait = ui_loading.Popup(self.root, "기술을 배우는 중" if pick != "" else "정리하는 중",
+                                slow=ui_loading.LEARN_SLOW)
+
         def work():
             return self.api.learn_pending(mon_id, move, pick,
                                           skip=(pick == ""))
 
         def done(r, err):
-            self._learn_asking = False
+            wait.close()
             if err:
                 config.log("기술 배우기 실패: %s" % err)
-                if self._learn_queue:
-                    self._learn_queue.pop(0)
-                return
+                return self._learn_failed(mon_id, name, move, pick, err)
+            self._learn_asking = False
             if r.get("message"):
                 self.notify(r["message"])
-            rest = r.get("pending") or []
-            if rest:
-                # 한 번에 여러 개가 기다릴 수 있다. 이어서 묻는다.
-                return self.root.after(400, self._ask_learn)
-            if self._learn_queue:
-                self._learn_queue.pop(0)
-            self.sync()
-            self.root.after(400, self._ask_learn)
+            self._learn_next(r.get("pending") or [])
 
         run_async(self.root, work, done)
+
+    def _learn_next(self, rest):
+        """한 마리를 끝냈다. 남은 게 있으면 이어서 묻고, 없으면 다음 포켓몬."""
+        self._learn_asking = False
+        if rest:
+            # 한 번에 여러 개가 기다릴 수 있다. 이어서 묻는다.
+            return self.root.after(400, self._ask_learn)
+        if self._learn_queue:
+            self._learn_queue.pop(0)
+        self.sync()
+        self.root.after(400, self._ask_learn)
+
+    def _learn_failed(self, mon_id, name, move, pick, err):
+        """응답을 못 받았다. **서버에서는 이미 배웠을 수도 있다** - 먼저 확인한다.
+
+          · 기다리던 목록에서 빠졌으면 처리된 것이다. 결과를 알린다.
+          · 아직 기다리는 중이면 다시 할지 묻는다. 안 하면 그대로 남겨 둔다
+            (다음 배틀 뒤에, 또는 포켓몬 관리의 기술 떠올리기에서 무료로 배운다).
+          · 확인도 안 되면(인터넷이 끊겼다) 그렇게 알리고 남겨 둔다.
+        """
+        wait = ui_loading.Popup(self.root, "결과를 확인하는 중", slow=ui_loading.LEARN_SLOW)
+        kr = self.dex.move_name(move) if self.dex else move
+
+        def done(r, e2):
+            wait.close()
+            mons = r if isinstance(r, list) else (r or {}).get("pokemon") or []
+            mon = next((m for m in mons if m.get("id") == mon_id), None)
+            if e2 or mon is None:
+                self._learn_asking = False
+                if self._learn_queue:
+                    self._learn_queue.pop(0)
+                return self.notify(natural(
+                    "인터넷 연결이 불안정해 %s을(를) 배우지 못했습니다. 연결되면 포켓몬 관리의 "
+                    "'기술 떠올리기' 에서 무료로 배울 수 있습니다." % kr))
+            pending = list(mon.get("pending") or [])
+            if move not in pending:
+                done_text = ("%s은(는) %s을(를) 배웠다!" % (name, kr)) if move in (mon.get("moves") or []) \
+                    else ("%s은(는) %s을(를) 배우지 않았다." % (name, kr))
+                self.notify(natural(done_text))
+                return self._learn_next(pending)
+            PLAT.activate()
+            again = confirm(self.root, "기술 배우기",
+                            natural("인터넷 연결이 불안정해 %s을(를) 배우지 못했습니다. "
+                                    "다시 시도할까요?" % kr),
+                            danger=False, ok_text="다시 시도")
+            if again:
+                return self._send_learn(mon_id, name, move, pick)
+            self._learn_asking = False
+            if self._learn_queue:
+                self._learn_queue.pop(0)
+            self.notify(natural("%s은(는) 나중에 포켓몬 관리의 '기술 떠올리기' 에서 무료로 "
+                                "배울 수 있습니다." % kr))
+
+        run_async(self.root, lambda: self.api.pokemon(), done)
 
     def open_friends(self):
         self.friends_win = self._tab("friends")

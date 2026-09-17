@@ -899,8 +899,8 @@ class Overlay(object):
             if not path:
                 return None
             try:
-                anim = sprites.load_animation(path, s["targetHeight"],
-                                              s["minScale"], s["maxScale"])
+                anim = sprites.load_battle_walker(path, s["targetHeight"],
+                                                  s["minScale"], s["maxScale"])
             except Exception:                              # noqa: BLE001
                 return None
         return (cls or Pet)(self, mon, anim)

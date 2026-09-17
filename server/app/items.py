@@ -398,7 +398,9 @@ def ball_bonus(item_id, dex, wild, mine=None, turn=0, uid=None, hour=None):
 
     if cond == "heavy":
         # 본가 헤비볼은 포획률에 더한다. 여기서는 곱으로 근사한다.
-        w = sp.get("weight", 0)
+        # **몸무게는 kg 칸이다.** "weight" 는 도감을 만들 때 야생 등장 가중치로
+        # 덮여서(build_pokedex), 잠만보(460kg)도 무게 4.5kg 으로 읽혀 늘 -20 이었다.
+        w = float(sp.get("kg") or 0)
         rate = max(1, sp.get("catch", 45))
         add = -20 if w < 100 else (0 if w < 200 else (20 if w < 300 else 30))
         return max(0.1, (rate + add) / float(rate))
@@ -537,7 +539,7 @@ def ball_why(item_id, dex, wild, mult, mine=None, turn=0, hour=None):
     if cond == "fast_species":
         return "발이 빠른 종이라" if on else "그리 빠르지 않아서"
     if cond == "heavy":
-        return "무게 %.1fkg" % (sp.get("weight", 0) / 10.0)
+        return "무게 %.1fkg" % float(sp.get("kg") or 0)
     if cond == "same_species_other_gender":
         return "같은 종 다른 성별이라" if on else "같은 종 다른 성별이 아니라"
     if cond == "asleep":

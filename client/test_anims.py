@@ -374,6 +374,44 @@ def main():
     chk("기준점으로 되돌리면 안 밀린다 (안 쓰면 %.0fpx 밀린다)"
         % abs(good - bad), abs((good + hurt_w / 2.0) - cx) < 1e-9)
 
+    print("\n=== 걷는 도트가 없는 종 (배틀 도트로 걷는다) ===")
+    # 쇼다운 배틀 도트처럼 **왼쪽을 보는** 그림: 부리(빨강)가 왼쪽 끝에 있다.
+    # 크라파 제보 - 오른쪽으로 걸을 때 왼쪽을 봐서 뒷걸음질로 보였다.
+    im = Image.new("RGBA", (40, 40), (0, 0, 0, 0))
+    for y in range(10, 34):
+        for x in range(12, 30):
+            im.putpixel((x, y), (40, 40, 40, 255))          # 몸
+    for y in range(16, 20):
+        for x in range(2, 12):
+            im.putpixel((x, y), (220, 40, 40, 255))         # 부리 (왼쪽)
+    bp = os.path.join(d, "battle_left.gif")
+    im.save(bp)
+
+    def beak_side(frame, key):
+        rgba = S.to_rgba(frame, key)
+        w = rgba.width
+        reds = [x for y in range(rgba.height) for x in range(w)
+                if rgba.getpixel((x, y))[0] > 180 and rgba.getpixel((x, y))[1] < 90]
+        return "left" if reds and max(reds) < w / 2 else ("right" if reds else "?")
+
+    fight = S.load_animation(bp, 48)
+    chk("관장 창용(load_animation) RIGHT 는 원본 그대로 왼쪽을 본다",
+        beak_side(fight.frames[S.RIGHT][0], fight.key) == "left")
+    walker = S.load_battle_walker(bp, 48)
+    chk("걷기용 RIGHT 는 오른쪽을 본다 (오른쪽으로 걸을 때 앞을 본다)",
+        beak_side(walker.frames[S.RIGHT][0], walker.key) == "right")
+    chk("걷기용 LEFT 는 왼쪽을 본다",
+        beak_side(walker.frames[S.LEFT][0], walker.key) == "left")
+    chk("관장 창이 캐시한 그림은 그대로다 (좌우를 안 바꿨다)",
+        beak_side(S.load_animation(bp, 48).frames[S.RIGHT][0], fight.key) == "left")
+    chk("크기·배율은 같다", (walker.w, walker.h, walker.scale) == (fight.w, fight.h, fight.scale))
+
+    print("\n=== 바꾼 배틀 도트는 캐시 이름이 다르다 (common/sprite_fix) ===")
+    from poketdesktop import sprite_cache as SC
+    chk("스토마는 판이 붙는다 (옛 납작한 그림을 안 쓴다)", SC._stem(618, False) == "0618-r2", SC._stem(618, False))
+    chk("  이로치도", SC._stem(618, True) == "0618s-r2", SC._stem(618, True))
+    chk("안 바꾼 종은 예전 이름", SC._stem(25, False) == "0025" and SC._stem(25, True) == "0025s")
+
     print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0

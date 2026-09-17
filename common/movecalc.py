@@ -143,8 +143,41 @@ def item_on(f):
     return bool(f.held) and not getattr(f, "used", False) and not getattr(f, "item_gone", False)
 
 
-def kg(f):
-    return float(((f.species or {}).get("kg")) or 0.0)
+# 틀깨기류. abilities.MOLD_BREAKERS 와 같다 (여기서는 abilities 를 import 하지 않는다).
+_MOLD_BREAKERS = ("MOLDBREAKER", "TERAVOLT", "TURBOBLAZE")
+
+
+def _ability(f):
+    """켜져 있는 특성. abilities.on 과 같은 판정 (위액을 맞으면 없는 것)."""
+    if f is None or not getattr(f, "ability_on", False) or not getattr(f, "ability", None):
+        return None
+    if (getattr(f, "cond", None) or {}).get("gastro"):
+        return None
+    return f.ability
+
+
+def kg(f, by=None):
+    """이 판에서의 몸무게(kg). 원작 순서 그대로:
+
+      1. 도감 몸무게에서 바디퍼지 한 번마다 100kg 을 뺀다 (0.1kg 아래로는 안 간다)
+      2. 헤비메탈이면 2배, 라이트메탈이면 절반
+      3. 0.1kg 아래로는 안 간다
+
+    by 는 몸무게를 재는 쪽(안다리걸기를 쓴 포켓몬). 틀깨기면 맞는 쪽의 헤비메탈·
+    라이트메탈을 무시한다.
+    """
+    base = float(((getattr(f, "species", None) or {}).get("kg")) or 0.0)
+    if not base:
+        return 0.0
+    w = max(0.1, base - 100.0 * int((getattr(f, "cond", None) or {}).get("autotomize") or 0))
+    ab = _ability(f)
+    if ab and by is not None and by is not f and _ability(by) in _MOLD_BREAKERS:
+        ab = None
+    if ab == "HEAVYMETAL":
+        w *= 2
+    elif ab == "LIGHTMETAL":
+        w /= 2.0
+    return max(0.1, round(w, 1))
 
 
 def _stat(f, name):
@@ -175,13 +208,13 @@ def power(move, user, target):
     base = int(move.get("power") or 0)
     k = key(move)
     if k in WEIGHT_TARGET:
-        w = kg(target)
+        w = kg(target, by=user)
         for limit, p in ((10, 20), (25, 40), (50, 60), (100, 80), (200, 100)):
             if w < limit:
                 return p
         return 120
     if k in WEIGHT_RATIO:
-        r = kg(user) / max(0.1, kg(target))
+        r = kg(user) / max(0.1, kg(target, by=user))
         for limit, p in ((5, 120), (4, 100), (3, 80), (2, 60)):
             if r >= limit:
                 return p

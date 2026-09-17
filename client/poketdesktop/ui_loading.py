@@ -19,13 +19,21 @@ from . import ui_common as U
 # 이만큼 지나면 "자고 있어서 그렇다" 고 알려준다.
 SLOW_AFTER = 4.0
 
+# 기술을 배우는 요청이 오래 걸릴 때. 인터넷이 느리면 서버가 깨어 있어도 오래 걸린다.
+# **끝날 때까지 닫지 않는다** - 전에는 창이 먼저 닫히고 뒤에서 실패해서, 사용자는
+# 기술이 그냥 안 배워진 줄 알았다.
+LEARN_SLOW = ("인터넷이 느려서 조금 걸리고 있습니다.\n"
+              "끝날 때까지 기다려 주세요.  (%d초)")
+
 
 class Overlay(object):
     """창 위에 덮는 기다림 표시."""
 
-    def __init__(self, parent, text="불러오는 중"):
+    def __init__(self, parent, text="불러오는 중", slow=None):
         self.parent = parent
         self.text = text
+        # 오래 걸릴 때 붙이는 말. %d 에 기다린 초가 들어간다. 없으면 서버가 깨는 중이라고 한다.
+        self.slow = slow
         self.t0 = time.time()
         self.job = None
         self.spin = 0
@@ -66,9 +74,9 @@ class Overlay(object):
         waited = time.time() - self.t0
         if waited >= SLOW_AFTER:
             self.note.configure(
-                text="서버가 자고 있어서 깨우는 중입니다.\n"
-                     "처음 한 번은 1분쯤 걸릴 수 있습니다.  (%d초)"
-                     % int(waited))
+                text=(self.slow or "서버가 자고 있어서 깨우는 중입니다.\n"
+                                   "처음 한 번은 1분쯤 걸릴 수 있습니다.  (%d초)")
+                % int(waited))
         try:
             self.job = self.parent.after(45, self._tick)
         except Exception:                                   # noqa: BLE001
@@ -109,7 +117,7 @@ class Popup(object):
 
     W, H = 340, 210
 
-    def __init__(self, root, text="불러오는 중"):
+    def __init__(self, root, text="불러오는 중", slow=None):
         self.win = tk.Toplevel(root)
         U.style_window(self.win, text, self.W, self.H)
         U.apply_theme(self.win)
@@ -117,7 +125,7 @@ class Popup(object):
                            highlightbackground=U.LINE2)
         self.win.resizable(False, False)
         self.win.protocol("WM_DELETE_WINDOW", lambda: None)
-        self.body = Overlay(self.win, text)
+        self.body = Overlay(self.win, text, slow=slow)
         PLAT.own_dialog(self.win, root)   # 맥: transient 는 창을 없앤다
         try:
             self.win.lift()

@@ -270,7 +270,7 @@ class Evolution(object):
                     except Exception:                       # noqa: BLE001
                         anim = None
                 if anim is None and path:
-                    anim = sprites.load_animation(
+                    anim = sprites.load_battle_walker(
                         path, s["targetHeight"], s["minScale"], s["maxScale"])
                 if anim is not None:
                     # 진화 전이 걷는 도트(4방향)였는데 진화 후가 배틀

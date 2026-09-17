@@ -46,6 +46,9 @@ MIN_SCENE_H = 220
 STEP_MS = 650
 # 포켓몬 도트 높이(px). 글자가 아니므로 글꼴 배율을 타지 않는다.
 MON_H = {"me": 132, "foe": 108}
+# 도트 폭 상한 (받침 폭쯤, 장면 좌표라 U.h 를 탄다). 높이만 맞추면 옆으로 긴 도트가
+# 받침 밖으로 넘친다 - 스토마(98x15)는 4배로 커져 392px, 갈모매(143x24)는 572px 였다.
+MON_W = {"me": 360, "foe": 290}
 
 CAT_KR = {"physical": "물리", "special": "특수", "status": "변화"}
 CAT_COLOR = {"physical": "#ff8a5b", "special": "#6fa8ff", "status": "#b7bfd6"}
@@ -358,7 +361,8 @@ class GymBattleWindow(object):
             path = sprite_cache.ensure(self.app.api, num, shiny)
             if not path:
                 return None
-            return sprites.load_animation(path, size, 0.2, 4.0)
+            return sprites.load_animation(path, size, 0.2, 4.0,
+                                          max_size=(U.h(MON_W[who]), size))
 
         def done(anim, err):
             if not self.alive or err or anim is None:

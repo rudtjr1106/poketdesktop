@@ -23,6 +23,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 
 os.environ["POKET_HOME"] = tempfile.mkdtemp(prefix="poket-smoke-remember-")
@@ -40,6 +41,8 @@ from poketdesktop import ui_common as U                     # noqa: E402
 
 import smoke_box_filter as SB                               # noqa: E402
 from test_learn_dialog import squeezed, texts               # noqa: E402
+
+SR_texts = texts
 
 OK = FAIL = 0
 DEX_PATH = os.path.join(HERE, "..", "server", "data", "pokedex.json")
@@ -244,6 +247,9 @@ class Api(SB.FakeApi):
         self.dex = dex
         self.money = 12000
         self.fail = None
+        self.net = None            # "drop" = 보내기 전에 끊김, "late" = 서버는 배우고 답이 끊김
+        self.hold = threading.Event()
+        self.hold.set()
 
     def remember_list(self, pid):
         self.calls.append(("remember_list", pid))
@@ -255,6 +261,10 @@ class Api(SB.FakeApi):
 
     def remember(self, pid, move, forget=""):
         self.calls.append(("remember", pid, move, forget))
+        self.hold.wait(10)                      # 느린 인터넷
+        from poketdesktop.api import ApiError
+        if self.net == "drop":
+            raise ApiError("서버 응답이 없습니다. 잠시 후 다시 시도해 주세요.")
         if self.fail:
             from poketdesktop.api import ApiError
             raise ApiError(self.fail, 400)
@@ -267,6 +277,8 @@ class Api(SB.FakeApi):
         cost = 0 if move in (m.get("pending") or []) else 5000
         m["pending"] = [x for x in m.get("pending") or [] if x != move]
         self.money -= cost
+        if self.net == "late":
+            raise ApiError("서버 응답이 없습니다. 잠시 후 다시 시도해 주세요.")
         return {"ok": True, "moves": m["moves"], "cost": cost, "money": self.money,
                 "message": "%s은(는) %s을(를) 떠올렸다!" % (m["info"]["name"], kr)}
 
@@ -390,14 +402,64 @@ def box_checks(root, dex):
         ui_remember.ask_remember = lambda *a, **k: "GROWL"
         ui_learn.ask_forget = lambda *a, **k: "ICEFANG"
         api.fail = "골드가 부족합니다. 5,000원이 필요한데 2,000원 있습니다."
+        api.calls[:] = []
         win.do_remember()
         wait_for(root, lambda: "골드가 부족" in win.status.cget("text"))
         chk("거절 말이 보인다", "골드가 부족" in win.status.cget("text"),
             win.status.cget("text"))
         chk("  빨간 글씨", win.status.cget("fg") == U.DANGER, win.status.cget("fg"))
+        chk("  서버가 거절한 것은 결과를 다시 묻지 않는다",
+            len([c for c in api.calls if c[0] == "remember_list"]) == 1, api.calls)
         api.fail = None
 
+        print("-- 느린 인터넷: 끝날 때까지 창을 덮는다")
+
+        def covered(text):
+            return any(isinstance(w, tk.Frame) and w.winfo_manager() == "place"
+                       and text in " ".join(SR_texts(w)) for w in win.win.winfo_children())
+        mons[0]["moves"] = ["SCRATCH"]
+        win.select(1)
+        settle(root)
+        api.hold.clear()
+        api.calls[:] = []
+        ui_remember.ask_remember = lambda *a, **k: "GROWL"
+        win.do_remember()
+        wait_for(root, lambda: ("remember", 1, "GROWL", "") in api.calls)
+        settle(root, 6)
+        chk("떠올리는 동안 '기술을 떠올리는 중' 이 창을 덮는다", covered("기술을 떠올리는 중"))
+        api.hold.set()
+        wait_for(root, lambda: "떠올렸다" in win.status.cget("text"))
+        settle(root, 10)
+        chk("  끝나면 걷힌다", not covered("기술을 떠올리는 중"))
+        chk("  결과가 나온다", "떠올렸다" in win.status.cget("text"), win.status.cget("text"))
+
+        print("-- 답이 끊겼는데 서버는 떠올렸다")
+        mons[0]["moves"] = ["SCRATCH"]
+        api.net = "late"
+        api.calls[:] = []
+        win.do_remember()
+        wait_for(root, lambda: api.calls.count(("remember_list", 1)) >= 2)
+        wait_for(root, lambda: "떠올렸다" in win.status.cget("text"))
+        settle(root, 10)
+        chk("결과를 서버에 다시 확인한다", api.calls.count(("remember_list", 1)) == 2, api.calls)
+        chk("  떠올린 것으로 알린다", "떠올렸다" in win.status.cget("text"), win.status.cget("text"))
+        chk("  덮개가 남지 않는다", not covered("결과를 확인하는 중"))
+
+        print("-- 보내기도 전에 끊겼다")
+        mons[0]["moves"] = ["SCRATCH"]
+        api.net = "drop"
+        api.calls[:] = []
+        win.do_remember()
+        wait_for(root, lambda: "못했습니다" in win.status.cget("text"))
+        settle(root, 6)
+        st = win.status.cget("text")
+        chk("못 떠올렸다고, 돈은 안 나갔다고 알린다", "못했습니다" in st and "돈은 나가지" in st, st)
+        chk("  빨간 글씨", win.status.cget("fg") == U.DANGER, win.status.cget("fg"))
+        chk("  기술은 그대로", mons[0]["moves"] == ["SCRATCH"], mons[0]["moves"])
+        api.net = None
+
         print("-- 진짜 창으로 한 번 (고르고 '떠올리기')")
+        api.money = 12000          # 앞에서 여러 번 떠올려 돈이 바닥났다 - 창이 '모자랍니다' 로 안 닫힌다
         ui_remember.ask_remember = real_remember
         ui_learn.ask_forget = real_forget
         win.select(1)

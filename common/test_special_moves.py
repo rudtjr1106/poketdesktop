@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""원작 공식 기술 검사 — 위력이 정해지지 않았던 기술과 씨뿌리기. 서버 없이 돈다.
+"""원작 공식 기술 검사 — 위력이 정해지지 않았던 기술, 씨뿌리기, 8·9세대 효과, 급소 표. 서버 없이 돈다.
 
     python common/test_special_moves.py
 
@@ -436,6 +436,116 @@ def t_AI와_빠진것(dex):
     chk("같은 시드면 같은 로그", ok and again == logs[7])
 
 
+# ---------------------------------------------------------------- 몸무게 (특성·바디퍼지)
+def t_몸무게(dex):
+    print("-- 몸무게: 헤비메탈·라이트메탈·틀깨기·바디퍼지")
+    boss = mon(dex, "AGGRON", 50, ["AUTOTOMIZE", "TACKLE"], ability="HEAVYMETAL")
+    bt, me, foe = fight(dex, mon(dex, "MACHAMP", 50, ["LOWKICK"]), boss, abilities=True)
+    chk("보스로라는 도감에 360kg", dex.get("AGGRON")["kg"] == 360.0, dex.get("AGGRON")["kg"])
+    chk("헤비메탈이면 2배 (720kg)", MC.kg(foe, by=me) == dex.get("AGGRON")["kg"] * 2, MC.kg(foe, by=me))
+    chk("  안다리걸기 위력 120", pw(dex, "LOWKICK", me, foe) == 120, pw(dex, "LOWKICK", me, foe))
+    me.ability = "MOLDBREAKER"
+    chk("틀깨기는 맞는 쪽의 헤비메탈을 무시한다", MC.kg(foe, by=me) == dex.get("AGGRON")["kg"],
+        MC.kg(foe, by=me))
+    me.ability = "NOGUARD"
+    foe.ability_on = False
+    chk("특성이 꺼진 판(야생)에서는 원래 몸무게", MC.kg(foe) == dex.get("AGGRON")["kg"], MC.kg(foe))
+    foe.ability_on = True
+
+    light = mon(dex, "SCIZOR", 50, ["TACKLE"], ability="LIGHTMETAL")
+    bt2, me2, foe2 = fight(dex, mon(dex, "MACHAMP", 50, ["LOWKICK"]), light, abilities=True)
+    chk("라이트메탈이면 절반", MC.kg(foe2) == round(dex.get("SCIZOR")["kg"] / 2.0, 1), MC.kg(foe2))
+
+    # 바디퍼지: 스피드가 오르면 100kg 가벼워지고, 교체하면 풀린다
+    foe.ability = "STURDY"
+    ev = use(bt, "foe", "AUTOTOMIZE")
+    chk("바디퍼지: 스피드가 크게 오른다", foe.stages.get("spe") == 2, foe.stages)
+    chk("  몸이 가벼워졌다고 알린다", "가벼워졌다" in texts(ev), texts(ev))
+    chk("  100kg 가벼워진다", MC.kg(foe) == dex.get("AGGRON")["kg"] - 100, MC.kg(foe))
+    foe.stages["spe"] = 6
+    ev = use(bt, "foe", "AUTOTOMIZE")
+    chk("  스피드가 더 못 오르면 실패하고 몸무게도 그대로",
+        MC.kg(foe) == dex.get("AGGRON")["kg"] - 100 and "가벼워졌다" not in texts(ev), (MC.kg(foe), texts(ev)))
+    for _ in range(6):
+        foe.stages["spe"] = 0
+        use(bt, "foe", "AUTOTOMIZE")
+    chk("  0.1kg 아래로는 안 간다", MC.kg(foe) == 0.1, MC.kg(foe))
+    foe.clear_volatile()
+    chk("  물러나면 원래 몸무게", MC.kg(foe) == dex.get("AGGRON")["kg"], MC.kg(foe))
+
+
+# ---------------------------------------------------------------- 8·9세대 효과와 급소 표
+def t_89세대_효과(dex):
+    print("-- 8·9세대 공격기 효과 (도감에 Showdown 으로 채움)")
+    # 제보: 파라블레이즈의 원념의칼이 HP 를 안 빨았다. 도감에 흡수 칸이 없었다.
+    bt, me, foe = fight(dex, mon(dex, "CERULEDGE", 60, ["BITTERBLADE"]),
+                        mon(dex, "SNORLAX", 60, ["TACKLE"]))
+    me.hp = me.maxhp // 3
+    before = me.hp
+    ev = use(bt, "me", "BITTERBLADE")
+    dealt = sum(e.get("damage") or 0 for e in ev if e.get("t") == "hit")
+    chk("원념의칼이 들어간다", dealt > 0, texts(ev))
+    chk("원념의칼: 준 데미지의 절반을 회복한다",
+        me.hp - before == max(1, dealt // 2), (before, me.hp, dealt))
+
+    bt, me, foe = fight(dex, mon(dex, "PALAFIN", 60, ["WAVECRASH"]),
+                        mon(dex, "SNORLAX", 70, ["TACKLE"]))
+    ev = use(bt, "me", "WAVECRASH")
+    dealt = sum(e.get("damage") or 0 for e in ev if e.get("t") == "hit")
+    chk("웨이브태클: 준 데미지의 1/3 을 반동으로 받는다",
+        dealt > 0 and me.maxhp - me.hp == max(1, int(dealt * 33 / 100.0)),
+        (dealt, me.maxhp - me.hp))
+
+    bt, me, foe = fight(dex, mon(dex, "ARMAROUGE", 60, ["ARMORCANNON"]),
+                        mon(dex, "SNORLAX", 70, ["TACKLE"]))
+    use(bt, "me", "ARMORCANNON")
+    chk("아머캐논: 자신의 방어·특수방어가 1 씩 떨어진다",
+        me.stages.get("def") == -1 and me.stages.get("spd") == -1, me.stages)
+    chk("  상대 능력은 그대로", not any(foe.stages.values()), foe.stages)
+
+    bt, me, foe = fight(dex, mon(dex, "SINISTCHA", 60, ["MATCHAGOTCHA"]),
+                        mon(dex, "SNORLAX", 70, ["TACKLE"]))
+    me.hp = me.maxhp // 3
+    before = me.hp
+    ev = use(bt, "me", "MATCHAGOTCHA")
+    dealt = sum(e.get("damage") or 0 for e in ev if e.get("t") == "hit")
+    chk("휘적휘적포: 절반 흡수", me.hp - before == max(1, dealt // 2), (before, me.hp, dealt))
+    md = dex.move("MATCHAGOTCHA")
+    chk("  화상 20%", (md.get("ail"), md.get("ailChance")) == ("burn", 20), md)
+
+    crits = 0
+    for seed in range(20):
+        bt, me, foe = fight(dex, mon(dex, "MEOWSCARADA", 60, ["FLOWERTRICK"]),
+                            mon(dex, "SNORLAX", 90, ["TACKLE"]), seed=seed)
+        ev = use(bt, "me", "FLOWERTRICK")
+        crits += any(e.get("t") == "hit" and e.get("crit") for e in ev)
+    chk("트릭플라워: 스무 번 다 급소", crits == 20, crits)
+
+    bt, me, foe = fight(dex, mon(dex, "MAUSHOLD", 60, ["POPULATIONBOMB"]),
+                        mon(dex, "SNORLAX", 100, ["TACKLE"]))
+    ev = use(bt, "me", "POPULATIONBOMB")
+    hits = [e for e in ev if e.get("t") == "hit"]
+    chk("찍찍베기: 열 번 때린다", len(hits) == 10, len(hits))
+
+    # 배울 수 있는 공격기 중 효과 칸이 비어 있는 것이 없다
+    learned = set(mv for sp in dex.species for _l, mv in sp.get("moves", []))
+    missing = sorted(k for k in learned
+                     if (dex.move(k) or {}).get("cat") not in (None, "status")
+                     and "drain" not in (dex.move(k) or {}))
+    chk("배울 수 있는 공격기는 모두 효과 칸이 있다", not missing, missing[:8])
+
+    print("-- 급소 확률 (7세대 이후 표)")
+    chk("단계별 분모 24 / 8 / 2 / 1", B.CRIT_BY_STAGE == (24, 8, 2, 1), B.CRIT_BY_STAGE)
+    atk = B.Fighter(dex, mon(dex, "KINGLER", 50, ["CRABHAMMER"]))
+    dfn = B.Fighter(dex, mon(dex, "SNORLAX", 50, ["TACKLE"]))
+    rng = random.Random(3)
+    n = 4000
+    got = sum(1 for _ in range(n) if B.damage(dex, dex.move("CRABHAMMER"), atk, dfn, rng)[1])
+    chk("1단계(크랩해머)는 1/8 언저리", 0.10 <= got / float(n) <= 0.15, got / float(n))
+    got0 = sum(1 for _ in range(n) if B.damage(dex, dex.move("TACKLE"), atk, dfn, rng)[1])
+    chk("0단계(몸통박치기)는 1/24 언저리", 0.025 <= got0 / float(n) <= 0.06, got0 / float(n))
+
+
 def main():
     dex = load_dex()
     t_제보(dex)
@@ -447,6 +557,8 @@ def main():
     t_한번씩(dex)
     t_씨뿌리기(dex)
     t_AI와_빠진것(dex)
+    t_몸무게(dex)
+    t_89세대_효과(dex)
     print()
     print("======================================================")
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))

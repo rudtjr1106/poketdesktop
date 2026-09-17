@@ -694,8 +694,8 @@ class WildController(object):
             if not path:
                 return
             try:
-                anim = sprites.load_animation(path, s["targetHeight"],
-                                              s["minScale"], s["maxScale"])
+                anim = sprites.load_battle_walker(path, s["targetHeight"],
+                                                  s["minScale"], s["maxScale"])
             except Exception:                              # noqa: BLE001
                 return
         if self.grass:

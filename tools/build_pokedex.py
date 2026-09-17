@@ -114,6 +114,101 @@ def rows(name):
             yield r
 
 
+# ---------------------------------------------------------------- 8·9세대 기술 효과
+# **PokeAPI 의 move_meta.csv 에는 8·9세대 기술 대부분이 없다.** 줄이 없으면
+# 흡수·반동·상태이상·능력 변화·급소·연속타가 통째로 빠져서, 원념의칼이 HP 를
+# 안 빨고 웨이브태클이 반동이 없고 아머캐논이 방어가 안 떨어졌다(배울 수 있는
+# 기술만 63개). 플래그(move_flag_map)도 같이 비어서 접촉·펀치도 몰랐다.
+#
+# 그 기술들만 Pokémon Showdown 의 기술 자료로 채운다. PokeAPI 에 줄이 있는
+# 기술은 건드리지 않는다. Showdown 자료는 함수(onHit 같은 것)를 빼고 내려오므로
+# 아래 칸으로 옮길 수 있는 효과만 들어온다 - 소금절이의 턴마다 데미지 같은
+# 전용 동작은 엔진이 따로 해야 한다.
+SHOWDOWN_MOVES = "https://play.pokemonshowdown.com/data/moves.json"
+SD_STATUS = {"brn": "burn", "par": "paralysis", "psn": "poison", "tox": "poison",
+             "slp": "sleep", "frz": "freeze"}
+SD_STAT = {"atk": "atk", "def": "def", "spa": "spa", "spd": "spd", "spe": "spe",
+           "accuracy": "acc", "evasion": "eva"}
+# Showdown 플래그 이름 -> PokeAPI move_flags 이름. 나머지는 이름이 같다.
+SD_FLAG = {"bypasssub": "authentic", "bullet": "ballistics", "nonsky": "non-sky-battle"}
+
+
+def showdown_moves():
+    p = os.path.join(CACHE, "showdown_moves.json")
+    if not os.path.exists(p) or os.path.getsize(p) == 0:
+        os.makedirs(CACHE, exist_ok=True)
+        sys.stderr.write("  받는 중: showdown moves.json\n")
+        with urllib.request.urlopen(SHOWDOWN_MOVES, timeout=180) as r:
+            data = r.read()
+        with open(p, "wb") as f:
+            f.write(data)
+    with io.open(p, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _pct(frac):
+    n, d = frac
+    return int(round(100.0 * n / d)) if d else 0
+
+
+def _boosts(b):
+    return [[SD_STAT[k], int(v)] for k, v in sorted(b.items()) if k in SD_STAT and v]
+
+
+def meta_from_showdown(v):
+    """Showdown 기술 하나 -> move_meta 와 같은 꼴 (PokeAPI 규칙 그대로).
+
+    확률 칸은 0 이 '늘', 양수가 '그 확률' 이다(battle.py). 공격하면서 자기
+    능력이 늘 바뀌는 것(아머캐논)은 인파이트처럼 statSelf=True, statChance=100.
+    """
+    out = {"ail": None, "ailChance": 0, "stat": [], "statSelf": False,
+           "statChance": 0, "drain": 0, "heal": 0, "crit": 0, "flinch": 0,
+           "hits": [1, 1]}
+    if v.get("drain"):
+        out["drain"] = _pct(v["drain"])
+    elif v.get("recoil"):
+        out["drain"] = -_pct(v["recoil"])
+    if v.get("heal"):
+        out["heal"] = _pct(v["heal"])
+    if v.get("willCrit"):
+        out["crit"] = 6                        # PokeAPI 가 '반드시 급소' 에 쓰는 값
+    elif v.get("critRatio"):
+        out["crit"] = max(0, int(v["critRatio"]) - 1)
+    mh = v.get("multihit")
+    if isinstance(mh, int):
+        out["hits"] = [mh, mh]
+    elif isinstance(mh, list) and len(mh) == 2:
+        out["hits"] = [int(mh[0]), int(mh[1])]
+    secs = list(v.get("secondaries") or ([v["secondary"]] if v.get("secondary") else []))
+    for sec in secs:
+        ch = int(sec.get("chance") or 100)
+        if sec.get("status") in SD_STATUS:
+            out["ail"], out["ailChance"] = SD_STATUS[sec["status"]], ch
+        vol = sec.get("volatileStatus")
+        if vol == "flinch":
+            out["flinch"] = ch
+        elif vol == "confusion":
+            out["ail"], out["ailChance"] = "confusion", ch
+        if _boosts(sec.get("boosts") or {}):
+            out["stat"], out["statSelf"], out["statChance"] = _boosts(sec["boosts"]), False, ch
+        own = _boosts((sec.get("self") or {}).get("boosts") or {})
+        if own:
+            out["stat"], out["statSelf"], out["statChance"] = own, True, ch
+    own = _boosts((v.get("self") or {}).get("boosts") or {})
+    if own:
+        out["stat"], out["statSelf"], out["statChance"] = own, True, 100
+    return out
+
+
+def flags_from_showdown(v, known):
+    out = set()
+    for k in (v.get("flags") or {}):
+        name = SD_FLAG.get(k, k)
+        if name in known:
+            out.add(name)
+    return sorted(out)
+
+
 def as_int(v, default=0):
     try:
         return int(v)
@@ -286,6 +381,10 @@ def build():
         if f:
             move_flags.setdefault(as_int(r["move_id"]), []).append(f)
 
+    known_flags = set(flag_name.values())
+    sd_moves = showdown_moves()
+    filled = []
+
     move_ident, move_out = {}, {}
     for r in rows("moves.csv"):
         mid = as_int(r["id"])
@@ -321,6 +420,19 @@ def build():
                 "hits": [as_int(m.get("min_hits"), 1) or 1,
                          as_int(m.get("max_hits"), 1) or 1],
             })
+        else:
+            sd = sd_moves.get(ident.lower())
+            # 공격기만 채운다. 변화기(꼬리자르기·설경 ...)는 statusmoves 가
+            # 기술마다 따로 처리해서, 여기서 능력 변화를 또 넣으면 두 번 걸린다.
+            if sd and move_out[ident]["cat"] != "status":
+                move_out[ident].update(meta_from_showdown(sd))
+                filled.append(ident)
+            # 플래그도 효과 표가 없는 기술만. 원래 플래그가 없는 옛 기술
+            # (튀어오르기 같은 것)까지 바꾸면 안 된다.
+            if sd and not move_out[ident]["flags"]:
+                move_out[ident]["flags"] = flags_from_showdown(sd, known_flags)
+
+    sys.stderr.write("  PokeAPI 에 효과가 없어 Showdown 으로 채운 공격기: %d개\n" % len(filled))
 
     # ---- 종 기본 ----
     species_row = {}

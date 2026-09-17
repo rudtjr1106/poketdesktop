@@ -28,6 +28,10 @@ STAGE_KEYS = ("atk", "def", "spa", "spd", "spe", "acc", "eva")
 STAGE_MIN, STAGE_MAX = -6, 6
 
 CRIT_CHANCE = 24            # 1/24 (7세대 이후)
+# 급소 단계별 확률의 분모 (7세대 이후): 0단계 1/24, 1단계 1/8, 2단계 1/2, 3단계
+# 이상 반드시. 예전에는 24 를 단계마다 반으로 나눠서(1/12, 1/6, 1/3) 얼음숨결·
+# 트릭플라워 같은 '반드시 급소' 기술(도감 crit 6)도 세 번에 한 번만 급소였다.
+CRIT_BY_STAGE = (CRIT_CHANCE, 8, 2, 1)
 CRIT_MULT = 1.5
 STAB = 1.5
 
@@ -338,7 +342,9 @@ def damage(dex, move, user, target, rng, crit=None):
         if user.cond.get("focus"):
             stages += 2                         # 기충전
         if stages:
-            chance = max(2, CRIT_CHANCE // (2 ** min(3, stages)))
+            chance = CRIT_BY_STAGE[min(3, max(0, stages))]
+        # 반드시 급소(분모 1)여도 난수는 똑같이 한 번 뽑는다. 안 뽑으면 그 뒤의
+        # 난수(데미지 폭·부가효과)가 전부 한 칸씩 밀려 같은 판이 다르게 흘러간다.
         crit = rng.randrange(chance) == 0
         if user.cond.get("laserfocus"):
             crit = True                         # 예민해지기

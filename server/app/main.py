@@ -27,6 +27,7 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
 
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
+from common import sprite_fix as SF        # noqa: E402
 from . import (auth, battle_routes, config, db, deps, eggs, item_routes,  # noqa: E402
                errors, items, migrations, pvp, pvp_routes,
                gym_routes, social_routes, tm_routes, tms, walk)
@@ -233,7 +234,10 @@ CONTENT_TYPE = {".gif": "image/gif", ".png": "image/png"}
 
 
 def _sprite_path(num, shiny, ext):
-    return os.path.join(SPRITE_DIR, "%04d%s%s" % (num, "s" if shiny else "", ext))
+    # 도트를 바꾼 종은 이름에 판을 붙인다. 안 그러면 옛 그림을 계속 준다 (common/sprite_fix).
+    r = SF.rev(num)
+    return os.path.join(SPRITE_DIR, "%04d%s%s%s" % (num, "s" if shiny else "",
+                                                   ("-" + r) if r else "", ext))
 
 
 def _sprite_cached(num, shiny):
@@ -250,7 +254,10 @@ def _sprite_fetch(num, shiny):
     import urllib.request
     os.makedirs(SPRITE_DIR, exist_ok=True)
     sub = "shiny/" if shiny else ""
-    for pat, ext in SPRITE_SOURCES:
+    sources = list(SPRITE_SOURCES)
+    if SF.source(num):
+        sources.insert(0, (SF.source(num), ".gif"))       # 납작한 쇼다운 도트 대신
+    for pat, ext in sources:
         url = "%s/%s" % (SPRITE_BASE, pat % (sub, num))
         try:
             # 짧게 잡는다. 세 군데를 도는데 각각 25초면 최악에 75초가 되고,

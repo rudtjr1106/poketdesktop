@@ -8,6 +8,8 @@ import os
 import threading
 import time
 
+from common import sprite_fix as SF
+
 from . import config
 
 _lock = threading.Lock()
@@ -54,7 +56,10 @@ def sprite_dir():
 
 
 def _stem(num, shiny):
-    return "%04d%s" % (int(num), "s" if shiny else "")
+    # 서버에서 도트를 바꾼 종(common/sprite_fix)은 이름에 판을 붙인다. 안 붙이면
+    # 이미 받아 둔 옛 그림(납작한 스토마)을 계속 쓴다.
+    r = SF.rev(num)
+    return "%04d%s%s" % (int(num), "s" if shiny else "", ("-" + r) if r else "")
 
 
 def find_local(num, shiny=False):

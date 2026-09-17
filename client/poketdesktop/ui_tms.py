@@ -591,14 +591,23 @@ class TmWindow(object):
                 return self.say("배우지 않았습니다.")
             forget = pick
 
+        pid = self.mon_id
+
         def work():
-            return self.app.api.tm_use(t["no"], self.mon_id, forget)
+            return self.app.api.tm_use(t["no"], pid, forget)
+
+        # **끝날 때까지 창을 덮는다.** 상태줄 글씨만으로는 느린 인터넷에서 눌린
+        # 건지 알 수 없었고, 15초에 끊기면 기술이 그냥 안 배워진 것처럼 보였다.
+        wait = ui_loading.Overlay(self.win, "기술을 가르치는 중", slow=ui_loading.LEARN_SLOW)
 
         def done(r, err):
+            wait.close()
             if not self.alive:
                 return
+            if err and not getattr(err, "status", 0):
+                return self._teach_failed(t, pid, name, err)     # 응답이 안 왔다
             if err:
-                return self.say("%s" % err, U.RED)
+                return self.say("%s" % err, U.RED)              # 서버가 거절했다
             if r.get("needForget"):
                 return self.say("기술이 네 개입니다. 다시 골라 주세요.")
             self._msg = (r.get("message") or "배웠다!", U.GOOD)
@@ -606,6 +615,24 @@ class TmWindow(object):
 
         self.say("가르치는 중...")
         U.run_async(self.root, work, done)
+
+    def _teach_failed(self, t, pid, name, err):
+        """응답을 못 받았다. 서버에서는 배웠을 수도 있으니 먼저 확인한다."""
+        wait = ui_loading.Overlay(self.win, "결과를 확인하는 중", slow=ui_loading.LEARN_SLOW)
+
+        def done(r, e2):
+            wait.close()
+            if not self.alive:
+                return
+            row = next((m for m in (r or {}).get("learners") or [] if m.get("id") == pid), None)
+            if not e2 and row and row.get("known"):
+                self._msg = (natural("%s이(가) %s을(를) 배웠다!" % (name, t["kr"])), U.GOOD)
+                return self.reload()
+            # 고른 포켓몬은 그대로 둔다 - 바로 다시 누를 수 있게.
+            self.say(natural("%s을(를) 가르치지 못했습니다. 다시 눌러 주세요. (%s)"
+                             % (t["kr"], getattr(err, "message", err))), U.RED)
+
+        U.run_async(self.root, lambda: self.app.api.tm_learners(t["no"]), done)
 
     # ---------------- 닫기 ----------------
     def close(self):

@@ -140,6 +140,9 @@ class FakeApi(object):
         self.calls = []
         self.gate = threading.Event()     # tm_learners 를 잠깐 붙잡는다
         self.gate.set()
+        self.use_gate = threading.Event()  # tm_use 를 붙잡는다 (느린 인터넷)
+        self.use_gate.set()
+        self.net = None
 
     def tms(self):
         self.calls.append("tms")
@@ -155,6 +158,17 @@ class FakeApi(object):
 
     def tm_use(self, no, pid, forget=""):
         self.calls.append(("use", no, pid, forget))
+        self.use_gate.wait(10)                     # 느린 인터넷
+        from poketdesktop.api import ApiError
+        if self.net == "drop":                     # 보내기도 전에 끊겼다
+            raise ApiError("서버 응답이 없습니다. 잠시 후 다시 시도해 주세요.")
+        if self.net == "reject":                   # 서버가 거절했다
+            raise ApiError("그 포켓몬은 그 기술을 배울 수 없습니다.", 400)
+        for m in self.learners:
+            if m["id"] == pid:
+                m["known"] = True
+        if self.net == "late":                     # 서버는 배웠는데 답이 끊겼다
+            raise ApiError("서버 응답이 없습니다. 잠시 후 다시 시도해 주세요.")
         return {"ok": True, "message": "배웠다!"}
 
     def sprite(self, num, shiny=False):
@@ -387,6 +401,77 @@ def run(root, app, api, tms, have, learners, sprite_gate):
         all(win.rows[n][0] is f for n, f in kept.items()), len(win.rows))
     chk("다시 불러와도 고른 줄은 그대로",
         win.rows[target][0].cget("bg") == U.ACCENT_SOFT)
+
+    print("\n=== 느린 인터넷에서 가르치기 (끝날 때까지 덮는다)")
+
+    def all_text(w):
+        out = []
+        for c in w.winfo_children():
+            try:
+                if "text" in c.keys() and c.cget("text"):
+                    out.append(str(c.cget("text")))
+            except tk.TclError:
+                pass
+            out.extend(all_text(c))
+        return out
+
+    def covered(text):
+        return any(isinstance(w, tk.Frame) and w.winfo_manager() == "place"
+                   and text in " ".join(all_text(w)) for w in win.win.winfo_children())
+
+    def fresh(pid):
+        for m in api.learners:
+            if m["id"] == pid:
+                m["known"] = False
+        win.pick(have[1])
+        win.pick(target)
+        wait_for(root, lambda: pid in win.mon_rows)
+        settle(root)
+        win.pick_mon(pid)
+        win.say("")                      # 앞 단계의 '배웠다' 가 남아 검사가 거저 통과하지 않게
+
+    fresh(11)
+    api.use_gate.clear()
+    win.teach()
+    wait_for(root, lambda: ("use", target, 11, "") in api.calls)
+    settle(root, 6)
+    chk("가르치는 동안 '기술을 가르치는 중' 이 창을 덮는다", covered("기술을 가르치는 중"))
+    api.use_gate.set()
+    wait_for(root, lambda: "배웠다" in win.status.cget("text") and not covered("기술을 가르치는 중"))
+    settle(root)
+    chk("  끝나면 걷히고 결과가 나온다",
+        not covered("기술을 가르치는 중") and "배웠다" in win.status.cget("text"),
+        win.status.cget("text"))
+
+    fresh(11)
+    api.net = "late"
+    n0 = len(api.calls)
+    win.teach()
+    wait_for(root, lambda: "배웠다" in win.status.cget("text") and api.calls[n0:].count(("learners", target)) >= 1)
+    settle(root, 6)
+    chk("답이 끊겼는데 서버는 배웠다: 확인하고 배웠다고 알린다",
+        "배웠다" in win.status.cget("text") and ("learners", target) in api.calls[n0:],
+        (win.status.cget("text"), api.calls[n0:]))
+
+    fresh(11)
+    api.net = "drop"
+    win.teach()
+    wait_for(root, lambda: "못했습니다" in win.status.cget("text"))
+    settle(root)
+    chk("보내기도 전에 끊겼다: 못 가르쳤다고 빨갛게", "못했습니다" in win.status.cget("text")
+        and win.status.cget("fg") == U.RED, (win.status.cget("text"), win.status.cget("fg")))
+    chk("  고른 포켓몬은 그대로 (바로 다시 누를 수 있다)", win.mon_id == 11, win.mon_id)
+
+    fresh(11)
+    api.net = "reject"
+    n0 = len(api.calls)
+    win.teach()
+    wait_for(root, lambda: "배울 수 없습니다" in win.status.cget("text"))
+    settle(root)
+    chk("서버가 거절하면 그 말을 그대로 (다시 확인하지 않는다)",
+        "배울 수 없습니다" in win.status.cget("text")
+        and ("learners", target) not in api.calls[n0:], api.calls[n0:])
+    api.net = None
 
     print("\n=== 닫기")
     win.pick(have[1])

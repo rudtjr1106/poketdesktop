@@ -12,6 +12,9 @@ TIMEOUT = 15
 # 다시 깨어나는 데 1분쯤 걸려서, 15초로는 로그인이 무조건 실패한다.
 # 처음 붙는 요청만 넉넉히 기다린다.
 WAKE_TIMEOUT = 90
+# 기술을 배우는 요청(기술머신·기다리던 기술·떠올리기). 기본 15초로는 느린 인터넷에서
+# 끊기는데, 그 사이 서버는 이미 배웠을 수 있다. 화면이 기다림 표시를 띄우고 기다린다.
+LEARN_TIMEOUT = 60
 
 
 class ApiError(Exception):
@@ -427,13 +430,14 @@ class Api(object):
         답(needForget)이 온다."""
         return self._call("POST", "/api/tms/use",
                           body={"no": int(no), "pokemon": int(pokemon),
-                                "forget": forget})
+                                "forget": forget}, timeout=LEARN_TIMEOUT)
 
     def learn_pending(self, pokemon, move, forget="", skip=False):
         """레벨업으로 배우려던 기술을 배우거나 버린다."""
         return self._call("POST", "/api/pokemon/learn",
                           body={"pokemon": int(pokemon), "move": move,
-                                "forget": forget, "skip": bool(skip)})
+                                "forget": forget, "skip": bool(skip)},
+                          timeout=LEARN_TIMEOUT)
 
     # ---------------- 기술 떠올리기 ----------------
     def remember_list(self, pokemon):
@@ -444,7 +448,7 @@ class Api(object):
         """떠올린다. 기술이 네 개면 forget 없이 부르면 needForget 이 온다."""
         return self._call("POST", "/api/pokemon/remember",
                           body={"pokemon": int(pokemon), "move": move,
-                                "forget": forget})
+                                "forget": forget}, timeout=LEARN_TIMEOUT)
 
     def use_item(self, item, pokemon=0, stat=""):
         return self._call("POST", "/api/bag/use",

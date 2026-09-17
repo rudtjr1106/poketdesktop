@@ -28,6 +28,7 @@ sys.path.insert(0, ROOT)
 from common import abilities as A            # noqa: E402
 from common import battle as B               # noqa: E402
 from common import pokelogic as P            # noqa: E402
+from common import statusmoves as SM          # noqa: E402
 from common import trainer_battle as TB      # noqa: E402
 
 OK = FAIL = 0
@@ -93,7 +94,11 @@ def t_끝까지_돈다(dex, gyms):
                 if tb.valid_switches() and rng.random() < 0.15:
                     tb.act("switch", rng.choice(tb.valid_switches()))
                 else:
-                    keys = [m for m in tb.me.moves if tb.me.pp.get(m, 0) > 0] or [B.STRUGGLE]
+                    # 막힌 기술(사슬묶기·도발·앵콜 ...)은 고르지 않는다 - 화면도 못 누르게
+                    # 막고, 서버(TrainerBattle.act)는 거절한다. 이 봇이 거르지 않아서 급소
+                    # 확률이 바뀌어 판이 달라지자 사슬묶기에 걸린 기술을 골라 예외가 났다.
+                    keys = [m for m in tb.me.moves if tb.me.pp.get(m, 0) > 0
+                            and not SM.restricted(tb.bt, tb.me, m)] or [B.STRUGGLE]
                     tb.act("move", rng.choice(keys))
                 if not tb.me.alive() and not tb.need_switch and not tb.over:
                     bad_switch.append(t["name"])

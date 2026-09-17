@@ -45,8 +45,14 @@ OK = FAIL = 0
 # 나란히 돌려 처음 어긋나는 곳을 보니 파티전 13판·야생전 8판 전부가 새로 동작하는 기술에서
 # 갈라졌다: 캐이시의 순간이동(유저 배틀에서 교체할 동료가 없으면 실패 / 야생은 도망),
 # 식스테일의 이상한빛(AI 가 이제 값을 매겨 고른다), 롱스톤의 조이기(붙잡기).
-PARTY_DIGEST = "dc9bdeb5d7c5d1d60405219184693873548eb6bc3aae75100f2e26f26047b7b9"
-SOLO_DIGEST = "eedbdbe3e433ff685efe4d4cf3a7f48ac0b601eb3d6793d270574b27439c5440"
+#
+# 1.4.3 뒤에 **급소 확률을 원작 표로** 고치면서 또 달라졌다 (dc9bdeb5 / eedbdbe3 에서).
+# 예전 식은 1단계 1/12·2단계 1/6·3단계 이상 1/3 이었고 원작은 1/8·1/2·반드시다
+# (battle.CRIT_BY_STAGE). 이 파티의 파이리가 급소율이 높은 베어가르기를 든다. 같은 때
+# 도감에 8·9세대 공격기 효과를 채웠는데, 그것만 넣었을 때는 옛 값이 그대로였고,
+# CRIT_BY_STAGE 를 옛 값 (24, 12, 6, 3) 으로 되돌리면 옛 값 둘이 그대로 나오는 것을 확인했다.
+PARTY_DIGEST = "05ceafd2d98051d8019008b101a66bb457060866d432d05277e2826f6c27450c"
+SOLO_DIGEST = "2d085a96b81c364bea3f3de50d911ce32519001c46b371262867ce833fd7b49b"
 
 
 def chk(name, cond, got=""):
@@ -185,16 +191,19 @@ def t_효과(dex):
             first += 1
     chk("선제공격손톱이 발동한다 (24판 중, 턴당 20%%)", 6 <= first <= 24, first)
 
-    # 구애머리띠: 첫 기술만 계속 쓴다 (샌드백 잠만보 Lv.30 상대로 여러 턴)
-    evs, bt = solo(dex, with_item(char, "CHOICEBAND"), bag, 3, turns=6)
+    # 구애머리띠: 첫 기술만 계속 쓴다 (샌드백 잠만보 Lv.30 상대로 여러 턴).
+    # 시드 3 은 급소 확률을 원작대로(베어가르기 1/8) 고친 뒤 두 턴 만에 끝나서
+    # '세 번 이상 썼다' 는 전제가 깨졌다. 시드 1 은 네 번 쓰고, 도구가 없으면 같은
+    # 판에서 기술을 바꿔 쓴다 - 잠금을 가장 또렷이 보여 준다.
+    evs, bt = solo(dex, with_item(char, "CHOICEBAND"), bag, 1, turns=6)
     used = [e["move"] for e in evs if e.get("t") == "move" and e.get("who") == "me"]
     chk("구애머리띠는 처음 쓴 기술만 쓴다", len(set(used)) == 1 and len(used) >= 3,
         used)
     chk("구애 잠금이 기억된다", bt.me.locked is not None, bt.me.locked)
-    evs0, _ = solo(dex, char, bag, 3, turns=6)
+    evs0, _ = solo(dex, char, bag, 1, turns=6)
     used0 = [e["move"] for e in evs0 if e.get("t") == "move" and e.get("who") == "me"]
-    chk("(같은 시드에서 도구 없이도 판이 두 턴은 간다 - 검사 전제)",
-        len(used0) >= 2, used0)
+    chk("(같은 시드에서 도구 없이는 기술을 바꿔 쓴다 - 검사 전제)",
+        len(used0) >= 2 and len(set(used0)) >= 2, used0)
     f0 = B.Fighter(dex, char)
     f1 = B.Fighter(dex, with_item(char, "CHOICEBAND"))
     chk("구애머리띠는 공격 1.5배", f1.stat("atk") == int(f0.stat("atk") * 1.5),

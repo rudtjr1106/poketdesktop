@@ -1518,6 +1518,12 @@ def after_status(bt, k, move, who, user, target, tw, ev):
             say(ev, who, "안개와 함께 주변이 깨끗해졌다!")
     if k == "PARTINGSHOT" and user.alive() and bt.kind != "wild" and _team_others(bt, who, user):
         bt.request_switch(who, "out", ev, k)
+    if k == "AUTOTOMIZE" and any(e.get("t") == "stat" and e.get("who") == who
+                                 and e.get("stat") == "spe" for e in ev):
+        # 바디퍼지: 스피드가 바뀌었을 때만(이미 +6 이라 실패하면 그대로) 100kg 가벼워진다.
+        # 교체하면 풀린다 (cond 는 물러날 때 비워진다). 안다리걸기·헤비봄버가 본다.
+        user.cond["autotomize"] = int(user.cond.get("autotomize") or 0) + 1
+        say(ev, who, "%s 은(는) 몸이 가벼워졌다!" % user.name)
     if k == "CHILLYRECEPTION":
         set_weather(bt, "snow", ev, who)
         if user.alive() and bt.kind != "wild" and _team_others(bt, who, user):
