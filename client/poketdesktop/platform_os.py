@@ -29,6 +29,8 @@ NEEDS_HIT_TRACKING = getattr(_M, "NEEDS_HIT_TRACKING", False)
 
 transparent_window = _M.transparent_window
 raise_above = _M.raise_above
+# 이미 '항상 위' 인 창을 다시 맨 위로 (overlay 가 몇 초에 한 번 부른다).
+keep_on_top = getattr(_M, "keep_on_top", _M.raise_above)
 show_again = _M.show_again
 bind_right = _M.bind_right
 RIGHT_CLICK = _M.RIGHT_CLICK
@@ -37,6 +39,9 @@ make_click_through = _M.make_click_through
 SpriteView = _M.SpriteView
 work_area = _M.work_area
 screens = _M.screens
+# 모니터 전부를 아우르는 사각형 (영역 직접 그리기가 이 위에 덮개를 깐다).
+virtual_screen = getattr(_M, "virtual_screen",
+                         lambda w, h: (0, 0, w, h))
 double_click_ms = _M.double_click_ms
 single_lock = _M.single_lock
 single_release = _M.single_release

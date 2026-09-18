@@ -556,6 +556,9 @@ def test_names_default():
             _save = ui_settings.SettingsWindow._save
             _toggle = ui_settings.SettingsWindow._toggle
             reset = ui_settings.SettingsWindow.reset
+            # 되돌린 뒤 '돌아다닐 영역' 설명을 다시 적는 자리. 여기서는 화면이
+            # 없으니 하는 일이 없다.
+            _paint_area = lambda self: None
 
         win = FakeSettingsWin()
         win.app = app

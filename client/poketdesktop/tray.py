@@ -123,11 +123,18 @@ class TrayBase(object):
         area_items = [
             Item(label,
                  (lambda w, h: lambda: self.call(a.set_area, w, h))(w, h),
-                 checked=(lambda w, h: lambda: (
+                 checked=(lambda w, h: lambda: not s.get("areaRect") and (
                      (s["areaW"], s["areaH"]) == (w, h) if w else s["areaW"] > 1200
                  ))(w, h),
                  radio=True)
             for label, w, h in AREA_PRESETS]
+        # 직접 그리기. 미리 정한 네 가지로는 '작업표시줄 위 띠' 나 '둘째 모니터'
+        # 같은 자리를 만들 수가 없다.
+        area_items = area_items + [
+            SEP,
+            Item("화면에 직접 그리기...", lambda: self.call(a.pick_area),
+                 checked=lambda: bool(s.get("areaRect")), radio=True),
+        ]
 
         return [
             # 이제 창이 하나다. 메뉴는 어느 탭으로 열지만 고른다.

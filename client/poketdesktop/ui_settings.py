@@ -173,8 +173,46 @@ class SettingsWindow(object):
                      anchor="w", justify="left",
                      wraplength=W - 60).pack(fill="x", padx=(22, 0),
                                              pady=(0, 6))
+        self._area_row(box, s)
         self._catch_row(box, s)
         self._autostart_row(box)
+
+    def _area_row(self, box, s):
+        """돌아다닐 영역. 화면에 직접 그린다 (트레이 메뉴에도 같은 것이 있다)."""
+        tk.Label(box, text="돌아다닐 영역", bg=U.BG, fg=U.FG, font=U.FONT_S,
+                 anchor="w").pack(fill="x", pady=(10, 2))
+        self.area_note = tk.Label(box, text=self._area_text(s), bg=U.BG,
+                                  fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
+                                  justify="left", wraplength=W - 60)
+        self.area_note.pack(fill="x", padx=(0, 0), pady=(0, 6))
+        row = tk.Frame(box, bg=U.BG)
+        row.pack(fill="x", pady=(0, 6))
+        U.ghost_button(row, "화면에 그리기", self._pick_area, height=30).pack(side="left")
+        U.ghost_button(row, "기본 자리로", self._clear_area, height=30).pack(
+            side="left", padx=(8, 0))
+
+    def _area_text(self, s):
+        rect = s.get("areaRect")
+        if rect and len(rect) == 4:
+            return ("직접 그린 영역 · %d x %d (왼쪽 위 %d, %d)"
+                    % (abs(rect[2] - rect[0]), abs(rect[3] - rect[1]), rect[0], rect[1]))
+        return ("화면 오른쪽 아래 %d x %d. '화면에 그리기' 로 원하는 자리를 끌어서 "
+                "정할 수 있습니다." % (min(s["areaW"], 100000), min(s["areaH"], 100000)))
+
+    def _pick_area(self):
+        self.app.pick_area()
+        self._paint_area()
+
+    def _clear_area(self):
+        self.app.set_area_rect(None)
+        self._paint_area()
+        U.set_status(self.status, "영역을 화면 오른쪽 아래로 되돌렸습니다.", U.GOOD)
+
+    def _paint_area(self):
+        try:
+            self.area_note.configure(text=self._area_text(self.app.settings))
+        except tk.TclError:
+            pass
 
     CATCH_CHOICES = (("new", "아직 안 잡은 포켓몬만"),
                      ("always", "항상"),
@@ -314,6 +352,7 @@ class SettingsWindow(object):
         U.set_status(self.status, "기본값으로 되돌렸습니다. 창을 다시 열면"
                                   " 값이 보입니다.")
         self.app.set_size(self.app.settings["targetHeight"])
+        self._paint_area()          # 직접 그린 영역도 기본값으로 빠졌다
         # 풀숲은 **무조건 다시 맞춘다.** 위에서 설정 값이 이미 기본값으로
         # 바뀌어 있어서, set_show_grass 로 가면 "안 바뀌었다" 며 그냥
         # 돌아온다. 그러면 껐던 사람은 되돌렸는데도 풀숲이 안 돋는다.

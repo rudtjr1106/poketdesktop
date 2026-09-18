@@ -59,6 +59,25 @@ def raise_above(win):
         pass
 
 
+def keep_on_top(win):
+    """이미 '항상 위' 인 창을 **다시** 맨 위로 올린다 (몇 초에 한 번).
+
+    창을 만들 때 한 번만 걸면 시간이 지나 다른 창에 가려진다. 나중에 뜬
+    '항상 위' 창이 우리 위에 얹히기 때문이다(윈도우는 늦게 활성화된 쪽이
+    위, 맥도 같은 층이면 나중 것이 위). 그래서 주기적으로 다시 올린다.
+
+    **자리와 포커스는 건드리지 않는다.** 여기(기본 구현)서는 -topmost 를
+    다시 걸고, 그 바람에 창이 튀면 제자리로 돌려놓는다.
+    """
+    try:
+        before = (win.winfo_x(), win.winfo_y())
+        win.attributes("-topmost", True)
+        if (win.winfo_x(), win.winfo_y()) != before:
+            win.geometry("+%d+%d" % before)
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
 def bind_right(widget, fn):
     """오른쪽 클릭을 건다.
 
@@ -198,6 +217,15 @@ def screens(fallback_w, fallback_h):
     한 대뿐이면 화면 하나가 전부다.
     """
     return [(0, 0, fallback_w, fallback_h)]
+
+
+def virtual_screen(fallback_w, fallback_h):
+    """모니터를 전부 아우르는 사각형 (x1, y1, x2, y2). 한 대면 그 화면.
+
+    영역을 직접 그릴 때 이 위에 덮개를 깐다. 모니터가 두 대면 두 화면에
+    걸쳐 그릴 수 있어야 한다.
+    """
+    return 0, 0, fallback_w, fallback_h
 
 
 # ---------------------------------------------------------------- 프로세스

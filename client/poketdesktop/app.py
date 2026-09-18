@@ -1282,9 +1282,38 @@ class App(object):
         else:
             self.settings["areaW"] = w
             self.settings["areaH"] = h
+        # 미리 정해진 크기를 고르면 직접 그린 영역은 버린다 - 둘 다 켜져 있으면
+        # 눌러도 아무 일이 없는 것처럼 보인다(그린 영역이 이기므로).
+        self.settings["areaRect"] = None
+        self._area_changed()
+
+    def set_area_rect(self, rect):
+        """직접 그린 영역을 쓴다. None 이면 다시 기본(오른쪽 아래)으로."""
+        self.settings["areaRect"] = list(rect) if rect else None
+        self._area_changed()
+
+    def pick_area(self):
+        """화면에 끌어서 활동 영역을 그린다 (캡처처럼)."""
+        from .ui_area import pick_area
+        if getattr(self, "_picking_area", False):
+            return
+        self._picking_area = True
+        try:
+            rect = pick_area(self.root, self.settings.get("areaRect")
+                             or (self.overlay.area() if self.overlay else None))
+        finally:
+            self._picking_area = False
+        if rect:
+            self.set_area_rect(rect)
+            self.notify("포켓몬이 돌아다닐 영역을 %d x %d 로 정했습니다."
+                        % (rect[2] - rect[0], rect[3] - rect[1]))
+        return rect
+
+    def _area_changed(self):
+        """영역이 바뀌었다. 저장하고, 밖에 있던 포켓몬을 안으로 들인다."""
         config.save_settings(self.settings)
         if self.overlay:
-            for p in self.overlay.pets.values():
+            for p in list(self.overlay.pets.values()) + list(self.overlay.eggs.values()):
                 p.clamp()
                 p.place()
         self.refresh_tray()

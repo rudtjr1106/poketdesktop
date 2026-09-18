@@ -10,6 +10,7 @@
 활동 범위는 작업표시줄을 뺀 작업 영역의 오른쪽 아래 구석으로 제한한다.
 """
 import random
+import time
 import tkinter as tk
 
 from . import config
@@ -40,6 +41,43 @@ SLEEP_AFTER_MS = 1800000
 # 32종을 세어 보니 Sleep 은 전 종에 있고 Sit/Laying 은 절반쯤(17/32)이다.
 # 그래서 없는 것은 빼고 있는 것 중에서만 고른다 - 늘 자기만 하지 않게.
 REST_POSES = ("Sit", "Laying", "Sleep")
+
+# 직접 그린 영역이 이보다 작으면 포켓몬이 들어갈 자리가 없다 (ui_area.MIN_* 와 짝).
+MIN_AREA_W, MIN_AREA_H = 120, 100
+
+# 직접 그린 영역을 다시 재는 주기(ms). 화면 구성이 바뀌면 이 안에 따라온다.
+AREA_CACHE_MS = 2000
+
+
+def drawn_area(rect, screen):
+    """설정에 든 '직접 그린 영역' 을 쓸 수 있는 꼴로. 없거나 이상하면 None.
+
+    모니터를 뺐다 꽂으면 그린 자리가 화면 밖일 수 있다. 화면 안으로 옮기고,
+    그래도 너무 작으면 없는 것으로 친다 (설정 그대로 두고 기본 영역을 쓴다).
+    """
+    try:
+        x1, y1, x2, y2 = (int(v) for v in rect)
+    except (TypeError, ValueError):
+        return None
+    sx1, sy1, sx2, sy2 = screen
+    x1, x2 = min(x1, x2), max(x1, x2)
+    y1, y2 = min(y1, y2), max(y1, y2)
+    x1, y1 = max(sx1, x1), max(sy1, y1)
+    x2, y2 = min(sx2, x2), min(sy2, y2)
+    if x2 - x1 < MIN_AREA_W or y2 - y1 < MIN_AREA_H:
+        return None
+    return x1, y1, x2, y2
+
+
+# '항상 위' 를 다시 거는 주기(ms).
+#
+# **한 번만 걸면 시간이 지나 가려진다.** 나중에 뜬 다른 '항상 위' 창이
+# 우리 위에 얹히기 때문이다(윈도우는 늦게 활성화된 쪽이 위, 맥도 같은 층이면
+# 나중 것이 위). 사용자 제보: "가끔 시간이 지나면 다른 창에 가려진다".
+#
+# 3초면 가려져도 곧 돌아오고, 창 몇 개를 다시 올리는 것뿐이라 거의 공짜다.
+# 자리·크기·포커스는 건드리지 않는다 (platform_*.keep_on_top).
+TOP_EVERY_MS = 3000
 
 # 이름표와 도트 창 사이 간격(px). **0 이면 안 된다** - 반투명 창과
 # 투명색 창이 맞닿으면 그 줄이 검게 합성된다 (Pet.measure_nameplate).
@@ -785,12 +823,34 @@ class Overlay(object):
         s = self.settings
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
+        rect = self._drawn_area(s.get("areaRect"), sw, sh)
+        if rect:
+            return rect
         wl, wt, wr, wb = work_area(sw, sh)
         x2 = wr - s["areaMarginR"]
         y2 = wb - s["areaMarginB"]
         x1 = max(wl, x2 - s["areaW"])
         y1 = max(wt, y2 - s["areaH"])
         return x1, y1, x2, y2
+
+    def _drawn_area(self, rect, sw, sh):
+        """직접 그린 영역. **잠깐 기억해 둔다.**
+
+        area() 는 걷는 동안 한 마리당 매 프레임 불린다(30fps x 여섯 마리).
+        모니터 목록을 그때마다 물어보면(맥은 NSScreen 을 새로 훑는다) 그것만으로
+        일이 된다. 화면 구성은 자주 안 바뀌므로 잠깐 기억해 뒀다 쓴다 - 모니터를
+        빼도 %.0f초 안에 따라온다.
+        """ % (AREA_CACHE_MS / 1000.0)
+        if not rect:
+            return None
+        key = tuple(rect)
+        now = time.time() * 1000.0
+        got = getattr(self, "_area_memo", None)
+        if got and got[0] == key and now - got[1] < AREA_CACHE_MS:
+            return got[2]
+        out = drawn_area(rect, PLAT.virtual_screen(sw, sh))
+        self._area_memo = (key, now, out)
+        return out
 
     # ---------------- 콜백 ----------------
     def on_pet_menu(self, pet, e):
@@ -1057,10 +1117,31 @@ class Overlay(object):
     def stop(self):
         self._running = False
 
+    def keep_on_top(self):
+        """'항상 위' 로 만들어 둔 창을 전부 다시 맨 위로.
+
+        **어느 창인지 따로 적어 두지 않는다.** -topmost 가 걸린 창을 그대로
+        찾는다 - 도트·이름표·설명·풀숲·배틀 연출이 전부 걸려 있고, 새로 생기는
+        창도 여기에 저절로 들어온다. 창 몇 개뿐이라 3초에 한 번은 싸다.
+        """
+        for w in self.root.winfo_children():
+            try:
+                if not w.winfo_exists() or not w.winfo_ismapped():
+                    continue
+                if not int(w.attributes("-topmost")):
+                    continue
+            except Exception:                              # noqa: BLE001
+                continue
+            PLAT.keep_on_top(w)
+
     def _tick(self):
         if not self._running:
             return
         ms = int(1000 / max(1, self.settings["fps"]))
+        self._top_ms = getattr(self, "_top_ms", 0) + ms
+        if self._top_ms >= TOP_EVERY_MS:
+            self._top_ms = 0
+            self.keep_on_top()
         cx = cy = None
         if PLAT.NEEDS_HIT_TRACKING:
             # 맥은 도트가 없는 자리도 창이 클릭을 먹는다. 커서가 어디

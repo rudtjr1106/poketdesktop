@@ -202,6 +202,8 @@ jobs:
           python client/test_gift_dialog.py
           python client/test_learn_dialog.py
           python client/test_learn_pending.py
+          python client/test_topmost.py
+          python client/test_area.py
       # 배틀 장면이 창 밖으로 잘리고, 트레이너 카드의 '도전하기' 가 통째로
       # 잘려 있었다. 글꼴이 다른 두 OS 에서 다 재 본다.
       - name: 관장 지도·배틀 창 (진짜 Tk)
@@ -260,6 +262,8 @@ jobs:
           python client/test_gift_dialog.py
           python client/test_learn_dialog.py
           python client/test_learn_pending.py
+          python client/test_topmost.py
+          python client/test_area.py
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
       - name: 설정·패치노트·새버전 창 높이

@@ -48,6 +48,24 @@ def raise_above(win):
     except Exception:                                       # noqa: BLE001
         pass
 
+def keep_on_top(win):
+    """다시 맨 위로. **SetWindowPos 로만 한다.**
+
+    Tk 의 -topmost 를 다시 걸면 테두리 없는 창이 (0, 0) 으로 튄다
+    (raise_above 의 설명). SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE 를 주면
+    자리도 크기도 포커스도 안 건드리고 '항상 위' 무리의 맨 앞으로만 간다.
+    """
+    HWND_TOPMOST = -1
+    SWP_NOSIZE, SWP_NOMOVE, SWP_NOACTIVATE = 0x0001, 0x0002, 0x0010
+    try:
+        hwnd = ctypes.windll.user32.GetParent(win.winfo_id()) or win.winfo_id()
+        ctypes.windll.user32.SetWindowPos(
+            ctypes.c_void_p(hwnd), ctypes.c_void_p(HWND_TOPMOST), 0, 0, 0, 0,
+            SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE)
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
 NAME = "poketdesktop-single-instance"
 
 
@@ -92,6 +110,21 @@ def work_area(fallback_w, fallback_h):
         r = RECT()
         if ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(r), 0):
             return r.left, r.top, r.right, r.bottom
+    except Exception:                                       # noqa: BLE001
+        pass
+    return 0, 0, fallback_w, fallback_h
+
+
+def virtual_screen(fallback_w, fallback_h):
+    """모니터 전부를 아우르는 사각형. 왼쪽/위 모니터가 있으면 x·y 가 음수다."""
+    SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN = 76, 77
+    SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN = 78, 79
+    try:
+        g = ctypes.windll.user32.GetSystemMetrics
+        x, y = g(SM_XVIRTUALSCREEN), g(SM_YVIRTUALSCREEN)
+        w, h = g(SM_CXVIRTUALSCREEN), g(SM_CYVIRTUALSCREEN)
+        if w > 0 and h > 0:
+            return x, y, x + w, y + h
     except Exception:                                       # noqa: BLE001
         pass
     return 0, 0, fallback_w, fallback_h

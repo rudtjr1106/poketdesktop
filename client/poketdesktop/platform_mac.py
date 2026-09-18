@@ -166,6 +166,36 @@ def raise_above(win):
         pass
 
 
+# 떠 있는 창 층(NSFloatingWindowLevel). Tk 의 -topmost 가 거는 층과 같다.
+FLOATING_LEVEL = 3
+
+
+def keep_on_top(win):
+    """이미 '항상 위' 인 창을 **다시** 맨 위로 (몇 초에 한 번).
+
+    한 번만 걸어 두면 시간이 지나 다른 창에 가린다. 같은 층(떠 있는 창)에
+    나중에 올라온 창이 우리보다 위에 놓이기 때문이다.
+
+    `orderFrontRegardless` 는 **앱을 앞으로 꺼내지 않는다** - 창만 그 층의
+    맨 앞으로 간다. 이미 맨 앞이면 아무 일도 안 일어난다(깜빡이지 않는다).
+    자리·크기·포커스는 건드리지 않는다.
+    """
+    try:
+        if not win.winfo_viewable():
+            return                      # 숨겨 둔 창(배틀 중 도트)은 그대로 둔다
+    except Exception:                                       # noqa: BLE001
+        return
+    w = nswindow(win)
+    if w is None:
+        return
+    try:
+        if w.level() < FLOATING_LEVEL:
+            w.setLevel_(FLOATING_LEVEL)
+        w.orderFrontRegardless()
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
 def own_dialog(win, root):
     """**맥에서는 transient 를 걸지 않는다.**
 
@@ -608,6 +638,15 @@ def screens(fallback_w, fallback_h):
         return out
     except Exception:                                       # noqa: BLE001
         return [(0, 0, fallback_w, fallback_h)]
+
+
+def virtual_screen(fallback_w, fallback_h):
+    """모니터 전부를 아우르는 사각형 (Tk 좌표). 주 화면 왼쪽에 둔 화면은 x 가 음수다."""
+    scrs = screens(fallback_w, fallback_h)
+    if not scrs:
+        return 0, 0, fallback_w, fallback_h
+    return (min(s[0] for s in scrs), min(s[1] for s in scrs),
+            max(s[2] for s in scrs), max(s[3] for s in scrs))
 
 
 def double_click_ms():
