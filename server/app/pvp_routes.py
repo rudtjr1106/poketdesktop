@@ -25,7 +25,7 @@ def _fight(uid, other, kind):
     if why:
         raise HTTPException(409, why)
     out = pvp.run_match(uid, other, kind=kind)
-    pvp.note_fight(uid)
+    pvp.note_fight(uid, kind)          # 랜덤 배틀만 하루 상한을 쓴다
     # 내 쪽은 지금 봤으니 안 본 것으로 세지 않는다. 상대는 다음에 켤 때
     # 알림으로 받는다.
     pvp.mark_seen(uid, out["matchId"])

@@ -184,7 +184,9 @@ class PvpWindow(object):
         elif s.get("ranked"):
             bits.append("점수 %d" % s.get("rating", 0))
         if left is not None:
-            bits.append("오늘 %d판 더 걸 수 있음" % left)
+            # 하루 상한은 **랜덤 배틀에만** 걸린다. 그냥 '몇 판 더' 라고 적으면
+            # 친구 배틀도 못 하는 줄 안다 (server/app/pvp.DAILY_BATTLES).
+            bits.append("오늘 랜덤 배틀 %d판 더 (친구 배틀은 제한 없음)" % left)
         self.sub.configure(text="  ·  ".join(bits))
 
         # **이기면 얼마를 받는지 적어 준다.** 상금이 있다는 것을

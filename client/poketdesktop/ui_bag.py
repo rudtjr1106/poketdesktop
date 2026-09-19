@@ -654,6 +654,11 @@ class BagWindow(object):
         self.sell_btn = U.ghost_button(inner, "팔기", self.do_sell, height=34)
         self.sell_btn.pack(side="right", padx=(0, 8), pady=11)
         self.sell_btn.configure(state="disabled")
+        # 별가루가 서른 개 쌓이면 '팔기' 를 서른 번 눌러야 했다. 여러 가지를
+        # 골라 한 번에 판다 (ui_sell).
+        self.sell_many_btn = U.ghost_button(inner, "여러 개 팔기",
+                                            self.do_sell_many, height=34)
+        self.sell_many_btn.pack(side="right", padx=(0, 8), pady=11)
         U.ghost_button(inner, "닫기", self.close,
                        height=34).pack(side="right", padx=(0, 8), pady=11)
         self.status = U.status_line(inner, "", bg=U.INK)
@@ -1201,6 +1206,37 @@ class BagWindow(object):
             self.reload()
 
         U.run_async(self.root, work, done)
+
+    # ---------------- 여러 개 팔기 ----------------
+    def do_sell_many(self):
+        """여러 도구를 골라 한 번에 판다. 판정과 계산은 서버가 한다."""
+        from .ui_sell import ask_sell_many, summary
+
+        if not self.items:
+            return self.say("가방을 아직 불러오지 못했습니다.", U.DANGER, U.DANGER)
+        lines = ask_sell_many(self.win, self.root, self.items, self.bag, self.money)
+        if not lines:
+            return
+        if not ui_box.confirm(self.win, "여러 개 팔기",
+                              summary(lines, self.items),
+                              danger=True, ok_text="판다"):
+            return
+
+        api = self.app.api
+        wait = ui_loading.Overlay(self.win, "파는 중")
+        self.say("파는 중...", U.FG_FAINT)
+
+        def done(r, err):
+            wait.close()
+            if not self.alive:
+                return
+            if err:
+                return self.say(getattr(err, "message", str(err)), U.DANGER, U.DANGER)
+            r = r or {}
+            self._pending = (r.get("message") or "팔았다.", U.GOOD)
+            self.reload()
+
+        U.run_async(self.root, lambda: api.sell_many(lines), done)
 
     # ---------------- 쓰기 ----------------
     def do_use(self):

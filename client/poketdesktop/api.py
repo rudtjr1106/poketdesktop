@@ -377,6 +377,13 @@ class Api(object):
     def sell(self, item, count=1):
         return self._call("POST", "/api/shop/sell", {"item": item, "count": count})
 
+    def sell_many(self, lines):
+        """여러 도구를 한 번에. lines 는 [{"item": id, "count": n}].
+
+        서버가 다 되거나 아무것도 안 되게 처리한다 (/api/shop/sell-many).
+        """
+        return self._call("POST", "/api/shop/sell-many", {"lines": list(lines)})
+
     # ---------------- 관장 도전 ----------------
     # 판정은 전부 서버가 한다. 여기서 보내는 것은 '무엇을 할지' 뿐이다.
     def gym(self):

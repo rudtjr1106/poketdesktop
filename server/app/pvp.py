@@ -61,7 +61,12 @@ PLACEMENT = 5
 # 그래서 자는 사람을 몇 번이고 때릴 수 있는데, 점수는 서로 주고받는
 # 것이라 아침에 점수가 바닥나 있게 된다. 두 가지로 막는다.
 PAIR_COOLDOWN_MIN = 30      # 같은 사람에게 다시 걸기까지
-DAILY_BATTLES = 20          # 하루에 내가 걸 수 있는 도전 수
+# 하루에 내가 걸 수 있는 **랜덤 배틀** 수.
+#
+# **친구 배틀은 안 센다.** 친구에게 한 판 걸었다고 랭크 한 판이 줄면, 친구와
+# 놀려면 랭크를 포기해야 한다. 같은 상대에게는 30분에 한 번만 걸 수 있어서
+# (PAIR_COOLDOWN_MIN) 둘이서 계속 붙어 점수를 몰아주는 것은 그대로 막힌다.
+DAILY_BATTLES = 20
 
 # 랜덤 배틀에서 상대를 고를 때만 쓰는 값들.
 #
@@ -625,11 +630,12 @@ def can_start(uid, kind="random"):
     team = ranked_team(uid) if kind == "random" else _party(uid)
     if not team:
         return "데리고 다니는 포켓몬이 없습니다."
-    row = _rating_row(uid)
-    used = row["fought"] if row["fought_day"] == _today() else 0
-    if used >= DAILY_BATTLES:
-        return "오늘은 %d판까지 걸 수 있습니다. 내일 다시 해주세요." % DAILY_BATTLES
     if kind == "random":
+        # 하루 상한과 쿨타임은 **랜덤 배틀에만** 건다 (DAILY_BATTLES 의 설명).
+        row = _rating_row(uid)
+        used = row["fought"] if row["fought_day"] == _today() else 0
+        if used >= DAILY_BATTLES:
+            return "오늘은 랜덤 배틀을 %d판까지 걸 수 있습니다. 내일 다시 해주세요." % DAILY_BATTLES
         left = random_cooldown_left(uid)
         if left:
             return "랜덤 배틀은 %d초 뒤에 다시 걸 수 있습니다." % left
@@ -655,8 +661,14 @@ def can_fight(uid, other, kind="friend"):
     return None
 
 
-def note_fight(uid):
-    """도전 횟수를 하나 올린다. 실제로 붙인 뒤에 부른다."""
+def note_fight(uid, kind="random"):
+    """도전 횟수를 하나 올린다. 실제로 붙인 뒤에 부른다.
+
+    **랜덤 배틀만 센다.** 하루 상한이 랜덤 배틀에만 걸리므로, 친구 배틀까지
+    세면 화면의 '오늘 남은 판' 이 실제로 걸 수 있는 수와 어긋난다.
+    """
+    if kind != "random":
+        return
     row = _rating_row(uid)
     today = _today()
     used = row["fought"] if row["fought_day"] == today else 0
@@ -668,6 +680,7 @@ def fight_status(uid):
     row = _rating_row(uid)
     today = _today()
     used = row["fought"] if row["fought_day"] == today else 0
+    # foughtToday/left 는 **랜덤 배틀** 기준이다 (친구 배틀은 상한이 없다).
     return {"foughtToday": used, "dailyBattles": DAILY_BATTLES,
             "left": max(0, DAILY_BATTLES - used),
             "randomCooldownSec": int(config.RANDOM_COOLDOWN_SEC),

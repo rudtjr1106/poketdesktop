@@ -21,6 +21,8 @@ from . import config, db, deps, evolution, items
 router = APIRouter()
 
 MAX_QTY = 999
+# 한 번에 팔 수 있는 가짓수. 가방에 들어올 수 있는 종류보다 넉넉하다.
+MAX_SELL_LINES = 100
 
 
 class BuyIn(BaseModel):
@@ -31,6 +33,15 @@ class BuyIn(BaseModel):
 class SellIn(BaseModel):
     item: str
     count: int = 1
+
+
+class SellLine(BaseModel):
+    item: str
+    count: int = 1
+
+
+class SellManyIn(BaseModel):
+    lines: list = []      # [{"item": "STARDUST", "count": 3}, ...]
 
 
 class UseIn(BaseModel):
@@ -128,6 +139,68 @@ def sell(body: SellIn, me=Depends(deps.current)):
             "message": korean.natural("%s %d개를 팔아 %d원을 받았다!"
                                       % (it["kr"], n, total)),
             **_wallet(uid)}
+
+
+@router.post("/api/shop/sell-many")
+def sell_many(body: SellManyIn, me=Depends(deps.current)):
+    """여러 도구를 한 번에 판다. 가방에서 골라 놓고 한 번에 넘긴다.
+
+    **다 되거나 아무것도 안 되거나.** 하나라도 값이 없거나 개수가 모자라면
+    아무것도 팔지 않는다. 절반만 팔리고 거절 문구가 뜨면, 무엇이 팔렸는지
+    알 수가 없다.
+
+    그래서 먼저 전부 확인하고, 그다음에 꺼낸다. 꺼내다 실패하면(그사이 다른
+    창에서 썼다) 꺼낸 것을 도로 넣는다.
+    """
+    uid = me["user"]["id"]
+    lines = body.lines or []
+    if not lines:
+        raise HTTPException(400, "팔 물건을 고르세요.")
+    if len(lines) > MAX_SELL_LINES:
+        raise HTTPException(400, "한 번에 %d가지까지 팔 수 있습니다." % MAX_SELL_LINES)
+
+    want = []
+    seen = set()
+    for raw in lines:
+        line = SellLine(**raw) if isinstance(raw, dict) else raw
+        it = items.get(line.item)
+        if not it:
+            raise HTTPException(404, "그런 도구가 없습니다.")
+        if it["id"] in seen:
+            raise HTTPException(400, "%s이(가) 두 번 들어 있습니다." % it["kr"])
+        seen.add(it["id"])
+        n = _qty(line.count)
+        price = items.sell_price(it["id"])
+        if price <= 0:
+            raise HTTPException(400, "%s은(는) 팔 수 없습니다." % it["kr"])
+        want.append((it, n, price))
+
+    bag = items.bag_get(uid)
+    for it, n, _price in want:
+        if int(bag.get(it["id"], 0)) < n:
+            raise HTTPException(400, "%s이(가) 모자랍니다." % it["kr"])
+
+    took, total, sold = [], 0, []
+    for it, n, price in want:
+        if not items.bag_take(uid, it["id"], n):
+            for back_id, back_n in took:            # 그사이 바뀌었다. 도로 넣는다.
+                items.bag_add(uid, back_id, back_n)
+            raise HTTPException(400, "%s이(가) 모자랍니다." % it["kr"])
+        took.append((it["id"], n))
+        total += price * n
+        sold.append({"item": it["id"], "kr": it["kr"], "count": n,
+                     "earned": price * n})
+    items.money_add(uid, total)
+
+    kinds = len(sold)
+    pieces = sum(x["count"] for x in sold)
+    if kinds == 1:
+        msg = "%s %d개를 팔아 %d원을 받았다!" % (sold[0]["kr"], pieces, total)
+    else:
+        msg = "%s 외 %d가지 %d개를 팔아 %d원을 받았다!" % (
+            sold[0]["kr"], kinds - 1, pieces, total)
+    return {"ok": True, "earned": total, "sold": sold,
+            "message": korean.natural(msg), **_wallet(uid)}
 
 
 # ---------------------------------------------------------------- 사용

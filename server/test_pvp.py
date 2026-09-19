@@ -198,6 +198,32 @@ def main():
         chk("친구 배틀도 걸려온 쪽은 전적에 안 남는다",
             se["friendWins"] + se["friendLosses"] + se["friendDraws"] == 0, se)
 
+        print("\n=== 하루 상한은 랜덤 배틀에만 ===")
+        # 제보: "친구와의 배틀도 20판 제한에 포함되나?" - 그랬다. 이제 안 센다.
+        g1 = mkuser("zz_pvp_cap", 2, 30)
+        h1 = mkuser("zz_pvp_cap2", 2, 30)
+        # 실제 경로로 스무 판을 채운다. rank_stat 줄은 첫 판 때 생기므로
+        # UPDATE 로 미리 넣으면 아무 줄도 안 바뀐다.
+        for _ in range(pvp.DAILY_BATTLES):
+            pvp.note_fight(g1, "random")
+        chk("랜덤은 상한에 걸린다", "랜덤 배틀" in (pvp.can_start(g1, "random") or ""),
+            pvp.can_start(g1, "random"))
+        chk("친구 배틀은 상한과 상관없다", pvp.can_start(g1, "friend") is None,
+            pvp.can_start(g1, "friend"))
+        chk("  친구에게 걸 수 있다", pvp.can_fight(g1, h1, "friend") is None,
+            pvp.can_fight(g1, h1, "friend"))
+        before = pvp.fight_status(g1)["foughtToday"]
+        pvp.note_fight(g1, "friend")
+        chk("친구 배틀은 오늘 판수를 안 쓴다",
+            pvp.fight_status(g1)["foughtToday"] == before,
+            (before, pvp.fight_status(g1)["foughtToday"]))
+        i1 = mkuser("zz_pvp_cap3", 2, 30)
+        n0 = pvp.fight_status(i1)["foughtToday"]
+        pvp.note_fight(i1, "random")
+        st = pvp.fight_status(i1)
+        chk("랜덤 배틀은 한 판을 쓴다", st["foughtToday"] == n0 + 1, st)
+        chk("  남은 판수도 그만큼 준다", st["left"] == pvp.DAILY_BATTLES - st["foughtToday"], st)
+
         print("\n=== 매칭 전력 (깍두기로 전력 깎기) ===")
         # 시즌 2 부터 평균 레벨이 아니라 팀 전력으로 붙인다. Lv.1 을 끼워 넣어도
         # 전력은 거의 그대로라 아래 사람과 붙지 못한다.

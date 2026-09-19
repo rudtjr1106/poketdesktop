@@ -290,6 +290,65 @@ def main():
     chk("로그인 없이는 못 산다(401)", st == 401, st)
 
     # ------------------------------------------------------------------
+    section("여러 개 한 번에 팔기")
+    # 가방에서 여러 가지를 골라 한 번에 판다. 다 되거나 아무것도 안 되거나.
+    # **이미 가방에 있는 것으로 본다** - 이 시점의 소지금(600원)으로는 살 수가 없다.
+    st, before = call("GET", "/api/bag", token=token)
+    money0 = before["money"]
+    ub0 = int(before["bag"].get("ULTRABALL", 0))
+    pb0 = int(before["bag"].get("POKEBALL", 0))
+    chk("검사 전제: 하이퍼볼 둘·몬스터볼 셋 이상", ub0 >= 2 and pb0 >= 3, (ub0, pb0))
+
+    st, r = call("POST", "/api/shop/sell-many",
+                 {"lines": [{"item": "ULTRABALL", "count": 2},
+                            {"item": "POKEBALL", "count": 2}]}, token)
+    earned = 400 * 2 + 100 * 2      # 하이퍼볼 800/2, 몬스터볼 200/2
+    chk("한 번에 판다", st == 200 and r.get("earned") == earned, r)
+    # 0개가 되면 가방에서 항목째 빠진다. 그래서 없는 것은 0 으로 읽는다.
+    chk("  판 만큼 줄어든다",
+        int(r["bag"].get("ULTRABALL") or 0) == ub0 - 2
+        and int(r["bag"].get("POKEBALL") or 0) == pb0 - 2, r.get("bag"))
+    chk("  돈이 늘어난다", r["money"] == money0 + earned, (money0, r.get("money")))
+    chk("  무엇을 팔았는지 알려준다",
+        [x["item"] for x in r.get("sold") or []] == ["ULTRABALL", "POKEBALL"],
+        r.get("sold"))
+    chk("  한 줄로 알려준다", "원을 받았다" in (r.get("message") or ""), r.get("message"))
+
+    st, after = call("GET", "/api/bag", token=token)
+    ub1 = int(after["bag"].get("ULTRABALL", 0))
+    st, r = call("POST", "/api/shop/sell-many",
+                 {"lines": [{"item": "POKEBALL", "count": 1},
+                            {"item": "STARDUST", "count": 5}]}, token)
+    chk("하나라도 모자라면 거부(400)", st == 400, (st, r))
+    st, now = call("GET", "/api/bag", token=token)
+    chk("  아무것도 안 팔린다 (돈도 그대로)",
+        now["bag"].get("POKEBALL") == after["bag"].get("POKEBALL")
+        and now["money"] == after["money"],
+        (after["bag"].get("POKEBALL"), now["bag"].get("POKEBALL"),
+         after["money"], now["money"]))
+
+    st, _ = call("POST", "/api/shop/sell-many",
+                 {"lines": [{"item": "MASTERBALL", "count": 1}]}, token)
+    chk("못 파는 물건은 거부(400)", st == 400, st)
+    st, _ = call("POST", "/api/shop/sell-many",
+                 {"lines": [{"item": "POKEBALL", "count": 1},
+                            {"item": "POKEBALL", "count": 1}]}, token)
+    chk("같은 것이 두 번 오면 거부(400)", st == 400, st)
+    st, _ = call("POST", "/api/shop/sell-many", {"lines": []}, token)
+    chk("빈 목록은 거부(400)", st == 400, st)
+    st, _ = call("POST", "/api/shop/sell-many",
+                 {"lines": [{"item": "NOSUCHITEM", "count": 1}]}, token)
+    chk("없는 도구는 404", st == 404, st)
+    st, _ = call("POST", "/api/shop/sell-many",
+                 {"lines": [{"item": "POKEBALL", "count": 0}]}, token)
+    chk("0개는 거부(400)", st == 400, st)
+    st, _ = call("POST", "/api/shop/sell-many",
+                 {"lines": [{"item": "POKEBALL", "count": 1}]})
+    chk("로그인 없이는 못 판다(401)", st == 401, st)
+    chk("  거절해도 가방은 그대로",
+        int(call("GET", "/api/bag", token=token)[1]["bag"].get("ULTRABALL") or 0) == ub1,
+        ub1)
+
     section("드랍")
     drops = 0
     catches = 0
