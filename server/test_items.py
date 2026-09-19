@@ -349,6 +349,13 @@ def main():
         int(call("GET", "/api/bag", token=token)[1]["bag"].get("ULTRABALL") or 0) == ub1,
         ub1)
 
+    # **판 몬스터볼을 도로 산다.** 아래 드랍 검사는 볼 스무 개를 던진다 -
+    # 여기서 두 개를 줄여 놓으면 못 잡는 판이 늘어 드랍이 0 이 되기도 한다
+    # (CI 에서 실제로 그렇게 깨졌다).
+    st, r = call("POST", "/api/shop/buy", {"item": "POKEBALL", "count": 2}, token)
+    chk("검사 뒤 몬스터볼을 도로 채운다",
+        st == 200 and int(r["bag"].get("POKEBALL") or 0) == pb0, (st, r.get("bag")))
+
     section("드랍")
     drops = 0
     catches = 0
