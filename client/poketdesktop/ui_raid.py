@@ -37,8 +37,10 @@ RESULT_KR = {"won": ("성공", U.GOOD), "lost": ("실패", U.DANGER),
 
 
 def hms(sec):
-    """남은 시간을 사람 말로."""
+    """남은 시간을 사람 말로. 첫 회차까지 며칠 남았을 수도 있다."""
     sec = max(0, int(sec))
+    if sec >= 86400:
+        return "%d일 %d시간" % (sec // 86400, (sec % 86400) // 3600)
     if sec >= 3600:
         return "%d시간 %d분" % (sec // 3600, (sec % 3600) // 60)
     if sec >= 60:
@@ -168,16 +170,41 @@ class RaidWindow(object):
                     d.get("end", "")), U.FG_DIM)
 
     def _off(self, d):
-        box = U.framed(self.body, bg=U.BG2)
-        box.pack(fill="x", padx=16, pady=16)
-        tk.Label(box, text="레이드 기간이 아닙니다", bg=U.BG2, fg=U.FG,
-                 font=U.FONT_H).pack(anchor="w", padx=16, pady=(14, 2))
-        lab = tk.Label(box, bg=U.BG2, fg=U.FG_DIM, font=U.FONT_S, anchor="w",
+        """아직(또는 이미) 기간이 아닐 때.
+
+        **언제 열리는지를 말해 준다.** 전에는 "기간이 아닙니다" 한 줄이라,
+        시작 전에 받아 본 사람은 무엇을 기다려야 하는지 알 수가 없었다.
+        """
+        card = d.get("next") or {}
+        soon = bool(card.get("at"))
+        box = U.framed(self.body, bg=U.BG2, border=U.ACCENT if soon else U.LINE)
+        box.pack(fill="x", padx=16, pady=(16, 0))
+        inner = tk.Frame(box, bg=U.BG2)
+        inner.pack(fill="x", padx=16, pady=14)
+        tk.Label(inner, text="전설·환상 레이드" if soon else "레이드 기간이 아닙니다",
+                 bg=U.BG2, fg=U.FG, font=U.FONT_H, anchor="w").pack(anchor="w")
+        if soon:
+            row = tk.Frame(inner, bg=U.BG2)
+            row.pack(fill="x", pady=(6, 0))
+            tk.Label(row, text="첫 회차", bg=U.BG2, fg=U.ACCENT, font=U.FONT_XS,
+                     anchor="w").pack(side="left")
+            tk.Label(row, text=when(card.get("at")), bg=U.BG2, fg=U.FG,
+                     font=(U.FAMILY_BLACK, U.pt(16)), anchor="w").pack(
+                side="left", padx=(8, 0))
+            self.clock = tk.Label(row, text="", bg=U.BG2, fg=U.ACCENT,
+                                  font=U.FONT_B, anchor="e")
+            self.clock.pack(side="right")
+            self._paint_clock()
+        lab = tk.Label(inner, bg=U.BG2, fg=U.FG_DIM, font=U.FONT_S, anchor="w",
                        justify="left",
-                       text="전설·환상 레이드는 %s ~ %s 에 열립니다."
-                            % (d.get("start", ""), d.get("end", "")))
-        lab.pack(fill="x", padx=16, pady=(0, 14))
+                       text="%s ~ %s, 매일 %s에 열립니다. 무엇이 나올지는 회차 시작 "
+                            "1시간 전에 공개됩니다."
+                            % (d.get("start", ""), d.get("end", ""),
+                               "와 ".join("%d시" % h for h in d.get("hours") or [])))
+        lab.pack(fill="x", pady=(8, 0))
         U.wrap_to_width(lab)
+        if soon:
+            self._rules(d)
         self._history()
 
     def _boss_card(self, parent, d):
@@ -259,7 +286,7 @@ class RaidWindow(object):
             elif left <= 0:
                 self.clock.configure(text="곧 시작", fg=U.ACCENT)
             else:
-                self.clock.configure(text=hms(left), fg=U.ACCENT)
+                self.clock.configure(text="%s 뒤" % hms(left), fg=U.ACCENT)
         except tk.TclError:
             pass
 

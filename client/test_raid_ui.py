@@ -296,6 +296,30 @@ def main():
     chk("눌린 위젯 없음", not bad, bad[:3])
     w.close()
 
+    print("=== 레이드 탭 (아직 기간 전) ===")
+    apiq = FakeApi(dex, n=3, revealed=False)
+
+    def _off():
+        d = FakeApi.raid(apiq)
+        d["on"] = False
+        d["open"] = False
+        d["room"] = None
+        d["next"]["leftSec"] = 3 * 86400 + 7200      # 사흘 뒤
+        return d
+    apiq.raid = _off
+    appq = FakeApp(root, apiq, dex)
+    wq = ui_raid.RaidWindow(appq)
+    rest(root, 0.6)
+    tq = " ".join(texts(wq.win))
+    chk("언제 여는지 알려준다", "9월 22일(화) 11시" in tq, tq[:200])
+    chk("남은 날을 센다", "3일" in tq, tq[:200])
+    chk("기간을 알려준다", "2026-09-22" in tq and "2026-10-06" in tq, tq[:250])
+    chk("규칙도 미리 보여준다", "Lv.50" in tq, tq[:250])
+    chk("기간 전에는 참가 단추가 없다", "참가하기" not in tq, tq[:200])
+    bad = squeezed(wq.win)
+    chk("눌린 위젯 없음", not bad, bad[:3])
+    wq.close()
+
     print("=== 레이드 탭 (공개 뒤 · 로비) ===")
     api2 = FakeApi(dex, n=3, revealed=True)
     app2 = FakeApp(root, api2, dex)
