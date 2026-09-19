@@ -411,6 +411,31 @@ def main():
                 wins += 1
             if (mv.get("battle") or {}).get("over"):
                 break
+    # 드랍은 확률이다(이기면 45%, 잡으면 30%). CI 는 마흔 번을 돌려도 실제로 붙는
+    # 판이 네댓 번뿐이라, 운이 나쁘면 한 개도 안 떨어져서 헛되이 빨개진다
+    # (실제 기록: 승1·포획3·드랍1 로 겨우 통과한 판도 있었다). 위의 '한 번은
+    # 이겼다' 와 같은 방식으로, 하나 떨어질 때까지 조금 더 해본다. 볼은 안 쓴다.
+    for _ in range(40):
+        if drops:
+            break
+        wd = wild(token)
+        if not wd:
+            continue
+        st, b = call("POST", "/api/wild/%d/battle" % wd["id"], {}, token)
+        if st != 200:
+            continue
+        bid = b["battle"]["id"]
+        for _t in range(70):
+            st, mv = call("POST", "/api/battle/%d/move" % bid,
+                          {"move": "", "hour": 13}, token)
+            if st != 200:
+                break
+            if mv.get("drop"):
+                drops += 1
+            if mv.get("exp"):
+                wins += 1
+            if (mv.get("battle") or {}).get("over"):
+                break
     note("배틀 승 %d / 포획 %d / 드랍 %d개" % (wins, catches, drops))
     chk("배틀을 한 번은 이겼다 (아래 검사의 전제)", wins > 0, wins)
     chk("잡거나 이기면 도구가 떨어진다", drops > 0, drops)
