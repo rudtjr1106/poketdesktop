@@ -243,8 +243,10 @@ def hyper_and_evs(root, dex):
     chk("노력치를 보여준다", "510 / 510" in evline, evline)
     chk("어느 능력에 붙었는지 보여준다",
         "공격 252" in evline and "스피드 252" in evline, evline)
-    bad = squeezed(win.win)
-    chk("눌린 위젯 없음", not bad, bad[:3])
+    # **능력치 칸만 본다.** 창 전체를 보면 여기서 안 건드린 자리의 2~4px
+    # 눌림(윈도우에서만 나는 것)까지 걸려서, 정작 보려는 것이 묻힌다.
+    bad = squeezed(win._d_stats)
+    chk("능력치 칸에 눌린 위젯 없음", not bad, bad[:3])
     try:
         win.close()
     except Exception:                                       # noqa: BLE001
