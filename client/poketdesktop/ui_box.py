@@ -14,6 +14,7 @@ from tkinter import ttk
 from PIL import ImageTk
 
 from common import movetext as MT
+from common import pokelogic as P
 from common.korean import natural
 
 from . import box_filter, item_icons, sprite_cache, sprites
@@ -665,12 +666,19 @@ class BoxWindow(object):
         sh = tk.Frame(stats, bg="#101623")
         sh.pack(fill="x", padx=11, pady=(9, 6))
         U.marker_label(sh, "능력치", bg="#101623").pack(side="left")
-        self.d_ivsum = tk.Label(sh, text="", bg="#101623", fg=U.GOOD,
-                                font=U.FONT_XS)
-        self.d_ivsum.pack(side="right")
+        # 종족값·개체값·노력치 요약. **머리줄 오른쪽에 붙이면 잘린다** -
+        # 한 줄에 다 안 들어가서, 제 줄을 주고 창 폭에 맞춰 접는다.
+        self.d_ivsum = tk.Label(stats, text="", bg="#101623", fg=U.GOOD,
+                                font=U.FONT_XS, anchor="w", justify="left")
+        self.d_ivsum.pack(fill="x", padx=11, pady=(0, 6))
+        U.wrap_to_width(self.d_ivsum)
 
         grid = tk.Frame(stats, bg="#101623")
-        grid.pack(fill="x", padx=11, pady=(0, 10))
+        grid.pack(fill="x", padx=11, pady=(0, 4))
+        self.d_evsum = tk.Label(stats, text="", bg="#101623", fg=U.FG_DIM,
+                                font=U.FONT_XS, anchor="w", justify="left")
+        self.d_evsum.pack(fill="x", padx=11, pady=(0, 9))
+        U.wrap_to_width(self.d_evsum)
         self.bars = {}
         for i, (k, label) in enumerate(STAT_ROWS):
             tk.Label(grid, text=label, bg="#101623", fg=U.FG_DIM, font=U.FONT_XS,
@@ -678,9 +686,9 @@ class BoxWindow(object):
             val = tk.Label(grid, text="-", bg="#101623", fg=U.FG, font=U.FONT_NUM,
                            anchor="e", width=4)
             val.grid(row=i, column=1, sticky="e")
-            cv = tk.Canvas(grid, width=116, height=7, bg="#232b3d",
+            cv = tk.Canvas(grid, width=86, height=7, bg="#232b3d",
                            highlightthickness=0, bd=0)
-            cv.grid(row=i, column=2, padx=(9, 10))
+            cv.grid(row=i, column=2, padx=(9, 8))
             # **글자 수로 폭을 잡지 않는다(width=6 이었다).** 그 폭은
             # 글꼴의 '평균 글자 너비' 로 계산되는데, 한글은 그보다 훨씬
             # 넓어서 글꼴이 바뀌면 어긋난다. 윈도우에서 '개체 31' 이
@@ -1456,18 +1464,24 @@ class BoxWindow(object):
         self._show_held(m)
 
         stats = info.get("stats", {})
-        ivs = m.get("ivs", {})
+        # **info 의 개체값을 쓴다** (m["ivs"] 가 아니라). 병뚜껑을 쓴 능력은
+        # 여기서 31 로 와서, 올라간 능력치와 숫자가 맞는다. 전에는 원래
+        # 개체값을 그대로 보여줘서 "병뚜껑이 반영이 안 된다" 로 보였다.
+        ivs = info.get("ivs") or m.get("ivs", {})
+        evs = info.get("evs") or {}
+        hyper = info.get("hyper") or {}
         mx = max(list(stats.values()) or [1])
         for k, _l in STAT_ROWS:
             val, cv, ivl = self.bars[k]
             v = stats.get(k, 0)
-            iv = ivs.get(k, 0)
+            iv = int(ivs.get(k, 0))
+            ev = int(evs.get(k, 0))
             val.configure(text=str(v))
             cv.delete("all")
             col = U.GOOD if iv == 31 else (U.ACCENT if iv >= 26 else "#63637d")
-            cv.create_rectangle(0, 0, int(116 * v / mx) if mx else 0, 7,
+            cv.create_rectangle(0, 0, int(86 * v / mx) if mx else 0, 7,
                                 fill=col, outline="")
-            ivl.configure(text="개체 %d" % iv,
+            ivl.configure(text="개체 %d%s" % (iv, "✦" if hyper.get(k) else ""),
                           fg=U.GOOD if iv == 31 else U.FG_DIM)
         # 종족값 합계를 같이 보여준다. 이게 없으면 "600족" 인지 아닌지
         # 화면에서 알 수가 없다 - 개체값(0~31 씩 굴리는 것)과 종족값(종마다
@@ -1475,9 +1489,23 @@ class BoxWindow(object):
         # "개체값이 낮다" 로 보인다.
         bst = sum((sp or {}).get("base", {}).get(k, 0)
                   for k in ("hp", "atk", "def", "spa", "spd", "spe"))
-        self.d_ivsum.configure(
-            text="종족값 %d  ·  개체값 %d / 186  (%.0f%%)"
-                 % (bst, info.get("ivTotal", 0), info.get("ivPercent", 0)))
+        note = "종족값 %d  ·  개체값 %d / 186" % (bst, info.get("ivTotal", 0))
+        if any(hyper.values()):
+            note += "   (✦ 병뚜껑으로 31 로 쳐줌)"
+        self.d_ivsum.configure(text=note)
+        # 노력치. **배틀로 조용히 쌓이는데 여태 볼 데가 없었다** - 능력치에는
+        # (노력치 / 4) 만큼 그대로 들어간다. 줄마다 붙이면 칸을 넘겨서
+        # 글자가 잘리므로 여기 한 줄로 모은다.
+        got = [(lab, int(evs.get(k, 0))) for k, lab in STAT_ROWS if evs.get(k)]
+        if got:
+            self.d_evsum.configure(
+                text="노력치 %d / %d   ·   %s"
+                     % (info.get("evTotal", 0), P.EV_TOTAL_MAX,
+                        "  ".join("%s %d" % (lab, v) for lab, v in got)))
+        else:
+            self.d_evsum.configure(
+                text="노력치 0 / %d   ·   배틀에서 쓰러뜨리면 쌓입니다"
+                     % P.EV_TOTAL_MAX)
         self._friendship(m)
         self._evolution(m)
 

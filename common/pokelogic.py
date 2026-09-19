@@ -496,6 +496,11 @@ class Pokedex(object):
         ivs = mon.get("ivs", {})
         evs = mon.get("evs", {})
         hyper = mon.get("hyper") or {}
+        # **화면에는 '쳐주는 값' 을 보낸다.** 능력치는 이미 이 값으로
+        # 계산되는데(effective_ivs) 목록·상세에 원래 개체값만 보이면,
+        # 병뚜껑을 써서 능력치가 올라가 놓고도 "개체 7" 이 그대로라
+        # 아무 일도 안 일어난 것처럼 보인다. 원래 값도 같이 보낸다.
+        eff = effective_ivs(mon)
         return {
             "num": s["num"],
             "name": mon.get("nickname") or s["kr"],
@@ -503,12 +508,13 @@ class Pokedex(object):
             "types": [self.type_name(t) for t in s["types"]],
             "level": mon.get("level", lv),
             "stats": self.stats_of(mon),
-            "ivs": ivs,
+            "ivs": dict((k, int(eff.get(k, 0))) for k in STATS),
+            "ivsRaw": dict((k, int(ivs.get(k, 0))) for k in STATS),
             "hyper": dict((k, bool(hyper.get(k))) for k in STATS),
             "evs": dict((k, int(evs.get(k, 0))) for k in STATS),
             "evTotal": sum(int(evs.get(k, 0)) for k in STATS),
-            "ivTotal": sum(ivs.get(k, 0) for k in STATS),
-            "ivPercent": round(100.0 * sum(ivs.get(k, 0) for k in STATS) / (IV_MAX * 6), 1),
+            "ivTotal": sum(eff.get(k, 0) for k in STATS),
+            "ivPercent": round(100.0 * sum(eff.get(k, 0) for k in STATS) / (IV_MAX * 6), 1),
             "nature": NATURE_BY_NAME.get(mon.get("nature", "HARDY"), ("", None, None, "?"))[3],
             # 성격이 무엇을 올리고 내리는지, 특성이 무슨 일을 하는지.
             # 이름만으로는 알 수가 없어서 같이 보낸다 (포켓몬 관리 창).

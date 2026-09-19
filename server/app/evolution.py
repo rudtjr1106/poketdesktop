@@ -45,7 +45,10 @@ def _stats_ok(want, dex, mon):
     if want is None:
         return True
     sp = dex.get(mon["species"]) or {}
-    st = P.calc_all_stats(sp, mon.get("ivs", {}), mon.get("evs", {}),
+    # 능력치를 보는 곳이라 **병뚜껑을 쳐준 개체값**으로 센다 (화면에 뜨는
+    # 능력치와 같은 값이어야 한다). 발키는 Lv.20 에 진화하고 병뚜껑은
+    # Lv.50 부터라 실제로 갈릴 일은 거의 없지만, 기준이 둘이면 안 된다.
+    st = P.calc_all_stats(sp, P.effective_ivs(mon), mon.get("evs", {}),
                           mon["level"], mon.get("nature", "HARDY"))
     a, d = st.get("atk", 0), st.get("def", 0)
     if want > 0:

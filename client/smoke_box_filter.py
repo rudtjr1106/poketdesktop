@@ -39,6 +39,7 @@ from common import pokelogic as P                           # noqa: E402
 from poketdesktop import box_filter                         # noqa: E402
 from poketdesktop import platform_os as PLAT                # noqa: E402
 from poketdesktop import ui_box                             # noqa: E402
+from test_learn_dialog import squeezed                      # noqa: E402
 
 OK = FAIL = 0
 
@@ -198,6 +199,56 @@ def make_gif(path):
     frames[0].save(path, save_all=True, append_images=frames[1:],
                    transparency=0, duration=90, loop=0, disposal=2)
     return path
+
+
+def hyper_and_evs(root, dex):
+    """병뚜껑과 노력치가 상세 칸에 **보이는가.**
+
+    사용자 제보: "병뚜껑으로 31 로 올려도 반영이 안 되는 것처럼 보인다."
+    실제로는 능력치에 제대로 들어가는데(effective_ivs) 화면이 원래 개체값을
+    그대로 보여줘서, 올라간 능력치 옆에 '개체 7' 이 그대로 남아 있었다.
+    노력치는 아예 보여주는 데가 없었다.
+    """
+    print()
+    print("-- 병뚜껑·노력치 표시")
+    sp = dex.get(445)                      # 한카리아스
+    m = {"id": 1, "species": sp["internal"], "num": 445, "level": 50,
+         "nickname": None, "onDesktop": True, "gender": "M", "shiny": False,
+         "ivs": dict((x, 7) for x in P.STATS),
+         "evs": {"hp": 6, "atk": 252, "def": 0, "spa": 0, "spd": 0, "spe": 252},
+         "hyper": {"atk": True, "spe": True},
+         "moves": [], "nature": "JOLLY",
+         "exp": P.exp_for_level(sp.get("growth", "medium"), 50)}
+    m["info"] = dex.describe(m)
+    app = FakeApp(root, dex, [m])
+    win = ui_box.BoxWindow(root, app)
+    settle_rows(root, win)
+    win.select(1)
+    settle(root)
+
+    plain = dex.describe(dict(m, hyper={}))
+    chk("병뚜껑이 능력치를 실제로 올린다",
+        m["info"]["stats"]["atk"] > plain["stats"]["atk"],
+        (plain["stats"]["atk"], m["info"]["stats"]["atk"]))
+    labels = dict((k, win.bars[k][2].cget("text")) for k, _l in ui_box.STAT_ROWS)
+    chk("병뚜껑 쓴 능력은 31 로 보인다",
+        labels["atk"].startswith("개체 31") and labels["spe"].startswith("개체 31"),
+        labels)
+    chk("병뚜껑 표시가 붙는다", "✦" in labels["atk"], labels["atk"])
+    chk("안 쓴 능력은 원래대로", labels["def"] == "개체 7", labels["def"])
+    total = win.d_ivsum.cget("text")
+    chk("합계도 쳐준 값으로", "90 / 186" in total, total)
+    chk("합계에 병뚜껑을 알린다", "병뚜껑" in total, total)
+    evline = win.d_evsum.cget("text")
+    chk("노력치를 보여준다", "510 / 510" in evline, evline)
+    chk("어느 능력에 붙었는지 보여준다",
+        "공격 252" in evline and "스피드 252" in evline, evline)
+    bad = squeezed(win.win)
+    chk("눌린 위젯 없음", not bad, bad[:3])
+    try:
+        win.close()
+    except Exception:                                       # noqa: BLE001
+        pass
 
 
 def main():
@@ -374,6 +425,7 @@ def main():
         pass
 
     many(root, dex)
+    hyper_and_evs(root, dex)
 
     try:
         root.destroy()
