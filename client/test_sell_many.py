@@ -15,6 +15,7 @@
 import os
 import sys
 import tempfile
+import time
 import types
 
 os.environ["POKET_HOME"] = tempfile.mkdtemp(prefix="poket-test-sell-")
@@ -170,8 +171,13 @@ def main():
 
         ui_box.confirm = lambda *a, **k: True
         bag.do_sell_many()
-        for _ in range(40):
+        # **횟수로 기다리면 안 된다.** update() 마흔 번은 눈 깜짝할 새라,
+        # 작업 스레드가 아직 안 끝난 채로 넘어간다 (윈도우 CI 에서 걸렸다).
+        # 끝났는지를 보고 기다린다.
+        end = time.time() + 10
+        while time.time() < end and not reloaded:
             root.update()
+            time.sleep(0.01)
         chk("고른 것을 한 번에 보낸다", sent == [picked], sent)
         chk("  끝나면 다시 불러온다", reloaded, reloaded)
         chk("  결과 말을 남긴다", bag._pending and "팔았다" in bag._pending[0],

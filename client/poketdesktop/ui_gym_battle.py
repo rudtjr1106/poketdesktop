@@ -179,6 +179,10 @@ class GymBattleWindow(object):
             cut = min(wh - room, self.scene_h - U.h(MIN_SCENE_H))
             self.scene_h -= max(0, cut)
             wh -= max(0, cut)
+        # 세로만 줄이고 가로는 안 봤다. 글꼴이 큰 화면에서는 U.h(860) 이
+        # 1032 까지 커져서, 1024 짜리 화면에서는 오른쪽 이름표가 밖으로 나간다.
+        ww = min(ww, (x2 - x1) - U.h(16))
+        self.ww = ww
         U.style_window(self.win, "관장 도전 — %s" % t.get("name", ""), ww, wh)
         # 독·작업표시줄을 뺀 자리 안에 놓는다 (style_window 는 화면 전체 기준이다)
         gx = x1 + max(0, ((x2 - x1) - ww) // 2)
@@ -223,7 +227,7 @@ class GymBattleWindow(object):
 
     def _scene(self):
         s = U.h
-        self.sw, self.sh = s(W) - 4, self.scene_h
+        self.sw, self.sh = self.ww - 4, self.scene_h
         cv = tk.Canvas(self.win, width=self.sw, height=self.sh, bg="#1b2334", highlightthickness=0)
         cv.pack(fill="x")
         self.cv = cv

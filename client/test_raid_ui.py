@@ -400,6 +400,31 @@ def main():
     chk("내 기술 칸이 뜬다", "PP" in t, t[:150])
     chk("기술 이름이 보인다", "몸통박치기" in t or "누르기" in t, t[:200])
 
+    print("=== 좁은 화면 ===")
+    # CI 맥에서 잡혔다: 글꼴이 크면 U.h(960) 이 1152 가 되는데 화면이
+    # 1024 라 오른쪽이 통째로 밖으로 나갔다. 작업 영역을 좁다고 속여서 본다.
+    real_area = PLAT.work_area
+    try:
+        PLAT.work_area = lambda w, h: (0, 0, 1024, 677)
+        api_n = FakeApi(dex, n=6, revealed=True)
+        room_n = api_n.begin()
+        app_n = FakeApp(root, api_n, dex)
+        bw_n = RUI.RaidBattleWindow(app_n, room_n)
+        pump(root, lambda: not bw_n.busy, timeout=25)
+        rest(root, 0.4)
+        bw_n.win.update_idletasks()
+        chk("좁은 화면에도 창이 들어간다", bw_n.win.winfo_width() <= 1024,
+            bw_n.win.winfo_width())
+        outs = [k for k in bw_n.slots if not inside(bw_n.cv, bw_n.slots[k]["name"])[0]]
+        chk("참가자 칸이 다 보인다", not outs, outs)
+        chk("체력바 글씨도 안에", inside(bw_n.cv, bw_n.hp_text)[0])
+        chk("라운드 표시도 안에", inside(bw_n.cv, bw_n.round_text)[0])
+        bad = squeezed(bw_n.win)
+        chk("눌린 위젯 없음", not bad, bad[:3])
+        bw_n.close()
+    finally:
+        PLAT.work_area = real_area
+
     print("=== 고르고 보내기 ===")
     before = len([c for c in api3.calls if c.startswith("act")])
     hp0 = bw.view["boss"]["hp"]

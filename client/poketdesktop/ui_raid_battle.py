@@ -101,6 +101,11 @@ class RaidBattleWindow(object):
             cut = min(wh - room, self.scene_h - U.h(MIN_SCENE_H))
             self.scene_h -= max(0, cut)
             wh -= max(0, cut)
+        # **가로도 화면 안에 넣는다.** 글꼴이 큰 화면에서는 U.h(960) 이
+        # 1152 까지 커지는데, 노트북 화면이 1024 면 오른쪽이 통째로 밖으로
+        # 나간다(참가자 여섯째 칸과 물러나기 단추가 안 보인다).
+        ww = min(ww, (x2 - x1) - U.h(16))
+        self.ww = ww
         boss = (self.view.get("boss") or {}).get("name") or "레이드"
         U.style_window(self.win, "레이드 — %s" % boss, ww, wh)
         gx = x1 + max(0, ((x2 - x1) - ww) // 2)
@@ -154,7 +159,7 @@ class RaidBattleWindow(object):
     # ---------------- 장면 ----------------
     def _scene(self):
         s = U.h
-        self.sw, self.sh = s(W) - 4, self.scene_h
+        self.sw, self.sh = self.ww - 4, self.scene_h
         cv = tk.Canvas(self.win, width=self.sw, height=self.sh, bg="#171326",
                        highlightthickness=0)
         cv.pack(fill="x")
