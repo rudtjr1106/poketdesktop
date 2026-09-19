@@ -84,19 +84,29 @@ def give_species(kind, rng=None):
     return rng.choice(pool(kind))
 
 
-def give(uid, kind, rng=None, now=None):
-    """알을 하나 준다. 새 알의 id."""
+def give(uid, kind, rng=None, now=None, species=None, known=None):
+    """알을 하나 준다. 새 알의 id.
+
+    species 를 주면 그 종으로 정해진 알이다 (레이드 보상 - 방금 잡은 보스가
+    그대로 들어 있다). 안 주면 지금까지처럼 목록에서 고르게 뽑는다.
+
+    known 이면 **무엇이 들어 있는지 화면에도 알린다** (public 을 보라).
+    안 주면 species 를 준 알만 그렇게 친다.
+    """
     if kind not in KINDS:
         raise ValueError("그런 알이 없습니다.")
-    species = give_species(kind, rng)
+    if species is not None and species not in pool(kind):
+        raise ValueError("그 종은 이 알에서 나오지 않습니다.")
+    known = bool(species is not None if known is None else known)
+    species = species or give_species(kind, rng)
     # 자리가 있으면 바로 데리고 다닌다. 꽉 찼으면 박스로 - 받자마자 누구를
     # 억지로 내리지 않는다. 관리 창에서 옮기면 그때부터 자란다.
     slot = deps.free_slot(uid)
     return db.run(
         "INSERT INTO egg (user_id, kind, species, need_sec, got_sec, created_at,"
-        " on_desktop, slot) VALUES (?,?,?,?,0,?,?,?)",
+        " on_desktop, slot, known) VALUES (?,?,?,?,0,?,?,?,?)",
         (uid, kind, species, KINDS[kind][1], now or _now_iso(),
-         1 if slot is not None else 0, slot)).lastrowid
+         1 if slot is not None else 0, slot, 1 if known else 0)).lastrowid
 
 
 def set_desktop(uid, egg_id, on):
@@ -177,13 +187,23 @@ def public(uid):
     """화면에 줄 알 목록. 아직 안 부화한 알과, 부화했지만 아직 안 알린 알.
 
     **알 속 종은 싣지 않는다.** 부화한 알만 태어난 포켓몬을 붙인다.
+
+    딱 하나 예외가 있다 - `known` 인 알(레이드 보상)은 받는 사람이 무엇을
+    잡았는지 이미 안다. 이름을 "테오키스의 알" 로 바꿔 준다. 화면은 전부
+    이 name 을 쓰므로(바탕화면 이름표·포켓몬 관리·부화 연출) 여기 한 줄로
+    끝난다.
     """
     rows = db.q("SELECT * FROM egg WHERE user_id=? AND"
                 " (hatched_at IS NULL OR announced=0) ORDER BY id", (uid,))
     out = []
     for r in rows:
         name, need = KINDS.get(r["kind"], ("포켓몬 알", r["need_sec"]))
-        e = {"id": r["id"], "kind": r["kind"], "name": name,
+        known = bool(r["known"]) if "known" in r.keys() else False
+        if known:
+            sp = deps.dex().get(r["species"]) or {}
+            if sp.get("kr"):
+                name = "%s의 알" % sp["kr"]
+        e = {"id": r["id"], "kind": r["kind"], "name": name, "known": known,
              "gotSec": r["got_sec"], "needSec": r["need_sec"],
              "leftSec": max(0, r["need_sec"] - r["got_sec"]),
              "hatched": r["hatched_at"] is not None,

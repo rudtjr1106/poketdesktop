@@ -343,3 +343,98 @@ def badge_image(text="야생", w=42, h=16, key=(255, 0, 255),
     tw = d.textlength(text, font=f) if f else len(text) * 6
     d.text(((w - tw) / 2.0, h * 0.16), text, fill=fg, font=f)
     return im
+
+
+# ---------------------------------------------------------------- 레이드 기둥
+CLOUD = (58, 44, 92)
+CLOUD_DARK = (36, 26, 62)
+BEAM = (214, 226, 255)
+
+
+def _mix(a, b, t):
+    t = max(0.0, min(1.0, t))
+    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
+
+
+def pillar_frames(w=200, h=160, frames=8, key=(255, 0, 255), color=(255, 192, 64)):
+    """레이드가 열리기 전 바탕화면에 내려오는 빛기둥.
+
+    포켓몬이 돌아다니는 **영역의 윗변**에서 시작한다 (화면 꼭대기가 아니다 -
+    영역을 화면 구석에 작게 그려 둔 사람 화면에서 기둥만 딴 데 떠 있으면
+    무엇과 이어진 것인지 알 수가 없다).
+
+    창 전체에 -alpha 를 걸어 비치게 만든다 (raid_fx.ALPHA). 여기서는 알파
+    없이 그린다 - 투명색 창은 '이 색은 안 보인다' 뿐이라 반투명이 없다.
+
+    color 는 보스 타입 색이다. 무엇이 나올지 공개되기 전에는 아무 색이나
+    쓰지 말고 회색빛으로 두는 쪽이 낫다 (부르는 쪽이 정한다).
+    """
+    w, h = max(40, int(w)), max(40, int(h))
+    out = []
+    cx = w / 2.0
+    top_r = w * 0.13          # 기둥 위쪽 반지름
+    bot_r = w * 0.44          # 아래쪽 반지름
+    cloud_h = h * 0.26
+    for i in range(frames):
+        t = i / float(frames)
+        im = Image.new("RGB", (w, h), key)
+        d = ImageDraw.Draw(im)
+        # 빛기둥. 바깥 -> 안쪽으로 세 겹, 안쪽이 밝다.
+        for layer, (grow, tint) in enumerate(((1.0, 0.25), (0.66, 0.55), (0.34, 0.9))):
+            pulse = 1.0 + 0.05 * math.sin((t + layer * 0.2) * 2 * math.pi)
+            tr, br = top_r * grow * pulse, bot_r * grow * pulse
+            d.polygon([(cx - tr, cloud_h * 0.75), (cx + tr, cloud_h * 0.75),
+                       (cx + br, h), (cx - br, h)],
+                      fill=_mix(color, BEAM, tint))
+        # 내려오는 빛의 띠
+        for k in range(3):
+            p = ((t + k / 3.0) % 1.0)
+            y = cloud_h * 0.75 + (h - cloud_h * 0.75) * p
+            r = top_r + (bot_r - top_r) * p
+            d.ellipse((cx - r, y - h * 0.018, cx + r, y + h * 0.018),
+                      fill=_mix(BEAM, (255, 255, 255), 0.6))
+        # 머리 위의 먹구름. 아래쪽 겹부터 그려 위쪽 겹이 테를 만든다.
+        for k, (ox, oy, rw, rh, col) in enumerate((
+                (-0.34, 0.70, 0.34, 0.46, CLOUD_DARK),
+                (0.36, 0.66, 0.30, 0.42, CLOUD_DARK),
+                (0.02, 0.76, 0.48, 0.48, CLOUD_DARK),
+                (-0.20, 0.46, 0.38, 0.52, CLOUD),
+                (0.22, 0.40, 0.34, 0.48, CLOUD),
+                (-0.02, 0.30, 0.40, 0.46, _mix(CLOUD, (255, 255, 255), 0.14)))):
+            sway = math.sin((t + k * 0.2) * 2 * math.pi) * w * 0.012
+            ccx = cx + w * ox + sway
+            ccy = cloud_h * oy
+            d.ellipse((ccx - w * rw / 2, ccy - cloud_h * rh / 2,
+                       ccx + w * rw / 2, ccy + cloud_h * rh / 2), fill=col)
+        # 올라가는 반짝임
+        for k in range(4):
+            p = ((t + k / 4.0) % 1.0)
+            y = h - (h - cloud_h) * p
+            x = cx + math.sin((p + k) * 3.3) * bot_r * 0.7
+            r = max(1.0, w * 0.012 * (1.0 - p))
+            d.ellipse((x - r, y - r, x + r, y + r), fill=(255, 255, 255))
+        _fade_out(im, w, h, key)
+        out.append(im)
+    return out, w, h
+
+
+# 4x4 순서 디더. 아래로 갈수록 투명색 픽셀이 촘촘해진다.
+_BAYER = ((0, 8, 2, 10), (12, 4, 14, 6), (3, 11, 1, 9), (15, 7, 13, 5))
+
+
+def _fade_out(im, w, h, key):
+    """기둥 아래쪽을 점점 사라지게.
+
+    투명색 창에는 반투명이 없다 - '이 색이면 안 보인다' 뿐이다. 그래서
+    아래로 갈수록 투명색 픽셀을 촘촘히 섞어 사라지는 것처럼 보이게 한다.
+    안 하면 바닥이 자로 자른 듯 뚝 끊겨서 빛기둥이 아니라 색판으로 보인다.
+    """
+    start = int(h * 0.38)
+    span = float(max(1, h - start))
+    px = im.load()
+    for y in range(start, h):
+        level = ((y - start) / span) ** 1.8 * 17.0
+        row = _BAYER[y & 3]
+        for x in range(w):
+            if row[x & 3] < level:
+                px[x, y] = key

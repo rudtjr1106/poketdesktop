@@ -99,6 +99,9 @@ jobs:
       # 혼란·방어·대타출동·도발·날씨·필드·방·진영·압정·교체 ... 변화기 144개
       - name: 변화기 (엔진)
         run: python common/test_status_moves.py
+      # 여럿이 보스 하나를 때리는 판. 턴 끝이 사람 수만큼 겹치면 안 된다.
+      - name: 레이드 (엔진)
+        run: python common/test_raid_battle.py
       # 먼 섬(울릉군·백령도·추자도)을 원래 쪽으로 당겨 그리는가, 이름표 자리
       - name: 관장 지도 배치
         run: python client/test_gym_map.py
@@ -209,6 +212,9 @@ jobs:
       # 잘려 있었다. 글꼴이 다른 두 OS 에서 다 재 본다.
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
+      # 레이드 탭·배틀 창·바탕화면 빛기둥. 여섯 명이 한 화면에 들어가는지 본다.
+      - name: 레이드 화면 (진짜 Tk)
+        run: python client/test_raid_ui.py
       # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
@@ -268,6 +274,9 @@ jobs:
           python client/test_sell_many.py
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
+      # 레이드 탭·배틀 창·바탕화면 빛기둥. 여섯 명이 한 화면에 들어가는지 본다.
+      - name: 레이드 화면 (진짜 Tk)
+        run: python client/test_raid_ui.py
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
       # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
@@ -322,6 +331,7 @@ jobs:
           python test_battle_state.py
           python test_heavy_ball.py
           python test_sprite_fix.py
+          python test_raid.py
 
       - name: 서버 띄우기
         env:

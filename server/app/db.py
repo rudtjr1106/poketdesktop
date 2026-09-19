@@ -437,6 +437,52 @@ CREATE TABLE IF NOT EXISTS season_result (
 -- 아무도 모른다. 여기 남겨 두면 5분마다 도는 keepalive 가 대신 봐 준다.
 --
 -- 오래된 것은 지운다. 이건 진단용이지 보관용이 아니다.
+-- 레이드 한 판 (1.5.0). 여럿이 보스 하나를 상대한다.
+-- data 에 raid_battle.RaidBattle.dump() 를 통째로 쓴다. rev 는 관장과 같은
+-- 이유로 둔다 - 여기서는 사람이 여럿이라 겹칠 일이 훨씬 잦다.
+-- session 은 회차 열쇠 ("2026-09-22T11", 한국시간).
+CREATE TABLE IF NOT EXISTS raid_room (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session     TEXT NOT NULL,
+    code        TEXT,                   -- 친구끼리 하는 방의 코드. 자동 매칭은 NULL
+    host        INTEGER,                -- 방을 만든 사람
+    boss        TEXT NOT NULL,
+    state       TEXT NOT NULL,          -- lobby / fighting / done
+    result      TEXT,                   -- won / lost / timeout / cancelled / expired
+    round       INTEGER NOT NULL DEFAULT 0,
+    rev         INTEGER NOT NULL DEFAULT 0,
+    data        TEXT,
+    events      TEXT NOT NULL DEFAULT '[]',   -- 마지막 라운드에 일어난 일
+    deadline    TEXT,                   -- 이번 라운드를 고를 수 있는 마지막 시각 (UTC)
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_raid_room_session ON raid_room(session, state);
+
+CREATE TABLE IF NOT EXISTS raid_member (
+    room_id   INTEGER NOT NULL REFERENCES raid_room(id) ON DELETE CASCADE,
+    user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pos       INTEGER NOT NULL,
+    name      TEXT NOT NULL,
+    damage    INTEGER NOT NULL DEFAULT 0,
+    prize     INTEGER NOT NULL DEFAULT 0,
+    got_egg   INTEGER NOT NULL DEFAULT 0,
+    seen      INTEGER NOT NULL DEFAULT 0,   -- 결과를 화면에 알렸나
+    left_at   TEXT,
+    PRIMARY KEY (room_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_raid_member_user ON raid_member(user_id);
+
+-- 하루 한 번. **판이 실제로 열릴 때** 적는다 (raid.begin) - 사람이 안 모여
+-- 취소된 것으로는 안 깎인다. 실패는 깎인다.
+CREATE TABLE IF NOT EXISTS raid_entry (
+    user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day       TEXT NOT NULL,            -- 한국시간 날짜
+    room_id   INTEGER NOT NULL,
+    at        TEXT NOT NULL,
+    PRIMARY KEY (user_id, day)
+);
+
 CREATE TABLE IF NOT EXISTS server_error (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     at      TEXT NOT NULL,
@@ -630,6 +676,10 @@ MIGRATIONS = [
     ("egg", "on_desktop",
      "ALTER TABLE egg ADD COLUMN on_desktop INTEGER NOT NULL DEFAULT 1"),
     ("egg", "slot", "ALTER TABLE egg ADD COLUMN slot INTEGER"),
+    # 무엇이 들어 있는지 아는 알 (1.5.0 레이드 보상). 보통 알은 부화할
+    # 때까지 종을 안 알려주지만, 레이드 알은 방금 잡은 그 포켓몬이다.
+    ("egg", "known",
+     "ALTER TABLE egg ADD COLUMN known INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

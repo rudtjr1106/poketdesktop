@@ -21,6 +21,7 @@ from .ui_dex import DexWindow
 from .ui_friends import FriendsWindow
 from .ui_gym import GymWindow
 from .ui_pvp import PvpWindow
+from .ui_raid import RaidWindow
 from .ui_rank import RankWindow
 from .ui_settings import SettingsWindow
 from .ui_shop import ShopWindow
@@ -38,6 +39,7 @@ TABS = [
     ("friends", "친구", FriendsWindow, False),
     ("pvp", "대전", PvpWindow, False),
     ("gym", "관장", GymWindow, True),
+    ("raid", "레이드", RaidWindow, False),
     ("rank", "랭킹", RankWindow, False),
     ("settings", "설정", SettingsWindow, False),
 ]

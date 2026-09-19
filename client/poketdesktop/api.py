@@ -15,6 +15,10 @@ WAKE_TIMEOUT = 90
 # 기술을 배우는 요청(기술머신·기다리던 기술·떠올리기). 기본 15초로는 느린 인터넷에서
 # 끊기는데, 그 사이 서버는 이미 배웠을 수 있다. 화면이 기다림 표시를 띄우고 기다린다.
 LEARN_TIMEOUT = 60
+# 레이드는 **여럿이 같은 방을 동시에 두드린다.** 라운드를 넘기는 요청은
+# 남들 몫까지 계산하느라 조금 오래 걸릴 수 있고, 여기서 끊기면 그 라운드를
+# 통째로 놓친다. 대신 폴링 간격보다는 짧아야 요청이 쌓이지 않는다.
+RAID_TIMEOUT = 20
 
 
 class ApiError(Exception):
@@ -415,6 +419,42 @@ class Api(object):
     def gym_act(self, bid, kind, move="", slot=-1):
         return self._call("POST", "/api/gym/battle/%d/act" % int(bid),
                           {"kind": kind, "move": move, "slot": int(slot), "hour": _hour()})
+
+    # ---------------- 레이드 ----------------
+    # 판정은 전부 서버가 한다. 라운드를 넘기는 것도 서버다 - 여기서는
+    # '무엇을 할지' 를 보내고, 창이 열려 있는 동안 방을 자주 물어본다.
+    def raid(self):
+        """일정 · 다음 회차 보스 · 내가 들어가 있는 방."""
+        return self._call("GET", "/api/raid")
+
+    def raid_room(self):
+        """지금 방 상태. 레이드 창이 이걸로 폴링한다."""
+        return self._call("GET", "/api/raid/room", timeout=RAID_TIMEOUT)
+
+    def raid_join(self, code=""):
+        return self._call("POST", "/api/raid/join", {"code": code or ""})
+
+    def raid_create(self):
+        """친구끼리 할 방을 만든다. 코드가 나온다."""
+        return self._call("POST", "/api/raid/create", {})
+
+    def raid_start(self):
+        """방장이 정각을 안 기다리고 시작한다."""
+        return self._call("POST", "/api/raid/start", {})
+
+    def raid_act(self, kind, move="", slot=-1):
+        return self._call("POST", "/api/raid/act",
+                          {"kind": kind, "move": move, "slot": int(slot)},
+                          timeout=RAID_TIMEOUT)
+
+    def raid_leave(self):
+        return self._call("POST", "/api/raid/leave", {})
+
+    def raid_seen(self):
+        return self._call("POST", "/api/raid/seen", {})
+
+    def raid_history(self, limit=10):
+        return self._call("GET", "/api/raid/history?limit=%d" % int(limit))
 
     # ---------------- 기술머신 ----------------
     # 사고팔 수 없고 쓴다고 없어지지도 않는다. 그래서 개수를 주고받는

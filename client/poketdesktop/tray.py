@@ -145,6 +145,9 @@ class TrayBase(object):
             Item("랜덤 배틀", lambda: self.call(a.pvp_random)),
             # 관장 도전은 지도에서 고르는 것이라 탭으로 바로 연다.
             Item("관장 도전", lambda: self.call(a.open_gym)),
+            # 레이드는 정해진 시각에만 열린다. 싸우던 판이 있으면 배틀
+            # 창으로, 없으면 일정 화면으로 간다 (app.resume_raid).
+            Item("레이드", lambda: self.call(a.resume_raid)),
             # 알림을 안 띄우기로 했으니, 놓치면 안 되는 것은 메뉴에
             # 남는다. 상대가 걸어온 대전은 화면에 아무 자국도 없어서
             # 여기 없으면 알 길이 없다.

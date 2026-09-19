@@ -1491,10 +1491,18 @@ class Battle(object):
             A.on_status(self, f, who, ail, source, ev)  # 싱크로
 
     # ---------------- 턴 종료 ----------------
-    def _end_of_turn(self, ev):
-        SM.end_turn_pre(self, ev)
+    def _end_of_turn(self, ev, sides=("me", "foe"), field=True):
+        """턴 끝 처리.
+
+        sides / field 는 **레이드(여럿이 보스 하나)** 때문에 열어 둔 문이다.
+        거기서는 한 판에 사람이 여럿이라 이 함수를 사람 수만큼 부르는데,
+        그대로 부르면 보스의 화상 데미지가 사람 수만큼 들어가고 리플렉터·
+        날씨의 남은 턴도 그만큼 줄어든다. 첫 사람만 보스와 판(field)을 맡고
+        나머지는 자기 쪽만 처리한다. 야생·관장·PvP 는 기본값 그대로다.
+        """
+        SM.end_turn_pre(self, ev, sides, field)
         for who, f in (("me", self.me), ("foe", self.foe)):
-            if not f.alive():
+            if who not in sides or not f.alive():
                 continue
             how = A.status_chip(f, f.status) if f.ability_on else "normal"
             if f.status == "burn" and how != "none":
@@ -1523,7 +1531,7 @@ class Battle(object):
                 H.end_of_turn(self, f, who, ev)     # 먹다남은음식, 맹독구슬 ...
             if f.ability_on:
                 A.end_of_turn(self, f, who, ev)     # 가속, 탈피, 변덕쟁이 ...
-        SM.end_turn_post(self, ev)
+        SM.end_turn_post(self, ev, sides, field)
         self._check_faint(ev)
 
     def _drain_seed(self, f, who, ev):

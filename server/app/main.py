@@ -29,7 +29,7 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from . import (auth, battle_routes, config, db, deps, eggs, item_routes,  # noqa: E402
-               errors, items, migrations, pvp, pvp_routes,
+               errors, items, migrations, pvp, pvp_routes, raid, raid_routes,
                gym_routes, social_routes, tm_routes, tms, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
@@ -39,6 +39,7 @@ app.include_router(pvp_routes.router)
 app.include_router(social_routes.router)
 app.include_router(tm_routes.router)
 app.include_router(gym_routes.router)
+app.include_router(raid_routes.router)
 
 RNG = deps.RNG
 
@@ -889,6 +890,10 @@ def me(ctx=Depends(current)):
         # /api/eggs/{id}/seen 을 부른다. 그전까지는 계속 실려 온다.
         "eggs": eggs.public(uid),
         "hatchedNow": hatched,
+        # 레이드 안내 (1.5.0). 다음 회차·보스·안 본 결과. 대전 수·선물과
+        # 같은 이유로 폴링을 새로 두지 않고 여기에 얹는다. 이벤트 기간이
+        # 아니면 None 이고 질의도 안 나간다.
+        "raid": raid.me_card(uid),
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 

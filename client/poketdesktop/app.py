@@ -36,6 +36,7 @@ from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
 from .ui_update import NewVersionAsk, PatchNotes, UpdateWindow  # noqa: E402
 from .wild_ui import WildController            # noqa: E402
+from . import raid_fx                          # noqa: E402
 
 
 # 켜 둔 동안 새 버전을 몇 시간마다 살펴볼지.
@@ -114,6 +115,13 @@ class App(object):
         self._anim_job = False
         self.arena = None
         self.battle = None
+        # 레이드 (1.5.0). 탭·배틀 창·바탕화면 기둥.
+        self.raid_window = None
+        self.raid_battle = None
+        self.raid_pillar = None
+        self.user_id = None
+        # 마지막으로 알린 회차. 같은 회차를 두 번 알리지 않는다.
+        self._raid_told = None
         self._quitting = False
         self._relogin = False
         self._sync_job = None
@@ -554,6 +562,9 @@ class App(object):
                 # 운영자가 보낸 선물. 서버가 /api/me 에서 이미 지급했고
                 # 여기서는 알리기만 한다.
                 self.announce_gifts(me.get("gifts") or [])
+                self.user_id = (me.get("user") or {}).get("id", self.user_id)
+                # 레이드 안내. 이벤트 기간이 아니면 None 이라 아무 일도 안 한다.
+                self.announce_raid(me.get("raid"))
             if self.overlay:
                 added = self.overlay.sync(mons or [], paths or {}, walks or {})
                 if me is not None and "eggs" in me:
@@ -799,6 +810,102 @@ class App(object):
 
     def open_gym(self):
         self.gym_window = self._tab("gym")
+
+    def open_raid(self):
+        self.raid_window = self._tab("raid")
+
+    # ---------------- 레이드 ----------------
+    def open_raid_battle(self, room):
+        """판이 열렸다. 배틀 창을 띄운다 (이미 떠 있으면 앞으로)."""
+        if not room or (room.get("state") or "") != "fighting":
+            return None
+        if self.raid_battle:
+            self.raid_battle.focus()
+            return self.raid_battle
+        from .ui_raid_battle import RaidBattleWindow
+        PLAT.activate()
+        self.raid_battle = RaidBattleWindow(self, room)
+        return self.raid_battle
+
+    def resume_raid(self):
+        """싸우던 판이 남아 있으면 창을 다시 띄운다 (트레이·기둥에서)."""
+        if self.raid_battle:
+            return self.raid_battle.focus()
+
+        def done(r, err):
+            if err or not r:
+                return self.open_raid()
+            if (r.get("state") or "") == "fighting":
+                return self.open_raid_battle(r)
+            self.open_raid()
+        run_async(self.root, lambda: self.api.raid_room(), done)
+
+    def announce_raid(self, card):
+        """/api/me 가 실어 준 레이드 안내. 폴링을 새로 두지 않는다.
+
+        · 회차가 가까우면 바탕화면에 빛기둥을 세운다 (raid_fx)
+        · 싸우던 판이 있으면 배틀 창을 다시 띄운다
+        · 끝났는데 아직 안 본 결과가 있으면 한 번 알린다
+        """
+        if not card:
+            return self._drop_pillar()
+        nxt = card.get("next") or {}
+        left = int(nxt.get("leftSec") or 0)
+        soon = bool(nxt) and (card.get("open") or 0 < left <= raid_fx.SHOW_BEFORE)
+        key = nxt.get("session")
+        # 한 번 눌러서 치운 회차는 다시 안 띄운다. 다음 회차가 되면 열쇠가
+        # 달라지므로 저절로 풀린다.
+        dismissed = key and key == (self.settings.get("raidPillarSeen") or "")
+        if soon and not dismissed and not card.get("playedToday") \
+                and not card.get("room"):
+            first = self.raid_pillar is None
+            self._raise_pillar(nxt)
+            if first and key and key != self._raid_told:
+                self._raid_told = key
+                name = nxt.get("kr") if nxt.get("revealed") else "전설의 포켓몬"
+                self.notify("%s 레이드가 곧 시작됩니다. 바탕화면의 빛기둥을 눌러 참가하세요."
+                            % name)
+        else:
+            self._drop_pillar()
+        if card.get("room") and not self.raid_battle:
+            self.resume_raid()
+        n = int(card.get("unseen") or 0)
+        if n and not self.raid_battle:
+            self.notify("레이드 결과가 도착했습니다. 레이드 탭에서 확인해 보세요.")
+
+    def _raise_pillar(self, nxt):
+        if not self.overlay:
+            return
+        if self.raid_pillar is None:
+            try:
+                self.raid_pillar = raid_fx.RaidPillar(self, nxt, self._pillar_clicked)
+            except Exception:                               # noqa: BLE001
+                import traceback
+                config.log("레이드 기둥을 못 세웠습니다:\n%s" % traceback.format_exc())
+                self.raid_pillar = None
+            return
+        self.raid_pillar.update(nxt)
+
+    def _pillar_clicked(self):
+        """빛기둥을 눌렀다. **치우고 그 회차에는 다시 안 띄운다.**
+
+        누른 사람은 이미 레이드를 보러 가는 중이다. 거기서 안 하기로 했다면
+        더더욱 바탕화면에 계속 떠 있을 이유가 없다.
+        """
+        key = (self.raid_pillar.card or {}).get("session") if self.raid_pillar else None
+        if key:
+            self.settings["raidPillarSeen"] = key
+            config.save_settings(self.settings)
+        self._drop_pillar()
+        self.resume_raid()
+
+    def _drop_pillar(self):
+        if self.raid_pillar is not None:
+            try:
+                self.raid_pillar.destroy()
+            except Exception:                               # noqa: BLE001
+                pass
+            self.raid_pillar = None
 
     # ---------------- 유저 배틀 ----------------
     # 대전은 비동기다. 상대가 켜져 있지 않아도 그 사람의 지금 파티를
@@ -1138,9 +1245,17 @@ class App(object):
             except Exception:                               # noqa: BLE001
                 pass
             self.hub = None
+        rb = getattr(self, "raid_battle", None)
+        if rb:
+            try:
+                rb.close()          # 판은 서버에 남는다. 다시 들어오면 이어서 한다
+            except Exception:                               # noqa: BLE001
+                pass
+            self.raid_battle = None
+        self._drop_pillar()
         for name in ("box_window", "shop_window", "bag_window",
                      "friends_win", "dex_window", "settings_win",
-                     "pvp_window", "notes_win"):
+                     "pvp_window", "raid_window", "notes_win"):
             w = getattr(self, name, None)
             if w:
                 try:
@@ -1316,6 +1431,9 @@ class App(object):
             for p in list(self.overlay.pets.values()) + list(self.overlay.eggs.values()):
                 p.clamp()
                 p.place()
+        # 레이드 기둥은 영역 윗변에서 내려온다 - 영역이 바뀌면 따라간다.
+        if self.raid_pillar is not None:
+            self.raid_pillar.reposition()
         self.refresh_tray()
 
     def set_show_grass(self, on):

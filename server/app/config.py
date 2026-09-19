@@ -206,3 +206,48 @@ STARTERS = [
 ]
 STARTER_SET = set(x for row in STARTERS for x in row[1:])
 STARTER_LEVEL = _int("POKET_STARTER_LEVEL", 5)
+
+
+# ---------------------------------------------------------------- 레이드
+# 전설·환상 레이드 (1.5.0). 정해진 시간에 3~6인이 모여 보스를 잡고,
+# 성공하면 **그 보스의 알**을 받는다. 알 종류가 무작위인 시즌 보상과 달리
+# 무엇이 나올지 알고 들어간다.
+#
+# 날짜·시각은 전부 **한국시간(KST)** 이다. 서버는 도커 안이라 UTC 로 돌고
+# pvp 의 하루 계산도 UTC 지만, 이벤트는 사람이 모이는 시각이 전부라
+# 여기서는 KST 로 잰다 (raid.kst_now).
+RAID_START = os.environ.get("POKET_RAID_START", "2026-09-22")   # 이날부터 (포함)
+RAID_END = os.environ.get("POKET_RAID_END", "2026-10-06")       # 이날까지 (포함)
+# 하루에 여는 회차 (KST 시각). 운영 자료상 11시가 가장 붐비고, 21시는
+# 저녁에 오는 사람을 위한 자리다.
+RAID_HOURS = tuple(int(x) for x in
+                   os.environ.get("POKET_RAID_HOURS", "11,21").split(",") if x.strip())
+RAID_OPEN_SEC = _int("POKET_RAID_OPEN_SEC", 300)      # 정각 몇 초 전부터 모이나 (5분)
+RAID_GRACE_SEC = _int("POKET_RAID_GRACE_SEC", 120)    # 정각에 모자라면 더 기다리는 시간 (2분)
+RAID_REVEAL_SEC = _int("POKET_RAID_REVEAL_SEC", 3600)  # 보스를 미리 알리는 시간 (1시간 전)
+
+RAID_MIN_PLAYERS = _int("POKET_RAID_MIN_PLAYERS", 3)
+RAID_MAX_PLAYERS = _int("POKET_RAID_MAX_PLAYERS", 6)
+RAID_MIN_PARTY = _int("POKET_RAID_MIN_PARTY", 2)      # 데리고 와야 하는 최소 마릿수
+
+# 레벨은 **전원 같게 맞춘다** (raid_battle.leveled). 높은 쪽은 내리고 낮은
+# 쪽은 올린다 - Lv.30 과 Lv.100 이 한 방에 서는 판이라, 안 맞추면 낮은 쪽이
+# 한 대에 쓰러져 구경만 한다. 개체값·노력치·성격·도구·기술은 그대로라
+# 잘 키운 사람이 여전히 세다.
+RAID_TEAM_LEVEL = _int("POKET_RAID_TEAM_LEVEL", 50)
+RAID_BOSS_LEVEL = _int("POKET_RAID_BOSS_LEVEL", 60)
+# 보스 체력 배율 = 기본 + 사람당. tools/sim_raid.py 로 쟀다
+# (봇 기준 3인 68% · 4인 70% · 5인 73% · 6인 98%).
+RAID_HP_BASE = _float("POKET_RAID_HP_BASE", 2.0)
+RAID_HP_PER = _float("POKET_RAID_HP_PER", 1.6)
+RAID_ROUNDS = _int("POKET_RAID_ROUNDS", 15)           # 이 안에 못 잡으면 실패
+RAID_DOUBLE_FROM = _int("POKET_RAID_DOUBLE_FROM", 4)  # 몇 명부터 보스가 두 번 움직이나
+RAID_ROUND_SEC = _int("POKET_RAID_ROUND_SEC", 25)     # 한 라운드 고르는 시간
+RAID_TTL = _int("POKET_RAID_TTL", 1800)               # 아무도 안 오면 판을 접는다
+
+# 보상. 알은 **확률**이다 - 참가 횟수를 막지 않는 대신 이걸로 조절한다.
+# 3개 상한을 두면 사흘이면 다 채운 사람이 안 와서 3인이 안 모인다.
+RAID_EGG_CHANCE = _float("POKET_RAID_EGG_CHANCE", 0.7)
+RAID_PRIZE = _int("POKET_RAID_PRIZE", 3000)           # 이기면 전원
+RAID_FAIL_PRIZE = _int("POKET_RAID_FAIL_PRIZE", 500)  # 져도 준다
+RAID_TOP_PRIZE = (3000, 2000, 1000)                   # 기여 1~3위 덤

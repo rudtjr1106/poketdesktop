@@ -1623,11 +1623,14 @@ def on_enter_abilities(bt, f, who, ev):
 
 
 # ---------------------------------------------------------------- 턴 끝
-def end_turn_pre(bt, ev):
-    """상태이상 데미지보다 먼저: 날씨 데미지·회복, 희망사항, 그래스필드, 아쿠아링·뿌리박기."""
+def end_turn_pre(bt, ev, sides=("me", "foe"), field=True):
+    """상태이상 데미지보다 먼저: 날씨 데미지·회복, 희망사항, 그래스필드, 아쿠아링·뿌리박기.
+
+    sides / field 는 레이드용이다 (battle.Battle._end_of_turn 의 설명을 보라).
+    """
     fl = bt.field
     w = bt.weather()
-    for who in ("me", "foe"):
+    for who in sides:
         f = bt.fighter(who)
         if not f.alive():
             continue
@@ -1658,7 +1661,7 @@ def end_turn_pre(bt, ev):
             A.pop(bt, f, who, ev)
             f.status, f.sleep_turns = None, 0
             ev.append({"t": "cure", "who": who, "text": "%s 의 상태이상이 나았다!" % f.name})
-    for who in ("me", "foe"):
+    for who in (("me", "foe") if field else ()):
         side = fl.side(who)
         wish = side.get("wish")
         if wish:
@@ -1668,7 +1671,7 @@ def end_turn_pre(bt, ev):
                 f = bt.fighter(who)
                 if f.alive():
                     _heal(bt, f, who, wish["amount"], ev, "%s 의 소원이 이루어졌다!" % wish.get("by", f.name))
-    for who in ("me", "foe"):
+    for who in sides:
         f = bt.fighter(who)
         if not f.alive():
             continue
@@ -1680,10 +1683,14 @@ def end_turn_pre(bt, ev):
             _heal(bt, f, who, f.maxhp / 16.0, ev, "%s 은(는) 뿌리로 양분을 빨아올렸다!" % f.name)
 
 
-def end_turn_post(bt, ev):
-    """상태이상 데미지·도구·특성 다음: 악몽·저주·조이기·문어굳히기, 남은 턴 세기, 하품·멸망의노래."""
+def end_turn_post(bt, ev, sides=("me", "foe"), field=True):
+    """상태이상 데미지·도구·특성 다음: 악몽·저주·조이기·문어굳히기, 남은 턴 세기, 하품·멸망의노래.
+
+    sides / field 는 레이드용이다 (battle.Battle._end_of_turn 의 설명을 보라).
+    남은 턴을 세는 것(리플렉터·방·필드·날씨)은 판에 하나뿐이라 field 쪽이다.
+    """
     fl = bt.field
-    for who in ("me", "foe"):
+    for who in sides:
         f = bt.fighter(who)
         if not f.alive():
             continue
@@ -1741,6 +1748,8 @@ def end_turn_post(bt, ev):
             if c["perish"] <= 0:
                 c.pop("perish", None)
                 f.hp = 0
+    if not field:
+        return
     for who in ("me", "foe"):
         side = fl.side(who)
         for name in ("reflect", "lightscreen", "auroraveil", "safeguard", "mist", "tailwind"):
