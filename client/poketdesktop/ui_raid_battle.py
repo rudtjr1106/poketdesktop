@@ -39,7 +39,7 @@ from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
 W = 960
 SCENE_H = 330
 MSG_H = 48
-CMD_H = 200
+CMD_H = 210
 MIN_SCENE_H = 250
 STEP_MS = 560
 POLL_MS = 1500              # 방을 물어보는 주기
@@ -832,8 +832,10 @@ class RaidBattleWindow(object):
                          if i != me.get("slot"))
         self.switch_btn.configure(state="normal" if can_switch else "disabled")
         self.leave_btn.configure(state="normal")
-        self.hint.configure(text="모두가 고르면 그 라운드가 한꺼번에 진행됩니다. "
-                                 "시간 안에 안 고르면 가장 센 기술로 대신 싸웁니다.")
+        # **한 줄짜리로 둔다.** 이 칸은 기술 설명도 띄우는 자리라 넉넉하지
+        # 않은데, 세 줄짜리를 기본으로 두면 윈도우에서 눌려 잘린다.
+        # 라운드가 어떻게 도는지는 보낸 뒤 화면에서 다시 말해 준다.
+        self.hint.configure(text="기술에 마우스를 올리면 설명이 나옵니다.")
         mon = (team[me.get("slot", 0)] if team else {}) or {}
         self.say("%s 은(는) 무엇을 할까?" % (mon.get("name") or ""))
 

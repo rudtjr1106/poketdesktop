@@ -562,9 +562,15 @@ def main():
                 chk("병뚜껑으로 %s 개체값을 31 취급" % want,
                     st == 200 and info.get("hyper", {}).get(want) is True,
                     r.get("error") or info.get("hyper"))
+                # 굴렸을 때의 개체값은 본가와 같이 **안 바뀐다** (ivsRaw).
+                # 화면에 보내는 ivs 는 능력치를 셀 때 쓰는 값이라 31 이다 -
+                # 안 그러면 능력치는 올라갔는데 "개체 7" 이 그대로 남는다.
                 chk("실제 개체값은 그대로 (본가와 같다)",
-                    info.get("ivs", {}).get(want) == before_ivs.get(want),
-                    (info.get("ivs", {}).get(want), before_ivs.get(want)))
+                    info.get("ivsRaw", {}).get(want) == before_ivs.get(want),
+                    (info.get("ivsRaw", {}).get(want), before_ivs.get(want)))
+                chk("화면에는 31 로 보인다",
+                    info.get("ivs", {}).get(want) == 31,
+                    info.get("ivs", {}).get(want))
                 chk("이미 단련한 능력에 또 쓰면 거부",
                     call("POST", "/api/bag/use",
                          {"item": "BOTTLECAP", "pokemon": pid3,
