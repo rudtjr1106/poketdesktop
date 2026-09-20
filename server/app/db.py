@@ -483,6 +483,37 @@ CREATE TABLE IF NOT EXISTS raid_entry (
     PRIMARY KEY (user_id, day)
 );
 
+-- 실시간 1:1 배틀 한 판 (친구끼리). 턴마다 live_battle.LiveBattle.dump() 를
+-- data 에 통째로 쓴다. **양쪽이 같은 방을 동시에 두드린다** - 상태를 바꾸는
+-- 곳은 rev 로 잠근다(관장·레이드와 같다).
+--
+-- a 가 건 쪽, b 가 받은 쪽이다. 엔진도 늘 a 기준으로 돌고, b 에게 줄 때만
+-- 한 번 뒤집는다 (live_battle 의 설명).
+CREATE TABLE IF NOT EXISTS live_match (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    a_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    b_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    a_name      TEXT NOT NULL,
+    b_name      TEXT NOT NULL,
+    state       TEXT NOT NULL,      -- invited / fighting / done
+    result      TEXT,               -- a / b / draw / declined / cancelled / expired
+    reason      TEXT,               -- ko / forfeit / turns
+    turn        INTEGER NOT NULL DEFAULT 0,
+    rev         INTEGER NOT NULL DEFAULT 0,
+    data        TEXT,
+    events      TEXT NOT NULL DEFAULT '[]',   -- 마지막 턴에 일어난 일 (a 기준)
+    deadline    TEXT,               -- 이번 턴을 고를 수 있는 마지막 시각 (UTC)
+    a_seen      INTEGER NOT NULL DEFAULT 0,   -- 결과를 화면에 알렸나
+    b_seen      INTEGER NOT NULL DEFAULT 0,
+    -- 전적을 이미 썼나. 알 지급과 같은 까닭으로 **먼저 찍고 그다음에
+    -- 쓴다** - 두 줄이 되면 사용자가 바로 알아챈다.
+    recorded    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_live_a ON live_match(a_id, state);
+CREATE INDEX IF NOT EXISTS idx_live_b ON live_match(b_id, state);
+
 CREATE TABLE IF NOT EXISTS server_error (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     at      TEXT NOT NULL,
@@ -680,6 +711,8 @@ MIGRATIONS = [
     # 때까지 종을 안 알려주지만, 레이드 알은 방금 잡은 그 포켓몬이다.
     ("egg", "known",
      "ALTER TABLE egg ADD COLUMN known INTEGER NOT NULL DEFAULT 0"),
+    ("live_match", "recorded",
+     "ALTER TABLE live_match ADD COLUMN recorded INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

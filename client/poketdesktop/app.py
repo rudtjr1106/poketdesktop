@@ -122,6 +122,11 @@ class App(object):
         self.user_id = None
         # 마지막으로 알린 회차. 같은 회차를 두 번 알리지 않는다.
         self._raid_told = None
+        # 실시간 배틀 (1.6.0). 창 하나와, 초대를 물어보는 예약.
+        self.live_battle = None
+        self._live_job = None
+        self._live_asking = False
+        self._live_told = None
         self._quitting = False
         self._relogin = False
         self._sync_job = None
@@ -565,6 +570,12 @@ class App(object):
                 self.user_id = (me.get("user") or {}).get("id", self.user_id)
                 # 레이드 안내. 이벤트 기간이 아니면 None 이라 아무 일도 안 한다.
                 self.announce_raid(me.get("raid"))
+                # 실시간 배틀. 걸려온 초대·싸우던 판·안 본 결과가 있으면
+                # 한 번 더 물어본다 (여기 실린 것은 요약이라 판 자체는 없다).
+                live = me.get("live")
+                if live and (live.get("invited") or live.get("state") == "fighting"
+                             or live.get("unseen")):
+                    self.check_live()
             if self.overlay:
                 added = self.overlay.sync(mons or [], paths or {}, walks or {})
                 if me is not None and "eggs" in me:
@@ -813,6 +824,110 @@ class App(object):
 
     def open_raid(self):
         self.raid_window = self._tab("raid")
+
+    # ---------------- 실시간 배틀 ----------------
+    # 친구끼리 **둘 다 켜 있을 때만** 하는 1:1. 초대를 알아차리는 가장 늦은
+    # 때가 다음 동기화(90초)라, 초대는 그보다 넉넉히 살아 있다(서버의
+    # LIVE_INVITE_SEC). 친구 탭을 열어 두면 거기서 자주 물어본다.
+    def live_invite(self, uid, name=""):
+        """친구에게 실시간 배틀을 건다."""
+        if self.live_battle:
+            return self.live_battle.focus()
+
+        def done(r, err):
+            if err:
+                return self.notify(getattr(err, "message", str(err)))
+            self.notify("%s 님에게 실시간 배틀을 신청했습니다. 수락하면 바로 시작합니다."
+                        % (name or "상대"))
+            self.live_watch(2000)
+        run_async(self.root, lambda: self.api.live_invite(uid), done)
+
+    def live_watch(self, ms=3000):
+        """잠깐 자주 물어본다 (초대를 걸어 뒀거나 친구 탭을 보고 있을 때)."""
+        if self._live_job is not None:
+            try:
+                self.root.after_cancel(self._live_job)
+            except Exception:                               # noqa: BLE001
+                pass
+        self._live_job = self.root.after(max(1000, ms), self.check_live)
+
+    def check_live(self):
+        """지금 내 실시간 배틀 상태를 한 번 물어본다."""
+        self._live_job = None
+        if not self.api or self._quitting:
+            return
+
+        def done(r, err):
+            if err or not isinstance(r, dict):
+                return
+            m = r.get("match")
+            self.announce_live(m, int(r.get("unseen") or 0))
+            # 아직 답을 기다리는 초대가 있으면 계속 본다
+            if m and m.get("state") == "invited":
+                self.live_watch(3000)
+        run_async(self.root, lambda: self.api.live(), done)
+
+    def announce_live(self, match, unseen=0):
+        """/api/live 나 /api/me 가 알려준 상태에 따라 화면을 띄운다."""
+        if not match:
+            if unseen and not self.live_battle:
+                self.notify("실시간 배틀 결과가 도착했습니다. 대전 탭에서 확인해 보세요.")
+            return
+        state = match.get("state")
+        if state == "fighting":
+            return self.open_live_battle(match)
+        if state == "invited" and not match.get("mine"):
+            return self._ask_live(match)
+        if state == "done" and match.get("outcome") and not self.live_battle:
+            self.open_live_battle(match)
+
+    def _ask_live(self, match):
+        """걸려온 초대를 물어본다. 한 번에 하나만."""
+        if self._live_asking or self.live_battle:
+            return
+        mid = match.get("id")
+        if mid is None or mid == self._live_told:
+            return
+        self._live_asking = True
+        self._live_told = mid
+        try:
+            from .ui_box import confirm
+            PLAT.activate()
+            ok = confirm(self.root, "실시간 배틀",
+                         "%s 님이 실시간 배틀을 신청했습니다.\n"
+                         "수락하면 바로 시작합니다. 양쪽 포켓몬은 모두 Lv.%d 로 "
+                         "맞춰집니다." % (match.get("foeName") or "친구",
+                                          match.get("level") or 50),
+                         danger=False, ok_text="수락")
+        except Exception:                                   # noqa: BLE001
+            ok = False
+        finally:
+            self._live_asking = False
+
+        def done(r, err):
+            if err:
+                return self.notify(getattr(err, "message", str(err)))
+            if ok and isinstance(r, dict) and r.get("state") == "fighting":
+                self.open_live_battle(r)
+        run_async(self.root, lambda: self.api.live_answer(mid, ok), done)
+
+    def open_live_battle(self, match):
+        """실시간 배틀 창을 띄운다 (이미 떠 있으면 앞으로)."""
+        if not match:
+            return None
+        if self.live_battle:
+            self.live_battle.focus()
+            return self.live_battle
+        from .ui_live_battle import LiveBattleWindow
+        PLAT.activate()
+        self.live_battle = LiveBattleWindow(self, match)
+        return self.live_battle
+
+    def resume_live(self):
+        """싸우던 판이 남아 있으면 창을 다시 띄운다."""
+        if self.live_battle:
+            return self.live_battle.focus()
+        self.check_live()
 
     # ---------------- 레이드 ----------------
     def open_raid_battle(self, room):
@@ -1245,6 +1360,19 @@ class App(object):
             except Exception:                               # noqa: BLE001
                 pass
             self.hub = None
+        lv = getattr(self, "live_battle", None)
+        if lv:
+            try:
+                lv.close()          # 판은 서버에 남는다
+            except Exception:                               # noqa: BLE001
+                pass
+            self.live_battle = None
+        if self._live_job is not None:
+            try:
+                self.root.after_cancel(self._live_job)
+            except Exception:                               # noqa: BLE001
+                pass
+            self._live_job = None
         rb = getattr(self, "raid_battle", None)
         if rb:
             try:

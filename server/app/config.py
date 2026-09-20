@@ -251,3 +251,18 @@ RAID_EGG_CHANCE = _float("POKET_RAID_EGG_CHANCE", 0.7)
 RAID_PRIZE = _int("POKET_RAID_PRIZE", 3000)           # 이기면 전원
 RAID_FAIL_PRIZE = _int("POKET_RAID_FAIL_PRIZE", 500)  # 져도 준다
 RAID_TOP_PRIZE = (3000, 2000, 1000)                   # 기여 1~3위 덤
+
+
+# ---------------------------------------------------------------- 실시간 배틀
+# 친구끼리 **둘 다 접속한 채로** 두는 1:1. 지금까지의 유저 배틀은 매칭
+# 순간 서버가 판 전체를 돌려 로그로 남기는 비동기였다(party_battle) -
+# 그건 그대로 두고, 이쪽을 따로 둔다. 상대가 자고 있어도 붙을 수 있는
+# 길은 남아 있어야 한다.
+LIVE_LEVEL = _int("POKET_LIVE_LEVEL", 50)        # 양쪽 다 이 레벨로 맞춘다
+LIVE_TURN_SEC = _int("POKET_LIVE_TURN_SEC", 30)  # 한 턴 고르는 시간
+# 초대가 살아 있는 시간. **90초보다 넉넉해야 한다** - 상대가 초대를 알게
+# 되는 가장 늦은 때가 다음 동기화(syncSeconds, 기본 90초)이기 때문이다.
+# 친구 탭을 열어 두고 있으면 그 자리에서 바로 뜬다.
+LIVE_INVITE_SEC = _int("POKET_LIVE_INVITE_SEC", 180)
+LIVE_TTL = _int("POKET_LIVE_TTL", 900)           # 아무도 안 돌아오면 판을 접는다
+LIVE_MAX_TURNS = _int("POKET_LIVE_MAX_TURNS", 150)

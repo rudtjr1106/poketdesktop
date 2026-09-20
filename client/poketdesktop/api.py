@@ -456,6 +456,32 @@ class Api(object):
     def raid_history(self, limit=10):
         return self._call("GET", "/api/raid/history?limit=%d" % int(limit))
 
+    # ---------------- 실시간 배틀 ----------------
+    # 친구끼리 둘 다 켜 있을 때만. 판정은 전부 서버가 하고, 여기서는
+    # '무엇을 할지' 를 보내고 창이 열려 있는 동안 자주 물어본다.
+    def live(self):
+        """지금 내 판 (초대 · 진행 중 · 아직 안 본 결과)."""
+        return self._call("GET", "/api/live", timeout=RAID_TIMEOUT)
+
+    def live_can(self, uid):
+        """저 친구에게 지금 걸 수 있나. 단추를 흐리게 하는 데 쓴다."""
+        return self._call("GET", "/api/live/can/%d" % int(uid))
+
+    def live_invite(self, uid):
+        return self._call("POST", "/api/live/invite/%d" % int(uid), {})
+
+    def live_answer(self, mid, accept=True):
+        return self._call("POST", "/api/live/%d/answer" % int(mid),
+                          {"accept": bool(accept)})
+
+    def live_act(self, kind, move="", slot=-1):
+        return self._call("POST", "/api/live/act",
+                          {"kind": kind, "move": move, "slot": int(slot)},
+                          timeout=RAID_TIMEOUT)
+
+    def live_seen(self):
+        return self._call("POST", "/api/live/seen", {})
+
     # ---------------- 기술머신 ----------------
     # 사고팔 수 없고 쓴다고 없어지지도 않는다. 그래서 개수를 주고받는
     # 자리가 없다 - 가졌는지 아닌지만 있다.

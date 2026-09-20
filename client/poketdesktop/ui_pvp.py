@@ -32,7 +32,7 @@ FIRST_ROWS = 8
 CHUNK_ROWS = 4
 
 RESULT = {"win": ("승", U.GOOD), "lose": ("패", U.RED), "draw": ("무", U.FG_DIM)}
-KIND = {"random": "랜덤", "friend": "친구"}
+KIND = {"random": "랜덤", "friend": "친구", "live": "실시간"}
 
 
 def _when(s):

@@ -39,7 +39,9 @@ class FriendsWindow(object):
         self.root = app.root
         self.data = None
         self.busy = False
+        self.alive = True
         self._job = None          # 목록을 나눠 만드는 일 (U.Chunked)
+        self._live_job = None     # 실시간 배틀 초대를 물어보는 예약
 
         # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
         self.win = U.panel(parent, self.root, "포스크탑 — 친구",
@@ -55,6 +57,7 @@ class FriendsWindow(object):
         self._body()
         self._status()
         self.reload()
+        self._watch_live()
 
     # ---------------- 머리 ----------------
     def _header(self):
@@ -132,6 +135,20 @@ class FriendsWindow(object):
         U.set_status(self.status, text, color)
 
     # ---------------- 자료 ----------------
+    def _watch_live(self):
+        """이 탭이 열려 있는 동안은 실시간 배틀 초대를 빨리 알아차린다.
+
+        평소에는 90초마다 도는 동기화가 알려 주는데, 실시간 배틀은 상대가
+        기다리고 있어서 그때까지 두면 늦다. 창을 닫으면 멈춘다.
+        """
+        if not self.alive:
+            return
+        try:
+            self.app.check_live()
+        except Exception:                                   # noqa: BLE001
+            pass
+        self._live_job = self.root.after(4000, self._watch_live)
+
     def reload(self):
         if self.busy:
             return
@@ -372,6 +389,13 @@ class FriendsWindow(object):
         # 접속해 있지 않아도 걸린다 - 그 사람의 지금 파티를 가져와 싸운다.
         U.ghost_button(row, "배틀", lambda: self.app.pvp_challenge(uid),
                        height=28, fill=U.RED).pack(side="right", padx=(0, 6))
+        # 실시간 배틀은 **둘 다 켜 있어야** 한다. 접속 중인 친구에게만 띄운다 -
+        # 꺼져 있는 친구 옆에 눌러도 거절당할 단추를 두지 않는다.
+        if f.get("online"):
+            U.ghost_button(row, "실시간",
+                           lambda: self.app.live_invite(uid, f.get("name")),
+                           height=28, fill=U.ACCENT_DARK,
+                           fg=U.ACCENT).pack(side="right", padx=(0, 6))
 
     def _request_row(self, x):
         row = self._card()
@@ -423,9 +447,16 @@ class FriendsWindow(object):
             pass
 
     def close(self):
+        self.alive = False
         if self._job is not None:
             self._job.cancel()          # 남은 카드를 닫힌 창에 만들지 않게
             self._job = None
+        if self._live_job is not None:
+            try:
+                self.root.after_cancel(self._live_job)
+            except Exception:                               # noqa: BLE001
+                pass
+            self._live_job = None
         try:
             self.win.destroy()
         except Exception:                                   # noqa: BLE001

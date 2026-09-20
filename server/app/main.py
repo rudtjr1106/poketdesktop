@@ -29,7 +29,8 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from . import (auth, battle_routes, config, db, deps, eggs, item_routes,  # noqa: E402
-               errors, items, migrations, pvp, pvp_routes, raid, raid_routes,
+               errors, items, live, live_routes, migrations, pvp, pvp_routes,
+               raid, raid_routes,
                gym_routes, social_routes, tm_routes, tms, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
@@ -40,6 +41,7 @@ app.include_router(social_routes.router)
 app.include_router(tm_routes.router)
 app.include_router(gym_routes.router)
 app.include_router(raid_routes.router)
+app.include_router(live_routes.router)
 
 RNG = deps.RNG
 
@@ -894,6 +896,10 @@ def me(ctx=Depends(current)):
         # 같은 이유로 폴링을 새로 두지 않고 여기에 얹는다. 이벤트 기간이
         # 아니면 None 이고 질의도 안 나간다.
         "raid": raid.me_card(uid),
+        # 실시간 배틀 안내 (초대가 와 있거나, 싸우던 판이 남아 있거나,
+        # 결과를 아직 안 봤을 때). 상대가 기다리고 있으므로 이 동기화로라도
+        # 알려야 한다.
+        "live": live.me_card(uid),
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 
