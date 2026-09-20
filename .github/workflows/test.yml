@@ -102,6 +102,13 @@ jobs:
       # 여럿이 보스 하나를 때리는 판. 턴 끝이 사람 수만큼 겹치면 안 된다.
       - name: 레이드 (엔진)
         run: python common/test_raid_battle.py
+      # 양쪽 다 사람인 1:1. 한쪽만 골라서는 턴이 안 돌아야 하고, 쓰러진
+      # 쪽만 다음을 골라야 한다.
+      - name: 실시간 배틀 (엔진)
+        run: python common/test_live_battle.py
+      # 게으름·독치장 같은 특성과 역린류·2턴 기술, 속이기의 '첫 턴에만'.
+      - name: 특성·턴제 기술 (엔진)
+        run: python common/test_new_abilities.py
       # 먼 섬(울릉군·백령도·추자도)을 원래 쪽으로 당겨 그리는가, 이름표 자리
       - name: 관장 지도 배치
         run: python client/test_gym_map.py
@@ -215,6 +222,8 @@ jobs:
       # 레이드 탭·배틀 창·바탕화면 빛기둥. 여섯 명이 한 화면에 들어가는지 본다.
       - name: 레이드 화면 (진짜 Tk)
         run: python client/test_raid_ui.py
+      - name: 실시간 배틀 화면 (진짜 Tk)
+        run: python client/test_live_ui.py
       # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
@@ -277,6 +286,8 @@ jobs:
       # 레이드 탭·배틀 창·바탕화면 빛기둥. 여섯 명이 한 화면에 들어가는지 본다.
       - name: 레이드 화면 (진짜 Tk)
         run: python client/test_raid_ui.py
+      - name: 실시간 배틀 화면 (진짜 Tk)
+        run: python client/test_live_ui.py
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
       # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
@@ -332,6 +343,7 @@ jobs:
           python test_heavy_ball.py
           python test_sprite_fix.py
           python test_raid.py
+          python test_live.py
 
       - name: 서버 띄우기
         env:
