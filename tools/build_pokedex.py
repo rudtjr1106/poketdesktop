@@ -44,6 +44,13 @@ NEEDED = [
 KO = 3          # PokeAPI 언어 id: 한국어
 EN = 9          # 영어
 LEVEL_UP = 1    # pokemon_move_methods: 레벨업으로 배움
+
+# 우리 게임에서만 자력으로 배우게 한 기술. 본가(PokeAPI) 표에는 없다.
+# 종 번호 -> [(레벨, 기술 내부이름)]. 여기 적어 두면 도감을 다시 만들어도
+# 살아남는다 - pokedex.json 만 손으로 고치면 다음 빌드에 날아간다.
+EXTRA_LEVEL_MOVES = {
+    260: [(52, "EARTHQUAKE")],   # 대짱이: 본가는 기술머신 전용이라 자력이 없다
+}
 MAX_DEX = 1025  # 9세대까지
 
 GROWTH = {
@@ -519,6 +526,18 @@ def build():
                 seen.add(mv)
                 out.append([lv, mv])
         lvmoves[pid] = out
+
+    # 위의 EXTRA_LEVEL_MOVES 를 얹는다. 이미 배우는 기술이면 건드리지 않는다.
+    for sid, extra in EXTRA_LEVEL_MOVES.items():
+        pid = poke_of_species.get(sid)
+        if pid is None:
+            continue
+        out = lvmoves.setdefault(pid, [])
+        have = set(mv for _lv, mv in out)
+        for lv, mv in extra:
+            if mv not in have:
+                out.append([lv, mv])
+        out.sort(key=lambda x: x[0])     # 진화기(레벨 0)는 그대로 맨 앞
 
     # ---- 진화 ----
     # CSV 에는 '어떤 종으로 진화하는가' 만 있고 '무엇에서' 는 없다.
