@@ -42,6 +42,10 @@ from poketdesktop import ui_common as U                     # noqa: E402
 from poketdesktop import ui_live_battle as LUI              # noqa: E402
 from test_learn_dialog import squeezed, texts               # noqa: E402
 
+# 기술 설명 중 가장 긴 것(68자). 안내 칸이 이만큼은 담아야 한다.
+LONGEST_DESC = ("상대의 지닌 물건을 탁 쳐서 떨어뜨려 배틀이 끝날 때까지 사용할 수 "
+                "없게 한다. 물건을 가진 상대에게는 데미지를 더 준다.")
+
 OK = FAIL = 0
 DATA = os.path.join(ROOT, "server", "data")
 
@@ -216,6 +220,17 @@ def main():
     chk("몇 대 몇인지 뜬다", ":" in w.turn_lbl.cget("text"), w.turn_lbl.cget("text"))
     bad = squeezed(w.win)
     chk("눌린 위젯 없음", not bad, bad[:3])
+
+    # 안내 칸은 기술에 마우스를 올리면 **기술 설명**으로 바뀐다. 기본 안내만
+    # 재면 짧아서 늘 통과하지만, 실제로 거기 들어가는 가장 긴 글은 훨씬 길다.
+    # 칸 폭이 좁은 윈도우에서는 줄 수가 늘어 눌린다 - 그래서 여기서 잰다.
+    keep = w.hint.cget("text")
+    w.hint.configure(text=LONGEST_DESC)
+    w.win.update_idletasks()
+    need, got = w.hint.winfo_reqheight(), w.hint.winfo_height()
+    chk("가장 긴 기술 설명도 안 눌린다", need <= got, (need, got))
+    w.hint.configure(text=keep)
+    w.win.update_idletasks()
 
     print("=== 고르고 보내기 ===")
     before = len([c for c in api.calls if c.startswith("act")])

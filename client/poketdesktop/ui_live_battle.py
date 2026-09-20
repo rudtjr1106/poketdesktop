@@ -39,7 +39,7 @@ from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
 W = 880
 SCENE_H = 290
 MSG_H = 48
-CMD_H = 206
+CMD_H = 264
 MIN_SCENE_H = 225
 STEP_MS = 600
 POLL_MS = 1500
