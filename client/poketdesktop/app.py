@@ -124,6 +124,10 @@ class App(object):
         self._raid_told = None
         # 실시간 배틀 (1.6.0). 창 하나와, 초대를 물어보는 예약.
         self.live_battle = None
+        # 내가 걸어 두고 아직 답을 못 받은 초대. 친구 탭이 이걸 보고
+        # "수락을 기다리는 중" 을 띄운다 - 알림 한 줄은 금방 사라져서
+        # 신청이 갔는지 안 갔는지 알 수가 없었다.
+        self.live_pending = None
         self._live_job = None
         self._live_asking = False
         self._live_told = None
@@ -839,8 +843,26 @@ class App(object):
                 return self.notify(getattr(err, "message", str(err)))
             self.notify("%s 님에게 실시간 배틀을 신청했습니다. 수락하면 바로 시작합니다."
                         % (name or "상대"))
+            # 폴링을 기다리지 않고 그 자리에서 친구 탭에 표시한다.
+            if isinstance(r, dict) and r.get("state") == "invited":
+                self.live_pending = r
             self.live_watch(2000)
         run_async(self.root, lambda: self.api.live_invite(uid), done)
+
+    def live_cancel(self, then=None):
+        """걸어 둔 초대를 거둬들인다 (서버에서는 answer(ok=False) 가 취소다)."""
+        m = self.live_pending
+        if not m:
+            return
+        mid = m.get("id")
+
+        def done(r, err):
+            self.live_pending = None
+            if err:
+                self.notify(getattr(err, "message", str(err)))
+            if callable(then):
+                then()
+        run_async(self.root, lambda: self.api.live_answer(mid, False), done)
 
     def live_watch(self, ms=3000):
         """잠깐 자주 물어본다 (초대를 걸어 뒀거나 친구 탭을 보고 있을 때)."""
@@ -869,6 +891,8 @@ class App(object):
 
     def announce_live(self, match, unseen=0):
         """/api/live 나 /api/me 가 알려준 상태에 따라 화면을 띄운다."""
+        self.live_pending = (match if match and match.get("state") == "invited"
+                             and match.get("mine") else None)
         if not match:
             if unseen and not self.live_battle:
                 self.notify("실시간 배틀 결과가 도착했습니다. 대전 탭에서 확인해 보세요.")

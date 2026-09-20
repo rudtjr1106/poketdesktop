@@ -42,6 +42,7 @@ class FriendsWindow(object):
         self.alive = True
         self._job = None          # 목록을 나눠 만드는 일 (U.Chunked)
         self._live_job = None     # 실시간 배틀 초대를 물어보는 예약
+        self._live_key = None     # 지금 그려 둔 '기다리는 중' 이 어느 초대인지
 
         # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
         self.win = U.panel(parent, self.root, "포스크탑 — 친구",
@@ -147,6 +148,15 @@ class FriendsWindow(object):
             self.app.check_live()
         except Exception:                                   # noqa: BLE001
             pass
+        # 걸어 둔 초대가 생기거나 사라졌을 때만 다시 그린다. 매번 그리면
+        # 스크롤 자리와 마우스가 4초마다 튄다.
+        key = (getattr(self.app, "live_pending", None) or {}).get("id")
+        if key != self._live_key:
+            self._live_key = key
+            try:
+                self.draw()
+            except Exception:                               # noqa: BLE001
+                pass
         self._live_job = self.root.after(4000, self._watch_live)
 
     def reload(self):
@@ -389,6 +399,16 @@ class FriendsWindow(object):
         # 접속해 있지 않아도 걸린다 - 그 사람의 지금 파티를 가져와 싸운다.
         U.ghost_button(row, "배틀", lambda: self.app.pvp_challenge(uid),
                        height=28, fill=U.RED).pack(side="right", padx=(0, 6))
+        # 걸어 둔 초대가 이 친구에게 간 것이면, 단추 대신 **기다리는 중**을
+        # 띄운다. 알림 한 줄은 금방 사라져서 신청이 갔는지 알 수가 없었다.
+        pend = getattr(self.app, "live_pending", None) or {}
+        if pend and pend.get("foeId") == uid:
+            U.ghost_button(row, "취소",
+                           lambda: self.app.live_cancel(self.draw),
+                           height=28).pack(side="right", padx=(0, 6))
+            tk.Label(row, text="수락을 기다리는 중...", bg=U.BG3, fg=U.ACCENT,
+                     font=U.FONT_S).pack(side="right", padx=(0, 8))
+            return
         # 실시간 배틀은 **둘 다 켜 있어야** 한다. 접속 중인 친구에게만 띄운다 -
         # 꺼져 있는 친구 옆에 눌러도 거절당할 단추를 두지 않는다.
         if f.get("online"):
