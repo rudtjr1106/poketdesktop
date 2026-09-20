@@ -469,7 +469,12 @@ def main():
     # 안 하면 세 번에 한 번쯤 CI 가 헛되이 빨갛게 된다.
     party = [m for m in mons if m.get("onDesktop")]
     if len(party) > 1:
-        for _ in range(8):
+        # **한 판만 이기면 된다** - 이기는 순간 파티 전원이 학습장치 몫을
+        # 받는다. 그런데 CI 러너는 마흔 판에 두세 번만 이긴다(같은 코드로
+        # 이 맥에서는 열네댓 번 이긴다 - 잡히는 마릿수가 적어 파티가 얇다).
+        # 여덟 번으로는 한 판도 못 이겨서 두 번 내리 빨갛게 됐다. 이길
+        # 때까지 넉넉히 해본다 - 이겨서 참이 되면 바로 빠져나간다.
+        for _ in range(50):
             if len(with_ev) > 1:
                 break
             wd = wild(token)
