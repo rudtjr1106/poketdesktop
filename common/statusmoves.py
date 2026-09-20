@@ -69,6 +69,39 @@ CALL_BAN = {"ASSIST", "BANEFULBUNKER", "BEAKBLAST", "BELCH", "BESTOW", "CELEBRAT
             "SHEDTAIL", "REVIVALBLESSING", "TERASTARSTORM", "BLAZINGTORQUE", "COMBATTORQUE",
             "MAGICALTORQUE", "NOXIOUSTORQUE", "WICKEDTORQUE", "DOODLE", "INSTRUCT", "ALLYSWITCH",
             "AFTERYOU", "SHELLTRAP", "SKETCH", "SPECTRALTHIEF", "SNIPESHOT"}
+# 역린류: 쓰면 2~3턴 이어지고, 끝나면 혼란에 빠진다. 소란피기는 혼란이 없다.
+RAGE_MOVES = {"OUTRAGE", "THRASH", "PETALDANCE", "RAGINGFURY"}
+LOCK_MOVES = RAGE_MOVES | {"UPROAR"}
+
+# 두 턴에 걸쳐 쓰는 기술. (첫 턴 문구, 숨는 자리, 첫 턴에 오르는 능력)
+# 숨는 자리가 있으면 그동안 웬만한 기술이 빗나간다.
+CHARGE2 = {
+    "SOLARBEAM": ("%s 은(는) 햇빛을 모으고 있다!", None, None),
+    "SOLARBLADE": ("%s 은(는) 햇빛을 모으고 있다!", None, None),
+    "SKYATTACK": ("%s 은(는) 힘을 모으고 있다!", None, None),
+    "RAZORWIND": ("%s 은(는) 바람을 모으고 있다!", None, None),
+    "SKULLBASH": ("%s 은(는) 머리를 단단히 했다!", None, "def"),
+    "METEORBEAM": ("%s 은(는) 우주의 힘을 모으고 있다!", None, "spa"),
+    "ELECTROSHOT": ("%s 은(는) 전기를 모으고 있다!", None, "spa"),
+    "FREEZESHOCK": ("%s 은(는) 전기를 모으고 있다!", None, None),
+    "ICEBURN": ("%s 은(는) 냉기를 모으고 있다!", None, None),
+    "GEOMANCY": ("%s 은(는) 에너지를 모으고 있다!", None, None),
+    "FLY": ("%s 은(는) 하늘 높이 날아올랐다!", "fly", None),
+    "BOUNCE": ("%s 은(는) 높이 뛰어올랐다!", "fly", None),
+    "DIG": ("%s 은(는) 땅속으로 파고들었다!", "dig", None),
+    "DIVE": ("%s 은(는) 물속으로 숨었다!", "dive", None),
+    "PHANTOMFORCE": ("%s 은(는) 모습을 감췄다!", "vanish", None),
+    "SHADOWFORCE": ("%s 은(는) 모습을 감췄다!", "vanish", None),
+}
+# 숨어 있어도 맞는 기술 (본가 그대로)
+HITS_HIDDEN = {
+    "fly": {"GUST", "TWISTER", "THUNDER", "SKYUPPERCUT", "HURRICANE", "SMACKDOWN",
+            "THOUSANDARROWS"},
+    "dig": {"EARTHQUAKE", "MAGNITUDE", "FISSURE"},
+    "dive": {"SURF", "WHIRLPOOL"},
+    "vanish": set(),
+}
+
 CHARGE_BAN = {"BOUNCE", "DIG", "DIVE", "FLY", "GEOMANCY", "METEORBEAM", "PHANTOMFORCE", "RAZORWIND",
               "SHADOWFORCE", "SKULLBASH", "SKYATTACK", "SKYDROP", "SOLARBEAM", "SOLARBLADE",
               "FREEZESHOCK", "ICEBURN", "ELECTROSHOT", "UPROAR"}
@@ -150,6 +183,14 @@ def restricted(bt, f, k):
     enc = c.get("encore")
     if enc and enc.get("move") != k and f.pp.get(enc.get("move"), 0) > 0:
         return "%s 은(는) 앙코르를 받아 다른 기술을 쓸 수 없다!" % f.name
+    rg = c.get("rage")
+    if rg and rg.get("move") != k and f.pp.get(rg.get("move"), 0) > 0:
+        return "%s 은(는) %s 을(를) 쓰는 중이라 멈출 수 없다!" % (
+            f.name, bt.move_name(rg.get("move")))
+    ch = c.get("charge2")
+    if ch and ch.get("move") != k and f.pp.get(ch.get("move"), 0) > 0:
+        return "%s 은(는) %s 을(를) 준비하는 중이다!" % (
+            f.name, bt.move_name(ch.get("move")))
     if c.get("taunt") and md.get("cat") == "status" and not MC.attacks(md):
         return "%s 은(는) 도발당해서 %s 을(를) 쓸 수 없다!" % (f.name, bt.move_name(k))
     dis = c.get("disable")
@@ -167,6 +208,55 @@ def restricted(bt, f, k):
     if c.get("silenced") and "sound" in flags(md):
         return "%s 은(는) 목이 막혀 %s 을(를) 쓸 수 없다!" % (f.name, bt.move_name(k))
     return None
+
+
+# 나온 첫 턴에만 쓸 수 있는 기술.
+FIRST_TURN_ONLY = {"FAKEOUT", "FIRSTIMPRESSION"}
+
+
+def locked_move(f):
+    """지금 반드시 써야 하는 기술 (역린류·2턴 기술). 없으면 None.
+
+    화면은 restricted 로 다른 칸을 흐리게 하지만, **고르는 쪽이 딴 것을
+    보내와도 거절하지 않는다** - 엔진이 어차피 이것으로 바꿔 쓴다.
+    사람이 창을 띄워 둔 사이에 잠긴 것이라면 거절이 더 이상하다.
+    """
+    c = f.cond or {}
+    for name in ("rage", "charge2"):
+        lock = c.get(name)
+        if not lock or not lock.get("move"):
+            continue
+        # **PP 가 떨어지면 잠금이 풀린다.** 안 그러면 쓸 수 없는 기술에
+        # 묶여서 아무것도 못 하게 된다 (몸부림으로 빠져나가야 한다).
+        if f.pp.get(lock["move"], 0) <= 0:
+            c.pop(name, None)
+            continue
+        return lock["move"]
+    return None
+
+
+def first_turn_only(f, k):
+    """속이기·만나자마자: 나온 턴이 아니면 실패한다.
+
+    **자료에는 이 규칙이 없다.** 우선도(+3)와 풀죽음(100%)은 도감에 맞게
+    들어 있어서, 이것만 빠지면 매 턴 100% 풀죽이는 기술이 된다.
+    """
+    if k not in FIRST_TURN_ONLY:
+        return False
+    return int((f.cond or {}).get("outTurns") or 0) > 1
+
+
+def hidden_spot(f):
+    """지금 숨어 있는 자리 (공중·땅속·물속·그림자). 없으면 None."""
+    return (f.cond or {}).get("invuln")
+
+
+def hidden_from(f, k):
+    """숨어 있어서 이 기술이 안 닿나."""
+    spot = hidden_spot(f)
+    if not spot:
+        return False
+    return k not in HITS_HIDDEN.get(spot, set())
 
 
 def priority(bt, f, move):
@@ -499,12 +589,36 @@ def on_leave(bt, who):
 
 
 def trapped(bt, f):
-    """교체·도망을 못 하나 (검은눈빛·블록·문어굳히기·조이기·뿌리박기·페어리록)."""
+    """교체·도망을 못 하나.
+
+    검은눈빛·블록·문어굳히기·조이기·뿌리박기·페어리록과, 상대의 특성
+    (그림자밟기·개미지옥·자력). 고스트 타입은 무엇에도 안 걸린다.
+    """
     if "GHOST" in f.types():
         return False
     c = f.cond
-    return bool(c.get("trapped") or c.get("octolock") or c.get("bound") or c.get("ingrain")
-                or bt.field.room("fairylock"))
+    if bool(c.get("trapped") or c.get("octolock") or c.get("bound") or c.get("ingrain")
+            or bt.field.room("fairylock")):
+        return True
+    return trapped_by_foe(bt, f)
+
+
+def trapped_by_foe(bt, f):
+    """상대 특성에 붙잡혀 있나. 붙잡는 쪽도 같은 특성이면 안 걸린다(본가)."""
+    who = getattr(f, "side_name", None) or "me"
+    foe = bt.fighter(other(who))
+    if foe is None or not foe.alive() or not A.on(foe):
+        return False
+    kind = A.TRAP_ABILITY.get(foe.ability)
+    if kind is None and foe.ability not in A.TRAP_ABILITY:
+        return False
+    if A.has(f, foe.ability):
+        return False                    # 서로 같은 특성이면 안 걸린다
+    if kind == "STEEL":
+        return "STEEL" in f.types()
+    if kind == "GROUNDED":
+        return grounded(f)
+    return True
 
 
 # ---------------------------------------------------------------- 기술 효과

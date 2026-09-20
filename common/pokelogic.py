@@ -176,6 +176,20 @@ def effective_ivs(mon):
     return ivs
 
 
+def at_level(mon, level):
+    """레벨만 맞춘 사본. **개체값·노력치·성격·도구·기술은 그대로다.**
+
+    레벨을 맞춰 붙이는 판(레이드·실시간 배틀)에서 쓴다. 랭크 배틀의
+    상한(pvp.capped)과 달리 **낮은 쪽은 올린다** - 안 그러면 Lv.30 이
+    Lv.100 과 한 방에 섰을 때 한 대에 쓰러져 구경만 한다.
+
+    원본을 고치지 않는다. 경험치는 그대로라 판이 끝나도 레벨은 안 바뀐다.
+    """
+    m = dict(mon)
+    m["level"] = max(1, min(LEVEL_MAX, int(level)))
+    return m
+
+
 def calc_all_stats(species, ivs, evs, level, nature):
     base = species["base"]
     return dict((s, calc_stat(s, base[s], ivs.get(s, 0), evs.get(s, 0), level, nature))

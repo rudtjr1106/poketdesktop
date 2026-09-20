@@ -177,6 +177,10 @@ class Fighter(object):
         h = self._held
         if h and (self.cond.get("embargo") or (self.field is not None and self.field.room("magicroom"))):
             return None
+        # 서투름: 지니고 있어도 못 쓴다 (도구 자체는 그대로 있다)
+        if h and self.ability_on and self.ability == "KLUTZ" \
+                and not (self.cond or {}).get("gastro"):
+            return None
         return h
 
     @held.setter
@@ -820,6 +824,11 @@ class Battle(object):
             return ["me", "foe"] if mp > fp else ["foe", "me"]
         # 같은 우선도 안에서 도구가 순서를 당기거나 미룬다 (선제공격손톱,
         # 느림보꼬리, 애슈열매). 도구가 없으면 난수를 안 건드린다.
+        # 시간벌기·균사의힘은 같은 우선도 안에서 반드시 나중이다.
+        lm = A.order_last(self.me, self.move_of(my_move)) if my_move else False
+        lf = A.order_last(self.foe, self.move_of(foe_move)) if foe_move else False
+        if lm != lf:
+            return ["foe", "me"] if lm else ["me", "foe"]
         if self.me.held or self.foe.held:
             ev = ev if ev is not None else []
             bm = H.order_bias(self, self.me, "me", ev)
@@ -865,7 +874,7 @@ class Battle(object):
                 pass                                      # 킹실드·블로킹·스레드트랩은 변화기를 못 막는다
             else:
                 ev.append({"t": "msg", "who": tw, "text": "%s 은(는) 공격으로부터 몸을 지켰다!" % target.name})
-                if A.is_contact(move) and user.alive():
+                if A.is_contact(move, user) and user.alive():
                     if guard == "SPIKYSHIELD" and not A.has(user, "MAGICGUARD"):
                         SM._chip(user, who, user.maxhp / 8.0, ev, "%s 은(는) 니들가드에 찔렸다!" % user.name)
                     elif guard == "KINGSSHIELD":
@@ -967,6 +976,11 @@ class Battle(object):
         enc = user.cond.get("encore")
         if enc and not called and key != STRUGGLE and user.pp.get(enc.get("move"), 0) > 0:
             key = enc["move"]                # 앙코르
+        if not called and key != STRUGGLE:
+            # 역린류·2턴 기술은 끝날 때까지 그 기술만 나간다 (PP 가 떨어지면 풀린다)
+            locked = SM.locked_move(user)
+            if locked:
+                key = locked
         move = self.move_of(key)
 
         if not called and not instructed:
@@ -981,6 +995,9 @@ class Battle(object):
         tw = "foe" if who == "me" else "me"
         k = MC.key(move) if key != STRUGGLE else STRUGGLE
         charging = k == "BIDE" and bool(user.bide)
+        # 두 턴에 걸쳐 쓰는 기술의 둘째 턴. PP 는 첫 턴에 이미 들었다.
+        second_turn = bool(not called and k in SM.CHARGE2
+                           and (user.cond.get("charge2") or {}).get("move") == k)
         if not called:
             if k not in SM.STREAK_MOVES:
                 user.cond.pop("streak", None)     # 방어는 연달아 쓸수록 실패하기 쉽다
@@ -989,11 +1006,24 @@ class Battle(object):
                 user.cond.pop("dbondUsed", None)
             if k != "GRUDGE":
                 user.cond.pop("grudge", None)
-        if key != STRUGGLE and not charging and (not called or instructed):
+        if key != STRUGGLE and not charging and not second_turn \
+                and (not called or instructed):
             cost = A.pp_cost(user, target) if abil else 1
             user.pp[key] = max(0, user.pp.get(key, 0) - cost)
             if user.held:
                 H.restore_pp(user, key, move.get("pp"), who, ev)   # 과사열매
+        # 속이기·만나자마자: 나온 턴이 아니면 실패한다
+        if not called and SM.first_turn_only(user, k):
+            ev.append({"t": "move", "who": who, "name": user.name,
+                       "move": self.move_name(key), "moveType": MC.move_type(move, user),
+                       "cat": move.get("cat"),
+                       "text": "%s 의 %s!" % (user.name, self.move_name(key))})
+            return self._fail(who, ev)
+        # 두 턴에 걸쳐 쓰는 기술의 **첫 턴**
+        if not called and not bounced:
+            hold = self._charge_turn(who, user, key, k, move, ev)
+            if hold:
+                return None
         if not charging and not bounced:
             ev.append({"t": "move", "who": who, "name": user.name,
                        "move": self.move_name(key), "moveType": MC.move_type(move, user),
@@ -1160,7 +1190,14 @@ class Battle(object):
             amount = max(1, int(total * abs(drain) / 100.0))
             if drain > 0 and user.held:
                 amount = max(1, int(amount * H.drain_mult(user)))    # 큰뿌리
-            if drain > 0:
+            if drain > 0 and abil and A.has(target, "LIQUIDOOZE"):
+                # 해감액: 빨아들인 쪽이 오히려 깎인다 (씨뿌리기와 같다)
+                A.pop(self, target, tw, ev)
+                user.hp = max(0, user.hp - amount)
+                ev.append({"t": "chip", "who": who, "damage": amount, "hp": user.hp,
+                           "maxhp": user.maxhp,
+                           "text": "%s 은(는) 해감액을 흡수했다!" % user.name})
+            elif drain > 0:
                 user.hp = min(user.maxhp, user.hp + amount)
                 ev.append({"t": "heal", "who": who, "amount": amount, "hp": user.hp,
                            "maxhp": user.maxhp,
@@ -1254,7 +1291,64 @@ class Battle(object):
             H.flinch(self, user, target, move)          # 왕의징표석·예리한이빨
             H.note_move(user, key)                      # 구애 잠금·메트로놈
 
+        if not called:
+            self._rage_tick(who, user, k, ev)
         self._check_faint(ev)
+
+    def _charge_turn(self, who, user, key, k, move, ev):
+        """두 턴에 걸쳐 쓰는 기술의 첫 턴. 이번 턴을 여기서 끝내면 True.
+
+        솔라빔은 햇빛이면, 파워허브를 지녔으면 한 턴에 나간다 (본가와 같다).
+        """
+        spec = SM.CHARGE2.get(k)
+        if not spec:
+            return False
+        if user.cond.get("charge2", {}).get("move") == k:
+            user.cond.pop("charge2", None)        # 두 번째 턴 - 그냥 나간다
+            user.cond.pop("invuln", None)
+            return False
+        text, hide, stat = spec
+        if k in ("SOLARBEAM", "SOLARBLADE") and self.weather() == "sun":
+            return False
+        if user.held == "POWERHERB":
+            user.held = None
+            user.used = True
+            ev.append({"t": "msg", "who": who,
+                       "text": "%s 은(는) 파워허브로 힘을 모았다!" % user.name})
+            return False
+        user.cond["charge2"] = {"move": k}
+        if hide:
+            user.cond["invuln"] = hide
+        ev.append({"t": "move", "who": who, "name": user.name,
+                   "move": self.move_name(key), "moveType": MC.move_type(move, user),
+                   "cat": move.get("cat"),
+                   "text": "%s 의 %s!" % (user.name, self.move_name(key))})
+        ev.append({"t": "msg", "who": who, "text": text % user.name})
+        if stat:
+            self._change_stat(user, stat, 1, ev, who, source=user)
+        return True
+
+    def _rage_tick(self, who, user, k, ev):
+        """역린류: 2~3턴 이어지고 끝나면 혼란에 빠진다 (소란피기는 혼란 없음)."""
+        if k not in SM.LOCK_MOVES:
+            if user.cond.get("rage"):
+                user.cond.pop("rage", None)       # 다른 기술을 썼으면 풀린다
+            return
+        rg = user.cond.get("rage")
+        if rg is None:
+            # 처음 썼다. 앞으로 한두 번 더 이어진다 (합쳐서 2~3턴).
+            user.cond["rage"] = {"move": k, "turns": self.rng.randint(1, 2)}
+            return
+        rg["turns"] -= 1
+        if rg["turns"] > 0:
+            return
+        user.cond.pop("rage", None)
+        if k == "UPROAR" or not user.alive():
+            return
+        if not user.cond.get("confused") and not A.has(user, "OWNTEMPO"):
+            user.cond["confused"] = self.rng.randint(2, 5)
+            ev.append({"t": "msg", "who": who,
+                       "text": "%s 은(는) 지쳐서 혼란에 빠졌다!" % user.name})
 
     # ---------------- 원작 공식 기술 ----------------
     def _before_special(self, k, move, who, user, target, tw, ev):
@@ -1375,6 +1469,9 @@ class Battle(object):
         """
         for f in (self.me, self.foe):
             f.hurt = None
+            # 나온 뒤 몇 턴째인가. 물러나면 cond 가 통째로 비므로(clear_volatile)
+            # 새로 나온 포켓몬은 다시 1 부터 센다 - 속이기가 이걸 본다.
+            f.cond["outTurns"] = int(f.cond.get("outTurns") or 0) + 1
             for c in ("protect", "endure", "magiccoat", "snatch", "electrify"):
                 f.cond.pop(c, None)
         self.field.clear_turn_guards()
@@ -1382,6 +1479,16 @@ class Battle(object):
 
     def _can_move(self, who, user, ev, key=None):
         """상태이상 때문에 못 움직이는지. 잠꼬대·코골기는 잠든 채로 쓴다."""
+        # 게으름: 한 턴 쓰면 다음 턴은 쉰다. 물러났다 나오면 다시 센다
+        # (abilities.on_switch_in 이 loaf 를 지운다).
+        if A.has(user, "TRUANT"):
+            if user.ab.get("loaf"):
+                user.ab["loaf"] = False
+                A.pop(self, user, who, ev)
+                ev.append({"t": "msg", "who": who,
+                           "text": "%s 은(는) 게으름을 피우고 있다!" % user.name})
+                return False
+            user.ab["loaf"] = True
         if user.flinched:
             # who 를 같이 실어야 화면이 **누구 머리 위에** 띄울지 안다.
             ev.append({"t": "msg", "who": who,
@@ -1570,6 +1677,8 @@ class Battle(object):
     # ---------------- 도주 ----------------
     def try_run(self, attempts=1):
         """본가 도주 공식. 스피드가 빠를수록 잘 도망간다."""
+        if A.has(self.me, "RUNAWAY"):                  # 도주: 야생에게서는 반드시
+            return True
         if self.me.held and H.flee_sure(self.me):      # 연막탄
             return True
         a, b = self.me.stat("spe"), self.foe.stat("spe")

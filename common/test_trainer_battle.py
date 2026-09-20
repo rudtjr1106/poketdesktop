@@ -91,7 +91,10 @@ def t_끝까지_돈다(dex, gyms):
                 if tb.need_switch:
                     tb.act("switch", rng.choice(tb.valid_switches()))
                     continue
-                if tb.valid_switches() and rng.random() < 0.15:
+                # 붙잡혀 있으면(검은눈빛·그림자밟기·자력 ...) 못 바꾼다.
+                # 쓰러져서 바꾸는 것(need_switch)은 붙잡혀도 된다.
+                if tb.valid_switches() and rng.random() < 0.15 \
+                        and not SM.trapped(tb.bt, tb.me):
                     tb.act("switch", rng.choice(tb.valid_switches()))
                 else:
                     # 막힌 기술(사슬묶기·도발·앵콜 ...)은 고르지 않는다 - 화면도 못 누르게

@@ -595,6 +595,9 @@ class TrainerBattle(object):
             raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
         if kind == "switch" and SM.trapped(self.bt, self.me):
             raise ValueError("%s 은(는) 붙잡혀 있어서 교체할 수 없습니다." % self.me.name)
+        if kind == "move":
+            # 역린류·2턴 기술로 잠겨 있으면 그것으로 바꿔 받는다 (거절하지 않는다)
+            value = SM.locked_move(self.me) or value
         if kind == "move" and value and value != B.STRUGGLE:
             why = SM.restricted(self.bt, self.me, value)
             enc = self.me.cond.get("encore")

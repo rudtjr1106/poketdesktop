@@ -89,6 +89,13 @@ BLOCK_DROPS = {"CLEARBODY": None, "WHITESMOKE": None, "FULLMETALBODY": None,
 INTIMIDATE_IMMUNE = {"CLEARBODY", "WHITESMOKE", "FULLMETALBODY", "HYPERCUTTER",
                      "INNERFOCUS", "OBLIVIOUS", "OWNTEMPO", "SCRAPPY"}
 
+# 이쪽을 향한 선제 기술(우선도 1 이상)을 막는다.
+PRIORITY_GUARD = {"DAZZLING", "QUEENLYMAJESTY", "ARMORTAIL"}
+# 도망·교체를 막는다. (특성, 걸리는 타입) - None 이면 타입을 안 가린다.
+TRAP_ABILITY = {"SHADOWTAG": None, "ARENATRAP": "GROUNDED", "MAGNETPULL": "STEEL"}
+# 자폭 계열. 습기가 있으면 아무도 못 쓴다.
+BOOM_MOVES = {"SELFDESTRUCT", "EXPLOSION", "MINDBLOWN", "MISTYEXPLOSION"}
+
 IMPLEMENTED = (
     set(MOLD_BREAKERS) | set(ATE) | set(PINCH) | set(TYPE_BOOST) | set(FLAG_BOOST)
     | set(ABSORB) | set(STATUS_IMMUNE) | set(BLOCK_DROPS)
@@ -120,7 +127,16 @@ IMPLEMENTED = (
        "SANDVEIL", "SNOWCLOAK", "RAINDISH", "ICEBODY", "DRYSKIN", "HYDRATION", "LEAFGUARD",
        "PROTOSYNTHESIS", "QUARKDRIVE",
        # 변화기와 맞물리는 것
-       "MAGICBOUNCE", "INFILTRATOR", "SUCTIONCUPS", "STICKYHOLD", "AROMAVEIL"})
+       "MAGICBOUNCE", "INFILTRATOR", "SUCTIONCUPS", "STICKYHOLD", "AROMAVEIL",
+       # 1.6.0 에서 채운 것들
+       "TRUANT", "TOXICDEBRIS", "DEFEATIST", "RIVALRY", "STAKEOUT", "CUTECHARM",
+       "CURSEDBODY", "TOXICCHAIN", "AFTERMATH", "INNARDSOUT", "SOULHEART",
+       "BADDREAMS", "SANDSPIT", "SEEDSOWER", "COLORCHANGE", "LONGREACH",
+       "GRASSPELT", "TANGLEDFEET", "DAMP", "KLUTZ", "RUNAWAY", "PERISHBODY",
+       "SUPERSWEETSYRUP", "SCREENCLEANER", "FRISK", "FOREWARN", "ANTICIPATION",
+       "LIQUIDOOZE", "STALL", "MYCELIUMMIGHT", "HEAVYMETAL", "LIGHTMETAL",
+       "GLUTTONY", "CHEEKPOUCH", "RIPEN"}
+    | set(PRIORITY_GUARD) | set(TRAP_ABILITY))
 
 STAGE_STATS = ("atk", "def", "spa", "spd", "spe")
 
@@ -187,7 +203,14 @@ def flags(move):
     return set(move.get("flags") or [])
 
 
-def is_contact(move):
+def is_contact(move, user=None):
+    """접촉하는 기술인가. **원격**은 무엇을 써도 안 닿는다."""
+    if user is not None and has(user, "LONGREACH"):
+        return False
+    return _raw_contact(move)
+
+
+def _raw_contact(move):
     return "contact" in flags(move)
 
 
@@ -259,11 +282,15 @@ def stat_mult(f, key):
             return 1.5
         if a == "SLOWSTART" and st.get("slow", 0) > 0:
             return 0.5
+    if key in ("atk", "spa") and a == "DEFEATIST" and f.hp * 2 <= f.maxhp:
+        return 0.5                     # 무기력: 절반 아래면 공격이 반이 된다
     if key == "def":
         if a == "MARVELSCALE" and f.status:
             return 1.5
         if a == "FURCOAT":
             return 2.0
+        if a == "GRASSPELT" and _terrain(f) == "grassy":
+            return 1.5
     w = _weather(f)
     if key == "spe":
         if (a == "SWIFTSWIM" and w == "rain") or (a == "CHLOROPHYLL" and w == "sun") \
@@ -298,6 +325,18 @@ def ignores_burn(f):
 
 
 # ---------------------------------------------------------------- 순서
+def order_last(f, move):
+    """시간벌기·균사의힘: 같은 우선도 안에서 **반드시 나중에** 움직인다."""
+    if has(f, "STALL"):
+        return True
+    return bool(has(f, "MYCELIUMMIGHT") and is_status(move))
+
+
+def ignores_guard(f, move):
+    """균사의힘으로 쓴 변화기는 상대의 특성에 안 막힌다."""
+    return bool(has(f, "MYCELIUMMIGHT") and is_status(move))
+
+
 def priority_bonus(f, move):
     if not on(f):
         return 0
@@ -330,6 +369,9 @@ def acc_mult(user, target, move):
     w = _weather(target)
     if (g == "SANDVEIL" and w == "sand") or (g == "SNOWCLOAK" and w in ("hail", "snow")):
         m *= 0.8
+    # 갈지자걸음: 혼란인 동안 잘 안 맞는다
+    if g == "TANGLEDFEET" and (getattr(target, "cond", None) or {}).get("confused"):
+        m *= 0.5
     return m
 
 
@@ -393,6 +435,14 @@ def attack_mult(user, target, move, mtype, eff):
         m *= 1.0 + 0.1 * min(5, st.get("down", 0))
     if a in ("ELECTROMORPHOSIS", "WINDPOWER") and st.get("charged") and mtype == "ELECTRIC":
         m *= 2.0
+    if a == "RIVALRY":
+        # 투쟁심: 성별이 같으면 세고 다르면 약하다. 성별이 없으면 그대로.
+        g1 = (user.mon or {}).get("gender")
+        g2 = (target.mon or {}).get("gender") if target is not None else None
+        if g1 in ("M", "F") and g2 in ("M", "F"):
+            m *= 1.25 if g1 == g2 else 0.75
+    if a == "STAKEOUT" and target is not None and (getattr(target, "ab", {}) or {}).get("fresh"):
+        m *= 2.0                       # 잠복: 이번에 나온 상대에게 두 배
     return m
 
 
@@ -446,6 +496,14 @@ def blocks(bt, user, uwho, target, twho, move, key, ev):
     """이 기술이 특성 때문에 막히거나 흡수되면 True. 메시지까지 낸다."""
     if not on(user) and not on(target):
         return False
+    # 습기: 판에 하나라도 있으면 자폭 계열을 아무도 못 쓴다
+    if key_of(move) in BOOM_MOVES:
+        for f, w in ((user, uwho), (target, twho)):
+            if has(f, "DAMP"):
+                pop(bt, f, w, ev)
+                ev.append({"t": "msg", "who": uwho,
+                           "text": "%s 은(는) 기술을 쓸 수 없다!" % user.name})
+                return True
     if not aims_at_foe(move):
         return False
     mtype = move_type(user, move)
@@ -454,6 +512,15 @@ def blocks(bt, user, uwho, target, twho, move, key, ev):
             and "DARK" in target.types() and move.get("target") in (10, 11)):
         ev.append({"t": "immune", "who": uwho, "text": "%s 에게는 효과가 없는 것 같다..." % target.name})
         return True
+    # 비비드바디·여왕의위엄·테일아머: 이쪽을 향한 선제 기술을 막는다.
+    # **틀깨기로도 안 뚫린다** (본가와 같다).
+    if has(target, *PRIORITY_GUARD) and (move.get("pri") or 0) > 0:
+        pop(bt, target, twho, ev)
+        ev.append({"t": "msg", "who": uwho,
+                   "text": "%s 은(는) 기술을 쓸 수 없다!" % user.name})
+        return True
+    if ignores_guard(user, move):
+        return False
     g = guard(user, target)
     if not g:
         return False
@@ -538,6 +605,7 @@ def on_switch_in(bt, f, who, ev):
     f.ab.pop("flash", None)
     f.ab.pop("charged", None)
     f.ab["protean"] = False
+    f.ab.pop("loaf", None)      # 게으름: 물러났다 나오면 다시 센다
     f.ab["fresh"] = True        # 나온 턴에는 가속이 안 붙는다
     a = f.ability
     foe, fwho = other(bt, who)
@@ -578,10 +646,71 @@ def on_switch_in(bt, f, who, ev):
         f.ab["slow"] = 5
         pop(bt, f, who, ev)
         ev.append({"t": "msg", "who": who, "text": "%s 은(는) 제대로 힘을 쓰지 못한다!" % f.name})
+    elif a == "SUPERSWEETSYRUP" and foe is not None and foe.alive() \
+            and not f.ab.get("syrup"):
+        f.ab["syrup"] = True           # 한 판에 한 번만
+        pop(bt, f, who, ev)
+        bt._change_stat(foe, "eva", -1, ev, fwho, source=f)
+    elif a == "SCREENCLEANER":
+        gone = []
+        for side in (bt.field.side("me"), bt.field.side("foe")):
+            for name in ("reflect", "lightscreen", "auroraveil"):
+                if side.pop(name, None):
+                    gone.append(name)
+        if gone:
+            pop(bt, f, who, ev)
+            ev.append({"t": "msg", "who": who,
+                       "text": "%s 이(가) 양쪽의 장막을 걷어냈다!" % f.name})
+    elif a == "FRISK" and foe is not None and foe.held:
+        pop(bt, f, who, ev)
+        ev.append({"t": "msg", "who": who,
+                   "text": "%s 은(는) 상대의 %s 을(를) 알아챘다!"
+                           % (f.name, _held_name(foe))})
+    elif a in ("FOREWARN", "ANTICIPATION") and foe is not None:
+        seen = _warn_move(bt, f, foe, a)
+        if seen:
+            pop(bt, f, who, ev)
+            ev.append({"t": "msg", "who": who, "text": seen})
     elif a == "SUPREMEOVERLORD" and f.ab.get("down"):
         pop(bt, f, who, ev)
         ev.append({"t": "msg", "who": who,
                    "text": "%s 은(는) 쓰러진 동료의 몫까지 힘이 넘친다!" % f.name})
+
+
+def _held_name(f):
+    try:
+        from . import held as H
+        return H.name(f.held) or f.held
+    except Exception:                                       # noqa: BLE001
+        return f.held
+
+
+def _warn_move(bt, f, foe, kind):
+    """예지몽·위험예지: 상대의 기술을 하나 알려준다.
+
+    보여 주기만 하는 특성이라 판을 바꾸지 않는다. 그래도 넣는 것은,
+    화면에 아무 말이 없으면 특성이 없는 것과 구별이 안 되기 때문이다.
+    """
+    best, score = None, -1
+    for k in foe.moves:
+        md = bt.move_of(k) or {}
+        if kind == "FOREWARN":
+            v = md.get("power") or 0
+        else:
+            # 위험예지: 효과가 굉장한 기술이나 일격필살에 반응한다
+            from . import battle as B
+            t = md.get("type")
+            v = 0
+            if MC.attacks(md) and t:
+                e = B.effectiveness(bt.dex, t, f.types())
+                v = 2 if e > 1 else 0
+        if v > score:
+            best, score = k, v
+    if best is None or score <= 0:
+        return None
+    if kind == "FOREWARN":
+        return "%s 은(는) 상대의 %s 을(를) 꿰뚫어봤다!" % (f.name, bt.move_name(best))
+    return "%s 은(는) 몸을 떨었다!" % f.name
 
 
 def on_switch_out(f):
@@ -641,7 +770,7 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
     if dmg <= 0:
         return
     mtype = move_type(user, move)
-    contact = is_contact(move)
+    contact = is_contact(move, user)
     rng = bt.rng
     # ---- 맞는 쪽이 접촉에 반응
     if contact and on(target) and user.alive():
@@ -671,11 +800,88 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
             user.ability = t
             ev.append({"t": "msg", "who": uwho,
                        "text": "%s 의 특성이 %s 이(가) 되었다!" % (user.name, bt.dex.ability_name(t))})
+        elif t == "CUTECHARM" and rng.random() < 0.3 and not user.cond.get("attract"):
+            g1 = (target.mon or {}).get("gender")
+            g2 = (user.mon or {}).get("gender")
+            if g1 in ("M", "F") and g2 in ("M", "F") and g1 != g2:
+                pop(bt, target, twho, ev)
+                user.cond["attract"] = True
+                ev.append({"t": "msg", "who": uwho,
+                           "text": "%s 은(는) 헤롱헤롱해졌다!" % user.name})
+        elif t == "PERISHBODY" and not user.cond.get("perish") \
+                and not target.cond.get("perish"):
+            pop(bt, target, twho, ev)
+            user.cond["perish"] = 3
+            target.cond["perish"] = 3
+            ev.append({"t": "msg", "who": twho,
+                       "text": "양쪽 모두 3턴 뒤에 쓰러진다!"})
+    # 저주받은바디는 접촉이 아니어도 된다
+    if on(target) and target.ability == "CURSEDBODY" and user.alive() \
+            and not user.cond.get("disable") and key_of(move) != "STRUGGLE" \
+            and rng.random() < 0.3:
+        pop(bt, target, twho, ev)
+        user.cond["disable"] = {"move": key_of(move), "turns": 4}
+        ev.append({"t": "msg", "who": uwho,
+                   "text": "%s 의 %s 은(는) 사슬묶기 상태가 되었다!"
+                           % (user.name, bt.move_name(key_of(move)))})
     # ---- 때리는 쪽
     if contact and has(user, "POISONTOUCH") and target.alive() and not target.status \
             and rng.random() < 0.3:
         pop(bt, user, uwho, ev)
         bt._apply_status(target, "poison", ev, source=user)
+    if has(user, "TOXICCHAIN") and target.alive() and not target.status \
+            and rng.random() < 0.3:
+        pop(bt, user, uwho, ev)
+        bt._apply_status(target, "bad-poison", ev, source=user)
+
+    # ---- 맞는 쪽이 판을 바꾸는 것 (살아 있든 아니든)
+    if on(target):
+        t = target.ability
+        if t == "TOXICDEBRIS" and move.get("cat") == "physical":
+            side = bt.field.side(uwho)
+            n = int(side.get("toxicspikes") or 0)
+            if n < 2:
+                side["toxicspikes"] = n + 1
+                pop(bt, target, twho, ev)
+                ev.append({"t": "msg", "who": uwho,
+                           "text": "상대의 발밑에 독압정이 흩어졌다!"})
+        elif t == "SANDSPIT" and bt.field.weather != "sand":
+            pop(bt, target, twho, ev)
+            bt.field.weather, bt.field.weather_turns = "sand", 5
+            ev.append({"t": "weather", "weather": "sand",
+                       "text": "모래바람이 불기 시작했다!"})
+        elif t == "SEEDSOWER" and bt.field.terrain != "grassy":
+            pop(bt, target, twho, ev)
+            bt.field.terrain, bt.field.terrain_turns = "grassy", 5
+            ev.append({"t": "msg", "who": twho, "text": "발밑에 풀이 무성해졌다!"})
+        elif t == "COLORCHANGE" and target.alive() and mtype \
+                and target.types() != [mtype]:
+            pop(bt, target, twho, ev)
+            target.types_override = [mtype]
+            ev.append({"t": "msg", "who": twho,
+                       "text": "%s 은(는) %s 타입이 되었다!"
+                               % (target.name, bt.dex.type_name(mtype))})
+
+    # ---- 쓰러뜨렸을 때 되돌아오는 것
+    if not target.alive():
+        if has(target, "AFTERMATH") and contact and user.alive() \
+                and not has(user, "MAGICGUARD"):
+            pop(bt, target, twho, ev)
+            d = max(1, user.maxhp // 4)
+            user.hp = max(0, user.hp - d)
+            ev.append({"t": "chip", "who": uwho, "damage": d, "hp": user.hp,
+                       "maxhp": user.maxhp,
+                       "text": "%s 은(는) 유폭에 휘말렸다!" % user.name})
+        elif has(target, "INNARDSOUT") and user.alive() and not has(user, "MAGICGUARD"):
+            pop(bt, target, twho, ev)
+            d = max(1, hp_before)
+            user.hp = max(0, user.hp - d)
+            ev.append({"t": "chip", "who": uwho, "damage": d, "hp": user.hp,
+                       "maxhp": user.maxhp,
+                       "text": "%s 은(는) 내용물을 뒤집어썼다!" % user.name})
+        if has(user, "SOULHEART") and user.alive():
+            pop(bt, user, uwho, ev)
+            bt._change_stat(user, "spa", 1, ev, uwho, source=user)
     # ---- 맞는 쪽의 능력 변화 (살아 있을 때만)
     if not target.alive() or not on(target):
         return
@@ -855,6 +1061,21 @@ def status_chip(f, kind):
 
 
 def end_of_turn(bt, f, who, ev):
+    """턴 끝. 나이트메어는 여기서 상대를 깎는다."""
+    if has(f, "BADDREAMS"):
+        foe, fwho = other(bt, who)
+        if foe is not None and foe.alive() and foe.status == "sleep" \
+                and not has(foe, "MAGICGUARD"):
+            pop(bt, f, who, ev)
+            d = max(1, foe.maxhp // 8)
+            foe.hp = max(0, foe.hp - d)
+            ev.append({"t": "chip", "who": fwho, "damage": d, "hp": foe.hp,
+                       "maxhp": foe.maxhp,
+                       "text": "%s 은(는) 악몽에 시달리고 있다!" % foe.name})
+    return _end_of_turn(bt, f, who, ev)
+
+
+def _end_of_turn(bt, f, who, ev):
     if not on(f) or not f.alive():
         return
     a = f.ability

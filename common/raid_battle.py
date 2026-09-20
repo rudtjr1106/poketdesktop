@@ -49,6 +49,7 @@ from . import battle as B
 from . import field as FD
 from . import held as H
 from . import movecalc as MC
+from . import pokelogic as P
 from . import statusmoves as SM
 
 TEAM_MAX = 6
@@ -79,18 +80,8 @@ WEATHER_BY_TYPE = {
 
 
 def leveled(mon, level):
-    """레벨만 맞춘 사본. **개체값·노력치·성격·도구·기술은 그대로다.**
-
-    레이드는 전원이 같은 레벨로 싸운다 (raid.TEAM_LEVEL). 높은 쪽은
-    내리고 낮은 쪽은 올린다 - 랭크 배틀(pvp.capped)은 내리기만 하지만,
-    여기서는 Lv.30 과 Lv.100 이 한 방에 서므로 올리지 않으면 낮은 쪽이
-    한 대에 쓰러져 구경만 하게 된다.
-
-    원본을 고치지 않는다. 경험치는 그대로라 판이 끝나도 레벨은 안 바뀐다.
-    """
-    m = dict(mon)
-    m["level"] = int(level)
-    return m
+    """레벨만 맞춘 사본 (pokelogic.at_level). 레이드는 전원 같은 레벨로 싸운다."""
+    return P.at_level(mon, level)
 
 
 class RaidDuel(B.Battle):
@@ -285,7 +276,8 @@ class RaidBattle(object):
         if not p.playing():
             raise ValueError("이번 라운드에는 움직일 수 없습니다.")
         if kind == "move":
-            key = value or ""
+            # 역린류·2턴 기술로 잠겨 있으면 그것으로 바꿔 받는다
+            key = SM.locked_move(p.mon) or value or ""
             if key != B.STRUGGLE:
                 if key not in p.mon.pp:
                     raise ValueError("그 기술은 배우지 않았습니다.")

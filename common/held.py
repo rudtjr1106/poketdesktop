@@ -379,17 +379,23 @@ def check_hp(bt, f, who, ev):
     if not _ready(f) or not f.alive():
         return
     h = f.held
+    # 먹보: 1/4 에 먹는 열매를 절반에서 먹는다. 숙성: 회복량이 두 배.
+    pinch = 0.5 if _has(f, "GLUTTONY") else 0.25
+    ripen = 2.0 if _has(f, "RIPEN") else 1.0
     spec = HEAL_BERRY.get(h)
     if spec:
         thr, kind, amt = spec
+        if thr <= 0.25:
+            thr = max(thr, pinch)
         if f.hp <= f.maxhp * thr and f.hp < f.maxhp:
             _consume(f)
-            heal = amt if kind == "flat" else f.maxhp * amt
+            heal = (amt if kind == "flat" else f.maxhp * amt) * ripen
             _heal(f, who, heal, ev, "%s 은(는) %s로 체력을 회복했다!"
                   % (f.name, name(h)))
+            _cheek_pouch(bt, f, who, ev)
         return
     spec = PINCH_BERRY.get(h)
-    if spec and f.hp * 4 <= f.maxhp:
+    if spec and f.hp <= f.maxhp * pinch:
         kind, stat = spec
         _consume(f)
         if kind == "stat":
@@ -406,6 +412,22 @@ def check_hp(bt, f, who, ev):
             f.armed = True
             _say(ev, who, "%s 은(는) 미클열매를 먹고 다음 기술의 명중률이 올랐다!"
                  % f.name)
+        _cheek_pouch(bt, f, who, ev)
+
+
+def _has(f, key):
+    """특성 확인. held 는 abilities 를 안 들여오므로 여기서 한 번만 본다."""
+    from . import abilities as A
+    return A.has(f, key)
+
+
+def _cheek_pouch(bt, f, who, ev):
+    """볼주머니: 어떤 나무열매를 먹어도 최대 체력의 1/3 을 더 회복한다."""
+    if not _has(f, "CHEEKPOUCH") or f.hp >= f.maxhp or not f.alive():
+        return
+    from . import abilities as A
+    A.pop(bt, f, who, ev)
+    _heal(f, who, f.maxhp / 3.0, ev, "%s 은(는) 볼주머니로 체력을 회복했다!" % f.name)
 
 
 def end_of_turn(bt, f, who, ev):
