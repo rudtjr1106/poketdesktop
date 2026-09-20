@@ -1138,7 +1138,12 @@ class Battle(object):
                     ev.append({"t": "msg", "who": tw, "text": "%s 은(는) 공격을 버텼다!" % target.name})
                 hp_before = target.hp
                 target.hp = max(0, target.hp - dmg)
-                total += dmg
+                # **실제로 깎은 만큼만 센다.** 계산으로 나온 dmg 를 그대로 더하면
+                # 체력 9 남은 상대를 474 짜리로 잡았을 때 474 를 준 것으로 쳐서,
+                # 원념의칼(흡수 50%)이 237 을 회복해 버린다. 흡수기·반동기·
+                # 조개껍질방울이 전부 이 값을 쓴다. 대타(hit_sub)는 이미 깎인
+                # 만큼만 돌려준다.
+                total += hp_before - target.hp
                 self._note_hurt(target, move, hp_before - target.hp, who)
                 ev.append({"t": "hit", "who": who, "target": "foe" if who == "me" else "me",
                            "damage": dmg, "crit": crit, "eff": 1.0 if fixed_move else eff,
