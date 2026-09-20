@@ -159,10 +159,35 @@ def main():
     chk("턴은 그대로", row["turn"] == turn, row["turn"])
     chk("상대에게는 '골랐다' 만", live.public(row, b)["battle"]["foe"]["chosen"] is True)
     mv2 = live.public(row, b)["battle"]["me"]["moves"][0]["key"]
+    step = live.public(row, a)["step"]
     row = live.act(b, "move", mv2)
     chk("둘 다 고르면 턴이 돈다", row["turn"] == turn + 1, row["turn"])
     ev = json.loads(row["events"])
     chk("일어난 일이 실린다", len(ev) > 0)
+
+    # **step 은 turn 과 따로 센다.** 교체(_do_switches)는 턴을 안 올리므로,
+    # 화면이 turn 만 보면 상대가 다음 포켓몬을 내보낸 것을 못 알아채고
+    # 제한 시간이 다 갈 때까지 옛 화면에 앉아 있게 된다 - 실제로 그랬다.
+    chk("판이 움직이면 step 이 오른다", live.public(row, a)["step"] > step,
+        (step, live.public(row, a)["step"]))
+    chk("양쪽이 같은 step 을 본다",
+        live.public(row, a)["step"] == live.public(row, b)["step"])
+    before = live.public(row, a)["step"]
+    lb = live._load(row)
+    lb.a.mon.hp = 0
+    lb.a.mon.ab["fainted"] = True
+    lb._settle([])
+    live._save(row, lb, [], None)
+    row = live.get(row["id"])
+    chk("쓰러지면 교체 차례", live.public(row, a)["battle"]["phase"] == "switch",
+        live.public(row, a)["battle"]["phase"])
+    turn_before = row["turn"]
+    row = live.act(a, "switch", [i for i in lb.a.alive_slots()
+                                 if i != lb.a.slot][0])
+    chk("교체는 턴을 안 올린다", row["turn"] == turn_before, row["turn"])
+    chk("그래도 step 은 오른다 (기다리는 쪽이 알아채야 한다)",
+        live.public(row, b)["step"] > before,
+        (before, live.public(row, b)["step"]))
 
     print("=== 시간을 넘기면 서버가 대신 ===")
     turn = row["turn"]

@@ -47,6 +47,16 @@ MON_H = {"me": 128, "foe": 108}
 MON_W = {"me": 340, "foe": 280}
 
 
+def step_of(m):
+    """판이 몇 걸음 나아갔나.
+
+    **옛 서버(1.6.1 이하)는 step 을 안 준다.** 그때는 turn 으로 돌아간다 -
+    안 그러면 step 이 늘 0 이라 화면이 한 턴도 재생하지 않는다. 교체를
+    못 알아채는 옛 동작으로 돌아갈 뿐, 판은 돌아간다.
+    """
+    return int((m or {}).get("step") or (m or {}).get("turn") or 0)
+
+
 class LiveBattleWindow(object):
 
     def __init__(self, app, data, on_close=None):
@@ -56,10 +66,14 @@ class LiveBattleWindow(object):
         self.alive = True
         self.room = data
         self.view = data.get("battle") or {}
-        self.played = int(data.get("turn") or 0)
+        # **turn 이 아니라 step 을 센다.** 교체는 턴을 안 올리므로 turn 만
+        # 보면 상대가 다음 포켓몬을 내보낸 것을 못 알아채고, 제한 시간이
+        # 다 갈 때까지 "고르고 있습니다" 인 채로 앉아 있게 된다.
+        self.played = step_of(data)
         self.queue = []
         self.busy = False
         self.sent = False
+        self._panel = None
         self.photos = {}
         self.anims = {"me": None, "foe": None}
         self.anim_jobs = {"me": None, "foe": None}
@@ -599,7 +613,7 @@ class LiveBattleWindow(object):
     def sync(self, room):
         self.room = room or self.room
         self.view = self.room.get("battle") or self.view
-        self.played = max(self.played, int(self.room.get("turn") or 0))
+        self.played = max(self.played, step_of(self.room))
         if self.room.get("deadlineIn") is not None:
             self._deadline = time.time() + int(self.room["deadlineIn"])
         for who in ("me", "foe"):
@@ -636,7 +650,7 @@ class LiveBattleWindow(object):
                 return
             m = (r or {}).get("match") if isinstance(r, dict) else None
             if not err and m:
-                got = int(m.get("turn") or 0)
+                got = step_of(m)
                 if got > self.played or (m.get("state") == "done"
                                          and not self.view.get("over")):
                     self.played = got
@@ -649,12 +663,32 @@ class LiveBattleWindow(object):
         run_async(self.root, lambda: self.app.api.live(), done)
 
     def _refresh(self):
+        """서버 값이 바뀌었으면 아래 칸을 다시 그린다.
+
+        예전에는 `self.sent`(내가 보냈던가) 일 때만 다시 그렸다. 그래서 **내가
+        아무것도 안 보낸 채 기다리던 쪽**은, 상대가 다음 포켓몬을 내보내
+        내 차례가 되어도 화면이 그대로였다 - "님이 다음 포켓몬을 고르고
+        있습니다" 를 띄운 채 제한 시간을 다 기다렸다.
+
+        그래서 보낸 적이 있는지가 아니라 **지금 무엇을 그려야 하는지**로 본다.
+        """
         for who in ("me", "foe"):
             self._paint_box(who)
         me = self.view.get("me") or {}
-        if self.sent and not me.get("chosen") and self.view.get("canAct"):
-            self.sent = False
+        want = self._panel_key(me)
+        if want != self._panel:
+            if self.view.get("canAct") and not me.get("chosen"):
+                self.sent = False
             self.show_commands()
+
+    def _panel_key(self, me=None):
+        """아래 칸이 무엇을 보여야 하는가. 이게 바뀌면 다시 그린다."""
+        me = self.view.get("me") or {} if me is None else me
+        if not self.view.get("canAct"):
+            return ("wait", self.view.get("phase"))
+        if self.sent or me.get("chosen"):
+            return ("sent",)
+        return ("act", self.view.get("phase"), me.get("slot"))
 
     def _paint_timer(self):
         left = max(0, int(self._deadline - time.time())) if self._deadline else 0
@@ -669,12 +703,14 @@ class LiveBattleWindow(object):
 
     # ---------------- 명령 ----------------
     def hide_commands(self):
+        self._panel = None
         for w in self.left.winfo_children():
             w.destroy()
         for b in (self.switch_btn, self.forfeit_btn):
             b.configure(state="disabled")
 
     def show_commands(self):
+        self._panel = self._panel_key()
         for w in self.left.winfo_children():
             w.destroy()
         # 남은 시간은 폴링이 1.5초마다 다시 적는데, 연출이 끝난 직후에는
@@ -824,7 +860,7 @@ class LiveBattleWindow(object):
                 self.sent = False
                 self.say(getattr(err, "message", str(err)))
                 return self.show_commands()
-            got = int(r.get("turn") or 0)
+            got = step_of(r)
             if got > self.played or (r.get("state") == "done"):
                 self.played = got
                 self.sent = False

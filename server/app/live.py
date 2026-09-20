@@ -327,6 +327,9 @@ def public(row, uid, now=None):
             - _now(now)).total_seconds()))
     if row["data"]:
         lb = _load(row)
+        # **step 은 turn 과 다르다.** 교체는 턴을 안 올리므로, 화면이 turn 만
+        # 보면 상대가 다음 포켓몬을 내보낸 것을 못 알아챈다.
+        out["step"] = lb.step
         out["battle"] = lb.view(who)
         out["events"] = lb.events_for(who, json.loads(row["events"] or "[]"))
         if row["deadline"] and row["state"] == "fighting":

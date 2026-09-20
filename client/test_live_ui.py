@@ -99,7 +99,10 @@ class FakeApi(object):
         self.auto_foe = True          # 상대가 알아서 고른다
 
     def match(self):
+        # server/app/live.py public() 과 같은 모양이어야 한다. step 은 교체처럼
+        # 턴이 안 오르는 진행까지 세므로 화면이 이걸 보고 다시 그린다.
         out = {"id": 1, "state": self.state, "rev": 1, "turn": self.turn,
+               "step": self.lb.step,
                "me": "a", "mine": True, "foeId": 2, "foeName": "상대",
                "level": 50, "turnSec": 30, "inviteSec": 180,
                "battle": self.lb.view("a"),
@@ -302,9 +305,19 @@ def main():
     chk("상대가 고르고 있다고 말한다", "고르고 있습니다" in t, t[:200])
     chk("내가 누를 것은 없다", "PP" not in t and "다음 포켓몬을 고르세요" not in t,
         t[:200])
+    # **상대가 다 골라서 나온 뒤에는 내 화면이 따라와야 한다.**
+    # 교체는 turn 을 안 올린다(_do_switches). 화면이 turn 만 보고 있으면
+    # 여기서 아무 일도 안 일어나, "고르고 있습니다" 를 띄운 채 제한 시간
+    # 30초를 다 기다리게 된다 - 실제로 그랬다. 폴링이 step 을 보고
+    # 따라잡는지 여기서 본다.
     api.lb.choose("b", "switch", 1)
     api.events = api.lb.resolve()
+    caught = pump(root, lambda: not w.busy and "PP" in " ".join(texts(w.win)),
+                  timeout=15)
     rest(root, 0.3)
+    t = " ".join(texts(w.win))
+    chk("상대가 골라 나오면 기다리지 않고 따라온다", caught, t[:200])
+    chk("'고르고 있습니다' 가 남아 있지 않다", "고르고 있습니다" not in t, t[:200])
 
     print("=== 끝 ===")
     # 상대를 전멸시킨다

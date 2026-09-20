@@ -115,6 +115,11 @@ class LiveBattle(object):
         self.field = FD.Field()
         self._wire()
         self.turn = 0
+        # **판이 실제로 움직인 횟수.** turn 과 다르다 - 교체(_do_switches)는
+        # 턴을 안 올리므로, 화면이 turn 만 보면 상대가 다음 포켓몬을 내보낸
+        # 것을 못 알아채고 제한 시간이 다 갈 때까지 옛 화면에 앉아 있게 된다.
+        # rev(서버 칸)도 못 쓴다 - 고르기만 해도 오르기 때문이다.
+        self.step = 0
         self.over = False
         self.result = None              # "a" / "b" / "draw"
         self.reason = None              # ko / forfeit / turns
@@ -278,6 +283,7 @@ class LiveBattle(object):
             return [{"t": "over", "result": self.result}]
         if not self.started:
             return self.start()
+        self.step += 1
         for w in ("a", "b"):
             if self.can_act(w) and self.side(w).choice is None:
                 self.side(w).choice = self.auto_choice(w)
@@ -544,7 +550,7 @@ class LiveBattle(object):
         """그 사람 시점의 판 상태. me 가 늘 자기 쪽이다."""
         me, foe = self.side(who), self.side(self.other(who))
         return {
-            "turn": self.turn, "maxTurns": self.max_turns,
+            "turn": self.turn, "step": self.step, "maxTurns": self.max_turns,
             "over": self.over, "result": self.outcome(who), "reason": self.reason,
             "phase": self.phase(), "canAct": self.can_act(who),
             "weather": self.field.weather, "terrain": self.field.terrain,
@@ -602,7 +608,7 @@ class LiveBattle(object):
 
     def dump(self):
         st = self.rng.getstate()
-        return {"v": 1, "turn": self.turn, "over": self.over,
+        return {"v": 1, "turn": self.turn, "step": self.step, "over": self.over,
                 "result": self.result, "reason": self.reason,
                 "started": self.started, "maxTurns": self.max_turns,
                 "a": self._dump_side(self.a), "b": self._dump_side(self.b),
@@ -622,6 +628,9 @@ class LiveBattle(object):
         self.field = FD.Field.load(d.get("field"))
         self._wire()
         self.turn = int(d["turn"])
+        # 옛 판(1.6.1 이전)에는 step 이 없다 - turn 으로 시작해 두면 적어도
+        # 뒤로 가지는 않는다.
+        self.step = int(d.get("step", d["turn"]) or 0)
         self.bt.turn_no = self.turn
         self.over = bool(d["over"])
         self.result = d.get("result")
