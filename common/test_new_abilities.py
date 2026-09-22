@@ -158,6 +158,31 @@ def main():
         any("역린" in (e.get("text") or "") for e in ev), [e.get("text") for e in ev][:3])
     chk("소란피기는 혼란이 없다", "UPROAR" in SM.LOCK_MOVES and "UPROAR" not in SM.RAGE_MOVES)
 
+    # **잠긴 기술이 사슬묶기에 걸리면 잠금이 풀린다** (본가와 같다).
+    # 안 풀면 잠금이 그 기술을 강요하고 사슬묶기가 그걸 막는다 - 다른 기술도
+    # '쓰는 중이라 멈출 수 없다' 로 막혀서 쓸 게 하나도 없었고, 레이드의
+    # 고르기는 "사슬묶기로 쓸 수 없다" 로 거절됐다(tools/sim_raid.py 가 터졌다).
+    bt, a, b = duel("SALAMENCE", "SNORLAX", a_moves=("OUTRAGE", "TACKLE"), seed=7)
+    b.hp = b.maxhp = 9999
+    bt._use("me", a, b, "OUTRAGE", [])
+    a.cond["disable"] = {"move": "OUTRAGE", "turns": 4}
+    chk("잠긴 기술이 막히면 다른 기술은 풀린다", SM.restricted(bt, a, "TACKLE") is None,
+        SM.restricted(bt, a, "TACKLE"))
+    chk("쓸 수 있는 기술이 생긴다", "TACKLE" in bt.usable(a), bt.usable(a))
+    chk("잠금이 풀린다", SM.locked_move(a, bt) is None and not a.cond.get("rage"),
+        a.cond.get("rage"))
+    before = b.hp
+    ev = []
+    bt._use("me", a, b, "TACKLE", ev)
+    chk("풀린 뒤에는 고른 기술이 나간다", b.hp < before,
+        [e.get("text") for e in ev][:3])
+    bt, a, b = duel("CHARIZARD", "SNORLAX", a_moves=("FLY", "TACKLE"))
+    b.hp = b.maxhp = 9999
+    bt._use("me", a, b, "FLY", [])
+    a.cond["disable"] = {"move": "FLY", "turns": 4}
+    chk("숨은 채 막히면 도로 나온다",
+        SM.locked_move(a, bt) is None and SM.hidden_spot(a) is None, a.cond)
+
     print("=== 두 턴에 걸쳐 쓰는 기술 ===")
     bt, a, b = duel("CHARIZARD", "SNORLAX", a_moves=("FLY", "TACKLE"))
     b.hp = b.maxhp = 9999

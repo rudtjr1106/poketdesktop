@@ -178,19 +178,32 @@ def restricted(bt, f, k):
     """이 기술을 지금 못 쓰는 까닭 (문구). 쓸 수 있으면 None."""
     if k == "STRUGGLE":
         return None
-    md = bt.move_of(k)
     c = f.cond
     enc = c.get("encore")
     if enc and enc.get("move") != k and f.pp.get(enc.get("move"), 0) > 0:
         return "%s 은(는) 앙코르를 받아 다른 기술을 쓸 수 없다!" % f.name
+    # 잠긴 기술 자체가 막혀 있으면(사슬묶기·도발·트집 ...) 잠금은 없는 셈이다 -
+    # locked_move 가 푼다. 여기서 다른 기술까지 막으면 쓸 수 있는 게 하나도
+    # 없어져서, 사슬묶기가 풀릴 때까지 턴을 그냥 날린다.
     rg = c.get("rage")
-    if rg and rg.get("move") != k and f.pp.get(rg.get("move"), 0) > 0:
+    if rg and rg.get("move") != k and f.pp.get(rg.get("move"), 0) > 0 \
+            and not blocked(bt, f, rg.get("move")):
         return "%s 은(는) %s 을(를) 쓰는 중이라 멈출 수 없다!" % (
             f.name, bt.move_name(rg.get("move")))
     ch = c.get("charge2")
-    if ch and ch.get("move") != k and f.pp.get(ch.get("move"), 0) > 0:
+    if ch and ch.get("move") != k and f.pp.get(ch.get("move"), 0) > 0 \
+            and not blocked(bt, f, ch.get("move")):
         return "%s 은(는) %s 을(를) 준비하는 중이다!" % (
             f.name, bt.move_name(ch.get("move")))
+    return blocked(bt, f, k)
+
+
+def blocked(bt, f, k):
+    """잠금·앙코르를 뺀, 이 기술 자체를 막는 것 (문구). 없으면 None."""
+    if k == "STRUGGLE":
+        return None
+    md = bt.move_of(k)
+    c = f.cond
     if c.get("taunt") and md.get("cat") == "status" and not MC.attacks(md):
         return "%s 은(는) 도발당해서 %s 을(를) 쓸 수 없다!" % (f.name, bt.move_name(k))
     dis = c.get("disable")
@@ -214,12 +227,17 @@ def restricted(bt, f, k):
 FIRST_TURN_ONLY = {"FAKEOUT", "FIRSTIMPRESSION"}
 
 
-def locked_move(f):
+def locked_move(f, bt=None):
     """지금 반드시 써야 하는 기술 (역린류·2턴 기술). 없으면 None.
 
     화면은 restricted 로 다른 칸을 흐리게 하지만, **고르는 쪽이 딴 것을
     보내와도 거절하지 않는다** - 엔진이 어차피 이것으로 바꿔 쓴다.
     사람이 창을 띄워 둔 사이에 잠긴 것이라면 거절이 더 이상하다.
+
+    bt 를 주면 **잠긴 기술이 막혔을 때도 잠금을 푼다** (본가와 같다 -
+    소란피기·역린이 사슬묶기에 걸리면 거기서 끝난다). 안 풀면 잠금이 그
+    기술을 강요하고 사슬묶기가 그걸 막아서, 레이드·실시간·관장의 고르기가
+    "사슬묶기로 쓸 수 없다" 로 거절되고 사람은 턴을 날렸다.
     """
     c = f.cond or {}
     for name in ("rage", "charge2"):
@@ -228,8 +246,11 @@ def locked_move(f):
             continue
         # **PP 가 떨어지면 잠금이 풀린다.** 안 그러면 쓸 수 없는 기술에
         # 묶여서 아무것도 못 하게 된다 (몸부림으로 빠져나가야 한다).
-        if f.pp.get(lock["move"], 0) <= 0:
+        if f.pp.get(lock["move"], 0) <= 0 or (
+                bt is not None and blocked(bt, f, lock["move"])):
             c.pop(name, None)
+            if name == "charge2":
+                c.pop("invuln", None)       # 숨어 있었다면 도로 나온다
             continue
         return lock["move"]
     return None

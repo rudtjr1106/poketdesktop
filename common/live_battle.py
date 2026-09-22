@@ -227,7 +227,7 @@ class LiveBattle(object):
             p.choice = ("switch", slot)
         elif kind == "move":
             # 역린류·2턴 기술로 잠겨 있으면 그것으로 바꿔 받는다
-            key = SM.locked_move(p.mon) or value or ""
+            key = SM.locked_move(p.mon, self.bt) or value or ""
             if key != B.STRUGGLE:
                 if key not in p.mon.pp:
                     raise ValueError("그 기술은 배우지 않았습니다.")

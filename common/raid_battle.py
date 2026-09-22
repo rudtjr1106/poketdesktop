@@ -277,7 +277,7 @@ class RaidBattle(object):
             raise ValueError("이번 라운드에는 움직일 수 없습니다.")
         if kind == "move":
             # 역린류·2턴 기술로 잠겨 있으면 그것으로 바꿔 받는다
-            key = SM.locked_move(p.mon) or value or ""
+            key = SM.locked_move(p.mon, p.bt) or value or ""
             if key != B.STRUGGLE:
                 if key not in p.mon.pp:
                     raise ValueError("그 기술은 배우지 않았습니다.")

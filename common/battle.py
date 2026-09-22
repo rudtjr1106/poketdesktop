@@ -978,7 +978,7 @@ class Battle(object):
             key = enc["move"]                # 앙코르
         if not called and key != STRUGGLE:
             # 역린류·2턴 기술은 끝날 때까지 그 기술만 나간다 (PP 가 떨어지면 풀린다)
-            locked = SM.locked_move(user)
+            locked = SM.locked_move(user, self)
             if locked:
                 key = locked
         move = self.move_of(key)
