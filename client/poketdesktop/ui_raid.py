@@ -129,7 +129,11 @@ class RaidWindow(object):
                  font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left")
         self.refresh_btn = U.ghost_button(inner, "새로고침",
                                           lambda: self.reload(), height=32)
-        self.refresh_btn.pack(side="right", pady=15)
+        # **위아래 여백(pady)을 주지 않는다.** 머리줄 높이는 정해져 있고 pack 이
+        # 알아서 세로 가운데에 둔다. 다른 탭처럼 pady=15 를 주면 단추(32 +
+        # 그림자 4)에 30 을 더해 66 을 달라는데, 윈도우(배율 1.0)의 머리줄은
+        # 62 라 단추가 4px 눌렸다. 맥은 머리줄이 74 라 안 보였다.
+        self.refresh_btn.pack(side="right")
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     # ---------------- 틀 ----------------
