@@ -649,7 +649,7 @@ class LiveBattleWindow(object):
             if not self.alive:
                 return
             m = (r or {}).get("match") if isinstance(r, dict) else None
-            if not err and m:
+            if not err and m and not self._stale(m):
                 got = step_of(m)
                 if got > self.played or (m.get("state") == "done"
                                          and not self.view.get("over")):
@@ -661,6 +661,19 @@ class LiveBattleWindow(object):
                     self._refresh()
             self.later(POLL_MS, self._poll)
         run_async(self.root, lambda: self.app.api.live(), done)
+
+    def _stale(self, m):
+        """이미 본 것보다 옛 응답인가 (rev 가 더 작다).
+
+        폴링은 따로 돌아서, 떠날 때 읽은 옛 상태가 더 새 상태를 받은 **뒤에**
+        도착할 수 있다. 아래 칸은 상태를 따라 다시 그리므로, 그대로 받으면
+        화면이 한 번 옛날로 돌아갔다가 다음 폴링에서 돌아온다.
+        """
+        try:
+            return (m.get("id") == self.room.get("id")
+                    and int(m.get("rev") or 0) < int(self.room.get("rev") or 0))
+        except (TypeError, ValueError, AttributeError):
+            return False
 
     def _refresh(self):
         """서버 값이 바뀌었으면 아래 칸을 다시 그린다.

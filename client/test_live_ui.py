@@ -101,7 +101,7 @@ class FakeApi(object):
     def match(self):
         # server/app/live.py public() 과 같은 모양이어야 한다. step 은 교체처럼
         # 턴이 안 오르는 진행까지 세므로 화면이 이걸 보고 다시 그린다.
-        out = {"id": 1, "state": self.state, "rev": 1, "turn": self.turn,
+        out = {"id": 1, "state": self.state, "rev": self._rev_now(), "turn": self.turn,
                "step": self.lb.step,
                "me": "a", "mine": True, "foeId": 2, "foeName": "상대",
                "level": 50, "turnSec": 30, "inviteSec": 180,
@@ -113,6 +113,16 @@ class FakeApi(object):
             out["reason"] = self.lb.reason
             out["outcome"] = self.lb.outcome("a")
         return out
+
+    def _rev_now(self):
+        """서버의 rev 처럼 **상태가 바뀔 때마다 오른다.** 늘 1 이면 화면이
+        옛 응답을 가려낼 수 없다 (검사가 엔진을 직접 바꾸므로 상태로 잰다)."""
+        cur = json.dumps([self.state, self.lb.dump(), len(self.events)],
+                         sort_keys=True, default=str)
+        if cur != getattr(self, "_rev_key", None):
+            self._rev_key = cur
+            self._rev = getattr(self, "_rev", 0) + 1
+        return self._rev
 
     def live(self):
         self.calls.append("live")
