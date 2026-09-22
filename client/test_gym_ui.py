@@ -545,6 +545,39 @@ def main():
     chk("한 턴이 돈다", pump(root, lambda: not b.busy and b.view["turn"] > turn0, 30), b.view["turn"])
     chk("기술을 쓰면 연출이 돈다", len(played) >= 1, played)
 
+    # **물기류는 과녁 가운데에서 위아래로 맞물린다.** 예전에는 윗니·아랫니
+    # 줄이 좌우로 갈라져 서로 반대쪽을 봐서 대각선으로 보였다 (사용자 제보).
+    # 다 닫힌 순간(마무리 충격 바로 앞)의 진짜 캔버스를 찍어 본다.
+    md = dex.moves["CRUNCH"]
+    chk("깨물어부수기는 이빨 연출", GB.FX.style_of(md) == "bite", GB.FX.style_of(md))
+    pump(root, lambda: not b.busy, 30)
+    shot = {}
+    orig_burst = GB.FX.Effect.burst
+
+    def spy_burst(self):
+        if self.style == "bite" and "polys" not in shot:
+            shot["polys"] = [b.cv.coords(i) for i in self.items
+                             if b.cv.type(i) == "polygon"]
+            shot["center"] = b._center("foe")
+        return orig_burst(self)
+    GB.FX.Effect.burst = spy_burst
+    b._pending_data = {"battle": b.view}
+    b._play_fx({"t": "move", "who": "me", "move": md["kr"], "moveType": md["type"],
+                "cat": md["cat"]}, "me", "foe")
+    pump(root, lambda: "polys" in shot, 10)
+    GB.FX.Effect.burst = orig_burst
+    polys = shot.get("polys") or []
+    cx, cy = shot.get("center") or (0, 0)
+    xs = [c[k] for c in polys for k in range(0, len(c), 2)]
+    mid = [sum(c[1::2]) / 3.0 for c in polys]
+    chk("물기: 다 닫힌 순간 이빨 일곱 개", len(polys) == 7, len(polys))
+    chk("물기: 이빨이 과녁 가운데에 선다 (대각선이 아니다)",
+        xs and abs(sum(xs) / len(xs) - cx) < 3, (xs and sum(xs) / len(xs), cx))
+    chk("물기: 윗니 넷은 위, 아랫니 셋은 아래",
+        sum(1 for y in mid if y < cy) == 4 and sum(1 for y in mid if y > cy) == 3,
+        [round(y - cy) for y in mid])
+    chk("물기: 연출이 끝까지 돈다", pump(root, lambda: b.fx is None, 10))
+
     # 끝까지 둔다: 가장 센 기술로
     for _ in range(80):
         if b.view.get("over"):

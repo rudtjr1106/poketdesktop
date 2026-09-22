@@ -284,6 +284,40 @@ def particle(cv, mtype, x, y, r):
 
 
 # ---------------------------------------------------------------- 연출 재생
+# ---- 이빨 (물기·깨물어부수기·불꽃엄니 ...) ----
+FANG_TEETH = 4                  # 윗니 수 (아랫니는 하나 적게, 반 칸 비켜 선다)
+FANG_GAP = 18                   # 이빨 사이
+FANG_W = 12                     # 이빨 밑변
+FANG_H = 22                     # 이빨 길이
+FANG_BITE = 4                   # 다 닫혔을 때 끝이 가운데를 넘는 만큼 (맞물린다)
+FANG_OPEN = (36, 26, 16, 7, 0)  # 벌어진 정도 - 한 칸씩 닫힌다
+FANG_STEP_MS = 30
+FANG_HOLD_MS = 90
+
+
+def fang_rows(tx, ty, gap=0):
+    """윗니·아랫니 다각형 좌표. gap 은 다 닫힌 자리에서 벌어진 만큼(px).
+
+    **두 줄 다 과녁(tx) 가운데에 선다.** 윗니는 위에서 아래를, 아랫니는
+    아래에서 위를 보고, 아랫니는 반 칸 비켜 서서 윗니 사이로 들어간다.
+    각 이빨은 (밑 왼쪽, 끝, 밑 오른쪽) 세 점.
+    """
+    half = (FANG_TEETH - 1) * FANG_GAP / 2.0
+    up_tip = ty + FANG_BITE - gap
+    lo_tip = ty - FANG_BITE + gap
+    upper = []
+    for k in range(FANG_TEETH):
+        x = tx - half + k * FANG_GAP
+        base = up_tip - FANG_H
+        upper.append((x - FANG_W / 2.0, base, x, up_tip, x + FANG_W / 2.0, base))
+    lower = []
+    for k in range(FANG_TEETH - 1):
+        x = tx - half + FANG_GAP / 2.0 + k * FANG_GAP
+        base = lo_tip + FANG_H
+        lower.append((x - FANG_W / 2.0, base, x, lo_tip, x + FANG_W / 2.0, base))
+    return upper, lower
+
+
 class Effect(object):
     """캔버스 위에서 도는 연출 하나. root.after 로 스스로 굴러간다."""
 
@@ -918,16 +952,35 @@ class Effect(object):
         self.after(200, self.burst)
 
     def fangs(self):
-        """이빨 자국."""
+        """이빨 자국 - 윗니·아랫니가 가운데로 닫히며 맞물린다.
+
+        예전에는 윗니 줄을 과녁 **왼쪽**에, 아랫니 줄을 **오른쪽**에 두고 서로
+        반대쪽을 보게 그려서, 두 줄이 왼쪽 아래에서 오른쪽 위로 이어지는
+        대각선으로 보였다(사용자 제보). 이제 두 줄 다 과녁 가운데에 서고,
+        벌어진 자리에서 닫힌다.
+        """
         tx, ty = self.dst
         light, dark = colors(self.type)
-        for sign in (-1, 1):
-            for k in range(3):
-                x = tx + sign * (14 + k * 12)
-                self.add(self.cv.create_polygon(
-                    x, ty - sign * 6, x + 7, ty - 26 * sign, x + 14, ty - sign * 6,
-                    fill=light, outline=dark))
-        self.after(200, self.burst)
+        teeth = []
+
+        def frame(i):
+            if self.dead:
+                return
+            for it in teeth:
+                self.cv.delete(it)
+            del teeth[:]
+            if i >= len(FANG_OPEN):
+                return self.after(FANG_HOLD_MS, self.burst)
+            up, lo = fang_rows(tx, ty, FANG_OPEN[i])
+            for pts in up + lo:
+                teeth.append(self.cv.create_polygon(*pts, fill=light, outline=dark,
+                                                    width=2))
+            self.items.extend(teeth)
+            # 다 닫힌 모습은 지우지 않고 잠깐 둔다
+            if i == len(FANG_OPEN) - 1:
+                return self.after(FANG_HOLD_MS, self.burst)
+            self.after(FANG_STEP_MS, lambda: frame(i + 1))
+        frame(0)
 
     # ---- 마무리 충격 ----
     def burst(self):

@@ -374,6 +374,31 @@ def main():
     chk("기준점으로 되돌리면 안 밀린다 (안 쓰면 %.0fpx 밀린다)"
         % abs(good - bad), abs((good + hurt_w / 2.0) - cx) < 1e-9)
 
+    print("\n=== 이빨 연출 (물기·깨물어부수기·엄니) ===")
+    # 예전에는 윗니 줄을 과녁 왼쪽에, 아랫니 줄을 오른쪽에 두고 서로 반대쪽을
+    # 보게 그려서, 두 줄이 대각선으로 이어져 보였다 (사용자 제보).
+    tx, ty = 200.0, 120.0
+    up, lo = FX.fang_rows(tx, ty, 0)
+    tips_u = [p_[2] for p_ in up]
+    tips_l = [p_[2] for p_ in lo]
+    chk("윗니 줄이 과녁 가운데에 선다 (대각선이 아니다)",
+        abs(sum(tips_u) / len(tips_u) - tx) < 1e-6, tips_u)
+    chk("아랫니 줄도 가운데에 선다", abs(sum(tips_l) / len(tips_l) - tx) < 1e-6, tips_l)
+    chk("윗니는 위에, 아랫니는 아래에 있다",
+        max(p_[1] for p_ in up) < ty < min(p_[1] for p_ in lo))
+    chk("윗니는 아래를, 아랫니는 위를 본다 (서로 마주 본다)",
+        all(p_[3] > p_[1] for p_ in up) and all(p_[3] < p_[1] for p_ in lo))
+    chk("다 닫히면 맞물린다 (끝이 가운데를 넘는다)",
+        min(p_[3] for p_ in up) > ty and max(p_[3] for p_ in lo) < ty)
+    chk("아랫니는 윗니 사이로 들어간다",
+        all(tips_u[i] < x < tips_u[i + 1] for i, x in enumerate(tips_l)))
+    chk("벌어진 데서 한 칸씩 닫힌다",
+        list(FX.FANG_OPEN) == sorted(FX.FANG_OPEN, reverse=True)
+        and FX.FANG_OPEN[-1] == 0 and len(set(FX.FANG_OPEN)) == len(FX.FANG_OPEN))
+    far = max(abs(v - ty) for p_ in sum(FX.fang_rows(tx, ty, FX.FANG_OPEN[0]), [])
+              for v in p_[1::2])
+    chk("가장 벌어져도 마무리 충격(반지름 75)보다 안쪽", far <= 75, far)
+
     print("\n=== 걷는 도트가 없는 종 (배틀 도트로 걷는다) ===")
     # 쇼다운 배틀 도트처럼 **왼쪽을 보는** 그림: 부리(빨강)가 왼쪽 끝에 있다.
     # 크라파 제보 - 오른쪽으로 걸을 때 왼쪽을 봐서 뒷걸음질로 보였다.
