@@ -42,11 +42,11 @@ SAMPLE = ["MEWTWO", "LUGIA", "RAYQUAZA", "DIALGA", "GIRATINA", "RESHIRAM",
           "TAPUKOKO", "REGIELEKI", "ENAMORUS"]
 
 
-def boss_mon(dex, name, level, rng):
+def boss_mon(dex, name, level, rng, ev=0):
     sp = dex.get(name)
     m = P.make_pokemon(sp, level, rng, shiny_rate=10 ** 9)
     m["ivs"] = dict((s, 31) for s in P.STATS)
-    m["evs"] = dict((s, 0) for s in P.STATS)
+    m["evs"] = dict((s, ev) for s in P.STATS)
     m["nature"] = "HARDY"
     m["moves"] = G.moveset(dex, sp, level, None)
     m["held"] = None
@@ -84,7 +84,7 @@ def bot_turn(rb, i):
 
 def one(dex, boss_name, n, kinds, opt, seed):
     rng = random.Random(seed)
-    boss = boss_mon(dex, boss_name, opt.boss_level, rng)
+    boss = boss_mon(dex, boss_name, opt.boss_level, rng, opt.boss_ev)
     players = []
     for i in range(n):
         kind = kinds[i % len(kinds)]
@@ -144,16 +144,24 @@ def main():
     ap.add_argument("--min-players", type=int, default=3)
     ap.add_argument("--max-players", type=int, default=6)
     ap.add_argument("--mix", action="store_true", default=True)
-    ap.add_argument("--only", dest="mix_kind", default="trained")
+    # **이게 늘 '섞어서' 로 돌았다.** 기본값이 "trained" 인데 아래에서
+    # "trained 가 아니면 섞지 않는다" 로 봐서, --only trained 를 줘도 섞였다.
+    # 레이드에 오는 사람은 키운 팀일 공산이 커서 따로 잴 수 있어야 한다.
+    ap.add_argument("--only", dest="mix_kind", default=None,
+                    choices=("casual", "trained"))
+    ap.add_argument("--boss-ev", type=int, default=96,
+                    help="보스 노력치 (능력마다). server/app/config.RAID_BOSS_EV 와 같게")
     ap.add_argument("--seed", default="20260919")
     ap.add_argument("--sweep", action="store_true")
     opt = ap.parse_args()
-    if opt.mix_kind != "trained":
+    if opt.mix_kind:
         opt.mix = False
     dex = P.Pokedex.load(os.path.join(DATA, "pokedex.json"))
     if not opt.sweep:
-        report(run(dex, opt), "보스 Lv.%d · 팀 Lv.%d · 체력 x(%.1f + %.1f x 인원) · %d라운드"
-               % (opt.boss_level, opt.team_level, opt.hp_base, opt.hp_per, opt.rounds))
+        who = {"casual": "보통 유저만", "trained": "키운 유저만"}.get(opt.mix_kind, "섞어서")
+        report(run(dex, opt), "%s · 보스 Lv.%d 노력치 %d · 팀 Lv.%d · 체력 x(%.1f + %.1f x 인원) · %d라운드"
+               % (who, opt.boss_level, opt.boss_ev, opt.team_level, opt.hp_base,
+                  opt.hp_per, opt.rounds))
         return
     for lv in (55, 60):
         for per in (0.8, 1.1, 1.4):

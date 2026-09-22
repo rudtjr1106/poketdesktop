@@ -187,7 +187,8 @@ def boss_mon(key, level=None):
     rng = random.Random(_seed(key, "mon"))
     mon = P.make_pokemon(sp, level or config.RAID_BOSS_LEVEL, rng, shiny_rate=10 ** 9)
     mon["ivs"] = dict((s, 31) for s in P.STATS)
-    mon["evs"] = dict((s, 0) for s in P.STATS)
+    # 노력치는 config 를 본다 - 0 이면 키운 팀에게 너무 쉬웠다.
+    mon["evs"] = dict((s, config.RAID_BOSS_EV) for s in P.STATS)
     mon["nature"] = "HARDY"
     mon["happiness"] = 255
     mon["held"] = None
@@ -640,7 +641,9 @@ def schedule(now=None):
             "openSec": config.RAID_OPEN_SEC, "graceSec": config.RAID_GRACE_SEC,
             "minPlayers": config.RAID_MIN_PLAYERS, "maxPlayers": config.RAID_MAX_PLAYERS,
             "minParty": config.RAID_MIN_PARTY, "teamLevel": config.RAID_TEAM_LEVEL,
-            "bossLevel": config.RAID_BOSS_LEVEL, "rounds": config.RAID_ROUNDS,
+            "bossLevel": config.RAID_BOSS_LEVEL, "bossEv": config.RAID_BOSS_EV,
+            "revealSec": config.RAID_REVEAL_SEC,
+            "rounds": config.RAID_ROUNDS,
             "roundSec": config.RAID_ROUND_SEC,
             "eggChance": config.RAID_EGG_CHANCE,
             "upcoming": [boss_card(k) for k in all_keys()

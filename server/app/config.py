@@ -236,8 +236,24 @@ RAID_MIN_PARTY = _int("POKET_RAID_MIN_PARTY", 2)      # 데리고 와야 하는 
 # 잘 키운 사람이 여전히 세다.
 RAID_TEAM_LEVEL = _int("POKET_RAID_TEAM_LEVEL", 50)
 RAID_BOSS_LEVEL = _int("POKET_RAID_BOSS_LEVEL", 60)
-# 보스 체력 배율 = 기본 + 사람당. tools/sim_raid.py 로 쟀다
-# (봇 기준 3인 68% · 4인 70% · 5인 73% · 6인 98%).
+# 보스 노력치 (능력마다). **0 이면 키운 팀에게 너무 쉽고, 252 는 너무
+# 어렵다.** 참가자는 자기 노력치 510 을 다 들고 오는데 보스만 0 이라 키운
+# 팀끼리 모이면 거의 안 졌다. 252 로 올리니 사용자가 "너무 어려워졌다,
+# 최소 70% 는 되게" 라고 했다. tools/sim_raid.py 120판 기준:
+#
+#   노력치      키운 팀 3인  4인   5인   6인    보통 팀 3인  6인
+#     0 (원래)       90%     77%   97%   95%          57%     77%
+#    64              79%     79%   88%   92%          51%     71%
+#    96              75%     77%   83%   90%          49%     73%   <- 이것
+#   128              70%     72%   82%   87%          48%     71%
+#   252              62%     56%   65%   74%          36%     59%
+#
+# 128 은 3인이 딱 70% 라 오차(±4%)면 밑으로 빠진다. 체력 배율(RAID_HP_PER)을
+# 올리는 건 거의 효과가 없었다 - 판이 길어질 뿐 보스가 위협이 안 된다.
+# 4인이 3인보다 살짝 어려운 것(두 번 움직이기 시작)은 RAID_DOUBLE_FROM 을
+# 옮겨도 꺾이는 자리가 따라 옮겨질 뿐이라 그대로 둔다.
+RAID_BOSS_EV = _int("POKET_RAID_BOSS_EV", 96)
+# 보스 체력 배율 = 기본 + 사람당. tools/sim_raid.py 로 쟀다.
 RAID_HP_BASE = _float("POKET_RAID_HP_BASE", 2.0)
 RAID_HP_PER = _float("POKET_RAID_HP_PER", 1.6)
 RAID_ROUNDS = _int("POKET_RAID_ROUNDS", 15)           # 이 안에 못 잡으면 실패

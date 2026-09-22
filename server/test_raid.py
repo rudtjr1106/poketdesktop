@@ -129,6 +129,9 @@ def main():
     mon = raid.boss_mon("%sT11" % day)
     chk("보스 레벨", mon["level"] == config.RAID_BOSS_LEVEL, mon["level"])
     chk("보스 개체값 전부 31", all(v == 31 for v in mon["ivs"].values()))
+    # **0 이면 키운 팀에게 너무 쉬웠고(77~97%), 252 는 너무 어려웠다(56~74%).**
+    chk("보스 노력치는 설정대로", config.RAID_BOSS_EV == 96
+        and all(v == config.RAID_BOSS_EV for v in mon["evs"].values()), mon["evs"])
 
     print("=== 모이기 ===")
     a = mkuser("레이드가")
@@ -407,6 +410,9 @@ def main():
     chk("일정에 규칙이 실린다",
         sch["minPlayers"] == config.RAID_MIN_PLAYERS
         and sch["teamLevel"] == config.RAID_TEAM_LEVEL)
+    chk("보스 노력치와 공개 시각도 실린다 (탭이 스스로 다시 부르는 데 쓴다)",
+        sch.get("bossEv") == config.RAID_BOSS_EV
+        and sch.get("revealSec") == config.RAID_REVEAL_SEC, sch.get("revealSec"))
 
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
