@@ -36,6 +36,24 @@ RESULT_KR = {"won": ("성공", U.GOOD), "lost": ("실패", U.DANGER),
              "expired": ("취소", U.FG_DIM)}
 
 
+def next_edge(left, d):
+    """다음 회차까지 left 초 남았을 때, 몇 초 뒤에 다시 불러야 하나.
+
+    화면이 바뀌는 경계 셋: 보스 공개(revealSec 전) · 모집 시작(openSec 전) ·
+    정각. 이미 지난 경계는 뺀다. 30분보다 멀면 30분 뒤에 한 번 본다 -
+    창을 며칠 켜 두어도 일정이 어긋나지 않게.
+    """
+    if left <= 0:
+        return None
+    edges = [d.get("openSec") or 300, 0]
+    if not (d.get("next") or {}).get("revealed"):
+        edges.append(d.get("revealSec") or 3600)
+    waits = [left - e for e in edges if left - e > 0]
+    if not waits:
+        return None
+    return min(min(waits), 1800)
+
+
 def hms(sec):
     """남은 시간을 사람 말로. 첫 회차까지 며칠 남았을 수도 있다."""
     sec = max(0, int(sec))
@@ -68,6 +86,7 @@ class RaidWindow(object):
         self.photos = {}
         self.jobs = []
         self._busy = False
+        self._poll_job = None     # 다음 불러오기 예약 (늘 하나)
         self._left = 0            # 다음 회차까지 남은 초 (받은 순간 기준)
         self._left_at = 0.0
         self.win = U.panel(parent, app.root, "레이드", W, H,
@@ -75,6 +94,7 @@ class RaidWindow(object):
         self.win.configure(bg=U.BG)
         if not U.is_embedded(self.win):
             U.install_wheel(self.win)
+        self._header()
         # 내용이 창보다 길다 (보스 카드 + 참가 + 규칙 + 다음 회차 + 기록).
         # 굴러가는 칸에 담는다 - 글자를 줄이거나 항목을 빼는 대신.
         self.status = U.status_line(self.win, "불러오는 중...", U.FG_DIM)
@@ -93,6 +113,25 @@ class RaidWindow(object):
         self.reload()
         self._countdown()
 
+    # ---------------- 머리 ----------------
+    def _header(self):
+        """다른 탭(친구·대전·가방·도감·랭크)과 같은 머리줄. **새로고침이 없었다.**
+
+        레이드 탭만 머리줄이 없어서, 화면이 멈춘 것 같을 때 할 수 있는 게
+        탭을 닫았다 다시 여는 것뿐이었다.
+        """
+        h = tk.Frame(self.win, bg=U.BG2, height=U.h(62))
+        h.pack(fill="x")
+        h.pack_propagate(False)
+        inner = tk.Frame(h, bg=U.BG2)
+        inner.pack(fill="both", expand=True, padx=16)
+        tk.Label(inner, text="레이드", bg=U.BG2, fg=U.FG,
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left")
+        self.refresh_btn = U.ghost_button(inner, "새로고침",
+                                          lambda: self.reload(), height=32)
+        self.refresh_btn.pack(side="right", pady=15)
+        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+
     # ---------------- 틀 ----------------
     def later(self, ms, fn):
         if not self.alive:
@@ -100,6 +139,23 @@ class RaidWindow(object):
         j = self.root.after(ms, lambda: self.alive and fn())
         self.jobs.append(j)
         return j
+
+    def _poll_later(self, ms):
+        """다음 불러오기를 **하나만** 예약한다.
+
+        예전에는 불러올 때마다 이전 예약을 두고 새로 걸어서, 로비에서
+        참가·시작을 누르거나 새로고침을 누를 때마다 2초짜리 폴링이 한 줄씩
+        늘었다. 열 번 누르면 2초에 열 번 서버를 두드린다.
+        """
+        if self._poll_job is not None:
+            try:
+                self.root.after_cancel(self._poll_job)
+            except Exception:                               # noqa: BLE001
+                pass
+            if self._poll_job in self.jobs:
+                self.jobs.remove(self._poll_job)
+        self._poll_job = self.later(ms, lambda: self.reload(True))
+        return self._poll_job
 
     def say(self, text, color=U.FG_DIM):
         if self.alive:
@@ -123,7 +179,7 @@ class RaidWindow(object):
                 return
             if err:
                 self.say(getattr(err, "message", str(err)), U.DANGER)
-                return self.later(5000, lambda: self.reload(True))
+                return self._poll_later(5000)
             self.data = r
             self._left = int(((r.get("next") or {}).get("leftSec")) or 0)
             self._left_at = _now()
@@ -134,7 +190,7 @@ class RaidWindow(object):
     def _schedule_poll(self):
         room = (self.data or {}).get("room")
         if room and room.get("state") == "lobby":
-            return self.later(LOBBY_POLL_MS, lambda: self.reload(True))
+            return self._poll_later(LOBBY_POLL_MS)
         if room and room.get("state") == "fighting":
             return self._to_battle(room)
         # 모이는 시간이 가까우면 조금 자주 본다. **모이기 시작하는 순간을
@@ -143,7 +199,14 @@ class RaidWindow(object):
         left = self._remaining()
         d = self.data or {}
         if d.get("open") or 0 < left <= (d.get("openSec") or 300) + 60:
-            self.later(IDLE_POLL_MS, lambda: self.reload(True))
+            return self._poll_later(IDLE_POLL_MS)
+        # **멀리 있어도 경계에서는 다시 부른다.** 예전에는 모집 6분 전 안쪽에서
+        # 연 탭만 저절로 바뀌었다. 한 시간 전에 열어 두면 시계만 줄다가 "곧
+        # 시작" 에서 멈추고, 보스 공개(1시간 전)도 '참가하기' 도 안 떴다 -
+        # 탭을 닫았다 다시 열어야 했다.
+        wait = next_edge(left, d)
+        if wait is not None:
+            self._poll_later(int(wait * 1000) + 1500)
 
     def _remaining(self):
         return max(0, self._left - int(_now() - self._left_at))
@@ -417,7 +480,10 @@ class RaidWindow(object):
             ("인원", "%d~%d명" % (d.get("minPlayers", 3), d.get("maxPlayers", 6))),
             ("레벨", "전원 Lv.%d 로 맞춰서 싸웁니다 (개체값·노력치·기술은 그대로)"
                      % d.get("teamLevel", 50)),
-            ("보스", "Lv.%d · 인원수만큼 체력이 늘어납니다" % d.get("bossLevel", 60)),
+            ("보스", "Lv.%d%s · 인원수만큼 체력이 늘어납니다"
+                     % (d.get("bossLevel", 60),
+                        (" · 능력마다 노력치 %d" % d["bossEv"]) if d.get("bossEv")
+                        else "")),
             ("제한", "%d라운드 안에 쓰러뜨려야 합니다 (한 라운드 %d초)"
                      % (d.get("rounds", 15), d.get("roundSec", 25))),
             ("보상", "성공하면 %d%% 확률로 **그 보스의 알**. 횟수 제한은 없지만 하루 한 번입니다."

@@ -111,7 +111,8 @@ class FakeApi(object):
         return {"on": True, "start": "2026-09-22", "end": "2026-10-06",
                 "hours": [11, 21], "next": self._card(), "open": True,
                 "openSec": 300, "graceSec": 120, "minPlayers": 3, "maxPlayers": 6,
-                "minParty": 2, "teamLevel": 50, "bossLevel": 60, "rounds": 15,
+                "minParty": 2, "teamLevel": 50, "bossLevel": 60, "bossEv": 96,
+                "revealSec": 3600, "rounds": 15,
                 "roundSec": 25, "eggChance": 0.7,
                 "upcoming": [self._card() for _ in range(6)],
                 "room": self.room() if self.rb or self.state == "lobby" else None,
@@ -357,6 +358,56 @@ def main():
     ts = " ".join(texts(w3s.win))
     chk("모자라면 까닭을 알려준다", "3명부터" in ts, ts[:200])
     w3s.close()
+
+    print("=== 새로고침 ===")
+    t = " ".join(texts(w2.win))
+    chk("머리줄에 새로고침이 있다 (다른 탭처럼)", "새로고침" in t, t[:120])
+    chk("보스 노력치를 알린다", "노력치 96" in t, t[:300])
+    before = api2.calls.count("raid")
+    w2.refresh_btn.command()
+    pump(root, lambda: api2.calls.count("raid") > before, timeout=5)
+    chk("누르면 다시 불러온다", api2.calls.count("raid") > before,
+        (before, api2.calls.count("raid")))
+    # **여러 번 눌러도 폴링은 한 줄이다.** 예전에는 불러올 때마다 이전
+    # 예약을 두고 새로 걸어서, 로비(2초)에서 열 번 누르면 2초에 열 번 갔다.
+    for _ in range(6):
+        w2.refresh_btn.command()
+        pump(root, lambda: not w2._busy, timeout=5)
+    rest(root, 0.2)
+    n0 = api2.calls.count("raid")
+    rest(root, 4.5)
+    got = api2.calls.count("raid") - n0
+    chk("여러 번 눌러도 폴링이 불어나지 않는다 (4.5초에 2~3번)", got <= 3, got)
+
+    print("=== 경계에서 스스로 다시 부른다 ===")
+    chk("경계 계산: 두 시간 앞이면 30분 뒤에 한 번", ui_raid.next_edge(
+        7200, {"openSec": 300, "revealSec": 3600, "next": {"revealed": False}}) == 1800)
+    chk("경계 계산: 공개 100초 전", ui_raid.next_edge(
+        3700, {"openSec": 300, "revealSec": 3600, "next": {"revealed": False}}) == 100)
+    chk("경계 계산: 공개됐으면 모집 시작까지", ui_raid.next_edge(
+        1000, {"openSec": 300, "revealSec": 3600, "next": {"revealed": True}}) == 700)
+    chk("경계 계산: 모집 중이면 정각까지", ui_raid.next_edge(
+        200, {"openSec": 300, "next": {"revealed": True}}) == 200)
+    chk("경계 계산: 지났으면 없음", ui_raid.next_edge(0, {}) is None)
+    # 보스 공개 5초 전에 연 탭 - 예전에는 모집 6분 전 안쪽이 아니면 다시
+    # 부르지 않아서, 공개도 '참가하기' 도 탭을 다시 열어야 떴다.
+    ape = FakeApi(dex, n=3, revealed=False)
+    ape.room = _no_room
+
+    def _far():
+        d = FakeApi.raid(ape)
+        d["open"] = False
+        d["room"] = None
+        d["next"]["leftSec"] = 3605
+        return d
+    ape.raid = _far
+    appe = FakeApp(root, ape, dex)
+    we = ui_raid.RaidWindow(appe)
+    pump(root, lambda: "raid" in ape.calls)
+    pump(root, lambda: ape.calls.count("raid") >= 2, timeout=12)
+    chk("보스 공개 시각이 되면 저절로 다시 불러온다", ape.calls.count("raid") >= 2,
+        ape.calls.count("raid"))
+    we.close()
 
     # 판이 열리면 배틀 창으로 넘긴다
     api2.begin()
