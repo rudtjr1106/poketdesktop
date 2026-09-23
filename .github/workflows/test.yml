@@ -354,6 +354,12 @@ jobs:
           # 돌릴 수가 없다(첫 조우까지 기다려야 한다).
           POKET_ALLOW_FORCE_WILD: "1"
           POKET_ALLOW_ADD_EXP: "1"
+          # **이벤트 쉐이미를 끈다.** 0.2% 로 누구에게나 나오는데, 야생을
+          # 40번·12번 뽑아 "전설이 안 나온다" 를 보는 검사가 그걸 실패로
+          # 읽는다. 판마다 10% 쯤 빨개져서 실제로 여러 번 헛걸음했다.
+          # 이벤트 볼을 받은 사람에게 반드시 나오는 길(test_event)은 이
+          # 값과 상관없으므로 그대로 검사된다. 운영 서버는 그대로 0.002.
+          POKET_EVENT_RESPAWN: "0"
           POKET_WILD_COOLDOWN_MIN: "60"
           POKET_WILD_COOLDOWN_MAX: "60"
           POKET_MISS_COOLDOWN: "60"
