@@ -146,8 +146,14 @@ def main():
         root.update_idletasks()
         chk("창이 작업 영역 높이에 맞춰 줄어든다", d4.win.winfo_height() <= 600 - 40,
             d4.win.winfo_height())
-        bot = d4.ok_btn.holder.winfo_rooty() + d4.ok_btn.holder.winfo_height()
-        chk("팔기 단추가 화면 안에 있다", bot <= 600, bot)
+        # **창 안쪽 자리로 잰다.** 화면 절대 좌표로 재면 창을 어디에 놓을지는
+        # OS 가 제목 표시줄만큼 더 내리므로 기계마다 1~2px 씩 다르다
+        # (CI 맥에서 601 vs 600 으로 걸렸다). 창이 화면에 맞게 줄었는지는
+        # 위의 검사가 보고, 여기서는 단추가 그 창 안에 들어오는지를 본다.
+        bot = (d4.ok_btn.holder.winfo_rooty() - d4.win.winfo_rooty()
+               + d4.ok_btn.holder.winfo_height())
+        chk("팔기 단추가 창 안에 있다", bot <= d4.win.winfo_height(),
+            (bot, d4.win.winfo_height()))
         chk("목록은 그대로 구른다 (줄 50개)",
             int((d4.canvas.cget("scrollregion") or "0 0 0 0").split()[3])
             > d4.canvas.winfo_height(), d4.canvas.cget("scrollregion"))
