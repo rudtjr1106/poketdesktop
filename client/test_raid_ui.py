@@ -379,6 +379,41 @@ def main():
     got = api2.calls.count("raid") - n0
     chk("여러 번 눌러도 폴링이 불어나지 않는다 (4.5초에 2~3번)", got <= 3, got)
 
+    print("=== 깜빡이지 않는다 ===")
+    # 로비는 2초마다 방을 물어본다. 예전에는 그때마다 화면을 통째로 지우고
+    # 다시 그려서(_clear) 아무도 안 들어와도 눈에 띄게 깜빡였다 (사용자 제보).
+    chk("남은 시간만 줄면 모양은 같다",
+        ui_raid.shape_of({"a": 1, "next": {"leftSec": 240, "revealed": True}})
+        == ui_raid.shape_of({"a": 1, "next": {"leftSec": 3, "revealed": True}}))
+    chk("사람이 들어오면 모양이 달라진다",
+        ui_raid.shape_of({"room": {"count": 3}}) != ui_raid.shape_of({"room": {"count": 4}}))
+    keep = [str(w) for w in w2.body.winfo_children()]
+    n_before = api2.calls.count("raid")
+    for _ in range(3):
+        w2.reload(True)
+        pump(root, lambda: api2.calls.count("raid") > n_before, timeout=5)
+        n_before = api2.calls.count("raid")
+    rest(root, 0.3)
+    chk("다시 불러도 그려 둔 것을 안 지운다",
+        [str(w) for w in w2.body.winfo_children()] == keep,
+        [str(w) for w in w2.body.winfo_children()][:3])
+    chk("그래도 인원은 맞다", "3 / 6명" in " ".join(texts(w2.win)))
+    # 사람이 들어오면 그때는 다시 그린다
+    api2.n = 4
+    w2.reload(True)
+    pump(root, lambda: "4 / 6명" in " ".join(texts(w2.win)), timeout=10)
+    chk("사람이 들어오면 다시 그린다", "4 / 6명" in " ".join(texts(w2.win)),
+        " ".join(texts(w2.win))[:120])
+    api2.n = 3
+    w2.reload(True)
+    pump(root, lambda: "3 / 6명" in " ".join(texts(w2.win)), timeout=10)
+    # 새로고침은 사람이 누른 것이라 바뀐 게 없어도 한 번은 다시 그린다
+    keep2 = [str(w) for w in w2.body.winfo_children()]
+    w2.refresh_btn.command()
+    pump(root, lambda: [str(x) for x in w2.body.winfo_children()] != keep2, timeout=10)
+    chk("새로고침을 누르면 다시 그린다",
+        [str(x) for x in w2.body.winfo_children()] != keep2)
+
     print("=== 경계에서 스스로 다시 부른다 ===")
     chk("경계 계산: 두 시간 앞이면 30분 뒤에 한 번", ui_raid.next_edge(
         7200, {"openSec": 300, "revealSec": 3600, "next": {"revealed": False}}) == 1800)

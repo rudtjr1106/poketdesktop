@@ -14,6 +14,7 @@
 로비에 있는 동안만 2초마다 방을 물어본다. 평소 동기화(90초)는 그대로다.
 """
 import datetime
+import json
 import tkinter as tk
 from tkinter import ttk
 
@@ -34,6 +35,31 @@ KIND_KR = {"legendary": "전설", "mythical": "환상"}
 RESULT_KR = {"won": ("성공", U.GOOD), "lost": ("실패", U.DANGER),
              "timeout": ("시간 초과", U.DANGER), "cancelled": ("취소", U.FG_DIM),
              "expired": ("취소", U.FG_DIM)}
+
+
+# 시간이 흘러서 저절로 바뀌는 값들. **그림의 모양을 바꾸지 않으므로**
+# 다시 그릴지 따질 때는 뺀다 (남은 시간은 시계가 따로 1초마다 적는다).
+TICKING = ("leftSec", "startsIn", "deadlineIn", "rev", "unseen", "updated_at")
+
+
+def shape_of(d):
+    """이 자료로 그린 화면의 모양. 이게 같으면 다시 그릴 것이 없다.
+
+    로비에서는 2초마다 방을 물어보는데, 예전에는 그때마다 화면을 통째로
+    지우고 다시 그렸다(_clear). 그래서 아무도 안 들어와도 2초에 한 번씩
+    **눈에 띄게 깜빡였고**, 보스 도트 라벨도 매번 새로 만들어졌다.
+    """
+    def strip(o):
+        if isinstance(o, dict):
+            return dict((k, strip(v)) for k, v in o.items() if k not in TICKING)
+        if isinstance(o, list):
+            return [strip(v) for v in o]
+        return o
+    try:
+        return json.dumps(strip(d or {}), sort_keys=True, ensure_ascii=False,
+                          default=str)
+    except (TypeError, ValueError):
+        return None
 
 
 def next_edge(left, d):
@@ -87,6 +113,7 @@ class RaidWindow(object):
         self.jobs = []
         self._busy = False
         self._poll_job = None     # 다음 불러오기 예약 (늘 하나)
+        self._shape = None        # 지금 그려 둔 화면의 모양 (shape_of)
         self._left = 0            # 다음 회차까지 남은 초 (받은 순간 기준)
         self._left_at = 0.0
         self.win = U.panel(parent, app.root, "레이드", W, H,
@@ -128,7 +155,7 @@ class RaidWindow(object):
         tk.Label(inner, text="레이드", bg=U.BG2, fg=U.FG,
                  font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left")
         self.refresh_btn = U.ghost_button(inner, "새로고침",
-                                          lambda: self.reload(), height=32)
+                                          self.refresh, height=32)
         # **위아래 여백(pady)을 주지 않는다.** 머리줄 높이는 정해져 있고 pack 이
         # 알아서 세로 가운데에 둔다. 다른 탭처럼 pady=15 를 주면 단추(32 +
         # 그림자 4)에 30 을 더해 66 을 달라는데, 윈도우(배율 1.0)의 머리줄은
@@ -170,6 +197,12 @@ class RaidWindow(object):
             w.destroy()
 
     # ---------------- 받아오기 ----------------
+    def refresh(self):
+        """사람이 새로고침을 눌렀다. 바뀐 게 없어도 한 번은 다시 그린다 -
+        눌렀는데 아무 일도 안 일어나면 먹통으로 보인다."""
+        self._shape = None
+        self.reload()
+
     def reload(self, quiet=False):
         if not self.alive or self._busy:
             return
@@ -187,7 +220,14 @@ class RaidWindow(object):
             self.data = r
             self._left = int(((r.get("next") or {}).get("leftSec")) or 0)
             self._left_at = _now()
-            self.render()
+            # **바뀐 것이 없으면 다시 그리지 않는다.** 남은 시간은 시계가
+            # 따로 적고, 그 값은 모양 열쇠에서 빠져 있다.
+            shape = shape_of(r)
+            if shape is None or shape != self._shape or not self.body.winfo_children():
+                self._shape = shape
+                self.render()
+            else:
+                self._paint_clock()
             self._schedule_poll()
         run_async(self.root, lambda: self.app.api.raid(), done)
 
