@@ -131,6 +131,30 @@ def main():
         any("팔 수 있는 물건이 없습니다" in t for t in texts), texts[:4])
     d3._cancel()
 
+    print("\n=== 물건이 많고 화면이 작을 때")
+    # **팔기 단추가 안 보인다는 제보.** 목록은 원래도 굴렀는데, 창 높이가
+    # 박혀 있어서 화면이 작거나 배율이 높으면 창 바닥(단추 줄)이 통째로
+    # 화면 밖으로 나갔다. 굴러도 소용없는 자리였다.
+    real_area = PLAT.work_area
+    try:
+        PLAT.work_area = lambda w, h: (0, 0, 1024, 600)
+        many = [{"id": "IT%d" % i, "kr": "물건%d" % i, "cat": "etc",
+                 "sell": 100 + i, "cost": 200 + i} for i in range(50)]
+        bag = dict(("IT%d" % i, 9) for i in range(50))
+        d4 = ui_sell.SellMany(root, root, many, bag, money=9999)
+        root.update()
+        root.update_idletasks()
+        chk("창이 작업 영역 높이에 맞춰 줄어든다", d4.win.winfo_height() <= 600 - 40,
+            d4.win.winfo_height())
+        bot = d4.ok_btn.holder.winfo_rooty() + d4.ok_btn.holder.winfo_height()
+        chk("팔기 단추가 화면 안에 있다", bot <= 600, bot)
+        chk("목록은 그대로 구른다 (줄 50개)",
+            int((d4.canvas.cget("scrollregion") or "0 0 0 0").split()[3])
+            > d4.canvas.winfo_height(), d4.canvas.cget("scrollregion"))
+        d4._cancel()
+    finally:
+        PLAT.work_area = real_area
+
     print("\n=== 확인 창에 보여줄 글")
     text = ui_sell.summary([{"item": "PEARL", "count": 2},
                             {"item": "STARDUST", "count": 1}], ITEMS)

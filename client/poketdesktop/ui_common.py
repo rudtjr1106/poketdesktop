@@ -380,13 +380,35 @@ def window_icon(win):
         pass
 
 
+# 창 위쪽 제목 표시줄과 아래 여유. 작업 영역에서 이만큼은 빼고 잡는다.
+CHROME_H = 44
+
+
 def style_window(win, title, w=None, h=None):
+    """창을 꾸미고 크기를 잡는다. **화면(작업 영역) 밖으로 나가지 않게 줄인다.**
+
+    예전에는 받은 크기를 그대로 박았다. 그래서 화면이 작거나 배율이 높은
+    PC 에서는 창 아래쪽이 화면 밖으로 나갔고, 아래에 붙여 둔 단추(가방
+    '여러 개 팔기' 의 팔기 단추처럼)가 통째로 안 보였다. 굴러가는 칸이
+    있어도 소용없다 - 안 보이는 것은 목록이 아니라 창 바닥이었다.
+
+    자리도 작업 영역 기준으로 잡는다 - 맥 메뉴 막대·윈도우 작업 표시줄
+    아래로 들어가지 않게.
+    """
     win.title(title)
     win.configure(bg=BG)
     window_icon(win)
     if w and h:
         sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
-        win.geometry("%dx%d+%d+%d" % (w, h, (sw - w) // 2, max(0, (sh - h) // 3)))
+        try:
+            x1, y1, x2, y2 = PLAT.work_area(sw, sh)
+        except Exception:                                   # noqa: BLE001
+            x1, y1, x2, y2 = 0, 0, sw, sh
+        w = max(320, min(w, (x2 - x1) - 16))
+        h = max(320, min(h, (y2 - y1) - CHROME_H))
+        x = x1 + max(0, ((x2 - x1) - w) // 2)
+        y = y1 + max(0, ((y2 - y1) - h - 30) // 3)
+        win.geometry("%dx%d+%d+%d" % (w, h, x, y))
     return win
 
 
