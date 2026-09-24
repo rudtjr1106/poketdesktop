@@ -1609,7 +1609,7 @@ def before_attack(bt, k, move, who, user, target, tw, ev):
 
 
 def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
-    """때리고 난 뒤 (고속스핀·끌어내기·유턴·필드 부수기·지옥찌르기·떨어뜨리기)."""
+    """때리고 난 뒤 (고속스핀·끌어내기·유턴·필드 부수기·떨어뜨리기·탁쳐서떨구기)."""
     if k in SPINNERS and user.alive() and total:
         side = bt.field.side(who)
         gone = [hz for hz in FD.HAZARDS if side.pop(hz, None)]
@@ -1635,6 +1635,19 @@ def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
             bt.request_switch(tw, "drag", ev, k)
     if k in OUT_ATTACKS and total and user.alive() and bt.kind != "wild" and _team_others(bt, who, user):
         bt.request_switch(who, "out", ev, k)
+    if (k == "KNOCKOFF" and total and target.alive() and not sub_hit
+            and MC.item_on(target)
+            and not (A.has(target, "STICKYHOLD") and not A.breaks(user))):
+        # 탁쳐서떨구기. 위력 1.5배는 movecalc 가 이미 한다 - 여기서 **실제로
+        # 떨군다**. 그동안 배수만 있고 도구는 그대로 붙어 있었다.
+        # 이 판에서만 없어진다: Fighter.held 는 배틀용 사본이고 DB 의 도구는
+        # 안 건드린다 (트릭·바꿔치기와 같다).
+        lost = target.held
+        target.held = None
+        target.item_gone = True
+        target.used = True            # 무기력(UNBURDEN)은 떨어뜨려도 켜진다
+        target.locked = None          # 구애 도구에 잠겨 있었으면 같이 풀린다
+        say(ev, tw, "%s 은(는) %s 을(를) 떨어뜨렸다!" % (target.name, H.name(lost)))
 
 
 def after_status(bt, k, move, who, user, target, tw, ev):

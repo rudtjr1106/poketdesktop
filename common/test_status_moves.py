@@ -496,6 +496,29 @@ def t_도구(dex):
     use(bt, "me", "RECYCLE")
     chk("리사이클: 먹은 열매를 되살린다", not me.used and me.held == "SITRUSBERRY")
 
+    print("-- 탁쳐서떨구기")
+    # 위력 1.5배(movecalc)만 있고 **도구를 실제로 떨구지는 않고 있었다**.
+    bt, me, foe = fight(dex, mon(dex, "MEOWSCARADA", 50, ["KNOCKOFF"]),
+                        mon(dex, "SNORLAX", 50, ["TACKLE"], held="LIFEORB"))
+    ev = use(bt, "me", "KNOCKOFF")
+    chk("탁쳐서떨구기: 도구를 떨군다",
+        foe.held is None and "떨어뜨렸다" in texts(ev), texts(ev))
+    chk("DB 의 도구는 그대로 (이 판에서만 없어진다)", foe.mon["held"] == "LIFEORB")
+    bt, me, foe = fight(dex, mon(dex, "MEOWSCARADA", 50, ["SCRATCH"]),
+                        mon(dex, "SNORLAX", 50, ["TACKLE"], held="LIFEORB"))
+    use(bt, "me", "SCRATCH")
+    chk("다른 기술은 안 떨군다", foe.held == "LIFEORB")
+    bt, me, foe = fight(dex, mon(dex, "MEOWSCARADA", 50, ["KNOCKOFF"]),
+                        mon(dex, "MUK", 50, ["TACKLE"], held="LIFEORB",
+                            ability="STICKYHOLD"), abilities=True)
+    use(bt, "me", "KNOCKOFF")
+    chk("점착은 안 떨어뜨린다", foe.held == "LIFEORB")
+    bt, me, foe = fight(dex, mon(dex, "MEOWSCARADA", 50, ["KNOCKOFF"]),
+                        mon(dex, "SNORLAX", 50, ["SUBSTITUTE"], held="LIFEORB"))
+    use(bt, "foe", "SUBSTITUTE")
+    use(bt, "me", "KNOCKOFF")
+    chk("대타 뒤에 있으면 못 떨군다", foe.held == "LIFEORB")
+
 
 # ---------------------------------------------------------------- 2. 판 전체
 def t_날씨(dex):
