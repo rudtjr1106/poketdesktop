@@ -90,6 +90,13 @@ def one(dex, boss_name, n, kinds, opt, seed):
         kind = kinds[i % len(kinds)]
         team = (SG.casual_team(dex, opt.team_level, rng) if kind == "casual"
                 else SG.trained_team(dex, dex, opt.team_level, rng))
+        if kind != "casual" and opt.perfect:
+            # **trained_team 은 개체값을 안 건드린다** - make_pokemon 이 굴린
+            # 무작위 값 그대로라 평균 15 쯤이다. 난이도 기준으로 삼는 '잘 키운
+            # 파티' 는 6V 에 도구까지 낀 쪽이라, 그걸 재려면 이게 필요하다.
+            for m in team:
+                m["ivs"] = dict((k, 31) for k in P.STATS)
+                m["held"] = opt.held
         players.append((i + 1, "P%d" % (i + 1),
                         [R.leveled(m, opt.team_level) for m in team]))
     rb = R.RaidBattle(dex, boss, players, hp_mult=opt.hp_base + opt.hp_per * n,
@@ -135,10 +142,10 @@ def report(rows, title):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("games", nargs="?", type=int, default=20)
-    ap.add_argument("--boss-level", type=int, default=60)
+    ap.add_argument("--boss-level", type=int, default=62)
     ap.add_argument("--team-level", type=int, default=50)
-    ap.add_argument("--hp-base", type=float, default=2.0)
-    ap.add_argument("--hp-per", type=float, default=1.6)
+    ap.add_argument("--hp-base", type=float, default=0.0)
+    ap.add_argument("--hp-per", type=float, default=2.0)
     ap.add_argument("--rounds", type=int, default=15)
     ap.add_argument("--double-from", type=int, default=4)
     ap.add_argument("--min-players", type=int, default=3)
@@ -149,8 +156,11 @@ def main():
     # 레이드에 오는 사람은 키운 팀일 공산이 커서 따로 잴 수 있어야 한다.
     ap.add_argument("--only", dest="mix_kind", default=None,
                     choices=("casual", "trained"))
-    ap.add_argument("--boss-ev", type=int, default=96,
+    ap.add_argument("--boss-ev", type=int, default=192,
                     help="보스 노력치 (능력마다). server/app/config.RAID_BOSS_EV 와 같게")
+    ap.add_argument("--perfect", action="store_true",
+                    help="키운 팀을 6V + 도구로 (난이도 기준이 되는 '잘 키운 파티')")
+    ap.add_argument("--held", default="LIFEORB", help="--perfect 일 때 쥐여줄 도구")
     ap.add_argument("--seed", default="20260919")
     ap.add_argument("--sweep", action="store_true")
     opt = ap.parse_args()
@@ -159,6 +169,8 @@ def main():
     dex = P.Pokedex.load(os.path.join(DATA, "pokedex.json"))
     if not opt.sweep:
         who = {"casual": "보통 유저만", "trained": "키운 유저만"}.get(opt.mix_kind, "섞어서")
+        if opt.perfect:
+            who += " (6V+%s)" % opt.held
         report(run(dex, opt), "%s · 보스 Lv.%d 노력치 %d · 팀 Lv.%d · 체력 x(%.1f + %.1f x 인원) · %d라운드"
                % (who, opt.boss_level, opt.boss_ev, opt.team_level, opt.hp_base,
                   opt.hp_per, opt.rounds))
