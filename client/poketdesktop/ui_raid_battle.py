@@ -37,9 +37,9 @@ from .ui_gym import shade
 from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
 
 W = 960
-SCENE_H = 330
-MSG_H = 48
-CMD_H = 210
+SCENE_H = 348
+MSG_H = 54
+CMD_H = 226
 MIN_SCENE_H = 250
 STEP_MS = 560
 POLL_MS = 1500              # 방을 물어보는 주기

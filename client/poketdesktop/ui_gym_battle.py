@@ -39,9 +39,9 @@ from .ui_gym import level_color, shade, trainer_photo
 # 독에 가려 기술 칸 아랫줄이 잘렸다. 기술 칸의 여백을 줄여 전체를 줄였고,
 # 그래도 독을 뺀 화면보다 크면 장면을 줄인다(글자 칸은 그대로).
 W = 860
-SCENE_H = 280
-MSG_H = 50
-CMD_H = 196
+SCENE_H = 296
+MSG_H = 56
+CMD_H = 212
 MIN_SCENE_H = 220
 STEP_MS = 650
 # 포켓몬 도트 높이(px). 글자가 아니므로 글꼴 배율을 타지 않는다.
