@@ -129,9 +129,12 @@ def main():
     mon = raid.boss_mon("%sT11" % day)
     chk("보스 레벨", mon["level"] == config.RAID_BOSS_LEVEL, mon["level"])
     chk("보스 개체값 전부 31", all(v == 31 for v in mon["ivs"].values()))
-    # **0 이면 키운 팀에게 너무 쉬웠고(77~97%), 252 는 너무 어려웠다(56~74%).**
-    chk("보스 노력치는 설정대로", config.RAID_BOSS_EV == 96
-        and all(v == config.RAID_BOSS_EV for v in mon["evs"].values()), mon["evs"])
+    # 노력치는 config 에서 고른다 (RAID_BOSS_EV 의 설명에 맞춘 표가 있다).
+    # **여기에 숫자를 박아 두지 않는다** - 난이도를 바꿀 때마다 이 검사가
+    # 조용히 빨개졌다(96 -> 192 로 올린 판이 그대로 배포됐다).
+    chk("보스 노력치는 설정대로",
+        all(v == config.RAID_BOSS_EV for v in mon["evs"].values()), mon["evs"])
+    chk("보스 노력치가 정상 범위", 0 <= config.RAID_BOSS_EV <= 252, config.RAID_BOSS_EV)
 
     print("=== 모이기 ===")
     a = mkuser("레이드가")
@@ -187,8 +190,16 @@ def main():
         raid.room(row["id"])["host"])
     raid.leave(b)
     raid.leave(c)
-    chk("전부 나가면 방이 없어진다", raid.room(row["id"])["state"] == "done",
+    # **빈 방은 접지 않고 남겨 둔다.** 접으면 다시 들어올 때마다 새 방이
+    # 생긴다 (한 사람이 6분에 49개를 만든 적이 있다).
+    chk("전부 나가도 방은 남는다", raid.room(row["id"])["state"] == "lobby",
         raid.room(row["id"])["state"])
+    again = raid.join(c, "레이드다", None, at(day, 11, 30))
+    chk("다시 들어오면 새 방이 아니라 그 방", again["id"] == row["id"],
+        (again["id"], row["id"]))
+    chk("비어 있던 방에 들어온 사람이 방장", raid.room(row["id"])["host"] == c,
+        raid.room(row["id"])["host"])
+    raid.leave(c)
     chk("끝까지 참가 횟수는 안 깎였다", not raid.played_today(a, t0))
 
     print("=== 방은 여러 개 생긴다 ===")
@@ -405,6 +416,28 @@ def main():
     chk("보면 0", raid_routes.unseen(a) == 0)
     hist = raid.history(a)
     chk("기록이 남는다", len(hist) >= 1 and hist[0]["boss"], hist[:1])
+
+    print("=== 지난 회차 (공개) ===")
+    # 내 기록이 아니어도 누구나 본다.
+    past = raid.past(10)
+    chk("지난 회차가 나온다", len(past) >= 1, len(past))
+    one = past[0]
+    chk("보스 이름이 한글로", bool(one["kr"]) and bool(one["boss"]), one.get("kr"))
+    chk("회차와 시각", one["session"] and one["at"], (one.get("session"), one.get("at")))
+    chk("참가 인원을 센다", one["players"] >= 1, one["players"])
+    chk("방마다 참가자가 들어 있다",
+        one["rooms"] and one["rooms"][0]["members"], one["rooms"][:1])
+    chk("딜 순위가 높은 쪽부터",
+        all(one["top"][i]["damage"] >= one["top"][i + 1]["damage"]
+            for i in range(len(one["top"]) - 1)), one["top"])
+    chk("최신 회차가 앞에",
+        all(past[i]["session"] >= past[i + 1]["session"]
+            for i in range(len(past) - 1)), [p_["session"] for p_ in past])
+    chk("사람이 안 모여 접힌 방은 안 센다",
+        all(r["rounds"] > 0 for p_ in past for r in p_["rooms"]),
+        [(r["rounds"], r["result"]) for p_ in past for r in p_["rooms"]])
+    chk("남의 기록도 보인다 (내가 안 간 회차 포함)",
+        sum(p_["players"] for p_ in past) >= len(hist), None)
     sch = raid.schedule(at(day, 10, 30))
     chk("일정에 다음 회차 여섯 개", len(sch["upcoming"]) == 6, len(sch["upcoming"]))
     chk("일정에 규칙이 실린다",

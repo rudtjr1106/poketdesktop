@@ -164,6 +164,12 @@ def seen(ctx=Depends(deps.current)):
     return {"ok": True}
 
 
+@router.get("/api/raid/past")
+def past(limit: int = 10, ctx=Depends(deps.current)):
+    """지난 회차 — 내가 안 간 판도 본다. 어떤 전설이 나왔고 누가 잡았는지."""
+    return {"raids": raid.past(limit)}
+
+
 @router.get("/api/raid/history")
 def history(limit: int = 10, ctx=Depends(deps.current)):
     return {"raids": raid.history(ctx["user"]["id"], max(1, min(50, limit)))}

@@ -599,6 +599,47 @@ class RaidWindow(object):
                 tk.Label(line, text="  ·  ".join(bits), bg=U.BG, fg=U.FG_DIM,
                          font=U.FONT_XS, anchor="w").pack(side="left")
         run_async(self.root, lambda: self.app.api.raid_history(6), done)
+        self._past()
+
+    def _past(self):
+        """지난 회차 — **내가 안 간 판도 보인다.** 어떤 전설이 나왔는지 궁금해한다."""
+        box = tk.Frame(self.body, bg=U.BG)
+        box.pack(fill="x", padx=16, pady=(0, 12))
+        tk.Label(box, text="지난 회차", bg=U.BG, fg=U.FG, font=U.FONT_B,
+                 anchor="w").pack(anchor="w", pady=(0, 4))
+        holder = tk.Frame(box, bg=U.BG)
+        holder.pack(fill="x")
+
+        def done(r, err):
+            if not self.alive or err:
+                return
+            rows = (r or {}).get("raids") or []
+            if not rows:
+                return tk.Label(holder, text="아직 지나간 회차가 없습니다.", bg=U.BG,
+                                fg=U.FG_FAINT, font=U.FONT_XS,
+                                anchor="w").pack(anchor="w")
+            for x in rows[:8]:
+                line = tk.Frame(holder, bg=U.BG)
+                line.pack(fill="x", pady=1)
+                tk.Label(line, text=when(x.get("at")), bg=U.BG, fg=U.FG_DIM,
+                         font=U.FONT_XS, width=15, anchor="w").pack(side="left")
+                tk.Label(line, text=x.get("kr") or x.get("boss") or "", bg=U.BG,
+                         fg=U.ACCENT, font=U.FONT_XS, width=10,
+                         anchor="w").pack(side="left")
+                bits = ["%d명" % (x.get("players") or 0)]
+                parties = x.get("parties") or 0
+                cleared = x.get("cleared") or 0
+                if parties:
+                    bits.append("%d/%d방 성공" % (cleared, parties)
+                                if cleared < parties else "전부 성공")
+                if x.get("eggs"):
+                    bits.append("알 %d개" % x["eggs"])
+                top = (x.get("top") or [None])[0]
+                if top:
+                    bits.append("1위 %s" % top.get("name"))
+                tk.Label(line, text="  ·  ".join(bits), bg=U.BG, fg=U.FG_DIM,
+                         font=U.FONT_XS, anchor="w").pack(side="left")
+        run_async(self.root, lambda: self.app.api.raid_past(8), done)
 
     # ---------------- 동작 ----------------
     def _send(self, fn, ok_text=""):

@@ -456,6 +456,10 @@ class Api(object):
     def raid_history(self, limit=10):
         return self._call("GET", "/api/raid/history?limit=%d" % int(limit))
 
+    def raid_past(self, limit=10):
+        """지난 회차 — 내가 안 간 판도 본다."""
+        return self._call("GET", "/api/raid/past?limit=%d" % int(limit))
+
     # ---------------- 실시간 배틀 ----------------
     # 친구끼리 둘 다 켜 있을 때만. 판정은 전부 서버가 하고, 여기서는
     # '무엇을 할지' 를 보내고 창이 열려 있는 동안 자주 물어본다.

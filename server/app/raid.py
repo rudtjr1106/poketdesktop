@@ -342,6 +342,13 @@ def create_code(uid, name, now=None):
     key = open_key(now)
     if not key:
         raise ValueError("지금은 모이는 시간이 아닙니다.")
+    # 이미 만들어 둔 빈 코드 방이 있으면 그것을 다시 쓴다 (새로 만들지 않는다).
+    old = db.q1(
+        "SELECT r.* FROM raid_room r WHERE r.host=? AND r.session=? AND r.state='lobby'"
+        " AND r.code IS NOT NULL AND NOT EXISTS (SELECT 1 FROM raid_member m"
+        " WHERE m.room_id=r.id AND m.left_at IS NULL)", (uid, key))
+    if old:
+        return _seat(old, uid, name, now)
     code = None
     for _ in range(12):
         c = _code()
@@ -368,12 +375,18 @@ def _seat(row, uid, name, now=None):
                    (row["id"], uid))
         return row
     here = members(row["id"])
-    if len([m for m in here if not m["left_at"]]) >= config.RAID_MAX_PLAYERS:
+    alive = [m for m in here if not m["left_at"]]
+    if len(alive) >= config.RAID_MAX_PLAYERS:
         raise ValueError("그 방은 이미 꽉 찼습니다.")
     pos = max([m["pos"] for m in here] or [-1]) + 1
     db.run("INSERT INTO raid_member (room_id, user_id, pos, name) VALUES (?,?,?,?)",
            (row["id"], uid, pos, name))
     _touch(row["id"], now)
+    if not alive:
+        # 앞사람이 다 나가서 비어 있던 방이다. 들어온 사람이 방장이 된다 -
+        # 안 그러면 나간 사람이 방장인 채로 남아 아무도 시작을 못 누른다.
+        db.run("UPDATE raid_room SET host=? WHERE id=?", (uid, row["id"]))
+        return room(row["id"])
     return row
 
 
@@ -404,10 +417,12 @@ def leave(uid, now=None):
     if row["state"] == "lobby":
         db.run("DELETE FROM raid_member WHERE room_id=? AND user_id=?", (row["id"], uid))
         left = [m for m in members(row["id"]) if not m["left_at"]]
-        if not left:
-            db.run("UPDATE raid_room SET state='done', result='cancelled', updated_at=?"
-                   " WHERE id=? AND state='lobby'", (now_iso(now), row["id"]))
-        elif row["host"] == uid:
+        # **빈 방은 접지 않고 그대로 둔다.** 접어 버리면 그 사람이 다시
+        # 들어올 때 늘 새 방이 생긴다 - 2026-09-25 11시에 한 사람이 6분 동안
+        # 방을 49개 만들었다(자리가 없어 나갔다 들어오기를 되풀이했다).
+        # 그대로 두면 open_lobby 가 같은 방을 다시 내주고, 아무도 안 오면
+        # TTL 이 치운다(expire_old).
+        if left and row["host"] == uid:
             # 방장이 나갔다. 다음 사람이 방장이 된다 - 안 그러면 아무도
             # 시작을 못 눌러 방이 그대로 굳는다.
             db.run("UPDATE raid_room SET host=? WHERE id=?",
@@ -663,6 +678,54 @@ def history(uid, limit=10):
         out.append({"session": r["session"], "boss": r["boss"], "num": sp.get("num"),
                     "kr": sp.get("kr"), "result": r["result"], "damage": r["damage"],
                     "prize": r["prize"], "egg": bool(r["got_egg"])})
+    return out
+
+
+def past(limit=10):
+    """지난 회차 목록 — **내 기록이 아니어도 누구나 본다.**
+
+    어떤 전설이 나왔고 누가 잡았는지. 회차 하나에 방이 여럿일 수 있어
+    회차로 묶는다. 아직 안 끝난 판과 사람이 안 모여 접힌 방은 안 센다
+    (round > 0 이면 실제로 싸운 방이다).
+    """
+    limit = max(1, min(60, int(limit)))
+    keys = [r["session"] for r in db.q(
+        "SELECT session FROM raid_room WHERE state='done' AND round > 0"
+        " GROUP BY session ORDER BY session DESC LIMIT ?", (limit,))]
+    if not keys:
+        return []
+    marks = ",".join("?" * len(keys))
+    rooms = db.q("SELECT id, session, boss, result, round FROM raid_room"
+                 " WHERE state='done' AND round > 0 AND session IN (%s)"
+                 " ORDER BY id" % marks, tuple(keys))
+    mem = db.q("SELECT m.room_id, m.name, m.damage, m.got_egg FROM raid_member m"
+               " JOIN raid_room r ON r.id=m.room_id"
+               " WHERE r.state='done' AND r.round > 0 AND r.session IN (%s)"
+               " ORDER BY m.damage DESC" % marks, tuple(keys))
+    by_room = {}
+    for m in mem:
+        by_room.setdefault(m["room_id"], []).append(
+            {"name": m["name"], "damage": m["damage"], "egg": bool(m["got_egg"])})
+    d = deps.dex()
+    out = []
+    for k in keys:
+        rs = [r for r in rooms if r["session"] == k]
+        if not rs:
+            continue
+        sp = d.get(rs[0]["boss"]) or {}
+        parties = [{"result": r["result"], "rounds": r["round"],
+                    "members": by_room.get(r["id"], [])} for r in rs]
+        people = [m for p in parties for m in p["members"]]
+        out.append({"session": k, "at": time_of(k).isoformat(),
+                    "boss": rs[0]["boss"], "num": sp.get("num"), "kr": sp.get("kr"),
+                    "types": [d.type_name(t) for t in sp.get("types") or []],
+                    "kind": kind_of(rs[0]["boss"]),
+                    "players": len(people),
+                    "eggs": sum(1 for m in people if m["egg"]),
+                    "cleared": sum(1 for p in parties if p["result"] == "won"),
+                    "parties": len(parties),
+                    "top": sorted(people, key=lambda m: -m["damage"])[:3],
+                    "rooms": parties})
     return out
 
 
