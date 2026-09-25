@@ -420,6 +420,43 @@ def main():
     chk("교체를 알린다", any(e["t"] == "recall" and e.get("p") == 0 for e in ev))
     chk("교체한 사람은 공격을 안 한다", rb.players[0].damage == 0)
 
+    print("=== 씨뿌리기는 심은 사람이 가져간다 ===")
+    # 보스는 모두가 같이 쓰는 한 마리이고 턴 끝은 첫 번째 사람이 맡는다.
+    # 그래서 예전에는 누가 심든 1번 사람이 회복했다.
+    # 보스에게 튀어오르기만 주어 아무도 안 쓰러지게 한다 (체력을 비교해야 한다).
+    for who in (0, 2):
+        players = [(k + 1, "P%d" % (k + 1),
+                    [R.leveled(mon("VENUSAUR", 50, ("LEECHSEED", "SPLASH")), 50),
+                     R.leveled(mon("PIDGEY", 50, ("SPLASH",)), 50)])
+                   for k in range(3)]
+        rb = R.RaidBattle(DEX, mon("SNORLAX", 60, ("SPLASH",)), players,
+                          hp_mult=6.0, max_rounds=30, rng=random.Random(3))
+        rb.start()
+        for _try in range(5):            # 씨뿌리기는 명중 90% 라 빗나갈 수 있다
+            if rb.boss.seeded:
+                break
+            for k in range(3):
+                rb.choose(k, "move", "LEECHSEED" if k == who else "SPLASH")
+            rb.resolve()
+        chk("%d번째 사람이 심으면 seed_by 도 그 사람" % (who + 1),
+            rb.boss.seed_by == who, rb.boss.seed_by)
+        for q in rb.players:
+            q.mon.hp = max(1, q.mon.maxhp // 2)
+        before = [q.mon.hp for q in rb.players]
+        boss_hp = rb.boss.hp
+        for k in range(3):
+            rb.choose(k, "move", "SPLASH")
+        ev = rb.resolve()
+        got = [q.mon.hp - before[k] for k, q in enumerate(rb.players)]
+        chk("%d번째 사람만 회복한다" % (who + 1),
+            got[who] > 0 and all(g == 0 for k, g in enumerate(got) if k != who), got)
+        chk("보스는 1/8 만 빼앗긴다 (사람 수만큼이 아니다)",
+            boss_hp - rb.boss.hp == max(1, rb.boss.maxhp // 8),
+            (boss_hp - rb.boss.hp, rb.boss.maxhp // 8))
+        chk("회복이 심은 사람 칸에 뜬다",
+            any(e["t"] == "heal" and e.get("p") == who for e in ev),
+            [(e["t"], e.get("p")) for e in ev if e["t"] == "heal"])
+
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
 

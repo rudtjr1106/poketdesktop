@@ -192,6 +192,7 @@ class RaidBattle(object):
             bt = RaidDuel(self.dex, p.mon, self.boss, self.rng, ai="trainer",
                           field=self.field)
             bt.raid = self
+            bt.raid_index = i            # 씨뿌리기가 심은 사람을 찾는 데 쓴다
             bt.teams = {"me": p.team, "foe": [self.boss]}
             bt.foe_prefix = ""
             bt.max_turns = 10 ** 9

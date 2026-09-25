@@ -158,6 +158,7 @@ class Fighter(object):
         self.types_override = None   # 변환자재가 바꾼 타입
         # 기술이 남기는 것 (volatile() 로 저장한다)
         self.seeded = False          # 씨뿌리기에 걸렸다. 물러나면 풀린다
+        self.seed_by = None          # 레이드: 씨를 심은 사람 자리 (그 사람이 회복한다)
         self.bide = None             # 참기: {"left": 남은 턴, "sum": 모은 데미지}
         self.stockpile = 0           # 비축하기 횟수 (0~3)
         self.item_gone = False       # 내던지기·자연의은혜로 도구를 썼다 (이 판에서만)
@@ -200,6 +201,8 @@ class Fighter(object):
             out["heldNow"] = self._held           # 트릭·바꿔치기로 바뀐 도구
         if self.seeded:
             out["seeded"] = True
+        if self.seed_by is not None:
+            out["seedBy"] = self.seed_by
         if self.bide:
             out["bide"] = dict(self.bide)
         if self.stockpile:
@@ -211,6 +214,7 @@ class Fighter(object):
     def load_volatile(self, d):
         d = d or {}
         self.seeded = bool(d.get("seeded"))
+        self.seed_by = d.get("seedBy")
         self.bide = dict(d["bide"]) if d.get("bide") else None
         self.stockpile = int(d.get("stockpile") or 0)
         self.item_gone = bool(d.get("itemGone"))
@@ -1465,6 +1469,9 @@ class Battle(object):
             self._fail(who, ev)
         else:
             target.seeded = True
+            # 레이드에서는 **누가 심었는지**를 같이 적는다. 보스는 모두가
+            # 같이 쓰는 한 마리라, 안 적으면 턴 끝을 맡은 사람이 회복한다.
+            target.seed_by = getattr(self, "raid_index", None)
             ev.append({"t": "msg", "who": tw, "text": "%s 에게 씨앗을 심었다!" % target.name})
 
     def begin_turn(self):
@@ -1647,9 +1654,21 @@ class Battle(object):
         self._check_faint(ev)
 
     def _drain_seed(self, f, who, ev):
-        """씨뿌리기: 최대 체력의 1/8 을 빼앗아 맞은편에 준다."""
+        """씨뿌리기: 최대 체력의 1/8 을 빼앗아 맞은편에 준다.
+
+        **레이드에서는 맞은편이 하나가 아니다.** 보스는 모두가 같이 쓰는
+        한 마리이고, 턴 끝은 첫 번째 사람의 Battle 이 맡는다. 그래서 그냥
+        self.me 에게 주면 누가 심었든 늘 첫 번째 사람이 회복했다. 심을 때
+        적어 둔 seed_by 로 진짜 심은 사람을 찾아 준다.
+        """
         other_who = "foe" if who == "me" else "me"
         other = self.foe if who == "me" else self.me
+        tag = None
+        raid = getattr(self, "raid", None)
+        if raid is not None and f is raid.boss and f.seed_by is not None:
+            p = raid.players[f.seed_by] if f.seed_by < len(raid.players) else None
+            if p is not None and p.mon is not None and p.mon.alive():
+                other, other_who, tag = p.mon, "me", f.seed_by
         d = min(f.hp, max(1, f.maxhp // 8))
         f.hp -= d
         ev.append({"t": "chip", "who": who, "damage": d, "hp": f.hp, "maxhp": f.maxhp,
@@ -1659,12 +1678,17 @@ class Battle(object):
         amount = max(1, int(d * H.drain_mult(other))) if other.held else d
         if A.has(f, "LIQUIDOOZE"):
             other.hp = max(0, other.hp - amount)
-            ev.append({"t": "chip", "who": other_who, "damage": amount, "hp": other.hp,
-                       "maxhp": other.maxhp, "text": "%s 은(는) 해감액을 흡수했다!" % other.name})
+            out = {"t": "chip", "who": other_who, "damage": amount, "hp": other.hp,
+                   "maxhp": other.maxhp, "text": "%s 은(는) 해감액을 흡수했다!" % other.name}
         elif other.hp < other.maxhp:
             other.hp = min(other.maxhp, other.hp + amount)
-            ev.append({"t": "heal", "who": other_who, "amount": amount, "hp": other.hp,
-                       "maxhp": other.maxhp, "text": "%s 은(는) 체력을 흡수했다!" % other.name})
+            out = {"t": "heal", "who": other_who, "amount": amount, "hp": other.hp,
+                   "maxhp": other.maxhp, "text": "%s 은(는) 체력을 흡수했다!" % other.name}
+        else:
+            return
+        if tag is not None:
+            out["p"] = tag              # 화면이 심은 사람 칸을 움직이게 (_tag 는 setdefault)
+        ev.append(out)
 
     def _check_faint(self, ev):
         if not self.foe.alive():
