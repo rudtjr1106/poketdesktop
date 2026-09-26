@@ -62,7 +62,9 @@ CAT_COLOR = {"held": U.ACCENT, "stone": U.PINK, "ev": U.GOOD, "iv": U.SHINY,
 # /api/bag/use 가 받아주는 효과. 나머지(볼, 파는 물건)는 여기서 쓸 수 없다.
 # "held" 는 use 가 아니라 /api/pokemon/{id}/hold 로 간다 - 대상을 고르는
 # 흐름은 같아서 여기서 같이 다룬다.
-USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny")
+USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket")
+# **대상 포켓몬이 없는 도구.** 고를 것이 없으니 목록을 띄우지 않고 바로 쓴다.
+NO_TARGET = ("ticket",)
 
 ROW_BG = "#10131c"      # 목록 한 줄 바탕
 SEL_BG = "#2b2417"      # 고른 줄
@@ -161,6 +163,12 @@ def item_desc(item):
         # 본가 문장은 "위력이 올라간다" 까지만 있다. 몇 배인지는 서버가 붙여 보낸다.
         if item.get("heldNote"):
             out += "\n\n" + item["heldNote"]
+        return out
+    if kind == "ticket":
+        out = item.get("desc") or "쓰면 확률로 알을 받는다."
+        pct = int(round(float(eff.get("chance") or 0) * 100))
+        if pct:
+            out += "\n\n당첨 확률 %d%%. 꽝이어도 표는 없어진다." % pct
         return out
     if kind == "ball":
         return "야생 포켓몬을 만났을 때 던지는 볼이다. 가방에서는 쓸 수 없다."
@@ -936,7 +944,18 @@ class BagWindow(object):
 
     def _show_targets(self, it):
         """도구에 맞춰 대상 목록을 칠하거나, 못 쓰는 도구면 안내로 바꾼다."""
-        usable = bool(it) and (it.get("effect") or {}).get("kind") in USABLE
+        kind = (it.get("effect") or {}).get("kind") if it else None
+        usable = bool(it) and kind in USABLE
+        if usable and kind in NO_TARGET:
+            # 대상이 없다. 목록 자리에 무엇을 하는 도구인지만 적는다.
+            self.mon_list.pack_forget()
+            self.mon_note.configure(text=natural(describe(it)))
+            self.mon_note.pack(fill="both", expand=True)
+            prev, self.mon_id = self.mon_id, None
+            row = self.mon_rows.get(prev)
+            if row is not None:
+                row.set_selected(False)
+            return
         if not usable:
             self.mon_list.pack_forget()
             self.mon_note.configure(
@@ -1144,10 +1163,12 @@ class BagWindow(object):
     def _refresh_button(self):
         it = self.current_item()
         mon = self.current_mon()
-        usable = bool(it) and (it.get("effect") or {}).get("kind") in USABLE
-        ok = bool(usable and mon and (not self.stat_needed or self.stat))
+        kind = (it.get("effect") or {}).get("kind") if it else None
+        usable = bool(it) and kind in USABLE
+        free = usable and kind in NO_TARGET          # 대상을 안 고르는 도구
+        ok = bool(usable and (free or (mon and (not self.stat_needed or self.stat))))
         self.use_btn.configure(state="normal" if ok else "disabled")
-        if it and usable and mon:
+        if it and usable and (mon or free):
             self.use_btn.configure(text="%s 쓰기" % it["kr"])
         else:
             self.use_btn.configure(text="쓰기")
@@ -1242,6 +1263,8 @@ class BagWindow(object):
     def do_use(self):
         it = self.current_item()
         mon = self.current_mon()
+        if it and (it.get("effect") or {}).get("kind") in NO_TARGET:
+            return self._use_no_target(it)
         if not it or not mon:
             return
         if self.stat_needed and not self.stat:
@@ -1289,6 +1312,29 @@ class BagWindow(object):
                 else:
                     announce_evolve(self.win, self.app, info)
         U.run_async(self.root, work, done)
+
+    def _use_no_target(self, it):
+        """대상이 없는 도구(뽑기권). 포켓몬을 안 고르고 바로 쓴다."""
+        api = self.app.api
+        item_id = it["id"]
+        hour = datetime.datetime.now().hour
+        self.use_btn.configure(state="disabled")
+        self.say("%s을(를) 쓰는 중..." % it["kr"], U.FG_FAINT)
+
+        def done(r, err):
+            if not self.alive:
+                return
+            if err:
+                self.say(getattr(err, "message", str(err)), U.DANGER, U.DANGER)
+                return self._refresh_button()
+            r = r or {}
+            color = U.GOOD if r.get("won") else U.FG_DIM
+            self._pending = (r.get("message") or "도구를 썼다.", color)
+            self.reload()
+            self.app.request_sync()          # 알 칸이 바뀐다
+
+        U.run_async(self.root,
+                    lambda: use_item(api, item_id, 0, "", hour), done)
 
     # ---------------- 끝내기 ----------------
     def close(self):

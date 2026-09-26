@@ -102,6 +102,19 @@ EXTRA = [
                 " 겉모습만 바뀌고 능력은 그대로다.",
         "effect": {"kind": "shiny"},
     },
+    # 레이드 보상 표 (1.6.6). 2026-09-26 디아루가 회차가 설계 문제로
+    # 두 방 다 시간 초과로 졌다 - 보스를 1시간 전에만 알려 주는데
+    # 기술머신은 드랍 전용이라 상성을 맞출 길이 없었다. 그날 싸운 사람에게
+    # 준다. 상점·드랍에 없다.
+    {
+        "id": "RAIDTICKETDIALGA", "ident": "raid-ticket-dialga",
+        "kr": "디아루가 알 뽑기권", "en": "Dialga Egg Ticket",
+        "cat": "misc", "cost": 0, "sell": 0, "buyable": False,
+        "desc": "레이드에서 아깝게 놓친 디아루가 알을 한 번 더 노려 보는 표."
+                " 쓰면 70% 확률로 알을 받는다. 포켓몬을 고르지 않아도 된다.",
+        "effect": {"kind": "ticket", "chance": 0.7,
+                   "species": "DIALGA", "eggKind": "legendary"},
+    },
 ]
 
 

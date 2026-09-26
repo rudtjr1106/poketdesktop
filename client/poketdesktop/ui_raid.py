@@ -626,18 +626,9 @@ class RaidWindow(object):
                 tk.Label(line, text=x.get("kr") or x.get("boss") or "", bg=U.BG,
                          fg=U.ACCENT, font=U.FONT_XS, width=10,
                          anchor="w").pack(side="left")
-                bits = ["%d명" % (x.get("players") or 0)]
-                parties = x.get("parties") or 0
-                cleared = x.get("cleared") or 0
-                if parties:
-                    bits.append("%d/%d방 성공" % (cleared, parties)
-                                if cleared < parties else "전부 성공")
-                if x.get("eggs"):
-                    bits.append("알 %d개" % x["eggs"])
-                top = (x.get("top") or [None])[0]
-                if top:
-                    bits.append("1위 %s" % top.get("name"))
-                tk.Label(line, text="  ·  ".join(bits), bg=U.BG, fg=U.FG_DIM,
+                bits = ["·".join(x.get("types") or [])]
+                tk.Label(line, text="  ·  ".join(b for b in bits if b),
+                         bg=U.BG, fg=U.FG_DIM,
                          font=U.FONT_XS, anchor="w").pack(side="left")
         run_async(self.root, lambda: self.app.api.raid_past(8), done)
 

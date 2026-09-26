@@ -3352,6 +3352,23 @@
    "sell": 4000,
    "weight": 14
   },
+  "RAIDTICKETDIALGA": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "desc": "레이드에서 아깝게 놓친 디아루가 알을 한 번 더 노려 보는 표. 쓰면 70% 확률로 알을 받는다. 포켓몬을 고르지 않아도 된다.",
+   "effect": {
+    "chance": 0.7,
+    "eggKind": "legendary",
+    "kind": "ticket",
+    "species": "DIALGA"
+   },
+   "en": "Dialga Egg Ticket",
+   "id": "RAIDTICKETDIALGA",
+   "ident": "raid-ticket-dialga",
+   "kr": "디아루가 알 뽑기권",
+   "sell": 0
+  },
   "RAREBONE": {
    "cat": "misc",
    "chance": 0.004597,

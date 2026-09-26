@@ -684,9 +684,9 @@ def history(uid, limit=10):
 def past(limit=10):
     """지난 회차 목록 — **내 기록이 아니어도 누구나 본다.**
 
-    어떤 전설이 나왔고 누가 잡았는지. 회차 하나에 방이 여럿일 수 있어
-    회차로 묶는다. 아직 안 끝난 판과 사람이 안 모여 접힌 방은 안 센다
-    (round > 0 이면 실제로 싸운 방이다).
+    **어떤 전설이 나왔는지**만 준다. 회차 하나에 방이 여럿일 수 있어
+    회차로 묶는다. 아직 안 끝난 판과 사람이 안 모여
+    접힌 방은 안 센다 (round > 0 이면 실제로 싸운 방이다).
     """
     limit = max(1, min(60, int(limit)))
     keys = [r["session"] for r in db.q(
@@ -698,14 +698,6 @@ def past(limit=10):
     rooms = db.q("SELECT id, session, boss, result, round FROM raid_room"
                  " WHERE state='done' AND round > 0 AND session IN (%s)"
                  " ORDER BY id" % marks, tuple(keys))
-    mem = db.q("SELECT m.room_id, m.name, m.damage, m.got_egg FROM raid_member m"
-               " JOIN raid_room r ON r.id=m.room_id"
-               " WHERE r.state='done' AND r.round > 0 AND r.session IN (%s)"
-               " ORDER BY m.damage DESC" % marks, tuple(keys))
-    by_room = {}
-    for m in mem:
-        by_room.setdefault(m["room_id"], []).append(
-            {"name": m["name"], "damage": m["damage"], "egg": bool(m["got_egg"])})
     d = deps.dex()
     out = []
     for k in keys:
@@ -713,19 +705,12 @@ def past(limit=10):
         if not rs:
             continue
         sp = d.get(rs[0]["boss"]) or {}
-        parties = [{"result": r["result"], "rounds": r["round"],
-                    "members": by_room.get(r["id"], [])} for r in rs]
-        people = [m for p in parties for m in p["members"]]
+        # **어떤 전설이 나왔는지만 보여 준다.** 몇 명이 갔는지·성공했는지·
+        # 딜 1위가 누군지·알이 몇 개 나왔는지는 남의 성적표라 안 싣는다.
         out.append({"session": k, "at": time_of(k).isoformat(),
                     "boss": rs[0]["boss"], "num": sp.get("num"), "kr": sp.get("kr"),
                     "types": [d.type_name(t) for t in sp.get("types") or []],
-                    "kind": kind_of(rs[0]["boss"]),
-                    "players": len(people),
-                    "eggs": sum(1 for m in people if m["egg"]),
-                    "cleared": sum(1 for p in parties if p["result"] == "won"),
-                    "parties": len(parties),
-                    "top": sorted(people, key=lambda m: -m["damage"])[:3],
-                    "rooms": parties})
+                    "kind": kind_of(rs[0]["boss"])})
     return out
 
 

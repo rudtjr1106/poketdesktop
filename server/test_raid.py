@@ -27,7 +27,7 @@ os.environ.pop("POKET_TURSO_URL", None)
 os.environ["POKET_POKEDEX"] = os.path.join(HERE, "data", "pokedex.json")
 os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
 
-from app import config, db, items, raid                        # noqa: E402
+from app import config, db, item_routes, items, raid           # noqa: E402
 from app import raid_routes                                    # noqa: E402
 
 OK = FAIL = 0
@@ -418,34 +418,45 @@ def main():
     chk("기록이 남는다", len(hist) >= 1 and hist[0]["boss"], hist[:1])
 
     print("=== 지난 회차 (공개) ===")
-    # 내 기록이 아니어도 누구나 본다.
+    # 내 기록이 아니어도 누구나 본다. **어떤 전설이 나왔는지만** 준다 -
+    # 인원·성공 여부·딜 1위는 남의 성적표라 빼기로 했다.
     past = raid.past(10)
     chk("지난 회차가 나온다", len(past) >= 1, len(past))
     one = past[0]
     chk("보스 이름이 한글로", bool(one["kr"]) and bool(one["boss"]), one.get("kr"))
     chk("회차와 시각", one["session"] and one["at"], (one.get("session"), one.get("at")))
-    chk("참가 인원을 센다", one["players"] >= 1, one["players"])
-    chk("방마다 참가자가 들어 있다",
-        one["rooms"] and one["rooms"][0]["members"], one["rooms"][:1])
-    chk("딜 순위가 높은 쪽부터",
-        all(one["top"][i]["damage"] >= one["top"][i + 1]["damage"]
-            for i in range(len(one["top"]) - 1)), one["top"])
+    chk("타입은 준다 (대비에 쓴다)", "types" in one, sorted(one))
+    chk("인원·성공·딜1위·알 개수는 안 준다",
+        not ({"players", "cleared", "parties", "top", "rooms", "eggs"} & set(one)),
+        sorted(one))
     chk("최신 회차가 앞에",
-        all(past[i]["session"] >= past[i + 1]["session"]
-            for i in range(len(past) - 1)), [p_["session"] for p_ in past])
-    chk("사람이 안 모여 접힌 방은 안 센다",
-        all(r["rounds"] > 0 for p_ in past for r in p_["rooms"]),
-        [(r["rounds"], r["result"]) for p_ in past for r in p_["rooms"]])
-    chk("남의 기록도 보인다 (내가 안 간 회차 포함)",
-        sum(p_["players"] for p_ in past) >= len(hist), None)
-    sch = raid.schedule(at(day, 10, 30))
-    chk("일정에 다음 회차 여섯 개", len(sch["upcoming"]) == 6, len(sch["upcoming"]))
-    chk("일정에 규칙이 실린다",
-        sch["minPlayers"] == config.RAID_MIN_PLAYERS
-        and sch["teamLevel"] == config.RAID_TEAM_LEVEL)
-    chk("보스 노력치와 공개 시각도 실린다 (탭이 스스로 다시 부르는 데 쓴다)",
-        sch.get("bossEv") == config.RAID_BOSS_EV
-        and sch.get("revealSec") == config.RAID_REVEAL_SEC, sch.get("revealSec"))
+        all(past[i2]["session"] >= past[i2 + 1]["session"]
+            for i2 in range(len(past) - 1)), [q["session"] for q in past])
+
+    print("=== 뽑기권 ===")
+    tk = items.get("RAIDTICKETDIALGA")
+    chk("도구가 있다", bool(tk), tk)
+    eff = (tk or {}).get("effect") or {}
+    chk("효과는 ticket 70% 디아루가",
+        eff.get("kind") == "ticket" and eff.get("chance") == 0.7
+        and eff.get("species") == "DIALGA", eff)
+    chk("상점·드랍에 없다", not tk.get("buyable") and not tk.get("weight"), tk)
+    tu = mkuser("뽑기권가")
+    import random as _rnd
+    before = len(db.q("SELECT id FROM egg WHERE user_id=?", (tu,)))
+    got = item_routes._use_ticket(tu, tk, dict(eff, chance=1.0))
+    chk("확률 1 이면 반드시 받는다", got["won"] and got["species"] == "DIALGA", got)
+    after = len(db.q("SELECT id FROM egg WHERE user_id=?", (tu,)))
+    chk("알이 실제로 늘었다", after == before + 1, (before, after))
+    row = db.q1("SELECT kind, species, known FROM egg WHERE user_id=? ORDER BY id DESC",
+                (tu,))
+    chk("전설 알이고 무엇인지 밝혀져 있다",
+        row["kind"] == "legendary" and row["species"] == "DIALGA" and row["known"],
+        dict(row))
+    got2 = item_routes._use_ticket(tu, tk, dict(eff, chance=0.0))
+    chk("확률 0 이면 꽝", not got2["won"], got2)
+    chk("꽝이면 알이 안 늘어난다",
+        len(db.q("SELECT id FROM egg WHERE user_id=?", (tu,))) == after)
 
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0

@@ -9,6 +9,7 @@ UPDATE 한 방으로 처리한다. 읽고-확인하고-쓰면 두 요청이 겹�
 같은 도구를 두 번 쓸 수 있다.
 """
 import datetime
+import random
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -16,7 +17,7 @@ from pydantic import BaseModel
 from common import korean
 from common import pokelogic as P
 
-from . import config, db, deps, evolution, items
+from . import config, db, deps, eggs, evolution, items
 
 router = APIRouter()
 
@@ -218,6 +219,21 @@ def use(body: UseIn, me=Depends(deps.current)):
     if items.bag_count(uid, it["id"]) <= 0:
         raise HTTPException(400, "%s이(가) 없습니다." % it["kr"])
 
+    # **뽑기권은 대상이 없다.** 포켓몬을 고르라고 막기 전에 처리한다.
+    # 먼저 가방에서 빼고 준다 - 반대로 하면 알을 주고 표가 안 빠질 때
+    # 공짜로 계속 뽑을 수 있다. 주는 데서 터지면 표를 돌려준다.
+    if kind == "ticket":
+        if not items.bag_take(uid, it["id"], 1):
+            raise HTTPException(400, "%s이(가) 없습니다." % it["kr"])
+        try:
+            out = _use_ticket(uid, it, eff)
+        except Exception:                                   # noqa: BLE001
+            items.bag_add(uid, it["id"], 1)
+            raise
+        out.update(_wallet(uid))
+        out["message"] = korean.natural(out.get("message", ""))
+        return out
+
     mon = _mon(uid, body.pokemon) if body.pokemon else None
     if mon is None:
         raise HTTPException(400, "어느 포켓몬에게 쓸지 골라 주세요.")
@@ -252,6 +268,24 @@ def use(body: UseIn, me=Depends(deps.current)):
     out["pokemon"] = deps.decorate(fresh)
     out["message"] = korean.natural(out.get("message", ""))
     return out
+
+
+def _use_ticket(uid, it, eff):
+    """뽑기권. 정해진 확률로 정해진 종의 알을 준다. 대상 포켓몬이 없다.
+
+    **알은 레이드에서 이겼을 때와 똑같은 길로 준다**(eggs.give) - 무엇이
+    들어 있는지 화면에 밝혀지고, 파티에 자리가 있으면 바로 올라간다.
+    """
+    chance = float(eff.get("chance") or 0)
+    species = eff.get("species")
+    kind = eff.get("eggKind") or "legendary"
+    name = (deps.dex().get(species) or {}).get("kr") or species
+    if random.random() >= chance:
+        return {"ok": True, "won": False,
+                "message": "%s을(를) 썼지만 이번에는 꽝이었다..." % it["kr"]}
+    eggs.give(uid, kind, species=species, known=True)
+    return {"ok": True, "won": True, "species": species, "eggKr": name,
+            "message": "%s 알을 받았다!" % name}
 
 
 def _use_ev(uid, it, eff, mon):
