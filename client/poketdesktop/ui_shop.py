@@ -118,6 +118,10 @@ def effect_text(it):
             return "포획률 %s배" % mult
         return "포획률은 몬스터볼과 같다"
 
+    if kind == "ticket":
+        pct = int(round(float(eff.get("chance") or 0) * 100))
+        return "쓰면 %d%% 확률로 알을 받는다" % pct if pct else "쓰면 알을 받는다"
+
     if kind == "ev":
         stat = STAT_KR.get(eff.get("stat"), eff.get("stat", ""))
         amount = int(eff.get("amount", 0) or 0)

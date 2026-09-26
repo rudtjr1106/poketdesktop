@@ -949,7 +949,7 @@ class BagWindow(object):
         if usable and kind in NO_TARGET:
             # 대상이 없다. 목록 자리에 무엇을 하는 도구인지만 적는다.
             self.mon_list.pack_forget()
-            self.mon_note.configure(text=natural(describe(it)))
+            self.mon_note.configure(text=natural(item_desc(it)))
             self.mon_note.pack(fill="both", expand=True)
             prev, self.mon_id = self.mon_id, None
             row = self.mon_rows.get(prev)
