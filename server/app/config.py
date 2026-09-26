@@ -261,7 +261,23 @@ RAID_BOSS_EV = _int("POKET_RAID_BOSS_EV", 192)
 # 인원만 라운드 초과로 지고 있었다. 0+2.0xN 은 1인당 똑같이 2.0 배다.
 RAID_HP_BASE = _float("POKET_RAID_HP_BASE", 0.0)
 RAID_HP_PER = _float("POKET_RAID_HP_PER", 2.0)
-RAID_ROUNDS = _int("POKET_RAID_ROUNDS", 15)           # 이 안에 못 잡으면 실패
+# 이 안에 못 잡으면 실패. **15 는 단단한 보스에게 너무 짧았다.**
+# 2026-09-26 21시 디아루가(강철·드래곤, 격투·땅만 2배)에서 두 방이 모두
+# 시간 초과로 졌다 - 5인 방은 보스 체력 2440 중 2172(89%)를 깎고 끝났다.
+# 진 판을 보면 전멸이 아니라 거의 전부 라운드 소진이다(디아루가 5인 66%).
+#
+# tools/sim_raid.py · 실제 운영 팀 기준 5인 승률:
+#
+#   보스          15R    20R
+#   디아루가        36%    59%
+#   무한다이노       33%    63%
+#   칠색조         45%    64%
+#   테라파고스       75%    95%
+#   비크티니       100%   100%   <- 쉬운 보스는 어차피 10라운드 안에 끝난다
+#
+# 단단한 보스만 올라가고 쉬운 보스는 그대로다. 한 라운드가 25초라
+# 판이 최대 2분쯤 길어진다.
+RAID_ROUNDS = _int("POKET_RAID_ROUNDS", 20)
 RAID_DOUBLE_FROM = _int("POKET_RAID_DOUBLE_FROM", 4)  # 몇 명부터 보스가 두 번 움직이나
 RAID_ROUND_SEC = _int("POKET_RAID_ROUND_SEC", 25)     # 한 라운드 고르는 시간
 RAID_TTL = _int("POKET_RAID_TTL", 1800)               # 아무도 안 오면 판을 접는다

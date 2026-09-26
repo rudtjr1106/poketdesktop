@@ -146,7 +146,7 @@ def main():
     ap.add_argument("--team-level", type=int, default=50)
     ap.add_argument("--hp-base", type=float, default=0.0)
     ap.add_argument("--hp-per", type=float, default=2.0)
-    ap.add_argument("--rounds", type=int, default=15)
+    ap.add_argument("--rounds", type=int, default=20)
     ap.add_argument("--double-from", type=int, default=4)
     ap.add_argument("--min-players", type=int, default=3)
     ap.add_argument("--max-players", type=int, default=6)
