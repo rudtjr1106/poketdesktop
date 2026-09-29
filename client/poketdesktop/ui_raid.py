@@ -337,6 +337,7 @@ class RaidWindow(object):
             tp.pack(anchor="w", pady=(4, 0))
             for name, tid in zip(card.get("types") or [], card.get("typeIds") or []):
                 U.chip(tp, name, U.TYPE_COLOR.get(tid, U.BG3)).pack(side="left", padx=(0, 4))
+            self._matchup_rows(txt, card.get("typeIds") or [])
             self._boss_art(art, card.get("num"))
         else:
             tk.Label(txt, text="???", bg=U.BG2, fg=U.FG_FAINT,
@@ -355,6 +356,44 @@ class RaidWindow(object):
                               font=(U.FAMILY_BLACK, U.pt(18)), anchor="e")
         self.clock.pack(anchor="e")
         self._paint_clock()
+
+    def _matchups(self, type_ids):
+        """(약점, 무효). 약점은 배율 큰 것부터. 없는 자료면 빈 목록."""
+        dex = self.app.dex
+        if not dex or not type_ids:
+            return [], []
+        weak, immune = [], []
+        for tid in getattr(dex, "types", {}) or {}:
+            mult = dex.effectiveness(tid, type_ids)
+            if mult >= 2:
+                weak.append((tid, mult))
+            elif mult == 0:
+                immune.append(tid)
+        weak.sort(key=lambda x: (-x[1], x[0]))
+        return weak, immune
+
+    def _matchup_rows(self, parent, type_ids):
+        """보스에게 잘 통하는/안 통하는 타입. **모이기 전에 준비하라고 띄운다.**
+
+        상성은 도감 자료로 여기서 센다 - 서버가 따로 안 내려보내도 된다.
+        """
+        dex = self.app.dex
+        weak, immune = self._matchups(type_ids)
+        if not weak and not immune:
+            return
+        row = tk.Frame(parent, bg=U.BG2)
+        row.pack(anchor="w", pady=(6, 0))
+        tk.Label(row, text="약점", bg=U.BG2, fg=U.FG_DIM,
+                 font=U.FONT_XS).pack(side="left", padx=(0, 6))
+        for tid, mult in weak:
+            U.chip(row, "%s x%s" % (dex.type_name(tid),
+                                    ("4" if mult >= 4 else "2")),
+                   U.TYPE_COLOR.get(tid, U.BG3)).pack(side="left", padx=(0, 4))
+        if immune:
+            names = " · ".join(dex.type_name(t) for t in immune)
+            lab = tk.Label(parent, text="안 통함: %s" % names, bg=U.BG2,
+                           fg=U.FG_FAINT, font=U.FONT_XS, anchor="w")
+            lab.pack(anchor="w", pady=(4, 0))
 
     def _boss_art(self, label, num):
         if not num:
