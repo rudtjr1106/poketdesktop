@@ -68,6 +68,11 @@ MAX_PARTY = _int("POKET_MAX_PARTY", 6)
 # 랜덤 배틀을 한 판 걸고 다음 판을 걸기까지 (초). 1.4.1
 RANDOM_COOLDOWN_SEC = _int("POKET_RANDOM_COOLDOWN_SEC", 30)
 MAX_DESKTOP = MAX_PARTY
+
+# PC 박스. 한 박스에 몇 마리, 박스는 몇 개까지.
+# 30 x 32 = 960마리. 본가(30 x 32)와 같게 잡았다.
+BOX_SIZE = _int("POKET_BOX_SIZE", 30)
+BOX_COUNT = _int("POKET_BOX_COUNT", 32)
 # 야생 레벨은 파티 수준을 따라간다.
 # 고정해두면 시작하자마자 도저히 못 이기는 상대를 만나 재미가 없다.
 WILD_MIN_LEVEL = _int("POKET_WILD_MIN_LEVEL", 2)      # 절대 하한

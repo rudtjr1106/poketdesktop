@@ -111,6 +111,14 @@ CREATE TABLE IF NOT EXISTS pokemon (
 );
 CREATE INDEX IF NOT EXISTS idx_pokemon_user ON pokemon(user_id);
 
+-- PC 박스 이름. 안 바꾼 박스는 여기 줄이 없다 (기본 이름은 클라가 짓는다).
+CREATE TABLE IF NOT EXISTS box_name (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    no       INTEGER NOT NULL,
+    name     TEXT NOT NULL,
+    PRIMARY KEY (user_id, no)
+);
+
 -- 아직 내 것이 아닌, 바탕화면에 나타난 야생 개체
 CREATE TABLE IF NOT EXISTS wild (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -653,6 +661,10 @@ FROM login_fail;
 """
 
 MIGRATIONS = [
+    # 어느 PC 박스에 들어 있나 (0 부터). 옛 행은 0 번 박스에 있는 셈이고,
+    # 서버가 처음 볼 때 잡은 순서대로 30마리씩 나눠 담는다 (main.assign_boxes).
+    ("pokemon", "box",
+     "ALTER TABLE pokemon ADD COLUMN box INTEGER NOT NULL DEFAULT 0"),
     # 이 야생 한 판에서 쓰러진 내 포켓몬 id 들 (json 배열).
     # 없으면 쓰러진 애가 다시 나온다 (battle_routes 의 lost 처리를 보라).
     ("battle", "fainted",
@@ -895,6 +907,7 @@ def row_to_mon(r):
         "held": (r["held"] if "held" in r.keys() else None) or None,
         "hyper": json.loads(r["hyper"]) if "hyper" in r.keys() and r["hyper"] else {},
         "noEvolve": bool(r["no_evolve"]) if "no_evolve" in r.keys() else False,
+        "box": (r["box"] if "box" in r.keys() else 0) or 0,
         "luxury": bool(r["luxury"]) if "luxury" in r.keys() else False,
         # 배우려고 기다리는 기술 (1.1.6). 네 개가 차 있어서 무엇을 잊을지
         # 아직 못 고른 것들이다. 클라이언트가 이걸 보고 창을 띄운다.

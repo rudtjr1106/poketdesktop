@@ -150,6 +150,15 @@ class DesktopIn(BaseModel):
     on: bool
 
 
+class BoxIn(BaseModel):
+    box: int = Field(ge=0, lt=1000)
+
+
+class BoxNameIn(BaseModel):
+    no: int = Field(ge=0, lt=1000)
+    name: str = Field(default="", max_length=20)
+
+
 class OrderIn(BaseModel):
     # 데리고 다니는 마리 수만큼만 받는다. 그보다 길면 자리 수가 어긋난다.
     ids: list[int] = Field(default_factory=list, max_length=12)
@@ -940,13 +949,80 @@ def _mons(user_id, only_desktop=False):
 _decorate = deps.decorate
 
 
+def _box_names(uid):
+    rows = db.q("SELECT no, name FROM box_name WHERE user_id=?", (uid,))
+    return dict((str(r["no"]), r["name"]) for r in rows)
+
+
+def _box_counts(uid):
+    """박스마다 몇 마리 들었나. 데리고 다니는 애는 박스를 차지하지 않는다."""
+    rows = db.q("SELECT box, COUNT(*) AS n FROM pokemon"
+                " WHERE user_id=? AND on_desktop=0 GROUP BY box", (uid,))
+    return dict((str(r["box"]), r["n"]) for r in rows)
+
+
+def assign_boxes(uid):
+    """박스를 처음 쓰는 사람의 포켓몬을 잡은 순서대로 30마리씩 나눠 담는다.
+
+    옛 행은 전부 0번 박스라, 그대로 두면 한 박스에 수백 마리가 들어 있는
+    꼴이 된다. **한 번만** 한다 - 0번이 넘치는 동안만 돈다.
+    """
+    size = config.BOX_SIZE
+    rows = db.q("SELECT id, box FROM pokemon WHERE user_id=? AND on_desktop=0"
+                " ORDER BY id ASC", (uid,))
+    if len(rows) <= size or any(r["box"] for r in rows):
+        return False                      # 넘치지 않거나 이미 나눠 담았다
+    for i, r in enumerate(rows):
+        no = min(i // size, config.BOX_COUNT - 1)
+        if no != r["box"]:
+            db.run("UPDATE pokemon SET box=? WHERE id=?", (no, r["id"]))
+    return True
+
+
 @app.get("/api/pokemon")
 def list_pokemon(ctx=Depends(current)):
     uid = ctx["user"]["id"]
+    assign_boxes(uid)
     # 알은 따로 싣는다. 포켓몬 목록에 섞으면 옛 클라이언트가 알을 포켓몬으로
     # 그리려다 터진다. 새 관리 창이 둘을 합쳐 보여준다.
     return {"pokemon": [_decorate(m) for m in _mons(uid)],
-            "eggs": eggs.box_list(uid)}
+            "eggs": eggs.box_list(uid),
+            "boxes": {"size": config.BOX_SIZE, "count": config.BOX_COUNT,
+                      "names": _box_names(uid), "used": _box_counts(uid)}}
+
+
+@app.post("/api/pokemon/{pid}/box")
+def set_box(pid: int, body: BoxIn, ctx=Depends(current)):
+    """포켓몬을 다른 박스로 옮긴다. 데리고 다니던 애는 박스로 돌아온다."""
+    uid = ctx["user"]["id"]
+    _own(uid, pid)
+    no = int(body.box)
+    if no >= config.BOX_COUNT:
+        raise HTTPException(400, "박스는 %d개까지입니다." % config.BOX_COUNT)
+    n = db.q1("SELECT COUNT(*) AS n FROM pokemon"
+              " WHERE user_id=? AND on_desktop=0 AND box=? AND id<>?",
+              (uid, no, pid))
+    if (n["n"] if n else 0) >= config.BOX_SIZE:
+        raise HTTPException(409, "그 박스가 가득 찼습니다 (%d마리)." % config.BOX_SIZE)
+    db.run("UPDATE pokemon SET box=?, on_desktop=0, slot=NULL WHERE id=?", (no, pid))
+    return {"ok": True, "pokemon": _decorate(db.row_to_mon(_own(uid, pid)))}
+
+
+@app.post("/api/pokemon/boxes/name")
+def set_box_name(body: BoxNameIn, ctx=Depends(current)):
+    """박스 이름. 빈 이름을 보내면 기본 이름으로 돌아간다."""
+    uid = ctx["user"]["id"]
+    no = int(body.no)
+    if no >= config.BOX_COUNT:
+        raise HTTPException(400, "그런 박스가 없습니다.")
+    name = (body.name or "").strip()
+    if name:
+        db.run("INSERT INTO box_name (user_id, no, name) VALUES (?,?,?)"
+               " ON CONFLICT(user_id, no) DO UPDATE SET name=excluded.name",
+               (uid, no, name))
+    else:
+        db.run("DELETE FROM box_name WHERE user_id=? AND no=?", (uid, no))
+    return {"ok": True, "names": _box_names(uid)}
 
 
 @app.get("/api/pokemon/desktop")

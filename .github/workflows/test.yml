@@ -342,6 +342,7 @@ jobs:
           python test_sprite_fix.py
           python test_raid.py
           python test_live.py
+          python test_boxes.py
 
       - name: 서버 띄우기
         env:
