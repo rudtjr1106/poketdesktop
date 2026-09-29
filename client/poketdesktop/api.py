@@ -175,6 +175,22 @@ class Api(object):
         r = self._call("GET", "/api/pokemon")
         return r.get("pokemon") or [], r.get("eggs") or []
 
+    def pokemon_boxes(self):
+        """(포켓몬, 알, 박스 정보). 박스 정보는 옛 서버면 빈 dict 다."""
+        r = self._call("GET", "/api/pokemon")
+        return (r.get("pokemon") or [], r.get("eggs") or [],
+                r.get("boxes") or {})
+
+    def set_box(self, pid, no):
+        """포켓몬을 다른 PC 박스로 옮긴다."""
+        return self._call("POST", "/api/pokemon/%d/box" % int(pid),
+                          {"box": int(no)})
+
+    def set_box_name(self, no, name):
+        """박스 이름을 바꾼다. 빈 이름이면 기본 이름으로 돌아간다."""
+        return self._call("POST", "/api/pokemon/boxes/name",
+                          {"no": int(no), "name": name or ""})
+
     def desktop(self):
         return self._call("GET", "/api/pokemon/desktop")["pokemon"]
 

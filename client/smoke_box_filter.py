@@ -133,6 +133,8 @@ def mon(dex, num, pid, on=False, nickname=None, held=None):
 
 class FakeApi(object):
     def __init__(self, mons):
+        self.box_size = 30
+        self.box_names = {}
         self.mons = mons
         self.eggs = []
         self.calls = []
@@ -145,6 +147,34 @@ class FakeApi(object):
 
     def pokemon_and_eggs(self):
         return self.pokemon(), list(self.eggs)
+
+    def pokemon_boxes(self):
+        """서버 /api/pokemon 과 같은 모양. 박스 정보가 함께 온다."""
+        mons = self.pokemon()
+        used = {}
+        for m in mons:
+            if not m.get("onDesktop"):
+                k = str(int(m.get("box") or 0))
+                used[k] = used.get(k, 0) + 1
+        return (mons, list(self.eggs),
+                {"size": self.box_size, "count": 32,
+                 "names": dict(self.box_names), "used": used})
+
+    def set_box(self, pid, no):
+        self.calls.append(("box", pid, no))
+        for m in self.mons:
+            if m["id"] == pid:
+                m["box"] = int(no)
+                m["onDesktop"] = False
+        return {"ok": True}
+
+    def set_box_name(self, no, name):
+        self.calls.append(("boxname", no, name))
+        if name:
+            self.box_names[str(no)] = name
+        else:
+            self.box_names.pop(str(no), None)
+        return {"ok": True, "names": dict(self.box_names)}
 
     def set_desktop(self, pid, on):
         self.calls.append(("desktop", pid, on))
@@ -597,6 +627,8 @@ def many(root, dex):
     party = [mon(dex, 7, 2007, on=True), mon(dex, 4, 2004, on=True),
              mon(dex, 1, 2001, on=True)]
     box = [mon(dex, n, 3000 + n) for n in range(2, 91) if n not in (4, 7)]
+    for i, m in enumerate(box):          # 서버가 30마리씩 나눠 담아 준다
+        m["box"] = i // 30
     big = party + box
     app = FakeApp(root, dex, big)
     app.api.gate.clear()                # 창이 부르는 목록은 붙잡아 둔다
@@ -652,35 +684,74 @@ def _many(root, dex, app, win, party, box, big):
     settle_rows(root, win)
     chk("지우면 첫 박스가 순서대로, 'PC 박스' 머리까지",
         layout(win) == full_layout(party_ids, page_ids(box_ids)), layout(win)[:12])
-    chk("머리 글씨", win._sep_label.cget("text")
-        == "PC 박스 · %d마리  ·  이 박스 %d마리" % (len(box), len(page_ids(box_ids))),
+    chk("머리 글씨", win._sep_label.cget("text") == "PC 박스 · %d마리" % len(box),
         win._sep_label.cget("text"))
 
-    # ---- 박스 넘기기 ----
+    # ---- 박스 넘기기·이름·옮기기 ----
     pages = (len(box) + ui_box.BOX_SIZE - 1) // ui_box.BOX_SIZE
-    chk("박스 수를 센다", win.pages == pages, (win.pages, pages))
-    chk("박스 이름표", win.lbl_page.cget("text") == "전체 박스 1/%d" % pages,
+    chk("박스 이름표에 이름과 마릿수", win.lbl_page.cget("text") == "박스 1  30/30",
         win.lbl_page.cget("text"))
     win._page(1)
     settle_rows(root, win)
     chk("다음 박스로 넘어간다",
         layout(win) == full_layout(party_ids, page_ids(box_ids, 1)), layout(win)[:12])
-    chk("이름표도 따라온다", win.lbl_page.cget("text") == "전체 박스 2/%d" % pages,
+    chk("이름표도 따라온다", win.lbl_page.cget("text").startswith("박스 2"),
         win.lbl_page.cget("text"))
     win._page(-1)
     settle_rows(root, win)
     chk("돌아온다", layout(win) == full_layout(party_ids, page_ids(box_ids)),
         layout(win)[:12])
+
+    # 이름 바꾸기
+    app.api.set_box_name(0, "불꽃방")
+    win.boxes["names"] = dict(app.api.box_names)
+    win._paint_page(0)
+    chk("박스 이름을 바꾸면 이름표에 나온다",
+        win.lbl_page.cget("text").startswith("불꽃방"), win.lbl_page.cget("text"))
+    app.api.set_box_name(0, "")
+    win.boxes["names"] = dict(app.api.box_names)
+    win._paint_page(0)
+    chk("비우면 기본 이름", win.lbl_page.cget("text").startswith("박스 1"),
+        win.lbl_page.cget("text"))
+
+    # **다른 박스로 옮기기** - 이게 없으면 박스가 있으나 마나다
+    movee = box_ids[0]
+    win.select(movee)
+    settle_rows(root, win)
+    win._do_move(movee, 2)
+    # 보내기도 다시 불러오기도 비동기다. 창이 그 박스를 보여줄 때까지 기다린다.
+    wait_for(root, lambda: ("box", movee, 2) in app.api.calls and win.box_no == 2)
+    settle_rows(root, win)
+    chk("옮기면 서버에 보낸다", ("box", movee, 2) in app.api.calls, app.api.calls[-2:])
+    chk("옮긴 박스를 보여준다", win.box_no == 2, win.box_no)
+    chk("옮긴 포켓몬이 그 박스에 있다", movee in shown(win), shown(win)[:6])
+    win.box_no = 0
+    win._show(win.sel)
+    settle_rows(root, win)
+    chk("떠난 박스에는 없다", movee not in shown(win), shown(win)[:6])
+    win._do_move(movee, 0)
+    wait_for(root, lambda: ("box", movee, 0) in app.api.calls and win.box_no == 0)
+    settle_rows(root, win)
+
+    # 찾기: 거르기를 걸면 박스를 넘어 다 뒤진다
+    win.f_query.set("피")
+    settle_rows(root, win)
+    chk("찾을 때는 박스를 넘어 다 뒤진다",
+        win._searching() and "찾는 중" in win.lbl_page.cget("text"),
+        win.lbl_page.cget("text"))
+    win.f_query.set("")
+    settle_rows(root, win)
+
     # 마지막 박스의 포켓몬을 고르면 그 박스로 옮겨 간다 (바탕화면 도트로 열 때)
     far = box_ids[-1]
     win.select(far)
     settle_rows(root, win)
     chk("다른 박스의 포켓몬을 고르면 그 박스로 간다",
-        far in win.rows and picked(win) == [far], (win.page, picked(win)))
+        far in win.rows and picked(win) == [far], (win.box_no, picked(win)))
     chk("  그 박스가 담겨 있다",
         layout(win) == full_layout(party_ids, page_ids(box_ids, pages - 1)),
         layout(win)[:12])
-    win.page = 0
+    win.box_no = 0
     win._show(win.sel)
     settle_rows(root, win)
 
@@ -739,8 +810,11 @@ def _many(root, dex, app, win, party, box, big):
     new_party = [m["id"] for m in new[:3]]
     new_box = [m["id"] for m in new[3:]]
     chk("파티는 새 순서대로", shown(win)[:3] == new_party, shown(win)[:3])
+    # **박스는 번호로 센다.** 앞에서 30마리로 자르면, 놓아주거나 새로 잡아
+    # 목록이 바뀐 뒤에는 실제 박스와 어긋난다.
+    first_box = [m["id"] for m in new[3:] if int(m.get("box") or 0) == 0]
     chk("첫 박스가 순서대로, 머리까지",
-        layout(win) == full_layout(new_party, page_ids(new_box)), layout(win)[:12])
+        layout(win) == full_layout(new_party, first_box), layout(win)[:12])
     chk("그대로인 줄은 같은 줄을 쓴다",
         all(win.rows[p] is before[p] for p in box_ids if p not in (gone, renamed)))
     chk("바뀐 줄은 새로 만든다 (새 별명)", win.rows[renamed] is not before[renamed]

@@ -368,6 +368,8 @@ class BoxWindow(object):
         self.rows = {}           # {id: Row} — 받은 목록으로 만들어 둔 줄 전부 (숨긴 줄 포함)
         self._shown = {"party": [], "box": []}   # 지금 담긴 줄 id, 화면 순서대로
         self._by_id = {}         # {id: 포켓몬} — 받은 목록
+        self.box_no = 0          # 지금 보고 있는 PC 박스
+        self.boxes = {}          # 서버가 준 박스 정보 (size/count/names/used)
         self._rows_job = None    # 줄을 나눠 만들고 담는 일 (U.Chunked)
         self._sep_on = False     # 'PC 박스' 머리가 담겨 있나
         self._wait = None        # 불러오는 중 표시
@@ -456,17 +458,20 @@ class BoxWindow(object):
         self.btn_type = U.ghost_button(bar, "타입: 전체", self._open_type_menu,
                                        height=26)
         self.btn_type.pack(side="left", pady=7)
-        # 쪽 넘기기. **위아래 여백을 주지 않는다** - 막대가 U.h(40) 인데
+        # 박스 넘기기. **위아래 여백을 주지 않는다** - 막대가 U.h(40) 인데
         # 단추는 그림자까지 30 이라, 여백을 주면 윈도우에서 눌린다.
-        self.page = 0
-        self.pages = 1
         self.btn_prev = U.ghost_button(bar, "◀", lambda: self._page(-1), height=26)
         self.btn_prev.pack(side="left", padx=(12, 0))
-        self.lbl_page = tk.Label(bar, text="박스 1/1", bg=U.BG2, fg=U.FG,
-                                 font=U.FONT_XS, width=12, anchor="center")
+        self.lbl_page = tk.Label(bar, text="박스 1", bg=U.BG2, fg=U.FG,
+                                 font=U.FONT_XS, width=16, anchor="center",
+                                 cursor="hand2")
         self.lbl_page.pack(side="left")
+        self.lbl_page.bind("<Button-1>", lambda _e: self.rename_box())
         self.btn_next = U.ghost_button(bar, "▶", lambda: self._page(1), height=26)
         self.btn_next.pack(side="left")
+        self.btn_rename = U.ghost_button(bar, "이름 바꾸기", self.rename_box,
+                                         height=26)
+        self.btn_rename.pack(side="left", padx=(8, 0))
         self.f_query = tk.StringVar()
         self.f_query.trace_add("write", lambda *_a: self._query_changed())
         box = U.entry(bar, self.f_query, width=12)
@@ -842,6 +847,9 @@ class BoxWindow(object):
         self.btn_nick = U.ghost_button(inner, "별명 짓기", self.do_nickname,
                                        height=34)
         self.btn_nick.pack(side="left", padx=8, pady=11)
+        self.btn_move = U.ghost_button(inner, "박스 옮기기", self.move_box,
+                                       height=34)
+        self.btn_move.pack(side="left", padx=(0, 8), pady=11)
         self.btn_release = U.PushButton(inner, "놓아주기", self.do_release,
                                         fill=U.DANGER_BG, fg=U.DANGER,
                                         shadow="#1a1013", hover="#3a2028",
@@ -856,7 +864,8 @@ class BoxWindow(object):
     def set_buttons(self, on):
         # 떠올리기 단추는 상세 칸에 있어서 바닥보다 나중에 만들어진다.
         rem = getattr(self, "btn_remember", None)
-        for b in (self.btn_party, self.btn_nick, self.btn_release, rem):
+        for b in (self.btn_party, self.btn_nick, self.btn_release, rem,
+                  getattr(self, "btn_move", None)):
             if b is not None:
                 b.configure(state="normal" if on else "disabled")
 
@@ -876,21 +885,24 @@ class BoxWindow(object):
         def work():
             from . import eggs_ui
             api = self.app.api
-            mons, eggs = api.pokemon_and_eggs()
+            mons, eggs, boxes = api.pokemon_boxes()
             sprite_cache.ensure_many(
                 api, [(m.get("num"), m.get("shiny")) for m in mons if m.get("onDesktop")])
             eggs_ui.fetch_icons(api, eggs)
             # 알도 한 줄씩 (1.4.1). 파티는 자리 순서, 박스는 알이 먼저.
-            return box_filter.merge_eggs(mons, eggs)
+            return box_filter.merge_eggs(mons, eggs), boxes
         U.run_async(self.root, work, self._loaded)
 
-    def _loaded(self, mons, err):
+    def _loaded(self, got, err):
         w, self._wait = self._wait, None
         if err:
             if w:
                 w.close()
             return self.say(getattr(err, "message", str(err)), U.DANGER)
         try:
+            mons, boxes = got if isinstance(got, tuple) else (got, None)
+            if boxes:
+                self.boxes = boxes
             self.mons = mons or []
             self._refresh_filter_bar()
             # 다시 불러온 까닭(떠올리기 결과 같은 것)이 있으면 지우지 않고 남긴다.
@@ -971,60 +983,163 @@ class BoxWindow(object):
 
     def _set_type(self, t):
         self.f_type = t
-        self.page = 0
         self._show_type()
         self._refilter()
 
+    # ---------------- PC 박스 ----------------
+    def box_size(self):
+        return int(self.boxes.get("size") or BOX_SIZE)
+
+    def box_count(self):
+        return int(self.boxes.get("count") or 32)
+
+    def box_name(self, no):
+        names = self.boxes.get("names") or {}
+        return names.get(str(no)) or "박스 %d" % (no + 1)
+
+    def box_used(self, no):
+        """그 박스에 든 마릿수. 서버가 준 값이 있으면 그것을 먼저 쓴다."""
+        used = self.boxes.get("used") or {}
+        if str(no) in used:
+            return int(used[str(no)])
+        return sum(1 for m in self.mons
+                   if not m.get("onDesktop") and int(m.get("box") or 0) == no)
+
+    def _searching(self):
+        """거르기가 걸려 있으면 **박스를 넘어 다 뒤진다** (찾기)."""
+        return bool(self.f_type or self.f_query.get().strip())
+
     def _page(self, delta):
-        page = max(0, min(self.page + delta, self.pages - 1))
-        if page == self.page:
+        no = max(0, min(self.box_no + delta, self.box_count() - 1))
+        if no == self.box_no:
             return
-        self.page = page
+        self.box_no = no
         self._show(self.sel)
 
     def _paint_page(self, total):
-        """쪽 표시와 단추. 박스 이름은 고른 타입 이름이다 (없으면 '전체')."""
-        dex = self.app.dex
-        name = (dex.type_name(self.f_type) if (dex and self.f_type) else "전체")
-        self.lbl_page.configure(text="%s 박스 %d/%d" % (name, self.page + 1,
-                                                       self.pages))
-        self.btn_prev.configure(state="normal" if self.page > 0 else "disabled")
+        """박스 이름표와 단추."""
+        if self._searching():
+            self.lbl_page.configure(text="찾는 중 · %d마리" % total)
+            for b in (self.btn_prev, self.btn_next, self.btn_rename):
+                b.configure(state="disabled")
+            return
+        self.lbl_page.configure(text="%s  %d/%d" % (self.box_name(self.box_no),
+                                                    self.box_used(self.box_no),
+                                                    self.box_size()))
+        self.btn_rename.configure(state="normal")
+        self.btn_prev.configure(state="normal" if self.box_no > 0 else "disabled")
         self.btn_next.configure(
-            state="normal" if self.page < self.pages - 1 else "disabled")
+            state="normal" if self.box_no < self.box_count() - 1 else "disabled")
+
+    def rename_box(self):
+        """박스 이름 바꾸기. 비우면 기본 이름으로 돌아간다."""
+        if self._searching():
+            return self.say("찾는 중에는 박스 이름을 바꿀 수 없습니다.", U.DANGER)
+        no = self.box_no
+        cur = (self.boxes.get("names") or {}).get(str(no), "")
+        name = ask_text(self.win, "박스 이름", "이 박스를 뭐라고 부를까요?",
+                        "비우면 기본 이름(박스 %d)으로 돌아갑니다" % (no + 1), cur)
+        if name is None:
+            return
+        name = name.strip()
+
+        def work():
+            return self.app.api.set_box_name(no, name)
+
+        def done(r, err):
+            if err:
+                return self.say(getattr(err, "message", str(err)), U.DANGER)
+            self.boxes["names"] = (r or {}).get("names") or {}
+            self._paint_page(0)
+            self.say("박스 이름을 %s 로 바꿨습니다."
+                     % self.box_name(no) if name else "기본 이름으로 되돌렸습니다.",
+                     U.GOOD)
+        U.run_async(self.root, work, done)
+
+    def move_box(self):
+        """고른 포켓몬을 다른 박스로. 어디로 보낼지 물어본다."""
+        m = self.current()
+        if not m:
+            return
+        if m.get("isEgg"):
+            return self.say("알은 박스를 옮길 수 없습니다.", U.DANGER)
+        pid = m["id"]
+        here = int(m.get("box") or 0)
+        rows = []
+        for no in range(self.box_count()):
+            used = self.box_used(no)
+            full = used >= self.box_size() and no != here
+            rows.append({
+                "text": "%s  (%d/%d)%s" % (self.box_name(no), used,
+                                           self.box_size(),
+                                           "  가득 참" if full else ""),
+                "checked": no == here and not m.get("onDesktop"),
+                "command": (lambda x=no: None) if full
+                else (lambda x=no: self._do_move(pid, x)),
+            })
+        self._menu(self.btn_move, rows)
+
+    def _do_move(self, pid, no):
+        def work():
+            return self.app.api.set_box(pid, no)
+
+        def done(r, err):
+            if err:
+                return self.say(getattr(err, "message", str(err)), U.DANGER)
+            self._note = ("%s 로 옮겼습니다." % self.box_name(no), U.GOOD)
+            self.box_no = no
+            self.reload()
+        U.run_async(self.root, work, done)
+
+    def _menu(self, btn, rows):
+        """단추 아래 드롭다운. 맥에서는 tk.Menu 가 after 타이머와 부딪혀
+        앱이 죽으므로 U.PopupMenu 를 쓴다 (_open_type_menu 와 같다)."""
+        from . import platform_os as PLAT
+        w = getattr(btn, "holder", None)
+        try:
+            x, y = w.winfo_rootx(), w.winfo_rooty() - U.h(20)
+        except Exception:                                   # noqa: BLE001
+            x, y = self.win.winfo_rootx() + 80, self.win.winfo_rooty() + 120
+        if not PLAT.NATIVE_MENU:
+            return U.PopupMenu(self.root, rows, x, y, width=220)
+        m = tk.Menu(self.root, tearoff=0, bg=U.BG2, fg=U.FG,
+                    activebackground=U.BG4, activeforeground=U.FG, bd=0,
+                    font=U.FONT_S)
+        for row in rows:
+            if row is None:
+                m.add_separator()
+                continue
+            m.add_command(label=("✓ " if row.get("checked") else "    ")
+                          + row["text"], command=row["command"])
+        try:
+            m.tk_popup(x, y)
+        finally:
+            m.grab_release()
+        return m
 
     def _reveal(self, pid):
-        """그 포켓몬이 있는 쪽으로 옮긴다 (거름망에 걸려 있으면 푼다).
+        """그 포켓몬이 있는 박스로 옮긴다 (거름망에 걸려 있으면 푼다).
 
         바탕화면 도트를 두 번 눌러 열면 그 포켓몬을 고른 채로 열리는데,
-        한 쪽만 그린 뒤로는 다른 쪽에 있으면 줄이 없다.
+        한 박스만 그리므로 다른 박스에 있으면 줄이 없다.
         """
         if getattr(self, "_revealing", False) or pid not in self._by_id:
             return False
+        m = self._by_id[pid]
         self._revealing = True
         try:
-            _party, box = box_filter.apply_box(self.mons, self.app.dex,
-                                               self.f_type, self.f_query.get())
-            ids = [m["id"] for m in box]
-            if pid not in ids:
-                if not any(m["id"] == pid for m in
-                           box_filter.split(self.mons)[0]):   # 파티는 늘 보인다
-                    self.f_type = None
-                    self.f_query.set("")
-                    self._show_type()
-                    _party, box = box_filter.apply_box(self.mons, self.app.dex,
-                                                       None, "")
-                    ids = [m["id"] for m in box]
-                else:
-                    return False
-            if pid in ids:
-                self.page = ids.index(pid) // BOX_SIZE
+            if self._searching():
+                self.f_type = None
+                self.f_query.set("")
+                self._show_type()
+            if not m.get("onDesktop"):
+                self.box_no = int(m.get("box") or 0)
             self._show(pid)
             return True
         finally:
             self._revealing = False
 
     def _query_changed(self):
-        self.page = 0
         self._refilter()
 
     def _refilter(self):
@@ -1075,11 +1190,12 @@ class BoxWindow(object):
                                           self.f_query.get())
         box_all = len(self.mons) - len(party)
         filtered = bool(self.f_type or self.f_query.get().strip())
-        # **한 쪽만 그린다.** 줄 하나에 위젯이 열서너 개라 수백 마리를 다
-        # 만들면 창이 느려진다.
-        self.pages = max(1, (len(box) + BOX_SIZE - 1) // BOX_SIZE)
-        self.page = max(0, min(self.page, self.pages - 1))
-        page_box = box[self.page * BOX_SIZE:(self.page + 1) * BOX_SIZE]
+        # **한 박스만 그린다.** 줄 하나에 위젯이 열서너 개라 수백 마리를 다
+        # 만들면 창이 느려진다. 거르기가 걸려 있으면 박스를 넘어 다 뒤진다.
+        if self._searching():
+            page_box = box
+        else:
+            page_box = [m for m in box if int(m.get("box") or 0) == self.box_no]
         self._paint_page(len(box))
         want = {"party": [m["id"] for m in party],
                 "box": [m["id"] for m in page_box]}
@@ -1100,11 +1216,9 @@ class BoxWindow(object):
 
         if box_all:
             self._sep_label.configure(
+                # 이 박스에 몇 마리인지는 위 막대(박스 이름표)가 보여준다.
                 text=("PC 박스 · %d마리 중 %d마리" % (box_all, len(box)) if filtered
-                      else "PC 박스 · %d마리" % box_all)
-                     # 박스가 여럿일 때만 이 박스 몫을 덧붙인다
-                     + ("  ·  이 박스 %d마리" % len(page_box)
-                        if self.pages > 1 else ""))
+                      else "PC 박스 · %d마리" % box_all))
             if not self._sep_on:
                 # 박스가 비어 있었으니 담긴 박스 줄이 없다. 끝에 붙이면 된다.
                 self._sep.pack(fill="x")
