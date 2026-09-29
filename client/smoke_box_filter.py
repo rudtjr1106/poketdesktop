@@ -38,6 +38,7 @@ from PIL import Image                                       # noqa: E402
 from common import pokelogic as P                           # noqa: E402
 from poketdesktop import box_filter                         # noqa: E402
 from poketdesktop import platform_os as PLAT                # noqa: E402
+from poketdesktop import eggs_ui                            # noqa: E402
 from poketdesktop import ui_box                             # noqa: E402
 from test_learn_dialog import squeezed                      # noqa: E402
 
@@ -91,6 +92,12 @@ def layout(win):
         names[str(r.f)] = pid
         names[str(r.line)] = "-"
     return [names.get(str(s), "?") for s in win.inner.pack_slaves()]
+
+
+def page_ids(box_ids, page=0):
+    """그 박스(쪽)에 담길 id 들. 창은 한 쪽만 그린다 (ui_box.BOX_SIZE)."""
+    n = ui_box.BOX_SIZE
+    return box_ids[page * n:(page + 1) * n]
 
 
 def full_layout(party_ids, box_ids):
@@ -269,6 +276,38 @@ def main():
     win = ui_box.BoxWindow(root, app)
     wait_for(root, lambda: getattr(win, "mons", None))
     settle_rows(root, win)
+
+    print("-- 전설·환상 표시")
+    # **전설 줄을 실제로 그려 본다.** 표시를 넣을 때 eggs_ui 를 모듈 밖에서
+    # 부르는 바람에 전설 포켓몬 줄에서만 터졌는데, 검사 자료에 전설이
+    # 없어서 안 걸렸다.
+    legend = [mon(dex, 150, 90, on=True),          # 뮤츠 - 전설
+              mon(dex, 151, 91),                   # 뮤 - 환상
+              mon(dex, 25, 92)]                    # 피카츄 - 아무것도 아님
+    lapp = FakeApp(root, dex, legend)
+    lwin = ui_box.BoxWindow(root, lapp)
+    wait_for(root, lambda: getattr(lwin, "mons", None))
+    settle_rows(root, lwin)
+    names = dict((pid, r.name_cell.cget("text")) for pid, r in lwin.rows.items())
+    kinds = dict((pid, r.legend) for pid, r in lwin.rows.items())
+    chk("전설에 표식", names.get(90, "").startswith("◆") and kinds.get(90) == "legendary",
+        (names.get(90), kinds.get(90)))
+    chk("환상에 표식", names.get(91, "").startswith("✦") and kinds.get(91) == "mythical",
+        (names.get(91), kinds.get(91)))
+    chk("보통 포켓몬에는 표식이 없다", kinds.get(92) is None and "◆" not in names.get(92, ""),
+        (names.get(92), kinds.get(92)))
+    lwin.select(92)          # 고른 줄은 글자색이 달라진다 - 피해서 잰다
+    settle(root)
+    chk("전설·환상 색이 알과 같다",
+        lwin.rows[90].name_cell.cget("fg") == eggs_ui.EGG_COLOR["legendary"]
+        and lwin.rows[91].name_cell.cget("fg") == eggs_ui.EGG_COLOR["mythical"],
+        (lwin.rows[90].name_cell.cget("fg"), lwin.rows[91].name_cell.cget("fg")))
+    lwin.select(91)
+    settle(root)
+    chips = [w.cget("text") for w in lwin.d_types.winfo_children()
+             if "text" in w.keys()]
+    chk("상세 칸에 '환상' 칩", "환상" in chips, chips)
+    lwin.close()
 
     print("-- 목록과 드롭다운")
     chk("여섯 마리가 다 그려진다 (파티 -> 박스 순)", shown(win) == [1, 2, 3, 4, 5, 6], shown(win))
@@ -600,19 +639,50 @@ def _many(root, dex, app, win, party, box, big):
         (shown(win), party_ids + want_ids))
     settle_rows(root, win)
     chk("다 만든 뒤에도 거른 결과 그대로", shown(win) == party_ids + want_ids, shown(win))
-    chk("숨긴 줄까지 전부 만들어 둔다", len(win.rows) == len(big), len(win.rows))
-    chk("줄이 겹치지 않는다 (줄·선 한 쌍씩 + 머리·굵은 선·없음)",
-        len(win.inner.winfo_children()) == 2 * len(big) + 3,
+    # **안 보일 줄은 만들지 않는다.** 예전에는 거름망에 걸러진 것까지 전부
+    # 미리 만들어 둬서(거르기를 풀 때 빨리 담으려고) 수백 마리면 느려졌다.
+    chk("안 보이는 줄까지 만들지는 않는다", len(win.rows) < len(big), len(win.rows))
+    chk("줄이 겹치지 않는다 (만든 줄·선 한 쌍씩 + 머리·굵은 선·없음)",
+        len(win.inner.winfo_children()) == 2 * len(win.rows) + 3,
         len(win.inner.winfo_children()))
 
     win.f_query.set("")
     chk("지우면 첫 묶음부터 곧바로 담긴다", len(shown(win)) > len(party_ids) + len(want_ids),
         len(shown(win)))
     settle_rows(root, win)
-    chk("지우면 전체가 순서대로, 'PC 박스' 머리까지",
-        layout(win) == full_layout(party_ids, box_ids), layout(win)[:12])
-    chk("머리 글씨", win._sep_label.cget("text") == "PC 박스 · %d마리" % len(box),
+    chk("지우면 첫 박스가 순서대로, 'PC 박스' 머리까지",
+        layout(win) == full_layout(party_ids, page_ids(box_ids)), layout(win)[:12])
+    chk("머리 글씨", win._sep_label.cget("text")
+        == "PC 박스 · %d마리  ·  이 박스 %d마리" % (len(box), len(page_ids(box_ids))),
         win._sep_label.cget("text"))
+
+    # ---- 박스 넘기기 ----
+    pages = (len(box) + ui_box.BOX_SIZE - 1) // ui_box.BOX_SIZE
+    chk("박스 수를 센다", win.pages == pages, (win.pages, pages))
+    chk("박스 이름표", win.lbl_page.cget("text") == "전체 박스 1/%d" % pages,
+        win.lbl_page.cget("text"))
+    win._page(1)
+    settle_rows(root, win)
+    chk("다음 박스로 넘어간다",
+        layout(win) == full_layout(party_ids, page_ids(box_ids, 1)), layout(win)[:12])
+    chk("이름표도 따라온다", win.lbl_page.cget("text") == "전체 박스 2/%d" % pages,
+        win.lbl_page.cget("text"))
+    win._page(-1)
+    settle_rows(root, win)
+    chk("돌아온다", layout(win) == full_layout(party_ids, page_ids(box_ids)),
+        layout(win)[:12])
+    # 마지막 박스의 포켓몬을 고르면 그 박스로 옮겨 간다 (바탕화면 도트로 열 때)
+    far = box_ids[-1]
+    win.select(far)
+    settle_rows(root, win)
+    chk("다른 박스의 포켓몬을 고르면 그 박스로 간다",
+        far in win.rows and picked(win) == [far], (win.page, picked(win)))
+    chk("  그 박스가 담겨 있다",
+        layout(win) == full_layout(party_ids, page_ids(box_ids, pages - 1)),
+        layout(win)[:12])
+    win.page = 0
+    win._show(win.sel)
+    settle_rows(root, win)
 
     win.f_query.set(q)
     root.update()
@@ -620,8 +690,8 @@ def _many(root, dex, app, win, party, box, big):
     win._set_type("FIRE")
     win._set_type(None)
     settle_rows(root, win)
-    chk("담는 도중에 여러 번 바꿔도 전체가 순서대로",
-        layout(win) == full_layout(party_ids, box_ids), layout(win)[:12])
+    chk("담는 도중에 여러 번 바꿔도 첫 박스가 순서대로",
+        layout(win) == full_layout(party_ids, page_ids(box_ids)), layout(win)[:12])
 
     print("-- 많을 때: 아직 없는 줄 고르기")
     other = ui_box.BoxWindow(root, app)
@@ -640,7 +710,10 @@ def _many(root, dex, app, win, party, box, big):
         chk("고른 줄만 칠해진다", picked(other) == [last], picked(other))
         chk("상세도 그 포켓몬", other.d_name.cget("text") == box[-1]["info"]["name"],
             other.d_name.cget("text"))
-        chk("다 담겨 있다", layout(other) == full_layout(party_ids, box_ids),
+        # 마지막 포켓몬을 골랐으니 그 포켓몬이 있는 박스가 담겨 있다
+        chk("고른 포켓몬이 있는 박스가 담겨 있다",
+            layout(other) == full_layout(
+                party_ids, page_ids(box_ids, (len(box_ids) - 1) // ui_box.BOX_SIZE)),
             layout(other)[:12])
     finally:
         other.close()
@@ -666,18 +739,23 @@ def _many(root, dex, app, win, party, box, big):
     new_party = [m["id"] for m in new[:3]]
     new_box = [m["id"] for m in new[3:]]
     chk("파티는 새 순서대로", shown(win)[:3] == new_party, shown(win)[:3])
-    chk("전체가 순서대로, 머리까지", layout(win) == full_layout(new_party, new_box),
-        layout(win)[:12])
+    chk("첫 박스가 순서대로, 머리까지",
+        layout(win) == full_layout(new_party, page_ids(new_box)), layout(win)[:12])
     chk("그대로인 줄은 같은 줄을 쓴다",
         all(win.rows[p] is before[p] for p in box_ids if p not in (gone, renamed)))
     chk("바뀐 줄은 새로 만든다 (새 별명)", win.rows[renamed] is not before[renamed]
         and "새별명" in win.rows[renamed].name_cell.cget("text"))
     chk("놓아준 줄은 없어진다", gone not in win.rows)
-    chk("새로 잡은 줄이 끝에 생긴다", shown(win)[-1] == 9999, shown(win)[-3:])
-    chk("줄이 남거나 겹치지 않는다", len(win.inner.winfo_children()) == 2 * len(new) + 3,
-        len(win.inner.winfo_children()))
     chk("고르던 것이 그대로 골라져 있다", win.sel == box_ids[10] and picked(win) == [box_ids[10]],
         (win.sel, picked(win)))
+    # 새로 잡은 것은 박스 맨 끝 = 마지막 박스에 있다. 그 포켓몬을 고르면
+    # 창이 알아서 그 박스로 옮겨 간다.
+    win.select(9999)
+    settle_rows(root, win)
+    chk("새로 잡은 줄이 마지막 박스 끝에 생긴다", shown(win)[-1] == 9999, shown(win)[-3:])
+    chk("줄이 남거나 겹치지 않는다",
+        len(win.inner.winfo_children()) == 2 * len(win.rows) + 3,
+        len(win.inner.winfo_children()))
 
 
 if __name__ == "__main__":

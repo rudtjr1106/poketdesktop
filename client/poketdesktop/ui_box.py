@@ -13,6 +13,7 @@ from tkinter import ttk
 
 from PIL import ImageTk
 
+from common import legends as L
 from common import movetext as MT
 from common import pokelogic as P
 from common.korean import natural
@@ -23,6 +24,11 @@ from . import ui_loading
 
 ROW_H = U.h(30)
 DETAIL_W = 340
+# PC 박스 한 쪽에 몇 마리. **한 쪽만 그린다.**
+# 예전에는 거름망에 걸러진 것까지 가진 포켓몬 전부의 줄을 미리 만들어 뒀다
+# (거르기를 풀 때 새로 안 만들려고). 줄 하나에 위젯이 열서너 개라, 수백
+# 마리가 되면 창이 눈에 띄게 느려졌다 (사용자 제보).
+BOX_SIZE = 30
 # 목록을 나눠 만드는 크기(U.Chunked). 줄 하나에 위젯이 열서너 개라 무겁다.
 # 첫 묶음은 첫 화면만큼(창 높이에 스무 줄 남짓)이면 된다.
 FIRST_ROWS = 20
@@ -214,6 +220,10 @@ class Row(object):
         shiny = mon.get("shiny")
         if shiny:
             name = "★ " + name
+        # 전설·환상 표식. 알이 쓰는 색과 같게 해서 한눈에 같은 뜻으로 읽힌다.
+        self.legend = None if self.egg else L.kind_of(mon.get("num"))
+        if self.legend:
+            name = ("◆ " if self.legend == "legendary" else "✦ ") + name
         g = None if self.egg else U.gender_mark(mon.get("gender"))
 
         self.cells = []
@@ -221,7 +231,9 @@ class Row(object):
                    U.FG_FAINT, U.FONT_XS)
         self.name_cell = self._cell(
             name, COLS[1],
-            self._egg_fg() or (U.SHINY if shiny else (U.FG if self.party else dim)),
+            self._egg_fg() or (U.SHINY if shiny else
+                               (_egg_color(self.legend) if self.legend
+                                else (U.FG if self.party else dim))),
             U.FONT_S)
         if g:
             # 글자 수로 어림하면 한글에서 어긋난다. 글꼴에 실제 폭을 물어본다.
@@ -340,9 +352,11 @@ class Row(object):
             self.name_cell.configure(fg=U.ACCENT_TEXT, font=U.FONT_B)
         else:
             self._paint(self.base, self.base)
+            # 고르기를 풀 때도 **전설·환상 색을 잃지 않는다.**
             self.name_cell.configure(
                 fg=self._egg_fg() or (U.SHINY if self.mon.get("shiny")
-                                      else (U.FG if self.party else U.FG_DIM)),
+                                      else (_egg_color(self.legend) if self.legend
+                                            else (U.FG if self.party else U.FG_DIM))),
                 font=U.FONT_S)
 
 
@@ -442,8 +456,19 @@ class BoxWindow(object):
         self.btn_type = U.ghost_button(bar, "타입: 전체", self._open_type_menu,
                                        height=26)
         self.btn_type.pack(side="left", pady=7)
+        # 쪽 넘기기. **위아래 여백을 주지 않는다** - 막대가 U.h(40) 인데
+        # 단추는 그림자까지 30 이라, 여백을 주면 윈도우에서 눌린다.
+        self.page = 0
+        self.pages = 1
+        self.btn_prev = U.ghost_button(bar, "◀", lambda: self._page(-1), height=26)
+        self.btn_prev.pack(side="left", padx=(12, 0))
+        self.lbl_page = tk.Label(bar, text="박스 1/1", bg=U.BG2, fg=U.FG,
+                                 font=U.FONT_XS, width=12, anchor="center")
+        self.lbl_page.pack(side="left")
+        self.btn_next = U.ghost_button(bar, "▶", lambda: self._page(1), height=26)
+        self.btn_next.pack(side="left")
         self.f_query = tk.StringVar()
-        self.f_query.trace_add("write", lambda *_a: self._refilter())
+        self.f_query.trace_add("write", lambda *_a: self._query_changed())
         box = U.entry(bar, self.f_query, width=12)
         box.pack(side="right", padx=(6, 10), pady=3)
         tk.Label(bar, text="이름 찾기", bg=U.BG2, fg=U.FG_DIM,
@@ -946,7 +971,60 @@ class BoxWindow(object):
 
     def _set_type(self, t):
         self.f_type = t
+        self.page = 0
         self._show_type()
+        self._refilter()
+
+    def _page(self, delta):
+        page = max(0, min(self.page + delta, self.pages - 1))
+        if page == self.page:
+            return
+        self.page = page
+        self._show(self.sel)
+
+    def _paint_page(self, total):
+        """쪽 표시와 단추. 박스 이름은 고른 타입 이름이다 (없으면 '전체')."""
+        dex = self.app.dex
+        name = (dex.type_name(self.f_type) if (dex and self.f_type) else "전체")
+        self.lbl_page.configure(text="%s 박스 %d/%d" % (name, self.page + 1,
+                                                       self.pages))
+        self.btn_prev.configure(state="normal" if self.page > 0 else "disabled")
+        self.btn_next.configure(
+            state="normal" if self.page < self.pages - 1 else "disabled")
+
+    def _reveal(self, pid):
+        """그 포켓몬이 있는 쪽으로 옮긴다 (거름망에 걸려 있으면 푼다).
+
+        바탕화면 도트를 두 번 눌러 열면 그 포켓몬을 고른 채로 열리는데,
+        한 쪽만 그린 뒤로는 다른 쪽에 있으면 줄이 없다.
+        """
+        if getattr(self, "_revealing", False) or pid not in self._by_id:
+            return False
+        self._revealing = True
+        try:
+            _party, box = box_filter.apply_box(self.mons, self.app.dex,
+                                               self.f_type, self.f_query.get())
+            ids = [m["id"] for m in box]
+            if pid not in ids:
+                if not any(m["id"] == pid for m in
+                           box_filter.split(self.mons)[0]):   # 파티는 늘 보인다
+                    self.f_type = None
+                    self.f_query.set("")
+                    self._show_type()
+                    _party, box = box_filter.apply_box(self.mons, self.app.dex,
+                                                       None, "")
+                    ids = [m["id"] for m in box]
+                else:
+                    return False
+            if pid in ids:
+                self.page = ids.index(pid) // BOX_SIZE
+            self._show(pid)
+            return True
+        finally:
+            self._revealing = False
+
+    def _query_changed(self):
+        self.page = 0
         self._refilter()
 
     def _refilter(self):
@@ -997,8 +1075,14 @@ class BoxWindow(object):
                                           self.f_query.get())
         box_all = len(self.mons) - len(party)
         filtered = bool(self.f_type or self.f_query.get().strip())
+        # **한 쪽만 그린다.** 줄 하나에 위젯이 열서너 개라 수백 마리를 다
+        # 만들면 창이 느려진다.
+        self.pages = max(1, (len(box) + BOX_SIZE - 1) // BOX_SIZE)
+        self.page = max(0, min(self.page, self.pages - 1))
+        page_box = box[self.page * BOX_SIZE:(self.page + 1) * BOX_SIZE]
+        self._paint_page(len(box))
         want = {"party": [m["id"] for m in party],
-                "box": [m["id"] for m in box]}
+                "box": [m["id"] for m in page_box]}
 
         for sec in ("party", "box"):
             order = self._shown[sec]
@@ -1017,7 +1101,10 @@ class BoxWindow(object):
         if box_all:
             self._sep_label.configure(
                 text=("PC 박스 · %d마리 중 %d마리" % (box_all, len(box)) if filtered
-                      else "PC 박스 · %d마리" % box_all))
+                      else "PC 박스 · %d마리" % box_all)
+                     # 박스가 여럿일 때만 이 박스 몫을 덧붙인다
+                     + ("  ·  이 박스 %d마리" % len(page_box)
+                        if self.pages > 1 else ""))
             if not self._sep_on:
                 # 박스가 비어 있었으니 담긴 박스 줄이 없다. 끝에 붙이면 된다.
                 self._sep.pack(fill="x")
@@ -1043,8 +1130,6 @@ class BoxWindow(object):
                     plan.append((sec, pid, prev))
                 prev = pid
         wanted = set(want["party"]) | set(want["box"])
-        plan += [(None, m["id"], None) for m in self.mons
-                 if m["id"] not in self.rows and m["id"] not in wanted]
         self._rows_job = U.Chunked(self.win, plan, self._place_row,
                                    first=FIRST_ROWS, size=CHUNK_ROWS)
 
@@ -1271,6 +1356,8 @@ class BoxWindow(object):
         return next((m for m in self.mons if m["id"] == self.sel), None)
 
     def select(self, pid):
+        if pid not in self.rows and self._reveal(pid):
+            return
         self._ensure_built(pid)
         prev, self.sel = self.sel, pid
         # 바뀐 두 줄만 칠한다. 고른 줄은 늘 하나라 나머지는 이미 안 고른
@@ -1451,6 +1538,10 @@ class BoxWindow(object):
         for t in (sp or {}).get("types", []):
             U.chip(self.d_types, dex.type_name(t), U.TYPE_COLOR.get(t, U.BG3),
                    font=U.FONT_S, padx=10, pady=2).pack(side="left", padx=(0, 4))
+        kind_ = L.kind_of(m.get("num"))
+        if kind_:
+            U.chip(self.d_types, EGG_KIND[kind_], _egg_color(kind_),
+                   font=U.FONT_S, padx=10, pady=2).pack(side="left", padx=(6, 0))
 
         hidden = info.get("hiddenAbility")
         self._trait("ability",
