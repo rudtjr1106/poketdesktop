@@ -1055,6 +1055,18 @@ class Battle(object):
         if MC.attacks(move) and not SM.before_attack(self, k, move, who, user, target, tw, ev):
             return
 
+        # **공중·땅속·물속·그림자에 숨은 상대에게는 정해진 기술만 닿는다.**
+        # 1.6.0 에서 공중날기·구멍파기·다이빙을 두 턴으로 만들면서 판정
+        # (statusmoves.hidden_from)까지 넣어 놓고 **여기에 연결하지 않아서**,
+        # 숨어 있어도 아무 기술이나 다 맞았다 (사용자 제보).
+        # 노가드는 뚫는다. 록온·마음의눈은 본가에서도 못 뚫는다.
+        if (not bounced and SM.hidden_spot(target) and SM.hidden_from(target, k)
+                and (MC.attacks(move) or A.aims_at_foe(move))
+                and not (abil and A.always_hit(user, target))):
+            ev.append({"t": "miss", "who": who,
+                       "text": "하지만 %s 에게 닿지 않았다!" % target.name})
+            return
+
         if k in MC.OHKO:
             if (abil and A.always_hit(user, target)) or user.cond.get("lockon"):
                 hit = True

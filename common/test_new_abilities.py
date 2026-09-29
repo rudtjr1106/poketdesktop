@@ -197,6 +197,35 @@ def main():
         not SM.hidden_from(a, "THUNDER") and not SM.hidden_from(a, "GUST"))
     chk("PP 는 첫 턴에 든다", a.pp["FLY"] == (DEX.move("FLY").get("pp") or 15) - 1,
         a.pp["FLY"])
+    # **숨어 있는 동안 실제로 안 맞아야 한다.** 판정(hidden_from)을 만들어
+    # 놓고 battle._use 에 연결하지 않아서, 공중·땅속·물속에 있어도 아무
+    # 기술이나 다 맞았다 (사용자 제보).
+    for mon_, mv, spot, reach, nope in (
+            ("CHARIZARD", "FLY", "fly", ("THUNDER", "GUST"), ("TACKLE", "EARTHQUAKE")),
+            ("SANDSLASH", "DIG", "dig", ("EARTHQUAKE",), ("TACKLE", "THUNDER")),
+            ("GYARADOS", "DIVE", "dive", ("SURF",), ("TACKLE", "PSYCHIC"))):
+        for mv2 in reach + nope:
+            h, x, y = duel(mon_, "SNORLAX", a_moves=(mv,), b_moves=(mv2,))
+            x.hp = x.maxhp = 9999
+            y.hp = y.maxhp = 9999
+            h._use("me", x, y, mv, [])
+            if SM.hidden_spot(x) != spot:
+                chk("%s 로 %s 에 숨는다" % (mv, spot), False, SM.hidden_spot(x))
+                continue
+            ev2 = []
+            h._use("foe", y, x, mv2, ev2)
+            hit = x.hp < x.maxhp
+            chk("%s 중 %s 는 %s" % (mv, mv2, "닿는다" if mv2 in reach else "안 닿는다"),
+                hit == (mv2 in reach),
+                [e.get("text") for e in ev2 if e.get("text")][-1:])
+    # 노가드는 뚫는다 (록온·마음의눈은 본가에서도 못 뚫는다)
+    h, x, y = duel("CHARIZARD", "MACHAMP", a_moves=("FLY",), b_moves=("TACKLE",),
+                   b_ab="NOGUARD")
+    x.hp = x.maxhp = 9999
+    h._use("me", x, y, "FLY", [])
+    h._use("foe", y, x, "TACKLE", [])
+    chk("노가드는 공중에 있어도 맞힌다", x.hp < x.maxhp, x.hp)
+
     ev = []
     bt._use("me", a, b, "FLY", ev)
     chk("두 번째 턴에 맞는다", b.hp < before, b.hp)
