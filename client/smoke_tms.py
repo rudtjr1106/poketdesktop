@@ -272,6 +272,47 @@ def run(root, app, api, tms, have, learners, sprite_gate):
         sr and sr[3] == win.list_inner.winfo_reqheight(),
         (sr, win.list_inner.winfo_reqheight()))
 
+    print("\n=== 타입·분류로 거르기")
+    # 358줄이라 '가진 것만' 하나로는 찾기 힘들다는 제보로 넣었다.
+    win._toggle_filter()                     # 전부 보기
+    settle_list(root, win)
+    kinds = {}
+    for t in tms:
+        kinds.setdefault(t["type"], []).append(t["no"])
+    ty = max(kinds, key=lambda k: len(kinds[k]))
+    win._set_type(ty)
+    settle_list(root, win)
+    chk("타입으로 거른다", packed_rows(win) == kinds[ty],
+        (len(packed_rows(win)), len(kinds[ty])))
+    chk("단추에 고른 타입이 보인다",
+        ui_tms.TYPE_KR.get(ty, ty) in win.type_btn.label.cget("text"),
+        win.type_btn.label.cget("text"))
+    want = [t["no"] for t in tms if t["type"] == ty and t["cat"] == "physical"]
+    win._set_cat("physical")
+    settle_list(root, win)
+    chk("타입 + 분류를 같이 건다", packed_rows(win) == want,
+        (len(packed_rows(win)), len(want)))
+    win._set_type(None)
+    settle_list(root, win)
+    chk("타입을 풀면 분류만 남는다",
+        packed_rows(win) == [t["no"] for t in tms if t["cat"] == "physical"],
+        len(packed_rows(win)))
+    win._set_cat(None)
+    settle_list(root, win)
+    chk("다 풀면 전부", packed_rows(win) == [t["no"] for t in tms],
+        len(packed_rows(win)))
+    # '가진 것만' 과도 같이 걸린다
+    win._toggle_filter()
+    win._set_cat("status")
+    settle_list(root, win)
+    chk("가진 것만 + 분류",
+        packed_rows(win) == [t["no"] for t in tms
+                             if t["have"] and t["cat"] == "status"],
+        len(packed_rows(win)))
+    win._set_cat(None)
+    settle_list(root, win)
+    chk("되돌리면 가진 것만", packed_rows(win) == have, len(packed_rows(win)))
+
     print("\n=== 나눠 만드는 중에")
     win._list_key = None
     win._paint_list()                  # 첫 묶음만 만들고 나머지는 예약

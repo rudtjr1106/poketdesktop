@@ -74,6 +74,8 @@ class TmWindow(object):
         self.no = None           # 고른 기술머신 번호
         self.mon_id = None
         self.only_have = True    # 가진 것만 보기
+        self.f_type = None       # 타입으로 거르기 (None = 전체)
+        self.f_cat = None        # 분류로 거르기 (물리·특수·변화)
         self._msg = None
         self._wait = None        # 불러오는 중 표시
         self._list_job = None    # 왼쪽 줄을 나눠 만드는 일
@@ -119,7 +121,14 @@ class TmWindow(object):
         self.filter_btn = U.ghost_button(bar, "가진 것만", self._toggle_filter,
                                          height=28)
         self.filter_btn.pack(side="right", padx=(0, 14))
-        tk.Label(bar, text="상점에서 살 수 없습니다. 포켓몬을 잡으면 나옵니다.",
+        # 타입·분류로 나눠 보기. 358줄이라 '가진 것만' 하나로는 찾기 힘들다.
+        self.cat_btn = U.ghost_button(bar, "분류: 전체", self._open_cat_menu,
+                                      height=28)
+        self.cat_btn.pack(side="right", padx=(0, 8))
+        self.type_btn = U.ghost_button(bar, "타입: 전체", self._open_type_menu,
+                                       height=28)
+        self.type_btn.pack(side="right", padx=(0, 8))
+        tk.Label(bar, text="상점에서 살 수 없습니다.",
                  bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="right",
                                                                padx=(0, 12))
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
@@ -228,7 +237,77 @@ class TmWindow(object):
         self._show_rows()
 
     def _visible(self):
-        return [t for t in self.tms if t.get("have") or not self.only_have]
+        out = []
+        for t in self.tms:
+            if self.only_have and not t.get("have"):
+                continue
+            if self.f_type and t.get("type") != self.f_type:
+                continue
+            if self.f_cat and t.get("cat") != self.f_cat:
+                continue
+            out.append(t)
+        return out
+
+    # ---------------- 타입·분류로 거르기 ----------------
+    def _menu(self, btn, rows):
+        """단추 아래에 드롭다운. 맥에서는 tk.Menu 가 after 타이머와 부딪혀
+        앱이 죽으므로 U.PopupMenu 를 쓴다 (ui_box 와 같은 갈림길)."""
+        from . import platform_os as PLAT
+        w = getattr(btn, "holder", None)
+        try:
+            x, y = w.winfo_rootx(), w.winfo_rooty() + w.winfo_height() + 2
+        except Exception:                                   # noqa: BLE001
+            x, y = self.win.winfo_rootx() + 80, self.win.winfo_rooty() + 80
+        if not PLAT.NATIVE_MENU:
+            return U.PopupMenu(self.root, rows, x, y, width=170)
+        m = tk.Menu(self.root, tearoff=0, bg=U.BG2, fg=U.FG,
+                    activebackground=U.BG4, activeforeground=U.FG, bd=0,
+                    font=U.FONT_S)
+        for row in rows:
+            if row is None:
+                m.add_separator()
+                continue
+            m.add_command(label=("✓ " if row.get("checked") else "    ")
+                          + row["text"], command=row["command"])
+        try:
+            m.tk_popup(x, y)
+        finally:
+            m.grab_release()
+        return m
+
+    def _types_present(self):
+        """목록에 실제로 있는 타입만. 도감 순서를 따른다."""
+        have = set(t.get("type") for t in self.tms
+                   if t.get("have") or not self.only_have)
+        order = list(getattr(self.app.dex, "types", {}) or {}) if self.app.dex else []
+        seen = [t for t in order if t in have]
+        return seen + sorted(x for x in have if x not in seen and x)
+
+    def _open_type_menu(self):
+        rows = [{"text": "전체", "checked": self.f_type is None,
+                 "command": lambda: self._set_type(None)}, None]
+        for t in self._types_present():
+            rows.append({"text": TYPE_KR.get(t, t), "checked": self.f_type == t,
+                         "command": (lambda x=t: self._set_type(x))})
+        return self._menu(self.type_btn, rows)
+
+    def _open_cat_menu(self):
+        rows = [{"text": "전체", "checked": self.f_cat is None,
+                 "command": lambda: self._set_cat(None)}, None]
+        for c in ("physical", "special", "status"):
+            rows.append({"text": CAT_KR.get(c, c), "checked": self.f_cat == c,
+                         "command": (lambda x=c: self._set_cat(x))})
+        return self._menu(self.cat_btn, rows)
+
+    def _set_type(self, t):
+        self.f_type = t
+        self.type_btn.configure(text="타입: %s" % (TYPE_KR.get(t, t) if t else "전체"))
+        self._show_rows()
+
+    def _set_cat(self, c):
+        self.f_cat = c
+        self.cat_btn.configure(text="분류: %s" % (CAT_KR.get(c, c) if c else "전체"))
+        self._show_rows()
 
     def _paint_list(self):
         """왼쪽 줄을 만든다.
