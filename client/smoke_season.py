@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 import tkinter as tk                                       # noqa: E402
 
 from poketdesktop import platform_os as PLAT               # noqa: E402
-from poketdesktop import ui_bag, ui_pvp, ui_rank, ui_season  # noqa: E402
+from poketdesktop import ui_bag, ui_rank, ui_season  # noqa: E402
 from poketdesktop import ui_common as U                    # noqa: E402
 
 OK = FAIL = 0
@@ -153,7 +153,6 @@ class FakeApp(object):
         self.root = root
         self.api = FakeApi()
         self.rank_window = None
-        self.pvp_window = None
         self.said = []
 
     def pvp_random(self, on_done=None):
@@ -270,15 +269,6 @@ def main():
     chk("고른 것을 보낸다 (칭호 떼기 + 명패)", app.api.sent_equip[-1] == ("", "bronze"),
         app.api.sent_equip)
     ew.close()
-
-    print("대전 기록")
-    pw = ui_pvp.PvpWindow(app)
-    pump(root, lambda: not pw.busy and "옛상대" in texts(pw.win))
-    t = texts(pw.win)
-    chk("RP 변화가 뜬다", "RP +20" in t, t[:300])
-    chk("시즌 1 기록은 점수로", "점수 -14" in t)
-    chk("요약에 티어와 RP", "몬스터볼 40 RP" in pw.sub.cget("text"), pw.sub.cget("text"))
-    pw.close()
 
     print("진화 알림 (가방·관장)")
     from poketdesktop import app as APP, desktop_battle, ui_bag as UB

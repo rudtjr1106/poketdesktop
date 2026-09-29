@@ -150,11 +150,12 @@ class TrayBase(object):
             Item("레이드", lambda: self.call(a.resume_raid)),
             # 알림을 안 띄우기로 했으니, 놓치면 안 되는 것은 메뉴에
             # 남는다. 상대가 걸어온 대전은 화면에 아무 자국도 없어서
-            # 여기 없으면 알 길이 없다.
+            # 여기 없으면 알 길이 없다. **대전 탭을 없앤 뒤로는** 여기가
+            # 유일한 길이다 - 투기장에서 가장 최근 판을 재생한다.
             Item(lambda: ("받은 대전 보기  (%d)" % a.pvp_unseen
                           if getattr(a, "pvp_unseen", 0)
                           else "받은 대전 보기"),
-                 lambda: self.call(a.open_pvp)),
+                 lambda: self.call(a.watch_pending)),
             # 친구 요청도 화면에 자국이 없다. 알림을 껐거나 놓쳤을 때
             # 여기 숫자가 유일한 단서다.
             Item(lambda: ("친구 요청 보기  (%d)" % a.friend_unseen

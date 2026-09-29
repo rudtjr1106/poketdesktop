@@ -19,7 +19,8 @@
 ## 창을 닫으면
 
 판은 서버에 남는다. 제한 시간이 지나면 서버가 대신 골라 주므로 상대가
-하염없이 기다리지는 않는다. 대전 탭에서 다시 들어올 수 있다.
+하염없이 기다리지는 않는다. 판이 살아 있으면 창이 저절로 다시 열린다
+(app.announce_live 가 폴링으로 본다).
 """
 import time
 import tkinter as tk
@@ -950,7 +951,7 @@ class LiveBattleWindow(object):
             from .ui_box import confirm
             if not confirm(self.win, "창 닫기",
                            "판은 그대로 이어집니다. 시간이 지나면 서버가 대신 골라 주고, "
-                           "대전 탭에서 다시 들어올 수 있어요.",
+                           "판이 살아 있으면 창이 저절로 다시 열려요.",
                            danger=False, ok_text="닫기"):
                 return
         self.close()

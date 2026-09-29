@@ -65,8 +65,6 @@ jobs:
       - name: 휠 한 칸
         run: python client/test_wheel.py
 
-      - name: 대전 목록 시각 (UTC -> 내 시간대)
-        run: python client/test_pvp_when.py
 
       - name: 기술 설명 (본가 문장)
         run: python client/test_move_desc.py

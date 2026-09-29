@@ -97,7 +97,6 @@ class App(object):
         self.friends_win = None
         self.dex_window = None
         self.settings_win = None
-        self.pvp_window = None
         # 마지막으로 있었던 일. 트레이 메뉴에서 보여준다.
         self.last_message = ""
         # 상대가 걸어온, 아직 안 본 대전 수. 트레이에 표시한다.
@@ -820,9 +819,6 @@ class App(object):
     def open_settings(self):
         self.settings_win = self._tab("settings")
 
-    def open_pvp(self):
-        self.pvp_window = self._tab("pvp")
-
     def open_gym(self):
         self.gym_window = self._tab("gym")
 
@@ -895,7 +891,7 @@ class App(object):
                              and match.get("mine") else None)
         if not match:
             if unseen and not self.live_battle:
-                self.notify("실시간 배틀 결과가 도착했습니다. 대전 탭에서 확인해 보세요.")
+                self.notify("실시간 배틀 결과가 도착했습니다.")
             return
         state = match.get("state")
         if state == "fighting":
@@ -1407,7 +1403,7 @@ class App(object):
         self._drop_pillar()
         for name in ("box_window", "shop_window", "bag_window",
                      "friends_win", "dex_window", "settings_win",
-                     "pvp_window", "raid_window", "notes_win"):
+                     "raid_window", "notes_win"):
             w = getattr(self, name, None)
             if w:
                 try:
