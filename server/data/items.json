@@ -1264,7 +1264,7 @@
   "CLEVERWING": {
    "cat": "ev",
    "chance": 0.010217,
-   "cost": 300,
+   "cost": 1000,
    "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 특수방어 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
@@ -1276,7 +1276,7 @@
    "ident": "clever-wing",
    "kr": "정신력깃털",
    "rarity": "common",
-   "sell": 150,
+   "sell": 500,
    "weight": 100
   },
   "COBABERRY": {
@@ -1853,7 +1853,7 @@
   "GENIUSWING": {
    "cat": "ev",
    "chance": 0.010217,
-   "cost": 300,
+   "cost": 1000,
    "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 특수공격 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
@@ -1865,7 +1865,7 @@
    "ident": "genius-wing",
    "kr": "지력깃털",
    "rarity": "common",
-   "sell": 150,
+   "sell": 500,
    "weight": 100
   },
   "GOLDBOTTLECAP": {
@@ -1974,7 +1974,7 @@
   "HEALTHWING": {
    "cat": "ev",
    "chance": 0.010217,
-   "cost": 300,
+   "cost": 1000,
    "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 HP 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
@@ -1986,7 +1986,7 @@
    "ident": "health-wing",
    "kr": "체력깃털",
    "rarity": "common",
-   "sell": 150,
+   "sell": 500,
    "weight": 100
   },
   "HEAVYBALL": {
@@ -2802,7 +2802,7 @@
   "MUSCLEWING": {
    "cat": "ev",
    "chance": 0.010217,
-   "cost": 300,
+   "cost": 1000,
    "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 공격 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
@@ -2814,7 +2814,7 @@
    "ident": "muscle-wing",
    "kr": "근력깃털",
    "rarity": "common",
-   "sell": 150,
+   "sell": 500,
    "weight": 100
   },
   "MYSTICWATER": {
@@ -3496,7 +3496,7 @@
   "RESISTWING": {
    "cat": "ev",
    "chance": 0.010217,
-   "cost": 300,
+   "cost": 1000,
    "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 방어 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
@@ -3508,7 +3508,7 @@
    "ident": "resist-wing",
    "kr": "저항력깃털",
    "rarity": "common",
-   "sell": 150,
+   "sell": 500,
    "weight": 100
   },
   "RINDOBERRY": {
@@ -4029,7 +4029,7 @@
   "SWIFTWING": {
    "cat": "ev",
    "chance": 0.010217,
-   "cost": 300,
+   "cost": 1000,
    "desc": "포켓몬에게 사용하는 도구. 포켓몬 1마리의 스피드 기초 포인트를 조금 올린다.",
    "effect": {
     "amount": 1,
@@ -4041,7 +4041,7 @@
    "ident": "swift-wing",
    "kr": "순발력깃털",
    "rarity": "common",
-   "sell": 150,
+   "sell": 500,
    "weight": 100
   },
   "SYRUPYAPPLE": {

@@ -71,6 +71,11 @@ PRICE_OVERRIDE = {
     "black-augurite": 3000, "peat-block": 3000, "metal-alloy": 3000,
     "scroll-of-darkness": 5000, "scroll-of-waters": 5000,
     "linking-cord": 8000,
+    # 노력치 깃털(+1). 본가 정가 300 원이면 노력치 1 에 300 원이라 영양제
+    # (+10 에 10,000 원, 1 에 1,000 원)보다 세 배 싸서 영양제를 살 이유가
+    # 없었다. 영양제와 같은 1 에 1,000 원으로 맞춘다 (시즌 3, 사용자 결정).
+    "health-wing": 1000, "muscle-wing": 1000, "resist-wing": 1000,
+    "genius-wing": 1000, "clever-wing": 1000, "swift-wing": 1000,
 }
 
 # 상점에서 팔지 않는 것 (드랍으로만 얻는다)
