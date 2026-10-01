@@ -335,6 +335,11 @@ class RewardsWindow(object):
         self.frame_var = tk.StringVar(value=NONE)
 
         self.win, self.body = _dialog(self.root, "칭호 · 명패", 440, 520)
+        # 칭호가 많으면(도감 업적으로 수십 개가 된다) 목록을 굴려서 본다
+        U.install_wheel(self.win)
+        self.cv = None
+        self.fit = None
+        self._radios = {}             # (변수 이름, 값) -> 라디오 단추
         self.status = U.status_line(self.win, "")
         self.status.pack(side="bottom", fill="x", padx=16, pady=(0, 10))
         self._wait = ui_loading.Overlay(self.win, "불러오는 중")
@@ -353,29 +358,51 @@ class RewardsWindow(object):
         eq = r.get("equipped") or {}
         self.title_var.set(eq.get("title") or NONE)
         self.frame_var.set(eq.get("frame") or NONE)
-        f = self.body
         titles = r.get("titles") or []
         frames = r.get("frames") or []
+
+        # **단추 줄을 먼저 아래에 붙인다.** 칭호가 수십 개면 목록이 창보다 길어서,
+        # 목록 뒤에 담으면 '달기' 가 창 밖으로 밀려 누를 수가 없었다 (1.7.0 -
+        # 도감 업적으로 칭호가 46개까지 늘었다). 목록은 그 위에서 굴린다.
+        row = tk.Frame(self.body, bg=U.BG)
+        row.pack(fill="x", side="bottom", pady=(10, 0))
+        U.PushButton(row, "달기", self.save, height=34,
+                     font=U.FONT_B).pack(side="right")
+        U.ghost_button(row, "닫기", self.close, height=34).pack(
+            side="right", padx=(0, 8))
+        holder = tk.Frame(self.body, bg=U.BG)
+        holder.pack(fill="both", expand=True)
+        self.cv = tk.Canvas(holder, bg=U.BG, highlightthickness=0, bd=0)
+        sb = ttk.Scrollbar(holder, orient="vertical", command=self.cv.yview)
+        self.cv.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self.cv.pack(side="left", fill="both", expand=True)
+        f = tk.Frame(self.cv, bg=U.BG)
+        wid = self.cv.create_window((0, 0), window=f, anchor="nw")
+        self.fit = U.scroll_fitter(self.cv, f, wid)
+        U.scrollable(self.cv, 60)
+        self._inner = f
 
         tk.Label(f, text="칭호", bg=U.BG, fg=U.FG, font=U.FONT_H).pack(anchor="w")
         tk.Label(f, text="랭킹·친구 목록·투기장에서 이름 옆에 붙습니다.",
                  bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS).pack(anchor="w")
         box = U.framed(f, bg=U.INK)
-        box.pack(fill="x", pady=(6, 12))
+        box.pack(fill="x", pady=(6, 12), padx=(0, 8))
         self._radio(box, self.title_var, NONE, "달지 않기", U.FG_DIM)
         for t in titles:
-            self._radio(box, self.title_var, t["id"], t["name"], U.ACCENT_TEXT)
+            self._radios[("title", t["id"])] = self._radio(
+                box, self.title_var, t["id"], t["name"], U.ACCENT_TEXT)
         if not titles:
-            tk.Label(box, text="아직 받은 칭호가 없습니다. 시즌이 끝나면 순위와 "
-                               "티어에 따라 받습니다.", bg=U.INK, fg=U.FG_FAINT,
-                     font=U.FONT_XS, wraplength=360, justify="left").pack(
+            tk.Label(box, text="아직 받은 칭호가 없습니다. 시즌 보상이나 도감 업적으로 "
+                               "받습니다.", bg=U.INK, fg=U.FG_FAINT,
+                     font=U.FONT_XS, wraplength=340, justify="left").pack(
                 anchor="w", padx=10, pady=6)
 
         tk.Label(f, text="명패", bg=U.BG, fg=U.FG, font=U.FONT_H).pack(anchor="w")
         tk.Label(f, text="이름이 명패 색으로 바뀝니다.", bg=U.BG, fg=U.FG_FAINT,
                  font=U.FONT_XS).pack(anchor="w")
         box = U.framed(f, bg=U.INK)
-        box.pack(fill="x", pady=(6, 12))
+        box.pack(fill="x", pady=(6, 12), padx=(0, 8))
         self._radio(box, self.frame_var, NONE, "달지 않기", U.FG_DIM)
         for fr in frames:
             self._radio(box, self.frame_var, fr["id"], fr["name"],
@@ -384,12 +411,23 @@ class RewardsWindow(object):
             tk.Label(box, text="아직 받은 명패가 없습니다.", bg=U.INK,
                      fg=U.FG_FAINT, font=U.FONT_XS).pack(anchor="w", padx=10,
                                                          pady=6)
-        row = tk.Frame(f, bg=U.BG)
-        row.pack(fill="x", side="bottom")
-        U.PushButton(row, "달기", self.save, height=34,
-                     font=U.FONT_B).pack(side="right")
-        U.ghost_button(row, "닫기", self.close, height=34).pack(
-            side="right", padx=(0, 8))
+        self.fit.fit_now()
+        self._show_equipped()
+
+    def _show_equipped(self):
+        """달고 있는 칭호가 목록 아래쪽에 있으면 거기까지 굴려 둔다."""
+        rb = self._radios.get(("title", self.title_var.get()))
+        if rb is None or self.cv is None:
+            return
+        try:
+            self.win.update_idletasks()
+            total = self._inner.winfo_height()
+            view = self.cv.winfo_height()
+            y = rb.master.winfo_y() + rb.winfo_y()
+            if total > view and y + rb.winfo_height() > view:
+                self.cv.yview_moveto(max(0.0, (y - view // 3) / float(total)))
+        except tk.TclError:
+            pass
 
     def _radio(self, parent, var, value, text, color):
         rb = tk.Radiobutton(parent, text=text, variable=var, value=value,

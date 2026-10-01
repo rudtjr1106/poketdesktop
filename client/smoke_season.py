@@ -31,6 +31,7 @@ import tkinter as tk                                       # noqa: E402
 from poketdesktop import platform_os as PLAT               # noqa: E402
 from poketdesktop import ui_bag, ui_rank, ui_season  # noqa: E402
 from poketdesktop import ui_common as U                    # noqa: E402
+from test_learn_dialog import squeezed                     # noqa: E402
 
 OK = FAIL = 0
 ERRORS = []
@@ -269,6 +270,45 @@ def main():
     chk("고른 것을 보낸다 (칭호 떼기 + 명패)", app.api.sent_equip[-1] == ("", "bronze"),
         app.api.sent_equip)
     ew.close()
+
+    print("칭호가 많을 때 (도감 업적 - 굴려서 본다)")
+    many = [{"id": "ach_%d" % i, "name": "업적 칭호 %d" % i, "season": 0} for i in range(46)]
+    real_rewards = app.api.rewards
+    app.api.rewards = lambda: {"titles": many,
+                               "frames": [{"id": "bronze", "name": "동빛 명패",
+                                           "color": "#d08a52"}],
+                               "equipped": {"title": "ach_40", "frame": None}}
+    try:
+        mw = ui_season.RewardsWindow(app)
+        pump(root, lambda: mw.cv is not None and "업적 칭호 0" in texts(mw.win))
+        for _ in range(8):
+            root.update()
+        mw.win.update_idletasks()
+        btn = [w for w in mw.body.winfo_children()][0]          # 맨 먼저 담은 단추 줄
+        by = btn.winfo_rooty() + btn.winfo_height()
+        wy = mw.win.winfo_rooty() + mw.win.winfo_height()
+        chk("'달기' 줄이 창 안에 다 보인다", btn.winfo_ismapped() and by <= wy
+            and btn.winfo_height() >= btn.winfo_reqheight(),
+            (by, wy, btn.winfo_height(), btn.winfo_reqheight()))
+        first, last = mw.cv.yview()
+        chk("목록은 창보다 길어서 굴린다", last - first < 0.999, (first, last))
+        rb = mw._radios[("title", "ach_40")]
+        top = mw.cv.winfo_rooty()
+        ry = rb.winfo_rooty()
+        chk("달고 있는 칭호(41번째)까지 굴려 둔다",
+            top <= ry and ry + rb.winfo_height() <= top + mw.cv.winfo_height(),
+            (top, ry, mw.cv.winfo_height()))
+        mw.cv.yview_moveto(1.0)
+        root.update()
+        chk("끝까지 굴리면 명패 칸이 보인다", mw.cv.yview()[1] >= 0.999, mw.cv.yview())
+        chk("눌린 위젯 없음", not squeezed(mw.win), squeezed(mw.win)[:3])
+        mw.title_var.set("ach_3")
+        mw.save()
+        pump(root, lambda: app.api.sent_equip and app.api.sent_equip[-1][0] == "ach_3")
+        chk("고른 칭호를 보낸다", app.api.sent_equip[-1][0] == "ach_3", app.api.sent_equip[-1])
+        mw.close()
+    finally:
+        app.api.rewards = real_rewards
 
     print("진화 알림 (가방·관장)")
     from poketdesktop import app as APP, desktop_battle, ui_bag as UB
