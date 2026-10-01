@@ -78,8 +78,10 @@ class DexWindow(object):
         h.pack_propagate(False)
         inner = tk.Frame(h, bg=U.BG2)
         inner.pack(fill="both", expand=True, padx=16)
+        # **pady 를 주지 않는다.** 윈도우에서 이 글자는 34px 라 위아래 17 씩을 더하면
+        # 68 로 머리줄(62)을 넘어 6px 눌렸다. 여백 없이도 세로 가운데에 놓인다.
         tk.Label(inner, text="도감", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", pady=17)
+                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left")
         self.count = tk.Label(inner, text="", bg=U.BG2, fg=U.ACCENT,
                               font=U.FONT_B)
         self.count.pack(side="left", padx=(12, 0))
