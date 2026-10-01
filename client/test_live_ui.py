@@ -128,10 +128,10 @@ class FakeApi(object):
         self.calls.append("live")
         return {"match": self.match(), "unseen": 0}
 
-    def live_act(self, kind, move="", slot=-1):
+    def live_act(self, kind, move="", slot=-1, mega=False):
         self.calls.append("act:%s" % (move or slot or kind))
         value = move if kind == "move" else (slot if kind == "switch" else None)
-        self.lb.choose("a", kind, value)
+        self.lb.choose("a", kind, value, mega=mega)
         if self.auto_foe and self.lb.can_act("b"):
             self.lb.choose("b", *self.lb.auto_choice("b"))
         if self.lb.ready():

@@ -121,6 +121,10 @@ class Player(object):
         self.damage = 0                  # 보스에게 넣은 누적 데미지
         self.left = False                # 스스로 나갔다
         self.auto = 0                    # 시간 안에 못 고른 횟수
+        # 메가진화 (시즌 3). 사람마다 제 판(보스와의 한 판)에서 한 번씩이다.
+        self.keystone = False
+        self.mega_done = set()
+        self.mega_req = False
 
     @property
     def mon(self):
@@ -199,6 +203,8 @@ class RaidBattle(object):
             bt.kind = "gym"              # 교체가 되는 판
             bt.switcher = self._make_switcher(i)
             bt.turn_no = self.round
+            bt.keystone = {"me": p.keystone, "foe": False}
+            bt.mega_done = p.mega_done       # 같은 객체 - 판을 다시 만들어도 한 번이 지켜진다
             p.bt = bt
         self._sync_weather()
 
@@ -269,8 +275,11 @@ class RaidBattle(object):
         return events
 
     # ---------------- 고르기 ----------------
-    def choose(self, i, kind, value=None):
-        """이번 라운드에 할 것을 적어 둔다. 라운드는 아직 안 돈다."""
+    def choose(self, i, kind, value=None, mega=False):
+        """이번 라운드에 할 것을 적어 둔다. 라운드는 아직 안 돈다.
+
+        mega: 이 라운드에 메가진화 (기술을 고를 때만, 될 때만 받는다).
+        """
         p = self.players[i]
         if self.over:
             raise ValueError("이미 끝난 레이드입니다.")
@@ -289,7 +298,9 @@ class RaidBattle(object):
                 if why and not (enc and enc.get("move") == key):
                     raise ValueError(why)
             p.choice = ("move", key)
+            p.mega_req = bool(mega) and p.bt.can_mega("me") is not None
         elif kind == "switch":
+            p.mega_req = False
             slot = int(value)
             if slot == p.slot or slot not in p.alive_slots():
                 raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
@@ -365,7 +376,15 @@ class RaidBattle(object):
             if p.playing() and p.choice and p.choice[0] == "switch":
                 self._switch(i, p.choice[1], ev)
 
-        # 3) 기술
+        # 3) 메가진화 (시즌 3): 고른 뒤, 순서를 정하기 전에
+        for i, p in enumerate(self.players):
+            if p.playing() and p.mega_req and p.choice and p.choice[0] == "move":
+                got = []
+                p.bt.mega_step({"me": True}, got)
+                ev.extend(self._tag(got, i))
+            p.mega_req = False
+
+        # 4) 기술
         for actor in self._order():
             if self.over:
                 break
@@ -654,6 +673,7 @@ class RaidBattle(object):
             "types": [dex.type_name(t) for t in f.types()], "typeIds": f.types(),
             "stages": dict((k, v) for k, v in f.stages.items() if v),
             "fainted": not f.alive(),
+            "mega": bool(f.mega),
             "ability": f.ability,
             "abilityKr": dex.ability_name(f.ability) if f.ability else None,
         }
@@ -713,7 +733,10 @@ class RaidBattle(object):
                          "moves": self.moves_of(me),
                          "team": [self.side(f, True) for f in p.team],
                          "choice": list(p.choice) if p.choice else None,
-                         "canAct": p.playing()}
+                         "canAct": p.playing(),
+                         "canMega": bool(p.playing() and p.bt is not None
+                                         and p.bt.can_mega("me")),
+                         "megaUsed": "me" in p.mega_done}
         return out
 
     # ---------------- 저장 ----------------
@@ -752,6 +775,8 @@ class RaidBattle(object):
                 "team": [self._dump_fighter(f) for f in p.team],
                 "damage": p.damage, "left": p.left,
                 "auto": p.auto, "choice": list(p.choice) if p.choice else None,
+                "keystone": p.keystone, "megaDone": sorted(p.mega_done),
+                "megaReq": p.mega_req,
             } for p in self.players],
             "field": self.field.dump(),
             "rng": [st[0], list(st[1]), st[2]],
@@ -777,6 +802,9 @@ class RaidBattle(object):
             p.left = bool(x.get("left"))
             p.auto = int(x.get("auto") or 0)
             p.choice = tuple(x["choice"]) if x.get("choice") else None
+            p.keystone = bool(x.get("keystone"))
+            p.mega_done = set(x.get("megaDone") or [])
+            p.mega_req = bool(x.get("megaReq"))
             self.players.append(p)
         self.round = int(d["round"])
         self.over = bool(d["over"])

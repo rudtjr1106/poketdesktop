@@ -11,6 +11,9 @@
 돌이 생기지 않는다.
 
     python tools/build_items.py --out server/data/items.json
+
+**메가스톤(시즌 3)은 여기서 안 만든다.** tools/add_megas.py 가 items.json 에
+따로 끼운다. 이걸 다시 돌렸으면 그것도 다시 돌려야 메가스톤이 안 사라진다.
 """
 import argparse
 import csv

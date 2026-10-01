@@ -257,9 +257,21 @@ def played_today(uid, now=None):
                  (uid, today_kst(now)))
 
 
-def party_of(uid):
+def party_all(uid):
+    """바탕화면에 데리고 다니는 포켓몬 전부."""
     return [db.row_to_mon(r) for r in db.q(
         "SELECT * FROM pokemon WHERE user_id=? AND on_desktop=1 ORDER BY slot, id", (uid,))]
+
+
+def party_split(uid):
+    """레이드에 실제로 나가는 팀과 쉬는 포켓몬. 전설·환상은 한 마리만 (시즌 3)."""
+    from . import pvp
+    return pvp.split_restricted(party_all(uid))
+
+
+def party_of(uid):
+    """레이드에 실제로 나가는 팀."""
+    return party_split(uid)[0]
 
 
 def expire_old(now=None):
@@ -277,6 +289,10 @@ def _can_play(uid, now=None):
     if played_today(uid, now):
         raise ValueError("오늘은 이미 레이드에 참가했습니다. 내일 다시 도전하세요.")
     if len(party_of(uid)) < config.RAID_MIN_PARTY:
+        if len(party_all(uid)) >= config.RAID_MIN_PARTY:
+            raise ValueError("전설·환상 포켓몬은 한 팀에 한 마리만 데려갈 수 있습니다. "
+                             "전설·환상이 아닌 포켓몬과 함께 %d마리 이상 데리고 와야 "
+                             "합니다." % config.RAID_MIN_PARTY)
         raise ValueError("포켓몬을 %d마리 이상 데리고 와야 합니다."
                          % config.RAID_MIN_PARTY)
 
@@ -476,6 +492,12 @@ def begin(row, now=None):
         hp_mult=config.RAID_HP_BASE + config.RAID_HP_PER * len(players),
         max_rounds=config.RAID_ROUNDS, double_from=config.RAID_DOUBLE_FROM,
         rng=random.Random())
+    # 메가진화 (시즌 3): 참가자마다 관장 8곳이면 키스톤
+    from . import mega
+    for p in rb.players:
+        p.keystone = mega.has_keystone(p.uid)
+        if p.bt is not None:
+            p.bt.keystone["me"] = p.keystone
     ev = rb.start()
     cur = db.run(
         "UPDATE raid_room SET state='fighting', data=?, events=?, round=0, rev=rev+1,"
@@ -527,7 +549,7 @@ def _save(row, rb, ev, now=None):
 CHOOSE_TRIES = 5
 
 
-def choose(uid, kind, value, now=None):
+def choose(uid, kind, value, now=None, mega=False):
     """이번 라운드에 할 것을 적는다. 다 모이면 그 자리에서 라운드가 돈다.
 
     **부딪히면 다시 해본다.** 여섯 명이 같은 방을 동시에 두드리는 판이라,
@@ -543,7 +565,7 @@ def choose(uid, kind, value, now=None):
         i = _index_of(row, uid)
         if i is None:
             raise LookupError("이 레이드의 참가자가 아닙니다.")
-        rb.choose(i, kind, value)
+        rb.choose(i, kind, value, mega=mega)
         ev = None
         if rb.ready():
             ev = rb.resolve()

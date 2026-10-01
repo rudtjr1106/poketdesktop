@@ -36,6 +36,7 @@ from . import ui_common as U
 from .ui_common import run_async
 from .ui_gym import shade
 from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
+from .ui_mega import MegaToggle
 
 W = 880
 SCENE_H = 306
@@ -231,6 +232,7 @@ class LiveBattleWindow(object):
                             font=(U.FAMILY, U.pt(12)), anchor="w", justify="left")
         self.msg.pack(side="left", fill="both", expand=True, padx=14)
         U.wrap_to_width(self.msg)
+        self.mega = MegaToggle(f, before=self.msg)       # 시즌 3, 고를 때만 보인다
 
     def _commands(self):
         self.cmd = tk.Frame(self.win, bg=U.BG)
@@ -445,6 +447,19 @@ class LiveBattleWindow(object):
             self.later(30, lambda: step(i + 1))
         step(0)
 
+    def _mega(self, ev):
+        """메가진화 - 도트와 이름을 메가 폼으로 바꾼다. 체력은 그대로다."""
+        who = ev.get("who")
+        mon = self.shown.get(who) if who in ("me", "foe") else None
+        if mon is not None:
+            mon = dict(mon)
+            mon["num"] = ev.get("num") or mon.get("num")
+            mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
+            mon["mega"] = True
+            self.set_mon(who, mon)
+            self._banner(who, "메가진화!")
+        self.say(ev.get("text"))
+
     def _banner(self, who, text):
         s = U.h
         cv = self.cv
@@ -533,6 +548,9 @@ class LiveBattleWindow(object):
                 pass
             self.say(text)
             return 420
+        if t == "mega":
+            self._mega(ev)
+            return STEP_MS + 450
         if t == "move":
             self.say(text)
             other = "foe" if who == "me" else "me"
@@ -722,6 +740,7 @@ class LiveBattleWindow(object):
             w.destroy()
         for b in (self.switch_btn, self.forfeit_btn):
             b.configure(state="disabled")
+        self.mega.show(False)
 
     def show_commands(self):
         self._panel = self._panel_key()
@@ -733,6 +752,8 @@ class LiveBattleWindow(object):
         me = self.view.get("me") or {}
         foe = self.view.get("foe") or {}
         self.forfeit_btn.configure(state="normal")
+        # 폴링이 명령 칸을 다시 그려도 켜 둔 메가는 그대로다 (이미 보이면 안 건드린다)
+        self.mega.show(self.view.get("canMega") and not (self.sent or me.get("chosen")))
         if not self.view.get("canAct"):
             self.switch_btn.configure(state="disabled")
             why = ("%s 님이 다음 포켓몬을 고르고 있습니다."
@@ -835,6 +856,7 @@ class LiveBattleWindow(object):
         for c in (0, 1, 2):
             grid.grid_columnconfigure(c, weight=1, uniform="pt")
         self.switch_btn.configure(state="disabled")
+        self.mega.show(False)
         self.hint.configure(text="쓰러진 포켓몬과 지금 나와 있는 포켓몬은 고를 수 없습니다.")
 
     def _party_cell(self, grid, i, m, active, ok):
@@ -863,6 +885,7 @@ class LiveBattleWindow(object):
     def _send(self, kind, move="", slot=-1):
         if self.busy or self.sent:
             return
+        mega = self.mega.take() if kind == "move" else False
         self.sent = True
         self.hide_commands()
         self.say("...")
@@ -881,7 +904,7 @@ class LiveBattleWindow(object):
                 return self.play(r.get("events") or [], r)
             self.sync(r)
             self.show_commands()
-        run_async(self.root, lambda: self.app.api.live_act(kind, move, slot), done)
+        run_async(self.root, lambda: self.app.api.live_act(kind, move, slot, mega=mega), done)
 
     def use_move(self, key):
         self._send("move", move=key)

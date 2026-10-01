@@ -119,9 +119,10 @@ class SettingsWindow(object):
 
         foot = tk.Frame(self.win, bg=U.BG)
         foot.pack(fill="x", side="bottom", padx=20, pady=16)
+        # 닫기 단추는 두지 않는다. 탭 안에서는 닫을 것이 없고, 따로 뜬 창은
+        # 제목 막대로 닫는다.
         U.ghost_button(foot, "기본값으로", self.reset, height=32).pack(
             side="left")
-        U.ghost_button(foot, "닫기", self.close, height=32).pack(side="right")
         self.status = U.status_line(self.win, "바꾸면 바로 적용됩니다.")
         self.status.pack(fill="x", side="bottom", padx=20)
 

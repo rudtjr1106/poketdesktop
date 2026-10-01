@@ -61,6 +61,26 @@ from . import movecalc as MC
 from . import statusmoves as SM
 
 TEAM_MAX = 6
+# 이 레벨 이상의 관장은 메가진화를 쓴다 (시즌 3). 한 판에 한 번이라 팀에서
+# 메가가 되는 첫 포켓몬에게만 스톤을 쥐여 준다.
+MEGA_TRAINER_LEVEL = 80
+
+
+def give_mega_stone(dex, team, level):
+    """높은 관장의 팀에서 메가가 되는 첫 포켓몬에게 스톤을 쥐여 준다.
+
+    레쿠쟈처럼 스톤 대신 기술로 되는 폼은 건너뛴다. 준 자리를 돌려준다(없으면 None).
+    """
+    if int(level or 0) < MEGA_TRAINER_LEVEL:
+        return None
+    for i, f in enumerate(team):
+        forms = (getattr(dex, "mega_of", None) or {}).get(f.mon.get("species")) or []
+        stone = next((m.get("megaStone") for m in forms if m.get("megaStone")), None)
+        if stone:
+            f.held = stone
+            f.mon = dict(f.mon, held=stone)
+            return i
+    return None
 MAX_TURNS = 400
 STATS = ("hp", "atk", "def", "spa", "spd", "spe")
 IV_GYM = 31                 # 관장 포켓몬의 개체값 (tools/build_gyms.py)
@@ -139,6 +159,11 @@ class TrainerBattle(object):
         self.foe_team = [self._fighter(trainer_mon(e)) for e in trainer["team"][:TEAM_MAX]]
         self.mi = next(i for i, f in enumerate(self.me_team) if f.alive())
         self.fi = 0
+        # 메가진화 (시즌 3). 내 키스톤은 서버가 채운다(관장 8곳). 높은 관장은
+        # 스톤을 쥐고 알아서 메가진화한다.
+        mega_slot = give_mega_stone(dex, self.foe_team, trainer.get("level"))
+        self.keystone = {"me": False, "foe": mega_slot is not None}
+        self.mega_done = set()
         self._make_duel(FD.Field())
         self.turn = 0
         self.over = False
@@ -162,6 +187,10 @@ class TrainerBattle(object):
         self.bt.max_turns = 10 ** 9            # 끝내는 건 여기서 한다
         self.bt.kind = "gym"
         self.bt.switcher = self._move_switch
+        # 같은 객체를 나눠 쓴다 - 불러올 때 판을 새로 만들어도 한 판 한 번이 지켜진다
+        self.bt.keystone = self.keystone
+        self.bt.mega_done = self.mega_done
+        self.bt.auto_mega = {"me": False, "foe": bool(self.keystone.get("foe"))}
 
     def _fighter(self, mon):
         f = B.Fighter(self.dex, mon)
@@ -564,8 +593,11 @@ class TrainerBattle(object):
     def valid_switches(self):
         return [i for i, f in enumerate(self.me_team) if f.alive() and i != self.mi]
 
-    def act(self, kind, value=None):
-        """kind: 'move' (value=기술) / 'switch' (value=자리) / 'forfeit'"""
+    def act(self, kind, value=None, mega=False):
+        """kind: 'move' (value=기술) / 'switch' (value=자리) / 'forfeit'
+
+        mega: 이 턴에 메가진화한다 (기술을 고를 때만. 교체하면서는 못 한다).
+        """
         if self.over:
             return [{"t": "over", "result": self.result}]
         if not self.started:
@@ -633,6 +665,10 @@ class TrainerBattle(object):
             self.foe_switched_last = True
         else:
             self.foe_switched_last = False
+
+        # 메가진화 (시즌 3): 둘 다 고른 뒤, 순서를 정하기 전에. 교체한 쪽은 못 한다.
+        bt.auto_mega["foe"] = bool(self.keystone.get("foe")) and foe_slot is None
+        bt.mega_step({"me": bool(mega) and kind == "move"}, ev)
 
         me, foe = self.me, self.foe
         me.flinched = False
@@ -733,6 +769,7 @@ class TrainerBattle(object):
             "types": [dex.type_name(t) for t in f.types()], "typeIds": f.types(),
             "stages": dict((k, v) for k, v in f.stages.items() if v),
             "fainted": not f.alive(),
+            "mega": bool(f.mega),
         }
         if mine or f.ab.get("shown"):
             out["ability"] = f.ability
@@ -769,6 +806,10 @@ class TrainerBattle(object):
         return {
             "turn": self.turn, "over": self.over, "result": self.result,
             "needSwitch": self.need_switch, "trainer": self.trainer,
+            # 메가진화 단추를 띄울지 (키스톤·스톤·한 판 한 번을 다 본 값)
+            "canMega": bool(not self.over and not self.need_switch
+                            and self.bt.can_mega("me")),
+            "megaUsed": "me" in self.mega_done,
             "me": {"slot": self.mi, "team": [self.side(f, True) for f in self.me_team]},
             "foe": {"slot": self.fi, "team": foe_team},
         }
@@ -802,6 +843,7 @@ class TrainerBattle(object):
             "seen": sorted(self.seen), "started": self.started, "kos": self.kos,
             "rng": [st[0], list(st[1]), st[2]],
             "field": self.bt.field.dump(), "pendingOut": self.pending_out,
+            "keystone": dict(self.keystone), "megaDone": sorted(self.mega_done),
         }
 
     @classmethod
@@ -815,6 +857,8 @@ class TrainerBattle(object):
         self.me_team = [self._load_fighter(x) for x in d["me"]]
         self.foe_team = [self._load_fighter(x) for x in d["foe"]]
         self.mi, self.fi = d["mi"], d["fi"]
+        self.keystone = dict(d.get("keystone") or {"me": False, "foe": False})
+        self.mega_done = set(d.get("megaDone") or [])
         self._make_duel(FD.Field.load(d.get("field")))
         self.pending_out = d.get("pendingOut")
         self.turn = d["turn"]

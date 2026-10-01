@@ -58,11 +58,17 @@ def _side_view(f):
     # Fighter 가 이미 도감 항목을 들고 있으니 거기서 가져온다 - 화면이
     # 도트를 찾을 때 쓰는 값이라 비면 아무것도 안 뜬다.
     sp = f.species or {}
-    return {"name": f.name, "species": f.mon.get("species"),
-            "num": f.mon.get("num") or sp.get("num"),
-            "level": f.mon.get("level"),
-            "shiny": bool(f.mon.get("shiny")), "hp": f.hp, "maxhp": f.maxhp,
-            "gender": f.mon.get("gender")}
+    out = {"name": f.name, "species": f.mon.get("species"),
+           # 메가진화한 선수가 다시 나오면 메가 모습으로 (시즌 3)
+           "num": sp.get("num") if f.mega else (f.mon.get("num") or sp.get("num")),
+           "level": f.mon.get("level"),
+           "shiny": bool(f.mon.get("shiny")), "hp": f.hp, "maxhp": f.maxhp,
+           "gender": f.mon.get("gender")}
+    # **메가일 때만 싣는다.** 늘 "mega": False 를 붙이면 메가와 상관없는 옛 판의
+    # 로그까지 글자가 바뀐다 (test_held 의 요약값이 그걸 지킨다).
+    if f.mega:
+        out["mega"] = True
+    return out
 
 
 class PartyBattle(object):
@@ -75,7 +81,7 @@ class PartyBattle(object):
         out["turns"]    총 턴 수
     """
 
-    def __init__(self, dex, a_mons, b_mons, seed=None):
+    def __init__(self, dex, a_mons, b_mons, seed=None, keystone=None):
         if not a_mons or not b_mons:
             # 엔진이 정책을 갖지는 않지만, 여기서 안 막으면 아래에서
             # team[0] 이 IndexError 를 내고 서버가 500 을 뱉는다.
@@ -95,6 +101,10 @@ class PartyBattle(object):
         self.field = FD.Field()
         self.round_no = 0
         self.bt = None
+        # 메가진화 (시즌 3). 양쪽 다 AI 가 싸우니 알아서 메가진화한다. 라운드마다
+        # Battle 을 새로 만들어도 한 판 한 번이 지켜지게 여기 둔다.
+        self.keystone = dict(keystone or {"me": False, "foe": False})
+        self.mega_done = set()
 
     # ---------------- 도구 ----------------
     @staticmethod
@@ -188,6 +198,9 @@ class PartyBattle(object):
         bt.teams = {"me": self.a, "foe": self.b}     # 집단폭행이 세는 같은 편
         bt.kind = "pvp"
         bt.switcher = self._move_switch
+        bt.keystone = self.keystone
+        bt.mega_done = self.mega_done
+        bt.auto_mega = {"me": True, "foe": True}
         self.bt = bt
         return bt
 
@@ -360,9 +373,9 @@ class PartyBattle(object):
         return "me" if ra > rb else "foe"
 
 
-def simulate(dex, a_mons, b_mons, seed=None):
-    """한 줄로 쓰는 입구."""
-    return PartyBattle(dex, a_mons, b_mons, seed).run()
+def simulate(dex, a_mons, b_mons, seed=None, keystone=None):
+    """한 줄로 쓰는 입구. keystone = {"me": a 가 가졌나, "foe": b 가 가졌나}."""
+    return PartyBattle(dex, a_mons, b_mons, seed, keystone=keystone).run()
 
 
 # 시점 뒤집기 --------------------------------------------------------

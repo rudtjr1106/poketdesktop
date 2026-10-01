@@ -370,6 +370,8 @@ def profile(uid, other):
     # 모르는 사람의 기록을 마음대로 볼 수 있으면 그것도 정보 수집이 된다.
     # 특히 "언제 컴퓨터 앞에 있었나" 는 접속 중 표시(초 단위가 아닌 3분
     # 창)보다 훨씬 많은 것을 말해 준다 - 생활 시간표가 그대로 드러난다.
+    from . import achievements
+    out["achievements"] = achievements.top(other)
     out["recent"] = []
     if rel in ("self", "friend"):
         out["lastSeen"] = seen

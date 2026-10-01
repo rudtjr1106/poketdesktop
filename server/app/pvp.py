@@ -164,13 +164,17 @@ def _party(uid):
 
 
 # ---- 전설·환상 제한 ----
-# 랭크 배틀에 나가는 팀에는 전설·환상을 한 마리까지만. 본가 랭크 배틀의 '금지급
-# 한 마리' 와 같은 생각이다. 시즌마다 1~5위가 알을 받으므로 그대로 두면 같은
-# 사람에게 전설이 쌓인다. 한 마리일 때는 시뮬레이션으로 재어 보니 매칭이
-# 상쇄해서 승률이 거의 안 오른다 (가장 센 종도 +5%p, 야생 한카리아스와 비슷).
+# 팀에는 전설·환상을 한 마리까지만. 본가 랭크 배틀의 '금지급 한 마리' 와 같은
+# 생각이다. 시즌마다 1~5위가 알을 받으므로 그대로 두면 같은 사람에게 전설이
+# 쌓인다. 한 마리일 때는 시뮬레이션으로 재어 보니 매칭이 상쇄해서 승률이 거의
+# 안 오른다 (가장 센 종도 +5%p, 야생 한카리아스와 비슷).
 #
-# 등록한 랭크 팀은 두 마리째를 넣을 수 없다 (set_team). 등록하지 않아서 바탕화면
-# 파티로 싸우는 사람은 **앞에 있는 한 마리만 나가고 나머지는 빠진다** (restrict).
+# 시즌 2 까지는 랭크(랜덤·실시간)에만 걸었다. **시즌 3 부터 친구 배틀·관장·레이드
+# 까지 모든 팀 배틀에 건다** (사용자 결정). 바탕화면 야생 배틀은 팀 대 팀이
+# 아니라서 그대로 둔다.
+#
+# 등록한 랭크 팀은 두 마리째를 넣을 수 없다 (set_team). 바탕화면 파티로 싸우는
+# 곳은 **앞에 있는 한 마리만 나가고 나머지는 쉰다** (restrict / split_restricted).
 RESTRICTED_MAX = 1
 
 
@@ -195,21 +199,44 @@ def restricted_species():
 _RESTRICTED = None
 
 
-def restrict(mons):
-    """랭크 배틀에 실제로 나가는 팀. (팀, 빠진 마릿수).
+def split_restricted(mons):
+    """실제로 나가는 팀과 쉬는 포켓몬. (팀, 쉬는 것 목록).
 
     전설·환상은 앞에서부터 RESTRICTED_MAX 마리만 남긴다. 순서는 그대로다.
     """
     names = restricted_species()
-    out, seen, dropped = [], 0, 0
+    out, seen, benched = [], 0, []
     for m in mons:
         if m.get("species") in names:
             if seen >= RESTRICTED_MAX:
-                dropped += 1
+                benched.append(m)
                 continue
             seen += 1
         out.append(m)
-    return out, dropped
+    return out, benched
+
+
+def restrict(mons):
+    """배틀에 실제로 나가는 팀. (팀, 빠진 마릿수)."""
+    out, benched = split_restricted(mons)
+    return out, len(benched)
+
+
+def battle_party(uid):
+    """친구 배틀·관장·레이드가 쓰는 팀 — 바탕화면 파티에 전설·환상 제한을 건 것.
+    (팀, 쉬는 것 목록)."""
+    return split_restricted(_party(uid))
+
+
+def bench_note(benched):
+    """쉬는 포켓몬을 알리는 한 줄. 없으면 빈 문자열. 이름은 별명이 있으면 별명."""
+    if not benched:
+        return ""
+    dex = deps.dex()
+    names = [m.get("nickname") or (dex.get(m.get("species")) or {}).get("kr")
+             or m.get("species") for m in benched]
+    return ("전설·환상 포켓몬은 한 팀에 %d마리만 데려갈 수 있어서 %s 은(는) 이번에 쉽니다."
+            % (RESTRICTED_MAX, "·".join(names)))
 
 
 def team_ids(uid):
@@ -305,12 +332,17 @@ def run_match(a_uid, b_uid, kind="random", seed=None):
     if kind == "random":
         a_mons, b_mons = capped(ranked_team(a_uid)), capped(ranked_team(b_uid))
     else:
-        a_mons, b_mons = _party(a_uid), _party(b_uid)
+        # 친구 배틀도 전설·환상은 한 마리 (시즌 3)
+        a_mons, b_mons = battle_party(a_uid)[0], battle_party(b_uid)[0]
     if not a_mons or not b_mons:
         raise ValueError("양쪽 다 데리고 다니는 포켓몬이 있어야 합니다.")
 
     seed = random.randrange(1 << 30) if seed is None else int(seed)
-    out = PB.simulate(dex, a_mons, b_mons, seed=seed)
+    # 메가진화 (시즌 3): 각자 관장 8곳이면 키스톤. 스톤을 든 애가 나오면 AI 가 쓴다.
+    from . import mega
+    out = PB.simulate(dex, a_mons, b_mons, seed=seed,
+                      keystone={"me": mega.has_keystone(a_uid),
+                                "foe": mega.has_keystone(b_uid)})
 
     # 엔진은 a 시점으로 me/foe 를 말한다. 여기서 사람 쪽으로 옮긴다.
     win = out["winner"]
@@ -808,13 +840,19 @@ def records(uid, limit=30):
     return out
 
 
+S2_STARTS = "2026-09-15"
+
+
 def _season2_opened():
-    """시즌 2 가 열린 시각 (손질 0260 이 돈 때). 모르면 시즌 시작 날짜."""
+    """시즌 2 가 열린 시각 (손질 0260 이 돈 때). 모르면 시즌 2 시작 날짜.
+
+    **season.SEASON_STARTS 가 아니다** - 그건 지금 시즌(3)의 시작이라, 그걸
+    쓰면 시즌 2 판의 숨은 점수 변화가 도로 보인다."""
     try:
         r = db.q1("SELECT v FROM meta WHERE k='mig:0260-season2-open'")
     except Exception:                                        # noqa: BLE001
         r = None
-    return (r["v"] if r and r["v"] else season.SEASON_STARTS)
+    return (r["v"] if r and r["v"] else S2_STARTS)
 
 
 def clear_records(uid, rid=None):

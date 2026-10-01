@@ -288,7 +288,9 @@ class RankWindow(object):
             text.append("랜덤 배틀은 Lv.%d 상한 · 랭크 팀으로 싸움 · 전력이 비슷한 상대와 붙음"
                         % r["levelCap"])
         if r.get("restrictedMax"):
-            text.append("랭크 배틀에 나가는 전설·환상 포켓몬은 %d마리까지" % r["restrictedMax"])
+            # 시즌 3 부터 랭크만이 아니라 모든 팀 배틀이다 (server/app/pvp.RESTRICTED_MAX)
+            text.append("전설·환상 포켓몬은 한 팀에 %d마리까지 (랭크·친구·관장·레이드)"
+                        % r["restrictedMax"])
         text.append("내가 건 랜덤 배틀만 점수에 들어갑니다")
         tk.Label(inner, text="\n".join(text), bg=CARD_BG, fg=U.FG_DIM,
                  font=U.FONT_XS, anchor="w", justify="left",
@@ -340,9 +342,15 @@ class RankWindow(object):
             if r.get("title"):
                 tk.Label(line, text=r["title"], bg=CARD_BG, fg=U.ACCENT_TEXT,
                          font=U.FONT_XS).pack(side="left", padx=(8, 0))
-            tk.Label(line, text="%d점 · %d승 %d패" % (
-                r.get("rating", 0), r.get("wins", 0), r.get("losses", 0)),
-                bg=CARD_BG, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="right")
+            if r.get("tierKr"):
+                # 시즌 2 부터: 끝날 때의 티어(챔피언·사천왕은 자리)와 RP
+                score = "%s · %d RP · %d승 %d패" % (
+                    r["tierKr"], r.get("rp") or 0, r.get("wins", 0), r.get("losses", 0))
+            else:
+                score = "%d점 · %d승 %d패" % (
+                    r.get("rating", 0), r.get("wins", 0), r.get("losses", 0))
+            tk.Label(line, text=score, bg=CARD_BG, fg=U.FG_FAINT,
+                     font=U.FONT_XS).pack(side="right")
 
     def _scroll_top(self):
         try:

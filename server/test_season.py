@@ -584,6 +584,89 @@ def main():
     hall = season.hall(1)
     chk("명예의 전당 10명", len(hall) == 10 and hall[0]["name"] == "s1_00", hall[:1])
 
+    print("\n=== 시즌 2 -> 3 전환 (손질 0290) ===")
+    # 시즌 2 가 끝난 상태: 마스터볼 여섯(자리는 다섯), 하이퍼·슈퍼·몬스터, 배치 못 마친 사람.
+    # 한 명은 한때 마스터볼(peak 620)이었다가 400 으로 내려왔다 - 최고 티어로 받는다.
+    db.run("DELETE FROM rank_stat")
+    db.run("DELETE FROM gift")
+    s2 = {}
+    plan = [("m1", 900, 900), ("m2", 800, 850), ("m3", 700, 700), ("m4", 650, 700),
+            ("m5", 640, 640), ("m6", 610, 610), ("fell", 400, 620), ("hy", 360, 380),
+            ("su", 200, 240), ("mo", 90, 120)]
+    for i, (name, rp, peak) in enumerate(plan):
+        u = mkuser("s2_" + name)
+        pvp._rating_row(u)
+        db.run("UPDATE rank_stat SET rating=?, best=?, games=30, wins=20, losses=10,"
+               " ranked=1, rp=?, peak_rp=?, fr_wins=2, earned=500, earned_day='2026-10-01'"
+               " WHERE user_id=?", (1300 - i * 10, 1300 - i * 10, rp, peak, u))
+        s2[name] = u
+    un2 = mkuser("s2_unranked")
+    pvp._rating_row(un2)
+    db.run("UPDATE rank_stat SET rating=980, games=2, ranked=0, rp=0 WHERE user_id=?", (un2,))
+    conn = db.connect()
+    note = migrations._season3_open(conn)
+    conn.commit()
+    print("  (%s)" % note)
+    res2 = dict((r["user_id"], r) for r in db.q("SELECT * FROM season_result WHERE season=2"))
+    chk("배치를 마친 10명만 보관", len(res2) == 10 and un2 not in res2, len(res2))
+    chk("RP 1등이 1위 · 챔피언", res2[s2["m1"]]["rank"] == 1
+        and res2[s2["m1"]]["tier"] == "champion" and res2[s2["m1"]]["title"] == "s2_champion",
+        dict(res2[s2["m1"]]))
+    chk("2~5등은 사천왕 (자리는 넷)",
+        all(res2[s2[n]]["tier"] == "elite" for n in ("m2", "m3", "m4", "m5")),
+        [res2[s2[n]]["tier"] for n in ("m2", "m3", "m4", "m5")])
+    chk("여섯째 마스터볼은 자리가 없어 마스터볼", res2[s2["m6"]]["tier"] == "master",
+        res2[s2["m6"]]["tier"])
+    chk("내려온 사람은 **최고 티어**(마스터볼)로", res2[s2["fell"]]["tier"] == "master"
+        and res2[s2["fell"]]["rp"] == 400, dict(res2[s2["fell"]]))
+    chk("하이퍼·슈퍼·몬스터", (res2[s2["hy"]]["tier"], res2[s2["su"]]["tier"],
+                          res2[s2["mo"]]["tier"]) == ("hyper", "super", "monster"))
+    chk("챔피언: 전설의 알 + 칭호 + 금빛 명패 + 사탕 1",
+        gifts_of(s2["m1"]) == [("egg", "legendary", 1), ("title", "s2_champion", 1),
+                               ("frame", "gold", 1), ("item", "SHINYCANDY", 1)],
+        gifts_of(s2["m1"]))
+    chk("사천왕: 환상의 알 + 칭호 + 은빛 명패 + 사탕 1",
+        all(gifts_of(s2[n]) == [("egg", "mythical", 1), ("title", "s2_elite", 1),
+                                ("frame", "silver", 1), ("item", "SHINYCANDY", 1)]
+            for n in ("m2", "m3", "m4", "m5")), gifts_of(s2["m5"]))
+    chk("마스터볼: 칭호 + 마스터볼 명패 + 사탕 1 (알 없음)",
+        all(gifts_of(s2[n]) == [("title", "s2_master", 1), ("frame", "master", 1),
+                                ("item", "SHINYCANDY", 1)] for n in ("m6", "fell")),
+        gifts_of(s2["fell"]))
+    chk("하이퍼볼·슈퍼볼: 칭호만", gifts_of(s2["hy"]) == [("title", "s2_hyper", 1)]
+        and gifts_of(s2["su"]) == [("title", "s2_super", 1)], (gifts_of(s2["hy"]), gifts_of(s2["su"])))
+    chk("몬스터볼·배치 못 마친 사람은 없음", gifts_of(s2["mo"]) == [] and gifts_of(un2) == [])
+    msg = db.q1("SELECT message FROM gift WHERE user_id=?", (s2["m1"],))["message"]
+    chk("안내: 자리와 순위, 알", "챔피언 자리" in msg and "1위" in msg and "켜 둔 시간" in msg, msg)
+    msg = db.q1("SELECT message FROM gift WHERE user_id=?", (s2["fell"],))["message"]
+    chk("안내: 최고 티어", "마스터볼 티어까지" in msg and "7위" in msg, msg)
+    st2 = stat(s2["m1"])
+    chk("숨은 점수는 1000 쪽으로 절반 (1300 -> 1150)", st2["rating"] == 1150, st2["rating"])
+    chk("RP · 최고 RP · 판수 · 배치는 0", (st2["rp"], st2["peak_rp"], st2["games"],
+                                      st2["ranked"]) == (0, 0, 0, 0), dict(st2))
+    chk("친구 전적·오늘 상금은 그대로", st2["fr_wins"] == 2 and st2["earned"] == 500)
+    n_gift = db.q1("SELECT COUNT(*) c FROM gift")["c"]
+    migrations._season3_open(conn)
+    conn.commit()
+    chk("두 번 돌아도 선물을 또 넣지 않는다",
+        db.q1("SELECT COUNT(*) c FROM gift")["c"] == n_gift, n_gift)
+    got = items.gift_claim(s2["m1"])
+    chk("챔피언이 켜면 네 줄을 받고 칭호가 달린다",
+        [x["kind"] for x in got] == ["egg", "title", "frame", "item"]
+        and season.deco(s2["m1"])["title"] == "시즌 2 챔피언", got)
+    items.gift_claim(s2["fell"])
+    chk("마스터볼 명패를 가진다", "master" in [f["id"] for f in season.owned(s2["fell"])[1]],
+        season.owned(s2["fell"]))
+    h2 = season.hall(2)
+    chk("명예의 전당(시즌 2): RP 와 티어", h2[0]["name"] == "s2_m1" and h2[0]["rp"] == 900
+        and h2[0]["tierKr"] == "챔피언", h2[:1])
+    chk("명예의 전당(시즌 1)은 예전 그대로 (RP 없음)",
+        all(r["rp"] is None and r["tierKr"] is None for r in season.hall(1)))
+    names = [n for n, _f in migrations.ONCE]
+    chk("손질 목록 맨 끝에 0290", names[-1] == "0290-season3-open", names[-3:])
+    chk("시즌 3 은 10/2 부터 2주", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
+        == (3, "2026-10-02", "2026-10-16"))
+
     print("\n=== 규칙표 ===")
     rules = season.rules_public()
     chk("티어 여섯 칸", [t["tier"] for t in rules["tiers"]] ==
@@ -752,8 +835,9 @@ def main():
     chk("RP · 최고 RP · 승패 · 연승은 그대로",
         all(before_rows[r["user_id"]] == (r["rp"], r["peak_rp"], r["wins"], r["losses"], r["streak"])
             for r in rows))
+    names = [n for n, _f in migrations.ONCE]
     chk("손질 목록에 올라 있다 (0270 뒤)",
-        [n for n, _f in migrations.ONCE][-2:] == ["0270-egg-slots", "0280-mmr-recenter"])
+        names.index("0280-mmr-recenter") == names.index("0270-egg-slots") + 1)
 
     print("\n=== 1.4.0 알에 자리 주기 (손질 0270) ===")
     full = mkuser("ss_egg_old_full", 6, 20)

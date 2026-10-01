@@ -185,9 +185,9 @@ class FakeApi(object):
         self.state = "fighting"
         return self.room()
 
-    def raid_act(self, kind, move="", slot=-1):
+    def raid_act(self, kind, move="", slot=-1, mega=False):
         self.calls.append("act:%s" % (move or slot))
-        self.rb.choose(0, kind, move if kind == "move" else slot)
+        self.rb.choose(0, kind, move if kind == "move" else slot, mega=mega)
         for i in range(1, len(self.rb.players)):
             if self.rb.players[i].playing():
                 self.rb.choose(i, *self.rb.auto_choice(i))
@@ -297,6 +297,41 @@ def main():
     bad = squeezed(w.win)
     chk("눌린 위젯 없음", not bad, bad[:3])
     w.close()
+
+    print("=== 전설·환상 한 마리 제한 (시즌 3) ===")
+    for case in ("bench", "short"):
+        apil = FakeApi(dex, n=3, revealed=True)
+        apil.state = "none"
+        apil.rb = None
+        apil.code = None
+        apil.room = _no_room
+
+        def _legend(apil=apil, case=case):
+            d = FakeApi.raid(apil)
+            d["room"] = None
+            if case == "bench":
+                d.update(party=3, partyAll=5,
+                         benchNote="전설·환상 포켓몬은 한 팀에 1마리만 데려갈 수 있어서 "
+                                   "루기·뮤 은(는) 이번에 쉽니다.")
+            else:
+                d.update(party=1, partyAll=2, benchNote="전설·환상 포켓몬은 한 팀에 1마리만 "
+                                                        "데려갈 수 있어서 루기아 은(는) 이번에 쉽니다.")
+            return d
+        apil.raid = _legend
+        appl = FakeApp(root, apil, dex)
+        wl = ui_raid.RaidWindow(appl)
+        pump(root, lambda: "raid" in apil.calls)
+        rest(root, 0.5)
+        tl = " ".join(texts(wl.win))
+        if case == "bench":
+            chk("쉬는 포켓몬을 참가 전에 알린다 (조사도 고친다)",
+                "루기·뮤는 이번에 쉽니다" in tl and "참가하기" in tl, tl[:300])
+        else:
+            chk("제한 때문에 모자라면 까닭을 말하고 참가 단추는 없다",
+                "한 팀에 한 마리만" in tl and "참가하기" not in tl, tl[:300])
+        bad = squeezed(wl.win)
+        chk("  눌린 위젯 없음", not bad, bad[:3])
+        wl.close()
 
     print("=== 레이드 탭 (아직 기간 전) ===")
     apiq = FakeApi(dex, n=3, revealed=False)

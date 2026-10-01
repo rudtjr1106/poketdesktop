@@ -91,6 +91,8 @@ class Pet(object):
         self.ov = overlay
         self.mon = mon
         self.id = mon.get("id")
+        # 빛나는 돌 표식 (bond_stone, 시즌 3). place() 가 옮기므로 먼저 둔다.
+        self.stone_badge = None
         self._first_anim = anim
         self.fw, self.fh = anim.w, anim.h
         key = anim.key                    # 투명색은 그림마다 다르다
@@ -344,6 +346,8 @@ class Pet(object):
             self.name_win.geometry(
                 "+%d+%d" % (int(self.x),
                             int(self.y) - self.name_h - NAME_GAP))
+        if self.stone_badge is not None:
+            self.stone_badge.place()
         if self.tip_win:
             self.hide_tip()
 
@@ -767,6 +771,9 @@ class Pet(object):
 
     def destroy(self):
         self.cancel_tip()
+        if self.stone_badge is not None:
+            self.stone_badge.destroy()
+            self.stone_badge = None
         try:
             self.view.destroy()
         except Exception:                                   # noqa: BLE001
@@ -1014,6 +1021,7 @@ class Overlay(object):
                 except Exception:
                     pass
             p.hide_tip()
+        self.place_badges()
         if not hidden:
             self.apply_names()
 
@@ -1042,6 +1050,7 @@ class Overlay(object):
                     p.name_win.withdraw()
             except Exception:                               # noqa: BLE001
                 pass
+        self.place_badges()                 # 빛나는 돌도 배틀 동안 숨는다
 
     def release_names(self):
         """배틀이 끝났다. 막은 곳이 더 없으면 이름표를 되살린다.
@@ -1075,6 +1084,18 @@ class Overlay(object):
                     self._show_name(p)
             except Exception:                               # noqa: BLE001
                 pass
+        self.place_badges()
+
+    def place_badges(self):
+        """빛나는 돌 표식을 지금 상태(숨김·배틀·이름표 유무)에 맞춘다.
+        가만히 서 있는 도트는 place() 를 안 부르므로 여기서 한 번 옮긴다."""
+        for p in list(self.pets.values()):
+            b = getattr(p, "stone_badge", None)
+            if b is not None:
+                try:
+                    b.place()
+                except Exception:                           # noqa: BLE001
+                    pass
 
     def _show_name(self, p):
         """이 도트의 이름표를 띄운다. 없으면(배틀 중에 태어났으면) 만든다.

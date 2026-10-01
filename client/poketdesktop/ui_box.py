@@ -21,6 +21,7 @@ from common.korean import natural
 from . import box_filter, item_icons, sprite_cache, sprites
 from . import ui_common as U
 from . import ui_loading
+from .ui_bond import BondPanel
 
 ROW_H = U.h(30)
 DETAIL_W = 340
@@ -688,11 +689,15 @@ class BoxWindow(object):
         self.d_evo_lines = tk.Frame(self.d_evo, bg="#101623")
         self.d_evo_lines.pack(fill="x", padx=11, pady=(0, 8))
 
+        # 메가진화 · 유대 미션 (시즌 3). 메가가 있는 종에만 진화 칸 아래에 뜬다.
+        self.bond = BondPanel(self, p, DETAIL_W)
+
         # 능력치
         stats = tk.Frame(p, bg="#101623", highlightthickness=2,
                          highlightbackground=U.LINE)
         stats.pack(fill="x", pady=(11, 0))
         self._d_stats = stats
+        self.bond.before = stats
         sh = tk.Frame(stats, bg="#101623")
         sh.pack(fill="x", padx=11, pady=(9, 6))
         U.marker_label(sh, "능력치", bg="#101623").pack(side="left")
@@ -1713,6 +1718,7 @@ class BoxWindow(object):
                      % P.EV_TOTAL_MAX)
         self._friendship(m)
         self._evolution(m)
+        self.bond.show(m)
 
         for w in self.d_moves.winfo_children():
             w.destroy()

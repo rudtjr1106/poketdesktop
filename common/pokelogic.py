@@ -369,6 +369,18 @@ class Pokedex(object):
         self.species = data["species"]
         self.by_internal = dict((s["internal"], s) for s in self.species)
         self.by_num = dict((s["num"], s) for s in self.species)
+        # 메가진화 폼 (시즌 3). **species 에는 넣지 않는다** - 도감 1025종을
+        # 세고 도는 모든 곳(도감 표시·업적·야생 추첨·알·관장 명단)이 흔들린다.
+        # 이름·번호로 찾을 때만 보인다 (배틀에서 모습을 바꿀 때, 도트).
+        self.megas = data.get("megas") or []
+        self.mega_of = {}               # 원래 종 -> [메가 폼]
+        for m in self.megas:
+            self.by_internal[m["internal"]] = m
+            self.by_num[m["num"]] = m
+            self.mega_of.setdefault(m["megaOf"], []).append(m)
+        if self.megas:
+            from . import held          # 늦게 부른다 - held 가 pokelogic 을 안 부르므로 안전
+            held.register_megas(self)
         self.moves = data.get("moves", {})
         self.abilities = data.get("abilities", {})
         self.types = data.get("types", {})

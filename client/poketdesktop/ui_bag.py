@@ -53,11 +53,11 @@ STAT_ROWS = [("hp", "HP"), ("atk", "공격"), ("def", "방어"),
 STAT_KR = dict(STAT_ROWS)
 
 # 분류 — 실제로 쓸 수 있는 것부터 위로 올린다
-CAT_ORDER = ["held", "stone", "ev", "iv", "misc", "ball"]
-CAT_KR = {"held": "지닌 도구", "stone": "진화의 돌", "ev": "노력치",
+CAT_ORDER = ["megastone", "held", "stone", "ev", "iv", "misc", "ball"]
+CAT_KR = {"megastone": "메가스톤", "held": "지닌 도구", "stone": "진화의 돌", "ev": "노력치",
           "iv": "단련", "misc": "기타", "ball": "볼"}
-CAT_COLOR = {"held": U.ACCENT, "stone": U.PINK, "ev": U.GOOD, "iv": U.SHINY,
-             "misc": U.INFO, "ball": U.RED}
+CAT_COLOR = {"megastone": "#a98bff", "held": U.ACCENT, "stone": U.PINK, "ev": U.GOOD,
+             "iv": U.SHINY, "misc": U.INFO, "ball": U.RED}
 
 # /api/bag/use 가 받아주는 효과. 나머지(볼, 파는 물건)는 여기서 쓸 수 없다.
 # "held" 는 use 가 아니라 /api/pokemon/{id}/hold 로 간다 - 대상을 고르는

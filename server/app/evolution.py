@@ -218,6 +218,8 @@ def apply(uid, mon, branch, dex, now):
     # 파이리를 키워 리자드가 돼도 리자드 칸은 비어 있었다. 이제 가진
     # 포켓몬이니 '잡음' 으로 올린다. 이미 쓰던 사람 몫은 migrations 가 한 번 채운다.
     items.mark_seen(uid, new_key, True, now or items._now_iso())
+    from . import achievements
+    achievements.safe_check(uid)
 
     out = dict(mon)
     out["species"] = new_key

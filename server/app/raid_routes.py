@@ -20,7 +20,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from . import db, deps, raid
+from . import db, deps, pvp, raid
 
 router = APIRouter()
 
@@ -33,6 +33,7 @@ class ActIn(BaseModel):
     kind: str = "move"           # move / switch
     move: str = ""
     slot: int = -1
+    mega: bool = False           # 이 라운드에 메가진화 (시즌 3)
 
 
 def _name(ctx):
@@ -61,7 +62,12 @@ def overview(ctx=Depends(deps.current)):
     out["room"] = raid.public(row, uid) if row else None
     played = raid.played_today(uid)
     out["playedToday"] = bool(played)
-    out["party"] = len(raid.party_of(uid))
+    # 나가는 팀(전설·환상 한 마리) 수와 데리고 다니는 전부. 둘이 다르면 화면이
+    # '왜 못 들어가는지' 를 전설 제한으로 설명한다 (시즌 3).
+    team, benched = raid.party_split(uid)
+    out["party"] = len(team)
+    out["partyAll"] = len(team) + len(benched)
+    out["benchNote"] = pvp.bench_note(benched)
     # 아직 결과를 못 본 판. /api/me 가 이걸 보고 알린다.
     out["unseen"] = unseen(uid)
     return out
@@ -136,7 +142,7 @@ def act(body: ActIn, ctx=Depends(deps.current)):
         raise HTTPException(400, "무엇을 할지 알 수 없습니다.")
     value = body.move if kind == "move" else int(body.slot)
     try:
-        row = raid.choose(uid, kind, value)
+        row = raid.choose(uid, kind, value, mega=bool(body.mega))
     except LookupError as e:
         raise HTTPException(404, str(e))
     except ValueError as e:

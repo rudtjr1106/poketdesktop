@@ -30,6 +30,7 @@ class ActIn(BaseModel):
     kind: str = "move"           # move / switch / forfeit
     move: str = ""
     slot: int = -1
+    mega: bool = False           # 이 턴에 메가진화 (시즌 3)
 
 
 def _mine(uid, tick=True):
@@ -88,7 +89,7 @@ def act(body: ActIn, ctx=Depends(deps.current)):
         int(body.slot) if kind == "switch" else None)
     _mine(uid)                       # 마감이 지났으면 먼저 넘긴다
     try:
-        row = live.act(uid, kind, value)
+        row = live.act(uid, kind, value, mega=bool(body.mega))
     except LookupError as e:
         raise HTTPException(404, str(e))
     except ValueError as e:

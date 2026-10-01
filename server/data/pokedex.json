@@ -2185,6 +2185,5201 @@
   "species": 1025,
   "types": 19
  },
+ "megas": [
+  {
+   "abil": [
+    "THICKFAT"
+   ],
+   "base": {
+    "atk": 100,
+    "def": 123,
+    "hp": 80,
+    "spa": 122,
+    "spd": 120,
+    "spe": 80
+   },
+   "baseExp": 236,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "plant"
+   ],
+   "en": "Mega Venusaur",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 2,
+    "spd": 1,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 1,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 2.4,
+   "hidden": null,
+   "internal": "VENUSAUR_MEGA",
+   "isBaby": false,
+   "kg": 155.5,
+   "kind": "씨앗포켓몬",
+   "kr": "메가이상해꽃",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "VENUSAUR",
+   "megaStone": "VENUSAURITE",
+   "megaStoneKr": "이상해꽃나이트",
+   "minLevel": 32,
+   "moves": [],
+   "num": 10033,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "GRASS",
+    "POISON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "TOUGHCLAWS"
+   ],
+   "base": {
+    "atk": 130,
+    "def": 111,
+    "hp": 78,
+    "spa": 130,
+    "spd": 85,
+    "spe": 100
+   },
+   "baseExp": 240,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "dragon"
+   ],
+   "en": "Mega Charizard X",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 1,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.7,
+   "hidden": null,
+   "internal": "CHARIZARD_MEGA_X",
+   "isBaby": false,
+   "kg": 110.5,
+   "kind": "화염포켓몬",
+   "kr": "메가리자몽X",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "CHARIZARD",
+   "megaStone": "CHARIZARDITEX",
+   "megaStoneKr": "리자몽나이트X",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10034,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "FIRE",
+    "DRAGON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "DROUGHT"
+   ],
+   "base": {
+    "atk": 104,
+    "def": 78,
+    "hp": 78,
+    "spa": 159,
+    "spd": 115,
+    "spe": 100
+   },
+   "baseExp": 240,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "dragon"
+   ],
+   "en": "Mega Charizard Y",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 1,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.7,
+   "hidden": null,
+   "internal": "CHARIZARD_MEGA_Y",
+   "isBaby": false,
+   "kg": 100.5,
+   "kind": "화염포켓몬",
+   "kr": "메가리자몽Y",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "CHARIZARD",
+   "megaStone": "CHARIZARDITEY",
+   "megaStoneKr": "리자몽나이트Y",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10035,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "FIRE",
+    "FLYING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "MEGALAUNCHER"
+   ],
+   "base": {
+    "atk": 103,
+    "def": 120,
+    "hp": 79,
+    "spa": 135,
+    "spd": 115,
+    "spe": 78
+   },
+   "baseExp": 239,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "water1"
+   ],
+   "en": "Mega Blastoise",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 3,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 1,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.6,
+   "hidden": null,
+   "internal": "BLASTOISE_MEGA",
+   "isBaby": false,
+   "kg": 101.1,
+   "kind": "껍질포켓몬",
+   "kr": "메가거북왕",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "BLASTOISE",
+   "megaStone": "BLASTOISINITE",
+   "megaStoneKr": "거북왕나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10036,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "WATER"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "TRACE"
+   ],
+   "base": {
+    "atk": 50,
+    "def": 65,
+    "hp": 55,
+    "spa": 175,
+    "spd": 105,
+    "spe": 150
+   },
+   "baseExp": 225,
+   "catch": 50,
+   "egg": [
+    "humanshape"
+   ],
+   "en": "Mega Alakazam",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.25,
+   "gen": 1,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.2,
+   "hidden": null,
+   "internal": "ALAKAZAM_MEGA",
+   "isBaby": false,
+   "kg": 48.0,
+   "kind": "초능력포켓몬",
+   "kr": "메가후딘",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "ALAKAZAM",
+   "megaStone": "ALAKAZITE",
+   "megaStoneKr": "후디나이트",
+   "minLevel": 32,
+   "moves": [],
+   "num": 10037,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "PSYCHIC"
+   ],
+   "weight": 50
+  },
+  {
+   "abil": [
+    "SHADOWTAG"
+   ],
+   "base": {
+    "atk": 65,
+    "def": 80,
+    "hp": 60,
+    "spa": 170,
+    "spd": 95,
+    "spe": 130
+   },
+   "baseExp": 225,
+   "catch": 45,
+   "egg": [
+    "indeterminate"
+   ],
+   "en": "Mega Gengar",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.4,
+   "hidden": null,
+   "internal": "GENGAR_MEGA",
+   "isBaby": false,
+   "kg": 40.5,
+   "kind": "그림자포켓몬",
+   "kr": "메가팬텀",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GENGAR",
+   "megaStone": "GENGARITE",
+   "megaStoneKr": "팬텀나이트",
+   "minLevel": 41,
+   "moves": [],
+   "num": 10038,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "GHOST",
+    "POISON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "PARENTALBOND"
+   ],
+   "base": {
+    "atk": 125,
+    "def": 100,
+    "hp": 105,
+    "spa": 60,
+    "spd": 100,
+    "spe": 100
+   },
+   "baseExp": 172,
+   "catch": 45,
+   "egg": [
+    "monster"
+   ],
+   "en": "Mega Kangaskhan",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 2,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 1.0,
+   "gen": 1,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.2,
+   "hidden": null,
+   "internal": "KANGASKHAN_MEGA",
+   "isBaby": false,
+   "kg": 100.0,
+   "kind": "가족포켓몬",
+   "kr": "메가캥카",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "KANGASKHAN",
+   "megaStone": "KANGASKHANITE",
+   "megaStoneKr": "캥카나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10039,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "NORMAL"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "AERILATE"
+   ],
+   "base": {
+    "atk": 155,
+    "def": 120,
+    "hp": 65,
+    "spa": 65,
+    "spd": 90,
+    "spe": 105
+   },
+   "baseExp": 175,
+   "catch": 45,
+   "egg": [
+    "bug"
+   ],
+   "en": "Mega Pinsir",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 1.7,
+   "hidden": null,
+   "internal": "PINSIR_MEGA",
+   "isBaby": false,
+   "kg": 59.0,
+   "kind": "뿔집게포켓몬",
+   "kr": "메가쁘사이저",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "PINSIR",
+   "megaStone": "PINSIRITE",
+   "megaStoneKr": "쁘사이저나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10040,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "BUG",
+    "FLYING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "MOLDBREAKER"
+   ],
+   "base": {
+    "atk": 155,
+    "def": 109,
+    "hp": 95,
+    "spa": 70,
+    "spd": 130,
+    "spe": 81
+   },
+   "baseExp": 189,
+   "catch": 45,
+   "egg": [
+    "water2",
+    "dragon"
+   ],
+   "en": "Mega Gyarados",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 6.5,
+   "hidden": null,
+   "internal": "GYARADOS_MEGA",
+   "isBaby": false,
+   "kg": 305.0,
+   "kind": "흉악포켓몬",
+   "kr": "메가갸라도스",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GYARADOS",
+   "megaStone": "GYARADOSITE",
+   "megaStoneKr": "갸라도스나이트",
+   "minLevel": 20,
+   "moves": [],
+   "num": 10041,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "WATER",
+    "DARK"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "TOUGHCLAWS"
+   ],
+   "base": {
+    "atk": 135,
+    "def": 85,
+    "hp": 80,
+    "spa": 70,
+    "spd": 95,
+    "spe": 150
+   },
+   "baseExp": 180,
+   "catch": 45,
+   "egg": [
+    "flying"
+   ],
+   "en": "Mega Aerodactyl",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 2
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 1,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 2.1,
+   "hidden": null,
+   "internal": "AERODACTYL_MEGA",
+   "isBaby": false,
+   "kg": 79.0,
+   "kind": "화석포켓몬",
+   "kr": "메가프테라",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "AERODACTYL",
+   "megaStone": "AERODACTYLITE",
+   "megaStoneKr": "프테라나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10042,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "ROCK",
+    "FLYING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "STEADFAST"
+   ],
+   "base": {
+    "atk": 190,
+    "def": 100,
+    "hp": 106,
+    "spa": 154,
+    "spd": 100,
+    "spe": 130
+   },
+   "baseExp": 306,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Mewtwo X",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 1,
+   "growth": "slow",
+   "happiness": 0,
+   "height": 2.3,
+   "hidden": null,
+   "internal": "MEWTWO_MEGA_X",
+   "isBaby": false,
+   "kg": 127.0,
+   "kind": "유전포켓몬",
+   "kr": "메가뮤츠X",
+   "legendary": true,
+   "mega": true,
+   "megaOf": "MEWTWO",
+   "megaStone": "MEWTWONITEX",
+   "megaStoneKr": "뮤츠나이트X",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10043,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "PSYCHIC",
+    "FIGHTING"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "INSOMNIA"
+   ],
+   "base": {
+    "atk": 150,
+    "def": 70,
+    "hp": 106,
+    "spa": 194,
+    "spd": 120,
+    "spe": 140
+   },
+   "baseExp": 306,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Mewtwo Y",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 1,
+   "growth": "slow",
+   "happiness": 0,
+   "height": 1.5,
+   "hidden": null,
+   "internal": "MEWTWO_MEGA_Y",
+   "isBaby": false,
+   "kg": 33.0,
+   "kind": "유전포켓몬",
+   "kr": "메가뮤츠Y",
+   "legendary": true,
+   "mega": true,
+   "megaOf": "MEWTWO",
+   "megaStone": "MEWTWONITEY",
+   "megaStoneKr": "뮤츠나이트Y",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10044,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "PSYCHIC"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "MOLDBREAKER"
+   ],
+   "base": {
+    "atk": 95,
+    "def": 105,
+    "hp": 90,
+    "spa": 165,
+    "spd": 110,
+    "spe": 45
+   },
+   "baseExp": 230,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "ground"
+   ],
+   "en": "Mega Ampharos",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 2,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.4,
+   "hidden": null,
+   "internal": "AMPHAROS_MEGA",
+   "isBaby": false,
+   "kg": 61.5,
+   "kind": "라이트포켓몬",
+   "kr": "메가전룡",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "AMPHAROS",
+   "megaStone": "AMPHAROSITE",
+   "megaStoneKr": "전룡나이트",
+   "minLevel": 30,
+   "moves": [],
+   "num": 10045,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "ELECTRIC",
+    "DRAGON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "TECHNICIAN"
+   ],
+   "base": {
+    "atk": 150,
+    "def": 140,
+    "hp": 70,
+    "spa": 65,
+    "spd": 100,
+    "spe": 75
+   },
+   "baseExp": 175,
+   "catch": 25,
+   "egg": [
+    "bug"
+   ],
+   "en": "Mega Scizor",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 2,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.0,
+   "hidden": null,
+   "internal": "SCIZOR_MEGA",
+   "isBaby": false,
+   "kg": 125.0,
+   "kind": "집게포켓몬",
+   "kr": "메가핫삼",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SCIZOR",
+   "megaStone": "SCIZORITE",
+   "megaStoneKr": "핫삼나이트",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10046,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "BUG",
+    "STEEL"
+   ],
+   "weight": 25
+  },
+  {
+   "abil": [
+    "SKILLLINK"
+   ],
+   "base": {
+    "atk": 185,
+    "def": 115,
+    "hp": 80,
+    "spa": 40,
+    "spd": 105,
+    "spe": 75
+   },
+   "baseExp": 175,
+   "catch": 45,
+   "egg": [
+    "bug"
+   ],
+   "en": "Mega Heracross",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 2,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 1.7,
+   "hidden": null,
+   "internal": "HERACROSS_MEGA",
+   "isBaby": false,
+   "kg": 62.5,
+   "kind": "외뿔포켓몬",
+   "kr": "메가헤라크로스",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "HERACROSS",
+   "megaStone": "HERACRONITE",
+   "megaStoneKr": "헤라크로스나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10047,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "BUG",
+    "FIGHTING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "SOLARPOWER"
+   ],
+   "base": {
+    "atk": 90,
+    "def": 90,
+    "hp": 75,
+    "spa": 140,
+    "spd": 90,
+    "spe": 115
+   },
+   "baseExp": 175,
+   "catch": 45,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Houndoom",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 2,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 2,
+   "growth": "slow",
+   "happiness": 35,
+   "height": 1.9,
+   "hidden": null,
+   "internal": "HOUNDOOM_MEGA",
+   "isBaby": false,
+   "kg": 49.5,
+   "kind": "다크포켓몬",
+   "kr": "메가헬가",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "HOUNDOOM",
+   "megaStone": "HOUNDOOMINITE",
+   "megaStoneKr": "헬가나이트",
+   "minLevel": 24,
+   "moves": [],
+   "num": 10048,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "DARK",
+    "FIRE"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "SANDSTREAM"
+   ],
+   "base": {
+    "atk": 164,
+    "def": 150,
+    "hp": 100,
+    "spa": 95,
+    "spd": 120,
+    "spe": 71
+   },
+   "baseExp": 270,
+   "catch": 45,
+   "egg": [
+    "monster"
+   ],
+   "en": "Mega Tyranitar",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 2,
+   "growth": "slow",
+   "happiness": 35,
+   "height": 2.5,
+   "hidden": null,
+   "internal": "TYRANITAR_MEGA",
+   "isBaby": false,
+   "kg": 255.0,
+   "kind": "갑옷포켓몬",
+   "kr": "메가마기라스",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "TYRANITAR",
+   "megaStone": "TYRANITARITE",
+   "megaStoneKr": "마기라스나이트",
+   "minLevel": 55,
+   "moves": [],
+   "num": 10049,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "ROCK",
+    "DARK"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "SPEEDBOOST"
+   ],
+   "base": {
+    "atk": 160,
+    "def": 80,
+    "hp": 80,
+    "spa": 130,
+    "spd": 80,
+    "spe": 100
+   },
+   "baseExp": 239,
+   "catch": 45,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Blaziken",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 3,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.9,
+   "hidden": null,
+   "internal": "BLAZIKEN_MEGA",
+   "isBaby": false,
+   "kg": 52.0,
+   "kind": "맹화포켓몬",
+   "kr": "메가번치코",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "BLAZIKEN",
+   "megaStone": "BLAZIKENITE",
+   "megaStoneKr": "번치코나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10050,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "FIRE",
+    "FIGHTING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "PIXILATE"
+   ],
+   "base": {
+    "atk": 85,
+    "def": 65,
+    "hp": 68,
+    "spa": 165,
+    "spd": 135,
+    "spe": 100
+   },
+   "baseExp": 233,
+   "catch": 45,
+   "egg": [
+    "humanshape",
+    "indeterminate"
+   ],
+   "en": "Mega Gardevoir",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "slow",
+   "happiness": 35,
+   "height": 1.6,
+   "hidden": null,
+   "internal": "GARDEVOIR_MEGA",
+   "isBaby": false,
+   "kg": 48.4,
+   "kind": "포용포켓몬",
+   "kr": "메가가디안",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GARDEVOIR",
+   "megaStone": "GARDEVOIRITE",
+   "megaStoneKr": "가디안나이트",
+   "minLevel": 30,
+   "moves": [],
+   "num": 10051,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "PSYCHIC",
+    "FAIRY"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "HUGEPOWER"
+   ],
+   "base": {
+    "atk": 105,
+    "def": 125,
+    "hp": 50,
+    "spa": 55,
+    "spd": 95,
+    "spe": 50
+   },
+   "baseExp": 133,
+   "catch": 45,
+   "egg": [
+    "ground",
+    "fairy"
+   ],
+   "en": "Mega Mawile",
+   "ev": {
+    "atk": 1,
+    "def": 1,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "fast",
+   "happiness": 70,
+   "height": 1.0,
+   "hidden": null,
+   "internal": "MAWILE_MEGA",
+   "isBaby": false,
+   "kg": 23.5,
+   "kind": "배반포켓몬",
+   "kr": "메가입치트",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "MAWILE",
+   "megaStone": "MAWILITE",
+   "megaStoneKr": "입치트나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10052,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "STEEL",
+    "FAIRY"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "FILTER"
+   ],
+   "base": {
+    "atk": 140,
+    "def": 230,
+    "hp": 70,
+    "spa": 60,
+    "spd": 80,
+    "spe": 50
+   },
+   "baseExp": 239,
+   "catch": 45,
+   "egg": [
+    "monster"
+   ],
+   "en": "Mega Aggron",
+   "ev": {
+    "atk": 0,
+    "def": 3,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "slow",
+   "happiness": 35,
+   "height": 2.2,
+   "hidden": null,
+   "internal": "AGGRON_MEGA",
+   "isBaby": false,
+   "kg": 395.0,
+   "kind": "철갑옷포켓몬",
+   "kr": "메가보스로라",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "AGGRON",
+   "megaStone": "AGGRONITE",
+   "megaStoneKr": "보스로라나이트",
+   "minLevel": 42,
+   "moves": [],
+   "num": 10053,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "STEEL"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "PUREPOWER"
+   ],
+   "base": {
+    "atk": 100,
+    "def": 85,
+    "hp": 60,
+    "spa": 80,
+    "spd": 85,
+    "spe": 100
+   },
+   "baseExp": 144,
+   "catch": 90,
+   "egg": [
+    "humanshape"
+   ],
+   "en": "Mega Medicham",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 2
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 1.3,
+   "hidden": null,
+   "internal": "MEDICHAM_MEGA",
+   "isBaby": false,
+   "kg": 31.5,
+   "kind": "명상포켓몬",
+   "kr": "메가요가램",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "MEDICHAM",
+   "megaStone": "MEDICHAMITE",
+   "megaStoneKr": "요가램나이트",
+   "minLevel": 37,
+   "moves": [],
+   "num": 10054,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "FIGHTING",
+    "PSYCHIC"
+   ],
+   "weight": 90
+  },
+  {
+   "abil": [
+    "INTIMIDATE"
+   ],
+   "base": {
+    "atk": 75,
+    "def": 80,
+    "hp": 70,
+    "spa": 135,
+    "spd": 80,
+    "spe": 135
+   },
+   "baseExp": 166,
+   "catch": 45,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Manectric",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 2
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 1.8,
+   "hidden": null,
+   "internal": "MANECTRIC_MEGA",
+   "isBaby": false,
+   "kg": 44.0,
+   "kind": "방전포켓몬",
+   "kr": "메가썬더볼트",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "MANECTRIC",
+   "megaStone": "MANECTITE",
+   "megaStoneKr": "썬더볼트나이트",
+   "minLevel": 26,
+   "moves": [],
+   "num": 10055,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "ELECTRIC"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "PRANKSTER"
+   ],
+   "base": {
+    "atk": 165,
+    "def": 75,
+    "hp": 64,
+    "spa": 93,
+    "spd": 83,
+    "spe": 75
+   },
+   "baseExp": 159,
+   "catch": 45,
+   "egg": [
+    "indeterminate"
+   ],
+   "en": "Mega Banette",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "fast",
+   "happiness": 35,
+   "height": 1.2,
+   "hidden": null,
+   "internal": "BANETTE_MEGA",
+   "isBaby": false,
+   "kg": 13.0,
+   "kind": "봉제인형포켓몬",
+   "kr": "메가다크펫",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "BANETTE",
+   "megaStone": "BANETTITE",
+   "megaStoneKr": "다크펫나이트",
+   "minLevel": 37,
+   "moves": [],
+   "num": 10056,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "GHOST"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "MAGICBOUNCE"
+   ],
+   "base": {
+    "atk": 150,
+    "def": 60,
+    "hp": 65,
+    "spa": 115,
+    "spd": 60,
+    "spe": 115
+   },
+   "baseExp": 163,
+   "catch": 30,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Absol",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "medium_slow",
+   "happiness": 35,
+   "height": 1.2,
+   "hidden": null,
+   "internal": "ABSOL_MEGA",
+   "isBaby": false,
+   "kg": 49.0,
+   "kind": "재난포켓몬",
+   "kr": "메가앱솔",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "ABSOL",
+   "megaStone": "ABSOLITE",
+   "megaStoneKr": "앱솔나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10057,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "DARK"
+   ],
+   "weight": 30
+  },
+  {
+   "abil": [
+    "SANDFORCE"
+   ],
+   "base": {
+    "atk": 170,
+    "def": 115,
+    "hp": 108,
+    "spa": 120,
+    "spd": 95,
+    "spe": 92
+   },
+   "baseExp": 270,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "dragon"
+   ],
+   "en": "Mega Garchomp",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 4,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 1.9,
+   "hidden": null,
+   "internal": "GARCHOMP_MEGA",
+   "isBaby": false,
+   "kg": 95.0,
+   "kind": "마하포켓몬",
+   "kr": "메가한카리아스",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GARCHOMP",
+   "megaStone": "GARCHOMPITE",
+   "megaStoneKr": "한카리아스나이트",
+   "minLevel": 48,
+   "moves": [],
+   "num": 10058,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "DRAGON",
+    "GROUND"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "ADAPTABILITY"
+   ],
+   "base": {
+    "atk": 145,
+    "def": 88,
+    "hp": 70,
+    "spa": 140,
+    "spd": 70,
+    "spe": 112
+   },
+   "baseExp": 184,
+   "catch": 45,
+   "egg": [
+    "ground",
+    "humanshape"
+   ],
+   "en": "Mega Lucario",
+   "ev": {
+    "atk": 1,
+    "def": 0,
+    "hp": 0,
+    "spa": 1,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 4,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.3,
+   "hidden": null,
+   "internal": "LUCARIO_MEGA",
+   "isBaby": false,
+   "kg": 57.5,
+   "kind": "파동포켓몬",
+   "kr": "메가루카리오",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "LUCARIO",
+   "megaStone": "LUCARIONITE",
+   "megaStoneKr": "루카리오나이트",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10059,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "FIGHTING",
+    "STEEL"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "SNOWWARNING"
+   ],
+   "base": {
+    "atk": 132,
+    "def": 105,
+    "hp": 90,
+    "spa": 132,
+    "spd": 105,
+    "spe": 30
+   },
+   "baseExp": 173,
+   "catch": 60,
+   "egg": [
+    "monster",
+    "plant"
+   ],
+   "en": "Mega Abomasnow",
+   "ev": {
+    "atk": 1,
+    "def": 0,
+    "hp": 0,
+    "spa": 1,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 4,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 2.7,
+   "hidden": null,
+   "internal": "ABOMASNOW_MEGA",
+   "isBaby": false,
+   "kg": 185.0,
+   "kind": "얼음나무포켓몬",
+   "kr": "메가눈설왕",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "ABOMASNOW",
+   "megaStone": "ABOMASITE",
+   "megaStoneKr": "눈설왕나이트",
+   "minLevel": 40,
+   "moves": [],
+   "num": 10060,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "GRASS",
+    "ICE"
+   ],
+   "weight": 60
+  },
+  {
+   "abil": [
+    "LEVITATE"
+   ],
+   "base": {
+    "atk": 100,
+    "def": 120,
+    "hp": 80,
+    "spa": 140,
+    "spd": 150,
+    "spe": 110
+   },
+   "baseExp": 270,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Latias",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 3,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 1.0,
+   "gen": 3,
+   "growth": "slow",
+   "happiness": 90,
+   "height": 1.8,
+   "hidden": null,
+   "internal": "LATIAS_MEGA",
+   "isBaby": false,
+   "kg": 52.0,
+   "kind": "무한포켓몬",
+   "kr": "메가라티아스",
+   "legendary": true,
+   "mega": true,
+   "megaOf": "LATIAS",
+   "megaStone": "LATIASITE",
+   "megaStoneKr": "라티아스나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10062,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "DRAGON",
+    "PSYCHIC"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "LEVITATE"
+   ],
+   "base": {
+    "atk": 130,
+    "def": 100,
+    "hp": 80,
+    "spa": 160,
+    "spd": 120,
+    "spe": 110
+   },
+   "baseExp": 270,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Latios",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.0,
+   "gen": 3,
+   "growth": "slow",
+   "happiness": 90,
+   "height": 2.3,
+   "hidden": null,
+   "internal": "LATIOS_MEGA",
+   "isBaby": false,
+   "kg": 70.0,
+   "kind": "무한포켓몬",
+   "kr": "메가라티오스",
+   "legendary": true,
+   "mega": true,
+   "megaOf": "LATIOS",
+   "megaStone": "LATIOSITE",
+   "megaStoneKr": "라티오스나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10063,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "DRAGON",
+    "PSYCHIC"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "SWIFTSWIM"
+   ],
+   "base": {
+    "atk": 150,
+    "def": 110,
+    "hp": 100,
+    "spa": 95,
+    "spd": 110,
+    "spe": 70
+   },
+   "baseExp": 241,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "water1"
+   ],
+   "en": "Mega Swampert",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 3,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.9,
+   "hidden": null,
+   "internal": "SWAMPERT_MEGA",
+   "isBaby": false,
+   "kg": 102.0,
+   "kind": "늪물고기포켓몬",
+   "kr": "메가대짱이",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SWAMPERT",
+   "megaStone": "SWAMPERTITE",
+   "megaStoneKr": "대짱이나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10064,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "WATER",
+    "GROUND"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "LIGHTNINGROD"
+   ],
+   "base": {
+    "atk": 110,
+    "def": 75,
+    "hp": 70,
+    "spa": 145,
+    "spd": 85,
+    "spe": 145
+   },
+   "baseExp": 239,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "dragon"
+   ],
+   "en": "Mega Sceptile",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 3
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 3,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.9,
+   "hidden": null,
+   "internal": "SCEPTILE_MEGA",
+   "isBaby": false,
+   "kg": 55.2,
+   "kind": "밀림포켓몬",
+   "kr": "메가나무킹",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SCEPTILE",
+   "megaStone": "SCEPTILITE",
+   "megaStoneKr": "나무킹나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10065,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "GRASS",
+    "DRAGON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "MAGICBOUNCE"
+   ],
+   "base": {
+    "atk": 85,
+    "def": 125,
+    "hp": 50,
+    "spa": 85,
+    "spd": 115,
+    "spe": 20
+   },
+   "baseExp": 133,
+   "catch": 45,
+   "egg": [
+    "humanshape"
+   ],
+   "en": "Mega Sableye",
+   "ev": {
+    "atk": 1,
+    "def": 1,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "medium_slow",
+   "happiness": 35,
+   "height": 0.5,
+   "hidden": null,
+   "internal": "SABLEYE_MEGA",
+   "isBaby": false,
+   "kg": 161.0,
+   "kind": "어둠포켓몬",
+   "kr": "메가깜까미",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SABLEYE",
+   "megaStone": "SABLENITE",
+   "megaStoneKr": "깜까미나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10066,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "DARK",
+    "GHOST"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "PIXILATE"
+   ],
+   "base": {
+    "atk": 110,
+    "def": 110,
+    "hp": 75,
+    "spa": 110,
+    "spd": 105,
+    "spe": 80
+   },
+   "baseExp": 172,
+   "catch": 45,
+   "egg": [
+    "flying",
+    "dragon"
+   ],
+   "en": "Mega Altaria",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 2,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "erratic",
+   "happiness": 70,
+   "height": 1.5,
+   "hidden": null,
+   "internal": "ALTARIA_MEGA",
+   "isBaby": false,
+   "kg": 20.6,
+   "kind": "허밍포켓몬",
+   "kr": "메가파비코리",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "ALTARIA",
+   "megaStone": "ALTARIANITE",
+   "megaStoneKr": "파비코리나이트",
+   "minLevel": 35,
+   "moves": [],
+   "num": 10067,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "DRAGON",
+    "FAIRY"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "INNERFOCUS"
+   ],
+   "base": {
+    "atk": 165,
+    "def": 95,
+    "hp": 68,
+    "spa": 65,
+    "spd": 115,
+    "spe": 110
+   },
+   "baseExp": 233,
+   "catch": 45,
+   "egg": [
+    "humanshape",
+    "indeterminate"
+   ],
+   "en": "Mega Gallade",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.0,
+   "gen": 4,
+   "growth": "slow",
+   "happiness": 35,
+   "height": 1.6,
+   "hidden": null,
+   "internal": "GALLADE_MEGA",
+   "isBaby": false,
+   "kg": 56.4,
+   "kind": "검포켓몬",
+   "kr": "메가엘레이드",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GALLADE",
+   "megaStone": "GALLADITE",
+   "megaStoneKr": "엘레이드나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10068,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "PSYCHIC",
+    "FIGHTING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "HEALER"
+   ],
+   "base": {
+    "atk": 60,
+    "def": 126,
+    "hp": 103,
+    "spa": 80,
+    "spd": 126,
+    "spe": 50
+   },
+   "baseExp": 390,
+   "catch": 255,
+   "egg": [
+    "fairy"
+   ],
+   "en": "Mega Audino",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 2,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 5,
+   "growth": "fast",
+   "happiness": 70,
+   "height": 1.5,
+   "hidden": null,
+   "internal": "AUDINO_MEGA",
+   "isBaby": false,
+   "kg": 32.0,
+   "kind": "히어링포켓몬",
+   "kr": "메가다부니",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "AUDINO",
+   "megaStone": "AUDINITE",
+   "megaStoneKr": "다부니나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10069,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "NORMAL",
+    "FAIRY"
+   ],
+   "weight": 255
+  },
+  {
+   "abil": [
+    "STRONGJAW"
+   ],
+   "base": {
+    "atk": 140,
+    "def": 70,
+    "hp": 70,
+    "spa": 110,
+    "spd": 65,
+    "spe": 105
+   },
+   "baseExp": 161,
+   "catch": 60,
+   "egg": [
+    "water2"
+   ],
+   "en": "Mega Sharpedo",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "slow",
+   "happiness": 35,
+   "height": 2.5,
+   "hidden": null,
+   "internal": "SHARPEDO_MEGA",
+   "isBaby": false,
+   "kg": 130.3,
+   "kind": "난폭포켓몬",
+   "kr": "메가샤크니아",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SHARPEDO",
+   "megaStone": "SHARPEDONITE",
+   "megaStoneKr": "샤크니아나이트",
+   "minLevel": 30,
+   "moves": [],
+   "num": 10070,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "WATER",
+    "DARK"
+   ],
+   "weight": 60
+  },
+  {
+   "abil": [
+    "SHELLARMOR"
+   ],
+   "base": {
+    "atk": 75,
+    "def": 180,
+    "hp": 95,
+    "spa": 130,
+    "spd": 80,
+    "spe": 30
+   },
+   "baseExp": 172,
+   "catch": 75,
+   "egg": [
+    "monster",
+    "water1"
+   ],
+   "en": "Mega Slowbro",
+   "ev": {
+    "atk": 0,
+    "def": 2,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.0,
+   "hidden": null,
+   "internal": "SLOWBRO_MEGA",
+   "isBaby": false,
+   "kg": 120.0,
+   "kind": "기생포켓몬",
+   "kr": "메가야도란",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SLOWBRO",
+   "megaStone": "SLOWBRONITE",
+   "megaStoneKr": "야도란나이트",
+   "minLevel": 37,
+   "moves": [],
+   "num": 10071,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "WATER",
+    "PSYCHIC"
+   ],
+   "weight": 75
+  },
+  {
+   "abil": [
+    "SANDFORCE"
+   ],
+   "base": {
+    "atk": 125,
+    "def": 230,
+    "hp": 75,
+    "spa": 55,
+    "spd": 95,
+    "spe": 30
+   },
+   "baseExp": 179,
+   "catch": 25,
+   "egg": [
+    "mineral"
+   ],
+   "en": "Mega Steelix",
+   "ev": {
+    "atk": 0,
+    "def": 2,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 2,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 10.5,
+   "hidden": null,
+   "internal": "STEELIX_MEGA",
+   "isBaby": false,
+   "kg": 740.0,
+   "kind": "철뱀포켓몬",
+   "kr": "메가강철톤",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "STEELIX",
+   "megaStone": "STEELIXITE",
+   "megaStoneKr": "강철톤나이트",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10072,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "STEEL",
+    "GROUND"
+   ],
+   "weight": 25
+  },
+  {
+   "abil": [
+    "NOGUARD"
+   ],
+   "base": {
+    "atk": 80,
+    "def": 80,
+    "hp": 83,
+    "spa": 135,
+    "spd": 80,
+    "spe": 121
+   },
+   "baseExp": 216,
+   "catch": 45,
+   "egg": [
+    "flying"
+   ],
+   "en": "Mega Pidgeot",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 3
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 2.2,
+   "hidden": null,
+   "internal": "PIDGEOT_MEGA",
+   "isBaby": false,
+   "kg": 50.5,
+   "kind": "새포켓몬",
+   "kr": "메가피죤투",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "PIDGEOT",
+   "megaStone": "PIDGEOTITE",
+   "megaStoneKr": "피죤투나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10073,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "NORMAL",
+    "FLYING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "REFRIGERATE"
+   ],
+   "base": {
+    "atk": 120,
+    "def": 80,
+    "hp": 80,
+    "spa": 120,
+    "spd": 80,
+    "spe": 100
+   },
+   "baseExp": 168,
+   "catch": 75,
+   "egg": [
+    "fairy",
+    "mineral"
+   ],
+   "en": "Mega Glalie",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 2,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.1,
+   "hidden": null,
+   "internal": "GLALIE_MEGA",
+   "isBaby": false,
+   "kg": 350.2,
+   "kind": "얼굴포켓몬",
+   "kr": "메가얼음귀신",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GLALIE",
+   "megaStone": "GLALITITE",
+   "megaStoneKr": "얼음귀신나이트",
+   "minLevel": 42,
+   "moves": [],
+   "num": 10074,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "ICE"
+   ],
+   "weight": 75
+  },
+  {
+   "abil": [
+    "MAGICBOUNCE"
+   ],
+   "base": {
+    "atk": 160,
+    "def": 110,
+    "hp": 50,
+    "spa": 160,
+    "spd": 110,
+    "spe": 110
+   },
+   "baseExp": 270,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Diancie",
+   "ev": {
+    "atk": 0,
+    "def": 1,
+    "hp": 0,
+    "spa": 0,
+    "spd": 2,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 6,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 1.1,
+   "hidden": null,
+   "internal": "DIANCIE_MEGA",
+   "isBaby": false,
+   "kg": 27.8,
+   "kind": "보석포켓몬",
+   "kr": "메가디안시",
+   "legendary": true,
+   "mega": true,
+   "megaOf": "DIANCIE",
+   "megaStone": "DIANCITE",
+   "megaStoneKr": "디안시나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10075,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "ROCK",
+    "FAIRY"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "TOUGHCLAWS"
+   ],
+   "base": {
+    "atk": 145,
+    "def": 150,
+    "hp": 80,
+    "spa": 105,
+    "spd": 110,
+    "spe": 110
+   },
+   "baseExp": 270,
+   "catch": 3,
+   "egg": [
+    "mineral"
+   ],
+   "en": "Mega Metagross",
+   "ev": {
+    "atk": 0,
+    "def": 3,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 3,
+   "growth": "slow",
+   "happiness": 35,
+   "height": 2.5,
+   "hidden": null,
+   "internal": "METAGROSS_MEGA",
+   "isBaby": false,
+   "kg": 942.9,
+   "kind": "무쇠다리포켓몬",
+   "kr": "메가메타그로스",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "METAGROSS",
+   "megaStone": "METAGROSSITE",
+   "megaStoneKr": "메타그로스나이트",
+   "minLevel": 45,
+   "moves": [],
+   "num": 10076,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "STEEL",
+    "PSYCHIC"
+   ],
+   "weight": 3
+  },
+  {
+   "abil": [
+    "DELTASTREAM"
+   ],
+   "base": {
+    "atk": 180,
+    "def": 100,
+    "hp": 105,
+    "spa": 180,
+    "spd": 100,
+    "spe": 115
+   },
+   "baseExp": 306,
+   "catch": 45,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Rayquaza",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 1,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 3,
+   "growth": "slow",
+   "happiness": 0,
+   "height": 10.8,
+   "hidden": null,
+   "internal": "RAYQUAZA_MEGA",
+   "isBaby": false,
+   "kg": 392.0,
+   "kind": "천공포켓몬",
+   "kr": "메가레쿠쟈",
+   "legendary": true,
+   "mega": true,
+   "megaMove": "DRAGONASCENT",
+   "megaOf": "RAYQUAZA",
+   "megaStone": null,
+   "minLevel": 1,
+   "moves": [],
+   "num": 10079,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "DRAGON",
+    "FLYING"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "SHEERFORCE"
+   ],
+   "base": {
+    "atk": 120,
+    "def": 100,
+    "hp": 70,
+    "spa": 145,
+    "spd": 105,
+    "spe": 20
+   },
+   "baseExp": 161,
+   "catch": 150,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Camerupt",
+   "ev": {
+    "atk": 1,
+    "def": 0,
+    "hp": 0,
+    "spa": 1,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.5,
+   "hidden": null,
+   "internal": "CAMERUPT_MEGA",
+   "isBaby": false,
+   "kg": 320.5,
+   "kind": "분화포켓몬",
+   "kr": "메가폭타",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "CAMERUPT",
+   "megaStone": "CAMERUPTITE",
+   "megaStoneKr": "폭타나이트",
+   "minLevel": 33,
+   "moves": [],
+   "num": 10087,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "FIRE",
+    "GROUND"
+   ],
+   "weight": 150
+  },
+  {
+   "abil": [
+    "SCRAPPY"
+   ],
+   "base": {
+    "atk": 136,
+    "def": 94,
+    "hp": 65,
+    "spa": 54,
+    "spd": 96,
+    "spe": 135
+   },
+   "baseExp": 168,
+   "catch": 60,
+   "egg": [
+    "ground",
+    "humanshape"
+   ],
+   "en": "Mega Lopunny",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 2
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 4,
+   "growth": "medium",
+   "happiness": 140,
+   "height": 1.3,
+   "hidden": null,
+   "internal": "LOPUNNY_MEGA",
+   "isBaby": false,
+   "kg": 28.3,
+   "kind": "토끼포켓몬",
+   "kr": "메가이어롭",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "LOPUNNY",
+   "megaStone": "LOPUNNITE",
+   "megaStoneKr": "이어롭나이트",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10088,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "NORMAL",
+    "FIGHTING"
+   ],
+   "weight": 60
+  },
+  {
+   "abil": [
+    "AERILATE"
+   ],
+   "base": {
+    "atk": 145,
+    "def": 130,
+    "hp": 95,
+    "spa": 120,
+    "spd": 90,
+    "spe": 120
+   },
+   "baseExp": 270,
+   "catch": 45,
+   "egg": [
+    "dragon"
+   ],
+   "en": "Mega Salamence",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "slow",
+   "happiness": 35,
+   "height": 1.8,
+   "hidden": null,
+   "internal": "SALAMENCE_MEGA",
+   "isBaby": false,
+   "kg": 112.6,
+   "kind": "드래곤포켓몬",
+   "kr": "메가보만다",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SALAMENCE",
+   "megaStone": "SALAMENCITE",
+   "megaStoneKr": "보만다나이트",
+   "minLevel": 50,
+   "moves": [],
+   "num": 10089,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "DRAGON",
+    "FLYING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "ADAPTABILITY"
+   ],
+   "base": {
+    "atk": 150,
+    "def": 40,
+    "hp": 65,
+    "spa": 15,
+    "spd": 80,
+    "spe": 145
+   },
+   "baseExp": 178,
+   "catch": 45,
+   "egg": [
+    "bug"
+   ],
+   "en": "Mega Beedrill",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 1,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 1.4,
+   "hidden": null,
+   "internal": "BEEDRILL_MEGA",
+   "isBaby": false,
+   "kg": 40.5,
+   "kind": "독벌포켓몬",
+   "kr": "메가독침붕",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "BEEDRILL",
+   "megaStone": "BEEDRILLITE",
+   "megaStoneKr": "독침붕나이트",
+   "minLevel": 10,
+   "moves": [],
+   "num": 10090,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "BUG",
+    "POISON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "MAGICBOUNCE"
+   ],
+   "base": {
+    "atk": 80,
+    "def": 93,
+    "hp": 95,
+    "spa": 135,
+    "spd": 110,
+    "spe": 70
+   },
+   "baseExp": 217,
+   "catch": 25,
+   "egg": [
+    "fairy"
+   ],
+   "en": "Mega Clefable",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 3,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.75,
+   "gen": 1,
+   "growth": "fast",
+   "happiness": 140,
+   "height": 1.7,
+   "hidden": null,
+   "internal": "CLEFABLE_MEGA",
+   "isBaby": false,
+   "kg": 42.3,
+   "kind": "요정포켓몬",
+   "kr": "메가픽시",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "CLEFABLE",
+   "megaStone": "CLEFABLITE",
+   "megaStoneKr": "픽시나이트",
+   "minLevel": 33,
+   "moves": [],
+   "num": 10278,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "FAIRY",
+    "FLYING"
+   ],
+   "weight": 25
+  },
+  {
+   "abil": [
+    "INNARDSOUT"
+   ],
+   "base": {
+    "atk": 125,
+    "def": 85,
+    "hp": 80,
+    "spa": 135,
+    "spd": 95,
+    "spe": 70
+   },
+   "baseExp": 221,
+   "catch": 45,
+   "egg": [
+    "plant"
+   ],
+   "en": "Mega Victreebel",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 4.5,
+   "hidden": null,
+   "internal": "VICTREEBEL_MEGA",
+   "isBaby": false,
+   "kg": 125.5,
+   "kind": "파리잡이포켓몬",
+   "kr": "메가우츠보트",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "VICTREEBEL",
+   "megaStone": "VICTREEBELITE",
+   "megaStoneKr": "우츠보트나이트",
+   "minLevel": 37,
+   "moves": [],
+   "num": 10279,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "GRASS",
+    "POISON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "HUGEPOWER"
+   ],
+   "base": {
+    "atk": 100,
+    "def": 105,
+    "hp": 60,
+    "spa": 130,
+    "spd": 105,
+    "spe": 120
+   },
+   "baseExp": 182,
+   "catch": 60,
+   "egg": [
+    "water3"
+   ],
+   "en": "Mega Starmie",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 2
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 1,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 2.3,
+   "hidden": null,
+   "internal": "STARMIE_MEGA",
+   "isBaby": false,
+   "kg": 80.0,
+   "kind": "수수께끼포켓몬",
+   "kr": "메가아쿠스타",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "STARMIE",
+   "megaStone": "STARMINITE",
+   "megaStoneKr": "아쿠스타나이트",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10280,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "WATER",
+    "PSYCHIC"
+   ],
+   "weight": 60
+  },
+  {
+   "abil": [
+    "MULTISCALE"
+   ],
+   "base": {
+    "atk": 124,
+    "def": 115,
+    "hp": 91,
+    "spa": 145,
+    "spd": 125,
+    "spe": 100
+   },
+   "baseExp": 270,
+   "catch": 45,
+   "egg": [
+    "water1",
+    "dragon"
+   ],
+   "en": "Mega Dragonite",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "slow",
+   "happiness": 35,
+   "height": 2.2,
+   "hidden": null,
+   "internal": "DRAGONITE_MEGA",
+   "isBaby": false,
+   "kg": 290.0,
+   "kind": "드래곤포켓몬",
+   "kr": "메가망나뇽",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "DRAGONITE",
+   "megaStone": "DRAGONINITE",
+   "megaStoneKr": "망나뇽나이트",
+   "minLevel": 55,
+   "moves": [],
+   "num": 10281,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "DRAGON",
+    "FLYING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "MEGASOL"
+   ],
+   "base": {
+    "atk": 92,
+    "def": 115,
+    "hp": 80,
+    "spa": 143,
+    "spd": 115,
+    "spe": 80
+   },
+   "baseExp": 236,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "plant"
+   ],
+   "en": "Mega Meganium",
+   "ev": {
+    "atk": 0,
+    "def": 1,
+    "hp": 0,
+    "spa": 0,
+    "spd": 2,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 2,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 2.4,
+   "hidden": null,
+   "internal": "MEGANIUM_MEGA",
+   "isBaby": false,
+   "kg": 201.0,
+   "kind": "허브포켓몬",
+   "kr": "메가메가니움",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "MEGANIUM",
+   "megaStone": "MEGANIUMITE",
+   "megaStoneKr": "메가니움나이트",
+   "minLevel": 32,
+   "moves": [],
+   "num": 10282,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "GRASS",
+    "FAIRY"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "DRAGONIZE"
+   ],
+   "base": {
+    "atk": 160,
+    "def": 125,
+    "hp": 85,
+    "spa": 89,
+    "spd": 93,
+    "spe": 78
+   },
+   "baseExp": 239,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "water1"
+   ],
+   "en": "Mega Feraligatr",
+   "ev": {
+    "atk": 2,
+    "def": 1,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 2,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 2.3,
+   "hidden": null,
+   "internal": "FERALIGATR_MEGA",
+   "isBaby": false,
+   "kg": 108.8,
+   "kind": "큰턱포켓몬",
+   "kr": "메가장크로다일",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "FERALIGATR",
+   "megaStone": "FERALIGITE",
+   "megaStoneKr": "장크로다일나이트",
+   "minLevel": 30,
+   "moves": [],
+   "num": 10283,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "WATER",
+    "DRAGON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "STALWART"
+   ],
+   "base": {
+    "atk": 140,
+    "def": 110,
+    "hp": 65,
+    "spa": 40,
+    "spd": 100,
+    "spe": 110
+   },
+   "baseExp": 163,
+   "catch": 25,
+   "egg": [
+    "flying"
+   ],
+   "en": "Mega Skarmory",
+   "ev": {
+    "atk": 0,
+    "def": 2,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 2,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 1.7,
+   "hidden": null,
+   "internal": "SKARMORY_MEGA",
+   "isBaby": false,
+   "kg": 40.4,
+   "kind": "갑옷새포켓몬",
+   "kr": "메가무장조",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SKARMORY",
+   "megaStone": "SKARMORITE",
+   "megaStoneKr": "무장조나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10284,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "STEEL",
+    "FLYING"
+   ],
+   "weight": 25
+  },
+  {
+   "abil": [
+    "SNOWWARNING"
+   ],
+   "base": {
+    "atk": 80,
+    "def": 70,
+    "hp": 70,
+    "spa": 140,
+    "spd": 100,
+    "spe": 120
+   },
+   "baseExp": 168,
+   "catch": 75,
+   "egg": [
+    "fairy",
+    "mineral"
+   ],
+   "en": "Mega Froslass",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 2
+   },
+   "evo": [],
+   "femaleRatio": 1.0,
+   "gen": 4,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.6,
+   "hidden": null,
+   "internal": "FROSLASS_MEGA",
+   "isBaby": false,
+   "kg": 29.6,
+   "kind": "설국포켓몬",
+   "kr": "메가눈여아",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "FROSLASS",
+   "megaStone": "FROSLASSITE",
+   "megaStoneKr": "눈여아나이트",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10285,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "ICE",
+    "GHOST"
+   ],
+   "weight": 75
+  },
+  {
+   "abil": [
+    "MOLDBREAKER"
+   ],
+   "base": {
+    "atk": 148,
+    "def": 75,
+    "hp": 110,
+    "spa": 110,
+    "spd": 110,
+    "spe": 75
+   },
+   "baseExp": 238,
+   "catch": 45,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Emboar",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 5,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.8,
+   "hidden": null,
+   "internal": "EMBOAR_MEGA",
+   "isBaby": false,
+   "kg": 180.3,
+   "kind": "큰불돼지포켓몬",
+   "kr": "메가염무왕",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "EMBOAR",
+   "megaStone": "EMBOARITE",
+   "megaStoneKr": "염무왕나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10286,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "FIRE",
+    "FIGHTING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "PIERCINGDRILL"
+   ],
+   "base": {
+    "atk": 165,
+    "def": 100,
+    "hp": 110,
+    "spa": 65,
+    "spd": 65,
+    "spe": 103
+   },
+   "baseExp": 178,
+   "catch": 60,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Excadrill",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 5,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 0.9,
+   "hidden": null,
+   "internal": "EXCADRILL_MEGA",
+   "isBaby": false,
+   "kg": 60.0,
+   "kind": "땅밑포켓몬",
+   "kr": "메가몰드류",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "EXCADRILL",
+   "megaStone": "EXCADRITE",
+   "megaStoneKr": "몰드류나이트",
+   "minLevel": 31,
+   "moves": [],
+   "num": 10287,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "GROUND",
+    "STEEL"
+   ],
+   "weight": 60
+  },
+  {
+   "abil": [
+    "SHELLARMOR"
+   ],
+   "base": {
+    "atk": 140,
+    "def": 149,
+    "hp": 60,
+    "spa": 75,
+    "spd": 99,
+    "spe": 62
+   },
+   "baseExp": 218,
+   "catch": 45,
+   "egg": [
+    "bug"
+   ],
+   "en": "Mega Scolipede",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 3
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 5,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 3.2,
+   "hidden": null,
+   "internal": "SCOLIPEDE_MEGA",
+   "isBaby": false,
+   "kg": 230.5,
+   "kind": "메가지네포켓몬",
+   "kr": "메가펜드라",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SCOLIPEDE",
+   "megaStone": "SCOLIPITE",
+   "megaStoneKr": "펜드라나이트",
+   "minLevel": 30,
+   "moves": [],
+   "num": 10288,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "BUG",
+    "POISON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "INTIMIDATE"
+   ],
+   "base": {
+    "atk": 130,
+    "def": 135,
+    "hp": 65,
+    "spa": 55,
+    "spd": 135,
+    "spe": 68
+   },
+   "baseExp": 171,
+   "catch": 90,
+   "egg": [
+    "ground",
+    "dragon"
+   ],
+   "en": "Mega Scrafty",
+   "ev": {
+    "atk": 0,
+    "def": 1,
+    "hp": 0,
+    "spa": 0,
+    "spd": 1,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 5,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 1.1,
+   "hidden": null,
+   "internal": "SCRAFTY_MEGA",
+   "isBaby": false,
+   "kg": 31.0,
+   "kind": "악당포켓몬",
+   "kr": "메가곤율거니",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SCRAFTY",
+   "megaStone": "SCRAFTINITE",
+   "megaStoneKr": "곤율거니나이트",
+   "minLevel": 39,
+   "moves": [],
+   "num": 10289,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "DARK",
+    "FIGHTING"
+   ],
+   "weight": 90
+  },
+  {
+   "abil": [
+    "EELEVATE"
+   ],
+   "base": {
+    "atk": 145,
+    "def": 80,
+    "hp": 85,
+    "spa": 135,
+    "spd": 90,
+    "spe": 80
+   },
+   "baseExp": 232,
+   "catch": 30,
+   "egg": [
+    "indeterminate"
+   ],
+   "en": "Mega Eelektross",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 5,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 3.0,
+   "hidden": null,
+   "internal": "EELEKTROSS_MEGA",
+   "isBaby": false,
+   "kg": 180.0,
+   "kind": "전기물고기포켓몬",
+   "kr": "메가저리더프",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "EELEKTROSS",
+   "megaStone": "EELEKTROSSITE",
+   "megaStoneKr": "저리더프나이트",
+   "minLevel": 55,
+   "moves": [],
+   "num": 10290,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "ELECTRIC"
+   ],
+   "weight": 30
+  },
+  {
+   "abil": [
+    "INFILTRATOR"
+   ],
+   "base": {
+    "atk": 75,
+    "def": 110,
+    "hp": 60,
+    "spa": 175,
+    "spd": 110,
+    "spe": 90
+   },
+   "baseExp": 234,
+   "catch": 45,
+   "egg": [
+    "indeterminate"
+   ],
+   "en": "Mega Chandelure",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 5,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 2.5,
+   "hidden": null,
+   "internal": "CHANDELURE_MEGA",
+   "isBaby": false,
+   "kg": 69.6,
+   "kind": "권유포켓몬",
+   "kr": "메가샹델라",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "CHANDELURE",
+   "megaStone": "CHANDELURITE",
+   "megaStoneKr": "샹델라나이트",
+   "minLevel": 55,
+   "moves": [],
+   "num": 10291,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "GHOST",
+    "FIRE"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "BULLETPROOF"
+   ],
+   "base": {
+    "atk": 137,
+    "def": 172,
+    "hp": 88,
+    "spa": 74,
+    "spd": 115,
+    "spe": 44
+   },
+   "baseExp": 239,
+   "catch": 45,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Chesnaught",
+   "ev": {
+    "atk": 0,
+    "def": 3,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 6,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.6,
+   "hidden": null,
+   "internal": "CHESNAUGHT_MEGA",
+   "isBaby": false,
+   "kg": 90.0,
+   "kind": "가시갑옷포켓몬",
+   "kr": "메가브리가론",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "CHESNAUGHT",
+   "megaStone": "CHESNAUGHTITE",
+   "megaStoneKr": "브리가론나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10292,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "GRASS",
+    "FIGHTING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "LEVITATE"
+   ],
+   "base": {
+    "atk": 69,
+    "def": 72,
+    "hp": 75,
+    "spa": 159,
+    "spd": 125,
+    "spe": 134
+   },
+   "baseExp": 240,
+   "catch": 45,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Delphox",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 6,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.5,
+   "hidden": null,
+   "internal": "DELPHOX_MEGA",
+   "isBaby": false,
+   "kg": 39.0,
+   "kind": "여우포켓몬",
+   "kr": "메가마폭시",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "DELPHOX",
+   "megaStone": "DELPHOXITE",
+   "megaStoneKr": "마폭시나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10293,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "FIRE",
+    "PSYCHIC"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "PROTEAN"
+   ],
+   "base": {
+    "atk": 125,
+    "def": 77,
+    "hp": 72,
+    "spa": 133,
+    "spd": 81,
+    "spe": 142
+   },
+   "baseExp": 239,
+   "catch": 45,
+   "egg": [
+    "water1"
+   ],
+   "en": "Mega Greninja",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 3
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 6,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.5,
+   "hidden": null,
+   "internal": "GRENINJA_MEGA",
+   "isBaby": false,
+   "kg": 40.0,
+   "kind": "시노비포켓몬",
+   "kr": "메가개굴닌자",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GRENINJA",
+   "megaStone": "GRENINJITE",
+   "megaStoneKr": "개굴닌자나이트",
+   "minLevel": 36,
+   "moves": [],
+   "num": 10294,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "WATER",
+    "DARK"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "FIREMANE"
+   ],
+   "base": {
+    "atk": 88,
+    "def": 92,
+    "hp": 86,
+    "spa": 129,
+    "spd": 86,
+    "spe": 126
+   },
+   "baseExp": 177,
+   "catch": 65,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Pyroar",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 2,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.875,
+   "gen": 6,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.5,
+   "hidden": null,
+   "internal": "PYROAR_MEGA",
+   "isBaby": false,
+   "kg": 93.3,
+   "kind": "임금포켓몬",
+   "kr": "메가화염레오",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "PYROAR",
+   "megaStone": "PYROARITE",
+   "megaStoneKr": "화염레오나이트",
+   "minLevel": 35,
+   "moves": [],
+   "num": 10295,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "FIRE",
+    "NORMAL"
+   ],
+   "weight": 65
+  },
+  {
+   "abil": [
+    "FAIRYAURA"
+   ],
+   "base": {
+    "atk": 85,
+    "def": 87,
+    "hp": 74,
+    "spa": 155,
+    "spd": 148,
+    "spe": 102
+   },
+   "baseExp": 130,
+   "catch": 120,
+   "egg": [
+    "fairy"
+   ],
+   "en": "Mega Floette",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 2,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 1.0,
+   "gen": 6,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 0.2,
+   "hidden": null,
+   "internal": "FLOETTE_MEGA",
+   "isBaby": false,
+   "kg": 100.8,
+   "kind": "한송이포켓몬",
+   "kr": "메가플라엣테",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "FLOETTE",
+   "megaStone": "FLOETTITE",
+   "megaStoneKr": "플라엣테나이트",
+   "minLevel": 19,
+   "moves": [],
+   "num": 10296,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "FAIRY"
+   ],
+   "weight": 120
+  },
+  {
+   "abil": [
+    "CONTRARY"
+   ],
+   "base": {
+    "atk": 102,
+    "def": 88,
+    "hp": 86,
+    "spa": 98,
+    "spd": 120,
+    "spe": 88
+   },
+   "baseExp": 169,
+   "catch": 80,
+   "egg": [
+    "water1",
+    "water2"
+   ],
+   "en": "Mega Malamar",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 6,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.9,
+   "hidden": null,
+   "internal": "MALAMAR_MEGA",
+   "isBaby": false,
+   "kg": 69.8,
+   "kind": "역전포켓몬",
+   "kr": "메가칼라마네로",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "MALAMAR",
+   "megaStone": "MALAMARITE",
+   "megaStoneKr": "칼라마네로나이트",
+   "minLevel": 30,
+   "moves": [],
+   "num": 10297,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "DARK",
+    "PSYCHIC"
+   ],
+   "weight": 80
+  },
+  {
+   "abil": [
+    "TOUGHCLAWS"
+   ],
+   "base": {
+    "atk": 140,
+    "def": 130,
+    "hp": 72,
+    "spa": 64,
+    "spd": 106,
+    "spe": 88
+   },
+   "baseExp": 175,
+   "catch": 45,
+   "egg": [
+    "water3"
+   ],
+   "en": "Mega Barbaracle",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 6,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.2,
+   "hidden": null,
+   "internal": "BARBARACLE_MEGA",
+   "isBaby": false,
+   "kg": 100.0,
+   "kind": "집합포켓몬",
+   "kr": "메가거북손데스",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "BARBARACLE",
+   "megaStone": "BARBARACITE",
+   "megaStoneKr": "거북손데스나이트",
+   "minLevel": 39,
+   "moves": [],
+   "num": 10298,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "ROCK",
+    "FIGHTING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "REGENERATOR"
+   ],
+   "base": {
+    "atk": 85,
+    "def": 105,
+    "hp": 65,
+    "spa": 132,
+    "spd": 163,
+    "spe": 44
+   },
+   "baseExp": 173,
+   "catch": 55,
+   "egg": [
+    "water1",
+    "dragon"
+   ],
+   "en": "Mega Dragalge",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 2,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 6,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.1,
+   "hidden": null,
+   "internal": "DRAGALGE_MEGA",
+   "isBaby": false,
+   "kg": 100.3,
+   "kind": "풀모방포켓몬",
+   "kr": "메가드래캄",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "DRAGALGE",
+   "megaStone": "DRAGALGITE",
+   "megaStoneKr": "드래캄나이트",
+   "minLevel": 48,
+   "moves": [],
+   "num": 10299,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "POISON",
+    "DRAGON"
+   ],
+   "weight": 55
+  },
+  {
+   "abil": [
+    "NOGUARD"
+   ],
+   "base": {
+    "atk": 137,
+    "def": 100,
+    "hp": 78,
+    "spa": 74,
+    "spd": 93,
+    "spe": 118
+   },
+   "baseExp": 175,
+   "catch": 100,
+   "egg": [
+    "flying",
+    "humanshape"
+   ],
+   "en": "Mega Hawlucha",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 6,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 1.0,
+   "hidden": null,
+   "internal": "HAWLUCHA_MEGA",
+   "isBaby": false,
+   "kg": 25.0,
+   "kind": "레슬링포켓몬",
+   "kr": "메가루차불",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "HAWLUCHA",
+   "megaStone": "HAWLUCHANITE",
+   "megaStoneKr": "루차불나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10300,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "FIGHTING",
+    "FLYING"
+   ],
+   "weight": 100
+  },
+  {
+   "abil": [
+    "AURABREAK"
+   ],
+   "base": {
+    "atk": 70,
+    "def": 91,
+    "hp": 216,
+    "spa": 216,
+    "spd": 85,
+    "spe": 100
+   },
+   "baseExp": 270,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Zygarde",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 3,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 6,
+   "growth": "slow",
+   "happiness": 0,
+   "height": 7.7,
+   "hidden": null,
+   "internal": "ZYGARDE_MEGA",
+   "isBaby": false,
+   "kg": 610.0,
+   "kind": "질서포켓몬",
+   "kr": "메가지가르데",
+   "legendary": true,
+   "mega": true,
+   "megaAbilityGuess": true,
+   "megaOf": "ZYGARDE",
+   "megaStone": "ZYGARDITE",
+   "megaStoneKr": "지가르데나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10301,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "DRAGON",
+    "GROUND"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "BERSERK"
+   ],
+   "base": {
+    "atk": 85,
+    "def": 110,
+    "hp": 78,
+    "spa": 160,
+    "spd": 116,
+    "spe": 36
+   },
+   "baseExp": 170,
+   "catch": 70,
+   "egg": [
+    "monster",
+    "dragon"
+   ],
+   "en": "Mega Drampa",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 2,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 7,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 3.0,
+   "hidden": null,
+   "internal": "DRAMPA_MEGA",
+   "isBaby": false,
+   "kg": 240.5,
+   "kind": "느긋누긋포켓몬",
+   "kr": "메가할비롱",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "DRAMPA",
+   "megaStone": "DRAMPANITE",
+   "megaStoneKr": "할비롱나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10302,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "NORMAL",
+    "DRAGON"
+   ],
+   "weight": 70
+  },
+  {
+   "abil": [
+    "DEFIANT"
+   ],
+   "base": {
+    "atk": 135,
+    "def": 135,
+    "hp": 65,
+    "spa": 70,
+    "spd": 65,
+    "spe": 100
+   },
+   "baseExp": 165,
+   "catch": 45,
+   "egg": [
+    "fairy",
+    "mineral"
+   ],
+   "en": "Mega Falinks",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 1,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 8,
+   "growth": "medium",
+   "happiness": 50,
+   "height": 1.6,
+   "hidden": null,
+   "internal": "FALINKS_MEGA",
+   "isBaby": false,
+   "kg": 99.0,
+   "kind": "진형포켓몬",
+   "kr": "메가대여르",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "FALINKS",
+   "megaStone": "FALINKSITE",
+   "megaStoneKr": "대여르나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10303,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "FIGHTING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "ELECTRICSURGE"
+   ],
+   "base": {
+    "atk": 135,
+    "def": 95,
+    "hp": 60,
+    "spa": 90,
+    "spd": 95,
+    "spe": 110
+   },
+   "baseExp": 218,
+   "catch": 75,
+   "egg": [
+    "ground",
+    "fairy"
+   ],
+   "en": "Mega Raichu X",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 3
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 1.2,
+   "hidden": null,
+   "internal": "RAICHU_MEGA_X",
+   "isBaby": false,
+   "kg": 38.0,
+   "kind": "쥐포켓몬",
+   "kr": "메가라이츄X",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "RAICHU",
+   "megaStone": "RAICHUNITEX",
+   "megaStoneKr": "라이츄나이트X",
+   "minLevel": 33,
+   "moves": [],
+   "num": 10304,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "ELECTRIC"
+   ],
+   "weight": 75
+  },
+  {
+   "abil": [
+    "NOGUARD"
+   ],
+   "base": {
+    "atk": 100,
+    "def": 55,
+    "hp": 60,
+    "spa": 160,
+    "spd": 80,
+    "spe": 130
+   },
+   "baseExp": 218,
+   "catch": 75,
+   "egg": [
+    "ground",
+    "fairy"
+   ],
+   "en": "Mega Raichu Y",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 3
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 1,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 1.0,
+   "hidden": null,
+   "internal": "RAICHU_MEGA_Y",
+   "isBaby": false,
+   "kg": 26.0,
+   "kind": "쥐포켓몬",
+   "kr": "메가라이츄Y",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "RAICHU",
+   "megaStone": "RAICHUNITEY",
+   "megaStoneKr": "라이츄나이트Y",
+   "minLevel": 33,
+   "moves": [],
+   "num": 10305,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "ELECTRIC"
+   ],
+   "weight": 75
+  },
+  {
+   "abil": [
+    "LEVITATE"
+   ],
+   "base": {
+    "atk": 50,
+    "def": 110,
+    "hp": 75,
+    "spa": 135,
+    "spd": 120,
+    "spe": 65
+   },
+   "baseExp": 159,
+   "catch": 45,
+   "egg": [
+    "indeterminate"
+   ],
+   "en": "Mega Chimecho",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 1,
+    "spd": 1,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "fast",
+   "happiness": 70,
+   "height": 1.2,
+   "hidden": null,
+   "internal": "CHIMECHO_MEGA",
+   "isBaby": false,
+   "kg": 8.0,
+   "kind": "풍경포켓몬",
+   "kr": "메가치렁",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "CHIMECHO",
+   "megaStone": "CHIMECHITE",
+   "megaStoneKr": "치렁나이트",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10306,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "PSYCHIC",
+    "STEEL"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "SHARPNESS"
+   ],
+   "base": {
+    "atk": 154,
+    "def": 60,
+    "hp": 65,
+    "spa": 75,
+    "spd": 60,
+    "spe": 151
+   },
+   "baseExp": 163,
+   "catch": 30,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Absol Z",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 3,
+   "growth": "medium_slow",
+   "happiness": 35,
+   "height": 1.2,
+   "hidden": null,
+   "internal": "ABSOL_MEGA_Z",
+   "isBaby": false,
+   "kg": 49.0,
+   "kind": "재난포켓몬",
+   "kr": "메가앱솔Z",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "ABSOL",
+   "megaStone": "ABSOLITEZ",
+   "megaStoneKr": "앱솔나이트Z",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10307,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "DARK",
+    "GHOST"
+   ],
+   "weight": 30
+  },
+  {
+   "abil": [
+    "CONTRARY"
+   ],
+   "base": {
+    "atk": 140,
+    "def": 100,
+    "hp": 85,
+    "spa": 60,
+    "spd": 90,
+    "spe": 110
+   },
+   "baseExp": 218,
+   "catch": 45,
+   "egg": [
+    "flying"
+   ],
+   "en": "Mega Staraptor",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 4,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.9,
+   "hidden": null,
+   "internal": "STARAPTOR_MEGA",
+   "isBaby": false,
+   "kg": 50.0,
+   "kind": "맹금포켓몬",
+   "kr": "메가찌르호크",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "STARAPTOR",
+   "megaStone": "STARAPTITE",
+   "megaStoneKr": "찌르호크나이트",
+   "minLevel": 34,
+   "moves": [],
+   "num": 10308,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "FIGHTING",
+    "FLYING"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "LEVITATE"
+   ],
+   "base": {
+    "atk": 130,
+    "def": 85,
+    "hp": 108,
+    "spa": 141,
+    "spd": 85,
+    "spe": 151
+   },
+   "baseExp": 270,
+   "catch": 45,
+   "egg": [
+    "monster",
+    "dragon"
+   ],
+   "en": "Mega Garchomp Z",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 4,
+   "growth": "slow",
+   "happiness": 70,
+   "height": 1.9,
+   "hidden": null,
+   "internal": "GARCHOMP_MEGA_Z",
+   "isBaby": false,
+   "kg": 99.0,
+   "kind": "마하포켓몬",
+   "kr": "메가한카리아스Z",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GARCHOMP",
+   "megaStone": "GARCHOMPITEZ",
+   "megaStoneKr": "한카리아스나이트Z",
+   "minLevel": 48,
+   "moves": [],
+   "num": 10309,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "DRAGON"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "STEADFAST"
+   ],
+   "base": {
+    "atk": 100,
+    "def": 70,
+    "hp": 70,
+    "spa": 164,
+    "spd": 70,
+    "spe": 151
+   },
+   "baseExp": 184,
+   "catch": 45,
+   "egg": [
+    "ground",
+    "humanshape"
+   ],
+   "en": "Mega Lucario Z",
+   "ev": {
+    "atk": 1,
+    "def": 0,
+    "hp": 0,
+    "spa": 1,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.125,
+   "gen": 4,
+   "growth": "medium_slow",
+   "happiness": 70,
+   "height": 1.3,
+   "hidden": null,
+   "internal": "LUCARIO_MEGA_Z",
+   "isBaby": false,
+   "kg": 49.4,
+   "kind": "파동포켓몬",
+   "kr": "메가루카리오Z",
+   "legendary": false,
+   "mega": true,
+   "megaAbilityGuess": true,
+   "megaOf": "LUCARIO",
+   "megaStone": "LUCARIONITEZ",
+   "megaStoneKr": "루카리오나이트Z",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10310,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "FIGHTING",
+    "STEEL"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "FLASHFIRE"
+   ],
+   "base": {
+    "atk": 120,
+    "def": 106,
+    "hp": 91,
+    "spa": 175,
+    "spd": 141,
+    "spe": 67
+   },
+   "baseExp": 270,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Heatran",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 4,
+   "growth": "slow",
+   "happiness": 100,
+   "height": 2.8,
+   "hidden": null,
+   "internal": "HEATRAN_MEGA",
+   "isBaby": false,
+   "kg": 570.0,
+   "kind": "화구포켓몬",
+   "kr": "메가히드런",
+   "legendary": true,
+   "mega": true,
+   "megaAbilityGuess": true,
+   "megaOf": "HEATRAN",
+   "megaStone": "HEATRANITE",
+   "megaStoneKr": "히드런나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10311,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "FIRE",
+    "STEEL"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "BADDREAMS"
+   ],
+   "base": {
+    "atk": 120,
+    "def": 130,
+    "hp": 70,
+    "spa": 165,
+    "spd": 130,
+    "spe": 85
+   },
+   "baseExp": 270,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Darkrai",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 2,
+    "spd": 0,
+    "spe": 1
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 4,
+   "growth": "slow",
+   "happiness": 0,
+   "height": 3.0,
+   "hidden": null,
+   "internal": "DARKRAI_MEGA",
+   "isBaby": false,
+   "kg": 240.0,
+   "kind": "암흑포켓몬",
+   "kr": "메가다크라이",
+   "legendary": true,
+   "mega": true,
+   "megaAbilityGuess": true,
+   "megaOf": "DARKRAI",
+   "megaStone": "DARKRANITE",
+   "megaStoneKr": "다크라이나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10312,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "DARK"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "UNSEENFIST"
+   ],
+   "base": {
+    "atk": 159,
+    "def": 105,
+    "hp": 89,
+    "spa": 70,
+    "spd": 105,
+    "spe": 55
+   },
+   "baseExp": 169,
+   "catch": 90,
+   "egg": [
+    "mineral"
+   ],
+   "en": "Mega Golurk",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 5,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 4.0,
+   "hidden": null,
+   "internal": "GOLURK_MEGA",
+   "isBaby": false,
+   "kg": 330.0,
+   "kind": "골렘포켓몬",
+   "kr": "메가골루그",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GOLURK",
+   "megaStone": "GOLURKITE",
+   "megaStoneKr": "골루그나이트",
+   "minLevel": 43,
+   "moves": [],
+   "num": 10313,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "GROUND",
+    "GHOST"
+   ],
+   "weight": 90
+  },
+  {
+   "abil": [
+    "TRACE"
+   ],
+   "base": {
+    "atk": 48,
+    "def": 76,
+    "hp": 74,
+    "spa": 143,
+    "spd": 101,
+    "spe": 124
+   },
+   "baseExp": 163,
+   "catch": 75,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Meowstic",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 2
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 6,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 0.8,
+   "hidden": null,
+   "internal": "MEOWSTIC_MEGA",
+   "isBaby": false,
+   "kg": 10.1,
+   "kind": "억제포켓몬",
+   "kr": "메가냐오닉스",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "MEOWSTIC",
+   "megaStone": "MEOWSTICITE",
+   "megaStoneKr": "냐오닉스나이트",
+   "minLevel": 25,
+   "moves": [],
+   "num": 10314,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "PSYCHIC"
+   ],
+   "weight": 75
+  },
+  {
+   "abil": [
+    "IRONFIST"
+   ],
+   "base": {
+    "atk": 157,
+    "def": 122,
+    "hp": 97,
+    "spa": 62,
+    "spd": 107,
+    "spe": 33
+   },
+   "baseExp": 167,
+   "catch": 60,
+   "egg": [
+    "water3"
+   ],
+   "en": "Mega Crabominable",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 7,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.6,
+   "hidden": null,
+   "internal": "CRABOMINABLE_MEGA",
+   "isBaby": false,
+   "kg": 252.8,
+   "kind": "털게포켓몬",
+   "kr": "메가모단단게",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "CRABOMINABLE",
+   "megaStone": "CRABOMINITE",
+   "megaStoneKr": "모단단게나이트",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10315,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "FIGHTING",
+    "ICE"
+   ],
+   "weight": 60
+  },
+  {
+   "abil": [
+    "TOUGHCLAWS"
+   ],
+   "base": {
+    "atk": 150,
+    "def": 175,
+    "hp": 75,
+    "spa": 70,
+    "spd": 120,
+    "spe": 40
+   },
+   "baseExp": 186,
+   "catch": 45,
+   "egg": [
+    "bug",
+    "water3"
+   ],
+   "en": "Mega Golisopod",
+   "ev": {
+    "atk": 0,
+    "def": 2,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 7,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 2.3,
+   "hidden": null,
+   "internal": "GOLISOPOD_MEGA",
+   "isBaby": false,
+   "kg": 148.0,
+   "kind": "장갑포켓몬",
+   "kr": "메가갑주무사",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GOLISOPOD",
+   "megaStone": "GOLISOPITE",
+   "megaStoneKr": "갑주무사나이트",
+   "minLevel": 30,
+   "moves": [],
+   "num": 10316,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "BUG",
+    "STEEL"
+   ],
+   "weight": 45
+  },
+  {
+   "abil": [
+    "SOULHEART"
+   ],
+   "base": {
+    "atk": 125,
+    "def": 115,
+    "hp": 80,
+    "spa": 170,
+    "spd": 115,
+    "spe": 95
+   },
+   "baseExp": 270,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Magearna",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 3,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 7,
+   "growth": "slow",
+   "happiness": 0,
+   "height": 1.3,
+   "hidden": null,
+   "internal": "MAGEARNA_MEGA",
+   "isBaby": false,
+   "kg": 248.1,
+   "kind": "인조포켓몬",
+   "kr": "메가마기아나",
+   "legendary": true,
+   "mega": true,
+   "megaAbilityGuess": true,
+   "megaOf": "MAGEARNA",
+   "megaStone": "MAGEARNITE",
+   "megaStoneKr": "마기아나나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10317,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "STEEL",
+    "FAIRY"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "VOLTABSORB"
+   ],
+   "base": {
+    "atk": 157,
+    "def": 75,
+    "hp": 88,
+    "spa": 147,
+    "spd": 80,
+    "spe": 153
+   },
+   "baseExp": 270,
+   "catch": 3,
+   "egg": [
+    "no-eggs"
+   ],
+   "en": "Mega Zeraora",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 3
+   },
+   "evo": [],
+   "femaleRatio": null,
+   "gen": 7,
+   "growth": "slow",
+   "happiness": 0,
+   "height": 1.5,
+   "hidden": null,
+   "internal": "ZERAORA_MEGA",
+   "isBaby": false,
+   "kg": 44.5,
+   "kind": "신뢰포켓몬",
+   "kr": "메가제라오라",
+   "legendary": true,
+   "mega": true,
+   "megaAbilityGuess": true,
+   "megaOf": "ZERAORA",
+   "megaStone": "ZERAORITE",
+   "megaStoneKr": "제라오라나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10319,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "ELECTRIC"
+   ],
+   "weight": 0
+  },
+  {
+   "abil": [
+    "SPICYSPRAY"
+   ],
+   "base": {
+    "atk": 138,
+    "def": 85,
+    "hp": 65,
+    "spa": 138,
+    "spd": 85,
+    "spe": 75
+   },
+   "baseExp": 170,
+   "catch": 75,
+   "egg": [
+    "plant"
+   ],
+   "en": "Mega Scovillain",
+   "ev": {
+    "atk": 2,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 9,
+   "growth": "medium",
+   "happiness": 50,
+   "height": 1.2,
+   "hidden": null,
+   "internal": "SCOVILLAIN_MEGA",
+   "isBaby": false,
+   "kg": 22.0,
+   "kind": "하바네로포켓몬",
+   "kr": "메가스코빌런",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "SCOVILLAIN",
+   "megaStone": "SCOVILLAINITE",
+   "megaStoneKr": "스코빌런나이트",
+   "minLevel": 17,
+   "moves": [],
+   "num": 10320,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "GRASS",
+    "FIRE"
+   ],
+   "weight": 75
+  },
+  {
+   "abil": [
+    "ADAPTABILITY"
+   ],
+   "base": {
+    "atk": 90,
+    "def": 105,
+    "hp": 83,
+    "spa": 150,
+    "spd": 96,
+    "spe": 101
+   },
+   "baseExp": 184,
+   "catch": 25,
+   "egg": [
+    "mineral"
+   ],
+   "en": "Mega Glimmora",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 2,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 9,
+   "growth": "medium_slow",
+   "happiness": 50,
+   "height": 2.8,
+   "hidden": null,
+   "internal": "GLIMMORA_MEGA",
+   "isBaby": false,
+   "kg": 77.0,
+   "kind": "광석포켓몬",
+   "kr": "메가킬라플로르",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "GLIMMORA",
+   "megaStone": "GLIMMORANITE",
+   "megaStoneKr": "킬라플로르나이트",
+   "minLevel": 35,
+   "moves": [],
+   "num": 10321,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "ROCK",
+    "POISON"
+   ],
+   "weight": 25
+  },
+  {
+   "abil": [
+    "COMMANDER"
+   ],
+   "base": {
+    "atk": 65,
+    "def": 90,
+    "hp": 68,
+    "spa": 135,
+    "spd": 125,
+    "spe": 92
+   },
+   "baseExp": 166,
+   "catch": 100,
+   "egg": [
+    "water2"
+   ],
+   "en": "Mega Tatsugiri",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 2,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 9,
+   "growth": "medium_slow",
+   "happiness": 50,
+   "height": 0.6,
+   "hidden": null,
+   "internal": "TATSUGIRI_MEGA",
+   "isBaby": false,
+   "kg": 24.0,
+   "kind": "의태포켓몬",
+   "kr": "메가싸리용",
+   "legendary": false,
+   "mega": true,
+   "megaAbilityGuess": true,
+   "megaOf": "TATSUGIRI",
+   "megaStone": "TATSUGIRINITE",
+   "megaStoneKr": "싸리용나이트",
+   "minLevel": 1,
+   "moves": [],
+   "num": 10322,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 0,
+   "types": [
+    "DRAGON",
+    "WATER"
+   ],
+   "weight": 100
+  },
+  {
+   "abil": [
+    "THERMALEXCHANGE"
+   ],
+   "base": {
+    "atk": 175,
+    "def": 117,
+    "hp": 115,
+    "spa": 105,
+    "spd": 101,
+    "spe": 87
+   },
+   "baseExp": 300,
+   "catch": 10,
+   "egg": [
+    "dragon",
+    "mineral"
+   ],
+   "en": "Mega Baxcalibur",
+   "ev": {
+    "atk": 3,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 9,
+   "growth": "slow",
+   "happiness": 50,
+   "height": 2.1,
+   "hidden": null,
+   "internal": "BAXCALIBUR_MEGA",
+   "isBaby": false,
+   "kg": 315.0,
+   "kind": "빙룡포켓몬",
+   "kr": "메가드닐레이브",
+   "legendary": false,
+   "mega": true,
+   "megaOf": "BAXCALIBUR",
+   "megaStone": "BAXCALIBRITE",
+   "megaStoneKr": "드닐레이브나이트",
+   "minLevel": 54,
+   "moves": [],
+   "num": 10325,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 2,
+   "types": [
+    "DRAGON",
+    "ICE"
+   ],
+   "weight": 10
+  },
+  {
+   "abil": [
+    "TRACE"
+   ],
+   "base": {
+    "atk": 48,
+    "def": 76,
+    "hp": 74,
+    "spa": 143,
+    "spd": 101,
+    "spe": 124
+   },
+   "baseExp": 163,
+   "catch": 75,
+   "egg": [
+    "ground"
+   ],
+   "en": "Mega Meowstic",
+   "ev": {
+    "atk": 0,
+    "def": 0,
+    "hp": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 2
+   },
+   "evo": [],
+   "femaleRatio": 0.5,
+   "gen": 6,
+   "growth": "medium",
+   "happiness": 70,
+   "height": 0.8,
+   "hidden": null,
+   "internal": "MEOWSTIC_MEGA_F",
+   "isBaby": false,
+   "kg": 10.1,
+   "kind": "억제포켓몬",
+   "kr": "메가냐오닉스",
+   "legendary": false,
+   "mega": true,
+   "megaGender": "F",
+   "megaOf": "MEOWSTIC",
+   "megaStone": "MEOWSTICITE",
+   "megaStoneKr": "냐오닉스나이트",
+   "minLevel": 25,
+   "moves": [],
+   "num": 10326,
+   "prevo": null,
+   "spawnable": false,
+   "stage": 1,
+   "types": [
+    "PSYCHIC"
+   ],
+   "weight": 75
+  }
+ ],
  "moves": {
   "10000000VOLTTHUNDERBOLT": {
    "acc": 0,

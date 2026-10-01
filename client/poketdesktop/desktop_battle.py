@@ -335,6 +335,12 @@ class DesktopBattle(object):
             side = self.mine if who == "me" else self.foe
             if side:
                 self.float_over(side, "효과가 없다...", "#9a9ab0")
+        if t == "mega":
+            # 바탕화면 도트는 걷는 그림이라 메가 모습이 없다 - 글씨로 알린다 (시즌 3)
+            side = self.mine if who == "me" else self.foe
+            if side:
+                self.float_over(side, "메가진화!", "#c9b3ff")
+                return self.after(700, done)
         self.after(220, done)
 
     def turn_done(self, result):

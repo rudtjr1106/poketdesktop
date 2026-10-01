@@ -104,6 +104,16 @@ class App(object):
         # 받아 놓고 아직 안 받아준 친구 요청 수. 대전과 같은 이유로
         # 트레이에 숫자로 남긴다 - 화면에 아무 자국이 없다.
         self.friend_unseen = 0
+        # 도감 업적 알림 (시즌 3)
+        self._ach_queue = []
+        self._ach_known = set()
+        self._ach_showing = False
+        # 메가진화 (시즌 3): 바탕화면의 빛나는 돌과 저절로 받은 스톤 알림
+        from .bond_stone import BondStones
+        self.bond_stones = BondStones(self)
+        self._bond_queue = []
+        self._bond_known = set()
+        self._bond_showing = False
         # 이미 알린 요청. 폴링마다 같은 것을 또 띄우지 않기 위해서다.
         self._friend_seen = set()
         self._friend_first = True
@@ -570,6 +580,11 @@ class App(object):
                 # 운영자가 보낸 선물. 서버가 /api/me 에서 이미 지급했고
                 # 여기서는 알리기만 한다.
                 self.announce_gifts(me.get("gifts") or [])
+                # 도감 업적 (시즌 3). 선물처럼 연출이 끝난 뒤 한 창에 묶어 알린다.
+                self.announce_achievements(
+                    (me.get("achievements") or {}).get("unseen") or [])
+                # 저절로 받은 메가스톤 (시즌 3). 업적과 같은 식으로 알린다.
+                self.announce_bond((me.get("bond") or {}).get("got") or [])
                 self.user_id = (me.get("user") or {}).get("id", self.user_id)
                 # 레이드 안내. 이벤트 기간이 아니면 None 이라 아무 일도 안 한다.
                 self.announce_raid(me.get("raid"))
@@ -581,6 +596,11 @@ class App(object):
                     self.check_live()
             if self.overlay:
                 added = self.overlay.sync(mons or [], paths or {}, walks or {})
+                # 빛나는 돌 표식. 새로 올라온 도트에도 붙어야 하므로 sync 뒤에.
+                if me is not None and "bond" in me:
+                    self.bond_stones.sync(me.get("bond"))
+                else:
+                    self.bond_stones.apply()
                 if me is not None and "eggs" in me:
                     self.overlay.sync_eggs(me.get("eggs") or [])
                     self.announce_hatch(me.get("eggs") or [])
@@ -1312,6 +1332,78 @@ class App(object):
         if self._gift_queue:
             self.root.after(400, self._show_gifts)
 
+    def announce_achievements(self, items):
+        """새로 달성한 업적을 알린다. **운영체제 알림은 쓰지 않는다** - 게임
+        안의 일이라서다(toast 의 규칙). 선물처럼 배틀·진화가 끝난 뒤 작은
+        창으로, 여럿이면 한 창에 묶는다.
+
+        다 보여준 뒤에 seen 을 부른다. 그전까지는 다음 동기화에도 실려 오므로,
+        같은 것을 두 번 띄우지 않게 이미 받은 열쇠를 기억한다.
+        """
+        fresh = [a for a in items if a.get("key") not in self._ach_known]
+        if not fresh:
+            return
+        self._ach_known.update(a["key"] for a in fresh)
+        self._ach_queue.extend(fresh)
+        self._show_achievements()
+
+    def _show_achievements(self):
+        if self._ach_showing or self._quitting or not self._ach_queue:
+            return
+        if self.battle or self.arena or self._gift_showing:
+            return self.root.after(1500, self._show_achievements)
+        got, self._ach_queue = list(self._ach_queue), []
+        self._ach_showing = True
+        try:
+            from . import ui_achievements
+            PLAT.activate()
+            ui_achievements.announce(self.root, self, got)
+        except Exception as e:                              # noqa: BLE001
+            config.log("업적 알림 오류: %s" % e)
+        finally:
+            self._ach_showing = False
+        if self.api:
+            run_async(self.root, lambda: self.api.achievements_seen(),
+                      lambda _r, _e: None)
+        if self._ach_queue:
+            self.root.after(400, self._show_achievements)
+
+    def announce_bond(self, items):
+        """저절로 받은 메가스톤을 알린다 (bond_stone.announce_got). 업적과 같이
+        배틀·진화·선물 창이 끝난 뒤에, 다 보여 준 다음 seen 을 부른다."""
+        fresh = [g for g in items if g.get("pokemon") not in self._bond_known]
+        if not fresh:
+            return
+        self._bond_known.update(g["pokemon"] for g in fresh)
+        self._bond_queue.extend(fresh)
+        self._show_bond()
+
+    def _show_bond(self):
+        if self._bond_showing or self._quitting or not self._bond_queue:
+            return
+        if self.battle or self.arena or self._gift_showing or self._ach_showing:
+            return self.root.after(1500, self._show_bond)
+        got, self._bond_queue = list(self._bond_queue), []
+        self._bond_showing = True
+        try:
+            from . import bond_stone
+            PLAT.activate()
+            win = bond_stone.announce_got(self.root, got)
+            if win is not None:
+                win.grab_set()
+                self.root.wait_window(win)
+        except Exception as e:                              # noqa: BLE001
+            config.log("메가스톤 알림 오류: %s" % e)
+        finally:
+            self._bond_showing = False
+        if self.api:
+            api = self.api
+            ids = [g["pokemon"] for g in got]
+            run_async(self.root, lambda: [api.bond_seen(i) for i in ids],
+                      lambda _r, _e: None)
+        if self._bond_queue:
+            self.root.after(400, self._show_bond)
+
     def announce_friends(self, listing):
         """친구 요청이 새로 왔는지 본다. sync 응답에 실려 온다.
 
@@ -1536,6 +1628,7 @@ class App(object):
         config.save_settings(self.settings)
         if self.overlay:
             self.overlay.refresh_visuals()
+            self.bond_stones.apply()       # 도트를 새로 만들었다 - 표식도 다시
         self.refresh_tray()
 
     def set_area(self, w, h):

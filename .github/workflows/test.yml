@@ -107,6 +107,9 @@ jobs:
       # 게으름·독치장 같은 특성과 역린류·2턴 기술, 속이기의 '첫 턴에만'.
       - name: 특성·턴제 기술 (엔진)
         run: python common/test_new_abilities.py
+      # 메가진화 (시즌 3): 폼 바꾸기·한 판 한 번·키스톤·스톤 보호·높은 관장
+      - name: 메가진화 (엔진)
+        run: python common/test_mega.py
       # 먼 섬(울릉군·백령도·추자도)을 원래 쪽으로 당겨 그리는가, 이름표 자리
       - name: 관장 지도 배치
         run: python client/test_gym_map.py
@@ -222,6 +225,17 @@ jobs:
         run: python client/test_raid_ui.py
       - name: 실시간 배틀 화면 (진짜 Tk)
         run: python client/test_live_ui.py
+      # 도감 업적 (시즌 3). 알림 창·업적 칸·도감 탭 전환·중복 알림 방지.
+      - name: 도감 업적 화면 (진짜 Tk)
+        run: python client/test_achievements_ui.py
+      # 메가진화 (시즌 3). 배틀 창의 메가진화 단추(메시지 막대)·관리 창의
+      # 유대 미션 칸·바탕화면의 빛나는 돌 표식과 스톤 알림 창.
+      - name: 메가진화 단추 (진짜 Tk)
+        run: python client/test_mega_ui.py
+      - name: 유대 미션 칸 (진짜 Tk)
+        run: python client/test_bond_ui.py
+      - name: 빛나는 돌 표식 (진짜 Tk)
+        run: python client/test_bond_stone.py
       # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
@@ -286,6 +300,17 @@ jobs:
         run: python client/test_raid_ui.py
       - name: 실시간 배틀 화면 (진짜 Tk)
         run: python client/test_live_ui.py
+      # 도감 업적 (시즌 3). 알림 창·업적 칸·도감 탭 전환·중복 알림 방지.
+      - name: 도감 업적 화면 (진짜 Tk)
+        run: python client/test_achievements_ui.py
+      # 메가진화 (시즌 3). 배틀 창의 메가진화 단추(메시지 막대)·관리 창의
+      # 유대 미션 칸·바탕화면의 빛나는 돌 표식과 스톤 알림 창.
+      - name: 메가진화 단추 (진짜 Tk)
+        run: python client/test_mega_ui.py
+      - name: 유대 미션 칸 (진짜 Tk)
+        run: python client/test_bond_ui.py
+      - name: 빛나는 돌 표식 (진짜 Tk)
+        run: python client/test_bond_stone.py
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
       # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
@@ -343,6 +368,9 @@ jobs:
           python test_raid.py
           python test_live.py
           python test_boxes.py
+          python test_achievements.py
+          python test_mega.py
+          python test_legend_limit.py
 
       - name: 서버 띄우기
         env:
@@ -420,6 +448,9 @@ jobs:
           python server/test_event.py http://127.0.0.1:8788 /tmp/poket-test.db
           # 관장 검사도 이기는 판을 보려고 DB 에 Lv.100 뮤츠를 넣는다.
           python server/test_gym.py http://127.0.0.1:8788 /tmp/poket-test.db
+          # 시즌 3: 업적·키스톤·유대 미션·메가진화 배틀. 몇 시간 걸릴 준비
+          # (관장 8곳·친밀도 255)만 DB 로 건너뛴다.
+          python server/test_season3.py http://127.0.0.1:8788 /tmp/poket-test.db
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

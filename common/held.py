@@ -141,17 +141,33 @@ HAPPINESS_ITEMS = {"SOOTHEBELL": 1.5}
 
 ALL = frozenset(KR)
 
+# 메가스톤 (시즌 3). 배틀 효과는 없고 메가진화의 열쇠다. 도감의 megas 에서
+# 채운다(register_megas) - 여기 없으면 normalize 가 버려서, 들리지도 못하고
+# 배틀에서도 사라진다.
+MEGA = {}
+
+
+def register_megas(dex):
+    for m in getattr(dex, "megas", None) or []:
+        sid = m.get("megaStone")
+        if sid:
+            MEGA[sid] = m.get("megaStoneKr") or sid
+
+
+def is_mega_stone(item):
+    return bool(item) and item in MEGA
+
 
 def normalize(v):
     """DB 나 요청에서 온 값을 도구 id 로. 모르는 것은 None."""
     if not v:
         return None
     k = "".join(c for c in str(v).upper() if c.isalnum())
-    return k if k in ALL else None
+    return k if (k in ALL or k in MEGA) else None
 
 
 def name(item):
-    return KR.get(item, item or "")
+    return KR.get(item) or MEGA.get(item) or (item or "")
 
 
 # ---------------------------------------------------------------- 도우미

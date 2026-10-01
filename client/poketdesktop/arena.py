@@ -563,6 +563,10 @@ class Arena(object):
             side = self.active.get(who)
             if side:
                 self.float_over(side, "효과가 없다...", "#9a9ab0")
+        # 메가진화 (시즌 3). 링의 도트는 걷는 그림이라 메가 모습이 없다 - 글씨로.
+        if t == "mega" and src:
+            self.float_over(src, "메가진화!", "#c9b3ff")
+            return self.after(max(200, int(self.gap * 1.2)), done)
         if t == "faint":
             side = self.active.get(who)
             if side:

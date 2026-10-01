@@ -460,6 +460,12 @@ class RaidWindow(object):
                        )
         lab.pack(fill="x", pady=(4, 10))
         U.wrap_to_width(lab)
+        if d.get("benchNote"):
+            # 전설·환상 한 마리 제한으로 쉬는 포켓몬 (시즌 3). 들어가기 전에 안다.
+            note = tk.Label(inner, text=natural(d["benchNote"]), bg=U.BG2, fg=U.ACCENT,
+                            font=U.FONT_S, anchor="w", justify="left")
+            note.pack(fill="x", pady=(0, 10))
+            U.wrap_to_width(note)
         btns = tk.Frame(inner, bg=U.BG2)
         btns.pack(fill="x")
         U.PushButton(btns, "참가하기", self.join, height=U.h(40)).pack(side="left")
@@ -477,6 +483,11 @@ class RaidWindow(object):
         if d.get("playedToday"):
             return "오늘은 이미 레이드에 참가했습니다. 다음 날 다시 도전할 수 있습니다."
         if (d.get("party") or 0) < d.get("minParty", 2):
+            if (d.get("partyAll") or 0) >= d.get("minParty", 2):
+                # 데리고 다니는 수는 되는데 전설·환상 제한(한 마리)으로 모자란다
+                return ("전설·환상 포켓몬은 한 팀에 한 마리만 데려갈 수 있습니다. "
+                        "전설·환상이 아닌 포켓몬과 함께 %d마리 이상 데리고 다녀야 "
+                        "참가할 수 있습니다." % d.get("minParty", 2))
             return ("포켓몬을 %d마리 이상 데리고 다녀야 참가할 수 있습니다. "
                     "포켓몬 관리 탭에서 바탕화면에 올려 주세요."
                     % d.get("minParty", 2))

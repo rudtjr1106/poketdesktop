@@ -1408,6 +1408,9 @@ def h_trick(bt, move, who, user, target, tw, ev):
     a, b = user._held if MC.item_on(user) else None, target._held if MC.item_on(target) else None
     if (not a and not b) or (A.has(target, "STICKYHOLD") and not A.breaks(user)) or target.cond.get("sub"):
         return fail(ev, who)
+    # 메가스톤은 바꿔치기할 수 없다 (본가와 같다)
+    if H.is_mega_stone(a) or H.is_mega_stone(b):
+        return fail(ev, who)
     user.held, target.held = b, a
     user.used = target.used = False
     user.item_gone = target.item_gone = False
@@ -1636,7 +1639,7 @@ def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
     if k in OUT_ATTACKS and total and user.alive() and bt.kind != "wild" and _team_others(bt, who, user):
         bt.request_switch(who, "out", ev, k)
     if (k == "KNOCKOFF" and total and target.alive() and not sub_hit
-            and MC.item_on(target)
+            and MC.item_on(target) and not H.is_mega_stone(target._held)
             and not (A.has(target, "STICKYHOLD") and not A.breaks(user))):
         # 탁쳐서떨구기. 위력 1.5배는 movecalc 가 이미 한다 - 여기서 **실제로
         # 떨군다**. 그동안 배수만 있고 도구는 그대로 붙어 있었다.

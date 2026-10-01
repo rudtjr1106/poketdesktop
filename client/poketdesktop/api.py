@@ -329,6 +329,13 @@ class Api(object):
     def profile(self, uid):
         return self._call("GET", "/api/users/%d/profile" % uid)
 
+    # 도감 업적 (시즌 3)
+    def achievements(self):
+        return self._call("GET", "/api/achievements")
+
+    def achievements_seen(self):
+        return self._call("POST", "/api/achievements/seen", {})
+
     # ---------------- 유저 배틀 ----------------
     def pvp_records(self, limit=30):
         return self._call("GET", "/api/pvp/records?limit=%d" % limit)
@@ -432,9 +439,11 @@ class Api(object):
     def gym_battle(self):
         return self._call("GET", "/api/gym/battle")
 
-    def gym_act(self, bid, kind, move="", slot=-1):
+    def gym_act(self, bid, kind, move="", slot=-1, mega=False):
+        # mega: 이 기술과 함께 메가진화 (시즌 3). 되는지는 서버가 다시 본다.
         return self._call("POST", "/api/gym/battle/%d/act" % int(bid),
-                          {"kind": kind, "move": move, "slot": int(slot), "hour": _hour()})
+                          {"kind": kind, "move": move, "slot": int(slot), "hour": _hour(),
+                           "mega": bool(mega)})
 
     # ---------------- 레이드 ----------------
     # 판정은 전부 서버가 한다. 라운드를 넘기는 것도 서버다 - 여기서는
@@ -458,9 +467,9 @@ class Api(object):
         """방장이 정각을 안 기다리고 시작한다."""
         return self._call("POST", "/api/raid/start", {})
 
-    def raid_act(self, kind, move="", slot=-1):
+    def raid_act(self, kind, move="", slot=-1, mega=False):
         return self._call("POST", "/api/raid/act",
-                          {"kind": kind, "move": move, "slot": int(slot)},
+                          {"kind": kind, "move": move, "slot": int(slot), "mega": bool(mega)},
                           timeout=RAID_TIMEOUT)
 
     def raid_leave(self):
@@ -494,13 +503,30 @@ class Api(object):
         return self._call("POST", "/api/live/%d/answer" % int(mid),
                           {"accept": bool(accept)})
 
-    def live_act(self, kind, move="", slot=-1):
+    def live_act(self, kind, move="", slot=-1, mega=False):
         return self._call("POST", "/api/live/act",
-                          {"kind": kind, "move": move, "slot": int(slot)},
+                          {"kind": kind, "move": move, "slot": int(slot), "mega": bool(mega)},
                           timeout=RAID_TIMEOUT)
 
     def live_seen(self):
         return self._call("POST", "/api/live/seen", {})
+
+    # ---------------- 메가진화 (시즌 3) ----------------
+    def bond(self, pid):
+        """한 개체의 유대 미션 카드 (키스톤·스톤·미션 진행)."""
+        return self._call("GET", "/api/bond/%d" % int(pid))
+
+    def bond_start(self, pid):
+        """빛나는 돌을 눌렀다 - 유대 미션을 연다."""
+        return self._call("POST", "/api/bond/%d/start" % int(pid), {})
+
+    def bond_seen(self, pid):
+        """저절로 받은 메가스톤을 알렸다."""
+        return self._call("POST", "/api/bond/%d/seen" % int(pid), {})
+
+    def bond_claim(self, pid, stone):
+        """미션을 다 채웠다 - 메가스톤을 받는다 (X/Y 는 여기서 고른다)."""
+        return self._call("POST", "/api/bond/%d/claim" % int(pid), {"stone": stone})
 
     # ---------------- 기술머신 ----------------
     # 사고팔 수 없고 쓴다고 없어지지도 않는다. 그래서 개수를 주고받는

@@ -91,6 +91,7 @@ class FakeApi(object):
         self.rev = 0
         self.png = fake_sprite()
         self.calls = []
+        self.megas = []                  # gym_act 에 실린 mega 값 (시즌 3)
 
     def _public(self, t):
         return {"id": t["id"], "name": t["name"], "role": t["role"], "sprite": t["sprite"],
@@ -146,8 +147,12 @@ class FakeApi(object):
     def gym_battle(self):
         return self._out([])
 
-    def gym_act(self, bid, kind, move="", slot=-1):
-        ev = self.tb.act(kind, move if kind == "move" else slot) if kind != "forfeit" else self.tb.act("forfeit")
+    def gym_act(self, bid, kind, move="", slot=-1, mega=False):
+        self.megas.append(bool(mega))
+        if kind == "move":
+            ev = self.tb.act("move", move, mega=mega)
+        else:
+            ev = self.tb.act(kind, slot) if kind != "forfeit" else self.tb.act("forfeit")
         extra = {}
         if self.tb.over and self.tb.result == "won":
             first = self.region not in self.cleared
@@ -611,6 +616,25 @@ def main():
     chk("이긴 곳이 지도에 반영된다",
         pump(root, lambda: gw.data and gw.by_region.get(won_region, {}).get("cleared"), 5),
         gw.data and gw.data["cleared"])
+
+    print("\n=== 판 처음의 안내 (전설·환상 한 마리, 시즌 3) ===")
+    api.region = name_of["지우"]
+    api.tb = TB.TrainerBattle(dex, [dict(m) for m in party], api.by_region[api.region], random.Random(3))
+    evs = api.tb.start()
+    note_text = "전설·환상 포켓몬은 한 팀에 1마리만 데려갈 수 있어서 루기아 은(는) 이번에 쉽니다."
+    evs.insert(1, {"t": "note", "text": note_text})
+    said = []
+    real_say = GB.GymBattleWindow.say
+    GB.GymBattleWindow.say = lambda self, text: (said.append(text), real_say(self, text))[1]
+    try:
+        nb = GB.GymBattleWindow(app, api._out(evs))
+        pump(root, lambda: not nb.busy, 30)
+    finally:
+        GB.GymBattleWindow.say = real_say
+    chk("인사 뒤에 안내 한 줄을 보여 준다", note_text in said, said[:4])
+    chk("  그다음 기술을 고른다", nb.mode == "moves" and not nb.busy, (nb.mode, nb.busy))
+    nb.close()
+    api.tb = None
 
     print("\n=== 쓰러진 채 닫았다가 이어 하기 ===")
     api.region = name_of["지우"]

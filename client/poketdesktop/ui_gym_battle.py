@@ -31,6 +31,7 @@ from . import platform_os as PLAT
 from . import ui_common as U
 from .ui_common import run_async
 from .ui_gym import level_color, shade, trainer_photo
+from .ui_mega import MegaToggle
 
 # 설계 크기. 글꼴이 커지는 맥에서는 U.h 로 창과 장면이 **같이** 커진다.
 # 장면만 키우고 창을 그대로 두면 오른쪽 이름표가 창 밖으로 잘린다.
@@ -301,6 +302,7 @@ class GymBattleWindow(object):
                             anchor="w", justify="left")
         self.msg.pack(side="left", fill="both", expand=True, padx=14)
         U.wrap_to_width(self.msg)
+        self.mega = MegaToggle(f, before=self.msg)       # 시즌 3, 고를 때만 보인다
 
     def _commands(self):
         self.cmd = tk.Frame(self.win, bg=U.BG)
@@ -575,6 +577,19 @@ class GymBattleWindow(object):
                     pass
         self.later(1400, gone)
 
+    def _mega(self, ev):
+        """메가진화 - 도트와 이름을 메가 폼으로 바꾼다. 체력은 그대로다."""
+        who = ev.get("who")
+        mon = self.shown.get(who) if who in ("me", "foe") else None
+        if mon is not None:
+            mon = dict(mon)
+            mon["num"] = ev.get("num") or mon.get("num")
+            mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
+            mon["mega"] = True
+            self.set_mon(who, mon)
+            self._show_banner(who, "메가진화!")
+        self.say(ev.get("text"))
+
     # ---------------- 재생 ----------------
     def play(self, events, data):
         self.busy = True
@@ -600,6 +615,11 @@ class GymBattleWindow(object):
         if t == "intro":
             self.say(text)
             return STEP_MS + 250
+        if t == "note":
+            # 서버가 판 처음에 붙이는 안내 (전설·환상 한 마리 제한으로 쉬는 포켓몬).
+            # 한 줄이 길어서 보통 사건보다 오래 둔다.
+            self.say(text)
+            return STEP_MS * 3 + 400
         if t == "switch":
             self.set_mon(who, ev.get("mon"))
             self.say(text)
@@ -609,6 +629,9 @@ class GymBattleWindow(object):
             self.cv.itemconfigure(self.sprite[who], image="")
             self.say(text)
             return 420
+        if t == "mega":
+            self._mega(ev)
+            return STEP_MS + 450
         if t == "move":
             self.say(text)
             other = "foe" if who == "me" else "me"
@@ -712,6 +735,7 @@ class GymBattleWindow(object):
             w.destroy()
         for b in (self.switch_btn, self.forfeit_btn):
             b.configure(state="disabled")
+        self.mega.show(False)
 
     def show_commands(self):
         self.mode = "moves"
@@ -732,6 +756,7 @@ class GymBattleWindow(object):
         self.switch_btn.configure(state="normal" if can_switch else "disabled")
         self.forfeit_btn.configure(state="normal")
         self.hint.configure(text="기술에 마우스를 올리면 설명이 나옵니다.")
+        self.mega.show(self.view.get("canMega"))
         self.say("%s 은(는) 무엇을 할까?" % mon.get("name", ""))
 
     def _move_cell(self, grid, i, m):
@@ -794,6 +819,7 @@ class GymBattleWindow(object):
             grid.grid_columnconfigure(c, weight=1, uniform="pt")
         self.switch_btn.configure(state="disabled")
         self.forfeit_btn.configure(state="normal")
+        self.mega.show(False)
         self.hint.configure(text="쓰러진 포켓몬과 지금 나와 있는 포켓몬은 고를 수 없습니다.")
         if forced:
             self.say("다음 포켓몬을 고르세요.")
@@ -865,6 +891,7 @@ class GymBattleWindow(object):
     def _send(self, kind, move="", slot=-1):
         if self.busy:
             return
+        mega = self.mega.take() if kind == "move" else False
         self.busy = True
         self.hide_commands()
         self.say("...")
@@ -882,7 +909,8 @@ class GymBattleWindow(object):
                 return self._reload()
             self.play(r.get("events") or [], r)
 
-        run_async(self.root, lambda: self.app.api.gym_act(self.bid, kind, move, slot), done)
+        run_async(self.root, lambda: self.app.api.gym_act(self.bid, kind, move, slot, mega=mega),
+                  done)
 
     def _reload(self):
         def done(r, err):

@@ -171,6 +171,9 @@ class Fighter(object):
         # 이 포켓몬이 서 있는 판과 진영. Battle 이 붙여 준다 (날씨·원더룸·순풍을 볼 때).
         self.field = None
         self.side_name = None
+        # 메가진화한 폼 열쇠 (시즌 3). **교체해도 안 풀린다** (본가와 같다) -
+        # 그래서 물러날 때 지워지는 cond 가 아니라 따로 둔다.
+        self.mega = None
 
     # ---- 지닌 도구: 금제·매직룸이면 없는 것처럼 ----
     @property
@@ -209,6 +212,8 @@ class Fighter(object):
             out["stockpile"] = self.stockpile
         if self.item_gone:
             out["itemGone"] = True
+        if self.mega:
+            out["mega"] = self.mega
         return out or None
 
     def load_volatile(self, d):
@@ -222,6 +227,10 @@ class Fighter(object):
             self.held = None                 # 이 판에서는 도구 효과도 없다 (DB 의 도구는 그대로)
         if "heldNow" in d:
             self.held = d["heldNow"]
+        if d.get("mega") and not self.mega:
+            form = self._dex.get(d["mega"])
+            if form:
+                self.mega_evolve(form)       # 변신보다 먼저 - 변신은 그 위에 입힌다
         self.cond = dict(d.get("cond") or {})
         SM.reapply(self)                     # 변신·파워트릭처럼 능력치를 바꿔 둔 것
 
@@ -236,6 +245,51 @@ class Fighter(object):
 
     def dex_move_name(self, key):
         return self._dex.move_name(key)
+
+    # ---- 메가진화 (시즌 3) ----
+    def mega_target(self):
+        """지금 지닌 것으로 될 수 있는 메가 폼 (도감 megas 의 한 줄). 없으면 None.
+
+        메가스톤을 지녀야 한다. 레쿠쟈만 스톤 대신 화룡점정을 알면 된다.
+        냐오닉스는 암수 메가가 달라서 성별로 고른다.
+        """
+        if self.mega or not self._dex:
+            return None
+        forms = (getattr(self._dex, "mega_of", None) or {}).get(self.mon.get("species")) or []
+        if not forms:
+            return None
+        held = self._held
+        cand = [m for m in forms
+                if (m.get("megaMove") and m["megaMove"] in self.moves)
+                or (held and m.get("megaStone") == held)]
+        if not cand:
+            return None
+        g = self.mon.get("gender")
+        for m in cand:
+            if m.get("megaGender") and m["megaGender"] == g:
+                return m
+        for m in cand:
+            if not m.get("megaGender"):
+                return m
+        return cand[0]
+
+    def mega_evolve(self, form):
+        """이 폼으로 바꾼다. 종족값·타입·특성이 바뀌고 **체력은 그대로**다."""
+        mon = dict(self.mon)
+        mon["species"] = form["internal"]
+        base = self._dex.stats_of(mon)
+        boost = self.mon.get("statBoost")
+        if boost:
+            base = dict((k, int(round(v * float(boost)))) for k, v in base.items())
+        base["hp"] = self.base.get("hp", base.get("hp"))
+        self.base = base
+        self.species = form
+        if form.get("abil"):
+            self.ability = "".join(c for c in str(form["abil"][0]).upper() if c.isalnum())
+        self.types_override = None
+        self.mega = form["internal"]
+        if not self.mon.get("nickname"):
+            self.name = form["kr"]
 
     def types(self):
         if self.types_override:
@@ -461,6 +515,11 @@ class Battle(object):
         # 저장해 두는 로그라 여기서 틀리면 나중에 다시 봐도 계속 틀린다.
         self.max_turns = MAX_TURNS
         self.foe_prefix = "야생 "
+        # 메가진화 (시즌 3). 키스톤은 부르는 쪽이 채운다(트레이너가 가진 것).
+        # auto_mega 는 AI 가 알아서 메가진화하는 쪽 (관장·랭크 상대).
+        self.keystone = {"me": False, "foe": False}
+        self.auto_mega = {"me": False, "foe": False}
+        self.mega_done = set()
 
     # ---------------- 서 있는 둘 ----------------
     @property
@@ -771,14 +830,61 @@ class Battle(object):
                 score *= 0.3 + 0.7 * min(1.0, mine * 1.6)
         return score
 
+    # ---------------- 메가진화 (시즌 3) ----------------
+    def can_mega(self, who):
+        """이 쪽이 지금 메가진화할 수 있으면 그 폼. 아니면 None.
+
+        키스톤이 있어야 하고, **한 판에 한 번**(한 쪽에서 한 마리만)이다.
+        """
+        if not self.keystone.get(who) or who in self.mega_done:
+            return None
+        f = self.me if who == "me" else self.foe
+        if f is None or f.mega or not f.alive():
+            return None
+        return f.mega_target()
+
+    def mega_step(self, want, ev):
+        """턴이 시작할 때 메가진화한다. want = {"me": bool, "foe": bool}.
+
+        **기술보다 먼저, 빠른 쪽부터** 바뀐다. 바뀐 뒤의 스피드로 이 턴의
+        순서를 정한다(7세대부터의 규칙) - 부르는 쪽이 이것을 _order 앞에 둔다.
+        새 특성(가뭄·위협 ...)은 나올 때처럼 바로 발동한다.
+        """
+        sides = [w for w in ("me", "foe")
+                 if (want.get(w) or self.auto_mega.get(w)) and self.can_mega(w)]
+        sides.sort(key=lambda w: -self.speed(w))
+        for w in sides:
+            f = self.me if w == "me" else self.foe
+            form = self.can_mega(w)
+            if not form:
+                continue
+            before = f.name
+            f.mega_evolve(form)
+            self.mega_done.add(w)
+            via = ("화룡점정" if form.get("megaMove")
+                   else H.name(form.get("megaStone")) or "메가스톤")
+            ev.append({"t": "mega", "who": w, "name": before, "to": form["kr"],
+                       "newName": f.name,          # 별명이면 별명 그대로
+                       "species": form["internal"], "num": form["num"],
+                       "types": list(form.get("types") or []),
+                       "text": "%s 의 %s 와(과) 키스톤이 반응했다! %s 은(는) %s (으)로 "
+                               "메가진화했다!" % (before, via, before, form["kr"])})
+            if f.ability_on:
+                A.on_switch_in(self, f, w, ev)           # 위협 ...
+                SM.on_enter_abilities(self, f, w, ev)    # 가뭄·잔비 같은 날씨·필드
+                # 메가는 새로 나온 것이 아니다 - 가속(메가블레이범)은 그 턴 끝에도 붙는다.
+                f.ab.pop("fresh", None)
+
     # ---------------- 한 턴 ----------------
-    def take_turn(self, my_move):
+    def take_turn(self, my_move, mega=False):
         """내 기술을 정해서 한 턴을 진행한다. 일어난 일 목록을 돌려준다."""
         if self.over:
             return [{"t": "over", "result": self.result}]
         self.turn_no += 1
         ev = []
         self.begin_turn()
+        # 메가진화가 먼저다 - 바뀐 타입·특성·스피드를 보고 AI 가 고르고 순서를 정한다.
+        self.mega_step({"me": bool(mega)}, ev)
         foe_move = self.choose_ai()
 
         if my_move != STRUGGLE and (my_move not in self.me.pp

@@ -823,6 +823,91 @@
  ],
  "dropTotal": 9788,
  "items": {
+  "ABOMASITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "눈설왕에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Abomasite",
+   "id": "ABOMASITE",
+   "ident": "abomasite",
+   "kr": "눈설왕나이트",
+   "megaFor": "ABOMASNOW",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "ABSOLITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "앱솔에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Absolite",
+   "id": "ABSOLITE",
+   "ident": "absolite",
+   "kr": "앱솔나이트",
+   "megaFor": "ABSOL",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "ABSOLITEZ": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "앱솔에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Absolite Z",
+   "id": "ABSOLITEZ",
+   "ident": "absolite-z",
+   "kr": "앱솔나이트Z",
+   "megaFor": "ABSOL",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "AERODACTYLITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "프테라에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Aerodactylite",
+   "id": "AERODACTYLITE",
+   "ident": "aerodactylite",
+   "kr": "프테라나이트",
+   "megaFor": "AERODACTYL",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "AGGRONITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "보스로라에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Aggronite",
+   "id": "AGGRONITE",
+   "ident": "aggronite",
+   "kr": "보스로라나이트",
+   "megaFor": "AGGRON",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "AGUAVBERRY": {
    "cat": "held",
    "chance": 0.010217,
@@ -838,6 +923,57 @@
    "rarity": "common",
    "sell": 500,
    "weight": 100
+  },
+  "ALAKAZITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "후딘에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Alakazite",
+   "id": "ALAKAZITE",
+   "ident": "alakazite",
+   "kr": "후디나이트",
+   "megaFor": "ALAKAZAM",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "ALTARIANITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "파비코리에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Altarianite",
+   "id": "ALTARIANITE",
+   "ident": "altarianite",
+   "kr": "파비코리나이트",
+   "megaFor": "ALTARIA",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "AMPHAROSITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "전룡에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Ampharosite",
+   "id": "AMPHAROSITE",
+   "ident": "ampharosite",
+   "kr": "전룡나이트",
+   "megaFor": "AMPHAROS",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "APICOTBERRY": {
    "cat": "held",
@@ -870,6 +1006,23 @@
    "rarity": "common",
    "sell": 500,
    "weight": 100
+  },
+  "AUDINITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "다부니에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Audinite",
+   "id": "AUDINITE",
+   "ident": "audinite",
+   "kr": "다부니나이트",
+   "megaFor": "AUDINO",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "AUSPICIOUSARMOR": {
    "cat": "stone",
@@ -904,6 +1057,74 @@
    "rarity": "common",
    "sell": 500,
    "weight": 100
+  },
+  "BANETTITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "다크펫에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Banettite",
+   "id": "BANETTITE",
+   "ident": "banettite",
+   "kr": "다크펫나이트",
+   "megaFor": "BANETTE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "BARBARACITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "거북손데스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Barbaracite",
+   "id": "BARBARACITE",
+   "ident": "barbaracite",
+   "kr": "거북손데스나이트",
+   "megaFor": "BARBARACLE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "BAXCALIBRITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "드닐레이브에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Baxcalibrite",
+   "id": "BAXCALIBRITE",
+   "ident": "baxcalibrite",
+   "kr": "드닐레이브나이트",
+   "megaFor": "BAXCALIBUR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "BEEDRILLITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "독침붕에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Beedrillite",
+   "id": "BEEDRILLITE",
+   "ident": "beedrillite",
+   "kr": "독침붕나이트",
+   "megaFor": "BEEDRILL",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "BIGMUSHROOM": {
    "cat": "misc",
@@ -1035,6 +1256,40 @@
    "sell": 4000,
    "weight": 14
   },
+  "BLASTOISINITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "거북왕에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Blastoisinite",
+   "id": "BLASTOISINITE",
+   "ident": "blastoisinite",
+   "kr": "거북왕나이트",
+   "megaFor": "BLASTOISE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "BLAZIKENITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "번치코에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Blazikenite",
+   "id": "BLAZIKENITE",
+   "ident": "blazikenite",
+   "kr": "번치코나이트",
+   "megaFor": "BLAZIKEN",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "BOTTLECAP": {
    "cat": "iv",
    "chance": 0.003474,
@@ -1083,6 +1338,23 @@
    "kr": "리보플라빈",
    "sell": 5000
   },
+  "CAMERUPTITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "폭타에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Cameruptite",
+   "id": "CAMERUPTITE",
+   "ident": "cameruptite",
+   "kr": "폭타나이트",
+   "megaFor": "CAMERUPT",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "CARBOS": {
    "cat": "ev",
    "cost": 10000,
@@ -1097,6 +1369,23 @@
    "ident": "carbos",
    "kr": "알칼로이드",
    "sell": 5000
+  },
+  "CHANDELURITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "샹델라에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Chandelurite",
+   "id": "CHANDELURITE",
+   "ident": "chandelurite",
+   "kr": "샹델라나이트",
+   "megaFor": "CHANDELURE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "CHARCOAL": {
    "cat": "held",
@@ -1113,6 +1402,40 @@
    "rarity": "uncommon",
    "sell": 1500,
    "weight": 45
+  },
+  "CHARIZARDITEX": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "리자몽에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Charizardite X",
+   "id": "CHARIZARDITEX",
+   "ident": "charizardite-x",
+   "kr": "리자몽나이트X",
+   "megaFor": "CHARIZARD",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "CHARIZARDITEY": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "리자몽에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Charizardite Y",
+   "id": "CHARIZARDITEY",
+   "ident": "charizardite-y",
+   "kr": "리자몽나이트Y",
+   "megaFor": "CHARIZARD",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "CHARTIBERRY": {
    "cat": "held",
@@ -1146,6 +1469,23 @@
    "sell": 500,
    "weight": 100
   },
+  "CHESNAUGHTITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "브리가론에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Chesnaughtite",
+   "id": "CHESNAUGHTITE",
+   "ident": "chesnaughtite",
+   "kr": "브리가론나이트",
+   "megaFor": "CHESNAUGHT",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "CHESTOBERRY": {
    "cat": "held",
    "chance": 0.010217,
@@ -1177,6 +1517,23 @@
    "rarity": "common",
    "sell": 500,
    "weight": 100
+  },
+  "CHIMECHITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "치렁에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Chimechite",
+   "id": "CHIMECHITE",
+   "ident": "chimechite",
+   "kr": "치렁나이트",
+   "megaFor": "CHIMECHO",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "CHIPPEDPOT": {
    "cat": "stone",
@@ -1261,6 +1618,23 @@
    "sell": 500,
    "weight": 100
   },
+  "CLEFABLITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "픽시에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Clefablite",
+   "id": "CLEFABLITE",
+   "ident": "clefablite",
+   "kr": "픽시나이트",
+   "megaFor": "CLEFABLE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "CLEVERWING": {
    "cat": "ev",
    "chance": 0.010217,
@@ -1327,6 +1701,23 @@
    "sell": 12500,
    "weight": 6
   },
+  "CRABOMINITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "모단단게에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Crabominite",
+   "id": "CRABOMINITE",
+   "ident": "crabominite",
+   "kr": "모단단게나이트",
+   "megaFor": "CRABOMINABLE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "CRACKEDPOT": {
    "cat": "stone",
    "chance": 0.00143,
@@ -1361,6 +1752,23 @@
    "rarity": "common",
    "sell": 500,
    "weight": 100
+  },
+  "DARKRANITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "다크라이에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Darkranite",
+   "id": "DARKRANITE",
+   "ident": "darkranite",
+   "kr": "다크라이나이트",
+   "megaFor": "DARKRAI",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "DAWNSTONE": {
    "cat": "stone",
@@ -1420,6 +1828,40 @@
    "sell": 1000,
    "weight": 14
   },
+  "DELPHOXITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "마폭시에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Delphoxite",
+   "id": "DELPHOXITE",
+   "ident": "delphoxite",
+   "kr": "마폭시나이트",
+   "megaFor": "DELPHOX",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "DIANCITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "디안시에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Diancite",
+   "id": "DIANCITE",
+   "ident": "diancite",
+   "kr": "디안시나이트",
+   "megaFor": "DIANCIE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "DRACOPLATE": {
    "cat": "held",
    "chance": 0.004597,
@@ -1436,6 +1878,23 @@
    "sell": 1500,
    "weight": 45
   },
+  "DRAGALGITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "드래캄에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Dragalgite",
+   "id": "DRAGALGITE",
+   "ident": "dragalgite",
+   "kr": "드래캄나이트",
+   "megaFor": "DRAGALGE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "DRAGONFANG": {
    "cat": "held",
    "chance": 0.004597,
@@ -1451,6 +1910,23 @@
    "rarity": "uncommon",
    "sell": 1500,
    "weight": 45
+  },
+  "DRAGONINITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "망나뇽에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Dragoninite",
+   "id": "DRAGONINITE",
+   "ident": "dragoninite",
+   "kr": "망나뇽나이트",
+   "megaFor": "DRAGONITE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "DRAGONSCALE": {
    "cat": "stone",
@@ -1470,6 +1946,23 @@
    "rarity": "rare",
    "sell": 1000,
    "weight": 14
+  },
+  "DRAMPANITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "할비롱에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Drampanite",
+   "id": "DRAMPANITE",
+   "ident": "drampanite",
+   "kr": "할비롱나이트",
+   "megaFor": "DRAMPA",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "DREADPLATE": {
    "cat": "held",
@@ -1580,6 +2073,23 @@
    "sell": 1500,
    "weight": 45
   },
+  "EELEKTROSSITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "저리더프에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Eelektrossite",
+   "id": "EELEKTROSSITE",
+   "ident": "eelektrossite",
+   "kr": "저리더프나이트",
+   "megaFor": "EELEKTROSS",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "ELECTIRIZER": {
    "cat": "stone",
    "chance": 0.00143,
@@ -1598,6 +2108,23 @@
    "rarity": "rare",
    "sell": 1000,
    "weight": 14
+  },
+  "EMBOARITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "염무왕에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Emboarite",
+   "id": "EMBOARITE",
+   "ident": "emboarite",
+   "kr": "염무왕나이트",
+   "megaFor": "EMBOAR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "ENIGMABERRY": {
    "cat": "held",
@@ -1631,6 +2158,23 @@
    "sell": 1500,
    "weight": 45
   },
+  "EXCADRITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "몰드류에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Excadrite",
+   "id": "EXCADRITE",
+   "ident": "excadrite",
+   "kr": "몰드류나이트",
+   "megaFor": "EXCADRILL",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "EXPERTBELT": {
    "cat": "held",
    "chance": 0.000511,
@@ -1646,6 +2190,23 @@
    "rarity": "epic",
    "sell": 7500,
    "weight": 5
+  },
+  "FALINKSITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "대여르에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Falinksite",
+   "id": "FALINKSITE",
+   "ident": "falinksite",
+   "kr": "대여르나이트",
+   "megaFor": "FALINKS",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "FASTBALL": {
    "cat": "ball",
@@ -1664,6 +2225,23 @@
    "rarity": "uncommon",
    "sell": 500,
    "weight": 45
+  },
+  "FERALIGITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "장크로다일에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Feraligite",
+   "id": "FERALIGITE",
+   "ident": "feraligite",
+   "kr": "장크로다일나이트",
+   "megaFor": "FERALIGATR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "FIGYBERRY": {
    "cat": "held",
@@ -1752,6 +2330,23 @@
    "sell": 1500,
    "weight": 45
   },
+  "FLOETTITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "플라엣테에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Floettite",
+   "id": "FLOETTITE",
+   "ident": "floettite",
+   "kr": "플라엣테나이트",
+   "megaFor": "FLOETTE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "FLOWERBALL": {
    "buyable": false,
    "cat": "ball",
@@ -1818,6 +2413,23 @@
    "sell": 500,
    "weight": 45
   },
+  "FROSLASSITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "눈여아에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Froslassite",
+   "id": "FROSLASSITE",
+   "ident": "froslassite",
+   "kr": "눈여아나이트",
+   "megaFor": "FROSLASS",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "FULLINCENSE": {
    "cat": "held",
    "chance": 0.00143,
@@ -1834,6 +2446,23 @@
    "sell": 5000,
    "weight": 14
   },
+  "GALLADITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "엘레이드에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Galladite",
+   "id": "GALLADITE",
+   "ident": "galladite",
+   "kr": "엘레이드나이트",
+   "megaFor": "GALLADE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "GANLONBERRY": {
    "cat": "held",
    "chance": 0.010217,
@@ -1849,6 +2478,74 @@
    "rarity": "common",
    "sell": 500,
    "weight": 100
+  },
+  "GARCHOMPITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "한카리아스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Garchompite",
+   "id": "GARCHOMPITE",
+   "ident": "garchompite",
+   "kr": "한카리아스나이트",
+   "megaFor": "GARCHOMP",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "GARCHOMPITEZ": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "한카리아스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Garchompite Z",
+   "id": "GARCHOMPITEZ",
+   "ident": "garchompite-z",
+   "kr": "한카리아스나이트Z",
+   "megaFor": "GARCHOMP",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "GARDEVOIRITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "가디안에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Gardevoirite",
+   "id": "GARDEVOIRITE",
+   "ident": "gardevoirite",
+   "kr": "가디안나이트",
+   "megaFor": "GARDEVOIR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "GENGARITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "팬텀에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Gengarite",
+   "id": "GENGARITE",
+   "ident": "gengarite",
+   "kr": "팬텀나이트",
+   "megaFor": "GENGAR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "GENIUSWING": {
    "cat": "ev",
@@ -1868,6 +2565,40 @@
    "sell": 500,
    "weight": 100
   },
+  "GLALITITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "얼음귀신에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Glalitite",
+   "id": "GLALITITE",
+   "ident": "glalitite",
+   "kr": "얼음귀신나이트",
+   "megaFor": "GLALIE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "GLIMMORANITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "킬라플로르에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Glimmoranite",
+   "id": "GLIMMORANITE",
+   "ident": "glimmoranite",
+   "kr": "킬라플로르나이트",
+   "megaFor": "GLIMMORA",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "GOLDBOTTLECAP": {
    "buyable": false,
    "cat": "iv",
@@ -1886,6 +2617,40 @@
    "sell": 5000,
    "weight": 9
   },
+  "GOLISOPITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "갑주무사에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Golisopite",
+   "id": "GOLISOPITE",
+   "ident": "golisopite",
+   "kr": "갑주무사나이트",
+   "megaFor": "GOLISOPOD",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "GOLURKITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "골루그에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Golurkite",
+   "id": "GOLURKITE",
+   "ident": "golurkite",
+   "kr": "골루그나이트",
+   "megaFor": "GOLURK",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "GREATBALL": {
    "cat": "ball",
    "chance": 0.004597,
@@ -1902,6 +2667,23 @@
    "rarity": "uncommon",
    "sell": 300,
    "weight": 45
+  },
+  "GRENINJITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "개굴닌자에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Greninjite",
+   "id": "GRENINJITE",
+   "ident": "greninjite",
+   "kr": "개굴닌자나이트",
+   "megaFor": "GRENINJA",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "GREPABERRY": {
    "cat": "ev",
@@ -1920,6 +2702,23 @@
    "rarity": "common",
    "sell": 40,
    "weight": 100
+  },
+  "GYARADOSITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "갸라도스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Gyaradosite",
+   "id": "GYARADOSITE",
+   "ident": "gyaradosite",
+   "kr": "갸라도스나이트",
+   "megaFor": "GYARADOS",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "HABANBERRY": {
    "cat": "held",
@@ -1952,6 +2751,23 @@
    "rarity": "uncommon",
    "sell": 1500,
    "weight": 45
+  },
+  "HAWLUCHANITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "루차불에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Hawluchanite",
+   "id": "HAWLUCHANITE",
+   "ident": "hawluchanite",
+   "kr": "루차불나이트",
+   "megaFor": "HAWLUCHA",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "HEALBALL": {
    "cat": "ball",
@@ -1989,6 +2805,23 @@
    "sell": 500,
    "weight": 100
   },
+  "HEATRANITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "히드런에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Heatranite",
+   "id": "HEATRANITE",
+   "ident": "heatranite",
+   "kr": "히드런나이트",
+   "megaFor": "HEATRAN",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "HEAVYBALL": {
    "cat": "ball",
    "chance": 0.004597,
@@ -2007,6 +2840,23 @@
    "sell": 500,
    "weight": 45
   },
+  "HERACRONITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "헤라크로스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Heracronite",
+   "id": "HERACRONITE",
+   "ident": "heracronite",
+   "kr": "헤라크로스나이트",
+   "megaFor": "HERACROSS",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "HONDEWBERRY": {
    "cat": "ev",
    "chance": 0.010217,
@@ -2024,6 +2874,23 @@
    "rarity": "common",
    "sell": 40,
    "weight": 100
+  },
+  "HOUNDOOMINITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "헬가에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Houndoominite",
+   "id": "HOUNDOOMINITE",
+   "ident": "houndoominite",
+   "kr": "헬가나이트",
+   "megaFor": "HOUNDOOM",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "HPUP": {
    "cat": "ev",
@@ -2172,6 +3039,23 @@
    "sell": 500,
    "weight": 100
   },
+  "KANGASKHANITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "캥카에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Kangaskhanite",
+   "id": "KANGASKHANITE",
+   "ident": "kangaskhanite",
+   "kr": "캥카나이트",
+   "megaFor": "KANGASKHAN",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "KASIBBERRY": {
    "cat": "held",
    "chance": 0.010217,
@@ -2273,6 +3157,40 @@
    "rarity": "common",
    "sell": 500,
    "weight": 100
+  },
+  "LATIASITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "라티아스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Latiasite",
+   "id": "LATIASITE",
+   "ident": "latiasite",
+   "kr": "라티아스나이트",
+   "megaFor": "LATIAS",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "LATIOSITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "라티오스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Latiosite",
+   "id": "LATIOSITE",
+   "ident": "latiosite",
+   "kr": "라티오스나이트",
+   "megaFor": "LATIOS",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "LAXINCENSE": {
    "cat": "held",
@@ -2433,6 +3351,23 @@
    "sell": 4000,
    "weight": 5
   },
+  "LOPUNNITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "이어롭에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Lopunnite",
+   "id": "LOPUNNITE",
+   "ident": "lopunnite",
+   "kr": "이어롭나이트",
+   "megaFor": "LOPUNNY",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "LOVEBALL": {
    "cat": "ball",
    "chance": 0.004597,
@@ -2450,6 +3385,40 @@
    "rarity": "uncommon",
    "sell": 500,
    "weight": 45
+  },
+  "LUCARIONITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "루카리오에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Lucarionite",
+   "id": "LUCARIONITE",
+   "ident": "lucarionite",
+   "kr": "루카리오나이트",
+   "megaFor": "LUCARIO",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "LUCARIONITEZ": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "루카리오에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Lucarionite Z",
+   "id": "LUCARIONITEZ",
+   "ident": "lucarionite-z",
+   "kr": "루카리오나이트Z",
+   "megaFor": "LUCARIO",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "LUCKYEGG": {
    "cat": "held",
@@ -2517,6 +3486,23 @@
    "sell": 3000,
    "weight": 14
   },
+  "MAGEARNITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "마기아나에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Magearnite",
+   "id": "MAGEARNITE",
+   "ident": "magearnite",
+   "kr": "마기아나나이트",
+   "megaFor": "MAGEARNA",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "MAGMARIZER": {
    "cat": "stone",
    "chance": 0.00143,
@@ -2568,6 +3554,23 @@
    "sell": 500,
    "weight": 100
   },
+  "MALAMARITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "칼라마네로에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Malamarite",
+   "id": "MALAMARITE",
+   "ident": "malamarite",
+   "kr": "칼라마네로나이트",
+   "megaFor": "MALAMAR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "MALICIOUSARMOR": {
    "cat": "stone",
    "chance": 0.00143,
@@ -2585,6 +3588,23 @@
    "rarity": "rare",
    "sell": 375,
    "weight": 14
+  },
+  "MANECTITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "썬더볼트에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Manectite",
+   "id": "MANECTITE",
+   "ident": "manectite",
+   "kr": "썬더볼트나이트",
+   "megaFor": "MANECTRIC",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "MASTERBALL": {
    "buyable": false,
@@ -2623,6 +3643,23 @@
    "sell": 4750,
    "weight": 5
   },
+  "MAWILITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "입치트에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Mawilite",
+   "id": "MAWILITE",
+   "ident": "mawilite",
+   "kr": "입치트나이트",
+   "megaFor": "MAWILE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "MEADOWPLATE": {
    "cat": "held",
    "chance": 0.004597,
@@ -2638,6 +3675,74 @@
    "rarity": "uncommon",
    "sell": 1500,
    "weight": 45
+  },
+  "MEDICHAMITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "요가램에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Medichamite",
+   "id": "MEDICHAMITE",
+   "ident": "medichamite",
+   "kr": "요가램나이트",
+   "megaFor": "MEDICHAM",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "MEGANIUMITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "메가니움에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Meganiumite",
+   "id": "MEGANIUMITE",
+   "ident": "meganiumite",
+   "kr": "메가니움나이트",
+   "megaFor": "MEGANIUM",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "MEOWSTICITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "냐오닉스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Meowsticite",
+   "id": "MEOWSTICITE",
+   "ident": "meowsticite",
+   "kr": "냐오닉스나이트",
+   "megaFor": "MEOWSTIC",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "METAGROSSITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "메타그로스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Metagrossite",
+   "id": "METAGROSSITE",
+   "ident": "metagrossite",
+   "kr": "메타그로스나이트",
+   "megaFor": "METAGROSS",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "METALALLOY": {
    "cat": "stone",
@@ -2692,6 +3797,40 @@
    "rarity": "rare",
    "sell": 4000,
    "weight": 14
+  },
+  "MEWTWONITEX": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "뮤츠에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Mewtwonite X",
+   "id": "MEWTWONITEX",
+   "ident": "mewtwonite-x",
+   "kr": "뮤츠나이트X",
+   "megaFor": "MEWTWO",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "MEWTWONITEY": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "뮤츠에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Mewtwonite Y",
+   "id": "MEWTWONITEY",
+   "ident": "mewtwonite-y",
+   "kr": "뮤츠나이트Y",
+   "megaFor": "MEWTWO",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "MICLEBERRY": {
    "cat": "held",
@@ -3066,6 +4205,40 @@
    "sell": 500,
    "weight": 100
   },
+  "PIDGEOTITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "피죤투에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Pidgeotite",
+   "id": "PIDGEOTITE",
+   "ident": "pidgeotite",
+   "kr": "피죤투나이트",
+   "megaFor": "PIDGEOT",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "PINSIRITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "쁘사이저에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Pinsirite",
+   "id": "PINSIRITE",
+   "ident": "pinsirite",
+   "kr": "쁘사이저나이트",
+   "megaFor": "PINSIR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "POISONBARB": {
    "cat": "held",
    "chance": 0.004597,
@@ -3300,6 +4473,23 @@
    "kr": "타우린",
    "sell": 5000
   },
+  "PYROARITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "화염레오에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Pyroarite",
+   "id": "PYROARITE",
+   "ident": "pyroarite",
+   "kr": "화염레오나이트",
+   "megaFor": "PYROAR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "QUALOTBERRY": {
    "cat": "ev",
    "chance": 0.010217,
@@ -3351,6 +4541,40 @@
    "rarity": "rare",
    "sell": 4000,
    "weight": 14
+  },
+  "RAICHUNITEX": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "라이츄에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Raichunite X",
+   "id": "RAICHUNITEX",
+   "ident": "raichunite-x",
+   "kr": "라이츄나이트X",
+   "megaFor": "RAICHU",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "RAICHUNITEY": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "라이츄에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Raichunite Y",
+   "id": "RAICHUNITEY",
+   "ident": "raichunite-y",
+   "kr": "라이츄나이트Y",
+   "megaFor": "RAICHU",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "RAIDTICKETDIALGA": {
    "buyable": false,
@@ -3575,6 +4799,23 @@
    "sell": 500,
    "weight": 100
   },
+  "SABLENITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "깜까미에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Sablenite",
+   "id": "SABLENITE",
+   "ident": "sablenite",
+   "kr": "깜까미나이트",
+   "megaFor": "SABLEYE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "SACHET": {
    "cat": "stone",
    "chance": 0.00143,
@@ -3610,6 +4851,74 @@
    "sell": 500,
    "weight": 100
   },
+  "SALAMENCITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "보만다에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Salamencite",
+   "id": "SALAMENCITE",
+   "ident": "salamencite",
+   "kr": "보만다나이트",
+   "megaFor": "SALAMENCE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "SCEPTILITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "나무킹에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Sceptilite",
+   "id": "SCEPTILITE",
+   "ident": "sceptilite",
+   "kr": "나무킹나이트",
+   "megaFor": "SCEPTILE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "SCIZORITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "핫삼에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Scizorite",
+   "id": "SCIZORITE",
+   "ident": "scizorite",
+   "kr": "핫삼나이트",
+   "megaFor": "SCIZOR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "SCOLIPITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "펜드라에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Scolipite",
+   "id": "SCOLIPITE",
+   "ident": "scolipite",
+   "kr": "펜드라나이트",
+   "megaFor": "SCOLIPEDE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "SCOPELENS": {
    "cat": "held",
    "chance": 0.00143,
@@ -3625,6 +4934,40 @@
    "rarity": "rare",
    "sell": 4000,
    "weight": 14
+  },
+  "SCOVILLAINITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "스코빌런에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Scovillainite",
+   "id": "SCOVILLAINITE",
+   "ident": "scovillainite",
+   "kr": "스코빌런나이트",
+   "megaFor": "SCOVILLAIN",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "SCRAFTINITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "곤율거니에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Scraftinite",
+   "id": "SCRAFTINITE",
+   "ident": "scraftinite",
+   "kr": "곤율거니나이트",
+   "megaFor": "SCRAFTY",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "SCROLLOFDARKNESS": {
    "cat": "stone",
@@ -3675,6 +5018,23 @@
    "rarity": "uncommon",
    "sell": 1500,
    "weight": 45
+  },
+  "SHARPEDONITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "샤크니아에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Sharpedonite",
+   "id": "SHARPEDONITE",
+   "ident": "sharpedonite",
+   "kr": "샤크니아나이트",
+   "megaFor": "SHARPEDO",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "SHELLBELL": {
    "cat": "held",
@@ -3792,6 +5152,23 @@
    "sell": 500,
    "weight": 100
   },
+  "SKARMORITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "무장조에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Skarmorite",
+   "id": "SKARMORITE",
+   "ident": "skarmorite",
+   "kr": "무장조나이트",
+   "megaFor": "SKARMORY",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "SKYPLATE": {
    "cat": "held",
    "chance": 0.004597,
@@ -3807,6 +5184,23 @@
    "rarity": "uncommon",
    "sell": 1500,
    "weight": 45
+  },
+  "SLOWBRONITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "야도란에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Slowbronite",
+   "id": "SLOWBRONITE",
+   "ident": "slowbronite",
+   "kr": "야도란나이트",
+   "megaFor": "SLOWBRO",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "SMOKEBALL": {
    "cat": "held",
@@ -3904,6 +5298,23 @@
    "sell": 1500,
    "weight": 45
   },
+  "STARAPTITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "찌르호크에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Staraptite",
+   "id": "STARAPTITE",
+   "ident": "staraptite",
+   "kr": "찌르호크나이트",
+   "megaFor": "STARAPTOR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "STARDUST": {
    "cat": "misc",
    "chance": 0.010217,
@@ -3936,6 +5347,23 @@
    "sell": 500,
    "weight": 100
   },
+  "STARMINITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "아쿠스타에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Starminite",
+   "id": "STARMINITE",
+   "ident": "starminite",
+   "kr": "아쿠스타나이트",
+   "megaFor": "STARMIE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "STARPIECE": {
    "cat": "misc",
    "chance": 0.00143,
@@ -3951,6 +5379,23 @@
    "rarity": "rare",
    "sell": 6000,
    "weight": 14
+  },
+  "STEELIXITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "강철톤에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Steelixite",
+   "id": "STEELIXITE",
+   "ident": "steelixite",
+   "kr": "강철톤나이트",
+   "megaFor": "STEELIX",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "STICKYBARB": {
    "cat": "held",
@@ -4006,6 +5451,23 @@
    "rarity": "rare",
    "sell": 1500,
    "weight": 14
+  },
+  "SWAMPERTITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "대짱이에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Swampertite",
+   "id": "SWAMPERTITE",
+   "ident": "swampertite",
+   "kr": "대짱이나이트",
+   "megaFor": "SWAMPERT",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "SWEETAPPLE": {
    "cat": "stone",
@@ -4115,6 +5577,23 @@
    "sell": 1100,
    "weight": 14
   },
+  "TATSUGIRINITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "싸리용에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Tatsugirinite",
+   "id": "TATSUGIRINITE",
+   "ident": "tatsugirinite",
+   "kr": "싸리용나이트",
+   "megaFor": "TATSUGIRI",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "THUNDERSTONE": {
    "cat": "stone",
    "chance": 0.00143,
@@ -4222,6 +5701,23 @@
    "sell": 1500,
    "weight": 45
   },
+  "TYRANITARITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "마기라스에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Tyranitarite",
+   "id": "TYRANITARITE",
+   "ident": "tyranitarite",
+   "kr": "마기라스나이트",
+   "megaFor": "TYRANITAR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "ULTRABALL": {
    "cat": "ball",
    "chance": 0.00143,
@@ -4275,6 +5771,40 @@
    "rarity": "rare",
    "sell": 1000,
    "weight": 14
+  },
+  "VENUSAURITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "이상해꽃에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Venusaurite",
+   "id": "VENUSAURITE",
+   "ident": "venusaurite",
+   "kr": "이상해꽃나이트",
+   "megaFor": "VENUSAUR",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
+  "VICTREEBELITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "우츠보트에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Victreebelite",
+   "id": "VICTREEBELITE",
+   "ident": "victreebelite",
+   "kr": "우츠보트나이트",
+   "megaFor": "VICTREEBEL",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   },
   "WACANBERRY": {
    "cat": "held",
@@ -4447,6 +5977,23 @@
    "sell": 1500,
    "weight": 45
   },
+  "ZERAORITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "제라오라에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Zeraorite",
+   "id": "ZERAORITE",
+   "ident": "zeraorite",
+   "kr": "제라오라나이트",
+   "megaFor": "ZERAORA",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
+  },
   "ZINC": {
    "cat": "ev",
    "cost": 10000,
@@ -4477,6 +6024,23 @@
    "rarity": "rare",
    "sell": 4000,
    "weight": 14
+  },
+  "ZYGARDITE": {
+   "cat": "megastone",
+   "chance": 0,
+   "cost": 0,
+   "desc": "지가르데에게 지니게 하면 배틀 중에 메가진화할 수 있다. 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+   "effect": {
+    "kind": "held"
+   },
+   "en": "Zygardite",
+   "id": "ZYGARDITE",
+   "ident": "zygardite",
+   "kr": "지가르데나이트",
+   "megaFor": "ZYGARDE",
+   "rarity": "legendary",
+   "sell": 0,
+   "weight": 0
   }
  },
  "rarityKr": {

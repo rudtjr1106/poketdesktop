@@ -159,6 +159,10 @@ def accept(uid, mid, now=None):
                        (row["a_id"], row["a_name"], a_team),
                        (row["b_id"], row["b_name"], b_team),
                        rng=random.Random(), max_turns=config.LIVE_MAX_TURNS)
+    # 메가진화 (시즌 3): 두 사람 각자 관장 8곳이면 키스톤
+    from . import mega
+    lb.keystone["me"] = mega.has_keystone(row["a_id"])
+    lb.keystone["foe"] = mega.has_keystone(row["b_id"])
     ev = lb.start()
     cur = db.run(
         "UPDATE live_match SET state='fighting', data=?, events=?, turn=0,"
@@ -212,7 +216,7 @@ def _save(row, lb, ev, now=None):
     return ok
 
 
-def act(uid, kind, value, now=None):
+def act(uid, kind, value, now=None, mega=False):
     """이번 턴에 할 것을 적는다. 둘 다 모이면 그 자리에서 턴이 돈다.
 
     **부딪히면 다시 해본다** - 둘이 같은 판을 동시에 두드리므로, rev 가
@@ -224,7 +228,7 @@ def act(uid, kind, value, now=None):
             raise LookupError("진행 중인 실시간 배틀이 없습니다.")
         lb = _load(row)
         who = side_of(row, uid)
-        lb.choose(who, kind, value)
+        lb.choose(who, kind, value, mega=mega)
         ev = None
         if lb.ready():
             ev = lb.resolve()

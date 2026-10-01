@@ -660,7 +660,10 @@ class ShopWindow(object):
             return self.say(_err(err), U.DANGER)
         try:
             data = data or {}
-            self.items = data.get("items") or []
+            # 메가스톤(92종)은 유대 미션으로만 받고 사고팔 수 없다. 상점에 두면
+            # '안 판다' 줄이 92개 쏟아진다 - 가방에서만 보인다 (시즌 3).
+            self.items = [it for it in (data.get("items") or [])
+                          if it.get("cat") != "megastone"]
             self.bag = data.get("bag") or {}
             self.money = int(data.get("money") or 0)
             self.sell_rate = float(data.get("sellRate") or 0.5)

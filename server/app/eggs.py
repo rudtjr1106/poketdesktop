@@ -168,6 +168,8 @@ def _make_mon(uid, species, rng, now, egg_slot=None):
     if slot is not None:
         db.run("UPDATE pokemon SET on_desktop=1, slot=? WHERE id=?", (slot, pid))
     items.mark_seen(uid, species, True, now)
+    from . import achievements
+    achievements.on_obtain(uid, mon, "hatch", now=now)
     return pid
 
 

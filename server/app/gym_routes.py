@@ -31,7 +31,7 @@ from pydantic import BaseModel
 
 from common import trainer_battle as TB
 
-from . import auth, battle_routes, config, db, deps, gym, items
+from . import auth, battle_routes, config, db, deps, gym, items, mega, pvp
 
 router = APIRouter()
 
@@ -39,6 +39,7 @@ router = APIRouter()
 class ActIn(BaseModel):
     kind: str                    # move / switch / forfeit
     move: str = ""
+    mega: bool = False           # 이 턴에 메가진화 (시즌 3)
     slot: int = -1
     hour: int = -1
 
@@ -142,11 +143,17 @@ def start(region: str, ctx=Depends(deps.current)):
                                 % (other.get("name") or "다른 트레이너"))
         tb = TB.TrainerBattle.load(deps.dex(), json.loads(old["data"]))
         return _out(old, tb, extra={"resumed": True})
-    party = _party(uid)
+    # 전설·환상은 한 마리만 나간다 (시즌 3). 나머지는 이번 판에서 쉰다.
+    party, benched = pvp.split_restricted(_party(uid))
     if not party:
         raise HTTPException(409, "데리고 다니는 포켓몬이 없습니다.")
     tb = TB.TrainerBattle(deps.dex(), party, t, random.Random())
+    tb.keystone["me"] = mega.has_keystone(uid)          # 관장 8곳 (시즌 3)
     events = tb.start()
+    if benched:
+        # 인사 바로 뒤에 알린다. 교체 목록에 없는 까닭을 판 처음에 말해 둔다.
+        at = 1 if events and events[0].get("t") == "intro" else 0
+        events.insert(at, {"t": "note", "text": pvp.bench_note(benched)})
     now = auth.now_iso()
     cur = db.run("INSERT INTO gym_battle (user_id, region, trainer, state, turn, rev, data,"
                  " created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -183,7 +190,7 @@ def act(bid: int, body: ActIn, ctx=Depends(deps.current)):
     kos_before = len(tb.kos)
     try:
         if kind == "move":
-            events = tb.act("move", body.move or "")
+            events = tb.act("move", body.move or "", mega=bool(body.mega))
         elif kind == "switch":
             events = tb.act("switch", int(body.slot))
         else:
@@ -215,11 +222,14 @@ def act(bid: int, body: ActIn, ctx=Depends(deps.current)):
         if pid:
             exp.extend(battle_routes.award(d, uid, tb.foe_team[ko["foe"]], pid, hour,
                                            rate=config.GYM_EXP_RATE) or [])
+            mega.on_ko(uid, pid)                         # 유대 미션 ② (시즌 3)
     if exp:
         extra["exp"] = exp
     if tb.over and tb.result == "won":
         t = gym.trainer(row["trainer"])
         prize, first = gym.record_win(uid, t, tb.turn, auth.now_iso())
+        # 유대 미션 ① (시즌 3): 파티에 있던 개체 중 관장 타입이 맞는 것
+        mega.on_gym_win(uid, [f.mon.get("id") for f in tb.me_team], t.get("type"))
         if prize:
             items.money_add(uid, prize)
         extra["reward"] = {"prize": prize, "first": first, "money": items.money(uid),

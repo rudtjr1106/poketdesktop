@@ -28,7 +28,7 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
-from . import (auth, battle_routes, config, db, deps, eggs, item_routes,  # noqa: E402
+from . import (achievements, auth, battle_routes, mega, config, db, deps, eggs, item_routes,  # noqa: E402
                errors, items, live, live_routes, migrations, pvp, pvp_routes,
                raid, raid_routes,
                gym_routes, social_routes, tm_routes, tms, walk)
@@ -316,7 +316,10 @@ def _warm_sprites():
 @app.get("/api/sprite/{num}")
 def sprite(num: int, shiny: bool = False):
     """정식 도트를 내려준다. 처음 요청될 때만 받아오고 그 뒤로는 캐시."""
-    if not 1 <= num <= 1025:
+    # 1~1025 에 더해 메가 폼 번호(10033~)도 받는다 (시즌 3). 도감에 있는
+    # 번호만 - 아무 번호나 받으면 남의 서버에 헛걸음을 시킨다.
+    mega = dex().by_num.get(num) if num > 1025 else None
+    if not (1 <= num <= 1025 or (mega and mega.get("mega"))):
         raise HTTPException(404, "그런 도감 번호가 없습니다.")
     p, ext = _sprite_cached(num, shiny)
     if not p:
@@ -325,6 +328,12 @@ def sprite(num: int, shiny: bool = False):
         p, ext = _sprite_cached(num, False)
         if not p:
             p, ext = _sprite_fetch(num, False)
+    if not p and mega:
+        # 새 메가(Z-A)는 도트가 아직 없을 수 있다. 원래 종 도트로 대신한다 -
+        # 모습은 안 바뀌어도 배틀은 이어져야 한다.
+        base = dex().get(mega.get("megaOf")) or {}
+        if base.get("num"):
+            return sprite(int(base["num"]), shiny)
     if not p:
         raise HTTPException(404, "도트를 찾지 못했습니다.")
     with open(p, "rb") as f:
@@ -749,6 +758,7 @@ def _give_starter(user_id, which):
     mid = db.insert_mon(user_id, mon, auth.now_iso())
     db.run("UPDATE pokemon SET on_desktop=1, slot=0 WHERE id=?", (mid,))
     items.mark_seen(user_id, pick, True, auth.now_iso())
+    achievements.on_obtain(user_id, mon, "starter")
     return mid
 
 
@@ -909,6 +919,11 @@ def me(ctx=Depends(current)):
         # 결과를 아직 안 봤을 때). 상대가 기다리고 있으므로 이 동기화로라도
         # 알려야 한다.
         "live": live.me_card(uid),
+        # 도감 업적 (시즌 3). 안 본 것만. 화면이 게임 안에서 알리고 seen 을 부른다
+        # - 운영체제 알림은 쓰지 않는다(게임 안의 일이라서).
+        "achievements": achievements.me_card(uid),
+        # 메가진화 (시즌 3): 키스톤·빛나는 돌을 띄울 개체·받을 스톤
+        "bond": mega.me_card(uid),
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 
@@ -989,6 +1004,62 @@ def list_pokemon(ctx=Depends(current)):
             "eggs": eggs.box_list(uid),
             "boxes": {"size": config.BOX_SIZE, "count": config.BOX_COUNT,
                       "names": _box_names(uid), "used": _box_counts(uid)}}
+
+
+class ClaimIn(BaseModel):
+    stone: str = ""
+
+
+@app.get("/api/bond/{pid}")
+def bond_card(pid: int, ctx=Depends(current)):
+    """한 개체의 유대 미션 (메가진화, 시즌 3)."""
+    out = mega.card(ctx["user"]["id"], pid)
+    if out is None:
+        raise HTTPException(404, "그런 포켓몬이 없습니다.")
+    out["keystone"] = mega.keystone_card(ctx["user"]["id"])
+    return out
+
+
+@app.post("/api/bond/{pid}/start")
+def bond_start(pid: int, ctx=Depends(current)):
+    """빛나는 돌을 눌렀다 - 유대 미션을 연다."""
+    try:
+        return mega.start(ctx["user"]["id"], pid)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/bond/{pid}/claim")
+def bond_claim(pid: int, body: ClaimIn, ctx=Depends(current)):
+    """미션을 다 채웠다 - 메가스톤을 받는다 (X/Y 는 여기서 고른다)."""
+    try:
+        return mega.claim(ctx["user"]["id"], pid, (body.stone or "").upper())
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/bond/{pid}/seen")
+def bond_seen(pid: int, ctx=Depends(current)):
+    """저절로 받은 메가스톤을 알렸다."""
+    mega.mark_seen(ctx["user"]["id"], pid)
+    return {"ok": True}
+
+
+@app.get("/api/achievements")
+def list_achievements(ctx=Depends(current)):
+    """도감 업적 전부와 진행. 숨은 업적은 달성 전까지 가린다."""
+    return achievements.public(ctx["user"]["id"])
+
+
+@app.post("/api/achievements/seen")
+def seen_achievements(ctx=Depends(current)):
+    """화면이 알렸다. 다음 /api/me 부터 안 싣는다."""
+    achievements.mark_seen(ctx["user"]["id"])
+    return {"ok": True}
 
 
 @app.post("/api/pokemon/{pid}/box")
@@ -1098,6 +1169,7 @@ def set_nickname(pid: int, body: NicknameIn, ctx=Depends(current)):
     _own(uid, pid)
     nick = (body.nickname or "").strip() or None
     db.run("UPDATE pokemon SET nickname=? WHERE id=?", (nick, pid))
+    achievements.safe_check(uid)     # 숨은 업적 '똑같은 이름'
     return {"ok": True, "pokemon": _decorate(db.row_to_mon(_own(uid, pid)))}
 
 
@@ -1340,6 +1412,9 @@ def _make_grass(uid):
     """풀숲을 만들면서 어떤 포켓몬이 숨어 있을지 미리 정해둔다."""
     mon = _event_mon(uid)
     if mon is None:
+        # 도감 업적으로 풀린 울트라비스트·패러독스 (시즌 3)
+        mon = achievements.unlock_mon(uid, RNG)
+    if mon is None:
         lo, hi, cap = _wild_levels(uid)
         mon = dex().roll_wild(lo, hi, RNG, max_bst=cap,
                               shiny_rate=config.SHINY_RATE)
@@ -1524,7 +1599,7 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
                                        mon, row, body)
     db.run("UPDATE wild SET throws=throws+1 WHERE id=?", (wid,))
 
-    caught, shakes = P.catch_attempt(sp, mon, RNG, bonus)
+    caught, shakes = P.catch_attempt(achievements.catch_species(sp), mon, RNG, bonus)
 
     if not caught:
         left = db.q1("SELECT * FROM wild WHERE id=?", (wid,))
@@ -1552,6 +1627,8 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     _bump(uid, "caught")
     _schedule_next(uid, _cooldown())
     items.mark_seen(uid, mon["species"], True, auth.now_iso())
+    achievements.on_obtain(uid, mon, "catch", ball=ball_id)
+    mega.on_catch(uid)                                   # 유대 미션 ③ (시즌 3)
     drop = _drop(uid, mon, config.DROP_ON_CATCH)
     tm_drop = _drop_tm(uid, mon, RNG)
     msg = "신난다! %s 을(를) 잡았다!" % dex().name(mon["species"])

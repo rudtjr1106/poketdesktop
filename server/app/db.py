@@ -111,6 +111,41 @@ CREATE TABLE IF NOT EXISTS pokemon (
 );
 CREATE INDEX IF NOT EXISTS idx_pokemon_user ON pokemon(user_id);
 
+-- 도감 업적 (시즌 3). 받은 것만 적는다. seen 은 화면이 알렸는가.
+CREATE TABLE IF NOT EXISTS achievement (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key      TEXT NOT NULL,
+    got_at   TEXT NOT NULL,
+    seen     INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, key)
+);
+
+-- 사람마다 세는 값 (이로치 수, 숨은 업적 표시 같은 것). seen 에 없는 것.
+CREATE TABLE IF NOT EXISTS user_stat (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key      TEXT NOT NULL,
+    n        INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, key)
+);
+
+-- 메가진화 유대 미션 (시즌 3). 개체 하나에 하나. 다 채우면 done_at,
+-- 스톤을 받으면 stone. 포켓몬을 놓아주면 같이 지워진다.
+CREATE TABLE IF NOT EXISTS bond (
+    pokemon_id  INTEGER PRIMARY KEY REFERENCES pokemon(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    species     TEXT NOT NULL,
+    started_at  TEXT NOT NULL,
+    gym         INTEGER NOT NULL DEFAULT 0,
+    kos         INTEGER NOT NULL DEFAULT 0,
+    wild        INTEGER NOT NULL DEFAULT 0,
+    done_at     TEXT,
+    stone       TEXT,
+    -- 받은 스톤을 알렸나. 스톤이 하나뿐인 종은 미션을 채우는 순간 서버가
+    -- 저절로 주므로(배틀·잡기 도중) 다음 동기화 때 창으로 알린다.
+    seen        INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_bond_user ON bond(user_id);
+
 -- PC 박스 이름. 안 바꾼 박스는 여기 줄이 없다 (기본 이름은 클라가 짓는다).
 CREATE TABLE IF NOT EXISTS box_name (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -725,6 +760,8 @@ MIGRATIONS = [
      "ALTER TABLE egg ADD COLUMN known INTEGER NOT NULL DEFAULT 0"),
     ("live_match", "recorded",
      "ALTER TABLE live_match ADD COLUMN recorded INTEGER NOT NULL DEFAULT 0"),
+    # 시즌 3 개발 중에 만든 DB 에는 이 칸이 없다
+    ("bond", "seen", "ALTER TABLE bond ADD COLUMN seen INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

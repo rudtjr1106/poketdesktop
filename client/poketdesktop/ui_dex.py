@@ -62,8 +62,13 @@ class DexWindow(object):
             U.install_wheel(self.win)
 
         self._header()
+        # 격자와 업적 칸을 번갈아 보여주려고 격자 쪽을 한 틀에 담는다.
+        self.dex_body = tk.Frame(self.win, bg=U.BG)
+        self.dex_body.pack(fill="both", expand=True)
         self._filters()
         self._grid()
+        self.ach = None             # 처음 누를 때 만든다
+        self._ach_label = None
         self.reload()
 
     # ---------------- 머리 ----------------
@@ -82,11 +87,17 @@ class DexWindow(object):
                             font=U.FONT_XS)
         self.sub.pack(side="left", padx=(10, 0))
         U.ghost_button(inner, "새로고침", self.reload,
-                       height=32).pack(side="right", pady=15)
+                       height=32).pack(side="right")
+        # 도감 업적 (시즌 3). 누르면 격자 자리에 업적 칸이 들어간다.
+        # **pady 를 주지 않는다** - 머리줄 62 에 단추(32+그림자 4)+30 이면
+        # 윈도우(배율 1.0)에서 4px 눌린다(레이드 머리줄에서 겪었다).
+        self.ach_btn = U.ghost_button(inner, "업적", self.toggle_achievements,
+                                      height=32)
+        self.ach_btn.pack(side="right", padx=(0, 8))
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     def _filters(self):
-        bar = tk.Frame(self.win, bg=U.BG)
+        bar = tk.Frame(self.dex_body, bg=U.BG)
         bar.pack(fill="x", padx=14, pady=(10, 6))
 
         self.gen_btns = {}
@@ -115,7 +126,7 @@ class DexWindow(object):
 
     # ---------------- 격자 ----------------
     def _grid(self):
-        wrap = tk.Frame(self.win, bg=U.BG)
+        wrap = tk.Frame(self.dex_body, bg=U.BG)
         wrap.pack(fill="both", expand=True, padx=14, pady=(4, 12))
         self.cv = tk.Canvas(wrap, bg=U.INK, highlightthickness=2,
                             highlightbackground=U.LINE, bd=0)
@@ -325,6 +336,27 @@ class DexWindow(object):
         pass
 
     # ---------------- 끝 ----------------
+    # ---------------- 업적 ----------------
+    def toggle_achievements(self):
+        """격자 <-> 업적 칸."""
+        from . import ui_achievements
+        if self.ach is None:
+            self.ach = ui_achievements.AchievementPanel(
+                self.win, self.app, on_count=self._ach_count)
+        if self.ach.f.winfo_manager():
+            self.ach.pack_forget()
+            self.dex_body.pack(fill="both", expand=True)
+            self.ach_btn.configure(text=self._ach_label or "업적")
+        else:
+            self.dex_body.pack_forget()
+            self.ach.pack(fill="both", expand=True)
+            self.ach_btn.configure(text="도감으로")
+            self.ach.reload()
+
+    def _ach_count(self, done, total):
+        """업적 수는 단추 글씨에 둔다 - 머리줄의 작은 글씨는 세대·본 수 자리다."""
+        self._ach_label = "업적 %d/%d" % (done, total)
+
     def focus(self):
         if U.is_embedded(self.win):
             return          # 탭이면 허브가 앞으로 꺼내 준다

@@ -229,6 +229,135 @@ def _season2_open(conn):
             % (len(rows), gifts, n_eggs, candies, n_all))
 
 
+# 시즌 2 보상표. **여기 숫자를 적는다** (규칙 2) - season.py 의 표(S2_REWARDS,
+# 티어 경계)가 시즌 3 에서 바뀌어도 이미 끝난 시즌 2 는 그때 정한 그대로다.
+#
+# **도달한 최고 티어**(peak_rp)로 준다 - 마지막 점수로 주면 막판에 안 하고
+# 버티게 된다. 챔피언·사천왕은 자리라 **끝날 때의 자리**로 본다: 마스터볼
+# (600 RP 이상) 안에서 RP 순 1등이 챔피언, 2~5등이 사천왕 (season.seats 와
+# 같은 순서 - RP, 숨은 점수, 승수). 몬스터볼에 머문 사람은 보상이 없다.
+S2_TIER_RP = [("monster", 0), ("super", 150), ("hyper", 350), ("master", 600)]
+S2_SEATS = 5
+# 티어 -> (칭호, 명패, 이로치사탕, 알)
+S2_REWARDS = {
+    "champion": ("s2_champion", "gold", 1, "legendary"),
+    "elite": ("s2_elite", "silver", 1, "mythical"),
+    "master": ("s2_master", "master", 1, None),
+    "hyper": ("s2_hyper", None, 0, None),
+    "super": ("s2_super", None, 0, None),
+}
+S2_TIER_KR = {"champion": "챔피언", "elite": "사천왕", "master": "마스터볼",
+              "hyper": "하이퍼볼", "super": "슈퍼볼", "monster": "몬스터볼"}
+S2_TITLE_KR = {"s2_champion": "시즌 2 챔피언", "s2_elite": "시즌 2 사천왕",
+               "s2_master": "시즌 2 마스터볼", "s2_hyper": "시즌 2 하이퍼볼",
+               "s2_super": "시즌 2 슈퍼볼"}
+S2_FRAME_KR = {"gold": "금빛 명패", "silver": "은빛 명패", "master": "마스터볼 명패"}
+S2_GIFT_TITLE = "시즌 2 보상"
+
+
+def _s2_tier(peak):
+    key = S2_TIER_RP[0][0]
+    for k, need in S2_TIER_RP:
+        if peak >= need:
+            key = k
+    return key
+
+
+def _season3_open(conn):
+    """시즌 2 를 닫고 시즌 3 을 연다 (2026-10-02, 메가진화·도감 업적과 함께).
+
+    시즌 2 열기(_season2_open)와 같은 순서다 (규칙 1 — 먼저 주고 나중에 지운다).
+      1) 시즌 2 순위표(RP 순)를 season_result 에 옮긴다 - 명예의 전당
+      2) 최고 티어·자리대로 보상을 선물(gift)로 넣는다
+      3) 그다음에 점수를 비운다
+
+    숨은 점수(MMR)는 시즌 2 때처럼 1000 쪽으로 절반만 남긴다. RP·최고 RP 는 0,
+    배치도 다시 한다. 친구 전적·하루 상금·전적 목록은 건드리지 않는다.
+    같은 제목의 선물이 있으면 넣지 않으므로 두 번 돌아도 두 번 안 준다.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0).isoformat()
+    rows = conn.execute(
+        "SELECT r.user_id, u.username, r.rating, r.rp, r.peak_rp, r.games, r.wins,"
+        " r.losses, r.draws FROM rank_stat r JOIN users u ON u.id=r.user_id"
+        " WHERE r.ranked=1 ORDER BY r.rp DESC, r.rating DESC, r.wins DESC").fetchall()
+    master_rp = S2_TIER_RP[-1][1]
+    seated = gifts = candies = n_eggs = 0
+    tiers = {}
+    for i, r in enumerate(rows, 1):
+        uid = _v(r, "user_id", 0)
+        rp = int(_v(r, "rp", 3) or 0)
+        peak = max(rp, int(_v(r, "peak_rp", 4) or 0))
+        seat = None
+        if rp >= master_rp and seated < S2_SEATS:
+            seat = "champion" if seated == 0 else "elite"
+            seated += 1
+        tier = seat or _s2_tier(peak)
+        tiers[tier] = tiers.get(tier, 0) + 1
+        reward = S2_REWARDS.get(tier)
+        title = reward[0] if reward else None
+        conn.execute(
+            "INSERT INTO season_result (season, user_id, rank, name, rating,"
+            " rp, tier, games, wins, losses, draws, title, at)"
+            " VALUES (2,?,?,?,?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(season, user_id) DO NOTHING",
+            (uid, i, _v(r, "username", 1), _v(r, "rating", 2), rp, tier,
+             _v(r, "games", 5), _v(r, "wins", 6), _v(r, "losses", 7),
+             _v(r, "draws", 8), title, now))
+        if reward is None:
+            continue            # 몬스터볼은 보관만 하고 보상은 없다
+        if conn.execute("SELECT 1 FROM gift WHERE user_id=? AND title=?",
+                        (uid, S2_GIFT_TITLE)).fetchone():
+            continue
+        title, frame, n, egg = reward
+        bits = []
+        if egg:
+            bits.append(S1_EGG_KR[egg])
+        bits.append("칭호 '%s'" % S2_TITLE_KR[title])
+        if frame:
+            bits.append(S2_FRAME_KR[frame])
+        if n:
+            bits.append("이로치사탕 %d개" % n)
+        if seat:
+            head = "시즌 2 를 %s 자리로 마쳤습니다 (최종 %d위)." % (S2_TIER_KR[seat], i)
+        else:
+            head = "시즌 2 에서 %s 티어까지 올랐습니다 (최종 %d위)." % (S2_TIER_KR[tier], i)
+        msg = "%s %s을(를) 드립니다. %s은(는) 랭킹 탭에서 바꿀 수 있습니다." % (
+            head, ", ".join(bits), "칭호와 명패" if frame else "칭호")
+        if n:
+            msg += " 이로치사탕은 가방에서 포켓몬에게 먹이면 이로치가 됩니다."
+        if egg:
+            msg += (" 알은 바탕화면에 나타나고, 게임을 켜 둔 시간만큼 자라서 "
+                    "부화합니다.")
+        lines = []
+        if egg:
+            lines.append(("egg", egg, 1))
+            n_eggs += 1
+        lines.append(("title", title, 1))
+        if frame:
+            lines.append(("frame", frame, 1))
+        if n:
+            lines.append(("item", "SHINYCANDY", n))
+            candies += n
+        for kind, rid, cnt in lines:
+            conn.execute(
+                "INSERT INTO gift (user_id, kind, item_id, count, title,"
+                " message, created_at) VALUES (?,?,?,?,?,?,?)",
+                (uid, kind, rid, cnt, S2_GIFT_TITLE, msg, now))
+            gifts += 1
+
+    n_all = conn.execute("SELECT COUNT(*) FROM rank_stat").fetchone()[0]
+    conn.execute(
+        "UPDATE rank_stat SET rating = 1000 + CAST((rating - 1000) / 2 AS INTEGER),"
+        " games=0, wins=0, losses=0, draws=0, streak=0, ranked=0,"
+        " rp=0, peak_rp=0, win_day='', updated_at=?", (now,))
+    conn.execute("UPDATE rank_stat SET best = rating")
+    return ("시즌 2 순위 %d명 보관 (%s), 선물 %d줄 (알 %d개, 이로치사탕 %d개), %d명 점수 전환"
+            % (len(rows), ", ".join("%s %d" % (S2_TIER_KR[k], v) for k, v in
+                                    sorted(tiers.items())),
+               gifts, n_eggs, candies, n_all))
+
+
 def _egg_slots(conn):
     """1.4.0 에 받은 알에 파티 자리를 준다.
 
@@ -285,6 +414,8 @@ ONCE = [
     ("0260-season2-open", _season2_open),
     ("0270-egg-slots", _egg_slots),
     ("0280-mmr-recenter", _mmr_recenter),
+    # 시즌 3 (1.7.0, 2026-10-02). 서버가 새 판으로 뜨는 순간 한 번 돈다.
+    ("0290-season3-open", _season3_open),
 ]
 
 

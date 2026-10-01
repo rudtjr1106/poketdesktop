@@ -21,7 +21,7 @@ from common import held as HELD
 from common import pokelogic as P
 from common import statusmoves as SM
 
-from . import auth, config, db, deps, items, tms, walk
+from . import achievements, auth, config, db, deps, items, tms, walk, mega
 
 router = APIRouter()
 
@@ -34,6 +34,7 @@ class MoveIn(BaseModel):
     # 옛 클라이언트는 예전과 똑같이 싸운다 - 멈춘다는 답을 받아도 처리할 줄 모른다.
     catch: str = ""
     finish: bool = False  # 멈췄다가 다시 싸우기로 했다 -> 이 판은 끝까지 싸운다
+    mega: bool = False    # 이 턴에 메가진화 (시즌 3). 자동 전투는 알아서 한다
 
 
 class SwitchIn(BaseModel):
@@ -135,11 +136,14 @@ def _battle(d, row, me, foe, rng=None):
     (내 쪽은 교체하면 칸을 통째로 갈아 끼우지만 야생 쪽은 판 내내 그대로라 거기에 둔다)
     """
     try:
-        fld = json.loads(row["foe"]).get("field")
-    except (TypeError, ValueError, KeyError):
-        fld = None
+        foe_raw = json.loads(row["foe"])
+        fld = foe_raw.get("field")
+    except (TypeError, ValueError, KeyError, AttributeError):
+        foe_raw, fld = {}, None
     bt = B.Battle(d, me, foe, rng, field=FD.Field.load(fld))
     bt.turn_no = row["turn"]
+    # 메가진화 (시즌 3). 한 판 한 번 - 교체해도 두 번 못 하게 판 저장본에 적는다.
+    bt.mega_done = set((foe_raw or {}).get("megaDone") or [])
     return bt
 
 
@@ -154,6 +158,8 @@ def _persist_sketch(uid, mon_id, f):
 def _save(row_id, bt, result=None, state=None):
     foe = _dump(bt.foe)
     foe["field"] = bt.field.dump()
+    if bt.mega_done:
+        foe["megaDone"] = sorted(bt.mega_done)
     db.run("UPDATE battle SET turn=?, me=?, foe=?, state=?, result=? WHERE id=?",
            (bt.turn_no, json.dumps(_dump(bt.me)), json.dumps(foe),
             state or ("done" if bt.over else "active"),
@@ -503,8 +509,12 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
                     "ballOptions": ball_options(uid, ctx["user"], bt, row, hour)}
     elif auto:
         pick = bt.choose_mine()
+    # 메가진화 (시즌 3): 키스톤(관장 8곳)이 있고 스톤을 지녔으면. 자동 전투는
+    # 알아서 한다 - **잡기 모드에서는 안 한다**(약하게 만들려다 세져서 쓰러뜨린다).
+    bt.keystone["me"] = mega.has_keystone(uid)
+    want_mega = bool(body.mega) or (auto and not spare)
     out = {"myMove": pick, "myMoveKr": bt.move_name(pick),
-           "events": bt.take_turn(pick), "spare": spare}
+           "events": bt.take_turn(pick, mega=want_mega), "spare": spare}
     if spare and not bt.over:
         # 다음 턴에 멈출 판이면 지금 알려 준다. 한 번 더 불러서 빈 답을 받는 사이
         # 0.6초가 그냥 흐른다. (잠재우기가 남았으면 멈추지 않는다 - 같은 판단)
@@ -516,6 +526,7 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
         db.run("INSERT INTO wild_state (user_id, wins) VALUES (?,1)"
                " ON CONFLICT(user_id) DO UPDATE SET wins=wins+1", (uid,))
         out["exp"] = award(d, uid, foe, row["mine_id"], hour)
+        mega.on_ko(uid, row["mine_id"])                  # 유대 미션 ② (시즌 3)
         items.mark_seen(uid, foe.mon["species"], False, auth.now_iso())
         # 쓰러뜨려도 도구가 떨어진다. 포획보다는 덜 나온다.
         # 볼이 다 떨어져도 배틀로는 다시 일어설 수 있어야 하기 때문이다.
@@ -622,7 +633,7 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
     # 잠들거나 얼면 2배, 그 밖의 상태이상은 1.5배 (본가와 같다)
     status_bonus = 2.0 if foe.status in ("sleep", "freeze") else \
         (1.5 if foe.status in ("paralysis", "poison", "burn") else 1.0)
-    caught, shakes = P.catch_attempt(sp, foe.mon, deps.RNG, bonus,
+    caught, shakes = P.catch_attempt(achievements.catch_species(sp), foe.mon, deps.RNG, bonus,
                                      hp_ratio, status_bonus)
 
     out = {"caught": caught, "shakes": shakes, "balls": balls,
@@ -663,6 +674,8 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
     db.run("INSERT INTO wild_state (user_id, caught) VALUES (?,1)"
            " ON CONFLICT(user_id) DO UPDATE SET caught=caught+1", (uid,))
     items.mark_seen(uid, foe.mon["species"], True, auth.now_iso())
+    achievements.on_obtain(uid, foe.mon, "catch", ball=ball)
+    mega.on_catch(uid)                                   # 유대 미션 ③ (시즌 3)
     drop = _drop(uid, foe.mon, config.DROP_ON_CATCH)
     tm_drop = _drop_tm(uid, foe.mon, deps.RNG)
     if drop:

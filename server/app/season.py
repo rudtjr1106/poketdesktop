@@ -23,11 +23,12 @@ import datetime
 
 from . import db
 
-SEASON = 2
+SEASON = 3
 # 화면에 적는 날짜. 시즌은 운영자가 migrations 로 닫는다 - 이 날짜가 지났다고
-# 저절로 닫히지 않는다.
-SEASON_STARTS = "2026-09-15"
-SEASON_ENDS = "2026-10-01"
+# 저절로 닫히지 않는다. 시즌 2 는 9/15~10/1, 시즌 3 은 10/2 부터 시즌 2 와 같은
+# 2주다 (티어 경계 150/350/600 이 2주에 맞춰져 있다).
+SEASON_STARTS = "2026-10-02"
+SEASON_ENDS = "2026-10-16"
 
 # 랜덤(랭크) 배틀에서만 쓴다. 이보다 높은 포켓몬은 이 레벨로 싸운다.
 # 모두를 50 으로 올리지는 않는다 - 아래쪽은 키운 만큼 강해지는 재미가 그대로
@@ -97,6 +98,11 @@ TITLES = {
     "s2_master": "시즌 2 마스터볼",
     "s2_hyper": "시즌 2 하이퍼볼",
     "s2_super": "시즌 2 슈퍼볼",
+    "s3_champion": "시즌 3 챔피언",
+    "s3_elite": "시즌 3 사천왕",
+    "s3_master": "시즌 3 마스터볼",
+    "s3_hyper": "시즌 3 하이퍼볼",
+    "s3_super": "시즌 3 슈퍼볼",
 }
 # 이름 둘레의 색. 랭킹·친구·투기장에서 남에게 보인다.
 FRAMES = {
@@ -122,9 +128,10 @@ S1_REWARDS = [
     (11, 30, "s1_top30", None, 0, None),
 ]
 
-# 시즌 2 가 끝날 때 줄 것. **도달한 최고 티어**로 준다 - 마지막 점수로 주면
+# 시즌 2 가 끝날 때 준 것. **도달한 최고 티어**로 준다 - 마지막 점수로 주면
 # 막판에 안 하고 버티게 된다. 사천왕·챔피언은 자리라 끝날 때의 자리로 본다.
-# 몬스터볼에 머문 사람은 보상이 없다.
+# 몬스터볼에 머문 사람은 보상이 없다. 실제로 나간 숫자는 migrations 에 있다
+# (_season3_open, 여기는 보여 주기용이다).
 # (티어, 칭호, 명패, 이로치사탕, 알)
 S2_REWARDS = [
     ("champion", "s2_champion", "gold", 1, "legendary"),
@@ -132,6 +139,14 @@ S2_REWARDS = [
     ("master", "s2_master", "master", 1, None),
     ("hyper", "s2_hyper", None, 0, None),
     ("super", "s2_super", None, 0, None),
+]
+# 시즌 3 이 끝날 때 줄 것. 시즌 2 와 같은 틀이다.
+S3_REWARDS = [
+    ("champion", "s3_champion", "gold", 1, "legendary"),
+    ("elite", "s3_elite", "silver", 1, "mythical"),
+    ("master", "s3_master", "master", 1, None),
+    ("hyper", "s3_hyper", None, 0, None),
+    ("super", "s3_super", None, 0, None),
 ]
 
 
@@ -339,7 +354,7 @@ def rules_public():
                      "frame": FRAMES[frame][0] if frame else None,
                      "frameColor": FRAMES[frame][1] if frame else None,
                      "shiny": n, "egg": EGG_KR.get(egg)}
-                    for t, title, frame, n, egg in S2_REWARDS],
+                    for t, title, frame, n, egg in S3_REWARDS],
     }
 
 
@@ -347,9 +362,12 @@ def hall(season, limit=10):
     """지난 시즌 순위표 (명예의 전당)."""
     rows = db.q("SELECT * FROM season_result WHERE season=?"
                 " ORDER BY rank LIMIT ?", (season, limit))
+    # 시즌 2 부터는 RP 와 티어가 있다 (시즌 1 은 숨은 점수뿐이던 시즌이다).
     return [{"rank": r["rank"], "userId": r["user_id"], "name": r["name"],
              "rating": r["rating"], "games": r["games"], "wins": r["wins"],
              "losses": r["losses"],
+             "rp": r["rp"] if season >= 2 else None,
+             "tierKr": TIER_KR.get(r["tier"]) if season >= 2 and r["tier"] else None,
              "title": TITLES.get(r["title"]) if r["title"] else None}
             for r in rows]
 
