@@ -1681,6 +1681,12 @@ def after_status(bt, k, move, who, user, target, tw, ev):
             bt.request_switch(who, "out", ev, k)
 
 
+# **상대**를 회복시키는 기술 (도감의 target 이 '고른 포켓몬' 이다). 원작에서는
+# 같은 편에게 쓰는 기술인데 이 게임은 늘 혼자 싸워서 상대밖에 없다. 그동안
+# 회복기라는 것만 보고 쓴 쪽을 회복시켜서, 사실상 HP회복과 같은 기술이었다.
+HEALS_TARGET = ("HEALPULSE", "FLORALHEALING")
+
+
 def heal_percent(k, move, user):
     """날씨로 회복량이 바뀌는 기술 (달빛·아침햇살·광합성·모래모으기)."""
     heal = move.get("heal") or 0

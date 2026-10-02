@@ -34,8 +34,10 @@ import datetime
 
 from . import config, db, season
 
-KINDS = ("notice", "free")
-KIND_KR = {"notice": "공지", "free": "자유"}
+# 공지는 운영자만 쓴다. 자유와 Q&A(1.8.1)는 누구나 쓴다 - 질문이 자유 글에 섞여
+# 묻히지 않게 따로 둔 칸일 뿐, 규칙은 자유 글과 같다.
+KINDS = ("notice", "free", "qna")
+KIND_KR = {"notice": "공지", "free": "자유", "qna": "Q&A"}
 TITLE_MAX = 40
 BODY_MAX = 2000
 COMMENT_MAX = 300
@@ -168,14 +170,17 @@ def _counts(ids):
 
 
 def listing(user, kind="all", page=1, now=None):
-    """목록 한 쪽. '전체' 는 최근 공지 몇 개를 맨 위에 붙이고 자유 글을 넘긴다."""
+    """목록 한 쪽. '전체' 는 최근 공지 몇 개를 맨 위에 붙이고 나머지 글(자유·Q&A)을 넘긴다."""
     uid = user["id"]
     admin = is_admin(user)
     now = now or _now()
     kind = kind if kind in KINDS else "all"
     page = max(1, int(page or 1))
-    where = "deleted=0 AND kind=?"
-    args = ("free" if kind == "all" else kind,)
+    if kind == "all":
+        # 공지는 맨 위에 따로 붙으므로 뺀다. 자유와 Q&A 가 함께 흐른다.
+        where, args = "deleted=0 AND kind<>'notice'", ()
+    else:
+        where, args = "deleted=0 AND kind=?", (kind,)
     total = db.q1("SELECT COUNT(*) c FROM board_post WHERE " + where, args)["c"]
     pages = max(1, (total + PAGE - 1) // PAGE)
     page = min(page, pages)

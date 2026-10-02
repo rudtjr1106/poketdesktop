@@ -37204,31 +37204,55 @@
      "TACKLE"
     ],
     [
-     7,
-     "LEECHSEED"
-    ],
-    [
-     13,
+     3,
      "VINEWHIP"
     ],
     [
-     20,
-     "POISONPOWDER"
-    ],
-    [
-     27,
-     "RAZORLEAF"
-    ],
-    [
-     34,
+     6,
      "GROWTH"
     ],
     [
-     41,
+     9,
+     "LEECHSEED"
+    ],
+    [
+     12,
+     "RAZORLEAF"
+    ],
+    [
+     15,
+     "POISONPOWDER"
+    ],
+    [
+     15,
      "SLEEPPOWDER"
     ],
     [
-     48,
+     18,
+     "SEEDBOMB"
+    ],
+    [
+     21,
+     "TAKEDOWN"
+    ],
+    [
+     24,
+     "SWEETSCENT"
+    ],
+    [
+     27,
+     "SYNTHESIS"
+    ],
+    [
+     30,
+     "WORRYSEED"
+    ],
+    [
+     33,
+     "POWERWHIP"
+    ],
+    [
+     36,
      "SOLARBEAM"
     ]
    ],
@@ -37298,34 +37322,58 @@
     ],
     [
      1,
-     "LEECHSEED"
+     "GROWTH"
     ],
     [
      1,
      "TACKLE"
     ],
     [
-     13,
+     1,
      "VINEWHIP"
     ],
     [
-     22,
-     "POISONPOWDER"
+     9,
+     "LEECHSEED"
     ],
     [
-     30,
+     12,
      "RAZORLEAF"
     ],
     [
-     38,
-     "GROWTH"
+     15,
+     "POISONPOWDER"
     ],
     [
-     46,
+     15,
      "SLEEPPOWDER"
     ],
     [
-     54,
+     20,
+     "SEEDBOMB"
+    ],
+    [
+     25,
+     "TAKEDOWN"
+    ],
+    [
+     30,
+     "SWEETSCENT"
+    ],
+    [
+     35,
+     "SYNTHESIS"
+    ],
+    [
+     40,
+     "WORRYSEED"
+    ],
+    [
+     45,
+     "POWERWHIP"
+    ],
+    [
+     50,
      "SOLARBEAM"
     ]
    ],
@@ -37391,7 +37439,11 @@
     ],
     [
      1,
-     "LEECHSEED"
+     "GROWTH"
+    ],
+    [
+     1,
+     "PETALDANCE"
     ],
     [
      1,
@@ -37402,23 +37454,47 @@
      "VINEWHIP"
     ],
     [
-     22,
-     "POISONPOWDER"
+     9,
+     "LEECHSEED"
     ],
     [
-     30,
+     12,
      "RAZORLEAF"
     ],
     [
-     43,
-     "GROWTH"
+     15,
+     "POISONPOWDER"
     ],
     [
-     55,
+     15,
      "SLEEPPOWDER"
     ],
     [
-     65,
+     20,
+     "SEEDBOMB"
+    ],
+    [
+     25,
+     "TAKEDOWN"
+    ],
+    [
+     30,
+     "SWEETSCENT"
+    ],
+    [
+     37,
+     "SYNTHESIS"
+    ],
+    [
+     44,
+     "WORRYSEED"
+    ],
+    [
+     51,
+     "POWERWHIP"
+    ],
+    [
+     58,
      "SOLARBEAM"
     ]
    ],
@@ -37491,28 +37567,44 @@
      "SCRATCH"
     ],
     [
-     9,
+     4,
      "EMBER"
     ],
     [
-     15,
-     "LEER"
+     8,
+     "SMOKESCREEN"
     ],
     [
-     22,
-     "RAGE"
+     12,
+     "DRAGONBREATH"
     ],
     [
-     30,
+     17,
+     "FIREFANG"
+    ],
+    [
+     20,
      "SLASH"
     ],
     [
-     38,
+     24,
      "FLAMETHROWER"
     ],
     [
-     46,
+     28,
+     "SCARYFACE"
+    ],
+    [
+     32,
      "FIRESPIN"
+    ],
+    [
+     36,
+     "INFERNO"
+    ],
+    [
+     40,
+     "FLAREBLITZ"
     ]
    ],
    "num": 4,
@@ -37587,24 +37679,36 @@
      "SCRATCH"
     ],
     [
-     15,
-     "LEER"
+     1,
+     "SMOKESCREEN"
+    ],
+    [
+     12,
+     "DRAGONBREATH"
+    ],
+    [
+     19,
+     "FIREFANG"
     ],
     [
      24,
-     "RAGE"
-    ],
-    [
-     33,
      "SLASH"
     ],
     [
-     42,
+     30,
      "FLAMETHROWER"
     ],
     [
-     56,
-     "FIRESPIN"
+     37,
+     "SCARYFACE"
+    ],
+    [
+     48,
+     "INFERNO"
+    ],
+    [
+     54,
+     "FLAREBLITZ"
     ]
    ],
    "num": 5,
@@ -37664,6 +37768,10 @@
     ],
     [
      1,
+     "DRAGONCLAW"
+    ],
+    [
+     1,
      "EMBER"
     ],
     [
@@ -37672,27 +37780,47 @@
     ],
     [
      1,
-     "LEER"
+     "HEATWAVE"
     ],
     [
      1,
      "SCRATCH"
     ],
     [
-     24,
-     "RAGE"
+     1,
+     "SMOKESCREEN"
     ],
     [
-     36,
+     12,
+     "DRAGONBREATH"
+    ],
+    [
+     19,
+     "FIREFANG"
+    ],
+    [
+     24,
      "SLASH"
     ],
     [
-     46,
+     30,
      "FLAMETHROWER"
     ],
     [
-     55,
+     39,
+     "SCARYFACE"
+    ],
+    [
+     46,
      "FIRESPIN"
+    ],
+    [
+     54,
+     "INFERNO"
+    ],
+    [
+     62,
+     "FLAREBLITZ"
     ]
    ],
    "num": 6,
@@ -37764,28 +37892,52 @@
      "TAILWHIP"
     ],
     [
-     8,
-     "BUBBLE"
-    ],
-    [
-     15,
+     3,
      "WATERGUN"
     ],
     [
-     22,
-     "BITE"
-    ],
-    [
-     28,
+     6,
      "WITHDRAW"
     ],
     [
-     35,
-     "SKULLBASH"
+     9,
+     "RAPIDSPIN"
     ],
     [
-     42,
+     12,
+     "BITE"
+    ],
+    [
+     15,
+     "WATERPULSE"
+    ],
+    [
+     18,
+     "PROTECT"
+    ],
+    [
+     21,
+     "RAINDANCE"
+    ],
+    [
+     24,
+     "AQUATAIL"
+    ],
+    [
+     27,
+     "SHELLSMASH"
+    ],
+    [
+     30,
+     "IRONDEFENSE"
+    ],
+    [
+     33,
      "HYDROPUMP"
+    ],
+    [
+     36,
+     "WAVECRASH"
     ]
    ],
    "num": 7,
@@ -37849,10 +38001,6 @@
    "moves": [
     [
      1,
-     "BUBBLE"
-    ],
-    [
-     1,
      "TACKLE"
     ],
     [
@@ -37860,24 +38008,52 @@
      "TAILWHIP"
     ],
     [
-     15,
+     1,
      "WATERGUN"
     ],
     [
-     24,
-     "BITE"
-    ],
-    [
-     31,
+     1,
      "WITHDRAW"
     ],
     [
-     39,
-     "SKULLBASH"
+     9,
+     "RAPIDSPIN"
     ],
     [
-     47,
+     12,
+     "BITE"
+    ],
+    [
+     15,
+     "WATERPULSE"
+    ],
+    [
+     20,
+     "PROTECT"
+    ],
+    [
+     25,
+     "RAINDANCE"
+    ],
+    [
+     30,
+     "AQUATAIL"
+    ],
+    [
+     35,
+     "SHELLSMASH"
+    ],
+    [
+     40,
+     "IRONDEFENSE"
+    ],
+    [
+     45,
      "HYDROPUMP"
+    ],
+    [
+     50,
+     "WAVECRASH"
     ]
    ],
    "num": 8,
@@ -37937,10 +38113,6 @@
     ],
     [
      1,
-     "BUBBLE"
-    ],
-    [
-     1,
      "TACKLE"
     ],
     [
@@ -37952,20 +38124,48 @@
      "WATERGUN"
     ],
     [
-     24,
-     "BITE"
-    ],
-    [
-     31,
+     1,
      "WITHDRAW"
     ],
     [
-     42,
-     "SKULLBASH"
+     9,
+     "RAPIDSPIN"
     ],
     [
-     52,
+     12,
+     "BITE"
+    ],
+    [
+     15,
+     "WATERPULSE"
+    ],
+    [
+     20,
+     "PROTECT"
+    ],
+    [
+     25,
+     "RAINDANCE"
+    ],
+    [
+     30,
+     "AQUATAIL"
+    ],
+    [
+     35,
+     "SHELLSMASH"
+    ],
+    [
+     42,
+     "IRONDEFENSE"
+    ],
+    [
+     49,
      "HYDROPUMP"
+    ],
+    [
+     56,
+     "WAVECRASH"
     ]
    ],
    "num": 9,
@@ -38033,6 +38233,10 @@
     [
      1,
      "TACKLE"
+    ],
+    [
+     9,
+     "BUGBITE"
     ]
    ],
    "num": 10,
@@ -38154,31 +38358,71 @@
     ],
     [
      1,
-     "CONFUSION"
+     "BUGBITE"
     ],
     [
-     15,
-     "POISONPOWDER"
+     1,
+     "HARDEN"
     ],
     [
-     16,
-     "STUNSPORE"
+     1,
+     "STRINGSHOT"
     ],
     [
-     17,
-     "SLEEPPOWDER"
+     1,
+     "TACKLE"
     ],
     [
-     21,
+     4,
      "SUPERSONIC"
     ],
     [
-     26,
+     8,
+     "CONFUSION"
+    ],
+    [
+     12,
+     "POISONPOWDER"
+    ],
+    [
+     12,
+     "SLEEPPOWDER"
+    ],
+    [
+     12,
+     "STUNSPORE"
+    ],
+    [
+     16,
+     "PSYBEAM"
+    ],
+    [
+     20,
      "WHIRLWIND"
     ],
     [
+     24,
+     "AIRSLASH"
+    ],
+    [
+     28,
+     "SAFEGUARD"
+    ],
+    [
      32,
-     "PSYBEAM"
+     "BUGBUZZ"
+    ],
+    [
+     36,
+     "TAILWIND"
+    ],
+    [
+     40,
+     "RAGEPOWDER"
+    ],
+    [
+     44,
+     "QUIVERDANCE"
     ]
    ],
    "num": 12,
@@ -38247,6 +38491,10 @@
     [
      1,
      "STRINGSHOT"
+    ],
+    [
+     9,
+     "BUGBITE"
     ]
    ],
    "num": 13,
@@ -38369,24 +38617,64 @@
      "FURYATTACK"
     ],
     [
-     16,
-     "FOCUSENERGY"
+     1,
+     "BUGBITE"
+    ],
+    [
+     1,
+     "HARDEN"
+    ],
+    [
+     1,
+     "POISONSTING"
+    ],
+    [
+     1,
+     "STRINGSHOT"
+    ],
+    [
+     11,
+     "FURYCUTTER"
+    ],
+    [
+     14,
+     "LASERFOCUS"
     ],
     [
      20,
-     "TWINEEDLE"
+     "FOCUSENERGY"
     ],
     [
-     25,
-     "RAGE"
+     23,
+     "VENOSHOCK"
     ],
     [
-     30,
+     26,
+     "ASSURANCE"
+    ],
+    [
+     29,
+     "TOXICSPIKES"
+    ],
+    [
+     32,
      "PINMISSILE"
     ],
     [
      35,
+     "POISONJAB"
+    ],
+    [
+     38,
      "AGILITY"
+    ],
+    [
+     41,
+     "ENDEAVOR"
+    ],
+    [
+     44,
+     "FELLSTINGER"
     ]
    ],
    "num": 15,
@@ -38451,31 +38739,59 @@
    "moves": [
     [
      1,
-     "GUST"
+     "TACKLE"
     ],
     [
      5,
      "SANDATTACK"
     ],
     [
-     12,
+     9,
+     "GUST"
+    ],
+    [
+     13,
      "QUICKATTACK"
     ],
     [
-     19,
+     17,
      "WHIRLWIND"
     ],
     [
-     28,
-     "WINGATTACK"
+     21,
+     "TWISTER"
     ],
     [
-     36,
+     25,
+     "FEATHERDANCE"
+    ],
+    [
+     29,
      "AGILITY"
     ],
     [
-     44,
-     "MIRRORMOVE"
+     33,
+     "WINGATTACK"
+    ],
+    [
+     37,
+     "ROOST"
+    ],
+    [
+     41,
+     "TAILWIND"
+    ],
+    [
+     45,
+     "AERIALACE"
+    ],
+    [
+     49,
+     "AIRSLASH"
+    ],
+    [
+     53,
+     "HURRICANE"
     ]
    ],
    "num": 16,
@@ -38547,24 +38863,52 @@
      "SANDATTACK"
     ],
     [
-     12,
+     1,
+     "TACKLE"
+    ],
+    [
+     13,
      "QUICKATTACK"
     ],
     [
-     21,
+     17,
      "WHIRLWIND"
     ],
     [
-     31,
-     "WINGATTACK"
+     22,
+     "TWISTER"
     ],
     [
-     40,
+     27,
+     "FEATHERDANCE"
+    ],
+    [
+     32,
      "AGILITY"
     ],
     [
-     49,
-     "MIRRORMOVE"
+     37,
+     "WINGATTACK"
+    ],
+    [
+     42,
+     "ROOST"
+    ],
+    [
+     47,
+     "TAILWIND"
+    ],
+    [
+     52,
+     "AERIALACE"
+    ],
+    [
+     57,
+     "AIRSLASH"
+    ],
+    [
+     62,
+     "HURRICANE"
     ]
    ],
    "num": 17,
@@ -38625,6 +38969,10 @@
     ],
     [
      1,
+     "HURRICANE"
+    ],
+    [
+     1,
      "QUICKATTACK"
     ],
     [
@@ -38632,20 +38980,44 @@
      "SANDATTACK"
     ],
     [
-     21,
+     1,
+     "TACKLE"
+    ],
+    [
+     17,
      "WHIRLWIND"
     ],
     [
-     31,
+     22,
+     "TWISTER"
+    ],
+    [
+     27,
+     "FEATHERDANCE"
+    ],
+    [
+     32,
+     "AGILITY"
+    ],
+    [
+     38,
      "WINGATTACK"
     ],
     [
      44,
-     "AGILITY"
+     "ROOST"
     ],
     [
-     54,
-     "MIRRORMOVE"
+     50,
+     "TAILWIND"
+    ],
+    [
+     56,
+     "AERIALACE"
+    ],
+    [
+     62,
+     "AIRSLASH"
     ]
    ],
    "num": 18,
@@ -38717,20 +39089,48 @@
      "TAILWHIP"
     ],
     [
-     7,
+     4,
      "QUICKATTACK"
     ],
     [
-     14,
-     "HYPERFANG"
-    ],
-    [
-     23,
+     7,
      "FOCUSENERGY"
     ],
     [
-     34,
+     10,
+     "BITE"
+    ],
+    [
+     13,
+     "LASERFOCUS"
+    ],
+    [
+     16,
+     "TAKEDOWN"
+    ],
+    [
+     19,
+     "ASSURANCE"
+    ],
+    [
+     22,
+     "CRUNCH"
+    ],
+    [
+     25,
+     "SUCKERPUNCH"
+    ],
+    [
+     28,
      "SUPERFANG"
+    ],
+    [
+     31,
+     "DOUBLEEDGE"
+    ],
+    [
+     34,
+     "ENDEAVOR"
     ]
    ],
    "num": 19,
@@ -38790,7 +39190,15 @@
     ],
     [
      1,
+     "FOCUSENERGY"
+    ],
+    [
+     1,
      "QUICKATTACK"
+    ],
+    [
+     1,
+     "SWORDSDANCE"
     ],
     [
      1,
@@ -38801,16 +39209,40 @@
      "TAILWHIP"
     ],
     [
-     14,
-     "HYPERFANG"
+     10,
+     "BITE"
     ],
     [
-     27,
-     "FOCUSENERGY"
+     13,
+     "LASERFOCUS"
     ],
     [
-     41,
+     16,
+     "TAKEDOWN"
+    ],
+    [
+     19,
+     "ASSURANCE"
+    ],
+    [
+     24,
+     "CRUNCH"
+    ],
+    [
+     29,
+     "SUCKERPUNCH"
+    ],
+    [
+     34,
      "SUPERFANG"
+    ],
+    [
+     39,
+     "DOUBLEEDGE"
+    ],
+    [
+     44,
+     "ENDEAVOR"
     ]
    ],
    "num": 20,
@@ -38880,24 +39312,44 @@
      "PECK"
     ],
     [
-     9,
+     4,
      "LEER"
     ],
     [
-     15,
+     8,
+     "ASSURANCE"
+    ],
+    [
+     11,
      "FURYATTACK"
     ],
     [
+     15,
+     "AERIALACE"
+    ],
+    [
+     18,
+     "WINGATTACK"
+    ],
+    [
      22,
-     "MIRRORMOVE"
+     "TAKEDOWN"
+    ],
+    [
+     25,
+     "AGILITY"
     ],
     [
      29,
-     "DRILLPECK"
+     "FOCUSENERGY"
+    ],
+    [
+     32,
+     "ROOST"
     ],
     [
      36,
-     "AGILITY"
+     "DRILLPECK"
     ]
    ],
    "num": 21,
@@ -38953,6 +39405,10 @@
    "moves": [
     [
      1,
+     "DRILLRUN"
+    ],
+    [
+     1,
      "GROWL"
     ],
     [
@@ -38964,20 +39420,44 @@
      "PECK"
     ],
     [
-     15,
+     1,
+     "PLUCK"
+    ],
+    [
+     8,
+     "ASSURANCE"
+    ],
+    [
+     11,
      "FURYATTACK"
     ],
     [
-     25,
-     "MIRRORMOVE"
+     15,
+     "AERIALACE"
     ],
     [
-     34,
-     "DRILLPECK"
+     18,
+     "WINGATTACK"
     ],
     [
-     43,
+     23,
+     "TAKEDOWN"
+    ],
+    [
+     27,
      "AGILITY"
+    ],
+    [
+     32,
+     "FOCUSENERGY"
+    ],
+    [
+     36,
+     "ROOST"
+    ],
+    [
+     41,
+     "DRILLPECK"
     ]
    ],
    "num": 22,
@@ -39050,24 +39530,64 @@
      "WRAP"
     ],
     [
-     10,
+     4,
      "POISONSTING"
     ],
     [
-     17,
+     9,
      "BITE"
     ],
     [
-     24,
+     12,
      "GLARE"
     ],
     [
-     31,
+     17,
      "SCREECH"
     ],
     [
-     38,
+     20,
      "ACID"
+    ],
+    [
+     25,
+     "SPITUP"
+    ],
+    [
+     25,
+     "STOCKPILE"
+    ],
+    [
+     25,
+     "SWALLOW"
+    ],
+    [
+     28,
+     "ACIDSPRAY"
+    ],
+    [
+     33,
+     "SLUDGEBOMB"
+    ],
+    [
+     36,
+     "GASTROACID"
+    ],
+    [
+     38,
+     "BELCH"
+    ],
+    [
+     41,
+     "HAZE"
+    ],
+    [
+     44,
+     "COIL"
+    ],
+    [
+     49,
+     "GUNKSHOT"
     ]
    ],
    "num": 23,
@@ -39128,6 +39648,18 @@
     ],
     [
      1,
+     "BITE"
+    ],
+    [
+     1,
+     "FIREFANG"
+    ],
+    [
+     1,
+     "ICEFANG"
+    ],
+    [
+     1,
      "LEER"
     ],
     [
@@ -39136,23 +39668,63 @@
     ],
     [
      1,
+     "THUNDERFANG"
+    ],
+    [
+     1,
      "WRAP"
     ],
     [
-     17,
-     "BITE"
-    ],
-    [
-     27,
+     12,
      "GLARE"
     ],
     [
-     36,
+     17,
      "SCREECH"
     ],
     [
-     47,
+     20,
      "ACID"
+    ],
+    [
+     27,
+     "SPITUP"
+    ],
+    [
+     27,
+     "STOCKPILE"
+    ],
+    [
+     27,
+     "SWALLOW"
+    ],
+    [
+     32,
+     "ACIDSPRAY"
+    ],
+    [
+     39,
+     "SLUDGEBOMB"
+    ],
+    [
+     44,
+     "GASTROACID"
+    ],
+    [
+     48,
+     "BELCH"
+    ],
+    [
+     51,
+     "HAZE"
+    ],
+    [
+     56,
+     "COIL"
+    ],
+    [
+     63,
+     "GUNKSHOT"
     ]
    ],
    "num": 24,
@@ -39216,30 +39788,82 @@
    "moves": [
     [
      1,
+     "CHARM"
+    ],
+    [
+     1,
      "GROWL"
+    ],
+    [
+     1,
+     "NASTYPLOT"
+    ],
+    [
+     1,
+     "NUZZLE"
+    ],
+    [
+     1,
+     "PLAYNICE"
+    ],
+    [
+     1,
+     "QUICKATTACK"
+    ],
+    [
+     1,
+     "SWEETKISS"
+    ],
+    [
+     1,
+     "TAILWHIP"
     ],
     [
      1,
      "THUNDERSHOCK"
     ],
     [
-     9,
+     4,
      "THUNDERWAVE"
     ],
     [
+     8,
+     "DOUBLETEAM"
+    ],
+    [
+     12,
+     "ELECTROBALL"
+    ],
+    [
      16,
-     "QUICKATTACK"
+     "FEINT"
     ],
     [
-     26,
-     "SWIFT"
+     20,
+     "SPARK"
     ],
     [
-     33,
+     24,
      "AGILITY"
     ],
     [
-     43,
+     28,
+     "IRONTAIL"
+    ],
+    [
+     32,
+     "DISCHARGE"
+    ],
+    [
+     36,
+     "THUNDERBOLT"
+    ],
+    [
+     40,
+     "LIGHTSCREEN"
+    ],
+    [
+     44,
      "THUNDER"
     ]
    ],
@@ -39300,7 +39924,71 @@
     ],
     [
      1,
+     "AGILITY"
+    ],
+    [
+     1,
+     "CHARM"
+    ],
+    [
+     1,
+     "DISCHARGE"
+    ],
+    [
+     1,
+     "DOUBLETEAM"
+    ],
+    [
+     1,
+     "ELECTROBALL"
+    ],
+    [
+     1,
+     "FEINT"
+    ],
+    [
+     1,
      "GROWL"
+    ],
+    [
+     1,
+     "IRONTAIL"
+    ],
+    [
+     1,
+     "LIGHTSCREEN"
+    ],
+    [
+     1,
+     "NASTYPLOT"
+    ],
+    [
+     1,
+     "NUZZLE"
+    ],
+    [
+     1,
+     "PLAYNICE"
+    ],
+    [
+     1,
+     "QUICKATTACK"
+    ],
+    [
+     1,
+     "SPARK"
+    ],
+    [
+     1,
+     "SWEETKISS"
+    ],
+    [
+     1,
+     "TAILWHIP"
+    ],
+    [
+     1,
+     "THUNDER"
     ],
     [
      1,
@@ -39309,6 +39997,10 @@
     [
      1,
      "THUNDERWAVE"
+    ],
+    [
+     5,
+     "THUNDERBOLT"
     ]
    ],
    "num": 26,
@@ -39371,27 +40063,71 @@
    "moves": [
     [
      1,
+     "DEFENSECURL"
+    ],
+    [
+     1,
      "SCRATCH"
     ],
     [
-     10,
-     "SANDATTACK"
-    ],
-    [
-     17,
-     "SLASH"
-    ],
-    [
-     24,
+     3,
      "POISONSTING"
     ],
     [
-     31,
+     6,
+     "SANDATTACK"
+    ],
+    [
+     9,
+     "ROLLOUT"
+    ],
+    [
+     12,
+     "FURYCUTTER"
+    ],
+    [
+     15,
+     "RAPIDSPIN"
+    ],
+    [
+     18,
+     "BULLDOZE"
+    ],
+    [
+     21,
      "SWIFT"
     ],
     [
-     38,
+     24,
      "FURYSWIPES"
+    ],
+    [
+     27,
+     "AGILITY"
+    ],
+    [
+     30,
+     "SLASH"
+    ],
+    [
+     33,
+     "DIG"
+    ],
+    [
+     36,
+     "GYROBALL"
+    ],
+    [
+     39,
+     "SWORDSDANCE"
+    ],
+    [
+     42,
+     "SANDSTORM"
+    ],
+    [
+     45,
+     "EARTHQUAKE"
     ]
    ],
    "num": 27,
@@ -39450,6 +40186,14 @@
     ],
     [
      1,
+     "DEFENSECURL"
+    ],
+    [
+     1,
+     "POISONSTING"
+    ],
+    [
+     1,
      "SANDATTACK"
     ],
     [
@@ -39457,20 +40201,56 @@
      "SCRATCH"
     ],
     [
-     17,
-     "SLASH"
+     9,
+     "ROLLOUT"
     ],
     [
-     27,
-     "POISONSTING"
+     12,
+     "FURYCUTTER"
     ],
     [
-     36,
+     15,
+     "RAPIDSPIN"
+    ],
+    [
+     18,
+     "BULLDOZE"
+    ],
+    [
+     21,
      "SWIFT"
     ],
     [
-     47,
+     26,
      "FURYSWIPES"
+    ],
+    [
+     31,
+     "SANDTOMB"
+    ],
+    [
+     36,
+     "SLASH"
+    ],
+    [
+     41,
+     "DIG"
+    ],
+    [
+     46,
+     "GYROBALL"
+    ],
+    [
+     51,
+     "SWORDSDANCE"
+    ],
+    [
+     56,
+     "SANDSTORM"
+    ],
+    [
+     61,
+     "EARTHQUAKE"
     ]
    ],
    "num": 28,
@@ -39539,31 +40319,51 @@
     ],
     [
      1,
-     "TACKLE"
-    ],
-    [
-     8,
-     "SCRATCH"
-    ],
-    [
-     14,
      "POISONSTING"
     ],
     [
-     21,
+     5,
+     "SCRATCH"
+    ],
+    [
+     10,
      "TAILWHIP"
     ],
     [
-     29,
-     "BITE"
-    ],
-    [
-     36,
+     15,
      "FURYSWIPES"
     ],
     [
-     43,
+     20,
+     "TOXICSPIKES"
+    ],
+    [
+     25,
      "DOUBLEKICK"
+    ],
+    [
+     30,
+     "BITE"
+    ],
+    [
+     35,
+     "HELPINGHAND"
+    ],
+    [
+     40,
+     "TOXIC"
+    ],
+    [
+     45,
+     "FLATTER"
+    ],
+    [
+     50,
+     "CRUNCH"
+    ],
+    [
+     55,
+     "EARTHPOWER"
     ]
    ],
    "num": 29,
@@ -39631,31 +40431,51 @@
     ],
     [
      1,
+     "POISONSTING"
+    ],
+    [
+     1,
      "SCRATCH"
     ],
     [
      1,
-     "TACKLE"
-    ],
-    [
-     14,
-     "POISONSTING"
-    ],
-    [
-     23,
      "TAILWHIP"
     ],
     [
-     32,
-     "BITE"
-    ],
-    [
-     41,
+     15,
      "FURYSWIPES"
     ],
     [
-     50,
+     22,
+     "TOXICSPIKES"
+    ],
+    [
+     29,
      "DOUBLEKICK"
+    ],
+    [
+     36,
+     "BITE"
+    ],
+    [
+     43,
+     "HELPINGHAND"
+    ],
+    [
+     50,
+     "TOXIC"
+    ],
+    [
+     57,
+     "FLATTER"
+    ],
+    [
+     64,
+     "CRUNCH"
+    ],
+    [
+     71,
+     "EARTHPOWER"
     ]
    ],
    "num": 30,
@@ -39715,7 +40535,39 @@
     ],
     [
      1,
-     "BODYSLAM"
+     "BITE"
+    ],
+    [
+     1,
+     "CRUNCH"
+    ],
+    [
+     1,
+     "DOUBLEKICK"
+    ],
+    [
+     1,
+     "EARTHPOWER"
+    ],
+    [
+     1,
+     "FLATTER"
+    ],
+    [
+     1,
+     "FURYSWIPES"
+    ],
+    [
+     1,
+     "GROWL"
+    ],
+    [
+     1,
+     "HELPINGHAND"
+    ],
+    [
+     1,
+     "POISONSTING"
     ],
     [
      1,
@@ -39723,15 +40575,19 @@
     ],
     [
      1,
-     "TACKLE"
+     "SLUDGEWAVE"
     ],
     [
      1,
      "TAILWHIP"
     ],
     [
-     14,
-     "POISONSTING"
+     1,
+     "TOXIC"
+    ],
+    [
+     1,
+     "TOXICSPIKES"
     ]
    ],
    "num": 31,
@@ -39801,31 +40657,51 @@
     ],
     [
      1,
-     "TACKLE"
-    ],
-    [
-     8,
-     "HORNATTACK"
-    ],
-    [
-     14,
      "POISONSTING"
     ],
     [
-     21,
+     5,
+     "PECK"
+    ],
+    [
+     10,
      "FOCUSENERGY"
     ],
     [
-     29,
+     15,
      "FURYATTACK"
     ],
     [
-     36,
-     "HORNDRILL"
+     20,
+     "TOXICSPIKES"
     ],
     [
-     43,
+     25,
      "DOUBLEKICK"
+    ],
+    [
+     30,
+     "HORNATTACK"
+    ],
+    [
+     35,
+     "HELPINGHAND"
+    ],
+    [
+     40,
+     "TOXIC"
+    ],
+    [
+     45,
+     "FLATTER"
+    ],
+    [
+     50,
+     "POISONJAB"
+    ],
+    [
+     55,
+     "EARTHPOWER"
     ]
    ],
    "num": 32,
@@ -39890,7 +40766,7 @@
    "moves": [
     [
      1,
-     "HORNATTACK"
+     "FOCUSENERGY"
     ],
     [
      1,
@@ -39898,27 +40774,47 @@
     ],
     [
      1,
-     "TACKLE"
+     "PECK"
     ],
     [
-     14,
+     1,
      "POISONSTING"
     ],
     [
-     23,
-     "FOCUSENERGY"
-    ],
-    [
-     32,
+     15,
      "FURYATTACK"
     ],
     [
-     41,
-     "HORNDRILL"
+     22,
+     "TOXICSPIKES"
+    ],
+    [
+     29,
+     "DOUBLEKICK"
+    ],
+    [
+     36,
+     "HORNATTACK"
+    ],
+    [
+     43,
+     "HELPINGHAND"
     ],
     [
      50,
-     "DOUBLEKICK"
+     "TOXIC"
+    ],
+    [
+     57,
+     "FLATTER"
+    ],
+    [
+     64,
+     "POISONJAB"
+    ],
+    [
+     71,
+     "EARTHPOWER"
     ]
    ],
    "num": 33,
@@ -39979,7 +40875,43 @@
     ],
     [
      1,
+     "DOUBLEKICK"
+    ],
+    [
+     1,
+     "EARTHPOWER"
+    ],
+    [
+     1,
+     "FLATTER"
+    ],
+    [
+     1,
+     "FOCUSENERGY"
+    ],
+    [
+     1,
+     "FURYATTACK"
+    ],
+    [
+     1,
+     "HELPINGHAND"
+    ],
+    [
+     1,
      "HORNATTACK"
+    ],
+    [
+     1,
+     "LEER"
+    ],
+    [
+     1,
+     "PECK"
+    ],
+    [
+     1,
+     "POISONJAB"
     ],
     [
      1,
@@ -39987,11 +40919,15 @@
     ],
     [
      1,
-     "TACKLE"
+     "SLUDGEWAVE"
     ],
     [
      1,
-     "THRASH"
+     "TOXIC"
+    ],
+    [
+     1,
+     "TOXICSPIKES"
     ]
    ],
    "num": 34,
@@ -40056,6 +40992,22 @@
    "moves": [
     [
      1,
+     "CHARM"
+    ],
+    [
+     1,
+     "COPYCAT"
+    ],
+    [
+     1,
+     "DEFENSECURL"
+    ],
+    [
+     1,
+     "DISARMINGVOICE"
+    ],
+    [
+     1,
      "GROWL"
     ],
     [
@@ -40063,28 +41015,64 @@
      "POUND"
     ],
     [
-     13,
+     1,
      "SING"
     ],
     [
-     18,
-     "DOUBLESLAP"
+     1,
+     "SPLASH"
     ],
     [
-     24,
-     "MINIMIZE"
+     1,
+     "SWEETKISS"
     ],
     [
-     31,
+     4,
+     "STOREDPOWER"
+    ],
+    [
+     8,
+     "ENCORE"
+    ],
+    [
+     12,
+     "AFTERYOU"
+    ],
+    [
+     16,
+     "LIFEDEW"
+    ],
+    [
+     20,
      "METRONOME"
     ],
     [
-     39,
-     "DEFENSECURL"
+     24,
+     "MOONLIGHT"
+    ],
+    [
+     28,
+     "GRAVITY"
+    ],
+    [
+     32,
+     "METEORMASH"
+    ],
+    [
+     36,
+     "FOLLOWME"
+    ],
+    [
+     40,
+     "COSMICPOWER"
+    ],
+    [
+     44,
+     "MOONBLAST"
     ],
     [
      48,
-     "LIGHTSCREEN"
+     "HEALINGWISH"
     ]
    ],
    "num": 35,
@@ -40144,15 +41132,15 @@
     ],
     [
      1,
-     "DOUBLESLAP"
+     "LIFEDEW"
     ],
     [
      1,
-     "MINIMIZE"
+     "METEORMASH"
     ],
     [
      1,
-     "SING"
+     "MOONBLAST"
     ]
    ],
    "num": 36,
@@ -40222,24 +41210,56 @@
      "TAILWHIP"
     ],
     [
-     16,
+     4,
+     "DISABLE"
+    ],
+    [
+     8,
      "QUICKATTACK"
     ],
     [
-     21,
-     "ROAR"
+     12,
+     "SPITE"
     ],
     [
-     28,
+     16,
+     "INCINERATE"
+    ],
+    [
+     20,
      "CONFUSERAY"
     ],
     [
-     35,
+     24,
+     "WILLOWISP"
+    ],
+    [
+     28,
+     "EXTRASENSORY"
+    ],
+    [
+     32,
      "FLAMETHROWER"
     ],
     [
-     42,
+     36,
+     "IMPRISON"
+    ],
+    [
+     40,
      "FIRESPIN"
+    ],
+    [
+     44,
+     "SAFEGUARD"
+    ],
+    [
+     48,
+     "INFERNO"
+    ],
+    [
+     52,
+     "FIREBLAST"
     ]
    ],
    "num": 37,
@@ -40294,15 +41314,11 @@
    "moves": [
     [
      1,
-     "EMBER"
+     "FLAMETHROWER"
     ],
     [
      1,
      "QUICKATTACK"
-    ],
-    [
-     1,
-     "ROAR"
     ],
     [
      1,
@@ -40370,34 +41386,82 @@
    "moves": [
     [
      1,
-     "SING"
+     "CHARM"
     ],
     [
-     9,
-     "POUND"
+     1,
+     "COPYCAT"
     ],
     [
-     14,
-     "DISABLE"
-    ],
-    [
-     19,
+     1,
      "DEFENSECURL"
     ],
     [
-     24,
-     "DOUBLESLAP"
+     1,
+     "DISABLE"
     ],
     [
-     29,
+     1,
+     "DISARMINGVOICE"
+    ],
+    [
+     1,
+     "POUND"
+    ],
+    [
+     1,
+     "SING"
+    ],
+    [
+     1,
+     "SWEETKISS"
+    ],
+    [
+     4,
+     "ECHOEDVOICE"
+    ],
+    [
+     8,
+     "COVET"
+    ],
+    [
+     12,
+     "SPITUP"
+    ],
+    [
+     12,
+     "STOCKPILE"
+    ],
+    [
+     12,
+     "SWALLOW"
+    ],
+    [
+     16,
+     "ROUND"
+    ],
+    [
+     20,
      "REST"
     ],
     [
-     34,
+     24,
      "BODYSLAM"
     ],
     [
-     39,
+     28,
+     "MIMIC"
+    ],
+    [
+     32,
+     "GYROBALL"
+    ],
+    [
+     36,
+     "HYPERVOICE"
+    ],
+    [
+     44,
      "DOUBLEEDGE"
     ]
    ],
@@ -40455,6 +41519,22 @@
    "moves": [
     [
      1,
+     "BODYSLAM"
+    ],
+    [
+     1,
+     "CHARM"
+    ],
+    [
+     1,
+     "COPYCAT"
+    ],
+    [
+     1,
+     "COVET"
+    ],
+    [
+     1,
      "DEFENSECURL"
     ],
     [
@@ -40463,11 +41543,63 @@
     ],
     [
      1,
-     "DOUBLESLAP"
+     "DISARMINGVOICE"
+    ],
+    [
+     1,
+     "DOUBLEEDGE"
+    ],
+    [
+     1,
+     "ECHOEDVOICE"
+    ],
+    [
+     1,
+     "GYROBALL"
+    ],
+    [
+     1,
+     "HYPERVOICE"
+    ],
+    [
+     1,
+     "MIMIC"
+    ],
+    [
+     1,
+     "POUND"
+    ],
+    [
+     1,
+     "REST"
+    ],
+    [
+     1,
+     "ROUND"
     ],
     [
      1,
      "SING"
+    ],
+    [
+     1,
+     "SPITUP"
+    ],
+    [
+     1,
+     "STOCKPILE"
+    ],
+    [
+     1,
+     "SWALLOW"
+    ],
+    [
+     1,
+     "SWEETKISS"
+    ],
+    [
+     5,
+     "PLAYROUGH"
     ]
    ],
    "num": 40,
@@ -40531,27 +41663,31 @@
    "moves": [
     [
      1,
-     "LEECHLIFE"
+     "GUST"
     ],
     [
-     10,
-     "SUPERSONIC"
+     6,
+     "HYPNOSIS"
     ],
     [
-     15,
+     11,
      "BITE"
     ],
     [
-     21,
-     "CONFUSERAY"
+     18,
+     "AIRCUTTER"
     ],
     [
-     28,
-     "WINGATTACK"
+     25,
+     "CROSSPOISON"
     ],
     [
-     36,
-     "HAZE"
+     34,
+     "AIRSLASH"
+    ],
+    [
+     43,
+     "LEECHLIFE"
     ]
    ],
    "num": 41,
@@ -40619,31 +41755,31 @@
     ],
     [
      1,
+     "GUST"
+    ],
+    [
+     6,
+     "HYPNOSIS"
+    ],
+    [
+     11,
      "BITE"
     ],
     [
-     1,
-     "LEECHLIFE"
+     18,
+     "AIRCUTTER"
     ],
     [
-     1,
-     "SCREECH"
+     25,
+     "CROSSPOISON"
     ],
     [
-     10,
-     "SUPERSONIC"
-    ],
-    [
-     21,
-     "CONFUSERAY"
-    ],
-    [
-     32,
-     "WINGATTACK"
+     34,
+     "AIRSLASH"
     ],
     [
      43,
-     "HAZE"
+     "LEECHLIFE"
     ]
    ],
    "num": 42,
@@ -40710,28 +41846,56 @@
      "ABSORB"
     ],
     [
-     15,
-     "POISONPOWDER"
+     1,
+     "GROWTH"
     ],
     [
-     17,
-     "STUNSPORE"
-    ],
-    [
-     19,
-     "SLEEPPOWDER"
-    ],
-    [
-     24,
+     4,
      "ACID"
     ],
     [
-     33,
-     "PETALDANCE"
+     8,
+     "SWEETSCENT"
     ],
     [
-     46,
-     "SOLARBEAM"
+     12,
+     "MEGADRAIN"
+    ],
+    [
+     14,
+     "POISONPOWDER"
+    ],
+    [
+     16,
+     "STUNSPORE"
+    ],
+    [
+     18,
+     "SLEEPPOWDER"
+    ],
+    [
+     20,
+     "GIGADRAIN"
+    ],
+    [
+     24,
+     "TOXIC"
+    ],
+    [
+     28,
+     "MOONBLAST"
+    ],
+    [
+     32,
+     "GRASSYTERRAIN"
+    ],
+    [
+     36,
+     "MOONLIGHT"
+    ],
+    [
+     40,
+     "PETALDANCE"
     ]
    ],
    "num": 43,
@@ -40806,27 +41970,55 @@
     ],
     [
      1,
-     "POISONPOWDER"
-    ],
-    [
-     1,
-     "STUNSPORE"
-    ],
-    [
-     19,
-     "SLEEPPOWDER"
-    ],
-    [
-     28,
      "ACID"
     ],
     [
-     38,
-     "PETALDANCE"
+     1,
+     "GROWTH"
     ],
     [
-     52,
-     "SOLARBEAM"
+     1,
+     "SWEETSCENT"
+    ],
+    [
+     12,
+     "MEGADRAIN"
+    ],
+    [
+     14,
+     "POISONPOWDER"
+    ],
+    [
+     16,
+     "STUNSPORE"
+    ],
+    [
+     18,
+     "SLEEPPOWDER"
+    ],
+    [
+     20,
+     "GIGADRAIN"
+    ],
+    [
+     26,
+     "TOXIC"
+    ],
+    [
+     32,
+     "MOONBLAST"
+    ],
+    [
+     38,
+     "GRASSYTERRAIN"
+    ],
+    [
+     44,
+     "MOONLIGHT"
+    ],
+    [
+     50,
+     "PETALDANCE"
     ]
    ],
    "num": 44,
@@ -40886,11 +42078,43 @@
     ],
     [
      1,
+     "ABSORB"
+    ],
+    [
+     1,
      "ACID"
     ],
     [
      1,
+     "GIGADRAIN"
+    ],
+    [
+     1,
+     "GRASSYTERRAIN"
+    ],
+    [
+     1,
+     "GROWTH"
+    ],
+    [
+     1,
+     "MEGADRAIN"
+    ],
+    [
+     1,
+     "MOONBLAST"
+    ],
+    [
+     1,
+     "MOONLIGHT"
+    ],
+    [
+     1,
      "PETALDANCE"
+    ],
+    [
+     1,
+     "POISONPOWDER"
     ],
     [
      1,
@@ -40901,8 +42125,12 @@
      "STUNSPORE"
     ],
     [
-     15,
-     "POISONPOWDER"
+     1,
+     "SWEETSCENT"
+    ],
+    [
+     1,
+     "TOXIC"
     ]
    ],
    "num": 45,
@@ -40968,27 +42196,35 @@
    "moves": [
     [
      1,
-     "SCRATCH"
+     "ABSORB"
     ],
     [
-     13,
+     5,
      "STUNSPORE"
     ],
     [
-     20,
-     "LEECHLIFE"
+     9,
+     "POISONPOWDER"
     ],
     [
-     27,
-     "SPORE"
+     15,
+     "VENOSHOCK"
     ],
     [
-     34,
+     21,
      "SLASH"
     ],
     [
-     41,
-     "GROWTH"
+     29,
+     "SPORE"
+    ],
+    [
+     37,
+     "XSCISSOR"
+    ],
+    [
+     47,
+     "ENERGYBALL"
     ]
    ],
    "num": 46,
@@ -41046,27 +42282,35 @@
    "moves": [
     [
      1,
-     "LEECHLIFE"
+     "ABSORB"
     ],
     [
-     1,
-     "SCRATCH"
-    ],
-    [
-     1,
+     5,
      "STUNSPORE"
     ],
     [
-     30,
-     "SPORE"
+     9,
+     "POISONPOWDER"
     ],
     [
-     39,
+     15,
+     "VENOSHOCK"
+    ],
+    [
+     21,
      "SLASH"
     ],
     [
-     48,
-     "GROWTH"
+     29,
+     "SPORE"
+    ],
+    [
+     37,
+     "XSCISSOR"
+    ],
+    [
+     47,
+     "ENERGYBALL"
     ]
    ],
    "num": 47,
@@ -41138,27 +42382,47 @@
      "TACKLE"
     ],
     [
-     24,
+     5,
+     "SUPERSONIC"
+    ],
+    [
+     11,
+     "CONFUSION"
+    ],
+    [
+     13,
      "POISONPOWDER"
     ],
     [
-     27,
-     "LEECHLIFE"
-    ],
-    [
-     30,
-     "STUNSPORE"
-    ],
-    [
-     35,
+     17,
      "PSYBEAM"
     ],
     [
-     38,
+     23,
+     "STUNSPORE"
+    ],
+    [
+     25,
+     "BUGBUZZ"
+    ],
+    [
+     29,
      "SLEEPPOWDER"
     ],
     [
-     43,
+     35,
+     "LEECHLIFE"
+    ],
+    [
+     37,
+     "ZENHEADBUTT"
+    ],
+    [
+     41,
+     "POISONFANG"
+    ],
+    [
+     47,
      "PSYCHIC"
     ]
    ],
@@ -41224,30 +42488,54 @@
     ],
     [
      1,
-     "LEECHLIFE"
+     "QUIVERDANCE"
     ],
     [
      1,
-     "POISONPOWDER"
+     "SUPERSONIC"
     ],
     [
      1,
      "TACKLE"
     ],
     [
-     30,
-     "STUNSPORE"
+     11,
+     "CONFUSION"
     ],
     [
-     38,
+     13,
+     "POISONPOWDER"
+    ],
+    [
+     17,
      "PSYBEAM"
     ],
     [
-     43,
+     23,
+     "STUNSPORE"
+    ],
+    [
+     25,
+     "BUGBUZZ"
+    ],
+    [
+     29,
      "SLEEPPOWDER"
     ],
     [
-     50,
+     37,
+     "LEECHLIFE"
+    ],
+    [
+     41,
+     "ZENHEADBUTT"
+    ],
+    [
+     47,
+     "POISONFANG"
+    ],
+    [
+     55,
      "PSYCHIC"
     ]
    ],
@@ -41313,27 +42601,55 @@
    "moves": [
     [
      1,
-     "SCRATCH"
-    ],
-    [
-     15,
-     "GROWL"
-    ],
-    [
-     19,
-     "DIG"
-    ],
-    [
-     24,
      "SANDATTACK"
     ],
     [
-     31,
+     1,
+     "SCRATCH"
+    ],
+    [
+     4,
+     "GROWL"
+    ],
+    [
+     8,
+     "ASTONISH"
+    ],
+    [
+     12,
+     "MUDSLAP"
+    ],
+    [
+     16,
+     "BULLDOZE"
+    ],
+    [
+     20,
+     "SUCKERPUNCH"
+    ],
+    [
+     24,
      "SLASH"
+    ],
+    [
+     28,
+     "SANDSTORM"
+    ],
+    [
+     32,
+     "DIG"
+    ],
+    [
+     36,
+     "EARTHPOWER"
     ],
     [
      40,
      "EARTHQUAKE"
+    ],
+    [
+     44,
+     "FISSURE"
     ]
    ],
    "num": 50,
@@ -41393,7 +42709,7 @@
     ],
     [
      1,
-     "DIG"
+     "ASTONISH"
     ],
     [
      1,
@@ -41401,19 +42717,55 @@
     ],
     [
      1,
-     "SCRATCH"
+     "NIGHTSLASH"
     ],
     [
-     24,
+     1,
      "SANDATTACK"
     ],
     [
-     35,
+     1,
+     "SCRATCH"
+    ],
+    [
+     1,
+     "TRIATTACK"
+    ],
+    [
+     12,
+     "MUDSLAP"
+    ],
+    [
+     16,
+     "BULLDOZE"
+    ],
+    [
+     20,
+     "SUCKERPUNCH"
+    ],
+    [
+     24,
      "SLASH"
     ],
     [
-     47,
+     30,
+     "SANDSTORM"
+    ],
+    [
+     36,
+     "DIG"
+    ],
+    [
+     42,
+     "EARTHPOWER"
+    ],
+    [
+     48,
      "EARTHQUAKE"
+    ],
+    [
+     54,
+     "FISSURE"
     ]
    ],
    "num": 51,
@@ -41477,31 +42829,55 @@
    "moves": [
     [
      1,
-     "GROWL"
+     "FAKEOUT"
     ],
     [
      1,
+     "GROWL"
+    ],
+    [
+     4,
+     "FEINT"
+    ],
+    [
+     8,
      "SCRATCH"
     ],
     [
      12,
-     "BITE"
-    ],
-    [
-     17,
      "PAYDAY"
     ],
     [
-     24,
-     "SCREECH"
+     16,
+     "BITE"
     ],
     [
-     33,
+     20,
+     "TAUNT"
+    ],
+    [
+     24,
+     "ASSURANCE"
+    ],
+    [
+     29,
      "FURYSWIPES"
     ],
     [
-     44,
+     32,
+     "SCREECH"
+    ],
+    [
+     36,
      "SLASH"
+    ],
+    [
+     40,
+     "NASTYPLOT"
+    ],
+    [
+     44,
+     "PLAYROUGH"
     ]
    ],
    "num": 52,
@@ -41561,7 +42937,11 @@
     ],
     [
      1,
-     "BITE"
+     "FAKEOUT"
+    ],
+    [
+     1,
+     "FEINT"
     ],
     [
      1,
@@ -41573,19 +42953,43 @@
     ],
     [
      1,
-     "SCREECH"
+     "SWITCHEROO"
     ],
     [
-     17,
+     12,
      "PAYDAY"
     ],
     [
-     37,
+     16,
+     "BITE"
+    ],
+    [
+     20,
+     "TAUNT"
+    ],
+    [
+     24,
+     "ASSURANCE"
+    ],
+    [
+     31,
      "FURYSWIPES"
     ],
     [
-     51,
+     36,
+     "SCREECH"
+    ],
+    [
+     42,
      "SLASH"
+    ],
+    [
+     48,
+     "NASTYPLOT"
+    ],
+    [
+     54,
+     "PLAYROUGH"
     ]
    ],
    "num": 53,
@@ -41653,24 +43057,56 @@
      "SCRATCH"
     ],
     [
-     28,
+     1,
      "TAILWHIP"
     ],
     [
-     31,
-     "DISABLE"
+     3,
+     "WATERGUN"
     ],
     [
-     36,
+     6,
      "CONFUSION"
     ],
     [
-     43,
+     9,
      "FURYSWIPES"
     ],
     [
-     52,
-     "HYDROPUMP"
+     12,
+     "WATERPULSE"
+    ],
+    [
+     15,
+     "DISABLE"
+    ],
+    [
+     18,
+     "ZENHEADBUTT"
+    ],
+    [
+     21,
+     "SCREECH"
+    ],
+    [
+     24,
+     "AQUATAIL"
+    ],
+    [
+     27,
+     "SOAK"
+    ],
+    [
+     30,
+     "PSYCHUP"
+    ],
+    [
+     34,
+     "AMNESIA"
+    ],
+    [
+     39,
+     "WONDERROOM"
     ]
    ],
    "num": 54,
@@ -41727,7 +43163,11 @@
    "moves": [
     [
      1,
-     "DISABLE"
+     "AQUAJET"
+    ],
+    [
+     1,
+     "CONFUSION"
     ],
     [
      1,
@@ -41738,16 +43178,52 @@
      "TAILWHIP"
     ],
     [
-     39,
-     "CONFUSION"
+     1,
+     "WATERGUN"
     ],
     [
-     48,
+     9,
      "FURYSWIPES"
     ],
     [
-     59,
+     12,
+     "WATERPULSE"
+    ],
+    [
+     15,
+     "DISABLE"
+    ],
+    [
+     18,
+     "ZENHEADBUTT"
+    ],
+    [
+     21,
+     "SCREECH"
+    ],
+    [
+     24,
+     "AQUATAIL"
+    ],
+    [
+     27,
+     "SOAK"
+    ],
+    [
+     30,
+     "PSYCHUP"
+    ],
+    [
+     36,
+     "AMNESIA"
+    ],
+    [
+     40,
      "HYDROPUMP"
+    ],
+    [
+     45,
+     "WONDERROOM"
     ]
    ],
    "num": 55,
@@ -41811,6 +43287,14 @@
    "moves": [
     [
      1,
+     "COVET"
+    ],
+    [
+     1,
+     "FOCUSENERGY"
+    ],
+    [
+     1,
      "LEER"
     ],
     [
@@ -41818,24 +43302,52 @@
      "SCRATCH"
     ],
     [
-     15,
-     "KARATECHOP"
-    ],
-    [
-     21,
+     5,
      "FURYSWIPES"
     ],
     [
-     27,
-     "FOCUSENERGY"
+     8,
+     "LOWKICK"
     ],
     [
-     33,
+     12,
      "SEISMICTOSS"
     ],
     [
-     39,
+     17,
+     "SWAGGER"
+    ],
+    [
+     22,
+     "CROSSCHOP"
+    ],
+    [
+     26,
+     "ASSURANCE"
+    ],
+    [
+     29,
      "THRASH"
+    ],
+    [
+     33,
+     "CLOSECOMBAT"
+    ],
+    [
+     36,
+     "SCREECH"
+    ],
+    [
+     40,
+     "STOMPINGTANTRUM"
+    ],
+    [
+     44,
+     "OUTRAGE"
+    ],
+    [
+     48,
+     "FINALGAMBIT"
     ]
    ],
    "num": 56,
@@ -41904,11 +43416,11 @@
     ],
     [
      1,
-     "FURYSWIPES"
+     "FLING"
     ],
     [
      1,
-     "KARATECHOP"
+     "FOCUSENERGY"
     ],
     [
      1,
@@ -41919,16 +43431,56 @@
      "SCRATCH"
     ],
     [
-     27,
-     "FOCUSENERGY"
+     5,
+     "FURYSWIPES"
     ],
     [
-     37,
+     8,
+     "LOWKICK"
+    ],
+    [
+     15,
      "SEISMICTOSS"
     ],
     [
-     46,
+     17,
+     "SWAGGER"
+    ],
+    [
+     22,
+     "CROSSCHOP"
+    ],
+    [
+     26,
+     "ASSURANCE"
+    ],
+    [
+     30,
      "THRASH"
+    ],
+    [
+     35,
+     "RAGEFIST"
+    ],
+    [
+     39,
+     "CLOSECOMBAT"
+    ],
+    [
+     44,
+     "SCREECH"
+    ],
+    [
+     48,
+     "STOMPINGTANTRUM"
+    ],
+    [
+     53,
+     "OUTRAGE"
+    ],
+    [
+     57,
+     "FINALGAMBIT"
     ]
    ],
    "num": 57,
@@ -41992,31 +43544,67 @@
    "moves": [
     [
      1,
-     "BITE"
-    ],
-    [
-     1,
-     "ROAR"
-    ],
-    [
-     18,
      "EMBER"
     ],
     [
-     23,
+     1,
      "LEER"
     ],
     [
-     30,
-     "TAKEDOWN"
+     4,
+     "HOWL"
     ],
     [
-     39,
+     8,
+     "BITE"
+    ],
+    [
+     12,
+     "FLAMEWHEEL"
+    ],
+    [
+     16,
+     "HELPINGHAND"
+    ],
+    [
+     20,
      "AGILITY"
     ],
     [
-     50,
+     24,
+     "FIREFANG"
+    ],
+    [
+     28,
+     "RETALIATE"
+    ],
+    [
+     32,
+     "CRUNCH"
+    ],
+    [
+     36,
+     "TAKEDOWN"
+    ],
+    [
+     40,
      "FLAMETHROWER"
+    ],
+    [
+     44,
+     "ROAR"
+    ],
+    [
+     48,
+     "PLAYROUGH"
+    ],
+    [
+     52,
+     "REVERSAL"
+    ],
+    [
+     56,
+     "FLAREBLITZ"
     ]
    ],
    "num": 58,
@@ -42076,11 +43664,55 @@
     ],
     [
      1,
+     "AGILITY"
+    ],
+    [
+     1,
+     "BITE"
+    ],
+    [
+     1,
+     "CRUNCH"
+    ],
+    [
+     1,
      "EMBER"
     ],
     [
      1,
+     "FIREFANG"
+    ],
+    [
+     1,
+     "FLAMEWHEEL"
+    ],
+    [
+     1,
+     "FLAREBLITZ"
+    ],
+    [
+     1,
+     "HELPINGHAND"
+    ],
+    [
+     1,
+     "HOWL"
+    ],
+    [
+     1,
      "LEER"
+    ],
+    [
+     1,
+     "PLAYROUGH"
+    ],
+    [
+     1,
+     "RETALIATE"
+    ],
+    [
+     1,
+     "REVERSAL"
     ],
     [
      1,
@@ -42089,6 +43721,10 @@
     [
      1,
      "TAKEDOWN"
+    ],
+    [
+     5,
+     "FLAMETHROWER"
     ]
    ],
    "num": 59,
@@ -42152,31 +43788,47 @@
    "moves": [
     [
      1,
-     "BUBBLE"
-    ],
-    [
-     16,
      "HYPNOSIS"
     ],
     [
-     19,
+     1,
      "WATERGUN"
     ],
     [
-     25,
-     "DOUBLESLAP"
+     6,
+     "POUND"
     ],
     [
-     31,
+     12,
+     "MUDSHOT"
+    ],
+    [
+     18,
+     "BUBBLEBEAM"
+    ],
+    [
+     24,
+     "RAINDANCE"
+    ],
+    [
+     30,
      "BODYSLAM"
     ],
     [
-     38,
-     "AMNESIA"
+     36,
+     "EARTHPOWER"
     ],
     [
-     45,
+     42,
      "HYDROPUMP"
+    ],
+    [
+     48,
+     "BELLYDRUM"
+    ],
+    [
+     54,
+     "DOUBLEEDGE"
     ]
    ],
    "num": 60,
@@ -42248,31 +43900,47 @@
    "moves": [
     [
      1,
-     "BUBBLE"
+     "HYPNOSIS"
     ],
     [
      1,
-     "HYPNOSIS"
+     "MUDSHOT"
+    ],
+    [
+     1,
+     "POUND"
     ],
     [
      1,
      "WATERGUN"
     ],
     [
-     26,
-     "DOUBLESLAP"
+     18,
+     "BUBBLEBEAM"
     ],
     [
-     33,
+     24,
+     "RAINDANCE"
+    ],
+    [
+     32,
      "BODYSLAM"
     ],
     [
-     41,
-     "AMNESIA"
+     40,
+     "EARTHPOWER"
     ],
     [
-     49,
+     48,
      "HYDROPUMP"
+    ],
+    [
+     56,
+     "BELLYDRUM"
+    ],
+    [
+     66,
+     "DOUBLEEDGE"
     ]
    ],
    "num": 61,
@@ -42336,15 +44004,11 @@
     ],
     [
      1,
-     "DOUBLESLAP"
+     "BUBBLEBEAM"
     ],
     [
      1,
      "HYPNOSIS"
-    ],
-    [
-     1,
-     "WATERGUN"
     ]
    ],
    "num": 62,
@@ -42478,27 +44142,31 @@
     ],
     [
      1,
-     "DISABLE"
-    ],
-    [
-     1,
      "TELEPORT"
     ],
     [
-     27,
-     "PSYBEAM"
+     6,
+     "HYPNOSIS"
     ],
     [
-     31,
+     11,
+     "CALMMIND"
+    ],
+    [
+     18,
+     "PSYCHOCUT"
+    ],
+    [
+     25,
+     "ZENHEADBUTT"
+    ],
+    [
+     34,
      "RECOVER"
     ],
     [
-     38,
+     43,
      "PSYCHIC"
-    ],
-    [
-     42,
-     "REFLECT"
     ]
    ],
    "num": 64,
@@ -42558,31 +44226,31 @@
     ],
     [
      1,
-     "CONFUSION"
-    ],
-    [
-     1,
-     "DISABLE"
-    ],
-    [
-     1,
      "TELEPORT"
     ],
     [
-     27,
-     "PSYBEAM"
+     6,
+     "CONFUSION"
     ],
     [
-     31,
+     6,
+     "HYPNOSIS"
+    ],
+    [
+     18,
+     "PSYCHOCUT"
+    ],
+    [
+     25,
+     "ZENHEADBUTT"
+    ],
+    [
+     34,
      "RECOVER"
     ],
     [
-     38,
+     43,
      "PSYCHIC"
-    ],
-    [
-     42,
-     "REFLECT"
     ]
    ],
    "num": 65,
@@ -42646,27 +44314,35 @@
    "moves": [
     [
      1,
-     "KARATECHOP"
+     "TACKLE"
     ],
     [
-     20,
-     "LOWKICK"
+     6,
+     "ROCKSMASH"
+    ],
+    [
+     11,
+     "BULLETPUNCH"
+    ],
+    [
+     18,
+     "DOUBLEHIT"
+    ],
+    [
+     22,
+     "MACHPUNCH"
     ],
     [
      25,
-     "LEER"
+     "BULKUP"
     ],
     [
-     32,
-     "FOCUSENERGY"
+     34,
+     "DOUBLEEDGE"
     ],
     [
-     39,
-     "SEISMICTOSS"
-    ],
-    [
-     46,
-     "SUBMISSION"
+     43,
+     "CLOSECOMBAT"
     ]
    ],
    "num": 66,
@@ -42731,27 +44407,35 @@
    "moves": [
     [
      1,
-     "KARATECHOP"
+     "TACKLE"
     ],
     [
-     1,
-     "LEER"
+     6,
+     "ROCKSMASH"
     ],
     [
-     1,
-     "LOWKICK"
+     11,
+     "BULLETPUNCH"
     ],
     [
-     36,
-     "FOCUSENERGY"
+     18,
+     "DOUBLEHIT"
     ],
     [
-     44,
-     "SEISMICTOSS"
+     22,
+     "MACHPUNCH"
     ],
     [
-     52,
-     "SUBMISSION"
+     25,
+     "BULKUP"
+    ],
+    [
+     34,
+     "DOUBLEEDGE"
+    ],
+    [
+     43,
+     "CLOSECOMBAT"
     ]
    ],
    "num": 67,
@@ -42811,27 +44495,39 @@
     ],
     [
      1,
-     "KARATECHOP"
+     "TACKLE"
     ],
     [
-     1,
-     "LEER"
+     6,
+     "ROCKSMASH"
     ],
     [
-     1,
-     "LOWKICK"
+     11,
+     "BULLETPUNCH"
     ],
     [
-     36,
-     "FOCUSENERGY"
+     18,
+     "DOUBLEHIT"
     ],
     [
-     44,
-     "SEISMICTOSS"
+     22,
+     "MACHPUNCH"
     ],
     [
-     52,
-     "SUBMISSION"
+     25,
+     "BULKUP"
+    ],
+    [
+     30,
+     "DRAINPUNCH"
+    ],
+    [
+     34,
+     "DOUBLEEDGE"
+    ],
+    [
+     43,
+     "CLOSECOMBAT"
     ]
    ],
    "num": 68,
@@ -42894,39 +44590,59 @@
    "moves": [
     [
      1,
-     "GROWTH"
-    ],
-    [
-     1,
      "VINEWHIP"
     ],
     [
-     13,
+     7,
+     "GROWTH"
+    ],
+    [
+     11,
      "WRAP"
+    ],
+    [
+     13,
+     "SLEEPPOWDER"
     ],
     [
      15,
      "POISONPOWDER"
     ],
     [
-     18,
-     "SLEEPPOWDER"
-    ],
-    [
-     21,
+     17,
      "STUNSPORE"
     ],
     [
-     26,
+     23,
      "ACID"
     ],
     [
-     33,
+     27,
+     "KNOCKOFF"
+    ],
+    [
+     29,
+     "SWEETSCENT"
+    ],
+    [
+     35,
+     "GASTROACID"
+    ],
+    [
+     39,
      "RAZORLEAF"
     ],
     [
-     42,
+     41,
+     "POISONJAB"
+    ],
+    [
+     47,
      "SLAM"
+    ],
+    [
+     52,
+     "POWERWHIP"
     ]
    ],
    "num": 69,
@@ -43001,28 +44717,48 @@
      "WRAP"
     ],
     [
+     13,
+     "SLEEPPOWDER"
+    ],
+    [
      15,
      "POISONPOWDER"
     ],
     [
-     18,
-     "SLEEPPOWDER"
-    ],
-    [
-     23,
+     17,
      "STUNSPORE"
     ],
     [
-     29,
+     24,
      "ACID"
     ],
     [
-     38,
+     29,
+     "KNOCKOFF"
+    ],
+    [
+     32,
+     "SWEETSCENT"
+    ],
+    [
+     39,
+     "GASTROACID"
+    ],
+    [
+     44,
      "RAZORLEAF"
     ],
     [
-     49,
+     47,
+     "POISONJAB"
+    ],
+    [
+     54,
      "SLAM"
+    ],
+    [
+     58,
+     "POWERWHIP"
     ]
    ],
    "num": 70,
@@ -43082,10 +44818,6 @@
     ],
     [
      1,
-     "ACID"
-    ],
-    [
-     1,
      "RAZORLEAF"
     ],
     [
@@ -43094,15 +44826,15 @@
     ],
     [
      1,
-     "STUNSPORE"
+     "SWEETSCENT"
     ],
     [
-     13,
-     "WRAP"
+     1,
+     "VINEWHIP"
     ],
     [
-     15,
-     "POISONPOWDER"
+     44,
+     "LEAFBLADE"
     ]
    ],
    "num": 71,
@@ -43167,35 +44899,55 @@
    "moves": [
     [
      1,
-     "ACID"
-    ],
-    [
-     7,
-     "SUPERSONIC"
-    ],
-    [
-     13,
-     "WRAP"
-    ],
-    [
-     18,
      "POISONSTING"
     ],
     [
-     22,
+     1,
      "WATERGUN"
     ],
     [
-     27,
-     "CONSTRICT"
+     4,
+     "ACID"
     ],
     [
-     33,
-     "BARRIER"
+     8,
+     "WRAP"
+    ],
+    [
+     12,
+     "SUPERSONIC"
+    ],
+    [
+     16,
+     "WATERPULSE"
+    ],
+    [
+     20,
+     "SCREECH"
+    ],
+    [
+     24,
+     "BUBBLEBEAM"
+    ],
+    [
+     28,
+     "HEX"
+    ],
+    [
+     32,
+     "ACIDARMOR"
+    ],
+    [
+     36,
+     "POISONJAB"
     ],
     [
      40,
-     "SCREECH"
+     "SURF"
+    ],
+    [
+     44,
+     "SLUDGEWAVE"
     ],
     [
      48,
@@ -43260,34 +45012,58 @@
     ],
     [
      1,
-     "SUPERSONIC"
+     "POISONSTING"
+    ],
+    [
+     1,
+     "REFLECTTYPE"
+    ],
+    [
+     1,
+     "WATERGUN"
     ],
     [
      1,
      "WRAP"
     ],
     [
-     18,
-     "POISONSTING"
+     12,
+     "SUPERSONIC"
     ],
     [
-     22,
-     "WATERGUN"
+     16,
+     "WATERPULSE"
     ],
     [
-     27,
-     "CONSTRICT"
-    ],
-    [
-     35,
-     "BARRIER"
-    ],
-    [
-     43,
+     20,
      "SCREECH"
     ],
     [
-     50,
+     24,
+     "BUBBLEBEAM"
+    ],
+    [
+     28,
+     "HEX"
+    ],
+    [
+     34,
+     "ACIDARMOR"
+    ],
+    [
+     40,
+     "POISONJAB"
+    ],
+    [
+     46,
+     "SURF"
+    ],
+    [
+     52,
+     "SLUDGEWAVE"
+    ],
+    [
+     58,
      "HYDROPUMP"
     ]
    ],
@@ -43353,31 +45129,59 @@
    "moves": [
     [
      1,
+     "DEFENSECURL"
+    ],
+    [
+     1,
      "TACKLE"
     ],
     [
-     11,
-     "DEFENSECURL"
+     6,
+     "ROCKPOLISH"
+    ],
+    [
+     10,
+     "ROLLOUT"
+    ],
+    [
+     12,
+     "BULLDOZE"
     ],
     [
      16,
      "ROCKTHROW"
     ],
     [
-     21,
+     18,
+     "SMACKDOWN"
+    ],
+    [
+     24,
      "SELFDESTRUCT"
     ],
     [
-     26,
-     "HARDEN"
+     28,
+     "STEALTHROCK"
     ],
     [
-     31,
+     30,
+     "ROCKBLAST"
+    ],
+    [
+     34,
      "EARTHQUAKE"
     ],
     [
      36,
      "EXPLOSION"
+    ],
+    [
+     40,
+     "DOUBLEEDGE"
+    ],
+    [
+     42,
+     "STONEEDGE"
     ]
    ],
    "num": 74,
@@ -43447,27 +45251,55 @@
     ],
     [
      1,
+     "ROCKPOLISH"
+    ],
+    [
+     1,
      "TACKLE"
+    ],
+    [
+     10,
+     "ROLLOUT"
+    ],
+    [
+     12,
+     "BULLDOZE"
     ],
     [
      16,
      "ROCKTHROW"
     ],
     [
-     21,
+     18,
+     "SMACKDOWN"
+    ],
+    [
+     24,
      "SELFDESTRUCT"
     ],
     [
-     29,
-     "HARDEN"
+     30,
+     "STEALTHROCK"
     ],
     [
-     36,
+     34,
+     "ROCKBLAST"
+    ],
+    [
+     40,
      "EARTHQUAKE"
     ],
     [
-     43,
+     44,
      "EXPLOSION"
+    ],
+    [
+     50,
+     "DOUBLEEDGE"
+    ],
+    [
+     54,
+     "STONEEDGE"
     ]
    ],
    "num": 75,
@@ -43528,6 +45360,14 @@
     ],
     [
      1,
+     "HEAVYSLAM"
+    ],
+    [
+     1,
+     "ROCKPOLISH"
+    ],
+    [
+     1,
      "TACKLE"
     ],
     [
@@ -43535,20 +45375,40 @@
      "ROCKTHROW"
     ],
     [
-     21,
+     18,
+     "SMACKDOWN"
+    ],
+    [
+     22,
+     "BULLDOZE"
+    ],
+    [
+     24,
      "SELFDESTRUCT"
     ],
     [
-     29,
-     "HARDEN"
+     30,
+     "STEALTHROCK"
     ],
     [
-     36,
+     34,
+     "ROCKBLAST"
+    ],
+    [
+     40,
      "EARTHQUAKE"
     ],
     [
-     43,
+     44,
      "EXPLOSION"
+    ],
+    [
+     50,
+     "DOUBLEEDGE"
+    ],
+    [
+     54,
+     "STONEEDGE"
     ]
    ],
    "num": 76,
@@ -43613,31 +45473,35 @@
    "moves": [
     [
      1,
+     "TACKLE"
+    ],
+    [
+     5,
      "EMBER"
     ],
     [
-     30,
-     "TAILWHIP"
+     9,
+     "DOUBLEHIT"
     ],
     [
-     32,
-     "STOMP"
+     15,
+     "FLAMEWHEEL"
     ],
     [
-     35,
-     "GROWL"
+     21,
+     "HYPNOSIS"
     ],
     [
-     39,
-     "FIRESPIN"
+     29,
+     "FIREBLAST"
     ],
     [
-     43,
-     "TAKEDOWN"
+     37,
+     "DOUBLEEDGE"
     ],
     [
-     48,
-     "AGILITY"
+     47,
+     "FLAREBLITZ"
     ]
    ],
    "num": 77,
@@ -43697,31 +45561,35 @@
     ],
     [
      1,
+     "TACKLE"
+    ],
+    [
+     5,
      "EMBER"
     ],
     [
-     1,
-     "GROWL"
+     9,
+     "DOUBLEHIT"
     ],
     [
-     1,
-     "STOMP"
+     15,
+     "FLAMEWHEEL"
     ],
     [
-     1,
-     "TAILWHIP"
+     21,
+     "HYPNOSIS"
     ],
     [
-     39,
-     "FIRESPIN"
+     29,
+     "FIREBLAST"
+    ],
+    [
+     37,
+     "DOUBLEEDGE"
     ],
     [
      47,
-     "TAKEDOWN"
-    ],
-    [
-     55,
-     "AGILITY"
+     "FLAREBLITZ"
     ]
    ],
    "num": 78,
@@ -43794,31 +45662,71 @@
    "moves": [
     [
      1,
-     "CONFUSION"
+     "CURSE"
     ],
     [
-     18,
-     "DISABLE"
+     1,
+     "TACKLE"
     ],
     [
-     22,
-     "HEADBUTT"
-    ],
-    [
-     27,
+     3,
      "GROWL"
     ],
     [
-     33,
+     6,
      "WATERGUN"
     ],
     [
-     40,
+     9,
+     "YAWN"
+    ],
+    [
+     12,
+     "CONFUSION"
+    ],
+    [
+     15,
+     "DISABLE"
+    ],
+    [
+     18,
+     "WATERPULSE"
+    ],
+    [
+     21,
+     "HEADBUTT"
+    ],
+    [
+     24,
+     "ZENHEADBUTT"
+    ],
+    [
+     27,
      "AMNESIA"
     ],
     [
-     48,
+     30,
+     "SURF"
+    ],
+    [
+     33,
+     "SLACKOFF"
+    ],
+    [
+     36,
      "PSYCHIC"
+    ],
+    [
+     39,
+     "PSYCHUP"
+    ],
+    [
+     42,
+     "RAINDANCE"
+    ],
+    [
+     45,
+     "HEALPULSE"
     ]
    ],
    "num": 79,
@@ -43880,31 +45788,71 @@
     ],
     [
      1,
-     "CONFUSION"
+     "CURSE"
     ],
     [
      1,
-     "DISABLE"
-    ],
-    [
-     1,
-     "HEADBUTT"
-    ],
-    [
-     27,
      "GROWL"
     ],
     [
-     33,
+     1,
+     "TACKLE"
+    ],
+    [
+     1,
      "WATERGUN"
     ],
     [
-     44,
+     9,
+     "YAWN"
+    ],
+    [
+     12,
+     "CONFUSION"
+    ],
+    [
+     15,
+     "DISABLE"
+    ],
+    [
+     18,
+     "WATERPULSE"
+    ],
+    [
+     21,
+     "HEADBUTT"
+    ],
+    [
+     24,
+     "ZENHEADBUTT"
+    ],
+    [
+     27,
      "AMNESIA"
     ],
     [
-     55,
+     30,
+     "SURF"
+    ],
+    [
+     33,
+     "SLACKOFF"
+    ],
+    [
+     36,
      "PSYCHIC"
+    ],
+    [
+     41,
+     "PSYCHUP"
+    ],
+    [
+     46,
+     "RAINDANCE"
+    ],
+    [
+     51,
+     "HEALPULSE"
     ]
    ],
    "num": 80,
@@ -43972,28 +45920,60 @@
      "TACKLE"
     ],
     [
-     21,
-     "SONICBOOM"
-    ],
-    [
-     25,
+     1,
      "THUNDERSHOCK"
     ],
     [
-     29,
+     4,
      "SUPERSONIC"
     ],
     [
-     35,
+     8,
      "THUNDERWAVE"
     ],
     [
-     41,
-     "SWIFT"
+     12,
+     "ELECTROBALL"
     ],
     [
-     47,
+     16,
+     "GYROBALL"
+    ],
+    [
+     20,
+     "SPARK"
+    ],
+    [
+     24,
      "SCREECH"
+    ],
+    [
+     28,
+     "MAGNETRISE"
+    ],
+    [
+     32,
+     "FLASHCANNON"
+    ],
+    [
+     36,
+     "DISCHARGE"
+    ],
+    [
+     40,
+     "METALSOUND"
+    ],
+    [
+     44,
+     "LIGHTSCREEN"
+    ],
+    [
+     48,
+     "LOCKON"
+    ],
+    [
+     52,
+     "ZAPCANNON"
     ]
    ],
    "num": 81,
@@ -44062,7 +46042,11 @@
     ],
     [
      1,
-     "SONICBOOM"
+     "ELECTRICTERRAIN"
+    ],
+    [
+     1,
+     "SUPERSONIC"
     ],
     [
      1,
@@ -44073,20 +46057,52 @@
      "THUNDERSHOCK"
     ],
     [
-     29,
-     "SUPERSONIC"
-    ],
-    [
-     38,
+     1,
      "THUNDERWAVE"
     ],
     [
-     46,
-     "SWIFT"
+     12,
+     "ELECTROBALL"
     ],
     [
-     54,
+     16,
+     "GYROBALL"
+    ],
+    [
+     20,
+     "SPARK"
+    ],
+    [
+     24,
      "SCREECH"
+    ],
+    [
+     28,
+     "MAGNETRISE"
+    ],
+    [
+     34,
+     "FLASHCANNON"
+    ],
+    [
+     40,
+     "DISCHARGE"
+    ],
+    [
+     46,
+     "METALSOUND"
+    ],
+    [
+     52,
+     "LIGHTSCREEN"
+    ],
+    [
+     58,
+     "LOCKON"
+    ],
+    [
+     64,
+     "ZAPCANNON"
     ]
    ],
    "num": 82,
@@ -44151,24 +46167,56 @@
      "SANDATTACK"
     ],
     [
-     7,
+     5,
      "LEER"
     ],
     [
-     15,
-     "FURYATTACK"
+     10,
+     "FURYCUTTER"
     ],
     [
-     23,
+     15,
+     "CUT"
+    ],
+    [
+     20,
+     "AERIALACE"
+    ],
+    [
+     25,
+     "AIRCUTTER"
+    ],
+    [
+     30,
+     "KNOCKOFF"
+    ],
+    [
+     35,
+     "FALSESWIPE"
+    ],
+    [
+     40,
+     "SLASH"
+    ],
+    [
+     45,
      "SWORDSDANCE"
     ],
     [
-     31,
+     50,
+     "AIRSLASH"
+    ],
+    [
+     55,
+     "LEAFBLADE"
+    ],
+    [
+     60,
      "AGILITY"
     ],
     [
-     39,
-     "SLASH"
+     65,
+     "BRAVEBIRD"
     ]
    ],
    "num": 83,
@@ -44233,31 +46281,55 @@
    "moves": [
     [
      1,
-     "PECK"
-    ],
-    [
-     20,
      "GROWL"
     ],
     [
-     24,
+     1,
+     "PECK"
+    ],
+    [
+     5,
+     "QUICKATTACK"
+    ],
+    [
+     9,
      "FURYATTACK"
     ],
     [
+     14,
+     "PLUCK"
+    ],
+    [
+     19,
+     "DOUBLEHIT"
+    ],
+    [
+     23,
+     "AGILITY"
+    ],
+    [
+     27,
+     "UPROAR"
+    ],
+    [
      30,
-     "DRILLPECK"
+     "ACUPRESSURE"
+    ],
+    [
+     33,
+     "SWORDSDANCE"
     ],
     [
      36,
-     "RAGE"
+     "DRILLPECK"
     ],
     [
-     40,
-     "TRIATTACK"
+     39,
+     "ENDEAVOR"
     ],
     [
-     44,
-     "AGILITY"
+     43,
+     "THRASH"
     ]
    ],
    "num": 84,
@@ -44318,10 +46390,6 @@
     ],
     [
      1,
-     "FURYATTACK"
-    ],
-    [
-     1,
      "GROWL"
     ],
     [
@@ -44329,16 +46397,48 @@
      "PECK"
     ],
     [
+     1,
+     "QUICKATTACK"
+    ],
+    [
+     12,
+     "FURYATTACK"
+    ],
+    [
+     15,
+     "PLUCK"
+    ],
+    [
+     19,
+     "DOUBLEHIT"
+    ],
+    [
+     23,
+     "AGILITY"
+    ],
+    [
+     26,
+     "UPROAR"
+    ],
+    [
      30,
+     "ACUPRESSURE"
+    ],
+    [
+     34,
+     "SWORDSDANCE"
+    ],
+    [
+     38,
      "DRILLPECK"
     ],
     [
-     39,
-     "RAGE"
+     43,
+     "ENDEAVOR"
     ],
     [
-     51,
-     "AGILITY"
+     50,
+     "THRASH"
     ]
    ],
    "num": 85,
@@ -44407,24 +46507,68 @@
      "HEADBUTT"
     ],
     [
-     30,
+     3,
      "GROWL"
     ],
     [
-     35,
-     "AURORABEAM"
+     7,
+     "CHARM"
     ],
     [
-     40,
+     11,
+     "ICYWIND"
+    ],
+    [
+     13,
+     "ENCORE"
+    ],
+    [
+     17,
+     "ICESHARD"
+    ],
+    [
+     21,
      "REST"
     ],
     [
-     45,
+     23,
+     "AQUARING"
+    ],
+    [
+     27,
+     "AURORABEAM"
+    ],
+    [
+     31,
+     "AQUAJET"
+    ],
+    [
+     33,
+     "BRINE"
+    ],
+    [
+     37,
      "TAKEDOWN"
     ],
     [
-     50,
+     41,
+     "DIVE"
+    ],
+    [
+     43,
+     "AQUATAIL"
+    ],
+    [
+     47,
      "ICEBEAM"
+    ],
+    [
+     51,
+     "SAFEGUARD"
+    ],
+    [
+     53,
+     "SNOWSCAPE"
     ]
    ],
    "num": 86,
@@ -44485,10 +46629,6 @@
     ],
     [
      1,
-     "AURORABEAM"
-    ],
-    [
-     1,
      "GROWL"
     ],
     [
@@ -44496,16 +46636,60 @@
      "HEADBUTT"
     ],
     [
-     44,
+     1,
+     "ICYWIND"
+    ],
+    [
+     13,
+     "ENCORE"
+    ],
+    [
+     17,
+     "ICESHARD"
+    ],
+    [
+     21,
      "REST"
     ],
     [
-     50,
+     23,
+     "AQUARING"
+    ],
+    [
+     27,
+     "AURORABEAM"
+    ],
+    [
+     31,
+     "AQUAJET"
+    ],
+    [
+     33,
+     "BRINE"
+    ],
+    [
+     39,
      "TAKEDOWN"
     ],
     [
-     56,
+     45,
+     "DIVE"
+    ],
+    [
+     49,
+     "AQUATAIL"
+    ],
+    [
+     55,
      "ICEBEAM"
+    ],
+    [
+     61,
+     "SAFEGUARD"
+    ],
+    [
+     65,
+     "SNOWSCAPE"
     ]
    ],
    "num": 87,
@@ -44570,35 +46754,67 @@
    "moves": [
     [
      1,
-     "DISABLE"
+     "POISONGAS"
     ],
     [
      1,
      "POUND"
     ],
     [
-     30,
-     "POISONGAS"
-    ],
-    [
-     33,
-     "MINIMIZE"
-    ],
-    [
-     37,
-     "SLUDGE"
-    ],
-    [
-     42,
+     4,
      "HARDEN"
     ],
     [
-     48,
+     7,
+     "MUDSLAP"
+    ],
+    [
+     12,
+     "DISABLE"
+    ],
+    [
+     15,
+     "SLUDGE"
+    ],
+    [
+     18,
+     "MUDSHOT"
+    ],
+    [
+     21,
+     "MINIMIZE"
+    ],
+    [
+     26,
+     "TOXIC"
+    ],
+    [
+     29,
+     "SLUDGEBOMB"
+    ],
+    [
+     32,
+     "SLUDGEWAVE"
+    ],
+    [
+     37,
      "SCREECH"
     ],
     [
-     55,
+     40,
+     "GUNKSHOT"
+    ],
+    [
+     43,
      "ACIDARMOR"
+    ],
+    [
+     46,
+     "BELCH"
+    ],
+    [
+     48,
+     "MEMENTO"
     ]
    ],
    "num": 88,
@@ -44658,7 +46874,11 @@
     ],
     [
      1,
-     "DISABLE"
+     "HARDEN"
+    ],
+    [
+     1,
+     "MUDSLAP"
     ],
     [
      1,
@@ -44669,24 +46889,52 @@
      "POUND"
     ],
     [
-     33,
-     "MINIMIZE"
+     12,
+     "DISABLE"
     ],
     [
-     37,
+     15,
      "SLUDGE"
     ],
     [
-     45,
-     "HARDEN"
+     18,
+     "MUDSHOT"
     ],
     [
-     53,
+     21,
+     "MINIMIZE"
+    ],
+    [
+     26,
+     "TOXIC"
+    ],
+    [
+     29,
+     "SLUDGEBOMB"
+    ],
+    [
+     32,
+     "SLUDGEWAVE"
+    ],
+    [
+     37,
      "SCREECH"
     ],
     [
-     60,
+     40,
+     "GUNKSHOT"
+    ],
+    [
+     46,
      "ACIDARMOR"
+    ],
+    [
+     52,
+     "BELCH"
+    ],
+    [
+     57,
+     "MEMENTO"
     ]
    ],
    "num": 89,
@@ -44754,27 +47002,55 @@
     ],
     [
      1,
+     "WATERGUN"
+    ],
+    [
+     4,
      "WITHDRAW"
     ],
     [
-     18,
-     "SUPERSONIC"
+     8,
+     "ICESHARD"
     ],
     [
-     23,
-     "CLAMP"
-    ],
-    [
-     30,
-     "AURORABEAM"
-    ],
-    [
-     39,
+     12,
      "LEER"
     ],
     [
-     50,
+     16,
+     "WHIRLPOOL"
+    ],
+    [
+     20,
+     "SUPERSONIC"
+    ],
+    [
+     24,
+     "AURORABEAM"
+    ],
+    [
+     28,
+     "PROTECT"
+    ],
+    [
+     32,
+     "RAZORSHELL"
+    ],
+    [
+     36,
+     "IRONDEFENSE"
+    ],
+    [
+     40,
      "ICEBEAM"
+    ],
+    [
+     44,
+     "SHELLSMASH"
+    ],
+    [
+     48,
+     "HYDROPUMP"
     ]
    ],
    "num": 90,
@@ -44838,7 +47114,39 @@
     ],
     [
      1,
-     "CLAMP"
+     "HYDROPUMP"
+    ],
+    [
+     1,
+     "ICEBEAM"
+    ],
+    [
+     1,
+     "ICESHARD"
+    ],
+    [
+     1,
+     "ICICLECRASH"
+    ],
+    [
+     1,
+     "IRONDEFENSE"
+    ],
+    [
+     1,
+     "LEER"
+    ],
+    [
+     1,
+     "PROTECT"
+    ],
+    [
+     1,
+     "SHELLSMASH"
+    ],
+    [
+     1,
+     "SPIKES"
     ],
     [
      1,
@@ -44846,11 +47154,27 @@
     ],
     [
      1,
+     "TACKLE"
+    ],
+    [
+     1,
+     "TOXICSPIKES"
+    ],
+    [
+     1,
+     "WATERGUN"
+    ],
+    [
+     1,
+     "WHIRLPOOL"
+    ],
+    [
+     1,
      "WITHDRAW"
     ],
     [
-     50,
-     "SPIKECANNON"
+     5,
+     "RAZORSHELL"
     ]
    ],
    "num": 91,
@@ -44921,15 +47245,51 @@
      "LICK"
     ],
     [
-     1,
-     "NIGHTSHADE"
-    ],
-    [
-     27,
+     4,
      "HYPNOSIS"
     ],
     [
-     35,
+     8,
+     "MEANLOOK"
+    ],
+    [
+     12,
+     "PAYBACK"
+    ],
+    [
+     16,
+     "SPITE"
+    ],
+    [
+     20,
+     "CURSE"
+    ],
+    [
+     24,
+     "HEX"
+    ],
+    [
+     28,
+     "NIGHTSHADE"
+    ],
+    [
+     32,
+     "SUCKERPUNCH"
+    ],
+    [
+     36,
+     "DARKPULSE"
+    ],
+    [
+     40,
+     "SHADOWBALL"
+    ],
+    [
+     44,
+     "DESTINYBOND"
+    ],
+    [
+     48,
      "DREAMEATER"
     ]
    ],
@@ -45003,18 +47363,54 @@
     ],
     [
      1,
+     "HYPNOSIS"
+    ],
+    [
+     1,
      "LICK"
     ],
     [
      1,
+     "MEANLOOK"
+    ],
+    [
+     12,
+     "PAYBACK"
+    ],
+    [
+     16,
+     "SPITE"
+    ],
+    [
+     20,
+     "CURSE"
+    ],
+    [
+     24,
+     "HEX"
+    ],
+    [
+     30,
      "NIGHTSHADE"
     ],
     [
-     29,
-     "HYPNOSIS"
+     36,
+     "SUCKERPUNCH"
     ],
     [
-     38,
+     42,
+     "DARKPULSE"
+    ],
+    [
+     48,
+     "SHADOWBALL"
+    ],
+    [
+     54,
+     "DESTINYBOND"
+    ],
+    [
+     60,
      "DREAMEATER"
     ]
    ],
@@ -45079,18 +47475,62 @@
     ],
     [
      1,
+     "HYPNOSIS"
+    ],
+    [
+     1,
      "LICK"
     ],
     [
      1,
+     "MEANLOOK"
+    ],
+    [
+     1,
+     "PERISHSONG"
+    ],
+    [
+     1,
+     "REFLECTTYPE"
+    ],
+    [
+     12,
+     "PAYBACK"
+    ],
+    [
+     16,
+     "SPITE"
+    ],
+    [
+     20,
+     "CURSE"
+    ],
+    [
+     24,
+     "HEX"
+    ],
+    [
+     30,
      "NIGHTSHADE"
     ],
     [
-     29,
-     "HYPNOSIS"
+     36,
+     "SUCKERPUNCH"
     ],
     [
-     38,
+     42,
+     "DARKPULSE"
+    ],
+    [
+     48,
+     "SHADOWBALL"
+    ],
+    [
+     54,
+     "DESTINYBOND"
+    ],
+    [
+     60,
      "DREAMEATER"
     ]
    ],
@@ -45157,31 +47597,31 @@
    "moves": [
     [
      1,
-     "SCREECH"
+     "ROLLOUT"
     ],
     [
-     1,
+     6,
      "TACKLE"
     ],
     [
-     15,
-     "BIND"
+     11,
+     "BULLDOZE"
     ],
     [
-     19,
-     "ROCKTHROW"
+     18,
+     "ROCKSLIDE"
     ],
     [
      25,
-     "RAGE"
+     "STEALTHROCK"
     ],
     [
-     33,
-     "SLAM"
+     34,
+     "HIGHHORSEPOWER"
     ],
     [
      43,
-     "HARDEN"
+     "IRONTAIL"
     ]
    ],
    "num": 95,
@@ -45253,28 +47693,52 @@
      "POUND"
     ],
     [
-     12,
+     5,
      "DISABLE"
     ],
     [
-     17,
+     9,
      "CONFUSION"
     ],
     [
-     24,
+     13,
      "HEADBUTT"
     ],
     [
-     29,
+     17,
      "POISONGAS"
     ],
     [
-     32,
-     "PSYCHIC"
+     21,
+     "PSYBEAM"
+    ],
+    [
+     25,
+     "PSYCHUP"
+    ],
+    [
+     29,
+     "ZENHEADBUTT"
+    ],
+    [
+     33,
+     "SWAGGER"
     ],
     [
      37,
-     "MEDITATE"
+     "PSYCHIC"
+    ],
+    [
+     41,
+     "NASTYPLOT"
+    ],
+    [
+     45,
+     "PSYSHOCK"
+    ],
+    [
+     49,
+     "FUTURESIGHT"
     ]
    ],
    "num": 96,
@@ -45345,20 +47809,48 @@
      "POUND"
     ],
     [
-     24,
+     1,
+     "SWITCHEROO"
+    ],
+    [
+     13,
      "HEADBUTT"
     ],
     [
-     33,
+     17,
      "POISONGAS"
     ],
     [
+     21,
+     "PSYBEAM"
+    ],
+    [
+     25,
+     "PSYCHUP"
+    ],
+    [
+     32,
+     "ZENHEADBUTT"
+    ],
+    [
      37,
+     "SWAGGER"
+    ],
+    [
+     42,
      "PSYCHIC"
     ],
     [
-     43,
-     "MEDITATE"
+     47,
+     "NASTYPLOT"
+    ],
+    [
+     51,
+     "PSYSHOCK"
+    ],
+    [
+     56,
+     "FUTURESIGHT"
     ]
    ],
    "num": 97,
@@ -45422,31 +47914,59 @@
    "moves": [
     [
      1,
-     "BUBBLE"
-    ],
-    [
-     1,
      "LEER"
     ],
     [
+     1,
+     "WATERGUN"
+    ],
+    [
+     4,
+     "HARDEN"
+    ],
+    [
+     8,
+     "METALCLAW"
+    ],
+    [
+     12,
+     "MUDSHOT"
+    ],
+    [
+     16,
+     "PROTECT"
+    ],
+    [
      20,
-     "VICEGRIP"
+     "BUBBLEBEAM"
     ],
     [
-     25,
-     "GUILLOTINE"
-    ],
-    [
-     30,
+     24,
      "STOMP"
     ],
     [
-     35,
-     "CRABHAMMER"
+     29,
+     "FLAIL"
+    ],
+    [
+     32,
+     "RAZORSHELL"
+    ],
+    [
+     36,
+     "SLAM"
     ],
     [
      40,
-     "HARDEN"
+     "SWORDSDANCE"
+    ],
+    [
+     44,
+     "CRABHAMMER"
+    ],
+    [
+     48,
+     "GUILLOTINE"
     ]
    ],
    "num": 98,
@@ -45502,7 +48022,11 @@
    "moves": [
     [
      1,
-     "BUBBLE"
+     "HAMMERARM"
+    ],
+    [
+     1,
+     "HARDEN"
     ],
     [
      1,
@@ -45510,23 +48034,55 @@
     ],
     [
      1,
-     "VICEGRIP"
+     "METALCLAW"
     ],
     [
-     25,
-     "GUILLOTINE"
+     1,
+     "WATERGUN"
     ],
     [
-     34,
+     1,
+     "WIDEGUARD"
+    ],
+    [
+     12,
+     "MUDSHOT"
+    ],
+    [
+     16,
+     "PROTECT"
+    ],
+    [
+     20,
+     "BUBBLEBEAM"
+    ],
+    [
+     24,
      "STOMP"
     ],
     [
+     31,
+     "FLAIL"
+    ],
+    [
+     36,
+     "RAZORSHELL"
+    ],
+    [
      42,
+     "SLAM"
+    ],
+    [
+     48,
+     "SWORDSDANCE"
+    ],
+    [
+     54,
      "CRABHAMMER"
     ],
     [
-     49,
-     "HARDEN"
+     60,
+     "GUILLOTINE"
     ]
    ],
    "num": 99,
@@ -45590,18 +48146,46 @@
    "moves": [
     [
      1,
-     "SCREECH"
+     "CHARGE"
     ],
     [
      1,
      "TACKLE"
     ],
     [
-     17,
-     "SONICBOOM"
+     4,
+     "THUNDERSHOCK"
+    ],
+    [
+     6,
+     "EERIEIMPULSE"
+    ],
+    [
+     9,
+     "SPARK"
+    ],
+    [
+     11,
+     "ROLLOUT"
+    ],
+    [
+     13,
+     "SCREECH"
+    ],
+    [
+     16,
+     "CHARGEBEAM"
+    ],
+    [
+     20,
+     "SWIFT"
     ],
     [
      22,
+     "ELECTROBALL"
+    ],
+    [
+     26,
      "SELFDESTRUCT"
     ],
     [
@@ -45609,12 +48193,24 @@
      "LIGHTSCREEN"
     ],
     [
-     36,
-     "SWIFT"
+     34,
+     "MAGNETRISE"
     ],
     [
-     43,
+     37,
+     "DISCHARGE"
+    ],
+    [
+     41,
      "EXPLOSION"
+    ],
+    [
+     46,
+     "GYROBALL"
+    ],
+    [
+     50,
+     "MIRRORCOAT"
     ]
    ],
    "num": 100,
@@ -45670,18 +48266,50 @@
    "moves": [
     [
      1,
-     "SCREECH"
+     "CHARGE"
     ],
     [
      1,
-     "SONICBOOM"
+     "EERIEIMPULSE"
+    ],
+    [
+     1,
+     "MAGNETICFLUX"
     ],
     [
      1,
      "TACKLE"
     ],
     [
+     1,
+     "THUNDERSHOCK"
+    ],
+    [
+     9,
+     "SPARK"
+    ],
+    [
+     11,
+     "ROLLOUT"
+    ],
+    [
+     13,
+     "SCREECH"
+    ],
+    [
+     16,
+     "CHARGEBEAM"
+    ],
+    [
+     20,
+     "SWIFT"
+    ],
+    [
      22,
+     "ELECTROBALL"
+    ],
+    [
+     26,
      "SELFDESTRUCT"
     ],
     [
@@ -45689,12 +48317,24 @@
      "LIGHTSCREEN"
     ],
     [
-     40,
-     "SWIFT"
+     36,
+     "MAGNETRISE"
     ],
     [
-     50,
+     41,
+     "DISCHARGE"
+    ],
+    [
+     47,
      "EXPLOSION"
+    ],
+    [
+     54,
+     "GYROBALL"
+    ],
+    [
+     58,
+     "MIRRORCOAT"
     ]
    ],
    "num": 101,
@@ -45757,35 +48397,55 @@
    "moves": [
     [
      1,
-     "BARRAGE"
+     "ABSORB"
     ],
     [
      1,
      "HYPNOSIS"
     ],
     [
-     25,
+     5,
      "REFLECT"
     ],
     [
-     28,
+     10,
      "LEECHSEED"
     ],
     [
-     32,
-     "STUNSPORE"
+     15,
+     "MEGADRAIN"
     ],
     [
-     37,
-     "POISONPOWDER"
+     20,
+     "CONFUSION"
     ],
     [
-     42,
+     25,
+     "SYNTHESIS"
+    ],
+    [
+     30,
+     "BULLETSEED"
+    ],
+    [
+     35,
+     "GIGADRAIN"
+    ],
+    [
+     40,
+     "EXTRASENSORY"
+    ],
+    [
+     45,
+     "UPROAR"
+    ],
+    [
+     50,
+     "WORRYSEED"
+    ],
+    [
+     55,
      "SOLARBEAM"
-    ],
-    [
-     48,
-     "SLEEPPOWDER"
     ]
    ],
    "num": 102,
@@ -45845,11 +48505,71 @@
     ],
     [
      1,
-     "BARRAGE"
+     "ABSORB"
+    ],
+    [
+     1,
+     "BULLETSEED"
+    ],
+    [
+     1,
+     "CONFUSION"
+    ],
+    [
+     1,
+     "EXTRASENSORY"
+    ],
+    [
+     1,
+     "GIGADRAIN"
     ],
     [
      1,
      "HYPNOSIS"
+    ],
+    [
+     1,
+     "LEAFSTORM"
+    ],
+    [
+     1,
+     "LEECHSEED"
+    ],
+    [
+     1,
+     "MEGADRAIN"
+    ],
+    [
+     1,
+     "PSYSHOCK"
+    ],
+    [
+     1,
+     "REFLECT"
+    ],
+    [
+     1,
+     "SEEDBOMB"
+    ],
+    [
+     1,
+     "SOLARBEAM"
+    ],
+    [
+     1,
+     "SYNTHESIS"
+    ],
+    [
+     1,
+     "UPROAR"
+    ],
+    [
+     1,
+     "WOODHAMMER"
+    ],
+    [
+     1,
+     "WORRYSEED"
     ]
    ],
    "num": 103,
@@ -45914,31 +48634,59 @@
    "moves": [
     [
      1,
-     "BONECLUB"
-    ],
-    [
-     1,
      "GROWL"
     ],
     [
-     25,
-     "LEER"
+     1,
+     "MUDSLAP"
     ],
     [
-     31,
+     4,
+     "TAILWHIP"
+    ],
+    [
+     8,
+     "FALSESWIPE"
+    ],
+    [
+     12,
+     "HEADBUTT"
+    ],
+    [
+     16,
+     "RETALIATE"
+    ],
+    [
+     20,
+     "FLING"
+    ],
+    [
+     24,
+     "STOMPINGTANTRUM"
+    ],
+    [
+     29,
+     "BONERUSH"
+    ],
+    [
+     32,
      "FOCUSENERGY"
     ],
     [
-     38,
-     "THRASH"
+     36,
+     "ENDEAVOR"
     ],
     [
-     43,
+     40,
      "BONEMERANG"
     ],
     [
-     46,
-     "RAGE"
+     44,
+     "THRASH"
+    ],
+    [
+     48,
+     "DOUBLEEDGE"
     ]
    ],
    "num": 104,
@@ -45998,11 +48746,7 @@
     ],
     [
      1,
-     "BONECLUB"
-    ],
-    [
-     1,
-     "FOCUSENERGY"
+     "FALSESWIPE"
     ],
     [
      1,
@@ -46010,19 +48754,51 @@
     ],
     [
      1,
-     "LEER"
+     "MUDSLAP"
     ],
     [
-     41,
-     "THRASH"
+     1,
+     "TAILWHIP"
+    ],
+    [
+     12,
+     "HEADBUTT"
+    ],
+    [
+     16,
+     "RETALIATE"
+    ],
+    [
+     20,
+     "FLING"
+    ],
+    [
+     24,
+     "STOMPINGTANTRUM"
+    ],
+    [
+     31,
+     "BONERUSH"
+    ],
+    [
+     36,
+     "FOCUSENERGY"
+    ],
+    [
+     42,
+     "ENDEAVOR"
     ],
     [
      48,
      "BONEMERANG"
     ],
     [
-     55,
-     "RAGE"
+     54,
+     "THRASH"
+    ],
+    [
+     60,
+     "DOUBLEEDGE"
     ]
    ],
    "num": 105,
@@ -46082,31 +48858,71 @@
     ],
     [
      1,
-     "DOUBLEKICK"
+     "FAKEOUT"
     ],
     [
      1,
-     "MEDITATE"
-    ],
-    [
-     33,
-     "ROLLINGKICK"
-    ],
-    [
-     38,
-     "JUMPKICK"
-    ],
-    [
-     43,
      "FOCUSENERGY"
     ],
     [
-     48,
+     1,
+     "HELPINGHAND"
+    ],
+    [
+     1,
+     "LOWSWEEP"
+    ],
+    [
+     1,
+     "TACKLE"
+    ],
+    [
+     4,
+     "DOUBLEKICK"
+    ],
+    [
+     8,
+     "LOWKICK"
+    ],
+    [
+     12,
+     "ENDURE"
+    ],
+    [
+     16,
+     "SUCKERPUNCH"
+    ],
+    [
+     21,
+     "WIDEGUARD"
+    ],
+    [
+     24,
+     "BLAZEKICK"
+    ],
+    [
+     28,
+     "FEINT"
+    ],
+    [
+     32,
+     "MEGAKICK"
+    ],
+    [
+     36,
+     "CLOSECOMBAT"
+    ],
+    [
+     40,
+     "REVERSAL"
+    ],
+    [
+     44,
      "HIGHJUMPKICK"
     ],
     [
-     53,
-     "MEGAKICK"
+     50,
+     "AXEKICK"
     ]
    ],
    "num": 106,
@@ -46166,31 +48982,75 @@
     ],
     [
      1,
-     "AGILITY"
+     "FAKEOUT"
     ],
     [
      1,
-     "COMETPUNCH"
+     "FEINT"
     ],
     [
-     33,
+     1,
+     "FOCUSENERGY"
+    ],
+    [
+     1,
+     "HELPINGHAND"
+    ],
+    [
+     1,
+     "TACKLE"
+    ],
+    [
+     4,
+     "MACHPUNCH"
+    ],
+    [
+     8,
+     "VACUUMWAVE"
+    ],
+    [
+     12,
+     "DETECT"
+    ],
+    [
+     16,
+     "BULLETPUNCH"
+    ],
+    [
+     21,
+     "QUICKGUARD"
+    ],
+    [
+     24,
      "FIREPUNCH"
     ],
     [
-     38,
+     24,
      "ICEPUNCH"
     ],
     [
-     43,
+     24,
      "THUNDERPUNCH"
     ],
     [
-     48,
+     28,
+     "AGILITY"
+    ],
+    [
+     32,
      "MEGAPUNCH"
     ],
     [
-     53,
+     36,
+     "CLOSECOMBAT"
+    ],
+    [
+     40,
      "COUNTER"
+    ],
+    [
+     44,
+     "FOCUSPUNCH"
     ]
    ],
    "num": 107,
@@ -46255,31 +49115,31 @@
    "moves": [
     [
      1,
-     "SUPERSONIC"
+     "TACKLE"
     ],
     [
-     1,
-     "WRAP"
+     6,
+     "REST"
     ],
     [
-     7,
-     "STOMP"
+     11,
+     "BULLDOZE"
     ],
     [
-     15,
-     "DISABLE"
+     18,
+     "ZENHEADBUTT"
     ],
     [
-     23,
-     "DEFENSECURL"
+     25,
+     "DOUBLEEDGE"
     ],
     [
-     31,
-     "SLAM"
+     34,
+     "ROLLOUT"
     ],
     [
-     39,
-     "SCREECH"
+     43,
+     "GIGAIMPACT"
     ]
    ],
    "num": 108,
@@ -46343,31 +49203,63 @@
    "moves": [
     [
      1,
-     "SMOG"
+     "POISONGAS"
     ],
     [
      1,
      "TACKLE"
     ],
     [
-     32,
-     "SLUDGE"
+     4,
+     "SMOG"
     ],
     [
-     37,
+     8,
      "SMOKESCREEN"
     ],
     [
-     40,
-     "SELFDESTRUCT"
+     12,
+     "CLEARSMOG"
     ],
     [
-     45,
+     16,
+     "ASSURANCE"
+    ],
+    [
+     20,
+     "SLUDGE"
+    ],
+    [
+     24,
      "HAZE"
     ],
     [
-     48,
+     28,
+     "SELFDESTRUCT"
+    ],
+    [
+     32,
+     "SLUDGEBOMB"
+    ],
+    [
+     36,
+     "TOXIC"
+    ],
+    [
+     40,
+     "BELCH"
+    ],
+    [
+     44,
      "EXPLOSION"
+    ],
+    [
+     48,
+     "MEMENTO"
+    ],
+    [
+     52,
+     "DESTINYBOND"
     ]
    ],
    "num": 109,
@@ -46427,7 +49319,11 @@
     ],
     [
      1,
-     "SLUDGE"
+     "HEATWAVE"
+    ],
+    [
+     1,
+     "POISONGAS"
     ],
     [
      1,
@@ -46435,23 +49331,55 @@
     ],
     [
      1,
-     "TACKLE"
-    ],
-    [
-     39,
      "SMOKESCREEN"
     ],
     [
-     43,
-     "SELFDESTRUCT"
+     1,
+     "TACKLE"
     ],
     [
-     49,
+     12,
+     "CLEARSMOG"
+    ],
+    [
+     16,
+     "ASSURANCE"
+    ],
+    [
+     20,
+     "SLUDGE"
+    ],
+    [
+     24,
      "HAZE"
     ],
     [
-     53,
+     28,
+     "SELFDESTRUCT"
+    ],
+    [
+     32,
+     "SLUDGEBOMB"
+    ],
+    [
+     38,
+     "TOXIC"
+    ],
+    [
+     44,
+     "BELCH"
+    ],
+    [
+     50,
      "EXPLOSION"
+    ],
+    [
+     56,
+     "MEMENTO"
+    ],
+    [
+     62,
+     "DESTINYBOND"
     ]
    ],
    "num": 110,
@@ -46516,31 +49444,59 @@
    "moves": [
     [
      1,
-     "HORNATTACK"
+     "TACKLE"
     ],
     [
-     30,
-     "STOMP"
-    ],
-    [
-     35,
+     1,
      "TAILWHIP"
     ],
     [
+     5,
+     "SMACKDOWN"
+    ],
+    [
+     10,
+     "BULLDOZE"
+    ],
+    [
+     15,
+     "HORNATTACK"
+    ],
+    [
+     20,
+     "SCARYFACE"
+    ],
+    [
+     25,
+     "STOMP"
+    ],
+    [
+     30,
+     "ROCKBLAST"
+    ],
+    [
+     35,
+     "DRILLRUN"
+    ],
+    [
      40,
-     "FURYATTACK"
+     "TAKEDOWN"
     ],
     [
      45,
-     "HORNDRILL"
+     "EARTHQUAKE"
     ],
     [
      50,
-     "LEER"
+     "STONEEDGE"
     ],
     [
      55,
-     "TAKEDOWN"
+     "MEGAHORN"
+    ],
+    [
+     60,
+     "HORNDRILL"
     ]
    ],
    "num": 111,
@@ -46611,31 +49567,59 @@
     ],
     [
      1,
-     "FURYATTACK"
+     "BULLDOZE"
     ],
     [
      1,
-     "HORNATTACK"
+     "SMACKDOWN"
     ],
     [
      1,
-     "STOMP"
+     "TACKLE"
     ],
     [
      1,
      "TAILWHIP"
     ],
     [
-     48,
-     "HORNDRILL"
+     15,
+     "HORNATTACK"
     ],
     [
-     55,
-     "LEER"
+     20,
+     "SCARYFACE"
     ],
     [
-     64,
+     25,
+     "STOMP"
+    ],
+    [
+     30,
+     "ROCKBLAST"
+    ],
+    [
+     35,
+     "DRILLRUN"
+    ],
+    [
+     40,
      "TAKEDOWN"
+    ],
+    [
+     47,
+     "EARTHQUAKE"
+    ],
+    [
+     54,
+     "STONEEDGE"
+    ],
+    [
+     61,
+     "MEGAHORN"
+    ],
+    [
+     68,
+     "HORNDRILL"
     ]
    ],
    "num": 112,
@@ -46700,35 +49684,83 @@
    "moves": [
     [
      1,
-     "DOUBLESLAP"
+     "CHARM"
+    ],
+    [
+     1,
+     "COPYCAT"
+    ],
+    [
+     1,
+     "COVET"
+    ],
+    [
+     1,
+     "DEFENSECURL"
+    ],
+    [
+     1,
+     "DISARMINGVOICE"
     ],
     [
      1,
      "POUND"
     ],
     [
-     24,
+     1,
+     "SWEETKISS"
+    ],
+    [
+     4,
+     "TAILWHIP"
+    ],
+    [
+     8,
+     "ECHOEDVOICE"
+    ],
+    [
+     12,
+     "LIFEDEW"
+    ],
+    [
+     16,
      "SING"
     ],
     [
-     30,
-     "GROWL"
+     20,
+     "FLING"
     ],
     [
-     38,
-     "MINIMIZE"
+     24,
+     "TAKEDOWN"
     ],
     [
-     44,
-     "DEFENSECURL"
+     28,
+     "HEALPULSE"
     ],
     [
-     48,
+     32,
+     "HELPINGHAND"
+    ],
+    [
+     36,
      "LIGHTSCREEN"
     ],
     [
-     54,
+     40,
      "DOUBLEEDGE"
+    ],
+    [
+     44,
+     "SOFTBOILED"
+    ],
+    [
+     48,
+     "LASTRESORT"
+    ],
+    [
+     52,
+     "HEALINGWISH"
     ]
    ],
    "num": 113,
@@ -46793,35 +49825,35 @@
    "moves": [
     [
      1,
-     "BIND"
-    ],
-    [
-     1,
-     "CONSTRICT"
-    ],
-    [
-     29,
      "ABSORB"
     ],
     [
-     32,
-     "POISONPOWDER"
-    ],
-    [
-     36,
+     6,
      "STUNSPORE"
     ],
     [
-     39,
+     11,
+     "POISONPOWDER"
+    ],
+    [
+     15,
+     "ACIDSPRAY"
+    ],
+    [
+     18,
+     "DOUBLEHIT"
+    ],
+    [
+     25,
+     "ENERGYBALL"
+    ],
+    [
+     34,
+     "ANCIENTPOWER"
+    ],
+    [
+     43,
      "SLEEPPOWDER"
-    ],
-    [
-     45,
-     "SLAM"
-    ],
-    [
-     49,
-     "GROWTH"
     ]
    ],
    "num": 114,
@@ -46877,31 +49909,63 @@
    "moves": [
     [
      1,
-     "COMETPUNCH"
+     "POUND"
     ],
     [
      1,
-     "RAGE"
-    ],
-    [
-     26,
-     "BITE"
-    ],
-    [
-     31,
      "TAILWHIP"
     ],
     [
+     4,
+     "GROWL"
+    ],
+    [
+     8,
+     "FAKEOUT"
+    ],
+    [
+     12,
+     "BITE"
+    ],
+    [
+     16,
+     "STOMP"
+    ],
+    [
+     20,
+     "FOCUSENERGY"
+    ],
+    [
+     24,
+     "HEADBUTT"
+    ],
+    [
+     28,
+     "SUCKERPUNCH"
+    ],
+    [
+     32,
+     "DOUBLEHIT"
+    ],
+    [
      36,
-     "MEGAPUNCH"
+     "CRUNCH"
     ],
     [
-     41,
-     "LEER"
+     40,
+     "ENDURE"
     ],
     [
-     46,
-     "DIZZYPUNCH"
+     44,
+     "REVERSAL"
+    ],
+    [
+     48,
+     "OUTRAGE"
+    ],
+    [
+     52,
+     "LASTRESORT"
     ]
    ],
    "num": 115,
@@ -46966,27 +50030,55 @@
    "moves": [
     [
      1,
-     "BUBBLE"
-    ],
-    [
-     19,
-     "SMOKESCREEN"
-    ],
-    [
-     24,
      "LEER"
     ],
     [
-     30,
+     1,
      "WATERGUN"
     ],
     [
-     37,
+     5,
+     "SMOKESCREEN"
+    ],
+    [
+     10,
+     "TWISTER"
+    ],
+    [
+     15,
+     "FOCUSENERGY"
+    ],
+    [
+     20,
+     "DRAGONBREATH"
+    ],
+    [
+     25,
+     "BUBBLEBEAM"
+    ],
+    [
+     30,
      "AGILITY"
+    ],
+    [
+     35,
+     "WATERPULSE"
+    ],
+    [
+     40,
+     "DRAGONPULSE"
     ],
     [
      45,
      "HYDROPUMP"
+    ],
+    [
+     50,
+     "DRAGONDANCE"
+    ],
+    [
+     55,
+     "RAINDANCE"
     ]
    ],
    "num": 116,
@@ -47052,27 +50144,55 @@
    "moves": [
     [
      1,
-     "BUBBLE"
+     "LEER"
     ],
     [
      1,
      "SMOKESCREEN"
     ],
     [
-     24,
-     "LEER"
+     1,
+     "TWISTER"
     ],
     [
-     30,
+     1,
      "WATERGUN"
     ],
     [
-     41,
+     15,
+     "FOCUSENERGY"
+    ],
+    [
+     20,
+     "DRAGONBREATH"
+    ],
+    [
+     25,
+     "BUBBLEBEAM"
+    ],
+    [
+     30,
      "AGILITY"
     ],
     [
-     52,
+     37,
+     "WATERPULSE"
+    ],
+    [
+     44,
+     "DRAGONPULSE"
+    ],
+    [
+     51,
      "HYDROPUMP"
+    ],
+    [
+     58,
+     "DRAGONDANCE"
+    ],
+    [
+     65,
+     "RAINDANCE"
     ]
    ],
    "num": 117,
@@ -47143,28 +50263,44 @@
      "TAILWHIP"
     ],
     [
-     19,
+     5,
      "SUPERSONIC"
     ],
     [
-     24,
+     10,
+     "WATERPULSE"
+    ],
+    [
+     15,
      "HORNATTACK"
     ],
     [
-     30,
-     "FURYATTACK"
+     20,
+     "AGILITY"
     ],
     [
-     37,
+     25,
+     "AQUARING"
+    ],
+    [
+     30,
+     "FLAIL"
+    ],
+    [
+     35,
      "WATERFALL"
     ],
     [
-     45,
-     "HORNDRILL"
+     40,
+     "SOAK"
     ],
     [
-     54,
-     "AGILITY"
+     45,
+     "MEGAHORN"
+    ],
+    [
+     50,
+     "HORNDRILL"
     ]
    ],
    "num": 118,
@@ -47231,24 +50367,40 @@
      "TAILWHIP"
     ],
     [
-     24,
+     1,
+     "WATERPULSE"
+    ],
+    [
+     15,
      "HORNATTACK"
     ],
     [
-     30,
-     "FURYATTACK"
+     20,
+     "AGILITY"
     ],
     [
-     39,
+     25,
+     "AQUARING"
+    ],
+    [
+     30,
+     "FLAIL"
+    ],
+    [
+     37,
      "WATERFALL"
     ],
     [
-     48,
-     "HORNDRILL"
+     44,
+     "SOAK"
     ],
     [
-     54,
-     "AGILITY"
+     51,
+     "MEGAHORN"
+    ],
+    [
+     58,
+     "HORNDRILL"
     ]
    ],
    "num": 119,
@@ -47312,34 +50464,66 @@
    "moves": [
     [
      1,
-     "TACKLE"
-    ],
-    [
-     17,
-     "WATERGUN"
-    ],
-    [
-     22,
      "HARDEN"
     ],
     [
-     27,
-     "RECOVER"
+     1,
+     "TACKLE"
     ],
     [
-     32,
-     "SWIFT"
+     4,
+     "WATERGUN"
     ],
     [
-     37,
+     8,
+     "CONFUSERAY"
+    ],
+    [
+     12,
+     "RAPIDSPIN"
+    ],
+    [
+     16,
      "MINIMIZE"
     ],
     [
-     42,
+     20,
+     "SWIFT"
+    ],
+    [
+     24,
+     "PSYBEAM"
+    ],
+    [
+     28,
+     "BRINE"
+    ],
+    [
+     32,
      "LIGHTSCREEN"
     ],
     [
-     47,
+     36,
+     "POWERGEM"
+    ],
+    [
+     40,
+     "PSYCHIC"
+    ],
+    [
+     44,
+     "SURF"
+    ],
+    [
+     48,
+     "RECOVER"
+    ],
+    [
+     52,
+     "COSMICPOWER"
+    ],
+    [
+     56,
      "HYDROPUMP"
     ]
    ],
@@ -47396,7 +50580,59 @@
    "moves": [
     [
      1,
+     "BRINE"
+    ],
+    [
+     1,
+     "CONFUSERAY"
+    ],
+    [
+     1,
+     "COSMICPOWER"
+    ],
+    [
+     1,
      "HARDEN"
+    ],
+    [
+     1,
+     "HYDROPUMP"
+    ],
+    [
+     1,
+     "LIGHTSCREEN"
+    ],
+    [
+     1,
+     "MINIMIZE"
+    ],
+    [
+     1,
+     "POWERGEM"
+    ],
+    [
+     1,
+     "PSYBEAM"
+    ],
+    [
+     1,
+     "PSYCHIC"
+    ],
+    [
+     1,
+     "RAPIDSPIN"
+    ],
+    [
+     1,
+     "RECOVER"
+    ],
+    [
+     1,
+     "SURF"
+    ],
+    [
+     1,
+     "SWIFT"
     ],
     [
      1,
@@ -47461,27 +50697,35 @@
    "moves": [
     [
      1,
-     "BARRIER"
-    ],
-    [
-     1,
      "CONFUSION"
     ],
     [
-     23,
-     "LIGHTSCREEN"
+     6,
+     "HYPNOSIS"
     ],
     [
-     31,
-     "DOUBLESLAP"
+     11,
+     "IRONDEFENSE"
     ],
     [
-     39,
-     "MEDITATE"
+     18,
+     "ZENHEADBUTT"
     ],
     [
-     47,
-     "SUBSTITUTE"
+     25,
+     "MIMIC"
+    ],
+    [
+     34,
+     "PSYCHIC"
+    ],
+    [
+     43,
+     "CALMMIND"
+    ],
+    [
+     46,
+     "DAZZLINGGLEAM"
     ]
    ],
    "num": 122,
@@ -47554,31 +50798,55 @@
    "moves": [
     [
      1,
-     "QUICKATTACK"
-    ],
-    [
-     17,
      "LEER"
     ],
     [
-     20,
-     "FOCUSENERGY"
+     1,
+     "QUICKATTACK"
     ],
     [
-     24,
+     4,
+     "FURYCUTTER"
+    ],
+    [
+     8,
+     "FALSESWIPE"
+    ],
+    [
+     12,
+     "WINGATTACK"
+    ],
+    [
+     16,
      "DOUBLETEAM"
     ],
     [
-     29,
+     20,
+     "DOUBLEHIT"
+    ],
+    [
+     24,
      "SLASH"
     ],
     [
-     35,
-     "SWORDSDANCE"
+     28,
+     "FOCUSENERGY"
     ],
     [
-     42,
+     32,
      "AGILITY"
+    ],
+    [
+     36,
+     "AIRSLASH"
+    ],
+    [
+     40,
+     "XSCISSOR"
+    ],
+    [
+     44,
+     "SWORDSDANCE"
     ]
    ],
    "num": 123,
@@ -47635,31 +50903,59 @@
    "moves": [
     [
      1,
-     "LOVELYKISS"
+     "COPYCAT"
+    ],
+    [
+     1,
+     "LICK"
     ],
     [
      1,
      "POUND"
     ],
     [
-     18,
-     "LICK"
+     1,
+     "POWDERSNOW"
     ],
     [
-     23,
-     "DOUBLESLAP"
+     1,
+     "SWEETKISS"
     ],
     [
-     31,
+     12,
+     "CONFUSION"
+    ],
+    [
+     16,
+     "COVET"
+    ],
+    [
+     20,
+     "SING"
+    ],
+    [
+     24,
+     "FAKETEARS"
+    ],
+    [
+     28,
      "ICEPUNCH"
     ],
     [
-     39,
-     "BODYSLAM"
+     34,
+     "PSYCHIC"
     ],
     [
-     47,
-     "THRASH"
+     40,
+     "LOVELYKISS"
+    ],
+    [
+     46,
+     "MEANLOOK"
+    ],
+    [
+     52,
+     "PERISHSONG"
     ],
     [
      58,
@@ -47728,6 +51024,10 @@
    "moves": [
     [
      1,
+     "CHARGE"
+    ],
+    [
+     1,
      "LEER"
     ],
     [
@@ -47735,24 +51035,52 @@
      "QUICKATTACK"
     ],
     [
-     34,
+     1,
      "THUNDERSHOCK"
     ],
     [
-     37,
+     12,
+     "SWIFT"
+    ],
+    [
+     16,
+     "SHOCKWAVE"
+    ],
+    [
+     20,
+     "THUNDERWAVE"
+    ],
+    [
+     24,
      "SCREECH"
     ],
     [
-     42,
+     28,
      "THUNDERPUNCH"
     ],
     [
-     49,
+     34,
+     "DISCHARGE"
+    ],
+    [
+     40,
+     "LOWKICK"
+    ],
+    [
+     46,
+     "THUNDERBOLT"
+    ],
+    [
+     52,
      "LIGHTSCREEN"
     ],
     [
-     54,
+     58,
      "THUNDER"
+    ],
+    [
+     64,
+     "GIGAIMPACT"
     ]
    ],
    "num": 125,
@@ -47819,28 +51147,60 @@
      "EMBER"
     ],
     [
-     36,
+     1,
      "LEER"
     ],
     [
-     39,
-     "CONFUSERAY"
-    ],
-    [
-     43,
-     "FIREPUNCH"
-    ],
-    [
-     48,
-     "SMOKESCREEN"
-    ],
-    [
-     52,
+     1,
      "SMOG"
     ],
     [
-     55,
+     1,
+     "SMOKESCREEN"
+    ],
+    [
+     12,
+     "CLEARSMOG"
+    ],
+    [
+     16,
+     "FLAMEWHEEL"
+    ],
+    [
+     20,
+     "CONFUSERAY"
+    ],
+    [
+     24,
+     "SCARYFACE"
+    ],
+    [
+     28,
+     "FIREPUNCH"
+    ],
+    [
+     34,
+     "LAVAPLUME"
+    ],
+    [
+     40,
+     "LOWKICK"
+    ],
+    [
+     46,
      "FLAMETHROWER"
+    ],
+    [
+     52,
+     "SUNNYDAY"
+    ],
+    [
+     58,
+     "FIREBLAST"
+    ],
+    [
+     64,
+     "HYPERBEAM"
     ]
    ],
    "num": 126,
@@ -47896,31 +51256,63 @@
    "moves": [
     [
      1,
-     "VICEGRIP"
-    ],
-    [
-     25,
-     "SEISMICTOSS"
-    ],
-    [
-     30,
-     "GUILLOTINE"
-    ],
-    [
-     36,
-     "FOCUSENERGY"
-    ],
-    [
-     43,
      "HARDEN"
     ],
     [
-     49,
-     "SLASH"
+     1,
+     "VICEGRIP"
     ],
     [
-     54,
+     4,
+     "FOCUSENERGY"
+    ],
+    [
+     8,
+     "BIND"
+    ],
+    [
+     12,
+     "SEISMICTOSS"
+    ],
+    [
+     16,
+     "BUGBITE"
+    ],
+    [
+     20,
+     "STORMTHROW"
+    ],
+    [
+     24,
+     "DOUBLEHIT"
+    ],
+    [
+     28,
+     "VITALTHROW"
+    ],
+    [
+     32,
+     "XSCISSOR"
+    ],
+    [
+     36,
+     "STRENGTH"
+    ],
+    [
+     40,
      "SWORDSDANCE"
+    ],
+    [
+     44,
+     "SUBMISSION"
+    ],
+    [
+     48,
+     "GUILLOTINE"
+    ],
+    [
+     52,
+     "SUPERPOWER"
     ]
    ],
    "num": 127,
@@ -47979,24 +51371,56 @@
      "TACKLE"
     ],
     [
-     21,
-     "STOMP"
-    ],
-    [
-     28,
+     1,
      "TAILWHIP"
     ],
     [
+     5,
+     "WORKUP"
+    ],
+    [
+     10,
+     "PAYBACK"
+    ],
+    [
+     15,
+     "ASSURANCE"
+    ],
+    [
+     20,
+     "HORNATTACK"
+    ],
+    [
+     25,
+     "SCARYFACE"
+    ],
+    [
+     30,
+     "ZENHEADBUTT"
+    ],
+    [
      35,
-     "LEER"
+     "RAGINGBULL"
     ],
     [
-     44,
-     "RAGE"
+     40,
+     "REST"
     ],
     [
-     51,
-     "TAKEDOWN"
+     45,
+     "SWAGGER"
+    ],
+    [
+     50,
+     "THRASH"
+    ],
+    [
+     55,
+     "DOUBLEEDGE"
+    ],
+    [
+     60,
+     "GIGAIMPACT"
     ]
    ],
    "num": 128,
@@ -48065,6 +51489,10 @@
     [
      15,
      "TACKLE"
+    ],
+    [
+     25,
+     "FLAIL"
     ]
    ],
    "num": 129,
@@ -48124,15 +51552,71 @@
     ],
     [
      1,
-     "DRAGONRAGE"
-    ],
-    [
-     1,
-     "HYDROPUMP"
+     "FLAIL"
     ],
     [
      1,
      "LEER"
+    ],
+    [
+     1,
+     "SPLASH"
+    ],
+    [
+     1,
+     "TACKLE"
+    ],
+    [
+     1,
+     "TWISTER"
+    ],
+    [
+     4,
+     "WHIRLPOOL"
+    ],
+    [
+     8,
+     "ICEFANG"
+    ],
+    [
+     12,
+     "BRINE"
+    ],
+    [
+     16,
+     "SCARYFACE"
+    ],
+    [
+     21,
+     "WATERFALL"
+    ],
+    [
+     24,
+     "CRUNCH"
+    ],
+    [
+     28,
+     "RAINDANCE"
+    ],
+    [
+     32,
+     "AQUATAIL"
+    ],
+    [
+     36,
+     "DRAGONDANCE"
+    ],
+    [
+     40,
+     "HYDROPUMP"
+    ],
+    [
+     44,
+     "HURRICANE"
+    ],
+    [
+     48,
+     "THRASH"
     ],
     [
      52,
@@ -48201,28 +51685,56 @@
      "WATERGUN"
     ],
     [
-     16,
+     5,
      "SING"
     ],
     [
-     20,
+     10,
      "MIST"
     ],
     [
-     25,
-     "BODYSLAM"
+     15,
+     "LIFEDEW"
     ],
     [
-     31,
+     20,
+     "ICESHARD"
+    ],
+    [
+     25,
      "CONFUSERAY"
     ],
     [
-     38,
+     30,
+     "WATERPULSE"
+    ],
+    [
+     35,
+     "BRINE"
+    ],
+    [
+     40,
+     "BODYSLAM"
+    ],
+    [
+     45,
      "ICEBEAM"
     ],
     [
-     46,
+     50,
+     "RAINDANCE"
+    ],
+    [
+     55,
      "HYDROPUMP"
+    ],
+    [
+     60,
+     "PERISHSONG"
+    ],
+    [
+     65,
+     "SHEERCOLD"
     ]
    ],
    "num": 131,
@@ -48394,27 +51906,67 @@
    "moves": [
     [
      1,
-     "SANDATTACK"
+     "COVET"
+    ],
+    [
+     1,
+     "GROWL"
+    ],
+    [
+     1,
+     "HELPINGHAND"
     ],
     [
      1,
      "TACKLE"
     ],
     [
-     27,
-     "QUICKATTACK"
-    ],
-    [
-     31,
+     1,
      "TAILWHIP"
     ],
     [
-     37,
+     5,
+     "SANDATTACK"
+    ],
+    [
+     10,
+     "QUICKATTACK"
+    ],
+    [
+     15,
+     "BABYDOLLEYES"
+    ],
+    [
+     20,
+     "SWIFT"
+    ],
+    [
+     25,
      "BITE"
     ],
     [
-     45,
+     30,
+     "COPYCAT"
+    ],
+    [
+     35,
+     "BATONPASS"
+    ],
+    [
+     40,
      "TAKEDOWN"
+    ],
+    [
+     45,
+     "CHARM"
+    ],
+    [
+     50,
+     "DOUBLEEDGE"
+    ],
+    [
+     55,
+     "LASTRESORT"
     ]
    ],
    "num": 133,
@@ -48473,39 +52025,95 @@
     ],
     [
      1,
-     "QUICKATTACK"
+     "BATONPASS"
     ],
     [
      1,
-     "SANDATTACK"
+     "BITE"
+    ],
+    [
+     1,
+     "CHARM"
+    ],
+    [
+     1,
+     "COPYCAT"
+    ],
+    [
+     1,
+     "COVET"
+    ],
+    [
+     1,
+     "DOUBLEEDGE"
+    ],
+    [
+     1,
+     "GROWL"
+    ],
+    [
+     1,
+     "HELPINGHAND"
+    ],
+    [
+     1,
+     "SWIFT"
     ],
     [
      1,
      "TACKLE"
     ],
     [
-     37,
+     1,
      "TAILWHIP"
     ],
     [
-     40,
-     "BITE"
+     1,
+     "TAKEDOWN"
     ],
     [
-     42,
-     "ACIDARMOR"
+     5,
+     "SANDATTACK"
     ],
     [
-     44,
+     10,
+     "QUICKATTACK"
+    ],
+    [
+     15,
+     "BABYDOLLEYES"
+    ],
+    [
+     20,
      "HAZE"
     ],
     [
-     48,
-     "MIST"
+     25,
+     "WATERPULSE"
     ],
     [
-     54,
+     30,
+     "AURORABEAM"
+    ],
+    [
+     35,
+     "AQUARING"
+    ],
+    [
+     40,
+     "MUDDYWATER"
+    ],
+    [
+     45,
+     "ACIDARMOR"
+    ],
+    [
+     50,
      "HYDROPUMP"
+    ],
+    [
+     55,
+     "LASTRESORT"
     ]
    ],
    "num": 134,
@@ -48564,39 +52172,95 @@
     ],
     [
      1,
-     "QUICKATTACK"
+     "BATONPASS"
     ],
     [
      1,
-     "SANDATTACK"
+     "BITE"
+    ],
+    [
+     1,
+     "CHARM"
+    ],
+    [
+     1,
+     "COPYCAT"
+    ],
+    [
+     1,
+     "COVET"
+    ],
+    [
+     1,
+     "DOUBLEEDGE"
+    ],
+    [
+     1,
+     "GROWL"
+    ],
+    [
+     1,
+     "HELPINGHAND"
+    ],
+    [
+     1,
+     "SWIFT"
     ],
     [
      1,
      "TACKLE"
     ],
     [
-     37,
+     1,
      "TAILWHIP"
     ],
     [
-     40,
+     1,
+     "TAKEDOWN"
+    ],
+    [
+     5,
+     "SANDATTACK"
+    ],
+    [
+     10,
+     "QUICKATTACK"
+    ],
+    [
+     15,
+     "BABYDOLLEYES"
+    ],
+    [
+     20,
      "THUNDERWAVE"
     ],
     [
-     42,
+     25,
      "DOUBLEKICK"
     ],
     [
-     44,
-     "AGILITY"
+     30,
+     "THUNDERFANG"
     ],
     [
-     48,
+     35,
      "PINMISSILE"
     ],
     [
-     54,
+     40,
+     "DISCHARGE"
+    ],
+    [
+     45,
+     "AGILITY"
+    ],
+    [
+     50,
      "THUNDER"
+    ],
+    [
+     55,
+     "LASTRESORT"
     ]
    ],
    "num": 135,
@@ -48655,39 +52319,91 @@
     ],
     [
      1,
-     "QUICKATTACK"
+     "BATONPASS"
     ],
     [
      1,
-     "SANDATTACK"
+     "CHARM"
+    ],
+    [
+     1,
+     "COPYCAT"
+    ],
+    [
+     1,
+     "COVET"
+    ],
+    [
+     1,
+     "DOUBLEEDGE"
+    ],
+    [
+     1,
+     "GROWL"
+    ],
+    [
+     1,
+     "HELPINGHAND"
+    ],
+    [
+     1,
+     "SWIFT"
     ],
     [
      1,
      "TACKLE"
     ],
     [
-     37,
+     1,
      "TAILWHIP"
     ],
     [
-     40,
+     1,
+     "TAKEDOWN"
+    ],
+    [
+     5,
+     "SANDATTACK"
+    ],
+    [
+     10,
+     "QUICKATTACK"
+    ],
+    [
+     15,
+     "BABYDOLLEYES"
+    ],
+    [
+     20,
+     "SMOG"
+    ],
+    [
+     25,
      "BITE"
     ],
     [
-     42,
-     "LEER"
+     30,
+     "FIREFANG"
     ],
     [
-     44,
+     35,
      "FIRESPIN"
     ],
     [
-     48,
-     "RAGE"
+     40,
+     "LAVAPLUME"
     ],
     [
-     54,
-     "FLAMETHROWER"
+     45,
+     "SCARYFACE"
+    ],
+    [
+     50,
+     "FLAREBLITZ"
+    ],
+    [
+     55,
+     "LASTRESORT"
     ]
    ],
    "num": 136,
@@ -48756,27 +52472,55 @@
     ],
     [
      1,
-     "SHARPEN"
-    ],
-    [
-     1,
      "TACKLE"
     ],
     [
-     23,
+     5,
+     "RECYCLE"
+    ],
+    [
+     10,
+     "MAGNETRISE"
+    ],
+    [
+     15,
+     "THUNDERSHOCK"
+    ],
+    [
+     20,
      "PSYBEAM"
     ],
     [
-     28,
-     "RECOVER"
+     25,
+     "CONVERSION2"
     ],
     [
-     35,
+     30,
      "AGILITY"
     ],
     [
-     42,
+     35,
+     "RECOVER"
+    ],
+    [
+     40,
+     "DISCHARGE"
+    ],
+    [
+     45,
      "TRIATTACK"
+    ],
+    [
+     50,
+     "DOUBLEEDGE"
+    ],
+    [
+     55,
+     "LOCKON"
+    ],
+    [
+     60,
+     "ZAPCANNON"
     ]
    ],
    "num": 137,
@@ -48841,26 +52585,58 @@
    "moves": [
     [
      1,
-     "WATERGUN"
+     "BIND"
     ],
     [
      1,
      "WITHDRAW"
     ],
     [
-     34,
-     "HORNATTACK"
+     5,
+     "ROLLOUT"
     ],
     [
-     39,
+     10,
+     "SANDATTACK"
+    ],
+    [
+     15,
+     "WATERGUN"
+    ],
+    [
+     20,
      "LEER"
     ],
     [
-     46,
-     "SPIKECANNON"
+     25,
+     "MUDSHOT"
     ],
     [
-     53,
+     30,
+     "ANCIENTPOWER"
+    ],
+    [
+     35,
+     "BRINE"
+    ],
+    [
+     41,
+     "PROTECT"
+    ],
+    [
+     45,
+     "ROCKBLAST"
+    ],
+    [
+     50,
+     "SURF"
+    ],
+    [
+     55,
+     "SHELLSMASH"
+    ],
+    [
+     60,
      "HYDROPUMP"
     ]
    ],
@@ -48923,26 +52699,58 @@
     ],
     [
      1,
-     "HORNATTACK"
+     "BIND"
     ],
     [
      1,
-     "WATERGUN"
+     "ROLLOUT"
+    ],
+    [
+     1,
+     "SANDATTACK"
     ],
     [
      1,
      "WITHDRAW"
     ],
     [
-     39,
+     15,
+     "WATERGUN"
+    ],
+    [
+     20,
      "LEER"
     ],
     [
-     44,
-     "SPIKECANNON"
+     25,
+     "MUDSHOT"
+    ],
+    [
+     30,
+     "ANCIENTPOWER"
+    ],
+    [
+     35,
+     "BRINE"
+    ],
+    [
+     43,
+     "PROTECT"
     ],
     [
      49,
+     "ROCKBLAST"
+    ],
+    [
+     56,
+     "SURF"
+    ],
+    [
+     63,
+     "SHELLSMASH"
+    ],
+    [
+     70,
      "HYDROPUMP"
     ]
    ],
@@ -49009,27 +52817,59 @@
    "moves": [
     [
      1,
-     "HARDEN"
-    ],
-    [
-     1,
-     "SCRATCH"
-    ],
-    [
-     34,
      "ABSORB"
     ],
     [
-     39,
-     "SLASH"
+     1,
+     "HARDEN"
     ],
     [
-     44,
+     5,
+     "SCRATCH"
+    ],
+    [
+     10,
+     "SANDATTACK"
+    ],
+    [
+     15,
+     "AQUAJET"
+    ],
+    [
+     20,
      "LEER"
     ],
     [
-     49,
-     "HYDROPUMP"
+     25,
+     "MUDSHOT"
+    ],
+    [
+     30,
+     "ANCIENTPOWER"
+    ],
+    [
+     35,
+     "BRINE"
+    ],
+    [
+     41,
+     "PROTECT"
+    ],
+    [
+     45,
+     "LEECHLIFE"
+    ],
+    [
+     50,
+     "LIQUIDATION"
+    ],
+    [
+     55,
+     "METALSOUND"
+    ],
+    [
+     60,
+     "STONEEDGE"
     ]
    ],
    "num": 140,
@@ -49095,19 +52935,63 @@
     ],
     [
      1,
+     "FEINT"
+    ],
+    [
+     1,
      "HARDEN"
+    ],
+    [
+     1,
+     "NIGHTSLASH"
+    ],
+    [
+     1,
+     "SANDATTACK"
     ],
     [
      1,
      "SCRATCH"
     ],
     [
-     46,
+     15,
+     "AQUAJET"
+    ],
+    [
+     20,
      "LEER"
     ],
     [
-     53,
-     "HYDROPUMP"
+     25,
+     "MUDSHOT"
+    ],
+    [
+     30,
+     "ANCIENTPOWER"
+    ],
+    [
+     35,
+     "BRINE"
+    ],
+    [
+     43,
+     "PROTECT"
+    ],
+    [
+     49,
+     "LEECHLIFE"
+    ],
+    [
+     56,
+     "LIQUIDATION"
+    ],
+    [
+     63,
+     "METALSOUND"
+    ],
+    [
+     70,
+     "STONEEDGE"
     ]
    ],
    "num": 141,
@@ -49164,27 +53048,59 @@
    "moves": [
     [
      1,
-     "AGILITY"
+     "ANCIENTPOWER"
     ],
     [
      1,
-     "WINGATTACK"
-    ],
-    [
-     33,
-     "SUPERSONIC"
-    ],
-    [
-     38,
      "BITE"
     ],
     [
-     45,
+     5,
+     "SUPERSONIC"
+    ],
+    [
+     10,
+     "WINGATTACK"
+    ],
+    [
+     15,
+     "SCARYFACE"
+    ],
+    [
+     20,
+     "ROCKSLIDE"
+    ],
+    [
+     25,
+     "ROAR"
+    ],
+    [
+     30,
+     "CRUNCH"
+    ],
+    [
+     35,
+     "IRONHEAD"
+    ],
+    [
+     40,
      "TAKEDOWN"
     ],
     [
-     54,
+     45,
+     "STONEEDGE"
+    ],
+    [
+     50,
+     "AGILITY"
+    ],
+    [
+     55,
      "HYPERBEAM"
+    ],
+    [
+     60,
+     "GIGAIMPACT"
     ]
    ],
    "num": 142,
@@ -49241,31 +53157,111 @@
    "moves": [
     [
      1,
-     "AMNESIA"
+     "BLOCK"
     ],
     [
      1,
-     "HEADBUTT"
+     "COVET"
     ],
     [
      1,
+     "DEFENSECURL"
+    ],
+    [
+     1,
+     "FLAIL"
+    ],
+    [
+     1,
+     "FLING"
+    ],
+    [
+     1,
+     "LASTRESORT"
+    ],
+    [
+     1,
+     "LICK"
+    ],
+    [
+     1,
+     "METRONOME"
+    ],
+    [
+     1,
+     "RECYCLE"
+    ],
+    [
+     1,
+     "SCREECH"
+    ],
+    [
+     1,
+     "STOCKPILE"
+    ],
+    [
+     1,
+     "SWALLOW"
+    ],
+    [
+     1,
+     "TACKLE"
+    ],
+    [
+     12,
+     "YAWN"
+    ],
+    [
+     16,
+     "BITE"
+    ],
+    [
+     20,
      "REST"
     ],
     [
-     35,
+     20,
+     "SLEEPTALK"
+    ],
+    [
+     20,
+     "SNORE"
+    ],
+    [
+     24,
+     "CRUNCH"
+    ],
+    [
+     28,
      "BODYSLAM"
     ],
     [
-     41,
-     "HARDEN"
+     32,
+     "HEAVYSLAM"
+    ],
+    [
+     36,
+     "AMNESIA"
+    ],
+    [
+     40,
+     "HIGHHORSEPOWER"
+    ],
+    [
+     44,
+     "HAMMERARM"
     ],
     [
      48,
-     "DOUBLEEDGE"
+     "BELLYDRUM"
+    ],
+    [
+     52,
+     "BELCH"
     ],
     [
      56,
-     "HYPERBEAM"
+     "GIGAIMPACT"
     ]
    ],
    "num": 143,
@@ -49320,23 +53316,67 @@
    "moves": [
     [
      1,
-     "ICEBEAM"
+     "GUST"
     ],
     [
      1,
-     "PECK"
+     "MIST"
     ],
     [
-     51,
-     "BLIZZARD"
+     5,
+     "POWDERSNOW"
     ],
     [
-     55,
+     10,
+     "REFLECT"
+    ],
+    [
+     15,
+     "ICESHARD"
+    ],
+    [
+     20,
      "AGILITY"
     ],
     [
+     25,
+     "ANCIENTPOWER"
+    ],
+    [
+     30,
+     "TAILWIND"
+    ],
+    [
+     35,
+     "FREEZEDRY"
+    ],
+    [
+     40,
+     "ROOST"
+    ],
+    [
+     45,
+     "ICEBEAM"
+    ],
+    [
+     50,
+     "SNOWSCAPE"
+    ],
+    [
+     55,
+     "HURRICANE"
+    ],
+    [
      60,
-     "MIST"
+     "HAZE"
+    ],
+    [
+     65,
+     "BLIZZARD"
+    ],
+    [
+     70,
+     "SHEERCOLD"
     ]
    ],
    "num": 144,
@@ -49392,23 +53432,67 @@
    "moves": [
     [
      1,
-     "DRILLPECK"
+     "PECK"
     ],
     [
      1,
+     "THUNDERWAVE"
+    ],
+    [
+     5,
      "THUNDERSHOCK"
     ],
     [
-     51,
-     "THUNDER"
+     10,
+     "LIGHTSCREEN"
     ],
     [
-     55,
+     15,
+     "PLUCK"
+    ],
+    [
+     20,
      "AGILITY"
     ],
     [
+     25,
+     "ANCIENTPOWER"
+    ],
+    [
+     30,
+     "CHARGE"
+    ],
+    [
+     35,
+     "DRILLPECK"
+    ],
+    [
+     40,
+     "ROOST"
+    ],
+    [
+     45,
+     "DISCHARGE"
+    ],
+    [
+     50,
+     "RAINDANCE"
+    ],
+    [
+     55,
+     "THUNDER"
+    ],
+    [
      60,
-     "LIGHTSCREEN"
+     "DETECT"
+    ],
+    [
+     65,
+     "MAGNETICFLUX"
+    ],
+    [
+     70,
+     "ZAPCANNON"
     ]
    ],
    "num": 145,
@@ -49464,22 +53548,66 @@
    "moves": [
     [
      1,
-     "FIRESPIN"
+     "GUST"
     ],
     [
      1,
-     "PECK"
-    ],
-    [
-     51,
      "LEER"
     ],
     [
-     55,
+     5,
+     "EMBER"
+    ],
+    [
+     10,
+     "SAFEGUARD"
+    ],
+    [
+     15,
+     "WINGATTACK"
+    ],
+    [
+     20,
      "AGILITY"
     ],
     [
+     25,
+     "ANCIENTPOWER"
+    ],
+    [
+     30,
+     "INCINERATE"
+    ],
+    [
+     35,
+     "AIRSLASH"
+    ],
+    [
+     40,
+     "ROOST"
+    ],
+    [
+     45,
+     "HEATWAVE"
+    ],
+    [
+     50,
+     "SUNNYDAY"
+    ],
+    [
+     55,
+     "HURRICANE"
+    ],
+    [
      60,
+     "ENDURE"
+    ],
+    [
+     65,
+     "OVERHEAT"
+    ],
+    [
+     70,
      "SKYATTACK"
     ]
    ],
@@ -49552,23 +53680,51 @@
      "WRAP"
     ],
     [
+     5,
+     "TWISTER"
+    ],
+    [
      10,
      "THUNDERWAVE"
+    ],
+    [
+     15,
+     "DRAGONTAIL"
     ],
     [
      20,
      "AGILITY"
     ],
     [
-     30,
+     25,
      "SLAM"
     ],
     [
+     31,
+     "AQUATAIL"
+    ],
+    [
+     35,
+     "DRAGONRUSH"
+    ],
+    [
      40,
-     "DRAGONRAGE"
+     "SAFEGUARD"
+    ],
+    [
+     45,
+     "RAINDANCE"
     ],
     [
      50,
+     "DRAGONDANCE"
+    ],
+    [
+     55,
+     "OUTRAGE"
+    ],
+    [
+     60,
      "HYPERBEAM"
     ]
    ],
@@ -49641,22 +53797,50 @@
     ],
     [
      1,
+     "TWISTER"
+    ],
+    [
+     1,
      "WRAP"
+    ],
+    [
+     15,
+     "DRAGONTAIL"
     ],
     [
      20,
      "AGILITY"
     ],
     [
-     35,
+     25,
      "SLAM"
     ],
     [
-     45,
-     "DRAGONRAGE"
+     33,
+     "AQUATAIL"
     ],
     [
-     55,
+     39,
+     "DRAGONRUSH"
+    ],
+    [
+     46,
+     "SAFEGUARD"
+    ],
+    [
+     53,
+     "RAINDANCE"
+    ],
+    [
+     60,
+     "DRAGONDANCE"
+    ],
+    [
+     67,
+     "OUTRAGE"
+    ],
+    [
+     74,
      "HYPERBEAM"
     ]
    ],
@@ -49717,7 +53901,11 @@
     ],
     [
      1,
-     "AGILITY"
+     "EXTREMESPEED"
+    ],
+    [
+     1,
+     "FIREPUNCH"
     ],
     [
      1,
@@ -49725,22 +53913,66 @@
     ],
     [
      1,
+     "ROOST"
+    ],
+    [
+     1,
+     "THUNDERPUNCH"
+    ],
+    [
+     1,
      "THUNDERWAVE"
+    ],
+    [
+     1,
+     "TWISTER"
+    ],
+    [
+     1,
+     "WINGATTACK"
     ],
     [
      1,
      "WRAP"
     ],
     [
-     35,
+     15,
+     "DRAGONTAIL"
+    ],
+    [
+     20,
+     "AGILITY"
+    ],
+    [
+     25,
      "SLAM"
     ],
     [
-     45,
-     "DRAGONRAGE"
+     33,
+     "AQUATAIL"
     ],
     [
-     60,
+     39,
+     "DRAGONRUSH"
+    ],
+    [
+     41,
+     "OUTRAGE"
+    ],
+    [
+     46,
+     "SAFEGUARD"
+    ],
+    [
+     53,
+     "RAINDANCE"
+    ],
+    [
+     62,
+     "DRAGONDANCE"
+    ],
+    [
+     80,
      "HYPERBEAM"
     ]
    ],
@@ -49805,27 +54037,59 @@
     ],
     [
      1,
-     "PSYCHIC"
+     "LIFEDEW"
     ],
     [
      1,
      "SWIFT"
     ],
     [
-     63,
-     "BARRIER"
+     8,
+     "ANCIENTPOWER"
     ],
     [
-     70,
-     "RECOVER"
+     16,
+     "PSYCHOCUT"
     ],
     [
-     75,
+     24,
+     "SAFEGUARD"
+    ],
+    [
+     32,
+     "AMNESIA"
+    ],
+    [
+     40,
+     "AURASPHERE"
+    ],
+    [
+     48,
+     "PSYCHIC"
+    ],
+    [
+     56,
+     "GUARDSWAP"
+    ],
+    [
+     56,
+     "POWERSWAP"
+    ],
+    [
+     64,
      "MIST"
     ],
     [
-     81,
-     "AMNESIA"
+     72,
+     "PSYSTRIKE"
+    ],
+    [
+     80,
+     "RECOVER"
+    ],
+    [
+     88,
+     "FUTURESIGHT"
     ]
    ],
    "num": 150,
@@ -49883,19 +54147,47 @@
      "POUND"
     ],
     [
+     1,
+     "REFLECTTYPE"
+    ],
+    [
      10,
-     "TRANSFORM"
+     "AMNESIA"
     ],
     [
      20,
-     "MEGAPUNCH"
+     "BATONPASS"
     ],
     [
      30,
-     "METRONOME"
+     "ANCIENTPOWER"
     ],
     [
      40,
+     "LIFEDEW"
+    ],
+    [
+     50,
+     "NASTYPLOT"
+    ],
+    [
+     60,
+     "METRONOME"
+    ],
+    [
+     70,
+     "IMPRISON"
+    ],
+    [
+     80,
+     "TRANSFORM"
+    ],
+    [
+     90,
+     "AURASPHERE"
+    ],
+    [
+     100,
      "PSYCHIC"
     ]
    ],

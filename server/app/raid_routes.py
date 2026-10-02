@@ -73,11 +73,13 @@ def overview(ctx=Depends(deps.current)):
     return out
 
 
-def unseen(uid):
+def unseen(uid, now=None):
     """끝났는데 아직 화면에 안 알린 판의 수."""
+    # 끝난 지 오래된 판은 세지 않는다 (raid.recent_room 과 같은 기준).
     r = db.q1("SELECT COUNT(*) c FROM raid_member m JOIN raid_room r ON r.id=m.room_id"
               " WHERE m.user_id=? AND m.seen=0 AND r.state='done'"
-              " AND r.result IN ('won','lost','timeout')", (uid,))
+              " AND r.result IN ('won','lost','timeout') AND r.updated_at >= ?",
+              (uid, raid._result_cut(now)))
     return (r["c"] if r else 0) or 0
 
 

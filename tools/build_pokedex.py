@@ -39,6 +39,7 @@ NEEDED = [
     "move_meta.csv", "move_meta_stat_changes.csv", "move_meta_ailments.csv",
     "move_flags.csv", "move_flag_map.csv", "move_flavor_text.csv",
     "items.csv", "item_names.csv", "item_categories.csv",
+    "version_groups.csv",
 ]
 
 KO = 3          # PokeAPI 언어 id: 한국어
@@ -488,6 +489,19 @@ def build():
     # 레벨 1 에는 하이드로펌프가 있어서, 잉어킹이 진화하자마자 그걸
     # 들고 나온다. 그래서 **레벨 0 이 남아 있는 가장 최근 버전그룹**
     # (17~25, 5~7세대)에서 따로 모은다.
+    #
+    # **'가장 최근' 은 번호가 아니라 세대로 견준다.** PokeAPI 는 일본판 재발매
+    # (red-green-japan 28, blue-japan 29)를 나중에 등록해서 번호가 세대 순이
+    # 아니다. 번호만 보면 blue-japan(29)이 scarlet-violet(25)을 이겨서, 1세대
+    # 151종만 1996년 적·녹·청 학습표를 썼다 (자속기가 40% 비어 있었다 -
+    # 나시 0개, 갸라도스 1개). 세대를 먼저 보고, 같은 세대 안에서만 번호로 견준다.
+    # legends-arceus(24, 8세대)는 그대로 남는다 - 히스이 39종은 SV 에 없다.
+    vg_gen = dict((as_int(r["id"]), as_int(r["generation_id"]))
+                  for r in rows("version_groups.csv"))
+
+    def vg_rank(vg):
+        return (vg_gen.get(vg, 0), vg)
+
     best_vg, tmp = {}, {}
     evo_vg, evo_tmp = {}, {}
     for r in rows("pokemon_moves.csv"):
@@ -500,18 +514,18 @@ def build():
         if mid not in move_ident:
             continue
         if lv == 0:
-            if vg > evo_vg.get(pid, -1):
-                evo_vg[pid] = vg
+            if vg_rank(vg) > evo_vg.get(pid, (-1, -1)):
+                evo_vg[pid] = vg_rank(vg)
                 evo_tmp[pid] = []
-            if vg == evo_vg[pid]:
+            if vg_rank(vg) == evo_vg[pid]:
                 evo_tmp[pid].append(move_ident[mid])
             continue
         if lv < 0:
             continue
-        if vg > best_vg.get(pid, -1):
-            best_vg[pid] = vg
+        if vg_rank(vg) > best_vg.get(pid, (-1, -1)):
+            best_vg[pid] = vg_rank(vg)
             tmp[pid] = []
-        if vg == best_vg[pid]:
+        if vg_rank(vg) == best_vg[pid]:
             tmp[pid].append((lv, move_ident[mid]))
     lvmoves = {}
     for pid in set(tmp) | set(evo_tmp):

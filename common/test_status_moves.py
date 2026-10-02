@@ -427,6 +427,52 @@ def t_회복(dex):
     chk("치유소원: 다음에 나온 포켓몬이 가득 회복", tb.me.hp == tb.me.maxhp, tb.me.hp)
 
 
+def t_상대를_회복(dex):
+    """치유파동·플라워힐은 **상대**를 회복시킨다 (1.8.1). 그동안 쓴 쪽이 회복해서
+    사실상 HP회복과 같은 기술이었다. 검은오물은 지금 타입으로 본다."""
+    print("\n=== 상대를 회복시키는 기술 · 검은오물 ===")
+    for key in SM.HEALS_TARGET:
+        bt, me, foe = fight(dex, mon(dex, "GARDEVOIR", 50, [key, "PSYCHIC"]),
+                            mon(dex, "SNORLAX", 50, ["TACKLE"]))
+        me.hp, foe.hp = me.maxhp // 4, foe.maxhp // 2
+        mine, theirs = me.hp, foe.hp
+        ev = use(bt, "me", key)
+        chk("%s: 상대가 회복한다" % key, foe.hp > theirs and me.hp == mine,
+            (me.hp, mine, foe.hp, theirs))
+        heal = [e for e in ev if e.get("t") == "heal"]
+        chk("  회복 사건이 상대 쪽으로 간다", heal and heal[0]["who"] == "foe"
+            and heal[0]["hp"] == foe.hp, heal)
+        foe.hp = foe.maxhp
+        ev = use(bt, "me", key)
+        chk("  상대 체력이 가득이면 실패", any("실패" in (e.get("text") or "") for e in ev)
+            and foe.hp == foe.maxhp, texts(ev))
+        me.hp, foe.hp = me.maxhp // 4, foe.maxhp // 2
+        md = dex.moves[key]
+        chk("  AI 는 값어치 0 으로 본다 (내가 위태로워도 안 쓴다)",
+            bt._status_score(md, 30.0, me, foe) == 0.0, bt._status_score(md, 30.0, me, foe))
+    bt, me, foe = fight(dex, mon(dex, "GARDEVOIR", 50, ["RECOVER"]), mon(dex, "SNORLAX", 50, ["TACKLE"]))
+    me.hp = me.maxhp // 4
+    before = me.hp
+    use(bt, "me", "RECOVER")
+    chk("HP회복은 그대로 쓴 쪽이 회복한다", me.hp > before, (me.hp, before))
+
+    # 검은오물: 종족 기본 타입이 아니라 **지금 타입**
+    from common import held as H
+    bt, me, foe = fight(dex, mon(dex, "MUK", 50, ["TACKLE"], held="BLACKSLUDGE"),
+                        mon(dex, "SNORLAX", 50, ["TACKLE"], held="BLACKSLUDGE"))
+    me.hp, foe.hp = me.maxhp // 2, foe.maxhp // 2
+    a0, b0 = me.hp, foe.hp
+    eot(bt)
+    chk("검은오물: 독 타입은 회복, 아니면 깎인다", me.hp > a0 and foe.hp < b0, (me.hp, a0, foe.hp, b0))
+    for f, types in ((me, ["WATER"]), (foe, ["POISON"])):
+        f.types = (lambda t: (lambda: list(t)))(types)       # 물붓기·변환자재로 타입이 바뀐 것처럼
+    me.hp, foe.hp = me.maxhp // 2, foe.maxhp // 2
+    a0, b0 = me.hp, foe.hp
+    eot(bt)
+    chk("  타입이 바뀌면 그 타입으로 본다 (독이 아니게 된 질뻐기는 깎이고, 독이 된 잠만보는 회복)",
+        me.hp < a0 and foe.hp > b0, (me.hp, a0, foe.hp, b0))
+
+
 def t_길동무와_튕기기(dex):
     print("-- 길동무·원념·원한·가로채기·매직코트·지휘")
     bt, me, foe = fight(dex, mon(dex, "GENGAR", 30, ["DESTINYBOND", "GRUDGE"]), mon(dex, "TYRANITAR", 80, ["CRUNCH", "DRAGONDANCE"]))
@@ -785,7 +831,7 @@ def t_무작위(dex):
 def main():
     dex = load_dex()
     for fn in (t_빠진것, t_혼란, t_방어, t_제한, t_시간차, t_헤롱헤롱과_잠김, t_특성과_타입, t_능력, t_회복,
-               t_길동무와_튕기기, t_부르기, t_도구, t_날씨, t_필드와_방, t_진영, t_압정과_교체, t_싱글에서_실패,
+               t_상대를_회복, t_길동무와_튕기기, t_부르기, t_도구, t_날씨, t_필드와_방, t_진영, t_압정과_교체, t_싱글에서_실패,
                t_저장, t_AI, t_무작위):
         fn(dex)
     print()

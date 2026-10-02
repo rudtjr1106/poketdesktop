@@ -127,6 +127,34 @@ def main():
     lst2 = board.listing(a, "all", 2, now=at(2000))
     chk("  둘째 쪽에 나머지 7개 + 공지는 그대로", len(lst2["posts"]) == 7 and len(lst2["pinned"]) == 3)
     chk("  쪽 번호가 넘치면 마지막 쪽", board.listing(a, "all", 99)["page"] == 2)
+
+    print("\n=== Q&A (1.8.1) ===")
+    n_all = board.listing(a, "all", 1, now=at(2000))["total"]
+    n_free = board.listing(a, "free", 1, now=at(2000))["total"]
+    # (이슬은 위에서 하루치 스무 개를 다 썼다 - 지우가 묻는다)
+    q1 = board.create(a, "qna", "키스톤은 어디서 얻나요", "관장 8곳이라던데", now=at(2100))
+    q = board.detail(b, q1, now=at(2101))
+    chk("누구나 Q&A 를 쓴다", q["kind"] == "qna" and q["kindKr"] == "Q&A", (q["kind"], q["kindKr"]))
+    lq = board.listing(a, "qna", 1, now=at(2200))
+    chk("Q&A 목록에는 질문만", [x["id"] for x in lq["posts"]] == [q1] and lq["total"] == 1
+        and lq["pinned"] == [], (lq["total"], [x["id"] for x in lq["posts"]]))
+    chk("자유 목록에는 안 나온다", board.listing(a, "free", 1, now=at(2200))["total"] == n_free)
+    la = board.listing(a, "all", 1, now=at(2200))
+    chk("전체에는 자유 글과 함께 흐른다 (최신이 맨 위)", la["total"] == n_all + 1
+        and la["posts"][0]["id"] == q1 and all(x["kind"] != "notice" for x in la["posts"]),
+        (la["total"], n_all, la["posts"][0]["id"]))
+    chk("  공지는 여전히 맨 위에 따로", len(la["pinned"]) == 3 and all(x["kind"] == "notice"
+                                                         for x in la["pinned"]))
+    c1 = board.comment(b, q1, "관장 8곳을 깨면 받아요", now=at(2300))
+    chk("Q&A 에도 댓글·답글이 달린다", board.detail(a, q1, now=at(2301))["comments"] == 1 and c1)
+    board.remove(a, q1)
+    chk("지우면 목록에서 빠진다", board.listing(a, "qna", 1, now=at(2400))["total"] == 0
+        and board.listing(a, "all", 1, now=at(2400))["total"] == n_all)
+    try:
+        board.create(b, "잡담", "x", "y", now=at(2500))
+        chk("모르는 종류는 거절", False)
+    except ValueError:
+        chk("모르는 종류는 거절", True)
     ln = board.listing(a, "notice", 1)
     chk("공지만: 다섯 개, 붙박이는 없다", len(ln["posts"]) == 5 and ln["pinned"] == []
         and all(x["kind"] == "notice" for x in ln["posts"]))

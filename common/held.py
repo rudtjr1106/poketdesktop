@@ -455,7 +455,10 @@ def end_of_turn(bt, f, who, ev):
         _heal(f, who, f.maxhp // 16, ev,
               "%s 은(는) 먹다남은음식으로 체력을 조금 회복했다!" % f.name)
     elif h == "BLACKSLUDGE":
-        if "POISON" in ((f.species or {}).get("types") or []):
+        # **지금 타입**으로 본다. 종족 기본 타입을 보면 변환자재·리베로·물붓기로
+        # 타입이 바뀐 것을 놓친다 (독 타입이 된 포켓몬이 깎이고, 독이 아니게 된
+        # 포켓몬이 회복했다).
+        if "POISON" in f.types():
             _heal(f, who, f.maxhp // 16, ev,
                   "%s 은(는) 검은오물로 체력을 조금 회복했다!" % f.name)
         else:

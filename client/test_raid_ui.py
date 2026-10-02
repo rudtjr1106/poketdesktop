@@ -702,6 +702,60 @@ def main():
     st._drop_pillar()
     rest(root, 0.2)
 
+    # ---- 끝났는데 결과를 못 본 판 (1.8.1) ----
+    # 판 도중에 프로그램이 꺼지면 '결과를 봤다' 가 안 찍혀서 서버가 그 방을 계속
+    # 실어 준다. 예전에는 그걸 대기실로 그려서 "사람을 기다리는 중" 이 뜨고
+    # 참가하기가 사라졌다 (나가기도 거절당했다) - 다음 회차에 레이드를 못 했다.
+    print("\n=== 결과를 못 본 판은 대기실이 아니다 ===")
+
+    class DoneApi(FakeApi):
+        def raid(self):
+            d = FakeApi.raid(self)
+            if not self.seen:
+                self.state = "done"
+                room = self.room()
+                room.update({"result": "won", "canStart": False})
+                d["room"] = room
+            else:
+                d["room"] = None
+            return d
+    dapi = DoneApi(dex, n=4)
+    dapp = FakeApp(root, dapi, dex)
+    wd = ui_raid.RaidWindow(dapp)
+    pump(root, lambda: wd.data is not None and wd.body.winfo_children())
+    rest(root, 0.3)
+    seen_texts = []
+
+    def walk(w):
+        for c in w.winfo_children():
+            try:
+                t = c.cget("text")
+                if t:
+                    seen_texts.append(str(t))
+            except tk.TclError:
+                pass
+            walk(c)
+    walk(wd.win)
+    chk("'사람을 기다리는 중' 이 안 뜬다", not any("사람을 기다리는 중" in t for t in seen_texts),
+        [t for t in seen_texts if "기다리" in t])
+    chk("결과를 보여 준다 (성공·상금·알)", any("성공" in t for t in seen_texts)
+        and any("6,000" in t for t in seen_texts) and any("알을 받았다" in t for t in seen_texts),
+        seen_texts[:14])
+    chk("참가하기가 그대로 있다 (다음 회차를 막지 않는다)", "참가하기" in seen_texts, seen_texts[:20])
+    chk("나가기 단추는 없다 (들어가 있는 방이 아니다)", "나가기" not in seen_texts)
+    chk("  이 방을 2초마다 다시 묻지 않는다 (대기실이 아니다)",
+        (wd.data.get("room") or {}).get("state") == "done")
+    wd.seen()
+    pump(root, lambda: dapi.seen == 1 and wd.data is not None and wd.data.get("room") is None)
+    rest(root, 0.3)
+    seen_texts[:] = []
+    walk(wd.win)
+    chk("확인을 누르면 서버에 알리고 결과 칸이 사라진다", dapi.seen == 1
+        and not any("지난 레이드 —" in t for t in seen_texts) and "참가하기" in seen_texts,
+        (dapi.seen, [t for t in seen_texts if "지난" in t]))
+    wd.close()
+    rest(root, 0.2)
+
     rest(root, 0.3)
     chk("콜백에서 터진 곳 없음", not errors, errors[:1])
     try:

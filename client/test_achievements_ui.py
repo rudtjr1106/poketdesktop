@@ -86,6 +86,23 @@ class FakeApi(object):
         self.calls.append("list")
         return PUBLIC
 
+    def titles(self):
+        self.calls.append("titles")
+        return {"owned": 1, "total": 5, "season": 3, "seasonEnds": "2026-10-16", "titles": [
+            {"id": "ach_dex_400", "name": "도감 조사원", "group": "도감 수집",
+             "how": "포켓몬 400종을 잡아 도감에 올리기", "owned": False, "open": True,
+             "value": 120, "target": 400},
+            {"id": "ach_region_1", "name": "관동 도감 완성", "group": "지방 도감",
+             "how": "관동 지방 포켓몬을 모두 잡기 (전설·환상 제외)", "owned": True, "open": True},
+            {"id": "ach_hidden_midnight", "name": "???", "group": "숨은 업적",
+             "how": "숨은 업적 - 달성하면 알 수 있다", "owned": False, "open": True},
+            {"id": "s3_master", "name": "시즌 3 마스터볼", "group": "랭킹전 시즌 3",
+             "how": "시즌 3 에서 마스터볼 티어(RP 600)에 오르기 - 시즌이 끝날 때 받는다",
+             "owned": False, "open": True},
+            {"id": "s2_super", "name": "시즌 2 슈퍼볼", "group": "지난 시즌 (다시 얻을 수 없음)",
+             "how": "시즌 2 에서 슈퍼볼 티어(RP 150)에 오르기 - 시즌이 끝날 때 받는다",
+             "owned": False, "open": False}]}
+
     def achievements_seen(self):
         self.calls.append("seen")
         return {"ok": True}
@@ -195,6 +212,97 @@ def main():
             dw.ach_btn.label.cget("text"))
         bad = squeezed(dw.win)
         chk("머리줄 눌림 없음", not bad, bad[:3])
+
+        # ---- 칭호 목록 (1.8.1): 칭호마다 얻는 조건 ----
+        print("\n=== 도감 탭의 칭호 목록 ===")
+        chk("'칭호' 단추가 있다", dw.title_btn.label.cget("text") == "칭호",
+            dw.title_btn.label.cget("text"))
+        dw.toggle_titles()
+        pump(root, lambda: dw.titles is not None and dw.titles.data is not None)
+        root.update()
+        chk("누르면 칭호 목록", dw.titles.f.winfo_manager() and not dw.dex_body.winfo_manager())
+        chk("  단추가 '도감으로'", dw.title_btn.label.cget("text") == "도감으로")
+        got = []
+
+        def walk(w):
+            for c in w.winfo_children():
+                try:
+                    t = c.cget("text")
+                    if t:
+                        got.append(str(t))
+                except tk.TclError:
+                    pass
+                walk(c)
+        walk(dw.titles.f)
+        chk("가진 수를 적는다", "가진 칭호 1 / 5" in got, got[:4])
+        chk("칭호 이름과 얻는 조건이 같이 보인다",
+            "「도감 조사원」" in got and any("400종" in t for t in got), got[:12])
+        chk("가진 칭호에는 별과 '가지고 있음'", "★ 「관동 도감 완성」" in got and "가지고 있음" in got, got)
+        chk("못 얻은 것은 진행을 보여 준다", "120 / 400" in got, got)
+        chk("숨은 칭호는 가린다", "「???」" in got and any("숨은 업적" in t for t in got))
+        chk("랭킹전 칭호의 조건", any("마스터볼 티어(RP 600)" in t for t in got), got)
+        chk("지난 시즌 칭호는 '지금은 얻을 수 없음'", "지금은 얻을 수 없음" in got
+            and any(t.startswith("지난 시즌") for t in got), got)
+        bad = squeezed(dw.win)
+        chk("  눌린 위젯 없음", not bad, bad[:3])
+        dw.toggle_achievements()
+        pump(root, lambda: dw.ach.f.winfo_manager())
+        root.update()
+        chk("업적을 누르면 칭호 목록은 숨는다 (셋 중 하나만 보인다)",
+            dw.ach.f.winfo_manager() and not dw.titles.f.winfo_manager()
+            and not dw.dex_body.winfo_manager())
+        chk("  칭호 단추는 다시 '칭호'", dw.title_btn.label.cget("text") == "칭호")
+        dw.toggle_titles()
+        root.update()
+        dw.toggle_titles()
+        root.update()
+        chk("칭호에서 다시 누르면 격자", dw.dex_body.winfo_manager()
+            and not dw.titles.f.winfo_manager() and not dw.ach.f.winfo_manager())
+
+        # 칭호는 실제로 예순 개쯤 된다. 창보다 길어도 **굴려서 끝까지 본다** (잘리면 안 된다).
+        print("\n=== 칭호가 많을 때 (굴리기) ===")
+        many = dict(app2.api.titles())
+        many["titles"] = [dict(many["titles"][i % 5], id="t%d" % i,
+                               name="칭호 %02d" % i) for i in range(60)]
+        many["total"] = 60
+        app2.api.titles = lambda: many
+        dw.toggle_titles()
+        pump(root, lambda: dw.titles.data is not None and dw.titles.data.get("total") == 60)
+        for _ in range(40):
+            root.update()
+            time.sleep(0.01)
+        tp = dw.titles
+        rows = [w for w in tp.body.winfo_children() if w.winfo_children()
+                and w.cget("highlightthickness") in (1, "1")]
+        chk("예순 줄이 다 그려진다", len(rows) == 60, len(rows))
+        view_h, all_h = tp.cv.winfo_height(), tp.body.winfo_reqheight()
+        chk("내용이 창보다 길다 (검사 전제)", all_h > view_h * 2, (all_h, view_h))
+        region = [float(x) for x in str(tp.cv.cget("scrollregion")).split()]
+        chk("굴리는 영역이 내용 전체를 덮는다", len(region) == 4 and region[3] >= all_h - 2,
+            (region, all_h))
+        chk("휠로 굴릴 수 있게 걸려 있다", getattr(tp.cv, "wheel_div", 0) > 0)
+        lo, hi = tp.cv.yview()
+        chk("처음엔 맨 위, 일부만 보인다", lo == 0.0 and hi < 0.6, (lo, hi))
+        # 진짜 휠 사건을 목록 위에서 낸다
+        x = tp.cv.winfo_rootx() + 40
+        y = tp.cv.winfo_rooty() + 40
+        for _ in range(6):
+            dw.win.event_generate("<MouseWheel>", delta=-120, rootx=x, rooty=y)
+            root.update()
+        chk("휠을 내리면 아래로 굴러간다", tp.cv.yview()[0] > 0.0, tp.cv.yview())
+        tp.cv.yview_moveto(1.0)
+        root.update()
+        last = rows[-1]
+        bottom = last.winfo_rooty() + last.winfo_height()
+        chk("끝까지 굴리면 마지막 줄이 통째로 보인다 (안 잘린다)",
+            tp.cv.yview()[1] >= 0.999 and last.winfo_rooty() >= tp.cv.winfo_rooty()
+            and bottom <= tp.cv.winfo_rooty() + view_h + 1,
+            (tp.cv.yview(), last.winfo_rooty(), bottom, tp.cv.winfo_rooty() + view_h))
+        chk("  마지막 줄의 글자도 보인다", "「칭호 59」" in [
+            c.cget("text") for w in last.winfo_children() for f in w.winfo_children()
+            for c in f.winfo_children() if c.winfo_class() == "Label"],
+            [c.cget("text") for w in last.winfo_children() for f in w.winfo_children()
+             for c in f.winfo_children() if c.winfo_class() == "Label"][:3])
         dw.close()
 
     print("\n=== 같은 업적을 두 번 안 띄운다 ===")

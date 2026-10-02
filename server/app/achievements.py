@@ -424,6 +424,65 @@ def public(uid):
             "unlocks": dict(("unlock_%d" % g, UNLOCKS[g][0] in got) for g in UNLOCKS)}
 
 
+# ---------------------------------------------------------------- 칭호 목록
+# 남이 단 칭호를 보고 "저건 어떻게 얻나" 를 알 길이 없었다. 업적 칸은 업적을
+# 보여 주지 칭호를 보여 주지 않고, 랭킹전 칭호는 어디에도 조건이 없었다.
+# 도감 탭의 '칭호' 가 이걸 그린다 (1.8.1).
+_SEAT_HOW = {"champion": "챔피언 자리(마스터볼 티어의 RP 1위)",
+             "elite": "사천왕 자리(마스터볼 티어의 RP 2~5위)"}
+
+
+def _season_titles():
+    """랭킹전 칭호와 조건. (id, 묶음, 조건, 지금 얻을 수 있나)"""
+    out = []
+    tier_rp = dict((k, rp) for k, _n, rp in season.TIERS)
+    now = season.SEASON
+
+    def tier_rows(no, rewards):
+        group = "랭킹전 시즌 %d" % no if no == now else "지난 시즌 (다시 얻을 수 없음)"
+        for tier, title, _frame, _n, _egg in rewards:
+            if tier in _SEAT_HOW:
+                how = "시즌 %d 을 %s로 마치기" % (no, _SEAT_HOW[tier])
+            else:
+                how = ("시즌 %d 에서 %s 티어(RP %d)에 오르기 - 시즌이 끝날 때 받는다"
+                       % (no, season.TIER_KR.get(tier, tier), tier_rp.get(tier, 0)))
+            out.append((title, group, how, no == now))
+    tier_rows(3, season.S3_REWARDS)
+    tier_rows(2, season.S2_REWARDS)
+    for lo, hi, title, _frame, _n, _egg in season.S1_REWARDS:
+        rank = "%d위" % lo if lo == hi else "%d~%d위" % (lo, hi)
+        out.append((title, "지난 시즌 (다시 얻을 수 없음)",
+                    "시즌 1 을 %s로 마치기" % rank, False))
+    return out
+
+
+def titles(uid):
+    """칭호 전부와 얻는 조건. 숨은 업적의 칭호는 얻기 전까지 가린다."""
+    check(uid)
+    own = set(r["rid"] for r in db.q(
+        "SELECT rid FROM user_reward WHERE user_id=? AND kind='title'", (uid,)))
+    prog = progress(uid)
+    out = []
+    for a in defs():
+        if not a["title"]:
+            continue
+        tid = title_id(a["key"])
+        mine = tid in own
+        c = {"id": tid, "name": a["title"], "group": a["group"], "how": a["desc"],
+             "owned": mine, "open": True}
+        if a["hidden"] and not mine:
+            c["name"], c["how"] = "???", "숨은 업적 - 달성하면 알 수 있다"
+        elif not mine and a["target"] > 1:
+            c["value"] = min(int(prog.get(a["stat"], 0)), a["target"])
+            c["target"] = a["target"]
+        out.append(c)
+    for tid, group, how, is_open in _season_titles():
+        out.append({"id": tid, "name": season.TITLES.get(tid, tid), "group": group,
+                    "how": how, "owned": tid in own, "open": is_open})
+    return {"titles": out, "owned": sum(1 for c in out if c["owned"]), "total": len(out),
+            "season": season.SEASON, "seasonEnds": season.SEASON_ENDS}
+
+
 def top(uid, n=3):
     """친구 프로필에 보일 대표 업적. 칭호가 있는 것 중 최근 것."""
     by = dict((a["key"], a) for a in defs())

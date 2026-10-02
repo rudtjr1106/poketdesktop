@@ -411,11 +411,42 @@ def main():
     card = raid.me_card(a, at(day, 10, 30))
     chk("/api/me 안내가 실린다", card and card["next"], card)
     chk("기간 밖에서는 안 싣는다", raid.me_card(a, at(after, 10, 30)) is None)
-    chk("안 본 결과를 센다", raid_routes.unseen(a) >= 1, raid_routes.unseen(a))
+    # 끝난 직후의 시각으로 잰다 (오래된 결과는 세지 않는다 - 아래 '못 본 판' 절)
+    last = db.q1("SELECT r.updated_at u FROM raid_room r JOIN raid_member m ON m.room_id=r.id"
+                 " WHERE m.user_id=? AND r.state='done' AND r.result IN ('won','lost','timeout')"
+                 " ORDER BY r.id DESC LIMIT 1", (a,))["u"]
+    just = datetime.datetime.fromisoformat(last) + datetime.timedelta(minutes=1)
+    chk("안 본 결과를 센다", raid_routes.unseen(a, just) >= 1, raid_routes.unseen(a, just))
     db.run("UPDATE raid_member SET seen=1 WHERE user_id=?", (a,))
-    chk("보면 0", raid_routes.unseen(a) == 0)
+    chk("보면 0", raid_routes.unseen(a, just) == 0)
     hist = raid.history(a)
     chk("기록이 남는다", len(hist) >= 1 and hist[0]["boss"], hist[:1])
+
+    print("=== 프로그램이 꺼져서 결과를 못 본 판 ===")
+    # 판 도중에 프로그램이 꺼지면 '결과를 봤다' 가 영영 안 찍힌다. 그 방이 며칠이고
+    # '보여 줄 방' 으로 남아서, 1.8.0 까지의 화면은 대기실을 그리고 참가를 막았다.
+    rid = db.q1("SELECT r.id FROM raid_room r JOIN raid_member m ON m.room_id=r.id"
+                " WHERE m.user_id=? AND r.state='done' AND r.result IN ('won','lost','timeout')"
+                " ORDER BY r.id DESC LIMIT 1", (a,))["id"]
+    ended = at(day, 11, 20)
+    db.run("UPDATE raid_member SET seen=0 WHERE user_id=? AND room_id=?", (a, rid))
+    db.run("UPDATE raid_room SET updated_at=? WHERE id=?", (raid.now_iso(ended), rid))
+    soon = ended + datetime.timedelta(minutes=10)
+    late = ended + datetime.timedelta(seconds=config.RAID_RESULT_KEEP + 60)
+    got = raid.recent_room(a, soon)
+    chk("끝난 직후에는 결과를 보여 준다", got is not None and got["id"] == rid
+        and raid.public(got, a, soon)["state"] == "done", got and got["id"])
+    chk("  안내에도 센다", raid.me_card(a, soon)["unseen"] == 1, raid.me_card(a, soon))
+    chk("오래 지나면 다시 내밀지 않는다 (대기실로 굳지 않는다)",
+        raid.recent_room(a, late) is None, raid.recent_room(a, late))
+    chk("  안내에서도 빠진다", raid.me_card(a, late)["unseen"] == 0, raid.me_card(a, late))
+    chk("  들어가 있는 방으로 치지 않는다 (다음 회차에 참가할 수 있다)",
+        raid.my_room(a) is None)
+    chk("  지난 레이드 기록에는 그대로 있다", any(h.get("id") == rid or h.get("room") == rid
+                                    for h in raid.history(a)) or len(raid.history(a)) >= 1)
+    chk("  상금·알은 판이 끝날 때 이미 지급돼 있다 (seen 과 상관없다)",
+        db.q1("SELECT prize FROM raid_member WHERE user_id=? AND room_id=?", (a, rid)) is not None)
+    db.run("UPDATE raid_member SET seen=1 WHERE user_id=?", (a,))
 
     print("=== 지난 회차 (공개) ===")
     # 내 기록이 아니어도 누구나 본다. **어떤 전설이 나왔는지만** 준다 -

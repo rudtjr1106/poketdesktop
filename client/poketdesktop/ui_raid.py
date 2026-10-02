@@ -265,7 +265,15 @@ class RaidWindow(object):
         head = tk.Frame(self.body, bg=U.BG)
         head.pack(fill="x", padx=16, pady=(14, 6))
         self._boss_card(head, d)
-        if room:
+        if room and room.get("state") == "done":
+            # **끝난 판은 대기실이 아니다.** 결과를 못 본 판(배틀 창이 닫혀 있었거나
+            # 판 도중에 프로그램이 꺼졌다)을 서버가 '보여 줄 방' 으로 실어 준다.
+            # 1.8.0 까지는 방이 있기만 하면 대기실을 그려서 "사람을 기다리는 중" 이
+            # 뜨고 참가하기가 사라졌다 - 나가기를 눌러도 들어가 있는 방이 아니라
+            # 거절당해서, 다음 회차에 레이드를 할 수가 없었다.
+            self._result(d, room)
+            self._join_box(d)
+        elif room:
             self._lobby(d, room)
         else:
             self._join_box(d)
@@ -557,6 +565,51 @@ class RaidWindow(object):
             if not room.get("canStart"):
                 b.configure(state="disabled")
         U.ghost_button(btns, "나가기", self.leave, height=U.h(38)).pack(side="right")
+
+    # ---------------- 못 본 결과 ----------------
+    def _result(self, d, room):
+        """끝났는데 결과를 아직 못 본 판. 확인을 누르면 사라진다 (참가는 그와 상관없이 된다)."""
+        res = room.get("result")
+        title = {"won": "지난 레이드 — 성공!", "lost": "지난 레이드 — 전멸",
+                 "timeout": "지난 레이드 — 시간 초과"}.get(res, "지난 레이드가 끝났습니다")
+        color = U.ACCENT if res == "won" else U.DANGER
+        box = U.framed(self.body, bg=U.BG2, border=color)
+        box.pack(fill="x", padx=16, pady=(10, 0))
+        inner = tk.Frame(box, bg=U.BG2)
+        inner.pack(fill="x", padx=16, pady=14)
+        side = tk.Frame(inner, bg=U.BG2)
+        side.pack(side="right", padx=(12, 0))
+        U.PushButton(side, "확인", self.seen, height=U.h(38)).pack()
+        body = tk.Frame(inner, bg=U.BG2)
+        body.pack(side="left", fill="x", expand=True)
+        tk.Label(body, text=title, bg=U.BG2, fg=color, font=U.FONT_H,
+                 anchor="w").pack(fill="x")
+        boss = (room.get("boss") or {}).get("kr") or "보스"
+        rw = room.get("reward") or {}
+        lines = []
+        if res == "won":
+            lines.append("%s 을(를) 쓰러뜨렸다!" % boss)
+            lines.append("%s 의 알을 받았다! 바탕화면에 두면 자라서 부화합니다." % boss
+                         if rw.get("egg") else "이번에는 알이 나오지 않았다.")
+        elif res == "timeout":
+            lines.append("%s 은(는) 사라져 버렸다." % boss)
+        else:
+            lines.append("모두 쓰러졌다.")
+        bits = []
+        if rw.get("prize"):
+            bits.append("상금 %s원" % format(rw["prize"], ","))
+        if rw.get("damage"):
+            bits.append("내 기여 %s" % format(rw["damage"], ","))
+        if bits:
+            lines.append("  ·  ".join(bits))
+        lab = tk.Label(body, text=natural("\n".join(lines)), bg=U.BG2, fg=U.FG_DIM,
+                       font=U.FONT_S, anchor="w", justify="left")
+        lab.pack(fill="x", pady=(6, 0))
+        U.wrap_to_width(lab)
+
+    def seen(self):
+        """결과를 봤다. 서버에 알리고 다시 그린다."""
+        self._send(lambda: self.app.api.raid_seen(), "")
 
     def _copy(self, text):
         try:

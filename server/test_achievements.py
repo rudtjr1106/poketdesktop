@@ -232,6 +232,42 @@ def main():
     top = A.top(uid)
     chk("대표 업적은 칭호 있는 것만", top and all(t["name"] for t in top), top)
 
+    print("\n=== 칭호 목록과 조건 (1.8.1) ===")
+    tl = A.titles(uid)
+    rows = tl["titles"]
+    by = dict((c["id"], c) for c in rows)
+    with_title = [a_ for a_ in A.defs() if a_["title"]]
+    chk("업적 칭호 전부 + 랭킹전 칭호 전부", len(rows) == len(with_title) + len(season.TITLES)
+        - len(with_title), (len(rows), len(with_title), len(season.TITLES)))
+    chk("칭호마다 얻는 조건이 있다", all(c.get("how") for c in rows),
+        [c["id"] for c in rows if not c.get("how")])
+    c = by["ach_dex_400"]
+    chk("도감 칭호: 조건과 진행", c["name"] == "도감 조사원" and "400종" in c["how"]
+        and c["open"] and (c["owned"] or c.get("target") == 400), c)
+    hid = [x for x in rows if x["group"] == "숨은 업적"]
+    chk("숨은 업적의 칭호는 얻기 전까지 가린다",
+        hid and all(x["owned"] or (x["name"] == "???" and "숨은" in x["how"]) for x in hid), hid[:2])
+    got_hidden = [x for x in hid if x["owned"]]
+    chk("  얻은 숨은 칭호는 이름과 조건이 보인다",
+        all(x["name"] != "???" and "숨은 업적 -" not in x["how"] for x in got_hidden), got_hidden[:2])
+    s3 = by["s3_master"]
+    chk("랭킹전(이번 시즌): 티어와 RP 를 적는다", "시즌 3" in s3["how"] and "마스터볼" in s3["how"]
+        and "600" in s3["how"] and s3["open"] and s3["group"] == "랭킹전 시즌 3", s3)
+    chk("  챔피언·사천왕은 자리로 설명한다", "1위" in by["s3_champion"]["how"]
+        and "2~5위" in by["s3_elite"]["how"], (by["s3_champion"]["how"], by["s3_elite"]["how"]))
+    old = [by["s2_master"], by["s1_top10"]]
+    chk("지난 시즌 칭호는 다시 얻을 수 없다고 알린다", all(not x["open"]
+        and "다시 얻을 수 없음" in x["group"] for x in old), old)
+    chk("  시즌 1 은 등수로", "6~10위" in by["s1_top10"]["how"] and "1위" in by["s1_champion"]["how"])
+    mine = set(r["rid"] for r in db.q("SELECT rid FROM user_reward WHERE user_id=? AND kind='title'", (uid,)))
+    chk("가진 칭호를 표시한다", set(c["id"] for c in rows if c["owned"]) == mine and tl["owned"] == len(mine),
+        (tl["owned"], len(mine)))
+    season.grant(uid, "title", "s2_super", 2)
+    chk("  랭킹전 칭호도", A.titles(uid)["titles"] and
+        dict((c["id"], c) for c in A.titles(uid)["titles"])["s2_super"]["owned"])
+    chk("묶음 차례: 도감 쪽이 먼저, 지난 시즌이 맨 뒤", rows[0]["group"] == "도감 수집"
+        and rows[-1]["group"].startswith("지난 시즌"), (rows[0]["group"], rows[-1]["group"]))
+
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
 

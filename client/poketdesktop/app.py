@@ -1671,6 +1671,37 @@ class App(object):
         run_async(self.root, lambda: self.api.set_desktop(pid, False),
                   lambda r, e: self.request_sync())
 
+    def float_over_pet(self, pid, text, color="#7bffa0", ms=1100):
+        """바탕화면의 그 포켓몬 머리 위에 글씨를 잠깐 띄운다 (배틀 밖에서).
+
+        배틀 중에는 배틀이 가진 이펙트 층에 쓴다. 여기는 층이 없을 때 - 싸우지
+        않고 잡아서 경험치를 받았을 때(1.8.1) - 잠깐 층을 열었다 닫는다.
+        """
+        ov = self.overlay
+        pet = ov.pets.get(pid) if ov else None
+        if pet is None or not text:
+            return False
+        from .fx_layer import FloatText, open_layer
+        try:
+            layer = open_layer(self.root, ov.area())
+        except Exception:                                   # noqa: BLE001
+            layer = None
+        if not layer:
+            return False
+        try:
+            FloatText(layer, pet.x + pet.fw / 2.0, pet.y - 6, text, color, ms=ms)
+        except Exception:                                   # noqa: BLE001
+            layer.destroy()
+            return False
+
+        def gone():
+            try:
+                layer.destroy()
+            except Exception:                               # noqa: BLE001
+                pass
+        self.root.after(ms + 500, gone)
+        return True
+
     def open_tint(self, pet):
         """이로치의 색 고르기 창. 고르면 바탕화면과 열려 있는 관리 창을 다시 맞춘다."""
         if self.arena or self.battle or not pet.mon.get("shiny"):

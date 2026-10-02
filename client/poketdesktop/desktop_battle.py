@@ -429,27 +429,9 @@ class DesktopBattle(object):
     def show_result(self, result):
         b = result.get("battle") or {}
         res = b.get("result")
+        # 경험치를 받은 결과에서 알릴 말·배울 기술·진화를 한 번에 뽑는다.
+        msgs, evolves, main = exp_news(self.app, result.get("exp"))
         if res == "won":
-            msgs = []
-            for e in (result.get("exp") or []):
-                if e.get("leveledUp"):
-                    msgs.append("%s 레벨 %d!" % (e["name"], e["level"]))
-                # 기술을 배운 건 반드시 알린다. 네 개가 차면 오래된 것이
-                # 밀려나는데, 말없이 사라지면 아끼던 기술이 없어진 걸
-                # 한참 뒤에야 알게 된다.
-                learned = e.get("learned") or []
-                if learned:
-                    msgs.append(natural("%s 은(는) %s 을(를) 배웠다!"
-                                        % (e["name"], ", ".join(learned))))
-                # 자리가 없어 아직 못 배운 것. **여기서 창을 띄우지 않는다** -
-                # 배틀 연출이 도는 중이고, 자동으로 싸우는 중이라 사용자가
-                # 화면을 안 보고 있을 수 있다. 정리가 끝난 뒤에 물어본다.
-                if e.get("pendingIds"):
-                    msgs.append(natural(
-                        "%s 은(는) %s 을(를) 배우려 한다."
-                        % (e["name"], ", ".join(e.get("pending") or []))))
-            main = next((e for e in (result.get("exp") or [])
-                         if not e.get("shared")), None)
             if main and self.mine:
                 self.float_over(self.mine, "+%d exp" % main["gained"], "#7bffa0")
             head = natural("%s 을(를) 쓰러뜨렸다!"
@@ -484,13 +466,7 @@ class DesktopBattle(object):
         # 바꾸면 서버가 들고 있는 배틀 스냅샷과 어긋난다.
         # 어느 포켓몬이 진화했는지 id 로 들고 간다. 같은 종이 파티에 둘 있으면
         # 종 이름으로는 누가 진화했는지 가릴 수 없다.
-        # 배우려고 기다리는 기술도 여기서 챙긴다. 진화와 같은 이유로
-        # 배틀이 다 끝난 뒤에 물어본다.
-        for e in (result.get("exp") or []):
-            if e.get("pendingIds"):
-                self.app.want_learn(e.get("id"), e["name"])
-        evolves = [dict(e["evolve"], pokemonId=e.get("id"))
-                   for e in (result.get("exp") or []) if e.get("evolve")]
+        # 배우려고 기다리는 기술도 같다 (exp_news 가 줄을 세워 두었다).
         self.pending_evolve = evolves
         self.after(RESULT_MS, self.finish_cleanup)
 
@@ -598,7 +574,14 @@ class DesktopBattle(object):
         if self.closed:
             return
         if r.get("caught"):
-            self.app.notify(r.get("message") or "잡았다!")
+            # 잡아도 경험치를 받는다 (쓰러뜨렸을 때의 절반, 1.8.1). 레벨업·진화도
+            # 쓰러뜨렸을 때와 똑같이 따라온다.
+            msgs, evolves, main = exp_news(self.app, r.get("exp"))
+            text = r.get("message") or "잡았다!"
+            if msgs:
+                text += "  " + " ".join(msgs)
+            self.app.notify(text)
+            self.pending_evolve = evolves
             self.foe = None
             # 잡은 쪽이 기뻐한다. 야생은 볼에 들어갔으니 내 포켓몬이 뛴다.
             if self.mine:
@@ -606,7 +589,10 @@ class DesktopBattle(object):
                     self.mine.play("Hop", once=True)
                 except Exception:                           # noqa: BLE001
                     pass
-            return self.after(500, self.finish_cleanup)
+                if main:
+                    self.float_over(self.mine, "+%d exp" % main["gained"], "#7bffa0")
+            # 받은 경험치가 뜰 시간을 준다 (정리가 글씨까지 치운다)
+            return self.after(1100 if main else 500, self.finish_cleanup)
         b = r.get("battle")
         if b:
             self.b = b
@@ -830,6 +816,37 @@ def evolve_learned_text(info):
         bits.append("  %s 을(를) 배우려 한다." % ", ".join(pending))
     line = "".join(bits)
     return natural(line)
+
+
+def exp_news(app, grants):
+    """서버가 준 경험치 결과(exp 목록)에서 화면이 할 일을 뽑는다.
+
+    돌려주는 것: (알릴 말들, 진화 목록, 싸운 포켓몬의 몫 또는 None)
+
+    쓰러뜨렸을 때와 잡았을 때(1.8.1) 가 같이 쓴다. 자리가 없어 못 배운 기술은
+    여기서 줄을 세워 둔다 (app.want_learn - 연출이 끝난 뒤에 물어본다).
+    """
+    msgs, evolves, main = [], [], None
+    for e in grants or []:
+        if e.get("leveledUp"):
+            msgs.append("%s 레벨 %d!" % (e["name"], e["level"]))
+        # 기술을 배운 건 반드시 알린다. 네 개가 차면 오래된 것이 밀려나는데,
+        # 말없이 사라지면 아끼던 기술이 없어진 걸 한참 뒤에야 알게 된다.
+        learned = e.get("learned") or []
+        if learned:
+            msgs.append(natural("%s 은(는) %s 을(를) 배웠다!"
+                                % (e["name"], ", ".join(learned))))
+        # 자리가 없어 아직 못 배운 것. **여기서 창을 띄우지 않는다** - 연출이
+        # 도는 중이고, 자동으로 싸우는 중이라 화면을 안 보고 있을 수 있다.
+        if e.get("pendingIds"):
+            msgs.append(natural("%s 은(는) %s 을(를) 배우려 한다."
+                                % (e["name"], ", ".join(e.get("pending") or []))))
+            app.want_learn(e.get("id"), e["name"])
+        if e.get("evolve"):
+            evolves.append(dict(e["evolve"], pokemonId=e.get("id")))
+        if main is None and not e.get("shared"):
+            main = e
+    return msgs, evolves, main
 
 
 def play_evolutions(app, infos):

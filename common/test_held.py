@@ -51,8 +51,13 @@ OK = FAIL = 0
 # (battle.CRIT_BY_STAGE). 이 파티의 파이리가 급소율이 높은 베어가르기를 든다. 같은 때
 # 도감에 8·9세대 공격기 효과를 채웠는데, 그것만 넣었을 때는 옛 값이 그대로였고,
 # CRIT_BY_STAGE 를 옛 값 (24, 12, 6, 3) 으로 되돌리면 옛 값 둘이 그대로 나오는 것을 확인했다.
-PARTY_DIGEST = "05ceafd2d98051d8019008b101a66bb457060866d432d05277e2826f6c27450c"
-SOLO_DIGEST = "2d085a96b81c364bea3f3de50d911ce32519001c46b371262867ce833fd7b49b"
+#
+# 1.8.1 에서 **1세대 151종의 학습표를 적청에서 스칼렛·바이올렛으로** 바꾸면서 또 달라졌다
+# (05ceafd2 / 2d085a96 에서). 이 파티가 전부 1세대라 들고 나오는 기술이 통째로 바뀐다 -
+# 엔진이 아니라 자료가 바뀐 것이다. 같은 때 고친 치유파동·검은오물은 이 판들에 안 나온다:
+# 옛 엔진(git HEAD)에 새 도감만 끼워 돌려도 아래 두 값이 그대로 나오는 것을 확인했다.
+PARTY_DIGEST = "df4c35fbdae876d71ab265f8f612e44d9ee1bad96ea871f24a6583dd37cf1743"
+SOLO_DIGEST = "e270fbf75ceefc43feb3b00e7336c6cc7d655fc4cbe0f4eac515fac418ae8682"
 
 
 def chk(name, cond, got=""):
@@ -173,6 +178,15 @@ def t_효과(dex):
     wall = P.make_pokemon(dex.get(95), 40, rng)       # 오닉스: 단단하고 선공기 없음
     bag = P.make_pokemon(dex.get(143), 30, rng)       # 잠만보 Lv.30: 오래 맞아 준다
     tank = P.make_pokemon(dex.get(143), 45, rng)      # 잠만보 Lv.45: 오래 산다
+    # **기술은 여기서 못 박는다.** 아래 판들은 '이 기술들로 몇 턴이 간다' 를 전제로
+    # 시드까지 골라 둔 것이다. 도감의 학습표를 따라가게 두면 표가 바뀔 때(1.8.1 에
+    # 1세대가 적청 -> 스칼렛·바이올렛) 판이 통째로 달라져 전제가 깨진다.
+    for m, moves in ((pika, ["THUNDERWAVE", "QUICKATTACK", "SWIFT", "AGILITY"]),
+                     (char, ["LEER", "RAGE", "SLASH", "FLAMETHROWER"]),
+                     (wall, ["BIND", "ROCKTHROW", "RAGE", "SLAM"]),
+                     (bag, ["AMNESIA", "HEADBUTT", "REST"]),
+                     (tank, ["HEADBUTT", "REST", "BODYSLAM", "HARDEN"])):
+        m["moves"] = list(moves)
 
     # 먹다남은음식: 턴 끝에 회복 이벤트가 난다 (잠만보 vs 오닉스는 여러 턴 간다)
     evs, bt = solo(dex, with_item(tank, "LEFTOVERS"), wall, 1, turns=4)

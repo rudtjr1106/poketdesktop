@@ -247,6 +247,9 @@ jobs:
       # 1.8.0: 이로치 색 고르기 - 색조 돌리기·캐시·바탕화면 갈아 입기·고르기 창
       - name: 이로치 색 고르기 (진짜 Tk)
         run: python client/test_tint_ui.py
+      # 1.8.1: 잡았을 때의 경험치 - 받은 레벨업·진화를 화면이 다루는지
+      - name: 잡았을 때의 경험치
+        run: python client/test_catch_exp.py
       # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
@@ -333,6 +336,9 @@ jobs:
       # 1.8.0: 이로치 색 고르기 - 색조 돌리기·캐시·바탕화면 갈아 입기·고르기 창
       - name: 이로치 색 고르기 (진짜 Tk)
         run: python client/test_tint_ui.py
+      # 1.8.1: 잡았을 때의 경험치 - 받은 레벨업·진화를 화면이 다루는지
+      - name: 잡았을 때의 경험치
+        run: python client/test_catch_exp.py
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
       # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
@@ -395,6 +401,7 @@ jobs:
           python test_legend_limit.py
           python test_board.py
           python test_s3_void.py
+          python test_catch_exp.py
 
       - name: 서버 띄우기
         env:

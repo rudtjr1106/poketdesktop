@@ -89,7 +89,7 @@ class FakeApi(object):
     def _row(self, p):
         admin = self.me == ADMIN
         out = {"id": p["id"], "kind": p["kind"],
-               "kindKr": {"notice": "공지", "free": "자유"}[p["kind"]],
+               "kindKr": {"notice": "공지", "free": "자유", "qna": "Q&A"}[p["kind"]],
                "title": p["title"], "agoSec": p["ago"], "edited": p["edited"],
                "comments": len([c for c in self.comments
                                 if c["post"] == p["id"] and not c["deleted"]]),
@@ -101,8 +101,10 @@ class FakeApi(object):
 
     def board(self, kind="all", page=1):
         self.calls.append(("list", kind, page))
-        want = "free" if kind == "all" else kind
-        rows = sorted([p for p in self.posts if p["kind"] == want], key=lambda p: -p["id"])
+        # 서버와 같다: '전체' 는 공지를 뺀 나머지(자유·Q&A), 그 밖에는 그 종류만
+        rows = sorted([p for p in self.posts
+                       if (p["kind"] != "notice" if kind == "all" else p["kind"] == kind)],
+                      key=lambda p: -p["id"])
         pages = max(1, (len(rows) + self.PAGE - 1) // self.PAGE)
         page = max(1, min(pages, page))
         pinned = []
@@ -367,7 +369,10 @@ def main():
     w.show_write()
     settle(root, 0.15)
     t = texts(top)
-    chk("공지 고르기가 안 보인다", "공지는 운영자만 쓸 수 있습니다." not in t and "종류" not in t, t[:12])
+    chk("공지 고르기가 안 보인다", "공지는 운영자만 쓸 수 있습니다." not in t
+        and list(w.kind_seg.cells) == ["free", "qna"],
+        list(w.kind_seg.cells))
+    chk("  자유·Q&A 중에 고른다 (기본은 자유)", "종류" in t and "Q&A" in t and w.kind_var == "free", t[:12])
     w.submit_post()
     chk("빈 제목은 안 보낸다", "제목을 적어 주세요" in w.status._label.cget("text")
         and not any(c[0] == "write" for c in api.calls))
@@ -392,6 +397,55 @@ def main():
     bad = squeezed(top)
     chk("눌린 위젯 없음", not bad, bad[:3])
     new_id = w.post["id"]
+
+    print("\n=== Q&A (1.8.1) ===")
+    w.show_list()
+    wait(root, lambda: w.view == "list")
+    settle(root, 0.2)
+    chk("목록 위에 Q&A 가 있다", list(w.seg.cells) == ["all", "notice", "free", "qna"],
+        list(w.seg.cells))
+    w.pick_kind("qna")
+    wait(root, lambda: w.data is not None and w.data.get("kind") == "qna")
+    settle(root)
+    chk("아직 질문이 없으면 빈 목록", w.data["total"] == 0, w.data["total"])
+    w.show_write()
+    settle(root, 0.15)
+    chk("Q&A 를 보다가 쓰면 Q&A 가 골라져 있다", w.kind_var == "qna")
+    w.title_var.set("메가진화 어떻게 해요?")
+    w.text.insert("1.0", "키스톤은 어디서 얻나요")
+    w._count_post()
+    settle(root, 0.2)
+    bad = squeezed(top)
+    chk("  쓰는 화면에 눌린 위젯 없음", not bad, bad[:3])
+    w.submit_post()
+    chk("Q&A 로 보낸다", wait(root, lambda: any(c[0] == "write" and c[1] == "qna"
+                                            and c[2] == "메가진화 어떻게 해요?" for c in api.calls)),
+        [c for c in api.calls if c[0] == "write"][-1:])
+    wait(root, lambda: w.view == "post" and w.post and w.post["title"] == "메가진화 어떻게 해요?")
+    settle(root)
+    chk("올린 질문이 바로 열리고 Q&A 표시가 붙는다", w.view == "post" and w.post is not None
+        and w.post["kind"] == "qna" and "Q&A" in texts(top), (w.view, texts(top)[:8]))
+    qid = w.post["id"]
+    w.show_list()
+    wait(root, lambda: w.view == "list" and w.data is not None and w.data.get("kind") == "qna"
+         and w.data["total"] == 1)
+    settle(root)
+    chk("Q&A 탭에는 질문만", [p["id"] for p in w.data["posts"]] == [qid]
+        and "메가진화 어떻게 해요?" in texts(top), [p["id"] for p in w.data["posts"]])
+    w.pick_kind("free")
+    wait(root, lambda: w.data is not None and w.data.get("kind") == "free")
+    chk("자유 탭에는 안 나온다", qid not in [p["id"] for p in w.data["posts"]])
+    w.pick_kind("all")
+    wait(root, lambda: w.data is not None and w.data.get("kind") == "all")
+    settle(root)
+    chk("전체에는 자유 글과 함께 나온다", qid in [p["id"] for p in w.data["posts"]]
+        and any(p["kind"] == "free" for p in w.data["posts"]), [p["kind"] for p in w.data["posts"]][:6])
+    bad = squeezed(top)
+    chk("  눌린 위젯 없음", not bad, bad[:3])
+    # 아래 절은 방금 올린 자유 글을 열어 둔 데서 이어진다
+    w.open_post(new_id)
+    wait(root, lambda: w.view == "post" and w.post is not None and w.post["id"] == new_id)
+    settle(root)
 
     print("\n=== 수정·삭제 ===")
     w.show_edit()
@@ -446,6 +500,86 @@ def main():
         "삭제" in texts(w2.win) and "수정" not in texts(w2.win))
     bad = squeezed(w2.win)
     chk("눌린 위젯 없음", not bad, bad[:3])
+
+    print("\n=== 공지의 링크 (1.8.1) ===")
+    URL = "https://github.com/rudtjr1106/poketdesktop/releases"
+    chk("주소를 가른다 (바로 붙은 한글에서 끝난다)",
+        ui_board.split_links("받는 곳: %s에서 받으세요." % URL)
+        == [("text", "받는 곳: "), ("link", URL), ("text", "에서 받으세요.")],
+        ui_board.split_links("받는 곳: %s에서 받으세요." % URL))
+    chk("  문장 끝의 마침표·괄호는 주소가 아니다",
+        ui_board.split_links("(%s)." % URL)[1] == ("link", URL), ui_board.split_links("(%s)." % URL))
+    chk("  주소가 없으면 그대로 한 덩이", ui_board.split_links("그냥 글\n둘째 줄")
+        == [("text", "그냥 글\n둘째 줄")])
+    chk("  http·https 가 아니면 열지 않는다", ui_board.open_url("file:///etc/passwd") is False
+        and ui_board.open_url("javascript:alert(1)") is False)
+    opened = []
+    real_open = ui_board.open_url
+    ui_board.open_url = lambda u: opened.append(u) or True
+    body = "새 버전이 나왔습니다.\n%s\n위 주소에서 받아 주세요." % URL
+    nid = api2.seed_post("notice", ADMIN, 1, "링크가 든 공지", body)
+    fid = api2.seed_post("free", "이슬", 3, "링크가 든 자유 글", body)
+
+    def links(win):
+        out = []
+
+        def walk(w):
+            for c in w.winfo_children():
+                if c.winfo_class() == "Label" and str(c.cget("cursor")) == "hand2" \
+                        and str(c.cget("text")).startswith("http"):
+                    out.append(c)
+                walk(c)
+        walk(win)
+        return out
+    w2.open_post(nid)
+    wait(root, lambda: w2.post is not None and w2.post["id"] == nid)
+    settle(root)
+    ls = links(w2.win)
+    chk("공지의 주소는 누를 수 있다", len(ls) == 1 and ls[0].cget("text") == URL,
+        [c.cget("text") for c in ls])
+    chk("  앞뒤 글은 그대로 보인다", "새 버전이 나왔습니다." in texts(w2.win)
+        and "위 주소에서 받아 주세요." in texts(w2.win), texts(w2.win)[-8:])
+    ls[0].event_generate("<Button-1>")
+    root.update()
+    chk("  누르면 그 주소를 연다", opened == [URL], opened)
+    bad = squeezed(w2.win)
+    chk("  눌린 위젯 없음", not bad, bad[:3])
+    w2.open_post(fid)
+    wait(root, lambda: w2.post is not None and w2.post["id"] == fid)
+    settle(root)
+    chk("자유 글의 주소는 그냥 글자다 (누를 수 없다)", not links(w2.win)
+        and any(URL in t for t in texts(w2.win)), [t for t in texts(w2.win) if "http" in t])
+    ui_board.open_url = real_open
+
+    print("\n=== 한글 자판에서 붙여넣기 (1.8.1) ===")
+    mac = root.tk.call("tk", "windowingsystem") == "aqua"
+    chk("영문 자판이면 손대지 않는다 (Tk 가 한다)",
+        U.edit_event_for("v", "v", (9 << 24) | ord("v"), True) is None
+        and U.edit_event_for("v", "\x16", 86, False) is None)
+    chk("맥: 한글 자판의 Cmd+ㅍ 은 붙여넣기",
+        U.edit_event_for("Hangul_Phieuf", "", (9 << 24) | 0x314D, True) == "<<Paste>>")
+    chk("맥: ㅊ 복사 · ㅌ 잘라내기 · ㅁ 전체 선택",
+        [U.edit_event_for("", "", (vk << 24) | ord(ch), True) for vk, ch in ((8, "ㅊ"), (7, "ㅌ"), (0, "ㅁ"))]
+        == ["<<Copy>>", "<<Cut>>", "<<SelectAll>>"])
+    chk("윈도우: 글쇠 이름이 깨져도 자리(VK)로 안다",
+        [U.edit_event_for("??", "", vk, False) for vk in (86, 67, 88, 65)]
+        == ["<<Paste>>", "<<Copy>>", "<<Cut>>", "<<SelectAll>>"])
+    chk("상관없는 글쇠는 None", U.edit_event_for("b", "b", (11 << 24) | 98, True) is None
+        and U.edit_event_for("??", "", 66, False) is None)
+    # 진짜 입력칸에서: 클립보드의 글이 들어온다
+    w2.show_write()
+    settle(root, 0.2)
+    root.clipboard_clear()
+    root.clipboard_append("붙여 넣은 글")
+    root.update()
+    w2.text.delete("1.0", "end")
+    w2.text.focus_force()
+    root.update()
+    seq, code = ("<Mod1-KeyPress>", (9 << 24) | 0x314D) if mac else ("<Control-KeyPress>", 86)
+    w2.text.event_generate(seq, keycode=code)
+    root.update()
+    chk("글쓰기 칸: 한글 자판으로 붙여 넣는다", w2.text.get("1.0", "end-1c") == "붙여 넣은 글",
+        w2.text.get("1.0", "end-1c"))
     w2.close()
 
     ui_box.confirm = real_confirm

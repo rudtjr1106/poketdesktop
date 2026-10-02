@@ -123,6 +123,7 @@ class MiniApp(object):
     undress_missing = staticmethod(App.undress_missing)
     mega_menu_row = App.mega_menu_row
     toggle_mega_walk = App.toggle_mega_walk
+    float_over_pet = App.float_over_pet
 
     def __init__(self, root, ov):
         self.root = root
@@ -532,6 +533,23 @@ def main():
     app = MiniApp(root, ov)
     toggle_part(root, ov, app, files, sheets)
     battle_part(root, ov, app)
+
+    # 배틀 밖에서 도트 위에 글씨 띄우기 (싸우지 않고 잡아서 받은 경험치, 1.8.1)
+    print("\n=== 도트 위에 잠깐 뜨는 글씨 ===")
+    before = set(root.winfo_children())
+    ok = app.float_over_pet(1, "+120 exp", ms=300)
+    root.update()
+    made = [w for w in root.winfo_children() if w not in before]
+    if fx_layer.open_layer(root, ov.area()) is None:
+        chk("이펙트 층을 못 여는 환경에서는 조용히 넘어간다", ok is False and not made)
+    else:
+        for w in [w for w in root.winfo_children() if w not in before and w not in made]:
+            w.destroy()                                  # 방금 확인용으로 연 층
+        chk("글씨를 띄울 층이 생긴다", ok is True and len(made) == 1, (ok, made))
+        settle(root, 1.2)
+        chk("  시간이 지나면 층까지 치운다", not any(w.winfo_exists() for w in made))
+    chk("바탕화면에 없는 포켓몬이면 아무 일도 없다", app.float_over_pet(999, "+1 exp") is False)
+
     canvas_part(root)
 
     ov.clear()

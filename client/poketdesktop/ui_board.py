@@ -25,6 +25,7 @@
 본다. 여기서는 서버가 준 canNotice / canDelete / canEdit 대로 단추를 보이고,
 거절당하면 그 말을 아래 줄에 그대로 적는다.
 """
+import re
 import tkinter as tk
 from tkinter import ttk
 
@@ -37,13 +38,54 @@ W, H = 760, 660
 ROW_BG = "#161b28"
 PIN_BG = "#231d10"            # 공지 줄
 REPLY_BG = "#10141e"
-KINDS = [("all", "전체"), ("notice", "공지"), ("free", "자유")]
-KIND_COLOR = {"notice": U.ACCENT, "free": U.INFO}
+KINDS = [("all", "전체"), ("notice", "공지"), ("free", "자유"), ("qna", "Q&A")]
+KIND_COLOR = {"notice": U.ACCENT, "free": U.INFO, "qna": U.GOOD}
+# 글을 쓸 때 고르는 종류. 공지는 운영자에게만 보인다.
+WRITE_KINDS = [("free", "자유"), ("qna", "Q&A")]
 LIMITS = {"title": 40, "body": 2000, "comment": 300}
 
 
 def _err(e):
     return getattr(e, "message", None) or str(e)
+
+
+# ---------------------------------------------------------------- 공지의 링크
+LINK = "#6fb7ff"
+LINK_HOVER = "#a8d4ff"
+# 주소에 쓸 수 있는 글자만 잇는다. 한글이 바로 붙어 있어도 ("…/releases에서")
+# 주소가 거기서 끝난다.
+_URL = re.compile(r"https?://[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+")
+_URL_TAIL = ".,;:!?)]'"
+
+
+def split_links(text):
+    """글을 [("text", ..), ("link", 주소), ..] 로 가른다. 주소는 한 줄을 통째로 차지한다."""
+    text = text or ""
+    out, pos = [], 0
+    for m in _URL.finditer(text):
+        url = m.group(0).rstrip(_URL_TAIL)
+        if len(url) <= len("https://"):
+            continue
+        before = text[pos:m.start()]
+        if before.strip():
+            out.append(("text", before.strip("\n")))
+        out.append(("link", url))
+        pos = m.start() + len(url)
+    rest = text[pos:]
+    if rest.strip() or not out:
+        out.append(("text", rest.strip("\n") if out else rest))
+    return out
+
+
+def open_url(url):
+    """기본 브라우저로 연다. http·https 만."""
+    if not (url or "").lower().startswith(("http://", "https://")):
+        return False
+    import webbrowser
+    try:
+        return bool(webbrowser.open(url))
+    except Exception:                                       # noqa: BLE001
+        return False
 
 
 class BoardWindow(object):
@@ -329,10 +371,7 @@ class BoardWindow(object):
         U.wrap_to_width(title)
         self._author(f, p, U.BG).pack(anchor="w", pady=(6, 10))
         tk.Frame(f, bg=U.LINE, height=U.h(1)).pack(fill="x", padx=(0, 8))
-        body = tk.Label(f, text=p.get("body") or "", bg=U.BG, fg=U.FG, font=U.FONT,
-                        anchor="w", justify="left")
-        body.pack(fill="x", pady=(12, 16), padx=(0, 8))
-        U.wrap_to_width(body)
+        self._body(f, p)
         tk.Frame(f, bg=U.LINE, height=U.h(1)).pack(fill="x", padx=(0, 8))
         U.marker_label(f, "댓글 %d" % int(p.get("comments") or 0),
                        bg=U.BG).pack(anchor="w", pady=(12, 8))
@@ -352,6 +391,36 @@ class BoardWindow(object):
                 self.cv.yview_moveto(1.0)
             except tk.TclError:
                 pass
+
+    def _body(self, parent, p):
+        """본문. **공지는 주소(http·https)를 누를 수 있다** (1.8.1).
+
+        자유 글과 댓글은 그냥 글자다 - 아무나 쓰는 글의 주소를 누르게 하면
+        낚시 링크를 걸 수 있다. 공지는 운영자만 쓴다 (서버가 kind 를 지킨다).
+        """
+        box = tk.Frame(parent, bg=U.BG)
+        box.pack(fill="x", pady=(12, 16), padx=(0, 8))
+        text = p.get("body") or ""
+        parts = split_links(text) if p.get("kind") == "notice" else [("text", text)]
+        for kind, chunk in parts:
+            if kind == "link":
+                lb = tk.Label(box, text=chunk, bg=U.BG, fg=LINK, font=self._link_font(),
+                              anchor="w", justify="left", cursor="hand2")
+                lb.bind("<Button-1>", lambda _e, u=chunk: open_url(u))
+                lb.bind("<Enter>", lambda _e, w=lb: w.configure(fg=LINK_HOVER))
+                lb.bind("<Leave>", lambda _e, w=lb: w.configure(fg=LINK))
+            else:
+                lb = tk.Label(box, text=chunk, bg=U.BG, fg=U.FG, font=U.FONT,
+                              anchor="w", justify="left")
+            lb.pack(fill="x")
+            U.wrap_to_width(lb)
+
+    def _link_font(self):
+        f = getattr(self, "_lf", None)
+        if f is None:
+            import tkinter.font as tkfont
+            f = self._lf = tkfont.Font(family=U.FONT[0], size=U.FONT[1], underline=True)
+        return f
 
     def _comment(self, parent, c, reply=False):
         bg = REPLY_BG if reply else ROW_BG
@@ -543,16 +612,20 @@ class BoardWindow(object):
             self.kind_var = post.get("kind") or "free"
         elif self.kind == "notice" and self.can_notice:
             self.kind_var = "notice"
-        if self.can_notice and not post:
+        elif self.kind == "qna":
+            self.kind_var = "qna"           # Q&A 를 보다가 쓰면 Q&A 로
+        if not post:
+            # 종류는 쓸 때만 고른다 (고칠 때는 못 바꾼다).
+            kinds = WRITE_KINDS + ([("notice", "공지")] if self.can_notice else [])
             row = tk.Frame(form, bg=U.BG)
             row.pack(fill="x", pady=(8, 0))
             tk.Label(row, text="종류", bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,
                      width=5, anchor="w").pack(side="left")
-            self.kind_seg = U.Segmented(row, [("free", "자유"), ("notice", "공지")],
-                                        self.kind_var, self._pick_post_kind)
+            self.kind_seg = U.Segmented(row, kinds, self.kind_var, self._pick_post_kind)
             self.kind_seg.pack(side="left")
-            tk.Label(row, text="공지는 운영자만 쓸 수 있습니다.", bg=U.BG, fg=U.FG_FAINT,
-                     font=U.FONT_XS).pack(side="left", padx=(10, 0))
+            tk.Label(row, text=("공지는 운영자만 쓸 수 있습니다." if self.can_notice
+                                else "질문은 Q&A 에 올려 주세요."),
+                     bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left", padx=(10, 0))
         row = tk.Frame(form, bg=U.BG)
         row.pack(fill="x", pady=(10, 0))
         tk.Label(row, text="제목", bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,

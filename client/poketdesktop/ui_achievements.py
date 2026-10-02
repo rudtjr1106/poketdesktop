@@ -219,3 +219,72 @@ class AchievementPanel(object):
 
     def close(self):
         self.alive = False
+
+
+# ---------------------------------------------------------------- 칭호 목록 (1.8.1)
+class TitlePanel(AchievementPanel):
+    """도감 탭 안의 칭호 목록 — 칭호마다 **어떻게 얻는지**를 적는다.
+
+    남이 단 칭호를 보고 "저건 어떻게 얻나" 를 알 길이 없었다. 업적 칸은 업적을
+    보여 주고(칭호는 보상으로 작게 적힌다), 랭킹전 칭호는 조건이 어디에도 없었다.
+    틀(굴리는 칸·진행 막대)은 업적 칸과 같다.
+    """
+
+    def reload(self):
+        def done(r, err):
+            if not self.alive:
+                return
+            if err:
+                self.summary.configure(text=getattr(err, "message", str(err)),
+                                       fg=U.DANGER)
+                return
+            self.data = r or {}
+            self.draw()
+        run_async(self.root, lambda: self.app.api.titles(), done)
+
+    def draw(self):
+        for w in self.body.winfo_children():
+            w.destroy()
+        d = self.data or {}
+        items = d.get("titles") or []
+        self.summary.configure(text="가진 칭호 %d / %d" % (d.get("owned", 0),
+                                                       d.get("total", len(items))), fg=U.FG)
+        self.unlock.configure(text="칭호는 랭킹 탭의 '칭호·명패' 에서 답니다")
+        groups = []
+        for c in items:
+            if c["group"] not in groups:
+                groups.append(c["group"])
+        for g in groups:
+            rows = [c for c in items if c["group"] == g]
+            head = tk.Frame(self.body, bg=U.BG)
+            head.pack(fill="x", pady=(10, 4))
+            U.marker_label(head, "%s  %d/%d" % (g, sum(1 for c in rows if c.get("owned")),
+                                                len(rows)), bg=U.BG).pack(side="left")
+            for c in rows:
+                self._row(c)
+        self.fit.schedule()
+
+    def _row(self, c):
+        got = bool(c.get("owned"))
+        closed = not got and not c.get("open", True)        # 지난 시즌: 다시 못 얻는다
+        bg = "#182033" if got else PANEL
+        row = tk.Frame(self.body, bg=bg, highlightthickness=1,
+                       highlightbackground=U.ACCENT if got else U.LINE)
+        row.pack(fill="x", pady=2)
+        inner = tk.Frame(row, bg=bg)
+        inner.pack(fill="x", padx=12, pady=7)
+        top = tk.Frame(inner, bg=bg)
+        top.pack(fill="x")
+        tk.Label(top, text=("★ " if got else "") + "「%s」" % c.get("name", ""), bg=bg,
+                 fg=U.ACCENT_TEXT if got else (U.FG_FAINT if closed else U.FG),
+                 font=U.FONT_B).pack(side="left")
+        state = "가지고 있음" if got else ("지금은 얻을 수 없음" if closed else "")
+        if state:
+            tk.Label(top, text=state, bg=bg, fg=U.GOOD if got else U.FG_FAINT,
+                     font=U.FONT_XS).pack(side="right")
+        how = tk.Label(inner, text=natural(c.get("how", "")), bg=bg,
+                       fg=U.FG_DIM, font=U.FONT_XS, anchor="w", justify="left")
+        how.pack(fill="x")
+        U.wrap_to_width(how)
+        if not got and "value" in c:
+            self._bar(inner, bg, c["value"], c["target"])

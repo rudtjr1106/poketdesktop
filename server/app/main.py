@@ -180,6 +180,7 @@ class ExpIn(BaseModel):
 class CatchIn(BaseModel):
     ball: str = "POKEBALL"
     hour: int = -1        # 클라이언트의 시각. 다크볼이 밤인지 볼 때 쓴다.
+    exp: bool = False     # 잡았을 때 경험치를 받겠다 (1.8.1, battle_routes.BallIn 을 보라)
 
 
 # ---------------------------------------------------------------- 공개
@@ -1092,6 +1093,12 @@ def list_achievements(ctx=Depends(current)):
     return achievements.public(ctx["user"]["id"])
 
 
+@app.get("/api/titles")
+def list_titles(ctx=Depends(current)):
+    """칭호 전부와 얻는 조건 (도감 탭의 칭호 목록, 1.8.1)."""
+    return achievements.titles(ctx["user"]["id"])
+
+
 @app.post("/api/achievements/seen")
 def seen_achievements(ctx=Depends(current)):
     """화면이 알렸다. 다음 /api/me 부터 안 싣는다."""
@@ -1673,6 +1680,12 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     # 돌려주기만 하고 읽는 쪽이 없어서 아무 일도 안 하고 있었다.
     if extra.get("happinessRate", 1) > 1:
         mon["luxury"] = True
+    # 잡아도 경험치를 받는다 (쓰러뜨렸을 때의 절반, 1.8.1). 싸우지 않고 볼만 던진
+    # 것이라 파티 맨 앞의 포켓몬이 받는다. 잡은 포켓몬을 넣기 **전에** 준다.
+    exp = []
+    if body.exp:
+        hour = body.hour if 0 <= body.hour <= 23 else None
+        exp = battle_routes.catch_exp(dex(), uid, mon, None, hour)
     got, where = battle_routes.store_caught(uid, mon)
     db.run("DELETE FROM wild WHERE id=?", (wid,))
     _bump(uid, "caught")
@@ -1690,7 +1703,7 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     if tm_drop:
         msg += "  %s 을(를) 주웠다!" % tm_drop["label"]
     return {"caught": True, "shakes": 4, "balls": balls, "where": where,
-            "ball": ball_id,
+            "ball": ball_id, "exp": exp,
             "pokemon": got, "drop": drop, "tmDrop": tm_drop,
             "money": items.money(uid),
             "bag": items.bag_get(uid), "message": korean.natural(msg)}

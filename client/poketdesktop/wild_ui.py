@@ -902,8 +902,21 @@ class WildController(object):
             if r.get("caught"):
                 self.clear()
                 info = (r.get("pokemon") or {}).get("info", {})
-                self.app.notify(r.get("message") or "잡았다!")
-                self.app.request_sync()
+                # 잡아도 경험치를 받는다 (1.8.1). 싸우지 않고 볼만 던졌으니 파티 맨
+                # 앞의 포켓몬이 받는다 - 그 머리 위에 띄운다.
+                from .desktop_battle import exp_news, play_evolutions
+                msgs, evolves, main = exp_news(self.app, r.get("exp"))
+                text = r.get("message") or "잡았다!"
+                if msgs:
+                    text += "  " + " ".join(msgs)
+                self.app.notify(text)
+                if main:
+                    self.app.float_over_pet(main.get("id"), "+%d exp" % main["gained"])
+                if evolves:
+                    # 진화 연출이 끝나면 스스로 동기화를 부른다
+                    self.app.root.after(900, lambda: play_evolutions(self.app, evolves))
+                else:
+                    self.app.request_sync()
                 if self.app.box_window:
                     self.app.box_window.reload()
                 self.check()

@@ -44,6 +44,10 @@ class SwitchIn(BaseModel):
 class BallIn(BaseModel):
     ball: str = "POKEBALL"
     hour: int = -1
+    # 잡았을 때 경험치를 받겠다 (1.8.1). **보낸 화면에게만 준다** - 경험치를 받으면
+    # 진화까지 일어나는데, 옛 화면은 잡은 답에 실린 진화를 몰라서 바탕화면의
+    # 도트가 옛 모습으로 남는다.
+    exp: bool = False
 
 
 def _now():
@@ -309,14 +313,15 @@ def give_evs(uid, mon_id, yields):
                 if after[k] != before[k])
 
 
-def award(dex, uid, foe, participant_id, hour=None, rate=1.0):
+def award(dex, uid, foe, participant_id, hour=None, rate=1.0, evs=True):
     """싸운 포켓몬은 전부, 파티의 나머지는 학습장치 몫.
 
     rate 는 트레이너전 배율(관장 도전은 config.GYM_EXP_RATE). 야생은 1.0.
+    evs=False 면 노력치는 안 준다 (잡았을 때 - 경험치만 절반 준다).
     """
     out = []
     foe_sp = dex.get(foe.mon["species"]) or {}
-    ev_yield = foe_sp.get("ev") or {}
+    ev_yield = (foe_sp.get("ev") or {}) if evs else {}
 
     part = db.q1("SELECT level, held FROM pokemon WHERE id=?", (participant_id,))
     lv = part["level"] if part else 5
@@ -325,7 +330,8 @@ def award(dex, uid, foe, participant_id, hour=None, rate=1.0):
     # 행복의알은 경험치 1.5배, 교정깁스·파워 시리즈는 노력치를 더 준다.
     # 싸운 그 한 마리만 본다 - 학습장치 몫은 도구와 무관하다.
     main = int(main * HELD.exp_mult(held))
-    got_ev = give_evs(uid, participant_id, HELD.ev_yield(held, ev_yield))
+    got_ev = (give_evs(uid, participant_id, HELD.ev_yield(held, ev_yield))
+              if evs else None)
     g = grant_exp(dex, uid, participant_id, main, hour)
     if g:
         g["shared"] = False
@@ -346,6 +352,28 @@ def award(dex, uid, foe, participant_id, hour=None, rate=1.0):
                     g["evs"] = share_ev
                 out.append(g)
     return out
+
+
+def catch_exp(dex, uid, foe, participant_id=None, hour=None):
+    """야생을 **잡았을 때**의 경험치 (1.8.1). 쓰러뜨렸을 때의 config.CATCH_EXP_RATE 배.
+
+    싸우던 포켓몬이 있으면 그 포켓몬이, 싸우지 않고 볼만 던졌으면 파티 맨 앞의
+    포켓몬이 받는다. 나머지는 학습장치 몫. 노력치는 주지 않는다.
+    **잡은 포켓몬을 파티에 넣기 전에 불러야 한다** - 넣은 뒤에 부르면 방금 잡힌
+    포켓몬이 자기가 잡힌 경험치를 나눠 받는다.
+    """
+    rate = float(config.CATCH_EXP_RATE)
+    if rate <= 0:
+        return []
+    if isinstance(foe, dict):           # 싸우지 않고 잡았다 - 야생의 자료만 있다
+        foe = B.Fighter(dex, foe)
+    if participant_id is None:
+        lead = db.q1("SELECT id FROM pokemon WHERE user_id=? AND on_desktop=1"
+                     " ORDER BY slot, id LIMIT 1", (uid,))
+        if not lead:
+            return []
+        participant_id = lead["id"]
+    return award(dex, uid, foe, participant_id, hour, rate=rate, evs=False)
 
 
 def spare_for(uid, foe, pref):
@@ -669,6 +697,9 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
     extra = items.ball_extra(ball)
     if extra.get("happiness"):
         foe.mon["happiness"] = extra["happiness"]
+    # 잡아도 경험치를 받는다 (절반). 잡은 포켓몬을 파티에 넣기 **전에** 준다.
+    if body.exp:
+        out["exp"] = catch_exp(d, uid, foe, row["mine_id"], hour)
     caught_mon, where = store_caught(uid, foe.mon)
     db.run("UPDATE battle SET state='done', result='caught' WHERE id=?", (row["id"],))
     db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))

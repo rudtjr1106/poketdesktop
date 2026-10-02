@@ -87,6 +87,9 @@ SHINY_RATE = _int("POKET_SHINY_RATE", 4096)
 BATTLE_TTL = _int("POKET_BATTLE_TTL", 900)        # 배틀이 방치되면 정리되는 시간(초)
 EXP_SHARE = _bool("POKET_EXP_SHARE", True)        # 학습장치: 파티 전원이 경험치를 받는다
 EXP_SHARE_RATE = _int("POKET_EXP_SHARE_RATE", 50)  # 참가 안 한 포켓몬이 받는 비율(%)
+# 야생 포켓몬을 **잡았을 때** 받는 경험치 (쓰러뜨렸을 때의 몇 배, 1.8.1).
+# 그동안 잡으면 경험치가 없어서, 키우려면 잡지 말고 쓰러뜨려야 했다.
+CATCH_EXP_RATE = _float("POKET_CATCH_EXP_RATE", 0.5)
 
 # ---- 야생 조우 ----
 # 풀숲이 돋아나기까지 걸리는 시간 (초). 이 사이에서 무작위로 정해진다.
@@ -292,6 +295,9 @@ RAID_ROUNDS = _int("POKET_RAID_ROUNDS", 20)
 RAID_DOUBLE_FROM = _int("POKET_RAID_DOUBLE_FROM", 4)  # 몇 명부터 보스가 두 번 움직이나
 RAID_ROUND_SEC = _int("POKET_RAID_ROUND_SEC", 25)     # 한 라운드 고르는 시간
 RAID_TTL = _int("POKET_RAID_TTL", 1800)               # 아무도 안 오면 판을 접는다
+# 끝난 판의 결과를 '아직 안 봤다' 며 들고 있는 시간. 이보다 오래된 결과는 화면에
+# 다시 내밀지 않는다 (지난 레이드 목록에서는 계속 볼 수 있다).
+RAID_RESULT_KEEP = _int("POKET_RAID_RESULT_KEEP", 3600)
 
 # 보상. 알은 **확률**이다 - 참가 횟수를 막지 않는 대신 이걸로 조절한다.
 # 3개 상한을 두면 사흘이면 다 채운 사람이 안 와서 3인이 안 모인다.

@@ -235,12 +235,19 @@ def my_room(uid):
         " ORDER BY r.id DESC LIMIT 1", (uid,))
 
 
-def recent_room(uid):
+def recent_room(uid, now=None):
     """화면에 보여 줄 방. 끝난 판도 **결과를 볼 때까지는** 같이 준다.
 
     안 그러면 마지막 일격을 넣지 않은 사람이 결과를 영영 못 본다 - 남의
     요청이 마지막 라운드를 돌리는 순간 그 방은 done 이 되고, 내 폴링은
     404 를 받아 상금도 알도 화면에 안 뜬다. seen 을 찍으면 그때 빠진다.
+
+    **끝난 지 오래된 결과는 안 준다** (config.RAID_RESULT_KEEP). seen 은 배틀 창이
+    결과를 띄웠을 때만 찍힌다. 판 도중에 프로그램이 꺼지면 영영 안 찍혀서 그
+    방이 며칠이고 '보여 줄 방' 으로 남았고, 1.8.0 까지의 화면은 방이 있으면 대기실
+    ("사람을 기다리는 중")을 그려서 다음 회차에 '참가하기' 가 아예 안 떴다 -
+    나가기를 눌러도 들어가 있는 방이 아니라 404 였다 (2026-10-02 에 아홉 명이
+    그 상태였다). 상금과 알은 판이 끝날 때 이미 지급되어 있다.
     """
     row = my_room(uid)
     if row:
@@ -248,8 +255,15 @@ def recent_room(uid):
     return db.q1(
         "SELECT r.* FROM raid_room r JOIN raid_member m ON m.room_id=r.id"
         " WHERE m.user_id=? AND m.seen=0 AND r.state='done'"
-        " AND r.result IN ('won','lost','timeout') ORDER BY r.id DESC LIMIT 1",
-        (uid,))
+        " AND r.result IN ('won','lost','timeout') AND r.updated_at >= ?"
+        " ORDER BY r.id DESC LIMIT 1",
+        (uid, _result_cut(now)))
+
+
+def _result_cut(now=None):
+    """이 시각보다 먼저 끝난 판의 결과는 다시 내밀지 않는다."""
+    return (_utc(now) - datetime.timedelta(seconds=config.RAID_RESULT_KEEP)) \
+        .replace(microsecond=0).isoformat()
 
 
 def played_today(uid, now=None):
@@ -748,12 +762,12 @@ def me_card(uid, now=None):
         "SELECT"
         " (SELECT COUNT(*) FROM raid_member m JOIN raid_room x ON x.id=m.room_id"
         "   WHERE m.user_id=? AND m.seen=0 AND x.state='done'"
-        "   AND x.result IN ('won','lost','timeout')) AS unseen,"
+        "   AND x.result IN ('won','lost','timeout') AND x.updated_at >= ?) AS unseen,"
         " (SELECT x.id FROM raid_room x JOIN raid_member m ON m.room_id=x.id"
         "   WHERE m.user_id=? AND m.left_at IS NULL AND x.state IN ('lobby','fighting')"
         "   ORDER BY x.id DESC LIMIT 1) AS room,"
         " (SELECT 1 FROM raid_entry WHERE user_id=? AND day=?) AS played",
-        (uid, uid, uid, today_kst(now)))
+        (uid, _result_cut(now), uid, uid, today_kst(now)))
     key = next_key(now)
     return {"next": boss_card(key), "open": open_key(now) is not None,
             "openSec": config.RAID_OPEN_SEC,

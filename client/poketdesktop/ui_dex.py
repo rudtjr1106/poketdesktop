@@ -68,6 +68,7 @@ class DexWindow(object):
         self._filters()
         self._grid()
         self.ach = None             # 처음 누를 때 만든다
+        self.titles = None          # 칭호 목록 (1.8.1). 이것도 처음 누를 때
         self._ach_label = None
         self.reload()
 
@@ -96,6 +97,9 @@ class DexWindow(object):
         self.ach_btn = U.ghost_button(inner, "업적", self.toggle_achievements,
                                       height=32)
         self.ach_btn.pack(side="right", padx=(0, 8))
+        # 칭호마다 얻는 조건을 적은 목록 (1.8.1). 업적과 같은 자리에 들어간다.
+        self.title_btn = U.ghost_button(inner, "칭호", self.toggle_titles, height=32)
+        self.title_btn.pack(side="right", padx=(0, 8))
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     def _filters(self):
@@ -345,15 +349,34 @@ class DexWindow(object):
         if self.ach is None:
             self.ach = ui_achievements.AchievementPanel(
                 self.win, self.app, on_count=self._ach_count)
-        if self.ach.f.winfo_manager():
-            self.ach.pack_forget()
-            self.dex_body.pack(fill="both", expand=True)
-            self.ach_btn.configure(text=self._ach_label or "업적")
-        else:
+        self._show_panel(None if self.ach.f.winfo_manager() else "ach")
+
+    def toggle_titles(self):
+        """격자 <-> 칭호 목록 (칭호마다 얻는 조건)."""
+        from . import ui_achievements
+        if self.titles is None:
+            self.titles = ui_achievements.TitlePanel(self.win, self.app)
+        self._show_panel(None if self.titles.f.winfo_manager() else "titles")
+
+    def _show_panel(self, which):
+        """격자 자리에 무엇을 둘지: None(도감 격자) · "ach"(업적) · "titles"(칭호).
+
+        셋 중 하나만 보인다. 보이는 칸의 단추는 '도감으로' 가 된다.
+        """
+        panes = {"ach": self.ach, "titles": self.titles}
+        for p in panes.values():
+            if p is not None and p.f.winfo_manager():
+                p.pack_forget()
+        if self.dex_body.winfo_manager():
             self.dex_body.pack_forget()
-            self.ach.pack(fill="both", expand=True)
-            self.ach_btn.configure(text="도감으로")
-            self.ach.reload()
+        self.ach_btn.configure(text="도감으로" if which == "ach"
+                               else (self._ach_label or "업적"))
+        self.title_btn.configure(text="도감으로" if which == "titles" else "칭호")
+        if which is None:
+            self.dex_body.pack(fill="both", expand=True)
+            return
+        panes[which].pack(fill="both", expand=True)
+        panes[which].reload()
 
     def _ach_count(self, done, total):
         """업적 수는 단추 글씨에 둔다 - 머리줄의 작은 글씨는 세대·본 수 자리다."""

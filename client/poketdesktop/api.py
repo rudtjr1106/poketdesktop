@@ -238,8 +238,10 @@ class Api(object):
     def wild_catch(self, wid, ball="POKEBALL"):
         # 시각을 같이 보낸다. 다크볼처럼 밤인지 봐야 하는 볼이 있고,
         # 서버는 도커 안이라 UTC 라서 사용자의 밤을 알 수 없다.
+        # exp: 잡았을 때의 경험치를 받겠다 (1.8.1). 서버는 이 값을 보낸 화면에게만
+        # 준다 - 받으면 레벨업·진화가 따라오는데 옛 화면은 그것을 못 그린다.
         return self._call("POST", "/api/wild/%d/catch" % wid,
-                          {"ball": ball, "hour": _hour()})
+                          {"ball": ball, "hour": _hour(), "exp": True})
 
     def wild_flee(self, wid):
         return self._call("POST", "/api/wild/%d/flee" % wid, {})
@@ -262,7 +264,7 @@ class Api(object):
 
     def battle_ball(self, bid, ball="POKEBALL"):
         return self._call("POST", "/api/battle/%d/ball" % bid,
-                          {"ball": ball, "hour": _hour()})
+                          {"ball": ball, "hour": _hour(), "exp": True})
 
     def battle_run(self, bid):
         return self._call("POST", "/api/battle/%d/run" % bid, {})
@@ -340,6 +342,10 @@ class Api(object):
 
     def achievements_seen(self):
         return self._call("POST", "/api/achievements/seen", {})
+
+    def titles(self):
+        """칭호 전부와 얻는 조건·가졌는지 (1.8.1)."""
+        return self._call("GET", "/api/titles")
 
     # ---------------- 유저 배틀 ----------------
     def pvp_records(self, limit=30):

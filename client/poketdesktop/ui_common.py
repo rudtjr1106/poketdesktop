@@ -911,7 +911,77 @@ def retire(frame, size=30):
                    on_done=lambda: smash(frame))
 
 
+# ---------------------------------------------------------------- 한글 자판에서 복사·붙여넣기
+# Tk 는 붙여넣기를 '<Command-v>' (윈도우는 '<Control-v>') 로 걸어 둔다 - **글쇠 이름이
+# v 일 때만** 맞는다. 자판이 한글이면 같은 자리의 글쇠가 'ㅍ' 으로 들어와서 아무
+# 일도 안 일어난다. 게시판에 글을 붙여 넣을 수 없다는 제보로 알았다 (1.8.0) -
+# 한글로 쓰다가 붙여 넣으려면 자판이 한글인 것이 당연하다.
+#
+# 글쇠 이름이 아니라 **자리**로 본다. 영문 자판이면 손대지 않는다 (Tk 가 한다).
+_EDIT_BY_CHAR = {"ㅁ": "<<SelectAll>>", "ㅊ": "<<Copy>>", "ㅍ": "<<Paste>>",
+                 "ㅌ": "<<Cut>>", "ㅋ": "<<Undo>>"}
+_EDIT_BY_MAC_VK = {0: "<<SelectAll>>", 6: "<<Undo>>", 7: "<<Cut>>", 8: "<<Copy>>",
+                   9: "<<Paste>>"}
+_EDIT_BY_WIN_VK = {65: "<<SelectAll>>", 67: "<<Copy>>", 86: "<<Paste>>", 88: "<<Cut>>",
+                   90: "<<Undo>>"}
+_EDIT_CLASSES = ("Text", "Entry", "TEntry", "TCombobox", "Spinbox", "TSpinbox")
+
+
+def edit_event_for(keysym, char, keycode, mac):
+    """Cmd/Ctrl 과 같이 눌린 글쇠가 뜻하는 편집 동작. 영문 자판이거나 모르는 글쇠면 None.
+
+    맥의 keycode 는 (자리 << 24) | 글자 다 (Tk 8.6.11 부터). 자리가 0 인 글쇠(A)는
+    위쪽이 비어서 글자로 가른다.
+    """
+    ks = keysym or ""
+    if len(ks) == 1 and ks.lower() in "acvxz":
+        return None                      # 영문 자판. Tk 의 원래 바인딩이 처리한다
+    for c in (char, ks):
+        if c in _EDIT_BY_CHAR:
+            return _EDIT_BY_CHAR[c]
+    try:
+        kc = int(keycode)
+    except (TypeError, ValueError):
+        return None
+    if not mac:
+        return _EDIT_BY_WIN_VK.get(kc)
+    try:
+        c = chr(kc & 0xFFFF)
+    except ValueError:
+        c = ""
+    if c in _EDIT_BY_CHAR:
+        return _EDIT_BY_CHAR[c]
+    if kc >> 24:
+        return _EDIT_BY_MAC_VK.get((kc >> 24) & 0xFF)
+    return None
+
+
+def install_edit_keys(root):
+    """입력칸(Text·Entry)에서 한글 자판으로도 복사·붙여넣기·잘라내기·전체 선택이 되게."""
+    try:
+        mac = root.tk.call("tk", "windowingsystem") == "aqua"
+    except tk.TclError:
+        return
+
+    def on_key(e):
+        ev = edit_event_for(e.keysym, e.char, e.keycode, mac)
+        if not ev:
+            return None
+        try:
+            e.widget.event_generate(ev)
+        except tk.TclError:
+            return None
+        return "break"
+    seq = "<Mod1-KeyPress>" if mac else "<Control-KeyPress>"
+    for cls in _EDIT_CLASSES:
+        try:
+            root.bind_class(cls, seq, on_key)
+        except tk.TclError:
+            pass
+
+
 def apply_theme(root):
+    install_edit_keys(root)
     s = ttk.Style(root)
     try:
         s.theme_use("clam")

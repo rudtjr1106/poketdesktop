@@ -809,7 +809,8 @@ class Battle(object):
             cur = who.stages.get(stat, 0)
             if (change > 0 and cur < STAGE_MAX) or (change < 0 and cur > STAGE_MIN):
                 useful = True
-        if md.get("heal") and user.hp < user.maxhp:
+        # 치유파동·플라워힐은 상대를 회복시킨다 - 쓰면 손해라 세지 않는다.
+        if md.get("heal") and user.hp < user.maxhp and mk not in SM.HEALS_TARGET:
             useful = True
         if not useful:
             return 0.0
@@ -1347,7 +1348,17 @@ class Battle(object):
                 return self._fail(who, ev)
             user.stockpile += 1
             ev.append({"t": "msg", "who": who, "text": "%s 은(는) %d개 비축했다!" % (user.name, user.stockpile)})
-        if heal > 0 and user.hp < user.maxhp:
+        if heal > 0 and k in SM.HEALS_TARGET:
+            # 치유파동·플라워힐: **상대**가 회복한다 (원작 그대로).
+            if (not target.alive() or target.hp >= target.maxhp
+                    or target.cond.get("healblock")):
+                return self._fail(who, ev)
+            amount = max(1, int(target.maxhp * heal / 100.0))
+            target.hp = min(target.maxhp, target.hp + amount)
+            ev.append({"t": "heal", "who": tw, "amount": amount, "hp": target.hp,
+                       "maxhp": target.maxhp,
+                       "text": "%s 은(는) 체력을 회복했다!" % target.name})
+        elif heal > 0 and user.hp < user.maxhp:
             amount = max(1, int(user.maxhp * heal / 100.0))
             user.hp = min(user.maxhp, user.hp + amount)
             ev.append({"t": "heal", "who": who, "amount": amount, "hp": user.hp,
