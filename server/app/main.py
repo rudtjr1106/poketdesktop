@@ -25,9 +25,12 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from typing import Optional                # noqa: E402
+
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
+from common import tint as TINT            # noqa: E402
 from . import (achievements, auth, battle_routes, board, board_routes, mega, config, db, deps, eggs, item_routes,  # noqa: E402
                errors, items, live, live_routes, migrations, pvp, pvp_routes,
                raid, raid_routes,
@@ -145,6 +148,11 @@ class DeleteIn(BaseModel):
 
 class NicknameIn(BaseModel):
     nickname: str = Field(default="", max_length=12)
+
+
+class TintIn(BaseModel):
+    # None 이면 이로치 색 그대로. 나머지는 common/tint.CHOICES 중 하나.
+    tint: Optional[str] = Field(default=None, max_length=8)
 
 
 class DesktopIn(BaseModel):
@@ -1190,6 +1198,20 @@ def set_order(body: OrderIn, ctx=Depends(current)):
                          " AND on_desktop=1", (i, pid, uid))
         moved += cur.rowcount
     return {"ok": True, "moved": moved}
+
+
+@app.post("/api/pokemon/{pid}/tint")
+def set_tint(pid: int, body: TintIn, ctx=Depends(current)):
+    """이로치 포켓몬의 색을 고른다 (1.8.0). 모든 사람의 화면에 그 색으로 나온다."""
+    uid = ctx["user"]["id"]
+    r = _own(uid, pid)
+    if not r["shiny"]:
+        raise HTTPException(409, "이로치 포켓몬만 색을 고를 수 있습니다.")
+    t = (body.tint or "").strip() or None
+    if not TINT.valid(t):
+        raise HTTPException(400, "고를 수 없는 색입니다.")
+    db.run("UPDATE pokemon SET tint=? WHERE id=?", (t, pid))
+    return {"ok": True, "pokemon": _decorate(db.row_to_mon(_own(uid, pid)))}
 
 
 @app.patch("/api/pokemon/{pid}")

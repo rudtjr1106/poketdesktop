@@ -145,6 +145,7 @@ def learners(no: int, me=Depends(deps.current)):
             "num": sp["num"],
             "level": r["level"],
             "shiny": bool(r["shiny"]),
+            "tint": db.row_to_mon(r)["tint"],
             "moves": moves,
             "known": t["move"] in moves,
         })

@@ -64,6 +64,9 @@ def _side_view(f):
            "level": f.mon.get("level"),
            "shiny": bool(f.mon.get("shiny")), "hp": f.hp, "maxhp": f.maxhp,
            "gender": f.mon.get("gender")}
+    # 이로치가 고른 색 (1.8.0). **있을 때만 싣는다** - 아래 메가와 같은 까닭이다.
+    if f.mon.get("tint") and f.mon.get("shiny"):
+        out["tint"] = f.mon["tint"]
     # **메가일 때만 싣는다.** 늘 "mega": False 를 붙이면 메가와 상관없는 옛 판의
     # 로그까지 글자가 바뀐다 (test_held 의 요약값이 그걸 지킨다).
     if f.mega:

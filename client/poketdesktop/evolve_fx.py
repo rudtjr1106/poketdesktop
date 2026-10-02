@@ -53,6 +53,7 @@ import random
 
 from PIL import Image
 
+from common import tint as T
 from common.korean import josa
 
 from . import platform_os as PLAT
@@ -245,7 +246,7 @@ class Evolution(object):
         s = ov.settings if ov else self.app.settings
         api = self.app.api
         num = self.info.get("toNum")
-        shiny = bool(self.pet.mon.get("shiny"))
+        shiny = T.skin(self.pet.mon)          # 이로치가 고른 색까지
         facing = self.pet.facing
 
         def work():
@@ -260,7 +261,7 @@ class Evolution(object):
                 # **걷는 도트를 먼저 본다.** overlay.make 와 같은 순서다.
                 # 여기서 배틀 도트만 받으면 진화한 그 순간부터 그 포켓몬만
                 # 정면으로 굳어서 혼자 안 걷는다 - 다른 애들은 걸어다니는데.
-                sheet, meta = walk_cache.ensure(api, num, shiny=bool(shiny))
+                sheet, meta = walk_cache.ensure(api, num, shiny=shiny)
                 if sheet and meta:
                     try:
                         anim = sprites.load_walk(

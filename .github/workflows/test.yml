@@ -244,6 +244,9 @@ jobs:
       # 1.8.0: 메가진화한 모습으로 바탕화면 걷기 + 메가진화 연출 (바탕화면·배틀 창)
       - name: 메가 폼으로 걷기·메가진화 연출 (진짜 Tk)
         run: python client/test_mega_walk.py
+      # 1.8.0: 이로치 색 고르기 - 색조 돌리기·캐시·바탕화면 갈아 입기·고르기 창
+      - name: 이로치 색 고르기 (진짜 Tk)
+        run: python client/test_tint_ui.py
       # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
@@ -327,6 +330,9 @@ jobs:
       # 1.8.0: 메가진화한 모습으로 바탕화면 걷기 + 메가진화 연출 (바탕화면·배틀 창)
       - name: 메가 폼으로 걷기·메가진화 연출 (진짜 Tk)
         run: python client/test_mega_walk.py
+      # 1.8.0: 이로치 색 고르기 - 색조 돌리기·캐시·바탕화면 갈아 입기·고르기 창
+      - name: 이로치 색 고르기 (진짜 Tk)
+        run: python client/test_tint_ui.py
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
       # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
@@ -470,6 +476,8 @@ jobs:
           python server/test_season3.py http://127.0.0.1:8788 /tmp/poket-test.db
           # 게시판 (1.8.0): 공지 권한·댓글·답글·지우기가 HTTP 로 오가는지
           python server/test_board_api.py http://127.0.0.1:8788
+          # 이로치 색 고르기 (1.8.0): 이로치만·값 검사·목록과 대전 자료에 실리는지
+          python server/test_tint.py http://127.0.0.1:8788 /tmp/poket-test.db
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

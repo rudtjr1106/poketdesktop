@@ -13,6 +13,8 @@ import random
 import time
 import tkinter as tk
 
+from common import tint as T
+
 from . import config
 from . import platform_os as PLAT
 from . import sprites
@@ -106,6 +108,9 @@ class Pet(object):
         self.id = mon.get("id")
         # 지금 입고 있는 도트의 번호. 다른 동작(Idle·Hop...)도 이 번호로 찾는다.
         self.look = look_num(mon)
+        # 지금 입고 있는 색 (common/tint 의 skin). 이로치가 색을 바꾸면 sync 가
+        # 이 값과 견주어 도트를 갈아 입힌다.
+        self.skin = T.skin(mon)
         # 배틀 중에 잠깐 메가 폼이 된 동안에는 sync 가 모습을 되돌리지 않는다.
         self.look_hold = False
         # 빛나는 돌 표식 (bond_stone, 시즌 3). place() 가 옮기므로 먼저 둔다.
@@ -400,8 +405,7 @@ class Pet(object):
             return got
         if not self.walking_sprite:
             return None                   # 배틀 도트로 대신하는 종
-        key = walk_cache.sheet_key(self.look, name,
-                                   bool(self.mon.get("shiny")))
+        key = walk_cache.sheet_key(self.look, name, T.skin(self.mon))
         if key in self.miss:
             return None
         ent = self.ov.sheets.get(key)
@@ -541,7 +545,7 @@ class Pet(object):
         # 맥판(platform_mac)의 reserve 는 일부러 아무것도 안 한다.
         # 거기서는 칸을 키우면 그만큼 마우스를 가로채기 때문이다.
         num = self.look
-        shiny = bool(self.mon.get("shiny"))
+        shiny = T.skin(self.mon)
         scale = self.base_scale or 1.0
         bw, bh = self.fw, self.fh
         for name in ("Walk",) + tuple(walk_cache.ANIMS):
@@ -965,9 +969,14 @@ class Overlay(object):
         갈아 끼운다 - 여기서 먼저 바꿔 버리면 연출이 '새 모습에서 새 모습으로'
         가 된다. 연출 중이거나 배틀에서 잠깐 변한 동안에도 건드리지 않는다.
         """
+        if getattr(pet, "evolving", False) or getattr(pet, "look_hold", False):
+            return
+        # 이로치가 색을 바꿨다 (1.8.0) - 번호는 같고 색만 다르다.
+        if T.skin(pet.mon) != getattr(pet, "skin", T.skin(pet.mon)):
+            self.reskin(pet, pet.look)
+            return
         want = look_num(pet.mon)
-        if (not want or want == pet.look or getattr(pet, "evolving", False)
-                or getattr(pet, "look_hold", False)):
+        if not want or want == pet.look:
             return
         if want < MEGA_FROM and (pet.look or 0) < MEGA_FROM:
             return
@@ -989,6 +998,7 @@ class Overlay(object):
             config.log("도트를 갈아 입히지 못했습니다: %s" % e)
             return False
         pet.look = num
+        pet.skin = T.skin(pet.mon)
         # 새 모습의 다른 동작(Idle·Hop)이 더 큰 칸을 쓸 수 있다. 지금 한 번에
         # 잡아 둔다 - 윈도우에서는 칸이 커질 때마다 창이 검게 번쩍인다.
         try:
@@ -999,7 +1009,7 @@ class Overlay(object):
 
     def path_for(self, mon, num=None):
         num = num or look_num(mon)
-        k = (num, bool(mon.get("shiny")))
+        k = (num, T.skin(mon))
         return self.paths.get(k) or self.paths.get((num, False))
 
     def anim_of(self, mon, num=None):
@@ -1011,7 +1021,7 @@ class Overlay(object):
         # 걷는 도트가 있으면 그걸 먼저 쓴다. 4방향에 걷기 프레임이 있어서
         # 위로 가면 등이 보이고 걸을 때 발이 바뀐다.
         # 이로치는 이로치 시트부터. 아직 안 받았으면 보통 색으로라도 걷는다.
-        sheet, meta = (self.walks.get(walk_cache.key(num, mon.get("shiny")))
+        sheet, meta = (self.walks.get(walk_cache.key(num, T.skin(mon)))
                        or self.walks.get(num) or (None, None))
         if sheet and meta:
             try:

@@ -27,6 +27,7 @@ import tkinter as tk
 
 from PIL import ImageTk
 
+from common import tint as T
 from common.korean import natural
 
 from . import battle_fx as FX
@@ -271,7 +272,7 @@ class LiveBattleWindow(object):
             return
         if not mon or mon.get("fainted"):
             return
-        num, shiny = mon.get("num"), mon.get("shiny")
+        num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
         size = U.h(MON_H[who])
 
         def work():
@@ -462,7 +463,7 @@ class LiveBattleWindow(object):
         mon["num"] = ev.get("num") or mon.get("num")
         mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
         mon["mega"] = True
-        ui_mega.warm(self, mon["num"], mon.get("shiny"))
+        ui_mega.warm(self, mon["num"], T.skin(mon))
 
         def swap():
             self.set_mon(who, mon)

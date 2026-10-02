@@ -20,6 +20,8 @@ import os
 import sqlite3
 import threading
 
+from common import tint as TINT
+
 from . import config
 
 _local = threading.local()
@@ -107,7 +109,9 @@ CREATE TABLE IF NOT EXISTS pokemon (
     -- 럭셔리볼로 잡았나. 친밀도가 두 배로 오른다(본가와 같다).
     -- 럭셔리볼은 그동안 happinessRate 를 돌려주기만 하고 읽는 쪽이
     -- 없어서 아무 일도 안 하고 있었다.
-    luxury         INTEGER NOT NULL DEFAULT 0
+    luxury         INTEGER NOT NULL DEFAULT 0,
+    -- 이로치 포켓몬이 고른 색 (1.8.0, common/tint). NULL 이면 이로치 색 그대로.
+    tint           TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_pokemon_user ON pokemon(user_id);
 
@@ -763,6 +767,9 @@ MIGRATIONS = [
      "ALTER TABLE pokemon ADD COLUMN luxury INTEGER NOT NULL DEFAULT 0"),
     ("pokemon", "held",
      "ALTER TABLE pokemon ADD COLUMN held TEXT"),
+    # 이로치 포켓몬이 고른 색 (1.8.0). 옛 행은 NULL = 이로치 색 그대로.
+    ("pokemon", "tint",
+     "ALTER TABLE pokemon ADD COLUMN tint TEXT"),
     # 옛 행은 전부 1 로 둔다. 그때는 걸려온 판도 점수에 들어갔으니
     # '내가 건 것' 과 구분이 없었다. 어차피 시즌 1 로 점수를 초기화한다.
     ("battle_record", "started",
@@ -980,6 +987,9 @@ def row_to_mon(r):
         # 아직 못 고른 것들이다. 클라이언트가 이걸 보고 창을 띄운다.
         "pending": (json.loads(r["pending"])
                     if "pending" in r.keys() and r["pending"] else []),
+        # 이로치가 고른 색 (1.8.0). **이로치일 때만** 뜻이 있다.
+        "tint": (TINT.clean(r["tint"])
+                 if "tint" in r.keys() and r["shiny"] else None),
     }
 
 

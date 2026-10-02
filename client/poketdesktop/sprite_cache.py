@@ -9,6 +9,7 @@ import threading
 import time
 
 from common import sprite_fix as SF
+from common import tint as T
 
 from . import config
 
@@ -62,8 +63,19 @@ def _stem(num, shiny):
     return "%04d%s%s" % (int(num), "s" if shiny else "", ("-" + r) if r else "")
 
 
+def _tinted_path(num, skin):
+    """색조를 돌린 그림을 둘 자리 (이로치가 고른 색, common/tint)."""
+    base, _hue = T.split(skin)
+    return os.path.join(sprite_dir(), _stem(num, base) + T.suffix(skin) + ".png")
+
+
 def find_local(num, shiny=False):
+    """shiny 는 skin 이다: False(기본) / True(이로치) / "s090"(색조를 돌린 것)."""
+    shiny = T.norm(shiny)
     d = sprite_dir()
+    if isinstance(shiny, str):
+        p = _tinted_path(num, shiny)
+        return p if os.path.exists(p) and os.path.getsize(p) > 0 else None
     for ext in (".gif", ".png"):
         p = os.path.join(d, _stem(num, shiny) + ext)
         if os.path.exists(p) and os.path.getsize(p) > 0:
@@ -71,13 +83,42 @@ def find_local(num, shiny=False):
     return None
 
 
+def _ensure_tinted(api, num, skin):
+    """밑그림(이로치/기본)을 마련하고 색조를 돌린 파일을 만든다."""
+    from . import sprite_tint
+    p = find_local(num, skin)
+    if p:
+        return p
+    base, hue = T.split(skin)
+    src = ensure(api, num, base)
+    if not src:
+        # 이로치 도트가 없다. 기본 도트라도 준다 (색은 안 입힌다).
+        return ensure(api, num, False) if base else None
+    # 이로치 도트를 못 받아서 기본 도트가 대신 왔으면 색을 입히지 않는다.
+    # 그걸 이로치 색조 파일로 굳히면 나중에 제대로 받아도 틀린 색이 남는다.
+    if base and not os.path.basename(src).startswith(_stem(num, True)):
+        return src
+    dst = _tinted_path(num, skin)
+    with _tint_lock:
+        if os.path.exists(dst) and os.path.getsize(dst) > 0:
+            return dst
+        return dst if sprite_tint.make(src, dst, hue) else src
+
+
+_tint_lock = threading.Lock()
+
+
 def ensure(api, num, shiny=False):
     """그림 파일 경로를 돌려준다. 없으면 서버에서 받아온다.
 
+    shiny 는 skin 이다 (common/tint): False / True / "s090" 같은 색조 값.
     반드시 작업 스레드에서 부를 것. 네트워크를 탄다.
     """
     if not num:
         return None
+    shiny = T.norm(shiny)
+    if isinstance(shiny, str):
+        return _ensure_tinted(api, num, shiny)
     p = find_local(num, shiny)
     if p:
         return p
@@ -106,13 +147,14 @@ def ensure(api, num, shiny=False):
 
 
 def ensure_many(api, items):
-    """[(번호, 이로치), ...] 를 한꺼번에 받아둔다."""
+    """[(번호, skin), ...] 를 한꺼번에 받아둔다. 열쇠는 (번호, T.norm(skin))."""
     out = {}
     for num, shiny in items:
+        k = (num, T.norm(shiny))
         try:
-            out[(num, bool(shiny))] = ensure(api, num, shiny)
+            out[k] = ensure(api, num, shiny)
         except Exception:
-            out[(num, bool(shiny))] = None
+            out[k] = None
     return out
 
 

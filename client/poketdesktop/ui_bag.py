@@ -26,6 +26,7 @@ from tkinter import ttk
 from PIL import ImageTk
 
 from common import pokelogic as P
+from common import tint as T
 from common.korean import natural
 
 from . import sprite_cache, sprites
@@ -721,7 +722,7 @@ class BagWindow(object):
             # 칸을 넓히지는 않는다 - 이름과 레벨 자리가 옮겨 간다.
             thumbs = {}
             for m in mons:
-                path = sprite_cache.ensure(api, m.get("num"), m.get("shiny"))
+                path = sprite_cache.ensure(api, m.get("num"), T.skin(m))
                 if not path:
                     continue
                 try:

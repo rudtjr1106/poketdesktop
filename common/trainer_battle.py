@@ -766,6 +766,8 @@ class TrainerBattle(object):
             "level": f.level, "hp": f.hp, "maxhp": f.maxhp,
             "status": f.status, "statusKr": B.STATUS_KR.get(f.status),
             "gender": f.mon.get("gender"), "shiny": bool(f.mon.get("shiny")),
+            # 이로치가 고른 색 (1.8.0, common/tint). 없으면 None.
+            "tint": f.mon.get("tint") if f.mon.get("shiny") else None,
             "types": [dex.type_name(t) for t in f.types()], "typeIds": f.types(),
             "stages": dict((k, v) for k, v in f.stages.items() if v),
             "fainted": not f.alive(),

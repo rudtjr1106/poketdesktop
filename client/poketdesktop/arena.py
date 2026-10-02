@@ -294,6 +294,7 @@ class Arena(object):
                     "id": -2000 - i,
                     "num": mon.get("num"),
                     "shiny": bool(mon.get("shiny")),
+                    "tint": mon.get("tint"),     # 이로치가 고른 색 (1.8.0)
                     "info": {"name": mon.get("name"),
                              "species": mon.get("species"),
                              "level": mon.get("level"),
@@ -349,6 +350,7 @@ class Arena(object):
                     "id": -1000 - i,
                     "num": mon.get("num"),
                     "shiny": bool(mon.get("shiny")),
+                    "tint": mon.get("tint"),     # 이로치가 고른 색 (1.8.0)
                     "info": {"name": mon.get("name"),
                              "species": mon.get("species"),
                              "level": mon.get("level"),

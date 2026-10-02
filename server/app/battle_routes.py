@@ -179,6 +179,7 @@ def _side(dex, f, reveal_pp=True):
         "status": f.status,
         "statusKr": B.STATUS_KR.get(f.status),
         "shiny": bool(f.mon.get("shiny")),
+        "tint": f.mon.get("tint") if f.mon.get("shiny") else None,
         "gender": f.mon.get("gender"),
         "types": [dex.type_name(t) for t in sp.get("types", [])],
         "typeIds": sp.get("types", []),

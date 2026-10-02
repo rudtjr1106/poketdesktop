@@ -16,6 +16,7 @@ from PIL import ImageTk
 from common import legends as L
 from common import movetext as MT
 from common import pokelogic as P
+from common import tint as T
 from common.korean import natural
 
 from . import box_filter, item_icons, sprite_cache, sprites
@@ -845,22 +846,27 @@ class BoxWindow(object):
         bar.pack_propagate(False)
         inner = tk.Frame(bar, bg=U.INK)
         inner.pack(fill="both", expand=True, padx=16)
+        # 단추(38) + 위아래 10 = 58 = 줄 높이. 11 이면 윈도우 배율에서 2px 눌린다.
 
         self.btn_party = U.PushButton(inner, "데리고 다니기", self.toggle_party,
                                       height=34)
-        self.btn_party.pack(side="left", pady=11)
+        self.btn_party.pack(side="left", pady=10)
         self.btn_nick = U.ghost_button(inner, "별명 짓기", self.do_nickname,
                                        height=34)
-        self.btn_nick.pack(side="left", padx=8, pady=11)
+        self.btn_nick.pack(side="left", padx=8, pady=10)
         self.btn_move = U.ghost_button(inner, "박스 옮기기", self.move_box,
                                        height=34)
-        self.btn_move.pack(side="left", padx=(0, 8), pady=11)
+        self.btn_move.pack(side="left", padx=(0, 8), pady=10)
+        # 이로치만 누를 수 있다 (1.8.0). 고른 색은 모든 사람의 화면에 보인다.
+        self.btn_tint = U.ghost_button(inner, "색 고르기", self.do_tint,
+                                       height=34)
+        self.btn_tint.pack(side="left", padx=(0, 8), pady=10)
         self.btn_release = U.PushButton(inner, "놓아주기", self.do_release,
                                         fill=U.DANGER_BG, fg=U.DANGER,
                                         shadow="#1a1013", hover="#3a2028",
                                         height=34, border=U.DANGER_LINE,
                                         font=U.FONT_S)
-        self.btn_release.pack(side="left", pady=11)
+        self.btn_release.pack(side="left", pady=10)
         self.status = tk.Label(inner, text="", bg=U.INK, fg=U.FG_FAINT,
                                font=U.FONT_S)
         self.status.pack(side="right")
@@ -870,7 +876,7 @@ class BoxWindow(object):
         # 떠올리기 단추는 상세 칸에 있어서 바닥보다 나중에 만들어진다.
         rem = getattr(self, "btn_remember", None)
         for b in (self.btn_party, self.btn_nick, self.btn_release, rem,
-                  getattr(self, "btn_move", None)):
+                  getattr(self, "btn_move", None), getattr(self, "btn_tint", None)):
             if b is not None:
                 b.configure(state="normal" if on else "disabled")
 
@@ -892,7 +898,7 @@ class BoxWindow(object):
             api = self.app.api
             mons, eggs, boxes = api.pokemon_boxes()
             sprite_cache.ensure_many(
-                api, [(m.get("num"), m.get("shiny")) for m in mons if m.get("onDesktop")])
+                api, [(m.get("num"), T.skin(m)) for m in mons if m.get("onDesktop")])
             eggs_ui.fetch_icons(api, eggs)
             # 알도 한 줄씩 (1.4.1). 파티는 자리 순서, 박스는 알이 먼저.
             return box_filter.merge_eggs(mons, eggs), boxes
@@ -1496,6 +1502,9 @@ class BoxWindow(object):
                 # 알에는 별명을 못 짓고 놓아줄 수도 없다.
                 self.btn_nick.configure(state="disabled")
                 self.btn_release.configure(state="disabled")
+            # 색 고르기는 이로치만
+            self.btn_tint.configure(
+                state="normal" if m.get("shiny") and not m.get("isEgg") else "disabled")
 
     # ---------------- 상세 그리기 ----------------
     def _draw_exp_bar(self):
@@ -2006,7 +2015,7 @@ class BoxWindow(object):
         # 둘 돌아서 두 배로 빨라진다.
         self._art_gen += 1
         gen = self._art_gen
-        key = (m.get("num"), bool(m.get("shiny")), ART_H)
+        key = (m.get("num"), T.skin(m), ART_H)
         got = self._art.get(key)
         if got is not None:
             self._art.move_to_end(key)
@@ -2015,7 +2024,7 @@ class BoxWindow(object):
         api = self.app.api
 
         def work():
-            path = sprite_cache.ensure(api, m.get("num"), m.get("shiny"))
+            path = sprite_cache.ensure(api, m.get("num"), T.skin(m))
             if not path:
                 return None
             anim = sprites.load_animation(path, target_height=ART_H,
@@ -2104,6 +2113,15 @@ class BoxWindow(object):
             return
         U.run_async(self.root, lambda: self.app.api.set_nickname(m["id"], val),
                     self._after("별명을 바꿨습니다."))
+
+    def do_tint(self):
+        """이로치의 색을 고른다 (1.8.0). 고르면 목록과 바탕화면을 다시 맞춘다."""
+        m = self.current()
+        if not m or m.get("isEgg") or not m.get("shiny"):
+            return
+        from .ui_tint import TintPicker
+        after = self._after("색을 바꿨습니다.")
+        TintPicker(self.app, m, parent=self.win, on_done=lambda _p: after(None, None))
 
     def do_release(self):
         m = self.current()
@@ -2441,7 +2459,7 @@ def confirm_release(parent, app, mon):
     keep = {}
 
     def work():
-        return sprite_cache.ensure(app.api, mon.get("num"), mon.get("shiny"))
+        return sprite_cache.ensure(app.api, mon.get("num"), T.skin(mon))
 
     def done(path, err):
         if err or not path:

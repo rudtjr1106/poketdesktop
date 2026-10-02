@@ -7,6 +7,7 @@ import tkinter as tk
 
 from common import patchnotes                  # noqa: E402
 from common import pokelogic as P              # noqa: E402
+from common import tint as T                   # noqa: E402
 from common.korean import natural              # noqa: E402
 from common.version import VERSION             # noqa: E402
 
@@ -554,7 +555,7 @@ class App(object):
             stone = self.keystone
             if me is not None:
                 stone = bool(((me.get("bond") or {}).get("keystone") or {}).get("has"))
-            want = [(m.get("num"), m.get("shiny")) for m in mons]
+            want = [(m.get("num"), T.skin(m)) for m in mons]
             want += self.dress_megas(mons, stone)
             paths = sprite_cache.ensure_many(self.api, want)
             # 걷는 도트도 같이 받아 둔다. 없는 종은 알아서 건너뛴다.
@@ -1213,7 +1214,7 @@ class App(object):
             nums = []
             for e in view.get("events") or []:
                 if e.get("t") == "teams":
-                    nums = [(x.get("num"), bool(x.get("shiny"))) for x in
+                    nums = [(x.get("num"), T.skin(x)) for x in
                             (e.get("me") or []) + (e.get("foe") or [])]
                     break
             paths = sprite_cache.ensure_many(
@@ -1620,6 +1621,9 @@ class App(object):
         title = "%s   Lv.%s" % (info.get("name", "?"), info.get("level", "?"))
         # 메가진화한 모습으로 걷기 (1.8.0). 될 수 있는 포켓몬에게만 줄이 생긴다.
         mega = self.mega_menu_row(pet)
+        # 이로치는 색을 고를 수 있다 (1.8.0). 모든 사람의 화면에 그 색으로 나온다.
+        tint = ({"text": "색 고르기...", "command": lambda: self.open_tint(pet)}
+                if pet.mon.get("shiny") and (pet.id or 0) > 0 else None)
         if not PLAT.NATIVE_MENU:
             # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
             rows = [
@@ -1631,6 +1635,8 @@ class App(object):
             ]
             if mega:
                 rows.append(mega)
+            if tint:
+                rows.append(tint)
             rows += [
                 None,
                 {"text": "포켓몬 관리...", "command": self.open_box},
@@ -1650,6 +1656,8 @@ class App(object):
         if mega:
             m.add_command(label=mega["text"], command=mega.get("command"),
                           state="normal" if mega.get("enabled", True) else "disabled")
+        if tint:
+            m.add_command(label=tint["text"], command=tint["command"])
         m.add_separator()
         m.add_command(label="포켓몬 관리...", command=self.open_box)
         m.add_separator()
@@ -1662,6 +1670,22 @@ class App(object):
     def _recall(self, pid):
         run_async(self.root, lambda: self.api.set_desktop(pid, False),
                   lambda r, e: self.request_sync())
+
+    def open_tint(self, pet):
+        """이로치의 색 고르기 창. 고르면 바탕화면과 열려 있는 관리 창을 다시 맞춘다."""
+        if self.arena or self.battle or not pet.mon.get("shiny"):
+            return
+        from .ui_tint import TintPicker
+
+        def done(_mon):
+            self.request_sync()
+            box = getattr(self, "box_window", None)
+            if box is not None:
+                try:
+                    box.reload()
+                except Exception:                           # noqa: BLE001
+                    pass
+        TintPicker(self, pet.mon, on_done=done)
 
     # ---------------- 메가진화한 모습으로 걷기 (1.8.0) ----------------
     # 겉모습뿐이다. 능력치도 배틀도 그대로고, 배틀 창에서는 여전히 메가진화
@@ -1708,7 +1732,7 @@ class App(object):
             form = self.mega_form(m, keystone)
             if form:
                 m["lookNum"] = form["num"]
-                want.append((form["num"], m.get("shiny")))
+                want.append((form["num"], T.skin(m)))
         return want
 
     @staticmethod
@@ -1718,7 +1742,7 @@ class App(object):
             n = m.get("lookNum")
             if not n:
                 continue
-            sh = bool(m.get("shiny"))
+            sh = T.skin(m)
             walk = (walks or {}).get(walk_cache.key(n, sh)) or (walks or {}).get(n)
             if not ((paths or {}).get((n, sh)) or (paths or {}).get((n, False))
                     or (walk and walk[0] and walk[1])):
@@ -1801,7 +1825,7 @@ class App(object):
                 except Exception:
                     break
             sprite_cache.ensure_many(
-                self.api, [(m.get("num"), m.get("shiny")) for m in picked])
+                self.api, [(m.get("num"), T.skin(m)) for m in picked])
         run_async(self.root, work, lambda r, e: self.request_sync())
 
     def set_size(self, px):
@@ -2043,7 +2067,7 @@ class App(object):
         nums = []
         for m in mons:
             # 메가 폼으로 걷는 포켓몬은 그 폼의 동작을 받는다 (look_num)
-            n, sh = look_num(m), bool(m.get("shiny"))
+            n, sh = look_num(m), T.skin(m)
             # 걷는 도트가 없는 종은 다른 동작도 없다. 물어볼 것도 없다.
             if (n and (n, sh) not in nums
                     and (self.overlay.walks.get(walk_cache.key(n, sh))

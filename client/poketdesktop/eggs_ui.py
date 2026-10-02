@@ -17,6 +17,7 @@ box_filter.egg_row). 박스에 넣은 알은 바탕화면에 안 서고 자라�
 import random
 import tkinter as tk
 
+from common import tint as T
 from common.korean import natural
 
 from . import item_icons, sprite_cache, sprites
@@ -215,7 +216,7 @@ def announce_hatch(parent, app, egg, on_close=None):
     num = mon.get("num")
     if num:
         def work():
-            return sprite_cache.ensure(app.api, num, mon.get("shiny"))
+            return sprite_cache.ensure(app.api, num, T.skin(mon))
 
         def done(path, err):
             if err or not path:

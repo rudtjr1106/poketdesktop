@@ -26,6 +26,7 @@ import tkinter as tk
 
 from PIL import ImageTk
 
+from common import tint as T
 from common.korean import natural
 
 from . import battle_fx as FX
@@ -278,7 +279,7 @@ class RaidBattleWindow(object):
             return
         if not mon or mon.get("fainted"):
             return self._paint(key)
-        num, shiny = mon.get("num"), mon.get("shiny")
+        num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
         size = U.h(BOSS_H if boss else MON_H)
         cap = U.h(BOSS_W if boss else MON_W)
 
@@ -600,7 +601,7 @@ class RaidBattleWindow(object):
             mon["num"] = ev.get("num") or mon.get("num")
             mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
             mon["mega"] = True
-            ui_mega.warm(self, mon["num"], mon.get("shiny"))
+            ui_mega.warm(self, mon["num"], T.skin(mon))
 
             def swap(key=key, mon=mon):
                 self.set_mon(key, mon, boss=(key == BOSS))

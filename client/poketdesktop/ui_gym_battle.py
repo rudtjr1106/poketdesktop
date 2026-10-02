@@ -23,6 +23,7 @@ import tkinter as tk
 
 from PIL import ImageTk
 
+from common import tint as T
 from common.korean import natural
 
 from . import battle_fx as FX
@@ -361,7 +362,7 @@ class GymBattleWindow(object):
         self.cv.itemconfigure(self.sprite[who], image="")
         if not mon or mon.get("fainted"):
             return
-        num, shiny = mon.get("num"), mon.get("shiny")
+        num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
         size = MON_H[who]
 
         def work():
@@ -592,7 +593,7 @@ class GymBattleWindow(object):
         mon["num"] = ev.get("num") or mon.get("num")
         mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
         mon["mega"] = True
-        ui_mega.warm(self, mon["num"], mon.get("shiny"))
+        ui_mega.warm(self, mon["num"], T.skin(mon))
 
         def swap():
             self.set_mon(who, mon)
@@ -874,12 +875,12 @@ class GymBattleWindow(object):
                 w.bind("<Button-1>", lambda _e, s=i: self.do_switch(s))
 
     def _party_thumb(self, label, m):
-        key = "p%s" % m.get("num")
+        key = "p%s/%s" % (m.get("num"), T.skin(m))
         if key in self.photos:
             return label.configure(image=self.photos[key])
 
         def work():
-            path = sprite_cache.ensure(self.app.api, m.get("num"), m.get("shiny"))
+            path = sprite_cache.ensure(self.app.api, m.get("num"), T.skin(m))
             if not path:
                 return None
             anim = sprites.load_animation(path, 32, 0.2, 2.0, max_frames=1)

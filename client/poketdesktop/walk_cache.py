@@ -25,6 +25,8 @@ import os
 import threading
 import time
 
+from common import tint as T
+
 from . import config
 
 # 걷기 말고 받아 두는 동작들. **여기가 유일한 목록이다** - app 이
@@ -43,20 +45,27 @@ def walk_dir():
     return d
 
 
+# 아래 함수들의 shiny 는 **skin** 이다 (common/tint): False(기본) / True(이로치) /
+# "s090" 처럼 이로치가 고른 색조. 색조 값은 밑그림 시트의 색조를 돌려 옆 폴더
+# (0025s-h090)에 따로 둔다.
 def key(num, shiny=False):
-    """overlay.walks 의 열쇠. 보통은 번호, 이로치는 (번호, True)."""
+    """overlay.walks 의 열쇠. 보통은 번호, 이로치는 (번호, True), 고른 색은 (번호, "s090")."""
     if not num:
         return num
-    return (int(num), True) if shiny else int(num)
+    shiny = T.norm(shiny)
+    return (int(num), shiny) if shiny else int(num)
 
 
 def sheet_key(num, name, shiny=False):
     """overlay.sheets 의 열쇠. 보통은 (번호, 동작), 이로치는 (번호, 동작, True)."""
-    return (num, name, True) if shiny else (num, name)
+    shiny = T.norm(shiny)
+    return (num, name, shiny) if shiny else (num, name)
 
 
 def _paths(num, name="Walk", shiny=False):
-    d = os.path.join(walk_dir(), "%04d%s" % (int(num), "s" if shiny else ""))
+    base, _hue = T.split(shiny)
+    d = os.path.join(walk_dir(), "%04d%s%s" % (int(num), "s" if base else "",
+                                               T.suffix(shiny)))
     return (os.path.join(d, "%s.png" % name),
             os.path.join(d, "%s.json" % name))
 
@@ -126,12 +135,38 @@ def ensure(api, num, name="Walk", shiny=False):
     if not num:
         return None, None
     num = int(num)
+    shiny = T.norm(shiny)
+    if isinstance(shiny, str):
+        return _ensure_tinted(api, num, name, shiny)
     if shiny:
         got = _ensure_one(api, num, name, True)
         if got[0]:
             return got
         return _ensure_one(api, num, name, False)
     return _ensure_one(api, num, name, False)
+
+
+def _ensure_tinted(api, num, name, skin):
+    """이로치가 고른 색의 시트. 밑그림 시트의 색조를 돌려 옆 폴더에 둔다."""
+    from . import sprite_tint
+    png, meta = local(num, name, skin)
+    if png:
+        return png, meta
+    base, hue = T.split(skin)
+    src, meta = _ensure_one(api, num, name, base)
+    if not src:
+        # 이로치 시트가 없는 종은 기본 색 시트로 걷는다 (ensure 의 약속 그대로).
+        # 거기에 이로치 색조를 입히면 엉뚱한 색이 된다 - 그대로 준다.
+        return _ensure_one(api, num, name, False) if base else (None, None)
+    dst, dst_meta = _paths(num, name, skin)
+    if not sprite_tint.make(src, dst, hue):
+        return src, meta
+    try:
+        with open(dst_meta, "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+    except OSError:
+        return src, meta
+    return dst, meta
 
 
 def _takes_shiny(fn):
@@ -227,7 +262,7 @@ def ensure_many(api, nums, name="Walk"):
     for n in nums:
         shiny = False
         if isinstance(n, (tuple, list)):
-            n, shiny = n[0], bool(n[1])
+            n, shiny = n[0], T.norm(n[1])
         if not n:
             continue
         k = key(n, shiny)

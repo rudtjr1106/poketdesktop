@@ -31,6 +31,8 @@
 import math
 import random
 
+from common import tint as T
+
 from . import config
 from . import sprite_cache, walk_cache
 from . import ui_common as U
@@ -198,7 +200,7 @@ def battle(host, pet, num, done):
     ov = getattr(app, "overlay", None)
     layer = getattr(host, "layer", None)
     state = {"gathered": False, "loaded": False, "fired": False}
-    shiny = bool((pet.mon or {}).get("shiny"))
+    shiny = T.skin(pet.mon)                 # 이로치가 고른 색까지
     need = bool(num) and ov is not None and getattr(pet, "look", None) != num
 
     def closed():

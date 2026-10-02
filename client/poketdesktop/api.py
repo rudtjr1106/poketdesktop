@@ -210,6 +210,11 @@ class Api(object):
     def set_nickname(self, pid, nickname):
         return self._call("PATCH", "/api/pokemon/%d" % pid, {"nickname": nickname})
 
+    def set_tint(self, pid, tint):
+        """이로치 포켓몬의 색을 고른다 (1.8.0). tint 는 common/tint 의 값, None 이면
+        이로치 색 그대로. 모든 사람의 화면에 그 색으로 나온다."""
+        return self._call("POST", "/api/pokemon/%d/tint" % pid, {"tint": tint})
+
     def release(self, pid):
         return self._call("DELETE", "/api/pokemon/%d" % pid)
 

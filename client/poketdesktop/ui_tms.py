@@ -25,6 +25,7 @@ import tkinter as tk
 from PIL import ImageTk
 
 from common import movetext as MT
+from common import tint as T
 from common.korean import natural
 
 from . import sprite_cache, sprites
@@ -572,7 +573,7 @@ class TmWindow(object):
         holder = tk.Label(slot, bg=U.BG2, bd=0, padx=0, pady=0,
                           highlightthickness=0)
         holder.pack(expand=True)
-        got = self.photos.get((mon.get("num"), bool(mon.get("shiny"))))
+        got = self.photos.get((mon.get("num"), T.skin(mon)))
         if got is not None:
             holder.configure(image=got)
         name = tk.Label(f, text="%s Lv.%s" % (mon.get("name", "?"),
@@ -601,7 +602,7 @@ class TmWindow(object):
         """
         want = []
         for m in learners:
-            k = (m.get("num"), bool(m.get("shiny")))
+            k = (m.get("num"), T.skin(m))
             if k[0] and k not in self.photos and k not in want:
                 want.append(k)
         if not want:
@@ -639,7 +640,7 @@ class TmWindow(object):
                 return
             for m in learners:
                 got = self.mon_rows.get(m["id"])
-                ph = self.photos.get((m.get("num"), bool(m.get("shiny"))))
+                ph = self.photos.get((m.get("num"), T.skin(m)))
                 if got is None or ph is None:
                     continue          # 아직 안 만든 줄은 만들 때 붙는다
                 try:
