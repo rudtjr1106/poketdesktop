@@ -45,6 +45,8 @@ NEEDED = [
 KO = 3          # PokeAPI 언어 id: 한국어
 EN = 9          # 영어
 LEVEL_UP = 1    # pokemon_move_methods: 레벨업으로 배움
+# 기술 수가 적은 외전. 이 표가 가장 최근인 종은 본편 표와 합친다 (레벨업 기술 쪽 설명).
+SIDE_GAMES = ("legends-arceus",)
 
 # 우리 게임에서만 자력으로 배우게 한 기술. 본가(PokeAPI) 표에는 없다.
 # 종 번호 -> [(레벨, 기술 내부이름)]. 여기 적어 두면 도감을 다시 만들어도
@@ -495,15 +497,25 @@ def build():
     # 아니다. 번호만 보면 blue-japan(29)이 scarlet-violet(25)을 이겨서, 1세대
     # 151종만 1996년 적·녹·청 학습표를 썼다 (자속기가 40% 비어 있었다 -
     # 나시 0개, 갸라도스 1개). 세대를 먼저 보고, 같은 세대 안에서만 번호로 견준다.
-    # legends-arceus(24, 8세대)는 그대로 남는다 - 히스이 39종은 SV 에 없다.
+    #
+    # **legends-arceus 는 외전이라 표가 빈약하다** (기술 수가 적은 게임이다).
+    # SV 에 없는 55종(토게키스·주뱃·알통몬·롱스톤 계열 등)은 이 표가 '가장
+    # 최근' 이어서, 토게키스가 불새·파동탄·신속·원시의힘을 못 배웠다 (제보).
+    # 그렇다고 본편 표로 갈아 끼우면 지금 배우던 기술(토게피의 문포스·
+    # 드레인키스 같은 자속기)이 사라진다. 그래서 **그 종들만 가장 최근 본편
+    # 표와 합친다** - 두 표에 다 있는 기술은 더 낮은 레벨을 쓴다. 어느
+    # 레벨에서도 전보다 배울 수 있는 기술이 줄지 않는다.
     vg_gen = dict((as_int(r["id"]), as_int(r["generation_id"]))
                   for r in rows("version_groups.csv"))
+    side_vg = set(as_int(r["id"]) for r in rows("version_groups.csv")
+                  if r["identifier"] in SIDE_GAMES)
 
     def vg_rank(vg):
         return (vg_gen.get(vg, 0), vg)
 
     best_vg, tmp = {}, {}
     evo_vg, evo_tmp = {}, {}
+    main_vg, main_tmp = {}, {}       # 외전을 뺀 것 중 가장 최근 (합칠 때 쓴다)
     for r in rows("pokemon_moves.csv"):
         if as_int(r["pokemon_move_method_id"]) != LEVEL_UP:
             continue
@@ -527,6 +539,18 @@ def build():
             tmp[pid] = []
         if vg_rank(vg) == best_vg[pid]:
             tmp[pid].append((lv, move_ident[mid]))
+        if vg not in side_vg:
+            if vg_rank(vg) > main_vg.get(pid, (-1, -1)):
+                main_vg[pid] = vg_rank(vg)
+                main_tmp[pid] = []
+            if vg_rank(vg) == main_vg[pid]:
+                main_tmp[pid].append((lv, move_ident[mid]))
+    for pid in tmp:
+        if best_vg[pid][1] in side_vg and main_tmp.get(pid):
+            low = {}
+            for lv, mv in tmp[pid] + main_tmp[pid]:
+                low[mv] = min(lv, low.get(mv, lv))
+            tmp[pid] = [(lv, mv) for mv, lv in low.items()]
     lvmoves = {}
     for pid in set(tmp) | set(evo_tmp):
         seen, out = set(), []

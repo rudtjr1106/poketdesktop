@@ -56,8 +56,12 @@ OK = FAIL = 0
 # (05ceafd2 / 2d085a96 에서). 이 파티가 전부 1세대라 들고 나오는 기술이 통째로 바뀐다 -
 # 엔진이 아니라 자료가 바뀐 것이다. 같은 때 고친 치유파동·검은오물은 이 판들에 안 나온다:
 # 옛 엔진(git HEAD)에 새 도감만 끼워 돌려도 아래 두 값이 그대로 나오는 것을 확인했다.
-PARTY_DIGEST = "df4c35fbdae876d71ab265f8f612e44d9ee1bad96ea871f24a6583dd37cf1743"
-SOLO_DIGEST = "e270fbf75ceefc43feb3b00e7336c6cc7d655fc4cbe0f4eac515fac418ae8682"
+#
+# 그 뒤 **레전드 아르세우스 표를 쓰던 53종을 본편 표와 합치면서** 한 번 더 달라졌다
+# (df4c35fb / e270fbf7 에서). 상대 파티의 롱스톤(95)이 그 53종이라 들고 나오는 기술이
+# 바뀐다. 이때는 엔진을 한 줄도 안 고쳤다 (도감과 tools/build_pokedex.py 만 바뀜).
+PARTY_DIGEST = "9b26cd0a7c8186568faec820a639f2d3df320173e10a541939be3d3428ad3aa8"
+SOLO_DIGEST = "a702a422b1485e3aee1279753eae4d44a0c925bed1dd63d81eec15c911d6b777"
 
 
 def chk(name, cond, got=""):
