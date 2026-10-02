@@ -358,6 +358,114 @@ def _season3_open(conn):
                gifts, n_eggs, candies, n_all))
 
 
+# ---- 시즌 3 첫날 0~9시(한국 시각)의 랜덤 배틀을 없던 일로 한다 ----
+# 시즌 3 은 10/2 00:00 에 열렸다. 그날 패치한다는 것을 미리 알리지 않아서
+# 연 직후에는 몇 사람만 있었고, 하루 20판이 UTC 날짜로 세어지던 때라 그
+# 사람들은 0~9시에 스무 판, 9시에 풀린 뒤 스무 판을 또 칠 수 있었다
+# (열 명이 마흔여섯 판, 한 명은 하루에 마흔 판). 운영자 결정으로 그 판들을
+# 지우고, 하루도 한국 시각 자정에 바뀌게 고쳤다 (pvp._today).
+#
+# 시각은 UTC 로 적혀 있다 (battle_record.ended_at).
+S3_VOID_FROM = "2026-10-01T15:00:00"      # 10/2 00:00 KST
+S3_VOID_TO = "2026-10-02T00:00:00"        # 10/2 09:00 KST
+S3_VOID_PLACEMENT = 5                     # pvp.PLACEMENT (규칙 2 - 여기 적어 둔다)
+S3_VOID_SAFE_RP = 150                     # season.SAFE_RP
+
+
+def _kst_day(iso):
+    t = datetime.datetime.fromisoformat(iso)
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=datetime.timezone.utc)
+    return (t.astimezone(datetime.timezone(datetime.timedelta(hours=9)))
+            .strftime("%Y-%m-%d"))
+
+
+def _s3_void_early(conn):
+    """그 시간대에 **건** 랜덤 배틀을 지우고, 건 사람의 시즌 3 점수를 다시 쌓는다.
+
+    1) 그 판의 전적을 지운다 - 건 쪽과 걸린 쪽 둘 다, 그리고 대전 로그.
+       걸린 쪽은 원래 점수가 안 움직였으므로 전적 줄만 사라진다.
+    2) 건 사람마다, **남은 판(9시 이후)을 처음부터 다시 쌓는다.** 판마다 그때
+       받은 점수 변화(delta · rp_delta)는 그대로 쓰고, 시작점만 시즌을 연 직후로
+       되돌린다. 상대의 그때 점수와 전력비를 남겨 두지 않아서 판마다 변화량을
+       새로 셈할 수는 없다 - 그리고 그 판에서 실제로 받은 것을 바꾸는 것보다
+       그대로 두는 편이 당사자에게 설명이 된다.
+       바닥(0, 슈퍼볼에 닿았으면 150)은 새로 쌓는 길에서 다시 적용한다.
+    3) 상금은 돌려받지 않는다 (규칙 1). 이미 썼을 수 있다.
+
+    하루 도전 수(fought)는 건드릴 것이 없다. 그 칸은 UTC 날짜로 세고 있어서
+    9시 이후에 친 판만 '10/2' 로 적혀 있고, 그 값이 곧 한국 날짜 10/2 의
+    남은 판수다. 0~9시에만 친 사람은 '10/1' 로 적혀 있어서 저절로 0 이 된다.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0).isoformat()
+    rows = conn.execute(
+        "SELECT id, user_id, match_id, rating, delta FROM battle_record"
+        " WHERE kind='random' AND started=1 AND ended_at>=? AND ended_at<?"
+        " ORDER BY id", (S3_VOID_FROM, S3_VOID_TO)).fetchall()
+    if not rows:
+        return "지울 판이 없다"
+    start = {}                      # 사람 -> 시즌을 연 직후의 숨은 점수
+    mids, ids = set(), []
+    for r in rows:
+        uid = _v(r, "user_id", 1)
+        if uid not in start:
+            start[uid] = int(_v(r, "rating", 3)) - int(_v(r, "delta", 4))
+        mid = _v(r, "match_id", 2)
+        if mid is not None:
+            mids.add(mid)
+        ids.append(_v(r, "id", 0))
+
+    # 1) 전적과 로그
+    before = conn.execute("SELECT COUNT(*) FROM battle_record").fetchone()[0]
+    for rid in ids:
+        conn.execute("DELETE FROM battle_record WHERE id=?", (rid,))
+    for mid in sorted(mids):
+        conn.execute("DELETE FROM battle_record WHERE match_id=?", (mid,))
+        conn.execute("DELETE FROM pvp_match WHERE id=?", (mid,))
+    gone = before - conn.execute("SELECT COUNT(*) FROM battle_record").fetchone()[0]
+
+    # 2) 남은 판으로 다시 쌓는다
+    for uid in sorted(start):
+        rating = max(0, start[uid])
+        best = rating
+        rp = peak = games = wins = losses = draws = streak = 0
+        win_day = ""
+        left = conn.execute(
+            "SELECT id, result, delta, rp_delta, ended_at FROM battle_record"
+            " WHERE user_id=? AND kind='random' AND started=1 AND ended_at>=?"
+            " ORDER BY id", (uid, S3_VOID_TO)).fetchall()
+        for g in left:
+            result = _v(g, "result", 1)
+            new_rating = max(0, rating + int(_v(g, "delta", 2) or 0))
+            floor = S3_VOID_SAFE_RP if peak >= S3_VOID_SAFE_RP else 0
+            new_rp = max(floor, rp + int(_v(g, "rp_delta", 3) or 0))
+            conn.execute(
+                "UPDATE battle_record SET rating=?, delta=?, rp=?, rp_delta=? WHERE id=?",
+                (new_rating, new_rating - rating, new_rp, new_rp - rp, _v(g, "id", 0)))
+            rating, rp = new_rating, new_rp
+            best, peak = max(best, rating), max(peak, rp)
+            games += 1
+            if result == "win":
+                wins += 1
+                streak = max(1, streak + 1)
+                win_day = _kst_day(_v(g, "ended_at", 4))
+            elif result == "lose":
+                losses += 1
+                streak = min(-1, streak - 1)
+            else:
+                draws += 1
+                streak = 0
+        conn.execute(
+            "UPDATE rank_stat SET rating=?, games=?, wins=?, losses=?, draws=?,"
+            " streak=?, best=?, ranked=?, rp=?, peak_rp=?, win_day=?, updated_at=?"
+            " WHERE user_id=?",
+            (rating, games, wins, losses, draws, streak, best,
+             1 if games >= S3_VOID_PLACEMENT else 0, rp, peak, win_day, now, uid))
+    return "%d명이 건 %d판을 지움 (전적 %d줄, 로그 %d개), 점수를 다시 쌓음" % (
+        len(start), len(ids), gone, len(mids))
+
+
 def _egg_slots(conn):
     """1.4.0 에 받은 알에 파티 자리를 준다.
 
@@ -416,6 +524,7 @@ ONCE = [
     ("0280-mmr-recenter", _mmr_recenter),
     # 시즌 3 (1.7.0, 2026-10-02). 서버가 새 판으로 뜨는 순간 한 번 돈다.
     ("0290-season3-open", _season3_open),
+    ("0300-s3-void-early", _s3_void_early),
 ]
 
 

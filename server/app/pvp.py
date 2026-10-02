@@ -104,8 +104,16 @@ def _iso(t=None):
     return (t or _now()).isoformat()
 
 
+# 하루는 **한국 시각 자정**에 바뀐다 (1.8.0). 예전에는 UTC 날짜를 써서 하루
+# 20판·하루 상금·오늘 첫 승이 한국 시각 오전 9시에 풀렸다. 쓰는 사람이 모두
+# 한국에 있는데 '하루' 가 아침 9시에 바뀌는 것은 아무도 예상하지 못한다 -
+# 시즌 3 을 자정에 열었더니 0~9시가 '어제 몫' 으로 세어져서, 그때 스무 판을
+# 치고 9시에 스무 판을 또 칠 수 있었다.
+KST = datetime.timezone(datetime.timedelta(hours=9))
+
+
 def _today():
-    return _now().strftime("%Y-%m-%d")
+    return _now().astimezone(KST).strftime("%Y-%m-%d")
 
 
 # ---------------------------------------------------------------- 로그

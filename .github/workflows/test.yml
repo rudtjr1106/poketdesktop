@@ -394,6 +394,7 @@ jobs:
           python test_mega.py
           python test_legend_limit.py
           python test_board.py
+          python test_s3_void.py
 
       - name: 서버 띄우기
         env:
