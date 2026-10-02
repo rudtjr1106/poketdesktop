@@ -1251,7 +1251,7 @@ def h_psychoshift(bt, move, who, user, target, tw, ev):
     if not user.status or target.status:
         return fail(ev, who)
     st = user.status
-    bt._apply_status(target, st, ev, source=user)
+    bt._apply_status(target, st, ev, source=user, by_move=True)
     if target.status == st:
         user.status, user.sleep_turns = None, 0
         ev.append({"t": "cure", "who": who, "text": "%s 의 상태이상이 옮겨 갔다!" % user.name})

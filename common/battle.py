@@ -1413,7 +1413,7 @@ class Battle(object):
                 chance = -1
             if chance == 0 or (chance > 0 and self.rng.uniform(0, 100) < chance * sec_mult):
                 # 누가 걸었는지 늘 넘긴다 - 신비의부적은 특성이 꺼진 판(야생·예전 PvP)에서도 막는다
-                self._apply_status(target, ail, ev, source=user)
+                self._apply_status(target, ail, ev, source=user, by_move=True)
 
         # 풀죽음
         fl = move.get("flinch") or 0
@@ -1559,7 +1559,8 @@ class Battle(object):
                 if fx == "flinch":
                     target.flinched = True
                 else:
-                    self._apply_status(target, fx, ev, source=user if user.ability_on else None)
+                    self._apply_status(target, fx, ev, source=user if user.ability_on else None,
+                                       by_move=True)
         if k == "FINALGAMBIT" and total:
             user.hp = 0
         if k == "WAKEUPSLAP" and target.status == "sleep" and total and target.alive():
@@ -1702,7 +1703,9 @@ class Battle(object):
     def status_kr(self, ail):
         return STATUS_KR.get(ail, ail)
 
-    def _apply_status(self, f, ail, ev, source=None):
+    def _apply_status(self, f, ail, ev, source=None, by_move=False):
+        """by_move: 기술이 건 상태이상인가 (독조종은 기술로 건 독에만 붙는다 -
+        독압정·독사슬·독수 같은 것으로 건 독에는 혼란이 따라오지 않는다)."""
         if f.status:
             return
         types = f.types() if f.ability_on else ((f.species or {}).get("types") or [])
@@ -1733,6 +1736,10 @@ class Battle(object):
             f.sleep_turns = self.rng.randint(1, 3)
         ev.append({"t": "ailment", "status": ail, "who": who,
                    "text": "%s 은(는) %s 상태가 되었다!" % (f.name, STATUS_KR.get(ail, ail))})
+        if by_move and ail in ("poison", "bad-poison") and source is not None and source is not f \
+                and A.has(source, "POISONPUPPETEER") and not f.cond.get("confused"):
+            A.pop(self, source, "foe" if who == "me" else "me", ev)     # 독조종
+            SM.confuse(self, f, who, ev, source=source)
         if f.held:
             H.on_status(self, f, who, ev)               # 버치열매 같은 것
         if f.ability_on:

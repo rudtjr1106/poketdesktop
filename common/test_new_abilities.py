@@ -326,6 +326,74 @@ def main():
     bt._use("me", a, b, "GIGADRAIN", ev)
     chk("해감액: 빨아들이면 오히려 깎인다", a.hp < before, (before, a.hp))
 
+    print("=== 독조종 (복숭악동) ===")
+    # 제보: "독조종인데 상대가 독에 걸려도 혼란에 빠지지 않는다" - 설명만 있고 동작이 없었다
+    hit = both = 0
+    shown = False
+    for seed in range(12):
+        bt, a, b = duel("PECHARUNT", "GYARADOS", a_moves=("TOXIC",), a_ab="POISONPUPPETEER", seed=seed)
+        ev = []
+        bt._use("me", a, b, "TOXIC", ev)
+        if b.status:
+            hit += 1
+            both += 1 if b.cond.get("confused") else 0
+            shown = shown or any(e.get("t") == "ability" and e.get("ability") == "POISONPUPPETEER"
+                                 and e.get("who") == "me" for e in ev)
+    chk("기술로 독에 걸린 상대는 혼란에도 빠진다", hit and hit == both, (hit, both))
+    chk("특성 이름이 뜬다", shown)
+    hit = both = 0
+    for seed in range(40):
+        bt, a, b = duel("PECHARUNT", "GYARADOS", a_moves=("MALIGNANTCHAIN",),
+                        a_ab="POISONPUPPETEER", seed=seed)
+        ev = []
+        bt._use("me", a, b, "MALIGNANTCHAIN", ev)
+        if b.status:
+            hit += 1
+            both += 1 if b.cond.get("confused") else 0
+        elif b.cond.get("confused"):
+            both -= 100                      # 독이 안 걸렸는데 혼란만 걸리면 안 된다
+    chk("때리는 기술의 부가 독에도 붙는다 (독이 안 걸리면 혼란도 없다)",
+        hit and hit == both, (hit, both))
+    bt, a, b = duel("PECHARUNT", "GYARADOS", a_ab="POISONPUPPETEER")
+    ev = []
+    bt._apply_status(b, "poison", ev, source=a)
+    chk("기술이 아닌 것(독압정·특성)으로 건 독에는 안 붙는다",
+        b.status == "poison" and not b.cond.get("confused"), (b.status, b.cond))
+    bt, a, b = duel("PECHARUNT", "GYARADOS", a_ab="POISONPUPPETEER")
+    ev = []
+    bt._apply_status(b, "burn", ev, source=a, by_move=True)
+    chk("독이 아닌 상태이상에는 안 붙는다",
+        b.status == "burn" and not b.cond.get("confused"), (b.status, b.cond))
+    bt, a, b = duel("ARBOK", "GYARADOS", a_ab="INTIMIDATE")
+    ev = []
+    bt._apply_status(b, "poison", ev, source=a, by_move=True)
+    chk("독조종이 아니면 독만 걸린다",
+        b.status == "poison" and not b.cond.get("confused"), (b.status, b.cond))
+    bt, a, b = duel("PECHARUNT", "SLOWBRO", a_ab="POISONPUPPETEER", b_ab="OWNTEMPO")
+    ev = []
+    bt._apply_status(b, "poison", ev, source=a, by_move=True)
+    chk("마이페이스는 독만 걸리고 혼란은 막는다",
+        b.status == "poison" and not b.cond.get("confused"), (b.status, b.cond))
+    bt, a, b = duel("PECHARUNT", "ARBOK", a_ab="POISONPUPPETEER")
+    ev = []
+    bt._apply_status(b, "poison", ev, source=a, by_move=True)
+    chk("독이 안 통하는 상대는 혼란도 없다",
+        not b.status and not b.cond.get("confused") and not ev, (b.status, b.cond, ev))
+    bt, a, b = duel("PECHARUNT", "GYARADOS", a_ab="POISONPUPPETEER")
+    b.cond["confused"] = 3
+    ev = []
+    bt._apply_status(b, "poison", ev, source=a, by_move=True)
+    chk("이미 혼란이면 조용히 독만 건다",
+        b.status == "poison" and b.cond.get("confused") == 3
+        and not any(e.get("t") == "ability" for e in ev), ev)
+    bt, a, b = duel("PECHARUNT", "GYARADOS", a_ab="POISONPUPPETEER")
+    a.ability_on = False
+    ev = []
+    bt._apply_status(b, "poison", ev, source=a, by_move=True)
+    chk("특성이 꺼진 판(야생)에서는 안 붙는다",
+        b.status == "poison" and not b.cond.get("confused"), (b.status, b.cond))
+    chk("채운 목록에 들어갔다", "POISONPUPPETEER" in A.IMPLEMENTED)
+
     print("=== 얼마나 채웠나 ===")
     import collections
     use = collections.Counter()
