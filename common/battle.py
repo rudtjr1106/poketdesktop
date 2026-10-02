@@ -90,6 +90,8 @@ SPARE_RISK_ABOVE = 0.4
 # 잡기 모드에서 먼저 거는 상태이상. 포획률이 잠듦 2배, 마비 1.5배.
 # 화상·독은 턴마다 체력을 깎아 쓰러뜨릴 수 있어서 안 건다.
 SPARE_STATUS = ("sleep", "paralysis")
+# 쓰면 스스로 최대 체력의 절반을 깎는 변화기 (잡기 모드가 상대의 남을 체력을 셀 때 본다)
+SELF_HALF = ("BELLYDRUM", "FILLETAWAY")
 
 # 쓸 기술이 하나도 없을 때 쓰는 몸부림.
 # 이게 없으면 양쪽 다 PP 가 떨어졌을 때 아무도 못 때려서 배틀이 안 끝난다.
@@ -735,9 +737,36 @@ class Battle(object):
             return None, "nosafe"
         return best_m, None
 
+    def _self_loss(self, f, other):
+        """f 가 이번 턴에 **먼저 움직여 스스로 깎을 수 있는** 체력의 최댓값.
+
+        잡기 모드가 '이 기술로는 안 쓰러진다' 를 셀 때 뺀다. 야생 비버통이 먼저
+        이판사판태클을 쓰고 반동으로 깎인 뒤에, 안 쓰러진다고 본 기술을 맞아
+        쓰러졌다. 반동기(준 데미지의 몇 %), 몸부림, 배북·살깎기·고스트의 저주를 센다.
+        """
+        worst = 0
+        for m in self.usable(f):
+            md = self.move_of(m)
+            mk = MC.key(md)
+            drain, heal = md.get("drain") or 0, md.get("heal") or 0
+            loss = 0
+            if mk in SELF_HALF or (mk == "CURSE" and "GHOST" in f.types()):
+                loss = f.maxhp // 2
+            elif MC.attacks(md) and heal < 0:
+                loss = int(f.maxhp * -heal / 100.0) + 1                 # 몸부림
+            elif MC.attacks(md) and drain < 0:
+                if f.ability_on and A.no_recoil(f):
+                    continue
+                d, _c, _e = damage(self.dex, md, f, other, MAX_RNG, crit=True)
+                hi = ((md.get("hits") or [1, 1]) + [1, 1])[1]
+                loss = max(1, int(min(other.hp, d * max(1, hi)) * -drain / 100.0))
+            worst = max(worst, loss)
+        return worst
+
     def _spare_hit(self, pool, user, target, crit):
         """쓰러뜨리지 않는 공격 기술 중 가장 많이 깎는 것. 없거나 너무 약하면 None."""
         best, best_m = 0.0, None
+        left = target.hp - self._self_loss(target, user)    # 상대가 먼저 반동을 받고 난 체력
         for m in pool:
             md = self.move_of(m)
             if not MC.attacks(md):
@@ -758,7 +787,7 @@ class Battle(object):
                 worst += target.maxhp // 8
             if target.seeded:
                 worst += target.maxhp // 8
-            if worst >= target.hp:
+            if worst >= left:
                 continue
             d, _c, _e = damage(self.dex, md, user, target, EST_RNG, crit=False)
             d *= (lo + hi) / 2.0 if hi > 1 else 1

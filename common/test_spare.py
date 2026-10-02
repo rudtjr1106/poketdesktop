@@ -97,6 +97,25 @@ def t_고르기(dex):
     me.pp["SPLASH"] = 0
     chk("몸부림만 남으면 멈춘다", bt.spare_plan(me, foe) == (None, "nosafe"), bt.spare_plan(me, foe))
 
+    # 야생 비버통이 먼저 이판사판태클을 쓰고 반동으로 깎인 뒤, '안 쓰러진다' 던
+    # 사이코키네시스를 맞아 쓰러졌다 (기술표를 넓히면서 드러났다). 상대가 스스로
+    # 깎을 수 있는 만큼을 빼고 센다.
+    psy = mon(dex, "BEHEEYEM", 74, ["PSYCHIC"])
+    # 사이코키네시스는 최대 154, 이판사판태클의 반동은 최대 62 다. 체력 200 이면
+    # 반동이 없을 때는 남고(46), 반동을 먼저 받으면 138 이라 쓰러진다.
+    bt, me, foe = fight(dex, psy, mon(dex, "BIBAREL", 74, ["TACKLE"]))
+    foe.hp = 200
+    chk("반동기가 없는 상대에게는 그 기술을 쓴다", bt.spare_plan(me, foe) == ("PSYCHIC", None),
+        bt.spare_plan(me, foe))
+    bt, me, foe = fight(dex, psy, mon(dex, "BIBAREL", 74, ["DOUBLEEDGE"]))
+    foe.hp = 200
+    chk("반동기를 가진 상대에게는 반동만큼 덜 남는다고 본다 (안 쓴다)",
+        bt.spare_plan(me, foe) == (None, "nosafe"), bt.spare_plan(me, foe))
+    chk("  상대가 스스로 깎을 수 있는 체력을 센다", 0 < bt._self_loss(foe, me) < foe.maxhp // 2,
+        bt._self_loss(foe, me))
+    bt, me, foe = fight(dex, psy, mon(dex, "BIBAREL", 74, ["BELLYDRUM"]))
+    chk("배북은 절반을 깎는다고 본다", bt._self_loss(foe, me) == foe.maxhp // 2, bt._self_loss(foe, me))
+
 
 def t_실제로_안_쓰러뜨린다(dex):
     print("-- 실제로 돌려 본다")
