@@ -511,6 +511,34 @@ class Api(object):
     def live_seen(self):
         return self._call("POST", "/api/live/seen", {})
 
+    # ---------------- 게시판 (1.8.0) ----------------
+    # 창을 열었을 때만 부른다. 새 공지가 있는지는 /api/me 에 실려 온다.
+    def board(self, kind="all", page=1):
+        return self._call("GET", "/api/board?kind=%s&page=%d" % (kind, int(page)))
+
+    def board_post(self, pid):
+        """글 하나와 댓글."""
+        return self._call("GET", "/api/board/%d" % int(pid))
+
+    def board_write(self, kind, title, body):
+        return self._call("POST", "/api/board",
+                          {"kind": kind, "title": title, "body": body})
+
+    def board_edit(self, pid, title, body):
+        return self._call("PUT", "/api/board/%d" % int(pid),
+                          {"title": title, "body": body})
+
+    def board_delete(self, pid):
+        return self._call("DELETE", "/api/board/%d" % int(pid))
+
+    def board_comment(self, pid, body, parent=0):
+        """댓글을 단다. parent 가 있으면 그 댓글에 다는 답글."""
+        return self._call("POST", "/api/board/%d/comments" % int(pid),
+                          {"body": body, "parent": int(parent or 0)})
+
+    def board_comment_delete(self, cid):
+        return self._call("DELETE", "/api/board/comments/%d" % int(cid))
+
     # ---------------- 메가진화 (시즌 3) ----------------
     def bond(self, pid):
         """한 개체의 유대 미션 카드 (키스톤·스톤·미션 진행)."""

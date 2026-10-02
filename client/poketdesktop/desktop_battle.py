@@ -30,6 +30,7 @@ from . import ball_menu
 from . import battle_fx as FX
 from . import config
 from . import evolve_fx
+from . import mega_fx
 from .fx_layer import FloatText, HpBar, open_layer
 from . import platform_os as PLAT
 from .ui_common import run_async
@@ -336,11 +337,11 @@ class DesktopBattle(object):
             if side:
                 self.float_over(side, "효과가 없다...", "#9a9ab0")
         if t == "mega":
-            # 바탕화면 도트는 걷는 그림이라 메가 모습이 없다 - 글씨로 알린다 (시즌 3)
+            # 무지갯빛이 모였다 터지고, 메가 폼의 도트가 있으면 이 판 동안
+            # 그 모습으로 싸운다 (1.8.0). 끝나면 finish_cleanup 이 되돌린다.
             side = self.mine if who == "me" else self.foe
             if side:
-                self.float_over(side, "메가진화!", "#c9b3ff")
-                return self.after(700, done)
+                return mega_fx.battle(self, side, ev.get("num"), done)
         self.after(220, done)
 
     def turn_done(self, result):
@@ -772,6 +773,8 @@ class DesktopBattle(object):
         if self.layer:
             self.layer.destroy()
             self.layer = None
+        # 배틀 중에 메가진화했으면 원래 입던 모습으로 되돌린다
+        mega_fx.release(self.app.overlay, [self.mine, self.foe])
         # 내 포켓몬은 원래 자리로 돌려보내고 다시 돌아다니게 한다
         if self.mine:
             self.mine.battling = False

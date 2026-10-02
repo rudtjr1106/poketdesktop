@@ -15,7 +15,7 @@ from . import autostart                     # noqa: E402
 from . import config, single, sprite_cache, ui_loading, updater, walk_cache  # noqa: E402
 from . import platform_os as PLAT              # noqa: E402
 from . import ui_common as U                   # noqa: E402
-from .overlay import Overlay                   # noqa: E402
+from .overlay import Overlay, look_num         # noqa: E402
 from .tray import Tray                         # noqa: E402
 if sys.platform == "darwin" and PLAT.gui_ready():   # noqa: E402
     # 맥은 pystray 를 못 쓴다 (tray_mac 의 첫 주석을 보라).
@@ -37,6 +37,7 @@ from .ui_login import LoginWindow, ask_password  # noqa: E402
 from .ui_update import NewVersionAsk, PatchNotes, UpdateWindow  # noqa: E402
 from .wild_ui import WildController            # noqa: E402
 from . import raid_fx                          # noqa: E402
+from . import mega_fx                          # noqa: E402
 
 
 # 켜 둔 동안 새 버전을 몇 시간마다 살펴볼지.
@@ -104,6 +105,13 @@ class App(object):
         # 받아 놓고 아직 안 받아준 친구 요청 수. 대전과 같은 이유로
         # 트레이에 숫자로 남긴다 - 화면에 아무 자국이 없다.
         self.friend_unseen = 0
+        # 게시판 (1.8.0): 서버가 알려 준 가장 최근 공지 번호. 마지막으로 본
+        # 번호(settings.noticeSeen)보다 크면 탭과 트레이에 표시한다.
+        self.board_notice = 0
+        self.board_window = None
+        # 키스톤이 있나 (서버가 /api/me 에 실어 준다). 메가진화한 모습으로
+        # 걸어다니게 할 수 있는지를 이걸로 본다 (1.8.0).
+        self.keystone = False
         # 도감 업적 알림 (시즌 3)
         self._ach_queue = []
         self._ach_known = set()
@@ -536,16 +544,22 @@ class App(object):
 
         def work():
             mons = self.api.desktop()
-            paths = sprite_cache.ensure_many(
-                self.api, [(m.get("num"), m.get("shiny")) for m in mons])
-            # 걷는 도트도 같이 받아 둔다. 없는 종은 알아서 건너뛴다.
-            walks = walk_cache.ensure_many(
-                self.api, [(m.get("num"), m.get("shiny")) for m in mons])
             me = None
             try:
                 me = self.api.me()
             except Exception:
                 pass
+            # 메가진화한 모습으로 걷게 해 둔 포켓몬은 그 폼의 도트를 받는다 (1.8.0).
+            # 키스톤은 방금 받은 me 로 본다 - 켜자마자의 첫 동기화에서도 맞게.
+            stone = self.keystone
+            if me is not None:
+                stone = bool(((me.get("bond") or {}).get("keystone") or {}).get("has"))
+            want = [(m.get("num"), m.get("shiny")) for m in mons]
+            want += self.dress_megas(mons, stone)
+            paths = sprite_cache.ensure_many(self.api, want)
+            # 걷는 도트도 같이 받아 둔다. 없는 종은 알아서 건너뛴다.
+            walks = walk_cache.ensure_many(self.api, want)
+            self.undress_missing(mons, paths, walks)
             if me and me.get("eggs"):
                 # 알 그림도 여기서 받아 둔다 (tk 스레드에서 받으면 멈춘다)
                 from . import eggs_ui
@@ -585,6 +599,9 @@ class App(object):
                     (me.get("achievements") or {}).get("unseen") or [])
                 # 저절로 받은 메가스톤 (시즌 3). 업적과 같은 식으로 알린다.
                 self.announce_bond((me.get("bond") or {}).get("got") or [])
+                # 게시판의 새 공지 (1.8.0). 탭과 트레이 메뉴에 표시만 한다.
+                self.note_notice((me.get("board") or {}).get("notice"))
+                self.keystone = bool(((me.get("bond") or {}).get("keystone") or {}).get("has"))
                 self.user_id = (me.get("user") or {}).get("id", self.user_id)
                 # 레이드 안내. 이벤트 기간이 아니면 None 이라 아무 일도 안 한다.
                 self.announce_raid(me.get("raid"))
@@ -663,6 +680,7 @@ class App(object):
         PLAT.activate()
         if not self.hub:
             self.hub = HubWindow(self)
+            self._paint_notice()
         self.hub.show(key)
         return self.hub.panes.get(key)
 
@@ -676,7 +694,49 @@ class App(object):
         self.bag_window = self._tab("bag")
 
     def open_tms(self):
-        self.tm_window = self._tab("tms")
+        # 기술머신은 가방 탭 안의 한 칸이다 (1.8.0, ui_bag_tabs)
+        pane = self._tab("bag")
+        self.bag_window = self.tm_window = pane
+        if pane is not None:
+            pane.show("tms")
+
+    def open_board(self):
+        self.board_window = self._tab("board")
+
+    # ---------------- 게시판의 새 공지 ----------------
+    @property
+    def notice_unseen(self):
+        try:
+            return int(self.board_notice or 0) > int(self.settings.get("noticeSeen") or 0)
+        except (TypeError, ValueError):
+            return False
+
+    def note_notice(self, latest):
+        """서버가 알려 준 가장 최근 공지 번호 (sync 에 실려 온다)."""
+        try:
+            latest = int(latest or 0)
+        except (TypeError, ValueError):
+            return
+        if latest != self.board_notice:
+            self.board_notice = latest
+            self._paint_notice()
+
+    def mark_notice_seen(self, latest=None):
+        """게시판을 열어 공지를 봤다. 표시를 끈다."""
+        try:
+            n = max(int(latest or 0), int(self.board_notice or 0))
+        except (TypeError, ValueError):
+            return
+        self.board_notice = max(self.board_notice, n)
+        if n > int(self.settings.get("noticeSeen") or 0):
+            self.settings["noticeSeen"] = n
+            config.save_settings(self.settings)
+        self._paint_notice()
+
+    def _paint_notice(self):
+        if self.hub:
+            self.hub.set_badge("board", self.notice_unseen)
+        self.refresh_tray()
 
     # ---------------- 배우려고 기다리는 기술 ----------------
     # 레벨업으로 배울 기술이 생겼는데 자리가 네 개 다 찼을 때다. 서버는
@@ -1495,7 +1555,7 @@ class App(object):
         self._drop_pillar()
         for name in ("box_window", "shop_window", "bag_window",
                      "friends_win", "dex_window", "settings_win",
-                     "raid_window", "notes_win"):
+                     "raid_window", "notes_win", "board_window"):
             w = getattr(self, name, None)
             if w:
                 try:
@@ -1558,19 +1618,27 @@ class App(object):
             return
         info = pet.mon.get("info", {})
         title = "%s   Lv.%s" % (info.get("name", "?"), info.get("level", "?"))
+        # 메가진화한 모습으로 걷기 (1.8.0). 될 수 있는 포켓몬에게만 줄이 생긴다.
+        mega = self.mega_menu_row(pet)
         if not PLAT.NATIVE_MENU:
             # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
-            U.PopupMenu(self.root, [
+            rows = [
                 {"text": title, "enabled": False},
                 None,
                 {"text": "정보 보기", "command": lambda: self.pet_open(pet)},
                 {"text": "박스로 거두기",
                  "command": lambda: self._recall(pet.id)},
+            ]
+            if mega:
+                rows.append(mega)
+            rows += [
                 None,
                 {"text": "포켓몬 관리...", "command": self.open_box},
                 None,
                 {"text": "종료", "command": self.quit},
-            ], event.x_root, event.y_root, width=190)
+            ]
+            U.PopupMenu(self.root, rows, event.x_root, event.y_root,
+                        width=230 if mega else 190)
             return
         m = tk.Menu(self.root, tearoff=0, bg=U.BG2, fg=U.FG,
                     activebackground=U.BG4, activeforeground=U.FG,
@@ -1579,6 +1647,9 @@ class App(object):
         m.add_separator()
         m.add_command(label="정보 보기", command=lambda: self.pet_open(pet))
         m.add_command(label="박스로 거두기", command=lambda: self._recall(pet.id))
+        if mega:
+            m.add_command(label=mega["text"], command=mega.get("command"),
+                          state="normal" if mega.get("enabled", True) else "disabled")
         m.add_separator()
         m.add_command(label="포켓몬 관리...", command=self.open_box)
         m.add_separator()
@@ -1591,6 +1662,116 @@ class App(object):
     def _recall(self, pid):
         run_async(self.root, lambda: self.api.set_desktop(pid, False),
                   lambda r, e: self.request_sync())
+
+    # ---------------- 메가진화한 모습으로 걷기 (1.8.0) ----------------
+    # 겉모습뿐이다. 능력치도 배틀도 그대로고, 배틀 창에서는 여전히 메가진화
+    # 단추를 눌러야 변한다. 그래서 서버에 두지 않고 이 PC 의 설정에 적는다
+    # (settings.megaWalk = 포켓몬 id 목록).
+    #
+    # **배틀에서 메가진화할 수 있는 포켓몬만** 된다: 키스톤이 있고, 자기
+    # 메가스톤을 지녔다(레쿠쟈는 화룡점정). 스톤을 떼면 다음 동기화에서
+    # 원래 모습으로 돌아오고, 다시 지니면 다시 메가 폼이 된다 - 켜 둔 것은
+    # 남아 있다.
+    def mega_ids(self):
+        out = []
+        for i in self.settings.get("megaWalk") or []:
+            try:
+                out.append(int(i))
+            except (TypeError, ValueError):
+                pass
+        return out
+
+    def mega_form(self, mon, keystone=None):
+        """이 포켓몬이 바탕화면에서 입을 수 있는 메가 폼 (도감 megas 의 한 줄). 없으면 None.
+
+        메가 폼의 도트가 있어야 한다 - 걷는 도트(walk)가 없으면 배틀 도트(dot)로
+        선다. 둘 다 없는 폼(26개)은 안 된다.
+        """
+        if not self.dex or not (self.keystone if keystone is None else keystone):
+            return None
+        try:
+            form = self.dex.mega_for(mon)
+        except Exception:                                   # noqa: BLE001
+            return None
+        if not form or not (form.get("walk") or form.get("dot")):
+            return None
+        return form
+
+    def dress_megas(self, mons, keystone=None):
+        """켜 둔 포켓몬에 lookNum(메가 폼의 번호)을 붙인다. 받아야 할 도트 목록을 준다."""
+        ids = set(self.mega_ids())
+        want = []
+        for m in mons or []:
+            m.pop("lookNum", None)
+            if m.get("id") not in ids:
+                continue
+            form = self.mega_form(m, keystone)
+            if form:
+                m["lookNum"] = form["num"]
+                want.append((form["num"], m.get("shiny")))
+        return want
+
+    @staticmethod
+    def undress_missing(mons, paths, walks):
+        """메가 폼의 도트를 못 받았으면 원래 모습으로 둔다."""
+        for m in mons or []:
+            n = m.get("lookNum")
+            if not n:
+                continue
+            sh = bool(m.get("shiny"))
+            walk = (walks or {}).get(walk_cache.key(n, sh)) or (walks or {}).get(n)
+            if not ((paths or {}).get((n, sh)) or (paths or {}).get((n, False))
+                    or (walk and walk[0] and walk[1])):
+                m.pop("lookNum", None)
+
+    def mega_menu_row(self, pet):
+        """우클릭 메뉴에 넣을 줄. 메가진화와 상관없는 포켓몬이면 None."""
+        mon = pet.mon or {}
+        if not self.dex or getattr(pet, "id", 0) is None or (pet.id or 0) < 0:
+            return None
+        forms = [f for f in (self.dex.mega_of.get(mon.get("species")) or [])
+                 if f.get("walk") or f.get("dot")]
+        if not forms:
+            return None
+        if pet.id in self.mega_ids() and (pet.look or 0) >= 10000:
+            return {"text": "원래 모습으로 걷기",
+                    "command": lambda: self.toggle_mega_walk(pet)}
+        if self.mega_form(mon):
+            return {"text": "메가진화한 모습으로 걷기",
+                    "command": lambda: self.toggle_mega_walk(pet)}
+        # 될 수 있는 종인데 아직 못 한다 - 무엇이 모자란지 알려 준다.
+        why = "키스톤 필요" if not self.keystone else "메가스톤을 지녀야 함"
+        return {"text": "메가 모습으로 걷기 (%s)" % why, "enabled": False}
+
+    def toggle_mega_walk(self, pet):
+        """그 도트를 메가진화한 모습으로 (또는 원래 모습으로) 바꾼다. 연출과 함께."""
+        if self.arena or self.battle or getattr(pet, "evolving", False):
+            return
+        ids = self.mega_ids()
+        if pet.id in ids and (pet.look or 0) >= 10000:
+            ids = [i for i in ids if i != pet.id]
+            self.settings["megaWalk"] = ids
+            config.save_settings(self.settings)
+            mega_fx.play(self, pet, pet.mon.get("num"), revert=True)
+            return
+        form = self.mega_form(pet.mon)
+        if not form:
+            return
+        if pet.id not in ids:
+            ids.append(pet.id)
+        self.settings["megaWalk"] = ids
+        config.save_settings(self.settings)
+        num = form["num"]
+
+        def done():
+            if getattr(pet, "look", None) == num:
+                self._prefetch_anims([pet.mon])
+                return
+            # 도트를 못 받았다. 켜 둔 것을 무르고 알린다 (화면에 아무 자국이 없다).
+            self.settings["megaWalk"] = [i for i in self.mega_ids() if i != pet.id]
+            config.save_settings(self.settings)
+            self.notify("메가진화한 모습의 도트를 받지 못했습니다.")
+        mega_fx.play(self, pet, num, on_done=done)
 
     def recall_all(self):
         if not self.overlay:
@@ -1861,7 +2042,8 @@ class App(object):
             return
         nums = []
         for m in mons:
-            n, sh = m.get("num"), bool(m.get("shiny"))
+            # 메가 폼으로 걷는 포켓몬은 그 폼의 동작을 받는다 (look_num)
+            n, sh = look_num(m), bool(m.get("shiny"))
             # 걷는 도트가 없는 종은 다른 동작도 없다. 물어볼 것도 없다.
             if (n and (n, sh) not in nums
                     and (self.overlay.walks.get(walk_cache.key(n, sh))

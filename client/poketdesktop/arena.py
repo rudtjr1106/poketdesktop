@@ -25,6 +25,7 @@ from . import arena_layout as L
 from . import battle_fx as FX
 from . import config
 from . import fx_layer as FL
+from . import mega_fx
 from . import platform_os as PLAT
 from . import ui_common as U
 from .overlay import Pet, work_area
@@ -563,10 +564,10 @@ class Arena(object):
             side = self.active.get(who)
             if side:
                 self.float_over(side, "효과가 없다...", "#9a9ab0")
-        # 메가진화 (시즌 3). 링의 도트는 걷는 그림이라 메가 모습이 없다 - 글씨로.
+        # 메가진화 (시즌 3). 무지갯빛이 모였다 터지고, 메가 폼의 도트가 있으면
+        # 이 판 동안 그 모습으로 싸운다 (1.8.0). 끝나면 cleanup 이 되돌린다.
         if t == "mega" and src:
-            self.float_over(src, "메가진화!", "#c9b3ff")
-            return self.after(max(200, int(self.gap * 1.2)), done)
+            return mega_fx.battle(self, src, ev.get("num"), done)
         if t == "faint":
             side = self.active.get(who)
             if side:
@@ -778,6 +779,9 @@ class Arena(object):
         # (또는 시험용 껍데기면) 아래 두 목록이 아예 없을 수 있다.
         made = list(getattr(self, "made_mine", None) or [])
         hidden = list(getattr(self, "hidden", None) or [])
+        # 판 중에 메가진화한 바탕화면 도트는 원래 입던 모습으로 되돌린다.
+        # (명단대로 새로 세운 도트는 아래에서 없애므로 손댈 것이 없다.)
+        mega_fx.release(ov, [p for p in self.mine if p not in made])
         for p in self.mine:
             if p in made:
                 continue

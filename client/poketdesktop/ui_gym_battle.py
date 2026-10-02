@@ -31,6 +31,7 @@ from . import platform_os as PLAT
 from . import ui_common as U
 from .ui_common import run_async
 from .ui_gym import level_color, shade, trainer_photo
+from . import ui_mega
 from .ui_mega import MegaToggle
 
 # 설계 크기. 글꼴이 커지는 맥에서는 U.h 로 창과 장면이 **같이** 커진다.
@@ -578,17 +579,25 @@ class GymBattleWindow(object):
         self.later(1400, gone)
 
     def _mega(self, ev):
-        """메가진화 - 도트와 이름을 메가 폼으로 바꾼다. 체력은 그대로다."""
+        """메가진화 - 빛에 싸였다가 도트와 이름이 메가 폼으로 바뀐다. 체력은 그대로다.
+
+        연출이 끝나면 스스로 다음 사건으로 넘긴다 (_apply 는 None 을 돌려준다).
+        """
         who = ev.get("who")
         mon = self.shown.get(who) if who in ("me", "foe") else None
-        if mon is not None:
-            mon = dict(mon)
-            mon["num"] = ev.get("num") or mon.get("num")
-            mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
-            mon["mega"] = True
+        self.say(ev.get("text"))
+        if mon is None:
+            return self.later(STEP_MS, self._next)
+        mon = dict(mon)
+        mon["num"] = ev.get("num") or mon.get("num")
+        mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
+        mon["mega"] = True
+        ui_mega.warm(self, mon["num"], mon.get("shiny"))
+
+        def swap():
             self.set_mon(who, mon)
             self._show_banner(who, "메가진화!")
-        self.say(ev.get("text"))
+        ui_mega.play_in(self, self._center(who), swap, size=MON_H[who] * 0.55)
 
     # ---------------- 재생 ----------------
     def play(self, events, data):
@@ -631,7 +640,7 @@ class GymBattleWindow(object):
             return 420
         if t == "mega":
             self._mega(ev)
-            return STEP_MS + 450
+            return None
         if t == "move":
             self.say(text)
             other = "foe" if who == "me" else "me"

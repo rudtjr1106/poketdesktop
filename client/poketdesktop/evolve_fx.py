@@ -411,9 +411,18 @@ class Evolution(object):
         if self.anim_new is not None:
             try:
                 swap_sprite(self.pet, self.anim_new)
+                # 지금 입은 도트의 번호. 다른 동작(Idle·Hop)을 이 번호로 찾는다.
+                if self.info.get("toNum"):
+                    self.pet.look = self.info["toNum"]
                 self.update_mon()
                 refresh_nameplate(self.pet)
             except Exception:
+                pass
+            # 새 모습의 가장 큰 칸을 지금(빛에 가려진 동안) 잡아 둔다. 나중에
+            # 동작이 바뀔 때 커지면 윈도우에서 창이 검게 번쩍인다.
+            try:
+                self.pet.reserve_box()
+            except Exception:                               # noqa: BLE001
                 pass
         else:
             self.show_normal()
@@ -541,7 +550,7 @@ class Evolution(object):
         sx = self.cx + random.uniform(-self.w0 * 0.65, self.w0 * 0.65)
         x, y = self.at(sx, self.by + random.uniform(-4, 6))
         r = random.uniform(2, 4)
-        col = U.ACCENT if random.random() < 0.6 else "#ffffff"
+        col = self.tint() if random.random() < 0.6 else "#ffffff"
         item = cv.create_oval(x - r, y - r, x + r, y + r, fill=col, outline="")
         self.items.append(item)
 
@@ -566,7 +575,7 @@ class Evolution(object):
         cv = self.layer.cv
         x, y = self.at(self.cx, self.cy)
         r = 16 + i * 17
-        col = "#ffffff" if i % 2 == 0 else U.ACCENT
+        col = "#ffffff" if i % 2 == 0 else self.tint(i)
         ring = cv.create_oval(x - r, y - r * 0.92, x + r, y + r * 0.92,
                               outline=col, width=max(1, 7 - i))
         self.items.append(ring)
@@ -602,7 +611,7 @@ class Evolution(object):
                     cv.coords(it, cx + ca * inner, cy + sa * inner,
                               cx + ca * outer, cy + sa * outer)
                     cv.itemconfigure(it, width=max(1, 4 - i // 3),
-                                     fill="#ffffff" if i < 6 else U.ACCENT)
+                                     fill="#ffffff" if i < 6 else self.tint(i))
                 except Exception:
                     return
             self.after(32, lambda: step(i + 1))
@@ -620,7 +629,7 @@ class Evolution(object):
             sp = random.uniform(5.0, 11.0)
             r = random.uniform(2, 4)
             it = cv.create_oval(cx - r, cy - r, cx + r, cy + r,
-                                fill=U.ACCENT if random.random() < 0.5
+                                fill=self.tint() if random.random() < 0.5
                                 else "#ffffff", outline="")
             self.items.append(it)
             bits.append([it, math.cos(a) * sp, math.sin(a) * sp * 0.8])
@@ -641,6 +650,10 @@ class Evolution(object):
         step(0)
 
     # ---------------- 도구 ----------------
+    def tint(self, i=None):
+        """빛 조각의 색. 진화는 금빛 하나다 (메가진화는 무지갯빛 - mega_fx)."""
+        return U.ACCENT
+
     def alive(self):
         if self.dead:
             return False

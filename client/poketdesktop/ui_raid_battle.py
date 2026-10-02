@@ -35,6 +35,7 @@ from . import ui_common as U
 from .ui_common import run_async
 from .ui_gym import shade
 from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
+from . import ui_mega
 from .ui_mega import MegaToggle
 
 W = 960
@@ -589,16 +590,24 @@ class RaidBattleWindow(object):
             return 340
         if t == "mega":
             # 레이드는 사람마다 한 판이다. 누가 바뀌었는지는 p(자리)로 안다.
+            # 빛에 싸였다가 바뀐다. 연출이 끝나면 스스로 다음 사건으로 넘긴다.
             mon = self.shown.get(key) if key is not None else None
-            if mon is not None:
-                mon = dict(mon)
-                mon["num"] = ev.get("num") or mon.get("num")
-                mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
-                mon["mega"] = True
-                self.set_mon(key, mon, boss=(key == BOSS))
-            self._flash("메가진화!", "#c9b3ff")
             self.say(text)
-            return STEP_MS + 400
+            if mon is None:
+                self._flash("메가진화!", "#c9b3ff")
+                return STEP_MS + 400
+            mon = dict(mon)
+            mon["num"] = ev.get("num") or mon.get("num")
+            mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
+            mon["mega"] = True
+            ui_mega.warm(self, mon["num"], mon.get("shiny"))
+
+            def swap(key=key, mon=mon):
+                self.set_mon(key, mon, boss=(key == BOSS))
+                self._flash("메가진화!", "#c9b3ff")
+            ui_mega.play_in(self, self._center(key), swap,
+                            size=U.h(BOSS_H if key == BOSS else MON_H) * 0.6)
+            return None
         if t == "move":
             self.say(text)
             other = BOSS if key != BOSS else self._boss_target(ev)

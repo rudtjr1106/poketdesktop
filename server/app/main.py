@@ -28,7 +28,7 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
-from . import (achievements, auth, battle_routes, mega, config, db, deps, eggs, item_routes,  # noqa: E402
+from . import (achievements, auth, battle_routes, board, board_routes, mega, config, db, deps, eggs, item_routes,  # noqa: E402
                errors, items, live, live_routes, migrations, pvp, pvp_routes,
                raid, raid_routes,
                gym_routes, social_routes, tm_routes, tms, walk)
@@ -42,6 +42,7 @@ app.include_router(tm_routes.router)
 app.include_router(gym_routes.router)
 app.include_router(raid_routes.router)
 app.include_router(live_routes.router)
+app.include_router(board_routes.router)
 
 RNG = deps.RNG
 
@@ -514,7 +515,13 @@ def _anim_fetch(num, name, shiny=False):
 
     png_path, meta_path = _anim_paths(num, name, shiny)
     os.makedirs(os.path.dirname(png_path), exist_ok=True)
-    base = "%s/%04d/%s" % (WALK_BASE, num, SHINY_SUBDIR if shiny else "")
+    mega = _mega_walk(num)
+    if mega:
+        # 메가 폼 (1.8.0). SpriteCollab 은 폼을 종 아래 폴더로 둔다
+        # (sprite/0006/0001/ = 메가리자몽X). 이로치는 그 아래 0001.
+        base = "%s/%s/%s" % (WALK_BASE, mega, "0001/" if shiny else "")
+    else:
+        base = "%s/%04d/%s" % (WALK_BASE, num, SHINY_SUBDIR if shiny else "")
 
     def grab(fn):
         with urllib.request.urlopen(base + fn, timeout=12) as r:
@@ -536,10 +543,18 @@ def _anim_fetch(num, name, shiny=False):
                     return None             # 저쪽이 잠깐 안 된다. 다음에 다시
             elif isinstance(e, OSError):
                 return None                 # 끊김·시간초과. 없는 종인지 모른다
-            if name == "Walk" and (_anim_meta(num, "Walk") or {}).get("src") == "follow":
+            if name == "Walk" and not mega \
+                    and (_anim_meta(num, "Walk") or {}).get("src") == "follow":
                 # 보통 걷기도 두 번째 출처에서 온 종이면 이로치도 거기서. 보통은
                 # SpriteCollab 인데 이로치만 followers 로 받으면 그림체가 바뀐다.
                 return _walk_fetch_follow(num, png_path, meta_path, shiny=True)
+            return _mark_missing(meta_path)
+        if mega:
+            # 메가 폼은 두 번째 출처가 없다. **404 일 때만** 없다고 적는다.
+            if isinstance(e, urllib.error.HTTPError) and e.code != 404:
+                return None
+            if isinstance(e, OSError) and not isinstance(e, urllib.error.HTTPError):
+                return None
             return _mark_missing(meta_path)
         if name == "Walk":
             # 걷기가 없다. 두 번째 출처를 본다.
@@ -634,8 +649,20 @@ def _anim_meta(num, name, shiny=False):
     return _anim_fetch(num, name, shiny)
 
 
+def _mega_walk(num):
+    """메가 폼 번호면 SpriteCollab 의 걷는 도트 경로("0006/0001"). 아니면 None.
+
+    경로는 도감 자료가 정한다 (tools/add_megas.py 의 walk). 번호가 URL 에서
+    오므로, 도감에 적힌 폼만 통과시킨다.
+    """
+    if num <= 1025:
+        return None
+    m = dex().by_num.get(num) or {}
+    return m.get("walk") if m.get("mega") else None
+
+
 def _check_anim(num, name):
-    if not 1 <= num <= 1025:
+    if not (1 <= num <= 1025 or _mega_walk(num)):
         raise HTTPException(404, "그런 도감 번호가 없습니다.")
     if name not in ANIM_NAMES:
         raise HTTPException(404, "그런 동작이 없습니다.")
@@ -924,6 +951,8 @@ def me(ctx=Depends(current)):
         "achievements": achievements.me_card(uid),
         # 메가진화 (시즌 3): 키스톤·빛나는 돌을 띄울 개체·받을 스톤
         "bond": mega.me_card(uid),
+        # 게시판 (1.8.0): 가장 최근 공지의 번호. 화면이 '새 공지' 를 표시한다
+        "board": board.me_card(),
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 

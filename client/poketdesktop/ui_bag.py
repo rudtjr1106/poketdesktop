@@ -450,11 +450,35 @@ class MonRow(object):
 
 
 # ---------------------------------------------------------------- 가방 창
+def bag_title(inner, switch=None):
+    """가방 탭의 머리 왼쪽 — 가방 그림, '가방', 그리고 [도구 | 기술머신] 고르기.
+
+    도구 칸과 기술머신 칸(ui_tms)이 같은 것을 같은 자리에 그린다. 그래야 칸을
+    오갈 때 고르는 단추가 제자리에 있다 (1.8.0 에서 두 탭을 하나로 합쳤다).
+    switch 는 단추를 만들어 주는 함수다 (ui_bag_tabs). 없으면 그리지 않는다.
+    """
+    # 가방 아이콘 — 몬스터볼 대신 여기서만 쓰는 그림이라 직접 그린다
+    cv = tk.Canvas(inner, width=28, height=28, bg=U.BG2,
+                   highlightthickness=0, bd=0)
+    cv.pack(side="left", pady=17)
+    cv.create_arc(9, 2, 19, 14, start=0, extent=180, style="arc",
+                  outline=U.INK, width=3)
+    cv.create_rectangle(3, 9, 25, 25, fill=U.ACCENT, outline=U.INK, width=2)
+    cv.create_rectangle(3, 14, 25, 18, fill=U.RED, outline="")
+    cv.create_rectangle(11, 13, 17, 19, fill="#f4f6fb", outline=U.INK,
+                        width=1)
+    tk.Label(inner, text="가방", bg=U.BG2, fg=U.FG,
+             font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=(12, 12))
+    if switch:
+        switch(inner).pack(side="left", padx=(0, 12))
+
+
 class BagWindow(object):
-    def __init__(self, root, app, parent=None):
+    def __init__(self, root, app, parent=None, switch=None):
         self.root = root
         self.app = app
         self.alive = True
+        self._switch = switch    # 가방 탭 안의 [도구 | 기술머신] (ui_bag_tabs)
 
         self.items = []          # /api/shop 이 준 도구 명세
         self.bag = {}            # {도구ID: 개수}
@@ -502,28 +526,18 @@ class BagWindow(object):
         inner = tk.Frame(h, bg=U.BG2)
         inner.pack(fill="both", expand=True, padx=16)
 
-        # 가방 아이콘 — 몬스터볼 대신 여기서만 쓰는 그림이라 직접 그린다
-        cv = tk.Canvas(inner, width=28, height=28, bg=U.BG2,
-                       highlightthickness=0, bd=0)
-        cv.pack(side="left", pady=17)
-        cv.create_arc(9, 2, 19, 14, start=0, extent=180, style="arc",
-                      outline=U.INK, width=3)
-        cv.create_rectangle(3, 9, 25, 25, fill=U.ACCENT, outline=U.INK, width=2)
-        cv.create_rectangle(3, 14, 25, 18, fill=U.RED, outline="")
-        cv.create_rectangle(11, 13, 17, 19, fill="#f4f6fb", outline=U.INK,
-                            width=1)
-
-        tk.Label(inner, text="가방", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=(12, 12))
+        bag_title(inner, self._switch)
         self.count_label = tk.Label(inner, text="", bg=U.BG2, fg=U.FG_FAINT,
                                     font=U.FONT_S)
         self.count_label.pack(side="left")
 
+        # **pady 를 주지 않는다.** 머리줄 62 에 단추(32+그림자 4)+30 이면 윈도우에서
+        # 4px 눌린다 (레이드·도감 머리줄에서 겪었다). 여백 없이도 세로 가운데에 놓인다.
         U.ghost_button(inner, "새로고침", self.reload,
-                       height=32).pack(side="right", pady=15)
+                       height=32).pack(side="right")
         purse = tk.Frame(inner, bg=U.INK, highlightthickness=2,
                          highlightbackground=U.LINE)
-        purse.pack(side="right", padx=(0, 10), pady=17)
+        purse.pack(side="right", padx=(0, 10))
         tk.Label(purse, text="소지금", bg=U.INK, fg=U.FG_FAINT,
                  font=U.FONT_XS).pack(side="left", padx=(10, 6), pady=4)
         self.money_label = tk.Label(purse, text="0원", bg=U.INK, fg=U.ACCENT,

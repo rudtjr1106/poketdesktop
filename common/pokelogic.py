@@ -391,6 +391,32 @@ class Pokedex(object):
         with open(path, encoding="utf-8") as f:
             return cls(json.load(f))
 
+    def mega_for(self, mon):
+        """이 포켓몬이 **지금 지닌 것으로** 될 수 있는 메가 폼. 없으면 None.
+
+        battle.Fighter.mega_target 과 같은 규칙이다 (배틀 밖에서 물어볼 때 쓴다 -
+        바탕화면을 메가 폼으로 걸어다니게 할 때). 메가스톤을 지녀야 하고,
+        레쿠쟈만 스톤 대신 화룡점정을 알면 된다. 냐오닉스는 성별로 고른다.
+        """
+        forms = self.mega_of.get((mon or {}).get("species")) or []
+        if not forms:
+            return None
+        held = mon.get("held")
+        moves = mon.get("moves") or []
+        cand = [m for m in forms
+                if (m.get("megaMove") and m["megaMove"] in moves)
+                or (held and m.get("megaStone") == held)]
+        if not cand:
+            return None
+        g = mon.get("gender")
+        for m in cand:
+            if m.get("megaGender") and m["megaGender"] == g:
+                return m
+        for m in cand:
+            if not m.get("megaGender"):
+                return m
+        return cand[0]
+
     def digest(self):
         blob = json.dumps(self.raw, ensure_ascii=False,
                           sort_keys=True, separators=(",", ":")).encode("utf-8")

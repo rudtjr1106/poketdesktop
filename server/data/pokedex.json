@@ -2200,6 +2200,7 @@
    },
    "baseExp": 236,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "plant"
@@ -2256,6 +2257,7 @@
    },
    "baseExp": 240,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "dragon"
@@ -2296,6 +2298,7 @@
     "FIRE",
     "DRAGON"
    ],
+   "walk": "0006/0001",
    "weight": 45
   },
   {
@@ -2312,6 +2315,7 @@
    },
    "baseExp": 240,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "dragon"
@@ -2368,6 +2372,7 @@
    },
    "baseExp": 239,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "water1"
@@ -2423,6 +2428,7 @@
    },
    "baseExp": 225,
    "catch": 50,
+   "dot": true,
    "egg": [
     "humanshape"
    ],
@@ -2461,6 +2467,7 @@
    "types": [
     "PSYCHIC"
    ],
+   "walk": "0065/0001",
    "weight": 50
   },
   {
@@ -2477,6 +2484,7 @@
    },
    "baseExp": 225,
    "catch": 45,
+   "dot": true,
    "egg": [
     "indeterminate"
    ],
@@ -2516,6 +2524,7 @@
     "GHOST",
     "POISON"
    ],
+   "walk": "0094/0001",
    "weight": 45
   },
   {
@@ -2532,6 +2541,7 @@
    },
    "baseExp": 172,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster"
    ],
@@ -2570,6 +2580,7 @@
    "types": [
     "NORMAL"
    ],
+   "walk": "0115/0001",
    "weight": 45
   },
   {
@@ -2586,6 +2597,7 @@
    },
    "baseExp": 175,
    "catch": 45,
+   "dot": true,
    "egg": [
     "bug"
    ],
@@ -2641,6 +2653,7 @@
    },
    "baseExp": 189,
    "catch": 45,
+   "dot": true,
    "egg": [
     "water2",
     "dragon"
@@ -2697,6 +2710,7 @@
    },
    "baseExp": 180,
    "catch": 45,
+   "dot": true,
    "egg": [
     "flying"
    ],
@@ -2736,6 +2750,7 @@
     "ROCK",
     "FLYING"
    ],
+   "walk": "0142/0001",
    "weight": 45
   },
   {
@@ -2752,6 +2767,7 @@
    },
    "baseExp": 306,
    "catch": 3,
+   "dot": true,
    "egg": [
     "no-eggs"
    ],
@@ -2807,6 +2823,7 @@
    },
    "baseExp": 306,
    "catch": 3,
+   "dot": true,
    "egg": [
     "no-eggs"
    ],
@@ -2845,6 +2862,7 @@
    "types": [
     "PSYCHIC"
    ],
+   "walk": "0150/0002",
    "weight": 0
   },
   {
@@ -2861,6 +2879,7 @@
    },
    "baseExp": 230,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "ground"
@@ -2917,6 +2936,7 @@
    },
    "baseExp": 175,
    "catch": 25,
+   "dot": true,
    "egg": [
     "bug"
    ],
@@ -2972,6 +2992,7 @@
    },
    "baseExp": 175,
    "catch": 45,
+   "dot": true,
    "egg": [
     "bug"
    ],
@@ -3027,6 +3048,7 @@
    },
    "baseExp": 175,
    "catch": 45,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -3066,6 +3088,7 @@
     "DARK",
     "FIRE"
    ],
+   "walk": "0229/0001",
    "weight": 45
   },
   {
@@ -3082,6 +3105,7 @@
    },
    "baseExp": 270,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster"
    ],
@@ -3121,6 +3145,7 @@
     "ROCK",
     "DARK"
    ],
+   "walk": "0248/0001",
    "weight": 45
   },
   {
@@ -3137,6 +3162,7 @@
    },
    "baseExp": 239,
    "catch": 45,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -3192,6 +3218,7 @@
    },
    "baseExp": 233,
    "catch": 45,
+   "dot": true,
    "egg": [
     "humanshape",
     "indeterminate"
@@ -3232,6 +3259,7 @@
     "PSYCHIC",
     "FAIRY"
    ],
+   "walk": "0282/0001",
    "weight": 45
   },
   {
@@ -3248,6 +3276,7 @@
    },
    "baseExp": 133,
    "catch": 45,
+   "dot": true,
    "egg": [
     "ground",
     "fairy"
@@ -3288,6 +3317,7 @@
     "STEEL",
     "FAIRY"
    ],
+   "walk": "0303/0001",
    "weight": 45
   },
   {
@@ -3304,6 +3334,7 @@
    },
    "baseExp": 239,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster"
    ],
@@ -3358,6 +3389,7 @@
    },
    "baseExp": 144,
    "catch": 90,
+   "dot": true,
    "egg": [
     "humanshape"
    ],
@@ -3397,6 +3429,7 @@
     "FIGHTING",
     "PSYCHIC"
    ],
+   "walk": "0308/0001",
    "weight": 90
   },
   {
@@ -3413,6 +3446,7 @@
    },
    "baseExp": 166,
    "catch": 45,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -3451,6 +3485,7 @@
    "types": [
     "ELECTRIC"
    ],
+   "walk": "0310/0001",
    "weight": 45
   },
   {
@@ -3467,6 +3502,7 @@
    },
    "baseExp": 159,
    "catch": 45,
+   "dot": true,
    "egg": [
     "indeterminate"
    ],
@@ -3505,6 +3541,7 @@
    "types": [
     "GHOST"
    ],
+   "walk": "0354/0001",
    "weight": 45
   },
   {
@@ -3521,6 +3558,7 @@
    },
    "baseExp": 163,
    "catch": 30,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -3559,6 +3597,7 @@
    "types": [
     "DARK"
    ],
+   "walk": "0359/0001",
    "weight": 30
   },
   {
@@ -3575,6 +3614,7 @@
    },
    "baseExp": 270,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "dragon"
@@ -3631,6 +3671,7 @@
    },
    "baseExp": 184,
    "catch": 45,
+   "dot": true,
    "egg": [
     "ground",
     "humanshape"
@@ -3671,6 +3712,7 @@
     "FIGHTING",
     "STEEL"
    ],
+   "walk": "0448/0001",
    "weight": 45
   },
   {
@@ -3687,6 +3729,7 @@
    },
    "baseExp": 173,
    "catch": 60,
+   "dot": true,
    "egg": [
     "monster",
     "plant"
@@ -3743,6 +3786,7 @@
    },
    "baseExp": 270,
    "catch": 3,
+   "dot": true,
    "egg": [
     "no-eggs"
    ],
@@ -3782,6 +3826,7 @@
     "DRAGON",
     "PSYCHIC"
    ],
+   "walk": "0380/0001",
    "weight": 0
   },
   {
@@ -3798,6 +3843,7 @@
    },
    "baseExp": 270,
    "catch": 3,
+   "dot": true,
    "egg": [
     "no-eggs"
    ],
@@ -3837,6 +3883,7 @@
     "DRAGON",
     "PSYCHIC"
    ],
+   "walk": "0381/0001",
    "weight": 0
   },
   {
@@ -3853,6 +3900,7 @@
    },
    "baseExp": 241,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "water1"
@@ -3909,6 +3957,7 @@
    },
    "baseExp": 239,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "dragon"
@@ -3949,6 +3998,7 @@
     "GRASS",
     "DRAGON"
    ],
+   "walk": "0254/0001",
    "weight": 45
   },
   {
@@ -3965,6 +4015,7 @@
    },
    "baseExp": 133,
    "catch": 45,
+   "dot": true,
    "egg": [
     "humanshape"
    ],
@@ -4004,6 +4055,7 @@
     "DARK",
     "GHOST"
    ],
+   "walk": "0302/0001",
    "weight": 45
   },
   {
@@ -4020,6 +4072,7 @@
    },
    "baseExp": 172,
    "catch": 45,
+   "dot": true,
    "egg": [
     "flying",
     "dragon"
@@ -4060,6 +4113,7 @@
     "DRAGON",
     "FAIRY"
    ],
+   "walk": "0334/0001",
    "weight": 45
   },
   {
@@ -4076,6 +4130,7 @@
    },
    "baseExp": 233,
    "catch": 45,
+   "dot": true,
    "egg": [
     "humanshape",
     "indeterminate"
@@ -4116,6 +4171,7 @@
     "PSYCHIC",
     "FIGHTING"
    ],
+   "walk": "0475/0001",
    "weight": 45
   },
   {
@@ -4132,6 +4188,7 @@
    },
    "baseExp": 390,
    "catch": 255,
+   "dot": true,
    "egg": [
     "fairy"
    ],
@@ -4187,6 +4244,7 @@
    },
    "baseExp": 161,
    "catch": 60,
+   "dot": true,
    "egg": [
     "water2"
    ],
@@ -4226,6 +4284,7 @@
     "WATER",
     "DARK"
    ],
+   "walk": "0319/0001",
    "weight": 60
   },
   {
@@ -4242,6 +4301,7 @@
    },
    "baseExp": 172,
    "catch": 75,
+   "dot": true,
    "egg": [
     "monster",
     "water1"
@@ -4282,6 +4342,7 @@
     "WATER",
     "PSYCHIC"
    ],
+   "walk": "0080/0002",
    "weight": 75
   },
   {
@@ -4298,6 +4359,7 @@
    },
    "baseExp": 179,
    "catch": 25,
+   "dot": true,
    "egg": [
     "mineral"
    ],
@@ -4337,6 +4399,7 @@
     "STEEL",
     "GROUND"
    ],
+   "walk": "0208/0001",
    "weight": 25
   },
   {
@@ -4353,6 +4416,7 @@
    },
    "baseExp": 216,
    "catch": 45,
+   "dot": true,
    "egg": [
     "flying"
    ],
@@ -4408,6 +4472,7 @@
    },
    "baseExp": 168,
    "catch": 75,
+   "dot": true,
    "egg": [
     "fairy",
     "mineral"
@@ -4447,6 +4512,7 @@
    "types": [
     "ICE"
    ],
+   "walk": "0362/0001",
    "weight": 75
   },
   {
@@ -4463,6 +4529,7 @@
    },
    "baseExp": 270,
    "catch": 3,
+   "dot": true,
    "egg": [
     "no-eggs"
    ],
@@ -4502,6 +4569,7 @@
     "ROCK",
     "FAIRY"
    ],
+   "walk": "0719/0001",
    "weight": 0
   },
   {
@@ -4518,6 +4586,7 @@
    },
    "baseExp": 270,
    "catch": 3,
+   "dot": true,
    "egg": [
     "mineral"
    ],
@@ -4573,6 +4642,7 @@
    },
    "baseExp": 306,
    "catch": 45,
+   "dot": true,
    "egg": [
     "no-eggs"
    ],
@@ -4612,6 +4682,7 @@
     "DRAGON",
     "FLYING"
    ],
+   "walk": "0384/0001",
    "weight": 0
   },
   {
@@ -4628,6 +4699,7 @@
    },
    "baseExp": 161,
    "catch": 150,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -4667,6 +4739,7 @@
     "FIRE",
     "GROUND"
    ],
+   "walk": "0323/0001",
    "weight": 150
   },
   {
@@ -4683,6 +4756,7 @@
    },
    "baseExp": 168,
    "catch": 60,
+   "dot": true,
    "egg": [
     "ground",
     "humanshape"
@@ -4723,6 +4797,7 @@
     "NORMAL",
     "FIGHTING"
    ],
+   "walk": "0428/0001",
    "weight": 60
   },
   {
@@ -4739,6 +4814,7 @@
    },
    "baseExp": 270,
    "catch": 45,
+   "dot": true,
    "egg": [
     "dragon"
    ],
@@ -4794,6 +4870,7 @@
    },
    "baseExp": 178,
    "catch": 45,
+   "dot": true,
    "egg": [
     "bug"
    ],
@@ -4849,6 +4926,7 @@
    },
    "baseExp": 217,
    "catch": 25,
+   "dot": true,
    "egg": [
     "fairy"
    ],
@@ -4904,6 +4982,7 @@
    },
    "baseExp": 221,
    "catch": 45,
+   "dot": true,
    "egg": [
     "plant"
    ],
@@ -4959,6 +5038,7 @@
    },
    "baseExp": 182,
    "catch": 60,
+   "dot": true,
    "egg": [
     "water3"
    ],
@@ -5014,6 +5094,7 @@
    },
    "baseExp": 270,
    "catch": 45,
+   "dot": true,
    "egg": [
     "water1",
     "dragon"
@@ -5070,6 +5151,7 @@
    },
    "baseExp": 236,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "plant"
@@ -5126,6 +5208,7 @@
    },
    "baseExp": 239,
    "catch": 45,
+   "dot": true,
    "egg": [
     "monster",
     "water1"
@@ -5182,6 +5265,7 @@
    },
    "baseExp": 163,
    "catch": 25,
+   "dot": true,
    "egg": [
     "flying"
    ],
@@ -5221,6 +5305,7 @@
     "STEEL",
     "FLYING"
    ],
+   "walk": "0227/0001",
    "weight": 25
   },
   {
@@ -5237,6 +5322,7 @@
    },
    "baseExp": 168,
    "catch": 75,
+   "dot": true,
    "egg": [
     "fairy",
     "mineral"
@@ -5293,6 +5379,7 @@
    },
    "baseExp": 238,
    "catch": 45,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -5348,6 +5435,7 @@
    },
    "baseExp": 178,
    "catch": 60,
+   "dot": false,
    "egg": [
     "ground"
    ],
@@ -5387,6 +5475,7 @@
     "GROUND",
     "STEEL"
    ],
+   "walk": "0530/0001",
    "weight": 60
   },
   {
@@ -5403,6 +5492,7 @@
    },
    "baseExp": 218,
    "catch": 45,
+   "dot": false,
    "egg": [
     "bug"
    ],
@@ -5458,6 +5548,7 @@
    },
    "baseExp": 171,
    "catch": 90,
+   "dot": false,
    "egg": [
     "ground",
     "dragon"
@@ -5498,6 +5589,7 @@
     "DARK",
     "FIGHTING"
    ],
+   "walk": "0560/0001",
    "weight": 90
   },
   {
@@ -5514,6 +5606,7 @@
    },
    "baseExp": 232,
    "catch": 30,
+   "dot": false,
    "egg": [
     "indeterminate"
    ],
@@ -5552,6 +5645,7 @@
    "types": [
     "ELECTRIC"
    ],
+   "walk": "0604/0001",
    "weight": 30
   },
   {
@@ -5568,6 +5662,7 @@
    },
    "baseExp": 234,
    "catch": 45,
+   "dot": false,
    "egg": [
     "indeterminate"
    ],
@@ -5623,6 +5718,7 @@
    },
    "baseExp": 239,
    "catch": 45,
+   "dot": false,
    "egg": [
     "ground"
    ],
@@ -5678,6 +5774,7 @@
    },
    "baseExp": 240,
    "catch": 45,
+   "dot": false,
    "egg": [
     "ground"
    ],
@@ -5733,6 +5830,7 @@
    },
    "baseExp": 239,
    "catch": 45,
+   "dot": false,
    "egg": [
     "water1"
    ],
@@ -5788,6 +5886,7 @@
    },
    "baseExp": 177,
    "catch": 65,
+   "dot": false,
    "egg": [
     "ground"
    ],
@@ -5843,6 +5942,7 @@
    },
    "baseExp": 130,
    "catch": 120,
+   "dot": false,
    "egg": [
     "fairy"
    ],
@@ -5881,6 +5981,7 @@
    "types": [
     "FAIRY"
    ],
+   "walk": "0670/0006",
    "weight": 120
   },
   {
@@ -5897,6 +5998,7 @@
    },
    "baseExp": 169,
    "catch": 80,
+   "dot": false,
    "egg": [
     "water1",
     "water2"
@@ -5953,6 +6055,7 @@
    },
    "baseExp": 175,
    "catch": 45,
+   "dot": false,
    "egg": [
     "water3"
    ],
@@ -6008,6 +6111,7 @@
    },
    "baseExp": 173,
    "catch": 55,
+   "dot": false,
    "egg": [
     "water1",
     "dragon"
@@ -6048,6 +6152,7 @@
     "POISON",
     "DRAGON"
    ],
+   "walk": "0691/0001",
    "weight": 55
   },
   {
@@ -6064,6 +6169,7 @@
    },
    "baseExp": 175,
    "catch": 100,
+   "dot": false,
    "egg": [
     "flying",
     "humanshape"
@@ -6104,6 +6210,7 @@
     "FIGHTING",
     "FLYING"
    ],
+   "walk": "0701/0001",
    "weight": 100
   },
   {
@@ -6120,6 +6227,7 @@
    },
    "baseExp": 270,
    "catch": 3,
+   "dot": false,
    "egg": [
     "no-eggs"
    ],
@@ -6160,6 +6268,7 @@
     "DRAGON",
     "GROUND"
    ],
+   "walk": "0718/0005",
    "weight": 0
   },
   {
@@ -6176,6 +6285,7 @@
    },
    "baseExp": 170,
    "catch": 70,
+   "dot": false,
    "egg": [
     "monster",
     "dragon"
@@ -6216,6 +6326,7 @@
     "NORMAL",
     "DRAGON"
    ],
+   "walk": "0780/0001",
    "weight": 70
   },
   {
@@ -6232,6 +6343,7 @@
    },
    "baseExp": 165,
    "catch": 45,
+   "dot": false,
    "egg": [
     "fairy",
     "mineral"
@@ -6287,6 +6399,7 @@
    },
    "baseExp": 218,
    "catch": 75,
+   "dot": false,
    "egg": [
     "ground",
     "fairy"
@@ -6342,6 +6455,7 @@
    },
    "baseExp": 218,
    "catch": 75,
+   "dot": false,
    "egg": [
     "ground",
     "fairy"
@@ -6397,6 +6511,7 @@
    },
    "baseExp": 159,
    "catch": 45,
+   "dot": false,
    "egg": [
     "indeterminate"
    ],
@@ -6452,6 +6567,7 @@
    },
    "baseExp": 163,
    "catch": 30,
+   "dot": false,
    "egg": [
     "ground"
    ],
@@ -6507,6 +6623,7 @@
    },
    "baseExp": 218,
    "catch": 45,
+   "dot": false,
    "egg": [
     "flying"
    ],
@@ -6562,6 +6679,7 @@
    },
    "baseExp": 270,
    "catch": 45,
+   "dot": false,
    "egg": [
     "monster",
     "dragon"
@@ -6617,6 +6735,7 @@
    },
    "baseExp": 184,
    "catch": 45,
+   "dot": false,
    "egg": [
     "ground",
     "humanshape"
@@ -6674,6 +6793,7 @@
    },
    "baseExp": 270,
    "catch": 3,
+   "dot": false,
    "egg": [
     "no-eggs"
    ],
@@ -6730,6 +6850,7 @@
    },
    "baseExp": 270,
    "catch": 3,
+   "dot": false,
    "egg": [
     "no-eggs"
    ],
@@ -6769,6 +6890,7 @@
    "types": [
     "DARK"
    ],
+   "walk": "0491/0002",
    "weight": 0
   },
   {
@@ -6785,6 +6907,7 @@
    },
    "baseExp": 169,
    "catch": 90,
+   "dot": false,
    "egg": [
     "mineral"
    ],
@@ -6840,6 +6963,7 @@
    },
    "baseExp": 163,
    "catch": 75,
+   "dot": false,
    "egg": [
     "ground"
    ],
@@ -6894,6 +7018,7 @@
    },
    "baseExp": 167,
    "catch": 60,
+   "dot": false,
    "egg": [
     "water3"
    ],
@@ -6949,6 +7074,7 @@
    },
    "baseExp": 186,
    "catch": 45,
+   "dot": false,
    "egg": [
     "bug",
     "water3"
@@ -7005,6 +7131,7 @@
    },
    "baseExp": 270,
    "catch": 3,
+   "dot": false,
    "egg": [
     "no-eggs"
    ],
@@ -7061,6 +7188,7 @@
    },
    "baseExp": 270,
    "catch": 3,
+   "dot": false,
    "egg": [
     "no-eggs"
    ],
@@ -7100,6 +7228,7 @@
    "types": [
     "ELECTRIC"
    ],
+   "walk": "0807/0001",
    "weight": 0
   },
   {
@@ -7116,6 +7245,7 @@
    },
    "baseExp": 170,
    "catch": 75,
+   "dot": false,
    "egg": [
     "plant"
    ],
@@ -7171,6 +7301,7 @@
    },
    "baseExp": 184,
    "catch": 25,
+   "dot": false,
    "egg": [
     "mineral"
    ],
@@ -7226,6 +7357,7 @@
    },
    "baseExp": 166,
    "catch": 100,
+   "dot": false,
    "egg": [
     "water2"
    ],
@@ -7266,6 +7398,7 @@
     "DRAGON",
     "WATER"
    ],
+   "walk": "0978/0003",
    "weight": 100
   },
   {
@@ -7282,6 +7415,7 @@
    },
    "baseExp": 300,
    "catch": 10,
+   "dot": false,
    "egg": [
     "dragon",
     "mineral"
@@ -7338,6 +7472,7 @@
    },
    "baseExp": 163,
    "catch": 75,
+   "dot": false,
    "egg": [
     "ground"
    ],

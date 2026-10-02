@@ -179,6 +179,56 @@ def marker_label(parent, text, bg=None, color=FG_DIM, mark=ACCENT):
     return row
 
 
+class Segmented(object):
+    """나란히 붙은 고르기 단추 ([도구 | 기술머신], [전체 | 공지 | 자유]).
+
+    지금 고른 칸은 금색으로 칠한다. 다른 칸을 누르면 on_pick(열쇠) 를 부른다.
+    칠을 바꾸는 것은 set() 이다 - 화면이 실제로 바뀐 뒤에 부르면, 실패했을 때
+    단추만 넘어가 있는 일이 없다.
+
+        seg = U.Segmented(parent, [("all", "전체"), ("notice", "공지")], "all", pick)
+        seg.frame.pack(side="left")
+    """
+
+    def __init__(self, parent, items, current, on_pick):
+        self.on_pick = on_pick
+        self.current = current
+        self.cells = {}
+        self.frame = tk.Frame(parent, bg=INK, highlightthickness=2,
+                              highlightbackground=LINE2, bd=0)
+        for key, label in items:
+            lb = tk.Label(self.frame, text=label, font=FONT_B, padx=h(13), pady=h(3))
+            lb.pack(side="left")
+            lb.bind("<Button-1>", lambda _e, k=key: self._click(k))
+            lb.bind("<Enter>", lambda _e, k=key: self._hover(k, True))
+            lb.bind("<Leave>", lambda _e, k=key: self._hover(k, False))
+            self.cells[key] = lb
+        self._paint()
+
+    def _paint(self):
+        for key, lb in self.cells.items():
+            on = key == self.current
+            lb.configure(bg=ACCENT if on else INK, fg=ACCENT_DARK if on else FG_DIM,
+                         cursor="" if on else "hand2")
+
+    def _hover(self, key, inside):
+        if key != self.current:
+            self.cells[key].configure(bg=BG3 if inside else INK,
+                                      fg=FG if inside else FG_DIM)
+
+    def _click(self, key):
+        if key != self.current and self.on_pick:
+            self.on_pick(key)
+
+    def set(self, key):
+        self.current = key
+        self._paint()
+
+    def pack(self, **kw):
+        self.frame.pack(**kw)
+        return self
+
+
 def chip(parent, text, bg, fg="#14141a", font=None, padx=6, pady=1):
     return tk.Label(parent, text=text, bg=bg, fg=fg, font=font or FONT_XS,
                     padx=padx, pady=pady)

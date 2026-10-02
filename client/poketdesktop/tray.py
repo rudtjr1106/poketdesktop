@@ -162,6 +162,10 @@ class TrayBase(object):
                           if getattr(a, "friend_unseen", 0)
                           else "친구 요청 보기"),
                  lambda: self.call(a.open_friends)),
+            # 게시판 (1.8.0). 새 공지도 화면에 자국이 없어서 여기에 표시한다.
+            Item(lambda: ("게시판  (새 공지)" if getattr(a, "notice_unseen", False)
+                          else "게시판"),
+                 lambda: self.call(a.open_board)),
             SEP,
             Item("바탕화면", submenu=[
                 Item("모두 거두기", lambda: self.call(a.recall_all)),

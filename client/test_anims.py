@@ -179,6 +179,7 @@ def main():
     fp = FakePet()
     fp.ov = ov
     fp.mon = {"num": 25}
+    fp.look = 25            # 지금 입은 도트의 번호 (1.8.0: 메가 폼이면 그 폼의 번호)
     fp.walking_sprite = True
     fp.anims = {"Walk": walk}
     fp.miss = set()

@@ -52,6 +52,22 @@ XML = """<AnimData>
 </AnimData>"""
 
 
+class Resp(object):
+    """urlopen 이 돌려주는 것처럼 보이는 것."""
+
+    def __init__(self, data):
+        self.data = data
+
+    def read(self):
+        return self.data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
 def main():
     root = ET.fromstring(XML)
 
@@ -169,19 +185,6 @@ def main():
             json.dump({"ok": True, "src": "follow", "frameW": 32, "frameH": 32,
                        "durations": [9], "frames": 1, "rows": 4}, f)
 
-        class Resp(object):
-            def __init__(self, data):
-                self.data = data
-
-            def read(self):
-                return self.data
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *a):
-                return False
-
         def fake2(url, timeout=0):
             calls.append(url)
             if "followsprites" in url:
@@ -200,6 +203,58 @@ def main():
                    "frames": 1, "rows": 8, "shiny": True}, f)
     chk("받아 둔 이로치 메타를 그대로 준다",
         M._meta_response(25, "Walk", shiny=True).get("shiny") is True)
+
+    print("\n=== 메가 폼의 걷는 도트 (1.8.0) ===")
+    import struct
+    from fastapi import HTTPException
+    chk("도감에 적힌 경로를 쓴다 (메가리자몽X = 0006/0001)", M._mega_walk(10034) == "0006/0001",
+        M._mega_walk(10034))
+    chk("걷는 도트가 없는 메가(리자몽Y)·보통 종·없는 번호는 None",
+        M._mega_walk(10035) is None and M._mega_walk(6) is None and M._mega_walk(99999) is None)
+
+    def code(fn, *a):
+        try:
+            fn(*a)
+            return 200
+        except HTTPException as e:
+            return e.status_code
+    chk("걷는 도트가 있는 메가만 통과시킨다",
+        (code(M._check_anim, 10034, "Walk"), code(M._check_anim, 10035, "Walk"),
+         code(M._check_anim, 99999, "Walk"), code(M._check_anim, 10034, "Nope")) == (200, 404, 404, 404))
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + struct.pack(">II", 64, 320) + b"0" * 64
+    calls = []
+
+    def fake3(url, timeout=0):
+        calls.append(url)
+        if url.endswith("AnimData.xml"):
+            return Resp(XML.encode("utf-8"))
+        if url.endswith("Walk-Anim.png"):
+            return Resp(png)
+        raise urllib.error.HTTPError(url, 404, "nope", None, None)
+    urllib.request.urlopen = fake3
+    try:
+        m = M._anim_fetch(10034, "Walk")
+        chk("폼 폴더에서 받는다 (sprite/0006/0001/)", m and m.get("ok") and m["rows"] == 8
+            and calls[0].endswith("/sprite/0006/0001/AnimData.xml")
+            and calls[1].endswith("/sprite/0006/0001/Walk-Anim.png"), (m, calls))
+        chk("메가 번호 폴더에 둔다", os.path.basename(os.path.dirname(
+            M._anim_paths(10034, "Walk")[0])) == "10034")
+        del calls[:]
+        M._anim_fetch(10034, "Walk", shiny=True)
+        chk("이로치는 그 아래 0001", calls and calls[0].endswith("/sprite/0006/0001/0001/AnimData.xml"),
+            calls[:1])
+
+        def fake4(url, timeout=0):
+            calls.append(url)
+            raise urllib.error.HTTPError(url, 404, "nope", None, None)
+        urllib.request.urlopen = fake4
+        del calls[:]
+        chk("없으면 없다고 적고, 두 번째 출처(followers)로 안 간다",
+            M._anim_fetch(10079, "Walk") is None
+            and json.load(io.open(M._anim_paths(10079, "Walk")[1], encoding="utf-8")) == {"ok": False}
+            and not any("followsprites" in c for c in calls), calls)
+    finally:
+        urllib.request.urlopen = real
 
     print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))

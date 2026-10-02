@@ -15,7 +15,8 @@ import tkinter as tk
 from tkinter import ttk
 
 from . import ui_common as U
-from .ui_bag import BagWindow
+from .ui_bag_tabs import BagTabs
+from .ui_board import BoardWindow
 from .ui_box import BoxWindow
 from .ui_dex import DexWindow
 from .ui_friends import FriendsWindow
@@ -24,21 +25,21 @@ from .ui_raid import RaidWindow
 from .ui_rank import RankWindow
 from .ui_settings import SettingsWindow
 from .ui_shop import ShopWindow
-from .ui_tms import TmWindow
 
 W, H = 1040, 700
 
 # (열쇠, 탭 이름, 클래스, root 를 인자로 받는가)
 TABS = [
     ("box", "포켓몬", BoxWindow, True),
-    ("bag", "가방", BagWindow, True),
+    # 가방 안에서 [도구 | 기술머신] 으로 나뉜다 (1.8.0 - 기술머신 탭을 합쳤다)
+    ("bag", "가방", BagTabs, True),
     ("shop", "상점", ShopWindow, True),
-    ("tms", "기술머신", TmWindow, True),
     ("dex", "도감", DexWindow, False),
     ("friends", "친구", FriendsWindow, False),
     ("gym", "관장", GymWindow, True),
     ("raid", "레이드", RaidWindow, False),
     ("rank", "랭킹", RankWindow, False),
+    ("board", "게시판", BoardWindow, False),
     ("settings", "설정", SettingsWindow, False),
 ]
 
@@ -109,6 +110,17 @@ class HubWindow(object):
         pane.win.pack(fill="both", expand=True)
         self.panes[key] = pane
         return pane
+
+    def set_badge(self, key, on):
+        """탭 이름 옆에 점을 찍는다 (새 공지). 켜고 끄는 것만 한다."""
+        row = next((t for t in TABS if t[0] == key), None)
+        if not row or key not in self.order:
+            return
+        try:
+            self.nb.tab(self.order.index(key),
+                        text="  %s%s  " % (row[1], " ●" if on else ""))
+        except tk.TclError:
+            pass
 
     def show(self, key):
         """그 탭으로 옮기고 창을 앞으로 꺼낸다."""

@@ -236,6 +236,14 @@ jobs:
         run: python client/test_bond_ui.py
       - name: 빛나는 돌 표식 (진짜 Tk)
         run: python client/test_bond_stone.py
+      # 1.8.0: 가방 안의 [도구 | 기술머신] 과 게시판 (글·댓글·답글·굴리기)
+      - name: 가방 탭 합치기 (진짜 Tk)
+        run: python client/test_bag_tabs.py
+      - name: 게시판 화면 (진짜 Tk)
+        run: python client/test_board_ui.py
+      # 1.8.0: 메가진화한 모습으로 바탕화면 걷기 + 메가진화 연출 (바탕화면·배틀 창)
+      - name: 메가 폼으로 걷기·메가진화 연출 (진짜 Tk)
+        run: python client/test_mega_walk.py
       # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
@@ -311,6 +319,14 @@ jobs:
         run: python client/test_bond_ui.py
       - name: 빛나는 돌 표식 (진짜 Tk)
         run: python client/test_bond_stone.py
+      # 1.8.0: 가방 안의 [도구 | 기술머신] 과 게시판 (글·댓글·답글·굴리기)
+      - name: 가방 탭 합치기 (진짜 Tk)
+        run: python client/test_bag_tabs.py
+      - name: 게시판 화면 (진짜 Tk)
+        run: python client/test_board_ui.py
+      # 1.8.0: 메가진화한 모습으로 바탕화면 걷기 + 메가진화 연출 (바탕화면·배틀 창)
+      - name: 메가 폼으로 걷기·메가진화 연출 (진짜 Tk)
+        run: python client/test_mega_walk.py
       - name: 설정·패치노트·새버전 창 높이
         run: python client/smoke_new_windows.py
       # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
@@ -371,6 +387,7 @@ jobs:
           python test_achievements.py
           python test_mega.py
           python test_legend_limit.py
+          python test_board.py
 
       - name: 서버 띄우기
         env:
@@ -451,6 +468,8 @@ jobs:
           # 시즌 3: 업적·키스톤·유대 미션·메가진화 배틀. 몇 시간 걸릴 준비
           # (관장 8곳·친밀도 255)만 DB 로 건너뛴다.
           python server/test_season3.py http://127.0.0.1:8788 /tmp/poket-test.db
+          # 게시판 (1.8.0): 공지 권한·댓글·답글·지우기가 HTTP 로 오가는지
+          python server/test_board_api.py http://127.0.0.1:8788
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

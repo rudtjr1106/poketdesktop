@@ -146,6 +146,36 @@ CREATE TABLE IF NOT EXISTS bond (
 );
 CREATE INDEX IF NOT EXISTS idx_bond_user ON bond(user_id);
 
+-- 게시판 (1.8.0). 공지(notice)는 운영자만, 자유(free)는 누구나.
+-- 지우면 줄을 없애지 않고 deleted 로 표시만 한다 (board.py).
+CREATE TABLE IF NOT EXISTS board_post (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT NOT NULL,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    author      TEXT NOT NULL,          -- 쓸 때의 닉네임
+    title       TEXT NOT NULL,
+    body        TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT,
+    deleted     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_board_post_kind ON board_post(kind, deleted, id);
+CREATE INDEX IF NOT EXISTS idx_board_post_user ON board_post(user_id, created_at);
+
+-- 댓글. parent_id 가 있으면 그 댓글에 단 답글이다 (한 단계까지).
+CREATE TABLE IF NOT EXISTS board_comment (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id     INTEGER NOT NULL REFERENCES board_post(id) ON DELETE CASCADE,
+    parent_id   INTEGER REFERENCES board_comment(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    author      TEXT NOT NULL,
+    body        TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    deleted     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_board_comment_post ON board_comment(post_id, id);
+CREATE INDEX IF NOT EXISTS idx_board_comment_user ON board_comment(user_id, created_at);
+
 -- PC 박스 이름. 안 바꾼 박스는 여기 줄이 없다 (기본 이름은 클라가 짓는다).
 CREATE TABLE IF NOT EXISTS box_name (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

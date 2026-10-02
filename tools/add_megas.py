@@ -24,6 +24,21 @@ megas 까지 본다.
   · 원시회귀(가이오가·그란돈)는 메가가 아니라 뺀다.
   · 레쿠쟈는 스톤이 없다. 화룡점정을 알면 메가진화한다 (megaMove).
 
+## 바탕화면에서 걸어다닐 도트 (1.8.0)
+
+메가 폼마다 두 가지를 적어 둔다. 화면은 이것만 보고 '메가 모습으로 걷기' 를
+보일지 정한다 - 받아 보고 판단하면 일러스트(도트가 아닌 것)까지 걸어다닌다.
+
+  · walk — SpriteCollab 에 걷는 도트가 있으면 그 경로 ("0006/0001").
+           8방향으로 걷는다. 94폼 중 41폼.
+  · dot  — showdown 배틀 도트(gif)가 있는가. 걷는 도트가 없으면 이걸로
+           선다 (정면 고정 - 걷는 도트가 없는 57종과 같은 방식).
+
+둘 다 없으면(Z-A 신규 대부분) 바탕화면에서는 메가 모습이 안 된다.
+자료는 tools/_cache 의 두 파일에서 온다 (없으면 지금 도감의 값을 그대로 둔다):
+  spritecollab_tracker.json  https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/tracker.json
+  mega_showdown.json         {메가 번호: showdown gif 가 있는가}
+
 ## 특성
 
 원본에 특성이 없는 폼이 있다(Z-A 에서 새로 나온 것들). 그때는 **원래 종의
@@ -169,7 +184,52 @@ def build(dex, items):
             entry["megaStoneKr"] = stone_items[entry["megaStone"]]["kr"]
         megas.append(entry)
     megas.sort(key=lambda m: m["num"])
+    notes.extend(annotate_sprites(megas, dex, by_int))
     return megas, sorted(stone_items.values(), key=lambda i: i["id"]), notes
+
+
+def annotate_sprites(megas, dex, by_int):
+    """메가 폼마다 walk / dot 을 적는다 (머리말의 '바탕화면에서 걸어다닐 도트')."""
+    notes = []
+    old = dict((m["internal"], m) for m in dex.get("megas") or [])
+    tracker = showdown = None
+    tp = os.path.join(C, "spritecollab_tracker.json")
+    sp = os.path.join(C, "mega_showdown.json")
+    if os.path.exists(tp):
+        with open(tp, encoding="utf-8") as f:
+            tracker = json.load(f)
+    if os.path.exists(sp):
+        with open(sp, encoding="utf-8") as f:
+            showdown = json.load(f)
+    if tracker is None or showdown is None:
+        notes.append("도트 자료(tools/_cache)가 없어 walk/dot 은 지금 도감 값을 그대로 둔다")
+    n_walk = n_dot = 0
+    for m in megas:
+        prev = old.get(m["internal"]) or {}
+        walk = prev.get("walk")
+        dot = bool(prev.get("dot"))
+        if tracker is not None:
+            base = by_int[m["megaOf"]]
+            suffix = m["internal"].split("_MEGA", 1)[1]            # "", "_X", "_Y", "_Z", "_F"
+            want = "Mega" + (suffix if suffix in ("_X", "_Y", "_Z") else "")
+            walk = None
+            subs = (tracker.get("%04d" % base["num"]) or {}).get("subgroups") or {}
+            for key_, form in sorted(subs.items()):
+                if form.get("name") == want and "Walk" in (form.get("sprite_files") or {}) \
+                        and not m.get("megaGender"):
+                    walk = "%04d/%s" % (base["num"], key_)
+                    break
+        if showdown is not None:
+            dot = bool(showdown.get(str(m["num"])))
+        m.pop("walk", None)
+        if walk:
+            m["walk"] = walk
+            n_walk += 1
+        m["dot"] = dot
+        n_dot += 1 if dot else 0
+    notes.append("바탕화면 도트: 걷는 도트 %d폼 · 배틀 도트 %d폼 · 둘 다 없음 %d폼"
+                 % (n_walk, n_dot, sum(1 for m in megas if not m.get("walk") and not m["dot"])))
+    return notes
 
 
 def main():

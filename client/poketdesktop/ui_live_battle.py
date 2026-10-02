@@ -36,6 +36,7 @@ from . import ui_common as U
 from .ui_common import run_async
 from .ui_gym import shade
 from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
+from . import ui_mega
 from .ui_mega import MegaToggle
 
 W = 880
@@ -448,17 +449,25 @@ class LiveBattleWindow(object):
         step(0)
 
     def _mega(self, ev):
-        """메가진화 - 도트와 이름을 메가 폼으로 바꾼다. 체력은 그대로다."""
+        """메가진화 - 빛에 싸였다가 도트와 이름이 메가 폼으로 바뀐다. 체력은 그대로다.
+
+        연출이 끝나면 스스로 다음 사건으로 넘긴다 (_apply 는 None 을 돌려준다).
+        """
         who = ev.get("who")
         mon = self.shown.get(who) if who in ("me", "foe") else None
-        if mon is not None:
-            mon = dict(mon)
-            mon["num"] = ev.get("num") or mon.get("num")
-            mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
-            mon["mega"] = True
+        self.say(ev.get("text"))
+        if mon is None:
+            return self.later(STEP_MS, self._next)
+        mon = dict(mon)
+        mon["num"] = ev.get("num") or mon.get("num")
+        mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
+        mon["mega"] = True
+        ui_mega.warm(self, mon["num"], mon.get("shiny"))
+
+        def swap():
             self.set_mon(who, mon)
             self._banner(who, "메가진화!")
-        self.say(ev.get("text"))
+        ui_mega.play_in(self, self._center(who), swap, size=MON_H[who] * 0.55)
 
     def _banner(self, who, text):
         s = U.h
@@ -550,7 +559,7 @@ class LiveBattleWindow(object):
             return 420
         if t == "mega":
             self._mega(ev)
-            return STEP_MS + 450
+            return None
         if t == "move":
             self.say(text)
             other = "foe" if who == "me" else "me"

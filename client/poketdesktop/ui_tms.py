@@ -30,7 +30,7 @@ from common.korean import natural
 from . import sprite_cache, sprites
 from . import ui_common as U
 from . import ui_loading
-from .ui_bag import _scroller
+from .ui_bag import _scroller, bag_title
 from .ui_learn import ask_forget
 
 LIST_W = 320
@@ -61,10 +61,11 @@ CAT_KR = MT.CAT_KR
 
 class TmWindow(object):
 
-    def __init__(self, root, app, parent=None):
+    def __init__(self, root, app, parent=None, switch=None):
         self.root = root
         self.app = app
         self.alive = True
+        self._switch = switch    # 가방 탭 안의 [도구 | 기술머신] (ui_bag_tabs)
 
         self.tms = []            # 서버가 준 전체 목록
         self.mons = []
@@ -107,20 +108,33 @@ class TmWindow(object):
 
     # ---------------- 머리 ----------------
     def _header(self):
-        bar = tk.Frame(self.win, bg=U.BG2, height=U.h(44))
-        bar.pack(fill="x")
-        bar.pack_propagate(False)
-        tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(16)).pack(side="left",
-                                                            padx=(14, 10))
-        tk.Label(bar, text="기술머신", bg=U.BG2, fg=U.FG,
-                 font=U.FONT_T).pack(side="left")
+        if self._switch:
+            # 가방 탭 안에 들어갈 때는 도구 칸(ui_bag)과 **같은 머리**를 그린다 -
+            # 같은 높이, 같은 자리의 [도구 | 기술머신]. 다르면 오갈 때마다
+            # 고르는 단추가 튄다.
+            h = tk.Frame(self.win, bg=U.BG2, height=U.h(62))
+            h.pack(fill="x")
+            h.pack_propagate(False)
+            bar = tk.Frame(h, bg=U.BG2)
+            bar.pack(fill="both", expand=True, padx=16)
+            bag_title(bar, self._switch)
+            last_pad = 0
+        else:
+            bar = tk.Frame(self.win, bg=U.BG2, height=U.h(44))
+            bar.pack(fill="x")
+            bar.pack_propagate(False)
+            tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(16)).pack(side="left",
+                                                                padx=(14, 10))
+            tk.Label(bar, text="기술머신", bg=U.BG2, fg=U.FG,
+                     font=U.FONT_T).pack(side="left")
+            last_pad = 14
         self.count_lbl = tk.Label(bar, text="", bg=U.BG2, fg=U.FG_DIM,
                                   font=U.FONT_S)
-        self.count_lbl.pack(side="left", padx=(10, 0))
+        self.count_lbl.pack(side="left", padx=(10 if not self._switch else 0, 0))
 
         self.filter_btn = U.ghost_button(bar, "가진 것만", self._toggle_filter,
                                          height=28)
-        self.filter_btn.pack(side="right", padx=(0, 14))
+        self.filter_btn.pack(side="right", padx=(0, last_pad))
         # 타입·분류로 나눠 보기. 358줄이라 '가진 것만' 하나로는 찾기 힘들다.
         self.cat_btn = U.ghost_button(bar, "분류: 전체", self._open_cat_menu,
                                       height=28)
