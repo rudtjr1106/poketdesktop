@@ -76,6 +76,10 @@ DEFAULTS = {
     # 싶은 사람이 있다. 그 사람에게 야생은 하던 일을 끊는 방해다.
     # 끄면 풀숲이 돋지 않고 서버에 물어보지도 않는다.
     "showGrass": True,
+    # 바탕화면 포켓몬이 얼마나 또렷한가 (1.9.0). 100 이면 그대로, 낮출수록
+    # 뒤가 비친다. 걸어다니는 포켓몬·알·바탕화면에서 싸우는 상대에 다 적용된다.
+    # 창이나 글을 가려서 불편하다는 사람이 있어서 뒀다.
+    "petOpacity": 100,
     # --- 활동 영역 ---
     # 직접 그린 영역 (x1, y1, x2, y2) 절대 좌표. None 이면 아래 areaW/areaH 로
     # 화면 오른쪽 아래에 잡는다. 화면에 끌어서 그린다 (ui_area).
@@ -142,6 +146,20 @@ DEFAULTS = {
 
 
 CATCH_MODES = ("new", "always", "off")
+
+
+# 가장 흐린 값. 투명도 99% 까지 올릴 수 있다 (사용자 요청). 0 은 안 된다 -
+# 완전히 안 보이면 창이 있는지조차 알 수 없고, 운영체제에 따라 클릭도 안 먹는다.
+PET_OPACITY_MIN = 1
+
+
+def pet_alpha(settings):
+    """바탕화면 포켓몬 창의 알파 (0.01 ~ 1.0). 이상한 값이면 1.0."""
+    try:
+        v = float((settings or {}).get("petOpacity", 100))
+    except (TypeError, ValueError):
+        return 1.0
+    return max(PET_OPACITY_MIN, min(100.0, v)) / 100.0
 
 
 def catch_mode(settings):

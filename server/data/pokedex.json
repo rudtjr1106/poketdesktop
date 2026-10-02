@@ -2241,6 +2241,7 @@
     "GRASS",
     "POISON"
    ],
+   "walk": "ow:venusaur/mega",
    "weight": 45
   },
   {
@@ -2356,6 +2357,7 @@
     "FIRE",
     "FLYING"
    ],
+   "walk": "ow:charizard/mega_y",
    "weight": 45
   },
   {
@@ -2412,6 +2414,7 @@
    "types": [
     "WATER"
    ],
+   "walk": "ow:blastoise/mega",
    "weight": 45
   },
   {
@@ -2637,6 +2640,7 @@
     "BUG",
     "FLYING"
    ],
+   "walk": "ow:pinsir/mega",
    "weight": 45
   },
   {
@@ -2694,6 +2698,7 @@
     "WATER",
     "DARK"
    ],
+   "walk": "ow:gyarados/mega",
    "weight": 45
   },
   {
@@ -2807,6 +2812,7 @@
     "PSYCHIC",
     "FIGHTING"
    ],
+   "walk": "ow:mewtwo/mega_x",
    "weight": 0
   },
   {
@@ -2920,6 +2926,7 @@
     "ELECTRIC",
     "DRAGON"
    ],
+   "walk": "ow:ampharos/mega",
    "weight": 45
   },
   {
@@ -2976,6 +2983,7 @@
     "BUG",
     "STEEL"
    ],
+   "walk": "ow:scizor/mega",
    "weight": 25
   },
   {
@@ -3032,6 +3040,7 @@
     "BUG",
     "FIGHTING"
    ],
+   "walk": "ow:heracross/mega",
    "weight": 45
   },
   {
@@ -3202,6 +3211,7 @@
     "FIRE",
     "FIGHTING"
    ],
+   "walk": "ow:blaziken/mega",
    "weight": 45
   },
   {
@@ -3373,6 +3383,7 @@
    "types": [
     "STEEL"
    ],
+   "walk": "ow:aggron/mega",
    "weight": 45
   },
   {
@@ -3655,6 +3666,7 @@
     "DRAGON",
     "GROUND"
    ],
+   "walk": "ow:garchomp/mega",
    "weight": 45
   },
   {
@@ -3770,6 +3782,7 @@
     "GRASS",
     "ICE"
    ],
+   "walk": "ow:abomasnow/mega",
    "weight": 60
   },
   {
@@ -3941,6 +3954,7 @@
     "WATER",
     "GROUND"
    ],
+   "walk": "ow:swampert/mega",
    "weight": 45
   },
   {
@@ -4228,6 +4242,7 @@
     "NORMAL",
     "FAIRY"
    ],
+   "walk": "ow:audino/mega",
    "weight": 255
   },
   {
@@ -4456,6 +4471,7 @@
     "NORMAL",
     "FLYING"
    ],
+   "walk": "ow:pidgeot/mega",
    "weight": 45
   },
   {
@@ -4626,6 +4642,7 @@
     "STEEL",
     "PSYCHIC"
    ],
+   "walk": "ow:metagross/mega",
    "weight": 3
   },
   {
@@ -4854,6 +4871,7 @@
     "DRAGON",
     "FLYING"
    ],
+   "walk": "ow:salamence/mega",
    "weight": 45
   },
   {
@@ -4910,6 +4928,7 @@
     "BUG",
     "POISON"
    ],
+   "walk": "ow:beedrill/mega",
    "weight": 45
   },
   {

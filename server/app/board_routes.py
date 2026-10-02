@@ -9,8 +9,16 @@
     POST   /api/board/{id}/comments                 댓글·답글
     DELETE /api/board/comments/{cid}                댓글 지우기
 
-창을 열었을 때만 부른다 - 폴링은 없다. 새 공지가 있는지는 /api/me 에
-실려 가는 번호 하나로 안다 (board.me_card).
+1.9.0:
+
+    GET    /api/board?...&q=말                      찾기 (제목·내용·쓴 사람)
+    POST   /api/board/{id}/like                     좋아요 누르기·취소
+    GET    /api/board/notify                        내 알림 목록
+    GET    /api/board/mine?what=posts&page=1        내 활동 한 쪽 (마이페이지: 알림·내 글·내 댓글)
+    POST   /api/board/notify/seen                   알림을 다 본 것으로
+
+창을 열었을 때만 부른다 - 폴링은 없다. 새 공지·패치노트와 안 본 알림은
+/api/me 에 실려 간다 (board.me_card).
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -43,8 +51,25 @@ def _run(fn, *a, **kw):
 
 
 @router.get("/api/board")
-def listing(kind: str = "all", page: int = 1, ctx=Depends(deps.current)):
-    return board.listing(ctx["user"], kind, page)
+def listing(kind: str = "all", page: int = 1, q: str = "", ctx=Depends(deps.current)):
+    return board.listing(ctx["user"], kind, page, q=q)
+
+
+# **notify 도 {pid} 보다 먼저 건다** (comments/{cid} 와 같은 이유).
+@router.get("/api/board/notify")
+def notifications(ctx=Depends(deps.current)):
+    return board.notifications(ctx["user"]["id"])
+
+
+@router.get("/api/board/mine")
+def mine(what: str = "posts", page: int = 1, ctx=Depends(deps.current)):
+    return board.mine_page(ctx["user"]["id"], (what or "posts").lower(), page)
+
+
+@router.post("/api/board/notify/seen")
+def notify_seen(ctx=Depends(deps.current)):
+    board.notify_seen(ctx["user"]["id"])
+    return board.notifications(ctx["user"]["id"])
 
 
 @router.post("/api/board")
@@ -77,6 +102,12 @@ def edit(pid: int, body: PostIn, ctx=Depends(deps.current)):
 def remove(pid: int, ctx=Depends(deps.current)):
     _run(board.remove, ctx["user"], pid)
     return {"ok": True}
+
+
+@router.post("/api/board/{pid}/like")
+def like(pid: int, ctx=Depends(deps.current)):
+    _run(board.like, ctx["user"], pid)
+    return _run(board.detail, ctx["user"], pid)
 
 
 @router.post("/api/board/{pid}/comments")

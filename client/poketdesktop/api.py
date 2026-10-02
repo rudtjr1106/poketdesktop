@@ -524,8 +524,13 @@ class Api(object):
 
     # ---------------- 게시판 (1.8.0) ----------------
     # 창을 열었을 때만 부른다. 새 공지가 있는지는 /api/me 에 실려 온다.
-    def board(self, kind="all", page=1):
-        return self._call("GET", "/api/board?kind=%s&page=%d" % (kind, int(page)))
+    def board(self, kind="all", page=1, q=""):
+        """목록 한 쪽. q 가 있으면 찾기 (1.9.0 - 제목·내용·쓴 사람)."""
+        path = "/api/board?kind=%s&page=%d" % (kind, int(page))
+        if q:
+            from urllib.parse import quote
+            path += "&q=" + quote(q, safe="")
+        return self._call("GET", path)
 
     def board_post(self, pid):
         """글 하나와 댓글."""
@@ -549,6 +554,26 @@ class Api(object):
 
     def board_comment_delete(self, cid):
         return self._call("DELETE", "/api/board/comments/%d" % int(cid))
+
+    def board_like(self, pid):
+        """좋아요를 누르거나 취소한다 (1.9.0). 글 전체를 돌려준다."""
+        return self._call("POST", "/api/board/%d/like" % int(pid), {})
+
+    def board_notify(self):
+        """내 알림 목록 - 내 글의 댓글, 내 댓글의 답글 (1.9.0)."""
+        return self._call("GET", "/api/board/notify")
+
+    def board_notify_seen(self):
+        return self._call("POST", "/api/board/notify/seen", {})
+
+    def board_mine(self, what="posts", page=1):
+        """내 활동 한 쪽 - notify / posts / comments (마이페이지가 탭·쪽을 넘길 때)."""
+        return self._call("GET", "/api/board/mine?what=%s&page=%d" % (what, int(page)))
+
+    # ---------------- 마이페이지 (1.9.0) ----------------
+    def mypage(self):
+        """내 정보와 기록을 한 번에 (칭호·관장·시즌·게시판 활동)."""
+        return self._call("GET", "/api/mypage")
 
     # ---------------- 메가진화 (시즌 3) ----------------
     def bond(self, pid):

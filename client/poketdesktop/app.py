@@ -35,7 +35,7 @@ from .ui_shop import ShopWindow                # noqa: E402
 from .ui_hub import HubWindow                  # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
-from .ui_update import NewVersionAsk, PatchNotes, UpdateWindow  # noqa: E402
+from .ui_update import NewVersionAsk, UpdateWindow  # noqa: E402
 from .wild_ui import WildController            # noqa: E402
 from . import raid_fx                          # noqa: E402
 from . import mega_fx                          # noqa: E402
@@ -110,6 +110,14 @@ class App(object):
         # 번호(settings.noticeSeen)보다 크면 탭과 트레이에 표시한다.
         self.board_notice = 0
         self.board_window = None
+        # 1.9.0: 가장 최근 패치노트 글 번호(settings.patchSeen 과 견준다)와
+        # 안 본 게시판 알림(내 글의 댓글, 내 댓글의 답글). 알림은 친구 요청처럼
+        # 운영체제 알림으로 한 번 알리고 트레이에 수로 남긴다.
+        self.board_patch = 0
+        self.board_unseen = 0
+        self._board_seen = set()     # 이미 알린 알림 번호
+        self._board_first = True
+        self.mypage_window = None
         # 키스톤이 있나 (서버가 /api/me 에 실어 준다). 메가진화한 모습으로
         # 걸어다니게 할 수 있는지를 이걸로 본다 (1.8.0).
         self.keystone = False
@@ -129,7 +137,6 @@ class App(object):
         # 켜 둔 동안의 새 버전 확인.
         self._update_job = None
         self._update_asking = False
-        self.notes_win = None
         self._anim_job = False
         self.arena = None
         self.battle = None
@@ -601,7 +608,8 @@ class App(object):
                 # 저절로 받은 메가스톤 (시즌 3). 업적과 같은 식으로 알린다.
                 self.announce_bond((me.get("bond") or {}).get("got") or [])
                 # 게시판의 새 공지 (1.8.0). 탭과 트레이 메뉴에 표시만 한다.
-                self.note_notice((me.get("board") or {}).get("notice"))
+                # 1.9.0: 새 패치노트와 내 글·댓글에 달린 댓글도 같이 실려 온다.
+                self.note_board(me.get("board"))
                 self.keystone = bool(((me.get("bond") or {}).get("keystone") or {}).get("has"))
                 self.user_id = (me.get("user") or {}).get("id", self.user_id)
                 # 레이드 안내. 이벤트 기간이 아니면 None 이라 아무 일도 안 한다.
@@ -701,8 +709,25 @@ class App(object):
         if pane is not None:
             pane.show("tms")
 
-    def open_board(self):
-        self.board_window = self._tab("board")
+    def open_board(self, post=None, kind=None):
+        """게시판을 연다. post 가 있으면 그 글로, kind 가 있으면 그 칸으로."""
+        pane = self.board_window = self._tab("board")
+        if pane is None:
+            return
+        try:
+            if post:
+                pane.open_post(int(post))
+            elif kind:
+                pane.show_kind(kind)
+        except Exception as e:                              # noqa: BLE001
+            config.log("게시판 열기 오류: %s" % e)
+
+    def open_patchnotes(self):
+        """패치노트를 본다. 게시판의 패치노트 칸이다 (1.9.0 - 예전의 '새로운 기능' 창)."""
+        self.open_board(kind="patch")
+
+    def open_mypage(self):
+        self.mypage_window = self._tab("my")
 
     # ---------------- 게시판의 새 공지 ----------------
     @property
@@ -736,8 +761,103 @@ class App(object):
 
     def _paint_notice(self):
         if self.hub:
-            self.hub.set_badge("board", self.notice_unseen)
+            self.hub.set_badge("board", self.notice_unseen or self.patch_unseen
+                               or self.board_unseen > 0)
         self.refresh_tray()
+
+    # ---------------- 새 패치노트 (1.9.0) ----------------
+    @property
+    def patch_unseen(self):
+        try:
+            return int(self.board_patch or 0) > int(self.settings.get("patchSeen") or 0)
+        except (TypeError, ValueError):
+            return False
+
+    def mark_patch_seen(self, latest=None):
+        """게시판의 패치노트 칸을 열어 봤다. 표시를 끈다."""
+        try:
+            n = max(int(latest or 0), int(self.board_patch or 0))
+        except (TypeError, ValueError):
+            return
+        self.board_patch = max(self.board_patch, n)
+        if n > int(self.settings.get("patchSeen") or 0):
+            self.settings["patchSeen"] = n
+            config.save_settings(self.settings)
+        self._paint_notice()
+
+    def note_board(self, card):
+        """동기화에 실려 온 게시판 소식 - 새 공지·새 패치노트·내 알림."""
+        card = card or {}
+        self.note_notice(card.get("notice"))
+        try:
+            patch = int(card.get("patch") or 0)
+        except (TypeError, ValueError):
+            patch = 0
+        changed = patch != self.board_patch
+        self.board_patch = max(self.board_patch, patch)
+        if "patchSeen" not in self.settings and patch:
+            # 처음 깐 사람에게 옛 패치노트 마흔 개가 다 '새 글' 일 수는 없다.
+            # 지금 것까지는 본 것으로 친다. 방금 갈아탄 사람은 이번 판의 글
+            # 하나만 새 글이다 (_tell_patchnotes_once 가 표시해 둔다).
+            fresh = bool(getattr(self, "_patch_fresh", False))
+            self.settings["patchSeen"] = patch - 1 if fresh else patch
+            config.save_settings(self.settings)
+            changed = True
+        self.announce_board(card.get("notify"))
+        if changed:
+            self._paint_notice()
+
+    def set_board_unseen(self, n):
+        """화면이 방금 서버에서 들은 안 본 알림 수 (마이페이지). 다음 동기화를
+        기다리지 않고 탭의 점과 트레이의 수를 바로 맞춘다."""
+        try:
+            n = max(0, int(n or 0))
+        except (TypeError, ValueError):
+            return
+        if n != self.board_unseen:
+            self.board_unseen = n
+            self._paint_notice()
+
+    def announce_board(self, notify):
+        """내 글에 댓글이, 내 댓글에 답글이 달렸다. 친구 요청과 같은 식으로 알린다.
+
+        **켤 때 이미 쌓여 있던 것은 수만 한 번 알린다** (announce_friends 와 같은
+        이유). 그 뒤에 새로 오는 것은 누가 무슨 글에 달았는지까지 알려 준다.
+        글을 열어 보면 서버가 본 것으로 치므로 다음 동기화에 수가 줄어든다.
+        """
+        if not isinstance(notify, dict):
+            return
+        items = [x for x in (notify.get("items") or []) if x.get("id") is not None]
+        try:
+            count = int(notify.get("count") or 0)
+        except (TypeError, ValueError):
+            count = len(items)
+        if count != self.board_unseen:
+            self.board_unseen = count
+            self._paint_notice()
+        fresh = [x for x in items if x["id"] not in self._board_seen]
+        self._board_seen.update(x["id"] for x in items)
+        first, self._board_first = self._board_first, False
+        if not fresh:
+            return
+        where = "게시판이나 마이페이지에서 볼 수 있습니다."
+        if first and count > 1:
+            self.toast("게시판에 새 댓글 %d개가 있습니다" % count, where, kind="board")
+            return
+        if len(fresh) == 1:
+            x = fresh[0]
+            what = "답글" if x.get("kind") == "reply" else "댓글"
+            self.toast("%s 님이 %s을 남겼습니다" % (x.get("actor") or "?", what),
+                       "%s — %s" % (x.get("title") or "", x.get("snippet") or ""),
+                       kind="board")
+        else:
+            names = []
+            for x in fresh:
+                if x.get("actor") and x["actor"] not in names:
+                    names.append(x["actor"])
+            self.toast("게시판에 새 댓글 %d개가 달렸습니다" % len(fresh),
+                       ", ".join(names[:4]), kind="board")
+        self.notify("게시판에 새 댓글이 달렸습니다 - %d개" % len(fresh))
 
     # ---------------- 배우려고 기다리는 기술 ----------------
     # 레벨업으로 배울 기술이 생겼는데 자리가 네 개 다 찼을 때다. 서버는
@@ -898,7 +1018,11 @@ class App(object):
         self.dex_window = self._tab("dex")
 
     def open_settings(self):
-        self.settings_win = self._tab("settings")
+        """설정은 마이페이지의 톱니바퀴 안에 있다 (1.9.0)."""
+        pane = self.mypage_window = self._tab("my")
+        if pane is not None:
+            pane.show_settings()
+            self.settings_win = pane.settings
 
     def open_gym(self):
         self.gym_window = self._tab("gym")
@@ -1556,7 +1680,7 @@ class App(object):
         self._drop_pillar()
         for name in ("box_window", "shop_window", "bag_window",
                      "friends_win", "dex_window", "settings_win",
-                     "raid_window", "notes_win", "board_window"):
+                     "raid_window", "board_window", "mypage_window"):
             w = getattr(self, name, None)
             if w:
                 try:
@@ -1944,48 +2068,25 @@ class App(object):
 
     # ---------------------------------------------------------------- 패치노트
     def show_patchnotes(self, greet=False):
-        """이번 판에 무엇이 들어왔는지 보여준다.
+        """이번 판에 무엇이 들어왔는지 본다 - 게시판의 패치노트 칸이다 (1.9.0).
 
-        갈아탄 뒤 처음 켤 때 한 번 저절로 뜨고, 그 뒤로는 트레이 메뉴에서
-        언제든 다시 열 수 있다.
+        예전에는 '새로운 기능' 창을 따로 띄웠다. 이제 새 버전이 나오면 서버가
+        게시판에 글을 올리므로 거기서 본다 - 지난 판들도 다 남아 있고, 댓글도
+        달 수 있다.
         """
-        # **지난번에 켠 판 다음부터 지금까지를 다 보여준다.**
-        # 하루에 두 판이 나가는 일이 드물지 않은데, 지금 판만
-        # 보여주면 가운데 판은 아무도 못 읽는다.
-        last = self.settings.get("notesShownVersion") or ""
-        entries = patchnotes.since(last, VERSION) if greet \
-            else [patchnotes.entry(VERSION)]
-        entries = [e for e in entries if e]
-        if not entries:
-            return self.notify("이 버전에는 적어 둔 변경 내역이 없습니다.")
-        # 여기까지 왔으면 읽을 기회를 준 것이다. 다음에는 이 판
-        # 다음부터 쌓는다.
-        if greet:
-            self.settings["notesShownVersion"] = VERSION
-            config.save_settings(self.settings)
-        w = self.notes_win
-        if w is not None:
-            try:
-                if w.win.winfo_exists():
-                    return w.show()
-            except Exception:                               # noqa: BLE001
-                pass
-            self.notes_win = None
-        try:
-            self.notes_win = PatchNotes(self.root, entries, greet=greet)
-            self.notes_win.show()
-        except Exception as e:                              # noqa: BLE001
-            config.log("새로운 기능 창 오류: %s" % e)
-            self.notes_win = None
+        self.open_patchnotes()
 
     def _tell_patchnotes_once(self):
-        """갈아탄 뒤 처음 켰을 때 한 번만 띄운다.
+        """갈아탄 뒤 처음 켰을 때 한 번 알린다. **창은 띄우지 않는다** (1.9.0).
 
-        **처음 켠 사람에게는 띄우지 않는다.** 아직 써보지도 않은 프로그램의
+        예전에는 '새로운 기능' 창이 저절로 떴다. 이제는 운영체제 알림 한 번과
+        게시판 탭의 표시로 알리고, 내용은 게시판의 패치노트 칸에서 본다.
+
+        **처음 켠 사람에게는 알리지 않는다.** 아직 써보지도 않은 프로그램의
         변경 내역은 읽을 이유가 없다. 대신 지금 버전을 적어 둬서, 다음에
         갈아탄 뒤에는 보게 한다.
 
-        버전을 적는 것은 창을 띄우든 말든 먼저 한다. 창 쪽에서 무슨 일이
+        버전을 적는 것은 알리든 말든 먼저 한다. 알림 쪽에서 무슨 일이
         나도 다음 실행마다 같은 안내가 또 뜨는 일은 없어야 한다.
         """
         last = self.settings.get("lastRunVersion") or ""
@@ -1995,10 +2096,15 @@ class App(object):
         config.save_settings(self.settings)
         if not last or not patchnotes.entry(VERSION):
             return
-        # 부팅으로 켜졌으면 한참 미룬다. 컴퓨터를 켜자마자 창이 튀어나와
-        # 포커스를 뺏으면, 그때 타이핑하던 것이 엉뚱한 데로 들어간다.
-        self.root.after(12000 if self.autostarted else 2200,
-                        lambda: self.show_patchnotes(greet=True))
+        # 이번 판의 패치노트 글은 아직 안 본 것이다 (note_board 가 본다)
+        self._patch_fresh = True
+        # 부팅으로 켜졌으면 한참 미룬다. 컴퓨터를 켜자마자 알림이 튀어나오면
+        # 다른 알림들에 묻힌다.
+        self.root.after(12000 if self.autostarted else 2200, self._toast_updated)
+
+    def _toast_updated(self):
+        self.toast("포스크탑 v%s 업데이트 완료" % VERSION,
+                   "바뀐 것은 게시판의 '패치노트' 에서 볼 수 있습니다.", kind="update")
 
     # ------------------------------------------------ 켜 둔 동안의 새 버전
     def _schedule_update_check(self):
@@ -2192,7 +2298,8 @@ class App(object):
         """
         pane = None
         if getattr(self, "hub", None):
-            pane = self.hub.panes.get("settings")
+            # 설정 화면은 마이페이지 탭 안에 있다 (톱니바퀴를 눌러야 생긴다)
+            pane = getattr(self.hub.panes.get("my"), "settings", None)
         pane = pane or getattr(self, "settings_win", None)
         if pane is not None and hasattr(pane, "show_autostart"):
             try:

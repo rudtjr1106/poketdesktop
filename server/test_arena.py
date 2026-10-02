@@ -186,6 +186,9 @@ def main():
         print("\n=== 순위표 ===")
         s, r = call("GET", "/api/pvp/ranking", None, ct)
         chk("순위표를 볼 수 있다", s == 200 and "ranking" in r, s)
+        f = (r.get("me") or {}).get("fight") or {}
+        chk("내 줄에 오늘 몇 판 더 걸 수 있는지가 실린다 (1.9.0 - 랭킹 탭 머리줄)",
+            f.get("dailyBattles") == 20 and f.get("left") == 20 - f.get("foughtToday", -1), f)
     finally:
         print("\n=== 정리 ===")
         for t in (at, bt, ct):

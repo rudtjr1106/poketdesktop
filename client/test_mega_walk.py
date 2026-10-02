@@ -187,8 +187,10 @@ def dex_part():
         (DEX.mega_for(mon(1, "RAYQUAZA", None, ["DRAGONASCENT"])) or {}).get("num") == MEGA_RAY)
     walk = [m for m in DEX.megas if m.get("walk")]
     dot = [m for m in DEX.megas if m.get("dot")]
-    chk("걷는 도트가 있는 폼 41, 배틀 도트가 있는 폼 57", (len(walk), len(dot)) == (41, 57),
-        (len(walk), len(dot)))
+    # 1.9.0: 세 번째 출처(GBA 풍)로 19폼이 더 걷는다 (메가보만다·메가메타그로스 …)
+    ow = [m for m in walk if str(m["walk"]).startswith("ow:")]
+    chk("걷는 도트가 있는 폼 60 (그중 세 번째 출처 19), 배틀 도트가 있는 폼 57",
+        (len(walk), len(ow), len(dot)) == (60, 19, 57), (len(walk), len(ow), len(dot)))
     chk("메가 폼의 번호는 모두 10000 이상 (오버레이가 이걸로 가른다)",
         all(m["num"] >= overlay.MEGA_FROM for m in DEX.megas))
 

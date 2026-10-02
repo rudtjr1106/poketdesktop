@@ -63,6 +63,79 @@ class FakeApi(object):
         return PNG + (b"S" if shiny else b"N")
 
 
+def t_new_source():
+    """1.9.0: 서버에 걷는 도트 출처가 하나 더 붙었다 (미라이돈 등 40종, 메가 19폼).
+
+    이 PC 에 '없다' 고 적어 둔 옛 표시를 그대로 믿으면 영영 안 걷는다.
+    """
+    print("\n=== 옛 '없음' 표시는 다시 묻는다 (1.9.0) ===")
+
+    class Api(object):
+        def __init__(self, have=(), src="ow"):
+            self.have, self.src, self.calls = set(have), src, []
+
+        def anim_meta(self, num, name="Walk", shiny=False):
+            self.calls.append((num, name))
+            if num in self.have and name == "Walk":
+                return {"ok": True, "frameW": 64, "frameH": 64, "durations": [12, 12],
+                        "frames": 2, "rows": 4, "src": self.src, "anim": "Walk",
+                        "rowmap": {"down": 0, "left": 1, "right": 2, "up": 3}}
+            if name == "Idle" and num == 990:
+                return {"ok": True, "frameW": 32, "frameH": 32, "durations": [8], "src": "pmd"}
+            return {"ok": False}
+
+        def anim_sheet(self, num, name="Walk", shiny=False):
+            return PNG + b"W"
+
+    # 예전 판이 '미라이돈(1008)에는 걷는 도트가 없다' 고 적어 둔 PC
+    png, meta_path = WC._paths(1008, "Walk")
+    os.makedirs(os.path.dirname(png), exist_ok=True)
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump({"ok": False}, f)
+    chk("옛 표시(세대 없음)는 못 본 것으로 친다", WC.local(1008, "Walk") == (None, None),
+        WC.local(1008, "Walk"))
+    api = Api(have={1008})
+    got, meta = WC.ensure(api, 1008, "Walk")
+    chk("서버에 다시 물어 받아 온다", got and meta.get("src") == "ow" and (1008, "Walk") in api.calls,
+        (got, api.calls))
+    chk("이제 걷는다 (다음부터는 안 묻는다)", WC.local(1008, "Walk")[0] == got
+        and (WC.ensure(api, 1008, "Walk")[0], len(api.calls))[1] == 1, api.calls)
+
+    # 새 출처에도 없는 종(Z-A 의 새 메가 등)은 새 세대로 적어 두고 다시 안 묻는다
+    api = Api()
+    WC.ensure(api, 10300, "Walk")
+    with open(WC._paths(10300, "Walk")[1], encoding="utf-8") as f:
+        mark = json.load(f)
+    chk("없으면 지금 세대로 적는다", mark == {"ok": False, "gen": WC.MISS_GEN}, mark)
+    n = len(api.calls)
+    WC.ensure(api, 10300, "Walk")
+    chk("지금 세대의 '없음' 은 믿는다 (다시 안 묻는다)", len(api.calls) == n
+        and WC.local(10300, "Walk") == (None, mark), api.calls)
+
+    # 다른 동작의 옛 '없음' 은 그대로 믿는다 (새 출처에는 걷기밖에 없다)
+    png, meta_path = WC._paths(25, "Sleep")
+    os.makedirs(os.path.dirname(png), exist_ok=True)
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump({"ok": False}, f)
+    chk("걷기가 아닌 동작의 옛 표시는 그대로", WC.local(25, "Sleep") == (None, {"ok": False}))
+
+    print("\n=== 걷기밖에 없는 출처 (1.9.0) ===")
+    api = Api(have={990})
+    WC.ensure(api, 990, "Walk")
+    chk("걷기가 셋째 출처에서 온 종", WC.walk_only(990) is True)
+    n = len(api.calls)
+    chk("다른 동작은 쓰지 않는다 (서 있을 때만 그림체가 바뀌지 않게)",
+        WC.ensure(api, 990, "Idle") == (None, None) and len(api.calls) == n, api.calls[n:])
+    api = Api(have={25}, src="pmd")
+    WC._failed.clear()
+    p25 = WC._paths(25, "Walk")
+    for f in p25:
+        if os.path.exists(f):
+            os.remove(f)
+    WC.ensure(api, 25, "Walk")
+    chk("첫째 출처에서 온 종은 그대로 다른 동작을 받는다", WC.walk_only(25) is False)
+
+
 def main():
     print("=== 열쇠 ===")
     chk("보통은 번호 그대로", WC.key(25) == 25 and WC.key(25, False) == 25)
@@ -89,7 +162,8 @@ def main():
     png, meta = WC.ensure(api, 7, "Walk", shiny=True)
     chk("보통 색 시트로 걷는다", png and open(png, "rb").read().endswith(b"N"), png)
     chk("없다고 적어 둔다 (다음부터 안 묻는다)",
-        json.load(open(WC._paths(7, "Walk", True)[1], encoding="utf-8")) == {"ok": False})
+        json.load(open(WC._paths(7, "Walk", True)[1], encoding="utf-8"))
+        == {"ok": False, "gen": WC.MISS_GEN})
 
     print("\n=== 옛 서버 (shiny 를 모른다) ===")
     old = FakeApi(old_server=True)
@@ -118,6 +192,8 @@ def main():
     got = WC.ensure_many(api, [25, (25, True), (7, True), (25, True), None])
     chk("열쇠 셋 (중복·None 은 뺀다)", set(got) == {25, (25, True), (7, True)}, list(got))
     chk("이로치 열쇠에는 이로치 시트", open(got[(25, True)][0], "rb").read().endswith(b"S"))
+
+    t_new_source()
 
     shutil.rmtree(HOME, ignore_errors=True)
     print("\n  합계  OK %d   FAIL %d" % (OK, FAIL))

@@ -31,12 +31,15 @@ megas 까지 본다.
 
   · walk — SpriteCollab 에 걷는 도트가 있으면 그 경로 ("0006/0001").
            8방향으로 걷는다. 94폼 중 41폼.
+           거기 없고 세 번째 출처(pokeemerald-expansion)에 있으면
+           "ow:salamence/mega" (1.9.0, 19폼 - GBA 풍 4방향).
   · dot  — showdown 배틀 도트(gif)가 있는가. 걷는 도트가 없으면 이걸로
            선다 (정면 고정 - 걷는 도트가 없는 57종과 같은 방식).
 
 둘 다 없으면(Z-A 신규 대부분) 바탕화면에서는 메가 모습이 안 된다.
 자료는 tools/_cache 의 두 파일에서 온다 (없으면 지금 도감의 값을 그대로 둔다):
   spritecollab_tracker.json  https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/tracker.json
+  overworld_megas.json       세 번째 출처에 overworld.png 가 있는 메가 폴더 목록 (["salamence/mega", ...])
   mega_showdown.json         {메가 번호: showdown gif 가 있는가}
 
 ## 특성
@@ -203,7 +206,13 @@ def annotate_sprites(megas, dex, by_int):
             showdown = json.load(f)
     if tracker is None or showdown is None:
         notes.append("도트 자료(tools/_cache)가 없어 walk/dot 은 지금 도감 값을 그대로 둔다")
-    n_walk = n_dot = 0
+    # 세 번째 출처 (1.9.0). 목록이 없으면 지금 도감에 적힌 "ow:…" 를 그대로 둔다.
+    op = os.path.join(C, "overworld_megas.json")
+    ow = None
+    if os.path.exists(op):
+        with open(op, encoding="utf-8") as f:
+            ow = set(json.load(f))
+    n_walk = n_dot = n_ow = 0
     for m in megas:
         prev = old.get(m["internal"]) or {}
         walk = prev.get("walk")
@@ -221,15 +230,40 @@ def annotate_sprites(megas, dex, by_int):
                     break
         if showdown is not None:
             dot = bool(showdown.get(str(m["num"])))
+        if not walk or str(walk).startswith(OW_MARK):
+            # SpriteCollab 에 없다. 세 번째 출처에 있으면 그 경로를 적는다.
+            prev_ow = prev.get("walk") if str(prev.get("walk") or "").startswith(OW_MARK) else None
+            path = ow_path(by_int[m["megaOf"]], m)
+            walk = (OW_MARK + path) if (ow is not None and path in ow) \
+                else (prev_ow if ow is None else None)
+            n_ow += 1 if walk else 0
         m.pop("walk", None)
         if walk:
             m["walk"] = walk
             n_walk += 1
         m["dot"] = dot
         n_dot += 1 if dot else 0
-    notes.append("바탕화면 도트: 걷는 도트 %d폼 · 배틀 도트 %d폼 · 둘 다 없음 %d폼"
-                 % (n_walk, n_dot, sum(1 for m in megas if not m.get("walk") and not m["dot"])))
+    notes.append("바탕화면 도트: 걷는 도트 %d폼(그중 세 번째 출처 %d) · 배틀 도트 %d폼 · 둘 다 없음 %d폼"
+                 % (n_walk, n_ow, n_dot,
+                    sum(1 for m in megas if not m.get("walk") and not m["dot"])))
     return notes
+
+
+OW_MARK = "ow:"               # server/app/main.py 의 OW_MARK 와 같다
+
+
+def ow_folder(en):
+    """영어 이름을 세 번째 출처의 폴더 이름으로 (server/app/main.ow_folder 와 같은 규칙)."""
+    s = (en or "").lower().replace("♀", "_f").replace("♂", "_m").replace("é", "e")
+    s = re.sub(r"[.':]", "", s)
+    return re.sub(r"[\s\-]+", "_", s).strip("_")
+
+
+def ow_path(base, m):
+    """메가 폼의 세 번째 출처 폴더. 'salamence/mega', 'charizard/mega_y'."""
+    suffix = m["internal"].split("_MEGA", 1)[1]
+    return "%s/mega%s" % (ow_folder(base["en"]),
+                          suffix.lower() if suffix in ("_X", "_Y", "_Z") else "")
 
 
 def main():

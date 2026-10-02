@@ -403,6 +403,8 @@ Lv.1 을 끼워 평균을 깎아도 원래 레벨대의 상대와 붙습니다.
 
 걷는 도트는 [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCollab)
 ([CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)) 을 씁니다.
+거기 없는 종은 [pokemon-followers-sprites](https://github.com/baptiste-ro/pokemon-followers-sprites)
+와 [pokeemerald-expansion](https://github.com/rh-hideout/pokeemerald-expansion) 의 팬 도트로 메웁니다.
 관장 지도는 통계청 SGIS 행정경계를 가공한
 [vuski/admdongkor](https://github.com/vuski/admdongkor)
 ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) 입니다.

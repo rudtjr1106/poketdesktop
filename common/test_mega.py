@@ -21,6 +21,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
+from common import abilities as A                  # noqa: E402
 from common import battle as B                               # noqa: E402
 from common import held as H                                 # noqa: E402
 from common import pokelogic as P                            # noqa: E402
@@ -125,6 +126,48 @@ def main():
     bt7, a7, _ = duel(mon("CHARIZARD", "CHARIZARDITEY"), mon("SNORLAX"))
     bt7.take_turn("TACKLE", mega=True)
     chk("메가리자몽Y 의 가뭄 -> 햇빛", bt7.field.weather == "sun", bt7.field.weather)
+
+    print("\n=== 메가진화하면 특성이 바뀐 것을 알린다 (1.9.0) ===")
+    # 제보: 가디안이 나오며 트레이스로 상대 특성을 베끼고, 메가진화하면
+    # 페어리스킨이 되는데 **배틀 화면에는 그 얘기가 없다.** 엔진은 바꾸고
+    # 있었고, 사건에 실어 보내지 않아서 화면이 옛 특성을 그대로 들고 있었다.
+    g = mon("GARDEVOIR", "GARDEVOIRITE")
+    g["ability"] = "TRACE"
+    foe = mon("GYARADOS")
+    foe["ability"] = "INTIMIDATE"
+    bt9, a9, b9 = duel(g, foe)
+    ev0 = []
+    A.on_switch_in(bt9, a9, "me", ev0)
+    chk("나오면서 상대 특성(위협)을 트레이스한다", a9.ability == "INTIMIDATE", a9.ability)
+    ev = bt9.take_turn("TACKLE", mega=True)
+    mg = [e for e in ev if e.get("t") == "mega"][0]
+    chk("메가진화하면 특성이 메가 폼의 것(페어리스킨)이 된다", a9.ability == "PIXILATE", a9.ability)
+    chk("메가 사건에 새 특성이 실린다 (화면이 칸을 고친다)",
+        mg.get("ability") == "PIXILATE" and mg.get("abilityKr") == DEX.ability_name("PIXILATE"), mg)
+    said = [e for e in ev if e.get("t") == "msg" and "특성이" in (e.get("text") or "")]
+    chk("바뀌었다고 한 줄 알린다", len(said) == 1 and DEX.ability_name("PIXILATE") in said[0]["text"]
+        and said[0]["who"] == "me" and ev.index(said[0]) == ev.index(mg) + 1,
+        [e.get("text") for e in said])
+    chk("메가 폼의 특성은 상대에게도 보인다", a9.ab.get("shown") is True)
+    # 원래 특성과 메가 특성이 같으면 '바뀌었다' 고 하지 않는다
+    r = mon("RAYQUAZA", None, ("DRAGONASCENT", "TACKLE"))
+    r["ability"] = "AIRLOCK"
+    form = [m for m in DEX.megas if m["megaOf"] == "RAYQUAZA"][0]
+    same = "".join(c for c in str(form["abil"][0]).upper() if c.isalnum())
+    r["ability"] = same
+    bt10, a10, _ = duel(r, mon("SNORLAX"))
+    ev = bt10.take_turn("TACKLE", mega=True)
+    mg = [e for e in ev if e.get("t") == "mega"]
+    chk("특성이 그대로면 '바뀌었다' 는 말은 없다 (사건에는 실린다)",
+        len(mg) == 1 and mg[0].get("ability") == same
+        and not any("특성이" in (e.get("text") or "") for e in ev if e.get("t") == "msg"),
+        [e.get("text") for e in ev if e.get("t") == "msg"])
+    # 특성을 끈 판(야생 배틀)에서는 특성 얘기를 하지 않는다
+    bt11, a11, _ = duel(mon("GARDEVOIR", "GARDEVOIRITE"), mon("SNORLAX"), abil=False)
+    ev = bt11.take_turn("TACKLE", mega=True)
+    mg = [e for e in ev if e.get("t") == "mega"]
+    chk("특성이 꺼진 판에서는 특성을 싣지 않는다", len(mg) == 1 and "ability" not in mg[0]
+        and not any("특성이" in (e.get("text") or "") for e in ev), mg)
 
     print("\n=== 저장·교체 ===")
     bt8, a8, _ = duel(mon("GENGAR", "GENGARITE"), mon("SNORLAX"))

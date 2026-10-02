@@ -593,6 +593,9 @@ class GymBattleWindow(object):
         mon["num"] = ev.get("num") or mon.get("num")
         mon["name"] = ev.get("newName") or ev.get("to") or mon.get("name")
         mon["mega"] = True
+        # 특성도 메가 폼의 것으로 바뀐다 (1.9.0). 안 고치면 칸에 옛 특성이 남는다.
+        if ev.get("abilityKr"):
+            mon["abilityKr"] = ev["abilityKr"]
         ui_mega.warm(self, mon["num"], T.skin(mon))
 
         def swap():

@@ -137,6 +137,13 @@ class Pet(object):
         # 창을 뚫는 방법은 OS 마다 다르다. 윈도우는 투명색을 지정하고,
         # 맥은 창 배경 자체를 투명하게 한다 - platform_os 가 고른다.
         bg = PLAT.transparent_window(self.win, hexkey)
+        # 설정의 투명도 (1.9.0). 그대로(100%)면 손대지 않는다 - 예전과 똑같은 창이다.
+        alpha = config.pet_alpha(getattr(overlay, "settings", None))
+        if alpha < 1.0:
+            try:
+                self.win.attributes("-alpha", alpha)
+            except Exception:                               # noqa: BLE001
+                pass
         self.view = PLAT.SpriteView(self.win, bg, self.fw, self.fh)
         self.label = self.view.widget      # 마우스는 이 위젯이 받는다
         # 동작마다 그림을 미리 다 만들지 않는다. 피카츄의 Attack 은
@@ -1054,6 +1061,25 @@ class Overlay(object):
         if anim is None:
             return None
         return (cls or Pet)(self, mon, anim)
+
+    # ---------------- 투명도 (1.9.0) ----------------
+    def alpha(self):
+        return config.pet_alpha(self.settings)
+
+    def paint_alpha(self, win):
+        try:
+            win.attributes("-alpha", self.alpha())
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    def apply_alpha(self):
+        """설정의 투명도를 지금 떠 있는 도트 전부에 입힌다.
+
+        내 포켓몬, 싸우는 상대(야생·투기장), 알까지다. 이름표와 체력바는
+        글자를 읽어야 해서 그대로 둔다.
+        """
+        for p in list(self.pets.values()) + list(self.extra) + list(self.eggs.values()):
+            self.paint_alpha(p.win)
 
     def clear(self):
         """화면의 도트를 전부 없앤다.

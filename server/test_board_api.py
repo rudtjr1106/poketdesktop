@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""게시판 API 검사. 서버를 띄워 놓고 돌린다 (1.8.0).
+"""게시판 API 검사. 서버를 띄워 놓고 돌린다 (1.8.0, 1.9.0 에서 좋아요·찾기·알림·마이페이지).
 
     python server/test_board_api.py http://127.0.0.1:8788
 
@@ -90,6 +90,43 @@ def main():
     cid = d["commentList"][0]["id"]
     st, d = call("POST", "/api/board/%d/comments" % pid, {"body": "답글", "parent": cid}, a)
     chk("답글", st == 200 and d["commentList"][0]["replies"][0]["body"] == "답글", (st, d))
+    # ---- 1.9.0: 좋아요, 찾기(한글 q), 알림, 마이페이지 - 경로와 상태 코드
+    from urllib.parse import quote
+    st, r = call("GET", "/api/board/notify", token=a)
+    # 글쓴이(a)는 방금 답글을 달며 그 글을 열어 봤다 - 본 알림은 없어진다
+    chk("알림 목록 (경로가 글 번호로 안 읽힌다). 본 알림은 없다", st == 200
+        and r["items"] == [] and r["unseen"] == 0, (st, r))
+    st, r = call("GET", "/api/board/notify", token=b)
+    chk("답글 알림은 댓글을 쓴 사람에게", st == 200
+        and any(x["postId"] == pid and x["kind"] == "reply" for x in r["items"])
+        and r["unseen"] >= 1, (st, r))
+    st, r = call("GET", "/api/me", token=b)
+    chk("/api/me 에 안 본 알림이 실린다", st == 200
+        and ((r.get("board") or {}).get("notify") or {}).get("count", 0) >= 1, r.get("board"))
+    st, r = call("POST", "/api/board/notify/seen", {}, b)
+    chk("알림을 다 본 것으로 (다 지운다)", st == 200 and r["unseen"] == 0 and r["items"] == [], (st, r))
+    # (좋아요는 글 전체를 돌려준다 = 글을 연 것이라, 알림 검사 뒤에 한다)
+    st, d = call("POST", "/api/board/%d/like" % pid, {}, b)
+    chk("좋아요", st == 200 and d["likes"] == 1 and d["liked"] is True, (st, d.get("likes")))
+    st, lst = call("GET", "/api/board?kind=all&page=1&q=" + quote("자유 %d" % tag), token=b)
+    chk("찾기: 한글로 찾는다", st == 200 and [x["id"] for x in lst["posts"]] == [pid]
+        and lst["pinned"] == [] and lst["posts"][0]["likes"] == 1, (st, lst.get("posts")))
+    st, r = call("POST", "/api/board", {"kind": "patch", "title": "가짜 패치노트", "body": "x"}, op)
+    chk("패치노트는 사람이 못 쓴다 (운영자도 403)", st == 403, (st, r))
+    st, r = call("GET", "/api/board?kind=patch", token=b)
+    chk("패치노트 칸", st == 200 and r["kind"] == "patch", (st, r.get("kind")))
+    st, r = call("GET", "/api/mypage", token=a)
+    chk("마이페이지", st == 200 and r["user"]["name"] == "게시%d" % tag
+        and r["board"]["postCount"] >= 1 and "seasons" in r and "gym" in r,
+        (st, list(r.keys()) if isinstance(r, dict) else r))
+    st, r = call("GET", "/api/mypage")
+    chk("마이페이지도 로그인 없이는 못 본다 (401)", st == 401, st)
+    st, r = call("GET", "/api/board/mine?what=posts&page=1", token=a)
+    chk("내 활동 한 쪽 (경로가 글 번호로 안 읽힌다)", st == 200 and r["what"] == "posts"
+        and any(x["id"] == pid for x in r["items"]) and r["size"] == 5, (st, r))
+    st, r = call("GET", "/api/board/mine?what=notify&page=9", token=a)
+    chk("없는 쪽을 달라면 마지막 쪽", st == 200 and r["what"] == "notify" and r["page"] == r["pages"], (st, r))
+
     st, r = call("DELETE", "/api/board/comments/%d" % cid, token=a)
     chk("남의 댓글은 못 지운다 (403)", st == 403, (st, r))
     st, d = call("DELETE", "/api/board/comments/%d" % cid, token=b)

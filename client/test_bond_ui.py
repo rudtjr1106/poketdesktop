@@ -16,6 +16,9 @@
   5. 다 채우면 '메가스톤 받기'. X/Y 는 고르게 하고, 고른 것으로 받는다.
   6. 목록을 빨리 넘겨도 늦게 온 옛 응답이 칸을 덮지 않는다.
   7. 레쿠쟈는 화룡점정 한 줄. 눌린 위젯이 없다.
+  8. (1.9.0) **메가진화하면 어떻게 되는지** — 메가 폼의 타입·특성(설명)·능력치
+     변화가 보인다. 능력치는 이 개체의 값으로 세고(엔진과 같은 계산), 체력은
+     그대로다. 폼이 둘이면 둘 다, 스톤이 없어도 보인다.
 """
 import os
 import sys
@@ -260,6 +263,64 @@ def main():
     t = panel_text(win)
     chk("화룡점정 한 줄", "화룡점정" in t, t)
     chk("  서버에 묻지 않는다", not any(c[0] == "bond" for c in api.calls[n:]), api.calls[n:])
+
+    print("\n=== 메가진화하면 (1.9.0) ===")
+    from poketdesktop import ui_bond
+    from common import battle as B
+    win.select(1)                                   # 리자몽: X 와 Y
+    wait(root, lambda: win.bond.card is not None)
+    settle(root)
+    pv = win.bond.previews
+    t = panel_text(win)
+    chk("폼이 둘이면 둘 다 보인다", [p["name"] for p in pv] == ["메가리자몽X", "메가리자몽Y"]
+        and "메가리자몽X" in t and "메가리자몽Y" in t, [p["name"] for p in pv])
+    chk("스톤이 없어도 보인다 (무엇을 얻는지 알아야 한다)", win.bond.preview.winfo_ismapped() == 1)
+    x = pv[0]
+    chk("타입이 바뀌는 폼 (X = 불꽃·드래곤)", x["types"] == ["FIRE", "DRAGON"] and x["typesChanged"]
+        and "드래곤" in t, x["types"])
+    chk("타입이 그대로인 폼 (Y)", pv[1]["typesChanged"] is False and "그대로" in t)
+    chk("특성과 그 설명", x["abilityKr"] == dex.ability_name("TOUGHCLAWS") and x["abilityKr"] in t
+        and x["abilityNote"] and x["abilityNote"][:8] in t.replace("\n", ""), (x["abilityKr"], x["abilityNote"]))
+    chk("특성이 바뀐다고 적는다", x["abilityChanged"] and "바뀜" in t)
+    me = mons[0]
+    f = B.Fighter(dex, me)
+    before = dict(f.base)
+    f.mega_evolve(dex.get("CHARIZARD_MEGA_X"))
+    rows = dict((k, (now, after, d)) for k, _l, now, after, d in x["rows"])
+    chk("능력치는 배틀 엔진이 메가진화할 때와 같은 값", all(
+        rows[k][0] == before[k] and rows[k][1] == f.base[k] for k in before), (rows, f.base))
+    chk("체력은 그대로", rows["hp"][2] == 0 and rows["hp"][0] == rows["hp"][1], rows["hp"])
+    chk("공격은 오른다 (종족값 84 -> 130)", rows["atk"][2] > 0 and ("+%d" % rows["atk"][2]) in t, rows["atk"])
+    chk("화면에 '지금 -> 메가' 와 변화가 적힌다", str(rows["atk"][0]) in t
+        and ("→  %d" % rows["atk"][1]) in t and "그대로" in t, t[-300:])
+    chk("변화 글: 오르면 +, 내리면 -, 같으면 '그대로'", (ui_bond.delta_text(46), ui_bond.delta_text(-10),
+                                         ui_bond.delta_text(0)) == ("+46", "-10", "그대로"))
+    chk("어떻게 메가진화하는지 한 줄", "리자몽나이트X" in t and "지니면" in t and "체력은 안 바뀝니다" in t)
+    bad = squeezed(win.bond.frame)
+    chk("  눌린 위젯이 없다", not bad, bad[:3])
+    win.select(2)                                   # 팬텀: 폼 하나
+    wait(root, lambda: win.bond.card is not None and win.bond.card.get("species") == "GENGAR")
+    settle(root)
+    chk("폼이 하나면 하나만", [p["name"] for p in win.bond.previews] == ["메가팬텀"],
+        [p["name"] for p in win.bond.previews])
+    chk("앞 포켓몬의 미리보기는 치운다", "메가리자몽X" not in panel_text(win))
+    win.select(4)                                   # 레쿠쟈: 스톤 없이 화룡점정
+    settle(root)
+    t = panel_text(win)
+    chk("레쿠쟈도 미리보기가 뜬다 (화룡점정으로)", [p["name"] for p in win.bond.previews] == ["메가레쿠쟈"]
+        and "화룡점정을 알고 있으면" in t, t[-200:])
+    win.select(3)
+    settle(root)
+    chk("메가가 없는 종에는 미리보기도 없다", not win.bond.frame.winfo_manager())
+    # 암수가 갈리는 종은 제 성별 것만
+    meow = [m for m in dex.megas if m["megaOf"] == "MEOWSTIC"]
+    if len(meow) >= 2:
+        got_f = ui_bond.forms_for(dex, {"species": "MEOWSTIC", "gender": "F"})
+        got_m = ui_bond.forms_for(dex, {"species": "MEOWSTIC", "gender": "M"})
+        chk("냐오닉스는 제 성별의 메가만 (엔진이 고르는 것과 같다)",
+            [g["internal"] for g in got_f] == ["MEOWSTIC_MEGA_F"]
+            and [g["internal"] for g in got_m] == ["MEOWSTIC_MEGA"],
+            ([g["internal"] for g in got_f], [g["internal"] for g in got_m]))
 
     print("\n=== 순서가 안 바뀐다 ===")
     for pid in (1, 5, 6, 1, 6, 2, 6):

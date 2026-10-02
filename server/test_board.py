@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""게시판 검사 (1.8.0).
+"""게시판 검사 (1.8.0, 1.9.0 에서 좋아요·찾기·알림·패치노트).
 
     python server/test_board.py
 
@@ -73,6 +73,169 @@ def status(fn, *a, **kw):
         return 200
     except HTTPException as e:
         return e.status_code
+
+
+def t_190(op, a, b):
+    """1.9.0: 좋아요, 찾기, 알림, 패치노트."""
+    c = mkuser("씨")
+    base = 100000
+
+    print("\n=== 좋아요 ===")
+    p1 = board.create(a, "free", "좋아요 받을 글", "토게키스 불새 배웠다", now=at(base))
+    p2 = board.create(b, "qna", "질문 있어요", "로토무 폼은 어떻게 바꾸나요?", now=at(base + 40))
+    chk("누르면 켜진다", board.like(b, p1) is True)
+    chk("다른 사람도 누른다", board.like(c, p1) is True)
+    d = board.detail(b, p1, now=at(base + 50))
+    chk("글에 수와 내가 눌렀는지가 실린다", d["likes"] == 2 and d["liked"] is True, (d["likes"], d["liked"]))
+    chk("안 누른 사람에게는 꺼져 있다", board.detail(a, p1)["liked"] is False)
+    row = [x for x in board.listing(a, "free", 1)["posts"] if x["id"] == p1][0]
+    chk("목록에도 수가 실린다", row["likes"] == 2 and row["liked"] is False, row)
+    chk("다시 누르면 취소된다", board.like(b, p1) is False and board.detail(b, p1)["likes"] == 1)
+    chk("내 글에도 누를 수 있다", board.like(a, p1) is True and board.detail(a, p1)["likes"] == 2)
+    chk("없는 글은 404", raises(LookupError, board.like, a, 999999))
+    r = board_routes.like(p2, ctx={"user": a})
+    chk("라우트는 글 전체를 돌려준다", r["id"] == p2 and r["likes"] == 1 and r["liked"] is True)
+
+    print("\n=== 찾기 ===")
+    lst = board.listing(a, "all", 1, q="토게키스")
+    chk("내용으로 찾는다", [x["id"] for x in lst["posts"]] == [p1] and lst["q"] == "토게키스", lst["posts"])
+    chk("찾을 때는 맨 위 공지를 안 붙인다", lst["pinned"] == [])
+    chk("제목으로 찾는다", [x["id"] for x in board.listing(a, "all", 1, q="질문")["posts"]] == [p2])
+    chk("쓴 사람으로 찾는다", p2 in [x["id"] for x in board.listing(a, "all", 1, q=b["username"])["posts"]])
+    chk("칸 안에서만 찾는다", board.listing(a, "free", 1, q="질문")["posts"] == []
+        and [x["id"] for x in board.listing(a, "qna", 1, q="질문")["posts"]] == [p2])
+    n1 = board.create(op, "notice", "점검 안내", "토게키스 관련 수정", now=at(base + 80))
+    chk("'전체' 에서 찾으면 공지도 나온다",
+        set(x["id"] for x in board.listing(a, "all", 1, q="토게키스")["posts"]) == {p1, n1})
+    chk("없는 말은 0개", board.listing(a, "all", 1, q="없는말없는말")["total"] == 0)
+    board.create(c, "free", "100% 확률", "under_score 글", now=at(base + 120))
+    chk("% 와 _ 는 글자 그대로 찾는다",
+        board.listing(a, "all", 1, q="%")["total"] == 1 and board.listing(a, "all", 1, q="r_s")["total"] == 1
+        and board.listing(a, "all", 1, q="rXs")["total"] == 0)
+    chk("지운 글은 안 나온다", (board.remove(op, n1), board.listing(a, "all", 1, q="점검")["total"])[1] == 0)
+    chk("빈 말이면 평소 목록", board.listing(a, "all", 1, q="   ")["q"] == "")
+    chk("라우트가 q 를 받는다", board_routes.listing("all", 1, "질문", ctx={"user": a})["total"] == 1)
+
+    print("\n=== 알림 ===")
+    db.run("DELETE FROM board_notify")
+    c1 = board.comment(b, p1, "댓글입니다", now=at(base + 200))
+    card = board.me_card(a["id"])
+    chk("내 글에 댓글이 달리면 알림이 온다",
+        card["notify"]["count"] == 1 and card["notify"]["items"][0]["kind"] == "comment"
+        and card["notify"]["items"][0]["actor"] == b["username"]
+        and card["notify"]["items"][0]["postId"] == p1, card["notify"])
+    chk("댓글 쓴 사람에게는 안 온다", board.me_card(b["id"])["notify"]["count"] == 0)
+    board.comment(a, p1, "내가 내 글에", now=at(base + 210))
+    chk("내가 내 글에 단 댓글은 알리지 않는다", board.me_card(a["id"])["notify"]["count"] == 1)
+    r1 = board.comment(c, p1, "답글입니다", parent=c1, now=at(base + 220))
+    nb = board.me_card(b["id"])["notify"]
+    chk("내 댓글에 답글이 달리면 알림이 온다",
+        nb["count"] == 1 and nb["items"][0]["kind"] == "reply" and nb["items"][0]["actor"] == c["username"], nb)
+    chk("글쓴이에게도 댓글 알림이 온다", board.me_card(a["id"])["notify"]["count"] == 2)
+    board.comment(b, p1, "답글의 답글", parent=r1, now=at(base + 230))
+    nc = board.me_card(c["id"])["notify"]
+    chk("답글에 단 답글은 그 답글을 쓴 사람에게 간다", nc["count"] == 1 and nc["items"][0]["kind"] == "reply", nc)
+    board.comment(c, p1, "글쓴이 댓글에 답글", parent=db.q1(
+        "SELECT id FROM board_comment WHERE body='내가 내 글에'")["id"], now=at(base + 240))
+    na = board.me_card(a["id"])["notify"]
+    chk("내 글의 내 댓글에 답글이 달리면 한 줄만 온다 (답글)",
+        na["count"] == 4 and na["items"][0]["kind"] == "reply", na)
+    chk("글 제목과 댓글 앞부분이 실린다",
+        na["items"][0]["title"] == "좋아요 받을 글" and na["items"][0]["snippet"] == "글쓴이 댓글에 답글", na["items"][0])
+    chk("목록 API", board.notifications(a["id"])["unseen"] == 4
+        and len(board.notifications(a["id"])["items"]) == 4)
+    board.detail(a, p1)
+    chk("그 글을 열면 그 알림은 없어진다 (본 알림은 남기지 않는다)",
+        board.me_card(a["id"])["notify"]["count"] == 0
+        and board.notifications(a["id"])["items"] == []
+        and db.q1("SELECT COUNT(*) c FROM board_notify WHERE user_id=?", (a["id"],))["c"] == 0)
+    chk("남의 알림은 그대로다", board.me_card(b["id"])["notify"]["count"] == 1)
+    board.notify_seen(b["id"])
+    chk("다 본 것으로 할 수 있다 ('모두 읽음' = 다 지운다)", board.me_card(b["id"])["notify"]["count"] == 0
+        and board.notifications(b["id"])["items"] == [])
+    c9 = board.comment(b, p1, "지울 댓글", now=at(base + 300))
+    chk("댓글 알림이 왔다", board.me_card(a["id"])["notify"]["count"] == 1)
+    board.remove_comment(b, c9)
+    chk("댓글을 지우면 알림도 사라진다", board.me_card(a["id"])["notify"]["count"] == 0)
+    r = board_routes.notifications(ctx={"user": a})
+    chk("알림 라우트", r["unseen"] == 0 and r["items"] == [])
+    chk("알림 지우기 라우트", board_routes.notify_seen(ctx={"user": a})["unseen"] == 0)
+
+    print("\n=== 내 활동 ===")
+    m = board.mine(a["id"])
+    chk("수: 내 글·댓글·받은 좋아요·알림", m["postCount"] >= 1 and m["commentCount"] >= 1
+        and m["likes"] == 2 and m["notifyCount"] == 0 and m["unseen"] == 0, m)
+    pg = board.mine_page(a["id"], "posts", 1, now=at(base + 400))
+    chk("내 글 한 쪽", pg["what"] == "posts" and p1 in [x["id"] for x in pg["items"]]
+        and pg["total"] == m["postCount"] and pg["size"] == board.MINE_PAGE, pg)
+    row = [x for x in pg["items"] if x["id"] == p1][0]
+    chk("  글마다 좋아요·댓글 수와 누르면 갈 글 번호", row["likes"] == 2 and row["comments"] >= 1
+        and row["postId"] == p1, row)
+    pg = board.mine_page(a["id"], "comments", 1, now=at(base + 400))
+    chk("내 댓글 한 쪽 (어느 글에 달았는지와 함께)", pg["total"] == m["commentCount"]
+        and pg["items"][0]["title"] == "좋아요 받을 글" and pg["items"][0]["postId"] == p1, pg["items"][:1])
+    pg = board.mine_page(a["id"], "notify", 1, now=at(base + 400))
+    chk("알림 한 쪽 - 본 알림은 없다", pg["total"] == 0 and pg["items"] == [] and pg["pages"] == 1, pg)
+    chk("모르는 종류는 내 글로", board.mine_page(a["id"], "zzz", 1)["what"] == "posts")
+
+    # 활동이 쌓여도 한 쪽은 다섯 개다 (마이페이지가 길어지지 않는다)
+    d = mkuser("다작")
+    made = [board.create(d, "free", "글 %02d" % i, "내용", now=at(base + 1000 + i * 40)) for i in range(12)]
+    for i in range(7):
+        board.comment(a, made[0], "남이 단 댓글 %d" % i, now=at(base + 2000 + i * 10))
+    p1_ = board.mine_page(d["id"], "posts", 1)
+    p3_ = board.mine_page(d["id"], "posts", 3)
+    chk("한 쪽은 다섯 개, 12개면 세 쪽", len(p1_["items"]) == 5 and p1_["pages"] == 3 and p1_["total"] == 12
+        and [x["title"] for x in p1_["items"]][:2] == ["글 11", "글 10"], p1_)
+    chk("마지막 쪽에는 남은 것만", [x["title"] for x in p3_["items"]] == ["글 01", "글 00"], p3_["items"])
+    chk("없는 쪽을 달라면 마지막 쪽", board.mine_page(d["id"], "posts", 99)["page"] == 3
+        and board.mine_page(d["id"], "posts", 0)["page"] == 1)
+    n1 = board.mine_page(d["id"], "notify", 1)
+    n2 = board.mine_page(d["id"], "notify", 2)
+    chk("알림도 쪽으로: 7개면 두 쪽, 최근 것부터", n1["pages"] == 2 and len(n1["items"]) == 5
+        and len(n2["items"]) == 2 and n1["items"][0]["snippet"] == "남이 단 댓글 6"
+        and n1["counts"]["unseen"] == 7, (n1["pages"], n1["items"][:1]))
+    board.detail(d, made[0])
+    n1 = board.mine_page(d["id"], "notify", 1)
+    chk("그 글을 열면 알림 쪽에서도 사라진다", n1["total"] == 0 and n1["items"] == []
+        and n1["counts"]["unseen"] == 0, n1)
+    chk("라우트: /api/board/mine", board_routes.mine("COMMENTS", 1, ctx={"user": a})["what"] == "comments")
+
+    print("\n=== 패치노트 ===")
+    from common import patchnotes
+    made = board.ensure_patch_posts(now=at(base + 500))
+    chk("버전마다 글 하나", len(made) == len(patchnotes.NOTES) and made[0] == patchnotes.NOTES[-1]["version"]
+        and made[-1] == patchnotes.NOTES[0]["version"], (len(made), made[:2], made[-2:]))
+    chk("두 번 부르면 아무것도 안 올린다", board.ensure_patch_posts(now=at(base + 600)) == [])
+    lst = board.listing(a, "patch", 1)
+    top = lst["posts"][0]
+    chk("패치노트 칸에 최신 버전이 맨 위", lst["total"] == len(patchnotes.NOTES)
+        and top["title"] == "v%s 업데이트" % patchnotes.NOTES[0]["version"]
+        and top["kindKr"] == "패치노트", top)
+    chk("운영자 이름으로 올라간다", top["author"] == op["username"] and top["authorAdmin"] is True)
+    d = board.detail(a, top["id"])
+    chk("내용은 요약과 항목들", patchnotes.NOTES[0]["headline"] in d["body"] and "■ " in d["body"])
+    old = lst["posts"][1]
+    ver = old["title"].split()[0].lstrip("v")
+    chk("옛 버전은 나온 날짜로", old["createdAt"] == patchnotes.RELEASED[ver], (ver, old["createdAt"]))
+    chk("'전체' 에는 안 흐른다", all(x["kind"] != "patch" for x in board.listing(a, "all", 1)["posts"]))
+    chk("사람은 패치노트를 못 쓴다 (운영자도)", raises(PermissionError, board.create, op, "patch", "t", "b"))
+    chk("고치거나 지울 수 없다", raises(PermissionError, board.edit, op, top["id"], "t", "b")
+        and raises(PermissionError, board.remove, op, top["id"]) and d["canEdit"] is False
+        and board.detail(op, top["id"])["canDelete"] is False)
+    board.comment(b, top["id"], "잘 봤습니다", now=at(base + 700))
+    board.like(b, top["id"])
+    d = board.detail(a, top["id"])
+    chk("댓글과 좋아요는 달 수 있다", d["comments"] == 1 and d["likes"] == 1)
+    chk("패치노트의 댓글은 운영자에게 알리지 않는다", board.me_card(op["id"])["notify"]["count"] == 0)
+    card = board.me_card(a["id"])
+    chk("/api/me 에 최신 패치노트 번호", card["patch"] == top["id"] and card["notice"] > 0, card)
+    chk("내 글 목록에 패치노트는 안 섞인다",
+        all(x["kind"] != "patch" for x in board.mine_page(op["id"], "posts", 1)["items"])
+        and board.mine(op["id"])["postCount"] == board.mine_page(op["id"], "posts", 1)["total"])
+    chk("upto 로 끊어 올릴 수 있다 (새 판이 나오면 그 글만 생긴다)",
+        (db.run("DELETE FROM board_post WHERE ref=?", ("patch:" + patchnotes.NOTES[0]["version"],)),
+         board.ensure_patch_posts(now=at(base + 800)))[1] == [patchnotes.NOTES[0]["version"]])
 
 
 def main():
@@ -161,7 +324,8 @@ def main():
     chk("공지 글쓴이에 운영자 표시", all(x["authorAdmin"] for x in ln["posts"]))
     chk("운영자만 공지를 쓸 수 있다고 알려 준다",
         board.listing(op)["canNotice"] is True and lst["canNotice"] is False)
-    chk("글자 수 한도를 같이 준다", lst["limits"] == {"title": 40, "body": 2000, "comment": 300})
+    chk("글자 수 한도를 같이 준다", lst["limits"] == {"title": 40, "body": 2000, "comment": 300,
+                                                 "search": 30}, lst["limits"])
 
     print("\n=== 댓글과 답글 ===")
     c1 = board.comment(b, f1, "첫 댓글", now=at(3000))
@@ -211,7 +375,7 @@ def main():
 
     print("\n=== 새 공지 알림 ===")
     latest = max(r["id"] for r in db.q("SELECT id FROM board_post WHERE kind='notice' AND deleted=0"))
-    chk("/api/me 용: 가장 최근 공지 번호", board.me_card() == {"notice": latest}, board.me_card())
+    chk("/api/me 용: 가장 최근 공지 번호", board.me_card()["notice"] == latest, board.me_card())
 
     print("\n=== 라우트 ===")
     r = board_routes.create(board_routes.PostIn(kind="FREE", title="라우트 글", body="내용"), ctx={"user": fake})
@@ -220,6 +384,8 @@ def main():
     r = board_routes.comment(r["id"], board_routes.CommentIn(body="댓글"), ctx={"user": fake})
     chk("댓글을 달면 글 전체를 돌려준다", len(r["commentList"]) == 1 and r["comments"] == 1)
     chk("목록 라우트", board_routes.listing("all", 1, ctx={"user": a})["total"] >= 1)
+
+    t_190(op, a, b)
 
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0

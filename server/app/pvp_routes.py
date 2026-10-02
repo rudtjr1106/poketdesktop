@@ -117,7 +117,10 @@ def ranking(limit: int = 50, ctx=Depends(deps.current)):
     me = pvp.summary(uid)
     d = season.deco(uid)
     me.update({"title": d.get("title"), "frame": d.get("frame"),
-               "frameColor": d.get("frameColor")})
+               "frameColor": d.get("frameColor"),
+               # 오늘 랜덤 배틀을 몇 판 더 걸 수 있나 (1.9.0 - 랭킹 탭 머리줄에 적는다).
+               # 하루 상한은 랜덤 배틀에만 걸린다.
+               "fight": pvp.fight_status(uid)})
     return {"ranking": pvp.ranking(max(1, min(100, limit)), uid),
             "me": me, "season": pvp.SEASON,
             "placement": pvp.PLACEMENT,

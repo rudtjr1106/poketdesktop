@@ -18,6 +18,10 @@
   7. 내 글만 수정·삭제 단추가 보인다. 서버가 거절하면 그 말을 적는다.
   8. 목록을 보면 '새 공지' 표시를 끈다.
   9. 긴 글(2000자)도 굴려서 보고, 눌린 위젯이 없다.
+ 10. (1.9.0) 좋아요: 목록에 수가 보이고, 글에서 누르면 켜지고 다시 누르면 꺼진다.
+     누른 뒤에 글을 다시 그리지 않는다 (읽던 자리가 안 튄다).
+ 11. (1.9.0) 찾기: 말을 넣으면 그 말이 든 글만. '전체 보기' 로 돌아온다.
+ 12. (1.9.0) 패치노트 칸: 서버가 올린 글. 본문의 주소를 누를 수 있고, 수정·삭제는 없다.
 """
 import os
 import sys
@@ -64,6 +68,7 @@ class FakeApi(object):
         self.calls = []
         self.fail = None
         self._id = 0
+        self.likes = {}          # 글 번호 -> 누른 사람들 (1.9.0)
 
     def _next(self):
         self._id += 1
@@ -88,34 +93,54 @@ class FakeApi(object):
 
     def _row(self, p):
         admin = self.me == ADMIN
+        patch = p["kind"] == "patch"
+        who = self.likes.get(p["id"], set())
         out = {"id": p["id"], "kind": p["kind"],
-               "kindKr": {"notice": "공지", "free": "자유", "qna": "Q&A"}[p["kind"]],
+               "kindKr": {"notice": "공지", "free": "자유", "qna": "Q&A",
+                          "patch": "패치노트"}[p["kind"]],
                "title": p["title"], "agoSec": p["ago"], "edited": p["edited"],
                "comments": len([c for c in self.comments
                                 if c["post"] == p["id"] and not c["deleted"]]),
+               "likes": len(who), "liked": self.uid in who,
                "mine": p["uid"] == self.uid,
-               "canDelete": p["uid"] == self.uid or admin,
-               "canEdit": p["uid"] == self.uid}
+               "canDelete": (p["uid"] == self.uid or admin) and not patch,
+               "canEdit": p["uid"] == self.uid and not patch}
         out.update(self._who(p))
         return out
 
-    def board(self, kind="all", page=1):
-        self.calls.append(("list", kind, page))
-        # 서버와 같다: '전체' 는 공지를 뺀 나머지(자유·Q&A), 그 밖에는 그 종류만
-        rows = sorted([p for p in self.posts
-                       if (p["kind"] != "notice" if kind == "all" else p["kind"] == kind)],
-                      key=lambda p: -p["id"])
+    def board(self, kind="all", page=1, q=""):
+        self.calls.append(("list", kind, page) + ((q,) if q else ()))
+        # 서버와 같다: '전체' 는 자유·Q&A 만 흐른다 (공지는 맨 위, 패치노트는 자기 칸).
+        # 찾을 때의 '전체' 는 공지·패치노트까지 다 뒤진다.
+        if kind == "all":
+            rows = [p for p in self.posts if q or p["kind"] in ("free", "qna")]
+        else:
+            rows = [p for p in self.posts if p["kind"] == kind]
+        if q:
+            rows = [p for p in rows if q in p["title"] or q in p["body"] or q in p["author"]]
+        rows = sorted(rows, key=lambda p: -p["id"])
         pages = max(1, (len(rows) + self.PAGE - 1) // self.PAGE)
         page = max(1, min(pages, page))
         pinned = []
-        if kind == "all":
+        if kind == "all" and not q:
             pinned = sorted([p for p in self.posts if p["kind"] == "notice"],
                             key=lambda p: -p["id"])[:3]
-        return {"kind": kind, "page": page, "pages": pages, "total": len(rows),
+        return {"kind": kind, "page": page, "pages": pages, "total": len(rows), "q": q,
                 "pinned": [self._row(p) for p in pinned],
                 "posts": [self._row(p) for p in rows[(page - 1) * self.PAGE:page * self.PAGE]],
                 "canNotice": self.me == ADMIN,
-                "limits": {"title": 40, "body": 2000, "comment": 300}}
+                "limits": {"title": 40, "body": 2000, "comment": 300, "search": 30}}
+
+    def board_like(self, pid):
+        self.calls.append(("like", pid))
+        if self.fail:
+            raise ApiError(self.fail, 403)
+        who = self.likes.setdefault(pid, set())
+        if self.uid in who:
+            who.discard(self.uid)
+        else:
+            who.add(self.uid)
+        return self.board_post(pid)
 
     def board_post(self, pid):
         self.calls.append(("post", pid))
@@ -192,6 +217,125 @@ class FakeApp(object):
 
     def mark_notice_seen(self, n):
         self.seen.append(n)
+
+    def mark_patch_seen(self, n):
+        self.patch_seen = getattr(self, "patch_seen", []) + [n]
+
+
+def t_190(root, top, w, api, app, new_id):
+    """1.9.0: 좋아요, 찾기, 패치노트."""
+    print("\n=== 좋아요 (1.9.0) ===")
+    api.likes[new_id] = {901, 902}
+    w.data = None
+    w.show_kind("free")
+    wait(root, lambda: w.view == "list" and w.data is not None and w.data.get("kind") == "free")
+    settle(root)
+    row = [p for p in w.data["posts"] if p["id"] == new_id][0]
+    chk("목록의 글에 좋아요 수가 실려 온다", row["likes"] == 2 and row["liked"] is False, row)
+    thumbs = [c for c in all_widgets(w.list) if isinstance(c, tk.Canvas)]
+    chk("목록에 엄지척 그림과 수가 보인다", len(thumbs) >= 1 and "2" in texts(w.list), texts(w.list)[:8])
+    w.open_post(new_id)
+    wait(root, lambda: w.view == "post" and w.post is not None and w.post["id"] == new_id)
+    settle(root)
+    chk("글에 좋아요 단추가 있다", "좋아요 2" in texts(top), [t for t in texts(top) if "좋아요" in t])
+    w.cv.yview_moveto(0.6)
+    settle(root, 0.1)
+    before = w.cv.yview()
+    gen = w._gen
+    w.toggle_like()
+    wait(root, lambda: ("like", new_id) in api.calls and w.post.get("liked") is True)
+    settle(root, 0.2)
+    chk("누르면 켜지고 수가 는다", w.post["likes"] == 3 and w.like_lbl.cget("text") == "좋아요 3"
+        and w.like_lbl.cget("fg") == ui_board.LIKE_ON, (w.post["likes"], w.like_lbl.cget("text")))
+    chk("글을 다시 그리지 않는다 (읽던 자리 그대로)", w._gen == gen and w.cv.yview() == before,
+        (gen, w._gen, before, w.cv.yview()))
+    chk("아래 줄에 알려 준다", "좋아요를 눌렀습니다" in w.status._label.cget("text"))
+    w.toggle_like()
+    wait(root, lambda: api.calls.count(("like", new_id)) == 2 and w.post.get("liked") is False)
+    settle(root, 0.2)
+    chk("다시 누르면 꺼진다", w.post["likes"] == 2 and w.like_lbl.cget("text") == "좋아요 2"
+        and "취소" in w.status._label.cget("text"), w.like_lbl.cget("text"))
+    api.fail = "잠시 뒤에 다시 해주세요."
+    w.toggle_like()
+    wait(root, lambda: api.calls.count(("like", new_id)) == 3 and not w.like_busy)
+    settle(root, 0.2)
+    chk("서버가 거절하면 그 말을 적고 수는 그대로", "잠시 뒤에" in w.status._label.cget("text")
+        and w.like_lbl.cget("text") == "좋아요 2", w.status._label.cget("text"))
+    api.fail = None
+    bad = squeezed(top)
+    chk("  눌린 위젯 없음", not bad, bad[:3])
+
+    print("\n=== 찾기 (1.9.0) ===")
+    w.show_kind("all")
+    wait(root, lambda: w.view == "list" and w.data is not None and w.data.get("kind") == "all")
+    settle(root)
+    chk("찾기 칸과 단추가 있다", "찾기" in texts(top) and w.q_entry.winfo_ismapped() == 1)
+    chk("빈 칸에는 안내 글이 보인다", w.q_hint.winfo_ismapped() == 1)
+    chk("평소에는 '전체 보기' 가 없다", "전체 보기" not in texts(top) or not w.clear_btn.holder.winfo_ismapped())
+    w.q_var.set("  메가진화  ")
+    w.search()
+    wait(root, lambda: w.data is not None and w.data.get("q") == "메가진화")
+    settle(root)
+    chk("다듬은 말로 서버에 묻는다", ("list", "all", 1, "메가진화") in api.calls,
+        [c for c in api.calls if c[0] == "list"][-2:])
+    found = [x for x in api.posts if "메가진화" in x["title"] + x["body"] + x["author"]]
+    chk("그 말이 든 글만 나온다", 1 <= w.data["total"] == len(found) < len(api.posts)
+        and "메가진화 어떻게 해요?" in [p["title"] for p in w.data["posts"]]
+        and set(p["id"] for p in w.data["posts"]) == set(x["id"] for x in found),
+        [p["title"] for p in w.data["posts"]])
+    chk("머리줄이 찾은 수를 적는다", w.count.cget("text") == "찾은 글 %d개" % len(found),
+        w.count.cget("text"))
+    chk("'전체 보기' 가 보인다", w.clear_btn.holder.winfo_ismapped() == 1)
+    bad = squeezed(top)
+    chk("  눌린 위젯 없음", not bad, bad[:3])
+    w.q_var.set("없는말없는말")
+    w.search()
+    wait(root, lambda: w.data is not None and w.data.get("q") == "없는말없는말")
+    settle(root)
+    chk("없으면 없다고 적는다", any("들어간 글이 없습니다" in t for t in texts(top)), texts(top)[-6:])
+    w.clear_search()
+    wait(root, lambda: w.data is not None and w.data.get("q") == "" and w.data["total"] > 1)
+    settle(root)
+    chk("'전체 보기' 로 평소 목록에 돌아온다", w.q == "" and w.q_var.get() == ""
+        and not w.clear_btn.holder.winfo_ismapped() and w.count.cget("text").startswith("글 "),
+        (w.q, w.count.cget("text")))
+
+    print("\n=== 패치노트 (1.9.0) ===")
+    pid = api.seed_post("patch", ADMIN, 1, "v1.9.0 업데이트",
+                        "마이페이지가 생겼습니다\n\n■ 받는 곳\nhttps://example.com/releases", ago=30)
+    w.pick_kind("patch")
+    wait(root, lambda: w.data is not None and w.data.get("kind") == "patch")
+    settle(root)
+    chk("패치노트 칸에 그 글이 있다", [p["id"] for p in w.data["posts"]] == [pid]
+        and "v1.9.0 업데이트" in texts(top) and "패치노트" in texts(top), w.data["posts"])
+    chk("열어 보면 '새 패치노트' 표시를 끈다", getattr(app, "patch_seen", []) == [pid],
+        getattr(app, "patch_seen", None))
+    w.pick_kind("all")
+    wait(root, lambda: w.data is not None and w.data.get("kind") == "all")
+    chk("'전체' 에는 안 섞인다", pid not in [p["id"] for p in w.data["posts"]])
+    w.open_post(pid)
+    wait(root, lambda: w.view == "post" and w.post is not None and w.post["id"] == pid)
+    settle(root)
+    links = [c for c in all_widgets(top) if isinstance(c, tk.Label)
+             and str(c.cget("text")).startswith("https://")]
+    chk("패치노트의 주소는 누를 수 있다", len(links) == 1 and links[0].cget("cursor") == "hand2",
+        [c.cget("text") for c in links])
+    chk("수정·삭제 단추가 없다 (운영자 글이어도)", "수정" not in texts(top), texts(top)[:10])
+    chk("좋아요와 댓글 칸은 있다", "좋아요 0" in texts(top) and "댓글 등록" in texts(top))
+    w.show_kind("patch")
+    wait(root, lambda: w.view == "list" and w.data is not None and w.data.get("kind") == "patch")
+    chk("밖에서 그 칸을 열 수 있다 (트레이의 '패치노트 보기')", w.kind == "patch" and w.seg.current == "patch")
+    w.show_kind("all")
+    wait(root, lambda: w.view == "list" and w.data is not None and w.data.get("kind") == "all")
+    settle(root)
+
+
+def all_widgets(w):
+    out = []
+    for c in w.winfo_children():
+        out.append(c)
+        out.extend(all_widgets(c))
+    return out
 
 
 def wait(root, cond, sec=6.0):
@@ -402,8 +546,8 @@ def main():
     w.show_list()
     wait(root, lambda: w.view == "list")
     settle(root, 0.2)
-    chk("목록 위에 Q&A 가 있다", list(w.seg.cells) == ["all", "notice", "free", "qna"],
-        list(w.seg.cells))
+    chk("목록 위에 Q&A 가 있다 (1.9.0 부터 패치노트도)",
+        list(w.seg.cells) == ["all", "notice", "free", "qna", "patch"], list(w.seg.cells))
     w.pick_kind("qna")
     wait(root, lambda: w.data is not None and w.data.get("kind") == "qna")
     settle(root)
@@ -442,6 +586,7 @@ def main():
         and any(p["kind"] == "free" for p in w.data["posts"]), [p["kind"] for p in w.data["posts"]][:6])
     bad = squeezed(top)
     chk("  눌린 위젯 없음", not bad, bad[:3])
+    t_190(root, top, w, api, app, new_id)
     # 아래 절은 방금 올린 자유 글을 열어 둔 데서 이어진다
     w.open_post(new_id)
     wait(root, lambda: w.view == "post" and w.post is not None and w.post["id"] == new_id)

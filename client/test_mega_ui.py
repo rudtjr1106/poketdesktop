@@ -136,6 +136,13 @@ def gym_part(root, dex, gyms, kmap):
     me = b.shown.get("me") or {}
     chk("도트 번호가 메가 폼", me.get("num") == MEGA_X, me.get("num"))
     chk("이름이 메가리자몽X", me.get("name") == "메가리자몽X", me.get("name"))
+    # 1.9.0: 메가진화하면 특성도 바뀐다 (맹화 -> 단단한발톱). 제보: 가디안이
+    # 트레이스로 베낀 특성이 메가진화 뒤에도 칸에 그대로 남아 있었다.
+    claws = dex.ability_name("TOUGHCLAWS")
+    chk("메가 사건에 새 특성이 실려 온다", seen[0].get("abilityKr") == claws, seen[0].get("abilityKr"))
+    chk("특성 칸이 메가 폼의 특성으로 바뀐다", me.get("abilityKr") == claws
+        and b.cv.itemcget(b.box["me"]["ability"], "text") == claws,
+        (me.get("abilityKr"), b.cv.itemcget(b.box["me"]["ability"], "text")))
     chk("한 번 쓰면 단추가 다시 안 뜬다", not b.mega.shown and b.view.get("megaUsed"),
         (b.mega.shown, b.view.get("megaUsed")))
     b.close()

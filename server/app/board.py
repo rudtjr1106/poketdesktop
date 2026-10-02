@@ -1,13 +1,35 @@
 # -*- coding: utf-8 -*-
 """게시판 — 공지와 자유 글, 댓글과 대댓글 (1.8.0).
 
-## 글 두 가지
+1.9.0 에서 넷이 붙었다: **패치노트**(서버가 올린다), **좋아요**, **검색**,
+**알림**(내 글에 댓글·내 댓글에 답글). 아래 각 절에 적었다.
+
+## 글의 종류
 
   · **공지(notice)** — 운영자만 쓴다. 운영자는 닉네임으로 정한다
     (config.BOARD_ADMINS, 기본 '나여조경석'). 닉네임은 계정마다 하나뿐이라
     남이 같은 이름을 쓸 수 없다. 비슷하게 생긴 이름으로 흉내 내는 것은
     화면의 '운영자' 표시로 가린다 - 그 표시는 여기서 붙인다.
-  · **자유(free)** — 누구나 쓴다.
+  · **자유(free)** · **Q&A(qna)** — 누구나 쓴다.
+  · **패치노트(patch)** — 사람이 쓰지 않는다. 서버가 뜰 때 common/patchnotes
+    의 버전마다 글 하나씩을 올린다 (ensure_patch_posts). 같은 버전을 두 번
+    올리지 않으려고 ref('patch:1.9.0')를 본다. 댓글과 좋아요는 달 수 있다.
+
+## 좋아요
+
+글마다 한 사람이 한 번. 다시 누르면 취소된다 (board_like). 댓글에는 없다.
+
+## 검색
+
+제목·내용·쓴 사람 이름에 그 말이 들어 있는 글. '전체' 에서 찾으면 공지와
+패치노트까지 같이 찾는다 (평소의 '전체' 는 자유와 Q&A 만 흐른다).
+
+## 알림
+
+누가 **내 글에 댓글**을 달거나 **내 댓글에 답글**을 달면 내 앞으로 한 줄이
+생긴다 (board_notify). /api/me 에 실려 가고, 화면이 운영체제 알림으로
+알린다. **그 글을 열어 보면 그 알림은 없어진다** - 본 알림을 쌓아 두지 않는다
+(목록에는 아직 안 본 것만 있다). 내가 나에게 단 것은 없다.
 
 ## 댓글
 
@@ -32,12 +54,19 @@
 """
 import datetime
 
+from common import patchnotes
+
 from . import config, db, season
 
 # 공지는 운영자만 쓴다. 자유와 Q&A(1.8.1)는 누구나 쓴다 - 질문이 자유 글에 섞여
-# 묻히지 않게 따로 둔 칸일 뿐, 규칙은 자유 글과 같다.
-KINDS = ("notice", "free", "qna")
-KIND_KR = {"notice": "공지", "free": "자유", "qna": "Q&A"}
+# 묻히지 않게 따로 둔 칸일 뿐, 규칙은 자유 글과 같다. 패치노트(1.9.0)는 서버가 올린다.
+KINDS = ("notice", "free", "qna", "patch")
+KIND_KR = {"notice": "공지", "free": "자유", "qna": "Q&A", "patch": "패치노트"}
+# '전체' 에 흐르는 글. 공지는 맨 위에 따로 붙고, 패치노트는 자기 칸에만 있다.
+FLOW = ("free", "qna")
+SEARCH_MAX = 30               # 찾는 말 길이
+NOTIFY_KEEP = 30              # 알림 목록에 보이는 수
+NOTIFY_CARD = 5               # /api/me 에 싣는 안 본 알림 수
 TITLE_MAX = 40
 BODY_MAX = 2000
 COMMENT_MAX = 300
@@ -148,16 +177,34 @@ def _who(row, authors):
             "authorAdmin": bool(a.get("admin"))}
 
 
-def _post_row(r, authors, uid, admin, now, counts):
+def _post_row(r, authors, uid, admin, now, counts, likes=None):
+    n_like, mine_like = likes or ({}, set())
+    patch = r["kind"] == "patch"
     out = {"id": r["id"], "kind": r["kind"], "kindKr": KIND_KR.get(r["kind"], r["kind"]),
            "title": r["title"], "createdAt": r["created_at"],
            "agoSec": _ago(r["created_at"], now), "edited": bool(r["updated_at"]),
            "comments": counts.get(r["id"], 0),
+           "likes": n_like.get(r["id"], 0), "liked": r["id"] in mine_like,
            "mine": r["user_id"] == uid,
-           "canDelete": r["user_id"] == uid or admin,
-           "canEdit": r["user_id"] == uid}
+           # 패치노트는 서버가 올린 글이다. 고치면 다음 판과 모양이 갈린다.
+           "canDelete": (r["user_id"] == uid or admin) and not patch,
+           "canEdit": r["user_id"] == uid and not patch}
     out.update(_who(r, authors))
     return out
+
+
+def _likes(ids, uid):
+    """({글: 좋아요 수}, 내가 누른 글들)."""
+    if not ids:
+        return {}, set()
+    marks = ",".join("?" * len(ids))
+    n = dict((r["post_id"], r["c"]) for r in db.q(
+        "SELECT post_id, COUNT(*) c FROM board_like WHERE post_id IN (%s)"
+        " GROUP BY post_id" % marks, tuple(ids)))
+    mine = set(r["post_id"] for r in db.q(
+        "SELECT post_id FROM board_like WHERE user_id=? AND post_id IN (%s)" % marks,
+        (uid,) + tuple(ids)))
+    return n, mine
 
 
 def _counts(ids):
@@ -169,18 +216,36 @@ def _counts(ids):
         " GROUP BY post_id" % marks, tuple(ids)))
 
 
-def listing(user, kind="all", page=1, now=None):
-    """목록 한 쪽. '전체' 는 최근 공지 몇 개를 맨 위에 붙이고 나머지 글(자유·Q&A)을 넘긴다."""
+def _like_arg(q):
+    """LIKE 에 넣을 말. % 와 _ 는 글자 그대로 찾는다."""
+    q = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return "%" + q + "%"
+
+
+def listing(user, kind="all", page=1, now=None, q=None):
+    """목록 한 쪽. '전체' 는 최근 공지 몇 개를 맨 위에 붙이고 나머지 글(자유·Q&A)을 넘긴다.
+
+    q 가 있으면 **찾기**다: 제목·내용·쓴 사람에 그 말이 든 글만. 이때는 맨 위에
+    붙는 공지가 없고, '전체' 는 공지·패치노트까지 다 뒤진다.
+    """
     uid = user["id"]
     admin = is_admin(user)
     now = now or _now()
     kind = kind if kind in KINDS else "all"
     page = max(1, int(page or 1))
-    if kind == "all":
+    q = " ".join((q or "").split())[:SEARCH_MAX]
+    if kind == "all" and q:
+        where, args = "deleted=0", ()
+    elif kind == "all":
         # 공지는 맨 위에 따로 붙으므로 뺀다. 자유와 Q&A 가 함께 흐른다.
-        where, args = "deleted=0 AND kind<>'notice'", ()
+        where = "deleted=0 AND kind IN (%s)" % ",".join("?" * len(FLOW))
+        args = tuple(FLOW)
     else:
         where, args = "deleted=0 AND kind=?", (kind,)
+    if q:
+        where += " AND (title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\'" \
+                 " OR author LIKE ? ESCAPE '\\')"
+        args = args + (_like_arg(q),) * 3
     total = db.q1("SELECT COUNT(*) c FROM board_post WHERE " + where, args)["c"]
     pages = max(1, (total + PAGE - 1) // PAGE)
     page = min(page, pages)
@@ -188,17 +253,19 @@ def listing(user, kind="all", page=1, now=None):
                      + " ORDER BY id DESC LIMIT ? OFFSET ?",
                      args + (PAGE, (page - 1) * PAGE)))
     pinned = []
-    if kind == "all":
+    if kind == "all" and not q:
         pinned = list(db.q("SELECT * FROM board_post WHERE deleted=0 AND kind='notice'"
                            " ORDER BY id DESC LIMIT ?", (PINNED,)))
     both = pinned + rows
     authors = _authors([r["user_id"] for r in both])
     counts = _counts([r["id"] for r in both])
-    return {"kind": kind, "page": page, "pages": pages, "total": total,
-            "pinned": [_post_row(r, authors, uid, admin, now, counts) for r in pinned],
-            "posts": [_post_row(r, authors, uid, admin, now, counts) for r in rows],
+    likes = _likes([r["id"] for r in both], uid)
+    return {"kind": kind, "page": page, "pages": pages, "total": total, "q": q,
+            "pinned": [_post_row(r, authors, uid, admin, now, counts, likes) for r in pinned],
+            "posts": [_post_row(r, authors, uid, admin, now, counts, likes) for r in rows],
             "canNotice": admin,
-            "limits": {"title": TITLE_MAX, "body": BODY_MAX, "comment": COMMENT_MAX}}
+            "limits": {"title": TITLE_MAX, "body": BODY_MAX, "comment": COMMENT_MAX,
+                       "search": SEARCH_MAX}}
 
 
 def _post(pid):
@@ -206,16 +273,20 @@ def _post(pid):
 
 
 def detail(user, pid, now=None):
-    """글 하나와 댓글. 댓글은 [댓글 {…, replies: [답글…]}] 로 묶는다."""
+    """글 하나와 댓글. 댓글은 [댓글 {…, replies: [답글…]}] 로 묶는다.
+
+    열어 본 것이므로 이 글에 걸린 내 알림은 지운다 (본 알림은 남기지 않는다).
+    """
     uid = user["id"]
     admin = is_admin(user)
     now = now or _now()
     r = _post(pid)
     if not r:
         raise LookupError("없는 글이거나 지워진 글입니다.")
+    db.run("DELETE FROM board_notify WHERE user_id=? AND post_id=?", (uid, pid))
     rows = list(db.q("SELECT * FROM board_comment WHERE post_id=? ORDER BY id", (pid,)))
     authors = _authors([r["user_id"]] + [c["user_id"] for c in rows])
-    post = _post_row(r, authors, uid, admin, now, _counts([pid]))
+    post = _post_row(r, authors, uid, admin, now, _counts([pid]), _likes([pid], uid))
     post["body"] = r["body"]
 
     def one(c):
@@ -253,6 +324,8 @@ def detail(user, pid, now=None):
 def create(user, kind, title, body, now=None):
     if kind not in KINDS:
         raise ValueError("글의 종류를 알 수 없습니다.")
+    if kind == "patch":
+        raise PermissionError("패치노트는 새 버전이 나올 때 자동으로 올라옵니다.")
     if kind == "notice" and not is_admin(user):
         raise PermissionError("공지는 운영자만 쓸 수 있습니다.")
     title = clean(title, TITLE_MAX, "제목", one_line=True)
@@ -271,6 +344,8 @@ def edit(user, pid, title, body, now=None):
         raise LookupError("없는 글이거나 지워진 글입니다.")
     if r["user_id"] != user["id"]:
         raise PermissionError("내가 쓴 글만 고칠 수 있습니다.")
+    if r["kind"] == "patch":
+        raise PermissionError("패치노트는 고칠 수 없습니다.")
     title = clean(title, TITLE_MAX, "제목", one_line=True)
     body = clean(body, BODY_MAX, "내용")
     db.run("UPDATE board_post SET title=?, body=?, updated_at=? WHERE id=?",
@@ -284,27 +359,70 @@ def remove(user, pid):
         raise LookupError("없는 글이거나 지워진 글입니다.")
     if r["user_id"] != user["id"] and not is_admin(user):
         raise PermissionError("내가 쓴 글만 지울 수 있습니다.")
+    if r["kind"] == "patch":
+        raise PermissionError("패치노트는 지울 수 없습니다.")
     db.run("UPDATE board_post SET deleted=1 WHERE id=?", (pid,))
+    db.run("DELETE FROM board_notify WHERE post_id=?", (pid,))
+
+
+def like(user, pid, now=None):
+    """좋아요를 누르거나 취소한다. 누른 상태가 됐으면 True."""
+    if not _post(pid):
+        raise LookupError("없는 글이거나 지워진 글입니다.")
+    uid = user["id"]
+    if db.q1("SELECT 1 FROM board_like WHERE post_id=? AND user_id=?", (pid, uid)):
+        db.run("DELETE FROM board_like WHERE post_id=? AND user_id=?", (pid, uid))
+        return False
+    db.run("INSERT INTO board_like (post_id, user_id, created_at) VALUES (?,?,?)"
+           " ON CONFLICT(post_id, user_id) DO NOTHING", (pid, uid, _iso(now)))
+    return True
 
 
 def comment(user, pid, body, parent=None, now=None):
-    if not _post(pid):
+    post = _post(pid)
+    if not post:
         raise LookupError("없는 글이거나 지워진 글입니다.")
     body = clean(body, COMMENT_MAX, "댓글")
-    parent_id = None
+    parent_id, target = None, None
     if parent:
-        p = db.q1("SELECT id, post_id, parent_id, deleted FROM board_comment WHERE id=?",
-                  (int(parent),))
+        p = db.q1("SELECT id, post_id, parent_id, user_id, deleted FROM board_comment"
+                  " WHERE id=?", (int(parent),))
         if not p or p["post_id"] != pid:
             raise LookupError("답글을 달 댓글이 없습니다.")
         # 답글에 다는 답글은 같은 댓글 아래에 나란히 붙인다 (한 단계까지)
         parent_id = p["parent_id"] or p["id"]
+        target = None if p["deleted"] else p["user_id"]      # 누구의 댓글에 다는가
     if not is_admin(user):
         _throttle(user["id"], "board_comment", COMMENT_COOLDOWN, COMMENTS_PER_DAY, "댓글", now)
     cur = db.run("INSERT INTO board_comment (post_id, parent_id, user_id, author, body,"
                  " created_at) VALUES (?,?,?,?,?,?)",
                  (pid, parent_id, user["id"], user["username"], body, _iso(now)))
-    return cur.lastrowid
+    cid = cur.lastrowid
+    try:
+        _notify(user, post, cid, target, now)
+    except Exception:                                        # noqa: BLE001
+        pass                    # 알림은 있으면 좋은 것이다. 댓글은 이미 달렸다.
+    return cid
+
+
+def _notify(user, post, cid, target, now=None):
+    """알림을 남긴다. 답글이면 그 댓글을 쓴 사람에게, 그리고 글쓴이에게.
+
+    한 사람에게 한 줄만 간다 - 내 글의 내 댓글에 답글이 달리면 '답글' 하나다.
+    내가 쓴 것은 나에게 알리지 않는다. 패치노트는 서버가 올린 글이라 글쓴이
+    (운영자)에게 댓글마다 알리지 않는다 - 답글만 알린다.
+    """
+    me = user["id"]
+    who = []
+    if target is not None and target != me:
+        who.append((target, "reply"))
+    if post["user_id"] != me and post["kind"] != "patch" \
+            and post["user_id"] not in [u for u, _k in who]:
+        who.append((post["user_id"], "comment"))
+    for uid, kind in who:
+        db.run("INSERT INTO board_notify (user_id, post_id, comment_id, kind, actor,"
+               " created_at) VALUES (?,?,?,?,?,?)",
+               (uid, post["id"], cid, kind, user["username"], _iso(now)))
 
 
 def remove_comment(user, cid):
@@ -314,13 +432,169 @@ def remove_comment(user, cid):
     if c["user_id"] != user["id"] and not is_admin(user):
         raise PermissionError("내가 쓴 댓글만 지울 수 있습니다.")
     db.run("UPDATE board_comment SET deleted=1 WHERE id=?", (cid,))
+    db.run("DELETE FROM board_notify WHERE comment_id=?", (cid,))    # 지운 댓글은 알리지 않는다
     return c["post_id"]
 
 
-def me_card():
-    """/api/me 에 싣는다: 가장 최근 공지의 번호. 화면이 '새 공지' 를 표시한다."""
+# ---------------------------------------------------------------- 알림
+def _notify_rows(uid, only_unseen, limit, now=None, offset=0):
+    now = now or _now()
+    rows = db.q(
+        "SELECT n.id, n.kind, n.actor, n.created_at, n.seen, n.post_id, n.comment_id,"
+        " p.title, c.body FROM board_notify n"
+        " JOIN board_post p ON p.id=n.post_id AND p.deleted=0"
+        " JOIN board_comment c ON c.id=n.comment_id AND c.deleted=0"
+        " WHERE n.user_id=?" + (" AND n.seen=0" if only_unseen else "")
+        + " ORDER BY n.id DESC LIMIT ? OFFSET ?", (uid, limit, int(offset or 0)))
+    out = []
+    for r in rows:
+        body = " ".join((r["body"] or "").split())
+        out.append({"id": r["id"], "kind": r["kind"], "actor": r["actor"],
+                    "postId": r["post_id"], "commentId": r["comment_id"],
+                    "title": r["title"],
+                    "snippet": body if len(body) <= 40 else body[:40] + "…",
+                    "agoSec": _ago(r["created_at"], now), "seen": bool(r["seen"])})
+    return out
+
+
+def notifications(uid, now=None):
+    """알림 목록 (최근 것부터). 본 알림은 지워지므로 여기 있는 것은 다 안 본 것이다."""
+    items = _notify_rows(uid, True, NOTIFY_KEEP, now)
+    return {"items": items, "unseen": mine(uid)["unseen"]}
+
+
+def notify_seen(uid):
+    """알림을 다 본 것으로 한다 = 다 지운다 ('모두 읽음')."""
+    db.run("DELETE FROM board_notify WHERE user_id=?", (uid,))
+
+
+def me_card(uid=None):
+    """/api/me 에 싣는다.
+
+    notice / patch — 가장 최근 공지·패치노트 글의 번호. 화면이 '새 글' 을 표시한다.
+    notify — 안 본 알림 수와 최근 몇 개. 화면이 운영체제 알림으로 알린다.
+    """
+    out = {"notice": 0, "patch": 0, "notify": {"count": 0, "items": []}}
     try:
-        r = db.q1("SELECT MAX(id) m FROM board_post WHERE deleted=0 AND kind='notice'")
-        return {"notice": int(r["m"] or 0)}
+        for r in db.q("SELECT kind, MAX(id) m FROM board_post WHERE deleted=0"
+                      " AND kind IN ('notice','patch') GROUP BY kind"):
+            out[r["kind"]] = int(r["m"] or 0)
+        if uid is not None:
+            n = db.q1(
+                "SELECT COUNT(*) c FROM board_notify n"
+                " JOIN board_post p ON p.id=n.post_id AND p.deleted=0"
+                " JOIN board_comment c ON c.id=n.comment_id AND c.deleted=0"
+                " WHERE n.user_id=? AND n.seen=0", (uid,))["c"]
+            if n:
+                out["notify"] = {"count": n,
+                                 "items": _notify_rows(uid, True, NOTIFY_CARD)}
     except Exception:                                        # noqa: BLE001
-        return {"notice": 0}
+        pass
+    return out
+
+
+# ---------------------------------------------------------------- 내 활동 (마이페이지)
+MINE_PAGE = 5                 # 마이페이지의 한 쪽
+MINE_WHAT = ("notify", "posts", "comments")
+
+
+def mine(uid):
+    """내 활동의 **수**만: 쓴 글, 단 댓글, 받은 좋아요, 알림(전체·안 본 것)."""
+    total = db.q1("SELECT COUNT(*) c FROM board_post WHERE user_id=? AND deleted=0"
+                  " AND kind<>'patch'", (uid,))["c"]
+    ctotal = db.q1("SELECT COUNT(*) c FROM board_comment c JOIN board_post p"
+                   " ON p.id=c.post_id AND p.deleted=0 WHERE c.user_id=? AND c.deleted=0",
+                   (uid,))["c"]
+    got = db.q1("SELECT COUNT(*) c FROM board_like l JOIN board_post p ON p.id=l.post_id"
+                " WHERE p.user_id=? AND p.deleted=0 AND p.kind<>'patch'", (uid,))["c"]
+    n = db.q1("SELECT COUNT(*) c FROM board_notify n"
+              " JOIN board_post p ON p.id=n.post_id AND p.deleted=0"
+              " JOIN board_comment c ON c.id=n.comment_id AND c.deleted=0"
+              " WHERE n.user_id=? AND n.seen=0", (uid,))
+    # 본 알림은 지워지므로 알림 수 = 안 본 수다 (열쇠 둘은 화면이 쓰던 이름 그대로 둔다)
+    return {"postCount": total, "commentCount": ctotal, "likes": got,
+            "notifyCount": int(n["c"] or 0), "unseen": int(n["c"] or 0)}
+
+
+def mine_page(uid, what="posts", page=1, now=None, size=MINE_PAGE):
+    """내 활동 한 쪽 (마이페이지). what = notify / posts / comments.
+
+    **쪽으로 나눠 준다.** 활동은 계속 쌓이는데 한 번에 다 주면 화면이 끝없이
+    길어진다. 화면은 한 쪽(5개)만 그리고 ◀ ▶ 로 넘긴다 - 글이 천 개여도
+    마이페이지의 높이는 같다.
+    """
+    now = now or _now()
+    what = what if what in MINE_WHAT else "posts"
+    counts = mine(uid)
+    total = {"posts": counts["postCount"], "comments": counts["commentCount"],
+             "notify": counts["notifyCount"]}[what]
+    pages = max(1, (total + size - 1) // size)
+    page = max(1, min(pages, int(page or 1)))
+    off = (page - 1) * size
+    items = []
+    if what == "posts":
+        rows = list(db.q("SELECT * FROM board_post WHERE user_id=? AND deleted=0"
+                         " AND kind<>'patch' ORDER BY id DESC LIMIT ? OFFSET ?",
+                         (uid, size, off)))
+        ids = [r["id"] for r in rows]
+        n_cm, likes = _counts(ids), _likes(ids, uid)
+        items = [{"id": r["id"], "postId": r["id"], "kind": r["kind"],
+                  "kindKr": KIND_KR.get(r["kind"], r["kind"]), "title": r["title"],
+                  "agoSec": _ago(r["created_at"], now),
+                  "comments": n_cm.get(r["id"], 0), "likes": likes[0].get(r["id"], 0)}
+                 for r in rows]
+    elif what == "comments":
+        for r in db.q("SELECT c.id, c.post_id, c.body, c.created_at, p.title"
+                      " FROM board_comment c JOIN board_post p ON p.id=c.post_id AND p.deleted=0"
+                      " WHERE c.user_id=? AND c.deleted=0 ORDER BY c.id DESC LIMIT ? OFFSET ?",
+                      (uid, size, off)):
+            body = " ".join((r["body"] or "").split())
+            items.append({"id": r["id"], "postId": r["post_id"], "title": r["title"],
+                          "snippet": body if len(body) <= 50 else body[:50] + "…",
+                          "agoSec": _ago(r["created_at"], now)})
+    else:
+        items = _notify_rows(uid, True, size, now, off)
+    return {"what": what, "page": page, "pages": pages, "total": total, "size": size,
+            "items": items, "counts": counts}
+
+
+# ---------------------------------------------------------------- 패치노트 글
+def _patch_time(version, now=None):
+    return patchnotes.RELEASED.get(version) or _iso(now)
+
+
+def ensure_patch_posts(now=None, upto=None):
+    """버전마다 패치노트 글 하나. 없는 것만 올린다. 올린 버전 목록을 돌려준다.
+
+    **서버가 뜰 때 한 번 부른다.** 새 판을 배포하면 그 판의 글이 그때 생긴다.
+    옛 버전은 처음 한 번 몰아서 올라가는데, 날짜는 그 판이 나온 때로 적는다
+    (patchnotes.RELEASED). 오래된 판부터 넣어서 번호도 나온 순서다.
+
+    글쓴이는 운영자다. 운영자 계정이 아직 없으면(새 DB) 아무것도 안 하고,
+    다음에 뜰 때 다시 본다. 지워진 글도 '있는 것' 으로 쳐서 되살리지 않는다.
+
+    upto 는 여기까지의 버전만 (검사용).
+    """
+    admin = None
+    for name in config.BOARD_ADMINS:
+        admin = db.q1("SELECT id, username FROM users WHERE username=?", (name,))
+        if admin:
+            break
+    if not admin:
+        return []
+    have = set(r["ref"] for r in db.q(
+        "SELECT ref FROM board_post WHERE ref LIKE 'patch:%'"))
+    made = []
+    for n in reversed(patchnotes.NOTES):                   # 오래된 판부터
+        ver = n["version"]
+        if upto and patchnotes._key(ver) > patchnotes._key(upto):
+            continue
+        ref = "patch:" + ver
+        if ref in have:
+            continue
+        title, body = patchnotes.as_post(ver)
+        db.run("INSERT INTO board_post (kind, user_id, author, title, body, created_at, ref)"
+               " VALUES ('patch',?,?,?,?,?,?)",
+               (admin["id"], admin["username"], title, body, _patch_time(ver, now), ref))
+        made.append(ver)
+    return made

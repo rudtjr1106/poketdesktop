@@ -143,8 +143,8 @@ def main():
     print("\n=== 없는 동작 표시 ===")
     mp = os.path.join(TMP, "miss.json")
     chk("None 을 돌려준다", M._mark_missing(mp) is None)
-    chk("ok:false 로 남는다",
-        json.load(io.open(mp, encoding="utf-8")) == {"ok": False})
+    chk("ok:false 로 남는다 (출처 몇 개를 뒤져 보고 적었는지와 함께 - 1.9.0)",
+        json.load(io.open(mp, encoding="utf-8")) == {"ok": False, "gen": M.MISS_GEN})
 
     print("\n=== 이로치 걷는 도트 (1.4.0) ===")
     png_n, meta_n = M._anim_paths(25, "Walk")
@@ -174,8 +174,7 @@ def main():
         fake.err = urllib.error.HTTPError(calls[-1], 404, "nope", None, None)
         M._anim_fetch(4, "Idle", shiny=True)
         chk("404 면 없다고 적는다 (클라이언트가 보통 색으로 걷는다)",
-            json.load(io.open(M._anim_paths(4, "Idle", True)[1], encoding="utf-8"))
-            == {"ok": False})
+            json.load(io.open(M._anim_paths(4, "Idle", True)[1], encoding="utf-8"))["ok"] is False)
         chk("보통 걷기가 SpriteCollab 인 종은 두 번째 출처(followers)로 안 간다",
             not any("followers" in c for c in calls), calls)
         # 보통 걷기부터 followers 에서 온 종: 이로치도 followers 의 -b-s 로
@@ -209,8 +208,12 @@ def main():
     from fastapi import HTTPException
     chk("도감에 적힌 경로를 쓴다 (메가리자몽X = 0006/0001)", M._mega_walk(10034) == "0006/0001",
         M._mega_walk(10034))
-    chk("걷는 도트가 없는 메가(리자몽Y)·보통 종·없는 번호는 None",
-        M._mega_walk(10035) is None and M._mega_walk(6) is None and M._mega_walk(99999) is None)
+    # 메가리자몽Y(10035)는 1.9.0 부터 세 번째 출처로 걷는다 (test_walk_ow.py).
+    # 어느 출처에도 없는 폼은 Z-A 의 새 메가들이다 (메가픽시 10278).
+    chk("세 번째 출처의 메가는 머리말이 붙은 경로 (메가리자몽Y)",
+        M._mega_walk(10035) == "ow:charizard/mega_y", M._mega_walk(10035))
+    chk("걷는 도트가 없는 메가(픽시)·보통 종·없는 번호는 None",
+        M._mega_walk(10278) is None and M._mega_walk(6) is None and M._mega_walk(99999) is None)
 
     def code(fn, *a):
         try:
@@ -219,7 +222,7 @@ def main():
         except HTTPException as e:
             return e.status_code
     chk("걷는 도트가 있는 메가만 통과시킨다",
-        (code(M._check_anim, 10034, "Walk"), code(M._check_anim, 10035, "Walk"),
+        (code(M._check_anim, 10034, "Walk"), code(M._check_anim, 10278, "Walk"),
          code(M._check_anim, 99999, "Walk"), code(M._check_anim, 10034, "Nope")) == (200, 404, 404, 404))
     png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + struct.pack(">II", 64, 320) + b"0" * 64
     calls = []
@@ -251,7 +254,7 @@ def main():
         del calls[:]
         chk("없으면 없다고 적고, 두 번째 출처(followers)로 안 간다",
             M._anim_fetch(10079, "Walk") is None
-            and json.load(io.open(M._anim_paths(10079, "Walk")[1], encoding="utf-8")) == {"ok": False}
+            and json.load(io.open(M._anim_paths(10079, "Walk")[1], encoding="utf-8"))["ok"] is False
             and not any("followsprites" in c for c in calls), calls)
     finally:
         urllib.request.urlopen = real

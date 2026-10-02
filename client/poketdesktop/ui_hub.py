@@ -21,9 +21,9 @@ from .ui_box import BoxWindow
 from .ui_dex import DexWindow
 from .ui_friends import FriendsWindow
 from .ui_gym import GymWindow
+from .ui_mypage import MyPageWindow
 from .ui_raid import RaidWindow
 from .ui_rank import RankWindow
-from .ui_settings import SettingsWindow
 from .ui_shop import ShopWindow
 
 W, H = 1040, 700
@@ -40,7 +40,8 @@ TABS = [
     ("raid", "레이드", RaidWindow, False),
     ("rank", "랭킹", RankWindow, False),
     ("board", "게시판", BoardWindow, False),
-    ("settings", "설정", SettingsWindow, False),
+    # 설정은 마이페이지 머리줄의 톱니바퀴 안으로 들어갔다 (1.9.0)
+    ("my", "마이페이지", MyPageWindow, False),
 ]
 
 
@@ -112,7 +113,7 @@ class HubWindow(object):
         return pane
 
     def set_badge(self, key, on):
-        """탭 이름 옆에 점을 찍는다 (새 공지). 켜고 끄는 것만 한다."""
+        """탭 이름 옆에 점을 찍는다 (새 공지·새 패치노트·새 댓글). 켜고 끄는 것만 한다."""
         row = next((t for t in TABS if t[0] == key), None)
         if not row or key not in self.order:
             return

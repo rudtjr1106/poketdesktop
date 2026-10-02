@@ -17,6 +17,17 @@
 표(token)를 올리고, 옛 표의 응답은 버린다.
 
 레쿠쟈는 스톤이 없다 - 화룡점정을 알면 된다고 한 줄만 적는다.
+
+## 메가진화하면 어떻게 되나 (1.9.0)
+
+미션 칸 아래에 **메가 폼의 타입·특성·능력치**를 미리 보여 준다. 메가진화하면
+특성이 바뀌는데(가디안의 트레이스 -> 페어리스킨) 그걸 알 곳이 없었고,
+능력치가 얼마나 오르는지도 배틀에 들어가 봐야 알았다 (제보).
+
+능력치는 **이 개체의** 레벨·개체값·노력치·성격으로 센다 - 배틀 엔진이
+메가진화할 때 하는 계산(Fighter.mega_evolve)과 같다. 체력은 안 바뀐다.
+서버에 묻지 않고 도감으로 여기서 센다. 스톤이 없어도 보인다 - 무엇을 얻게
+되는지 알아야 미션을 할 마음이 든다. 폼이 둘(X·Y)이면 둘 다 보여 준다.
 """
 import tkinter as tk
 
@@ -25,6 +36,57 @@ from . import ui_common as U
 CARD = "#101623"
 BAR_BG = "#232b3d"
 MEGA = "#b69cff"
+STAT_ROWS = [("hp", "HP"), ("atk", "공격"), ("def", "방어"),
+             ("spa", "특수공격"), ("spd", "특수방어"), ("spe", "스피드")]
+
+
+def forms_for(dex, mon):
+    """이 개체가 될 수 있는 메가 폼들. 암수가 갈리는 종(냐오닉스)은 제 성별 것만."""
+    forms = ((getattr(dex, "mega_of", None) or {}).get((mon or {}).get("species")) or []) \
+        if dex else []
+    # 배틀 엔진(Fighter.mega_target)과 같은 차례: 제 성별의 폼이 있으면 그것,
+    # 없으면 성별 표시가 없는 폼. 같은 스톤으로 되는 다른 성별의 폼은 뺀다.
+    g = (mon or {}).get("gender")
+    mine = [f for f in forms if f.get("megaGender") and f["megaGender"] == g]
+    stones = set(f.get("megaStone") for f in mine)
+    rest = [f for f in forms if not f.get("megaGender") and f.get("megaStone") not in stones]
+    return mine + rest
+
+
+def mega_preview(dex, mon, form):
+    """이 개체가 그 폼으로 메가진화하면 어떻게 되는가. 못 세면 None.
+
+    배틀 엔진(Fighter.mega_evolve)과 같은 계산이다: 종만 메가 폼으로 바꿔
+    능력치를 다시 세고, **체력은 그대로** 둔다. 특성은 메가 폼의 첫 특성.
+    """
+    try:
+        now = dex.stats_of(mon)
+        after = dex.stats_of(dict(mon, species=form["internal"]))
+    except Exception:                                       # noqa: BLE001
+        return None
+    if not now or not after:
+        return None
+    after["hp"] = now.get("hp", after.get("hp"))
+    ab = "".join(c for c in str((form.get("abil") or [""])[0]).upper() if c.isalnum())
+    base = dex.get(mon.get("species")) or {}
+    return {
+        "name": form.get("kr") or form.get("internal"),
+        "types": list(form.get("types") or []),
+        "typesChanged": list(form.get("types") or []) != list(base.get("types") or []),
+        "ability": ab or None,
+        "abilityKr": dex.ability_name(ab) if ab else None,
+        "abilityNote": dex.ability_desc(ab) if ab else None,
+        "abilityChanged": bool(ab) and ab != (mon.get("ability") or ""),
+        "rows": [(k, label, int(now.get(k, 0)), int(after.get(k, 0)),
+                  int(after.get(k, 0)) - int(now.get(k, 0))) for k, label in STAT_ROWS],
+        "stoneKr": form.get("megaStoneKr"),
+        "move": form.get("megaMove"),
+    }
+
+
+def delta_text(d):
+    """능력치 변화 글. '+46', '-10', 안 바뀌면 '그대로'."""
+    return "그대로" if not d else ("+%d" % d if d > 0 else "%d" % d)
 
 
 class BondPanel(object):
@@ -43,6 +105,10 @@ class BondPanel(object):
         self.btn = None
         self.body = tk.Frame(f, bg=CARD)
         self.body.pack(fill="x", padx=11, pady=(0, 8))
+        # 메가진화하면 어떻게 되나 (1.9.0). 미션 칸(body)은 서버 답이 오면 다시
+        # 그리므로, 여기에 섞지 않고 따로 둔다.
+        self.preview = tk.Frame(f, bg=CARD)
+        self.previews = []                 # 지금 보여 주는 미리보기들 (검사가 본다)
 
     # ---------------- 보이기 ----------------
     def show(self, m):
@@ -62,6 +128,7 @@ class BondPanel(object):
             kw["before"] = self.before
         self.frame.pack(**kw)
         self._button(None)
+        self._preview(m)
         if not any(f.get("megaStone") for f in forms):
             self._lines([("화룡점정을 알고 있으면 스톤 없이 메가진화합니다. "
                           "키스톤은 있어야 합니다.", U.FG_DIM)])
@@ -83,6 +150,81 @@ class BondPanel(object):
             self.render(r)
         except tk.TclError:
             pass                           # 그사이 창을 닫았다
+
+    # ---------------- 메가진화하면 ----------------
+    def _preview(self, m):
+        """메가 폼의 타입·특성·능력치 변화. 도감으로 여기서 센다."""
+        for w in self.preview.winfo_children():
+            w.destroy()
+        self.preview.pack_forget()
+        self.previews = []
+        dex = self.box.app.dex
+        for form in forms_for(dex, m):
+            pv = mega_preview(dex, m, form)
+            if pv:
+                self.previews.append(pv)
+        if not self.previews:
+            return
+        self.preview.pack(fill="x", padx=11, pady=(0, 9))
+        for pv in self.previews:
+            self._preview_block(pv, dex)
+
+    def _preview_block(self, pv, dex):
+        f = self.preview
+        tk.Frame(f, bg=U.LINE, height=1).pack(fill="x", pady=(2, 7))
+        head = tk.Frame(f, bg=CARD)
+        head.pack(fill="x")
+        tk.Label(head, text=pv["name"], bg=CARD, fg=MEGA, font=U.FONT_B,
+                 anchor="w").pack(side="left")
+        tk.Label(head, text="메가진화하면", bg=CARD, fg=U.FG_FAINT,
+                 font=U.FONT_XS).pack(side="left", padx=(6, 0))
+        types = tk.Frame(f, bg=CARD)
+        types.pack(fill="x", pady=(5, 0))
+        tk.Label(types, text="타입", bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS,
+                 width=5, anchor="w").pack(side="left")
+        for t in pv["types"]:
+            U.chip(types, dex.type_name(t), U.TYPE_COLOR.get(t, U.BG3),
+                   font=U.FONT_XS, padx=7).pack(side="left", padx=(0, 4))
+        if not pv["typesChanged"]:
+            tk.Label(types, text="그대로", bg=CARD, fg=U.FG_FAINT,
+                     font=U.FONT_XS).pack(side="left", padx=(2, 0))
+        if pv.get("abilityKr"):
+            ab = tk.Frame(f, bg=CARD)
+            ab.pack(fill="x", pady=(5, 0))
+            tk.Label(ab, text="특성", bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS,
+                     width=5, anchor="w").pack(side="left", anchor="n")
+            col = tk.Frame(ab, bg=CARD)
+            col.pack(side="left", fill="x", expand=True)
+            line = tk.Frame(col, bg=CARD)
+            line.pack(fill="x")
+            tk.Label(line, text=pv["abilityKr"], bg=CARD, fg=U.FG, font=U.FONT_B,
+                     anchor="w").pack(side="left")
+            tk.Label(line, text="바뀜" if pv["abilityChanged"] else "그대로", bg=CARD,
+                     fg=U.ACCENT if pv["abilityChanged"] else U.FG_FAINT,
+                     font=U.FONT_XS).pack(side="left", padx=(6, 0))
+            if pv.get("abilityNote"):
+                self._label(col, pv["abilityNote"], U.FG_DIM).pack(fill="x")
+        grid = tk.Frame(f, bg=CARD)
+        grid.pack(fill="x", pady=(6, 0))
+        grid.columnconfigure(3, weight=1)
+        for i, (_k, label, now, after, d) in enumerate(pv["rows"]):
+            tk.Label(grid, text=label, bg=CARD, fg=U.FG_DIM, font=U.FONT_XS,
+                     anchor="w", width=7).grid(row=i, column=0, sticky="w", pady=1)
+            tk.Label(grid, text=str(now), bg=CARD, fg=U.FG_DIM, font=U.FONT_S,
+                     anchor="e").grid(row=i, column=1, sticky="e")
+            tk.Label(grid, text="→  %d" % after, bg=CARD, fg=U.FG if d else U.FG_DIM,
+                     font=U.FONT_NUM if d else U.FONT_S,
+                     anchor="w").grid(row=i, column=2, sticky="w", padx=(8, 0))
+            tk.Label(grid, text=delta_text(d), bg=CARD,
+                     fg=U.GOOD if d > 0 else (U.DANGER if d < 0 else U.FG_FAINT),
+                     font=U.FONT_S, anchor="e").grid(row=i, column=3, sticky="e")
+        how = ("화룡점정을 알고 있으면" if pv.get("move")
+               else "%s 을(를) 지니면" % pv["stoneKr"] if pv.get("stoneKr") else None)
+        note = "지금 레벨·개체값·노력치·성격으로 센 값입니다. 체력은 안 바뀝니다."
+        if how:
+            note = "%s 배틀에서 메가진화할 수 있습니다. %s" % (how, note)
+        from common.korean import natural
+        self._label(f, natural(note), U.FG_FAINT).pack(fill="x", pady=(6, 0))
 
     # ---------------- 그리기 ----------------
     def _clear(self):

@@ -18,7 +18,6 @@ pystray 의 맥 백엔드는 `NSApplication.run()` 을 부른다. 그걸 별도
 import threading
 
 from . import autostart
-from common import patchnotes
 from common.version import VERSION
 
 # ---------------------------------------------------------------- 메뉴 서술
@@ -53,6 +52,21 @@ def val(v):
 # 84px 짜리 "아주 크게" 는 뺐다. 바탕화면을 너무 가린다.
 # 그래도 크게 하고 싶으면 설정 창의 슬라이더로 120 까지 올릴 수 있다.
 SIZE_PRESETS = [("작게", 36), ("보통", 48), ("크게", 64)]
+
+
+def board_label(app):
+    """트레이의 게시판 줄. 화면에 자국이 안 남는 것을 괄호에 적는다.
+
+    내 글·댓글에 달린 새 댓글이 가장 먼저다 (사람이 나에게 한 말이다).
+    """
+    n = int(getattr(app, "board_unseen", 0) or 0)
+    if n:
+        return "게시판  (새 댓글 %d)" % n
+    if getattr(app, "notice_unseen", False):
+        return "게시판  (새 공지)"
+    if getattr(app, "patch_unseen", False):
+        return "게시판  (새 패치노트)"
+    return "게시판"
 AREA_PRESETS = [("좁게", 360, 240), ("보통", 520, 360),
                 ("넓게", 760, 520), ("화면 전체", 0, 0)]
 
@@ -163,9 +177,8 @@ class TrayBase(object):
                           else "친구 요청 보기"),
                  lambda: self.call(a.open_friends)),
             # 게시판 (1.8.0). 새 공지도 화면에 자국이 없어서 여기에 표시한다.
-            Item(lambda: ("게시판  (새 공지)" if getattr(a, "notice_unseen", False)
-                          else "게시판"),
-                 lambda: self.call(a.open_board)),
+            # 1.9.0: 내 글·댓글에 달린 새 댓글 수와 새 패치노트도 여기에 남는다.
+            Item(lambda: board_label(a), lambda: self.call(a.open_board)),
             SEP,
             Item("바탕화면", submenu=[
                 Item("모두 거두기", lambda: self.call(a.recall_all)),
@@ -198,8 +211,9 @@ class TrayBase(object):
             # 볼과 소지금은 가방·상점 창에 이미 크게 떠 있다. 메뉴에
             # 또 두면 길기만 하다. 여기는 버전 하나로 줄인다.
             Item("버전 %s" % VERSION, enabled=False),
-            Item("이번 버전 새로운 기능", lambda: self.call(a.show_patchnotes),
-                 enabled=bool(patchnotes.entry(VERSION))),
+            # 예전의 '새로운 기능' 창은 게시판의 패치노트 칸으로 갔다 (1.9.0)
+            Item("패치노트 보기", lambda: self.call(a.open_patchnotes)),
+            Item("설정", lambda: self.call(a.open_settings)),
             Item("로그아웃", lambda: self.call(a.logout)),
             Item("회원탈퇴", lambda: self.call(a.delete_account)),
             SEP,

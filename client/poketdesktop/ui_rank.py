@@ -42,6 +42,15 @@ def _date_kr(s):
         return s or ""
 
 
+def today_text(fight):
+    """머리줄에 적을 '오늘 몇 판 가능'. 하루 상한(랜덤 배틀 20판) 기준이다."""
+    left = max(0, int(fight.get("left") or 0))
+    cap = int(fight.get("dailyBattles") or 0)
+    if not left:
+        return "오늘은 다 했습니다 (%d판)" % cap if cap else "오늘은 다 했습니다"
+    return "오늘 %d판 가능" % left
+
+
 class RankWindow(object):
 
     def __init__(self, app, parent=None):
@@ -173,6 +182,10 @@ class RankWindow(object):
             bits.append("배치까지 %d판" % left if left else "곧 오릅니다")
         bits.append("%d전 %d승 %d패" % (me.get("games", 0), me.get("wins", 0),
                                       me.get("losses", 0)))
+        # 오늘 랜덤 배틀을 몇 판 더 걸 수 있나 (1.9.0). 옛 서버는 안 실어 준다.
+        fight = me.get("fight") or {}
+        if fight.get("left") is not None:
+            bits.append(today_text(fight))
         if self.rules.get("endsAt"):
             bits.append("%s까지" % _date_kr(self.rules["endsAt"]))
         self.sub.configure(text="  ·  ".join(bits))

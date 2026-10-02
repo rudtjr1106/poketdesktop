@@ -121,6 +121,13 @@ class FakeApp(object):
         self._friend_first = True
         self.autostarted = False
         self.notes_shown = []
+        # 게시판 소식 (1.9.0)
+        self.hub = None
+        self.board_notice = 0
+        self.board_patch = 0
+        self.board_unseen = 0
+        self._board_seen = set()
+        self._board_first = True
         self.__dict__.update(over)
 
     def notify(self, message):
@@ -133,6 +140,15 @@ class FakeApp(object):
     toast = App.toast
     announce_friends = App.announce_friends
     _tell_patchnotes_once = App._tell_patchnotes_once
+    _toast_updated = App._toast_updated
+    # 게시판 소식 (1.9.0)
+    note_board = App.note_board
+    note_notice = App.note_notice
+    announce_board = App.announce_board
+    mark_patch_seen = App.mark_patch_seen
+    _paint_notice = App._paint_notice
+    notice_unseen = App.notice_unseen
+    patch_unseen = App.patch_unseen
 
     def show_patchnotes(self, greet=False):
         self.notes_shown.append(greet)
@@ -267,8 +283,8 @@ def test_toast():
     chk("트레이가 실패해도 터지지 않는다",
         app.toast("새 버전", "받으세요", kind="update") is False)
 
-    chk("띄우는 종류는 둘뿐이다",
-        set(patchnotes.TOAST_KINDS) == {"update", "friend"},
+    chk("띄우는 종류는 셋뿐이다 (새 버전·친구 요청·게시판 댓글)",
+        set(patchnotes.TOAST_KINDS) == {"update", "friend", "board"},
         "kinds=%r" % (patchnotes.TOAST_KINDS,))
 
 
@@ -359,27 +375,37 @@ def test_patchnotes():
     app.settings["lastRunVersion"] = ""
     app._tell_patchnotes_once()
     app.root.fire()
-    chk("처음 켠 사람에게는 안 띄운다", app.notes_shown == [],
-        "shown=%r" % app.notes_shown)
+    chk("처음 켠 사람에게는 안 알린다", app.notes_shown == [] and app.tray.toasts == [],
+        "shown=%r toasts=%r" % (app.notes_shown, app.tray.toasts))
     chk("그래도 버전은 적어 둔다",
         app.settings["lastRunVersion"] == patchnotes.latest()["version"]
         or app.settings["lastRunVersion"] != "",
         "last=%r" % app.settings["lastRunVersion"])
 
-    # 갈아탄 사람에게는 띄운다
+    # 갈아탄 사람에게는 알린다 - **창이 아니라 알림 한 번** (1.9.0).
+    # 내용은 게시판의 패치노트 칸에서 본다.
     app = FakeApp()
     app.settings["lastRunVersion"] = "1.0.11"
     app._tell_patchnotes_once()
     app.root.fire()
-    chk("갈아탄 사람에게는 띄운다", app.notes_shown == [True],
+    chk("갈아탄 사람에게 창은 안 띄운다 (1.9.0)", app.notes_shown == [],
         "shown=%r" % app.notes_shown)
+    chk("대신 알림 한 번", len(app.tray.toasts) == 1 and VERSION in app.tray.toasts[0][0]
+        and "패치노트" in app.tray.toasts[0][1], "toasts=%r" % (app.tray.toasts,))
 
-    # 같은 버전을 다시 켜면 안 띄운다
-    app.notes_shown = []
+    # 같은 버전을 다시 켜면 안 알린다
+    app.tray.toasts = []
     app._tell_patchnotes_once()
     app.root.fire()
-    chk("같은 버전은 다시 안 띄운다", app.notes_shown == [],
-        "shown=%r" % app.notes_shown)
+    chk("같은 버전은 다시 안 알린다", app.tray.toasts == [],
+        "toasts=%r" % (app.tray.toasts,))
+
+    # 알림을 꺼 둔 사람에게는 알림도 안 띄운다 (게시판 탭의 점은 남는다)
+    app = FakeApp()
+    app.settings.update({"lastRunVersion": "1.0.11", "notifyImportant": False})
+    app._tell_patchnotes_once()
+    app.root.fire()
+    chk("알림을 껐으면 안 띄운다", app.tray.toasts == [])
 
     # 부팅으로 켜졌으면 한참 미룬다 (켜자마자 창이 포커스를 뺏으면 안 된다)
     app = FakeApp(autostarted=True)
@@ -388,6 +414,120 @@ def test_patchnotes():
     delays = [ms for ms, _fn, _a in app.root.jobs]
     chk("부팅으로 켜졌으면 늦게 띄운다", delays and delays[0] >= 10000,
         "delays=%r" % delays)
+
+
+# ---------------------------------------------------------------- 게시판 소식 (1.9.0)
+def _n(i, kind="comment", actor="지우", title="내 글", snippet="댓글입니다"):
+    return {"id": i, "kind": kind, "actor": actor, "postId": 7, "title": title,
+            "snippet": snippet}
+
+
+def test_board_news():
+    print("게시판 소식 (1.9.0)")
+    chk("알림 종류에 게시판이 있다", "board" in patchnotes.TOAST_KINDS)
+
+    # --- 새 패치노트 표시
+    app = FakeApp()                                   # 처음 깐 사람
+    app.note_board({"notice": 0, "patch": 45, "notify": {"count": 0, "items": []}})
+    chk("처음 깐 사람에게 옛 패치노트는 새 글이 아니다",
+        app.patch_unseen is False and app.settings.get("patchSeen") == 45,
+        (app.patch_unseen, app.settings.get("patchSeen")))
+    app = FakeApp()                                   # 방금 갈아탄 사람
+    app.settings["lastRunVersion"] = "1.0.11"
+    app._tell_patchnotes_once()
+    app.note_board({"notice": 0, "patch": 45, "notify": {"count": 0, "items": []}})
+    chk("갈아탄 사람에게는 이번 판의 글 하나만 새 글이다",
+        app.patch_unseen is True and app.settings.get("patchSeen") == 44,
+        (app.patch_unseen, app.settings.get("patchSeen")))
+    from poketdesktop import tray
+    chk("트레이의 게시판 줄에 적힌다", tray.board_label(app) == "게시판  (새 패치노트)",
+        tray.board_label(app))
+    app.mark_patch_seen(45)
+    chk("패치노트 칸을 열면 꺼진다", app.patch_unseen is False and app.settings["patchSeen"] == 45
+        and tray.board_label(app) == "게시판")
+    app.note_board({"notice": 0, "patch": 46, "notify": {"count": 0, "items": []}})
+    chk("다음 판이 나오면 다시 켜진다", app.patch_unseen is True)
+
+    # --- 내 글의 댓글·내 댓글의 답글
+    app = FakeApp()
+    app.note_board({"notice": 0, "patch": 0,
+                    "notify": {"count": 3, "items": [_n(1), _n(2), _n(3)]}})
+    chk("켤 때 쌓여 있던 것은 수만 한 번 알린다", len(app.tray.toasts) == 1
+        and "3" in app.tray.toasts[0][0], "toasts=%r" % (app.tray.toasts,))
+    chk("안 본 수를 기억한다", app.board_unseen == 3)
+    chk("트레이에 수로 남는다", tray.board_label(app) == "게시판  (새 댓글 3)", tray.board_label(app))
+    app.note_board({"notice": 0, "patch": 0,
+                    "notify": {"count": 3, "items": [_n(1), _n(2), _n(3)]}})
+    chk("같은 것을 두 번 알리지 않는다", len(app.tray.toasts) == 1)
+    app.note_board({"notice": 0, "patch": 0, "notify": {"count": 4, "items": [
+        _n(4, "reply", "이슬", "레이드 같이 하실 분", "저도 갑니다"), _n(1), _n(2), _n(3)]}})
+    chk("새로 온 것은 누가 무슨 글에 달았는지 알린다", len(app.tray.toasts) == 2
+        and "이슬" in app.tray.toasts[1][0] and "답글" in app.tray.toasts[1][0]
+        and "레이드 같이 하실 분" in app.tray.toasts[1][1] and "저도 갑니다" in app.tray.toasts[1][1],
+        "toast=%r" % (app.tray.toasts[-1],))
+    app.note_board({"notice": 0, "patch": 0, "notify": {"count": 6, "items": [
+        _n(6, actor="웅이"), _n(5, actor="봄이"), _n(4), _n(1), _n(2)]}})
+    chk("여럿이 한꺼번에 오면 한 번에 묶는다", len(app.tray.toasts) == 3
+        and "2" in app.tray.toasts[2][0] and "웅이" in app.tray.toasts[2][1]
+        and "봄이" in app.tray.toasts[2][1], "toast=%r" % (app.tray.toasts[-1],))
+    app.note_board({"notice": 0, "patch": 0, "notify": {"count": 0, "items": []}})
+    chk("글을 열어 보면 수가 줄어든다", app.board_unseen == 0 and tray.board_label(app) == "게시판")
+    app.note_board(None)
+    app.note_board({"notice": 3})                      # 옛 서버: notify 가 없다
+    chk("옛 서버의 답(공지 번호만)에도 터지지 않는다", app.board_notice == 3 and app.board_unseen == 0)
+
+    app = FakeApp()
+    app.note_board({"notify": {"count": 0, "items": []}})
+    app.note_board({"notify": {"count": 1, "items": [_n(9, actor="지우", title="질문")]}})
+    chk("켠 뒤 처음 온 한 건은 이름으로 알린다", len(app.tray.toasts) == 1
+        and "지우" in app.tray.toasts[0][0] and "댓글" in app.tray.toasts[0][0],
+        "toasts=%r" % (app.tray.toasts,))
+    app = FakeApp()
+    app.settings["notifyImportant"] = False
+    app.note_board({"notify": {"count": 0, "items": []}})
+    app.note_board({"notify": {"count": 1, "items": [_n(9)]}})
+    chk("알림을 껐으면 안 띄우지만 수는 센다", app.tray.toasts == [] and app.board_unseen == 1)
+
+
+# ---------------------------------------------------------------- 투명도 (1.9.0)
+def test_opacity():
+    print("포켓몬 투명도 (1.9.0)")
+    chk("기본은 그대로 (100%)", config.DEFAULTS["petOpacity"] == 100
+        and config.pet_alpha(dict(config.DEFAULTS)) == 1.0)
+    chk("값이 없던 옛 설정도 그대로", config.pet_alpha({}) == 1.0 and config.pet_alpha(None) == 1.0)
+    chk("60% 는 0.6", abs(config.pet_alpha({"petOpacity": 60}) - 0.6) < 1e-9)
+    chk("투명도 99% 까지 (또렷함 1%)", config.PET_OPACITY_MIN == 1
+        and abs(config.pet_alpha({"petOpacity": 1}) - 0.01) < 1e-9)
+    chk("완전히 안 보이게는 안 된다 (창이 있는지조차 모른다)",
+        config.pet_alpha({"petOpacity": 0}) == config.PET_OPACITY_MIN / 100.0)
+    chk("이상한 값이면 그대로", config.pet_alpha({"petOpacity": "x"}) == 1.0
+        and config.pet_alpha({"petOpacity": 500}) == 1.0)
+
+    from poketdesktop import overlay as OV
+
+    class Win(object):
+        def __init__(self):
+            self.alpha = None
+
+        def attributes(self, name, value):
+            assert name == "-alpha"
+            self.alpha = value
+
+    class P(object):
+        def __init__(self):
+            self.win = Win()
+
+    ov = OV.Overlay.__new__(OV.Overlay)
+    ov.settings = {"petOpacity": 55}
+    ov.pets = {1: P(), 2: P()}
+    ov.extra = [P()]
+    ov.eggs = {9: P()}
+    ov.apply_alpha()
+    got = [p.win.alpha for p in list(ov.pets.values()) + ov.extra + list(ov.eggs.values())]
+    chk("내 포켓몬·싸우는 상대·알에 모두 입힌다", got == [0.55] * 4, got)
+    ov.settings["petOpacity"] = 100
+    ov.apply_alpha()
+    chk("되돌리면 다시 또렷해진다", all(p.win.alpha == 1.0 for p in ov.pets.values()))
 
 
 # ---------------------------------------------------------------- 릴리스 본문
@@ -464,7 +604,10 @@ def test_tray_menu():
         any("친구 요청" in x and "3" in x for x in labels),
         "labels=%r" % [x for x in labels if "친구" in x])
     chk("풀숲 줄이 있다", any("풀숲" in x for x in labels))
-    chk("새로운 기능 줄이 있다", any("새로운 기능" in x for x in labels))
+    chk("패치노트 보기 줄이 있다 (1.9.0 - 예전의 '새로운 기능')",
+        any(x == "패치노트 보기" for x in labels), labels)
+    chk("설정 줄이 있다 (설정 탭이 마이페이지 안으로 들어갔다)", any(x == "설정" for x in labels))
+    chk("게시판 줄이 있다", any(x.startswith("게시판") for x in labels))
 
     # 요청이 없으면 숫자를 붙이지 않는다 (괄호 안에 0 이 뜨면 이상하다)
     app.friend_unseen = 0
@@ -656,6 +799,8 @@ def main():
     test_toast()
     test_friends()
     test_patchnotes()
+    test_board_news()
+    test_opacity()
     test_highlights()
     test_tray_menu()
     test_names_default()

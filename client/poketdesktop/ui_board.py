@@ -3,7 +3,9 @@
 
 화면은 셋이고 한 칸(self.body)에서 갈아 끼운다.
 
-  · **목록** — [전체 | 공지 | 자유]. '전체' 는 최근 공지 셋이 맨 위에 붙는다.
+  · **목록** — [전체 | 공지 | 자유 | Q&A | 패치노트]. '전체' 는 최근 공지 셋이
+    맨 위에 붙는다. 아래 줄의 찾기 칸에 말을 넣으면 제목·내용·쓴 사람으로
+    찾는다 (1.9.0).
   · **글** — 내용과 댓글. 댓글마다 '답글' 을 누르면 아래 입력칸이 그 댓글에
     다는 답글이 된다. 답글은 한 단계까지만 들여 쓴다.
   · **쓰기** — 제목과 내용. 공지는 운영자에게만 고르는 칸이 보인다.
@@ -18,6 +20,17 @@
 
 목록, 글과 댓글, 쓰는 칸 모두 길어지면 굴려서 본다. 댓글 입력칸과 단추
 줄은 굴러가는 칸 밖(아래)에 붙여서, 댓글이 아무리 많아도 늘 보인다.
+
+## 좋아요 (1.9.0)
+
+글마다 엄지척 하나. 목록에는 댓글 수 옆에 수가 보이고, 글 안에서는 단추를
+눌러 켜고 끈다. 누른 뒤에는 글을 다시 그리지 않고 단추만 고친다 - 읽던
+자리가 맨 위로 튀지 않게.
+
+## 패치노트 (1.9.0)
+
+새 버전이 나오면 서버가 글을 올린다. 사람은 못 쓰고, 댓글과 좋아요는 된다.
+업데이트한 뒤 뜨던 '새로운 기능' 창 대신 이 칸을 본다.
 
 ## 판정은 서버가 한다
 
@@ -38,8 +51,12 @@ W, H = 760, 660
 ROW_BG = "#161b28"
 PIN_BG = "#231d10"            # 공지 줄
 REPLY_BG = "#10141e"
-KINDS = [("all", "전체"), ("notice", "공지"), ("free", "자유"), ("qna", "Q&A")]
-KIND_COLOR = {"notice": U.ACCENT, "free": U.INFO, "qna": U.GOOD}
+KINDS = [("all", "전체"), ("notice", "공지"), ("free", "자유"), ("qna", "Q&A"),
+         ("patch", "패치노트")]
+KIND_COLOR = {"notice": U.ACCENT, "free": U.INFO, "qna": U.GOOD, "patch": U.PINK}
+# 운영자만 올리는 글. 본문의 주소를 누를 수 있다.
+TRUSTED_KINDS = ("notice", "patch")
+LIKE_ON = U.ACCENT            # 내가 누른 좋아요
 # 글을 쓸 때 고르는 종류. 공지는 운영자에게만 보인다.
 WRITE_KINDS = [("free", "자유"), ("qna", "Q&A")]
 LIMITS = {"title": 40, "body": 2000, "comment": 300}
@@ -96,6 +113,7 @@ class BoardWindow(object):
         self.alive = True
         self.kind = "all"
         self.page = 1
+        self.q = ""               # 찾는 말 (비어 있으면 평소 목록)
         self.data = None          # 마지막으로 받은 목록
         self.post = None          # 열어 본 글 (댓글 포함)
         self.view = None          # list / post / write
@@ -222,22 +240,86 @@ class BoardWindow(object):
         self.page_lbl.pack(side="left", padx=10)
         self.next_btn = U.ghost_button(nav, "▶", lambda: self.turn(1), height=28)
         self.next_btn.pack(side="left")
+        self._search_row()
         wrap = tk.Frame(self.body, bg=U.BG)
         wrap.pack(fill="both", expand=True, padx=16)
         self.list = self._scroll_area(wrap)
         if self.data and self.data.get("kind") == self.kind \
-                and self.data.get("page") == self.page:
+                and self.data.get("page") == self.page \
+                and (self.data.get("q") or "") == self.q:
             self._fill_list(self.data)          # 보던 것을 먼저 그리고 새로 받는다
         else:
             tk.Label(self.list, text="불러오는 중...", bg=U.BG, fg=U.FG_FAINT,
                      font=U.FONT_S).pack(pady=30)
         self.load_list(gen)
 
+    # ---------------- 찾기 ----------------
+    def _search_row(self):
+        row = tk.Frame(self.body, bg=U.BG)
+        row.pack(fill="x", padx=16, pady=(0, 8))
+        self.q_var = tk.StringVar(value=self.q)
+        self.find_btn = U.ghost_button(row, "찾기", self.search, height=30)
+        self.find_btn.pack(side="right")
+        self.clear_btn = U.ghost_button(row, "전체 보기", self.clear_search, height=30)
+        box = U.entry(row, self.q_var)
+        box.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.q_box = box
+        self.q_entry = box.entry
+        self.q_entry.bind("<Return>", lambda _e: (self.search(), "break")[1])
+        self.q_entry.bind("<Escape>", lambda _e: (self.clear_search(), "break")[1])
+        self.q_hint = tk.Label(self.q_entry, text="제목·내용·쓴 사람으로 찾기", bg=U.INK,
+                               fg=U.FG_FAINT, font=U.FONT_S, cursor="xterm")
+        self.q_hint.bind("<Button-1>", lambda _e: self.q_entry.focus_set())
+        self.q_var.trace_add("write", lambda *_a: self._paint_search())
+        self.q_entry.bind("<FocusIn>", lambda _e: self._paint_search(), add="+")
+        self.q_entry.bind("<FocusOut>", lambda _e: self._paint_search(), add="+")
+        self._paint_search()
+
+    def _paint_search(self):
+        """빈 칸에는 안내 글을, 찾는 중에는 '전체 보기' 단추를 보인다."""
+        try:
+            typing = bool(self.q_var.get()) or self.q_entry.focus_get() is self.q_entry
+            if typing:
+                self.q_hint.place_forget()
+            else:
+                self.q_hint.place(x=0, rely=0.5, anchor="w")
+            if self.q:
+                # 찾기 단추 왼쪽, 입력칸 오른쪽에 끼운다
+                self.clear_btn.pack(side="right", padx=(0, 8), before=self.q_box)
+            else:
+                self.clear_btn.pack_forget()
+        except (tk.TclError, KeyError):
+            pass
+
+    def search(self):
+        q = " ".join(self.q_var.get().split())[:int(self.limits.get("search", 30))]
+        if q == self.q:
+            return self.load_list() if q else None
+        self.q = q
+        self.page = 1
+        self._paint_search()
+        self.load_list()
+
+    def clear_search(self):
+        self.q_var.set("")
+        if self.q:
+            self.q = ""
+            self.page = 1
+            self._paint_search()
+            self.load_list()
+
     def pick_kind(self, kind):
         self.kind = kind
         self.page = 1
         self.seg.set(kind)
         self.load_list()
+
+    def show_kind(self, kind):
+        """밖에서 그 칸을 열어 달라고 할 때 (트레이의 '패치노트 보기')."""
+        if kind not in [k for k, _l in KINDS]:
+            return
+        self.kind, self.page, self.q = kind, 1, ""
+        self.show_list()
 
     def turn(self, delta):
         pages = (self.data or {}).get("pages") or 1
@@ -248,7 +330,7 @@ class BoardWindow(object):
 
     def load_list(self, gen=None):
         gen = self._gen if gen is None else gen
-        kind, page = self.kind, self.page
+        kind, page, q = self.kind, self.page, self.q
         api = self.app.api
 
         def done(r, err):
@@ -256,12 +338,14 @@ class BoardWindow(object):
                 return
             if err:
                 return self.say(_err(err), U.DANGER)
-            if (kind, page) != (self.kind, self.page):
+            if (kind, page, q) != (self.kind, self.page, self.q):
                 return                       # 그사이 다른 것을 골랐다
             self.data = r or {}
+            self.data["q"] = q
             self.page = self.data.get("page") or page
             self._fill_list(self.data)
-        run_async(self.root, lambda: api.board(kind, page), done)
+        run_async(self.root, (lambda: api.board(kind, page, q)) if q
+                  else (lambda: api.board(kind, page)), done)
 
     def _fill_list(self, d):
         self.can_notice = bool(d.get("canNotice"))
@@ -273,14 +357,18 @@ class BoardWindow(object):
             self._row(p, pinned=True)
         for p in posts:
             self._row(p)
+        q = d.get("q") or ""
         if not pinned and not posts:
-            tk.Label(self.list, text="아직 글이 없습니다. 첫 글을 써 보세요.",
+            empty = ("'%s' 이(가) 들어간 글이 없습니다." % q) if q else (
+                "아직 패치노트가 없습니다." if d.get("kind") == "patch"
+                else "아직 글이 없습니다. 첫 글을 써 보세요.")
+            tk.Label(self.list, text=natural(empty),
                      bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S).pack(pady=40)
         pages = d.get("pages") or 1
         self.page_lbl.configure(text="%d / %d" % (d.get("page") or 1, pages))
         self.prev_btn.configure(state="normal" if self.page > 1 else "disabled")
         self.next_btn.configure(state="normal" if self.page < pages else "disabled")
-        self.count.configure(text="글 %d개" % (d.get("total") or 0))
+        self.count.configure(text=("찾은 글 %d개" if q else "글 %d개") % (d.get("total") or 0))
         try:
             self.cv.yview_moveto(0.0)
         except tk.TclError:
@@ -293,6 +381,14 @@ class BoardWindow(object):
         if seen and mark:
             try:
                 mark(max(seen))
+            except Exception:                               # noqa: BLE001
+                pass
+        # 패치노트 칸을 열어 봤다 - 새 패치노트 표시도 끈다
+        patches = [p["id"] for p in posts if p.get("kind") == "patch"]
+        mark = getattr(self.app, "mark_patch_seen", None)
+        if patches and mark and d.get("kind") == "patch":
+            try:
+                mark(max(patches))
             except Exception:                               # noqa: BLE001
                 pass
 
@@ -310,6 +406,18 @@ class BoardWindow(object):
         if n:
             tk.Label(top, text="댓글 %d" % n, bg=bg, fg=U.ACCENT, font=U.FONT_XS).pack(
                 side="right", anchor="n", padx=(8, 0), pady=(2, 0))
+        likes = int(p.get("likes") or 0)
+        extra = []
+        if likes:
+            # 댓글 수와 나란히: 엄지척 그림과 수. 내가 누른 글은 금색으로 채운다.
+            col = LIKE_ON if p.get("liked") else U.FG_DIM
+            lk = tk.Frame(top, bg=bg)
+            lk.pack(side="right", anchor="n", padx=(8, 0), pady=(2, 0))
+            icon = U.thumb_icon(lk, U.h(13), col, bool(p.get("liked")), bg)
+            icon.pack(side="left")
+            num = tk.Label(lk, text=str(likes), bg=bg, fg=col, font=U.FONT_XS)
+            num.pack(side="left", padx=(3, 0))
+            extra = [lk, icon, num]
         title = tk.Label(top, text=p.get("title") or "", bg=bg, fg=U.FG,
                          font=U.FONT_B, anchor="w", justify="left")
         title.pack(side="left", fill="x", expand=True, padx=(8, 0))
@@ -317,7 +425,7 @@ class BoardWindow(object):
         who = self._author(row, p, bg)
         who.pack(anchor="w", padx=12, pady=(0, 9))
         for w in [row, top, title, who] + list(top.winfo_children()) \
-                + list(who.winfo_children()):
+                + list(who.winfo_children()) + extra:
             w.bind("<Button-1>", lambda _e, i=p["id"]: self.open_post(i))
         return row
 
@@ -372,6 +480,7 @@ class BoardWindow(object):
         self._author(f, p, U.BG).pack(anchor="w", pady=(6, 10))
         tk.Frame(f, bg=U.LINE, height=U.h(1)).pack(fill="x", padx=(0, 8))
         self._body(f, p)
+        self._like_bar(f, p)
         tk.Frame(f, bg=U.LINE, height=U.h(1)).pack(fill="x", padx=(0, 8))
         U.marker_label(f, "댓글 %d" % int(p.get("comments") or 0),
                        bg=U.BG).pack(anchor="w", pady=(12, 8))
@@ -401,7 +510,7 @@ class BoardWindow(object):
         box = tk.Frame(parent, bg=U.BG)
         box.pack(fill="x", pady=(12, 16), padx=(0, 8))
         text = p.get("body") or ""
-        parts = split_links(text) if p.get("kind") == "notice" else [("text", text)]
+        parts = split_links(text) if p.get("kind") in TRUSTED_KINDS else [("text", text)]
         for kind, chunk in parts:
             if kind == "link":
                 lb = tk.Label(box, text=chunk, bg=U.BG, fg=LINK, font=self._link_font(),
@@ -414,6 +523,60 @@ class BoardWindow(object):
                               anchor="w", justify="left")
             lb.pack(fill="x")
             U.wrap_to_width(lb)
+
+    # ---------------- 좋아요 ----------------
+    def _like_bar(self, parent, p):
+        """본문 아래의 좋아요 단추. 엄지척 그림 + 수."""
+        bar = tk.Frame(parent, bg=U.BG)
+        bar.pack(fill="x", pady=(0, 14), padx=(0, 8))
+        btn = tk.Frame(bar, bg=U.BG2, highlightthickness=2, highlightbackground=U.LINE2,
+                       cursor="hand2")
+        btn.pack(side="left")
+        size = U.h(18)
+        self.like_cv = tk.Canvas(btn, width=size, height=size, bg=U.BG2,
+                                 highlightthickness=0, bd=0, cursor="hand2")
+        self.like_cv.pack(side="left", padx=(12, 6), pady=U.h(6))
+        self.like_lbl = tk.Label(btn, text="", bg=U.BG2, fg=U.FG, font=U.FONT_B,
+                                 cursor="hand2")
+        self.like_lbl.pack(side="left", padx=(0, 14))
+        self.like_btn = btn
+        self.like_busy = False
+        for w in (btn, self.like_cv, self.like_lbl):
+            w.bind("<Button-1>", lambda _e: self.toggle_like())
+        self._paint_like(p)
+
+    def _paint_like(self, p):
+        on = bool(p.get("liked"))
+        n = int(p.get("likes") or 0)
+        col = LIKE_ON if on else U.FG_DIM
+        try:
+            self.like_cv.delete("all")
+            U.draw_thumb(self.like_cv, 0, 0, U.h(18), col, on, U.BG2)
+            self.like_lbl.configure(text="좋아요 %d" % n, fg=LIKE_ON if on else U.FG)
+            self.like_btn.configure(highlightbackground=U.ACCENT_SHADOW if on else U.LINE2)
+        except tk.TclError:
+            pass
+
+    def toggle_like(self):
+        if not self.post or self.like_busy:
+            return
+        pid = self.post["id"]
+        gen = self._gen
+        api = self.app.api
+        self.like_busy = True
+
+        def done(r, err):
+            if not self.alive or gen != self._gen:
+                return
+            self.like_busy = False
+            if err:
+                return self.say(_err(err), U.DANGER)
+            # 글을 다시 그리지 않는다 - 읽던 자리가 맨 위로 튄다. 단추만 고친다.
+            self.post["likes"], self.post["liked"] = r.get("likes"), r.get("liked")
+            self._paint_like(self.post)
+            self.data = None                 # 목록의 수는 다음에 새로 받는다
+            self.say("좋아요를 눌렀습니다." if r.get("liked") else "좋아요를 취소했습니다.")
+        run_async(self.root, lambda: api.board_like(pid), done)
 
     def _link_font(self):
         f = getattr(self, "_lf", None)

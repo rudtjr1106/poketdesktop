@@ -24,8 +24,18 @@ SpriteCollab 에 없는 14종은
 [baptiste-ro/pokemon-followers-sprites](https://github.com/baptiste-ro/pokemon-followers-sprites)
 로 메웠다 (HGSS 풍 4방향 도트).
 
-어느 쪽에도 없는 43종(야생에 나오는 건 29종)은 배틀 도트로 대신한다.
-그 종들은 정면 고정이라 걷는 모습이 없다.
+그 둘에도 없는 40종(미라이돈·패러독스·재앙의 포켓몬 등)과 메가 폼 19개
+(메가보만다·메가메타그로스 …)는 1.9.0 부터
+[rh-hideout/pokeemerald-expansion](https://github.com/rh-hideout/pokeemerald-expansion)
+의 따라다니는 포켓몬 도트(`graphics/pokemon/…/overworld.png`)로 메운다.
+GBA 풍 4방향 도트이고, 그 프로젝트에 기여한 팬들이 그린 것이다 (이로치는
+같은 그림에 팔레트만 바꾼다). 서버가 받아서 우리 시트 꼴로 다시 짠다
+(`server/app/pngmini.py`). 따로 적힌 라이선스가 없으므로 위와 같이 **비상업**
+으로만 쓰고 출처를 여기에 밝힌다.
+
+세 출처를 합치면 기본 종 1025종이 모두 걷는다 (2026-10 확인). 어느 쪽에도
+없는 것은 레전드 Z-A 에서 새로 나온 메가 폼 34개뿐이고, 그건 배틀 도트로
+서 있는다 (정면 고정이라 걷는 모습이 없다).
 
 ## 관장 도전
 

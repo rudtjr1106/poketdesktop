@@ -889,16 +889,30 @@ class Battle(object):
             if not form:
                 continue
             before = f.name
+            old_ability = f.ability
             f.mega_evolve(form)
             self.mega_done.add(w)
             via = ("화룡점정" if form.get("megaMove")
                    else H.name(form.get("megaStone")) or "메가스톤")
-            ev.append({"t": "mega", "who": w, "name": before, "to": form["kr"],
+            mega_ev = {"t": "mega", "who": w, "name": before, "to": form["kr"],
                        "newName": f.name,          # 별명이면 별명 그대로
                        "species": form["internal"], "num": form["num"],
                        "types": list(form.get("types") or []),
                        "text": "%s 의 %s 와(과) 키스톤이 반응했다! %s 은(는) %s (으)로 "
-                               "메가진화했다!" % (before, via, before, form["kr"])})
+                               "메가진화했다!" % (before, via, before, form["kr"])}
+            ev.append(mega_ev)
+            if f.ability_on and f.ability:
+                # **메가진화하면 특성도 메가 폼의 것으로 바뀐다.** 엔진은 바꾸고
+                # 있었는데 아무 데도 알리지 않아서, 화면에는 옛 특성(가디안이
+                # 트레이스로 베낀 것)이 그대로 남아 있었다 (제보). 메가 폼의
+                # 특성은 하나로 정해져 있어 상대에게도 그대로 보인다.
+                f.ab["shown"] = True
+                mega_ev["ability"] = f.ability
+                mega_ev["abilityKr"] = self.dex.ability_name(f.ability)
+                if f.ability != old_ability:
+                    ev.append({"t": "msg", "who": w,
+                               "text": "%s 의 특성이 %s (으)로 바뀌었다!"
+                                       % (f.name, mega_ev["abilityKr"])})
             if f.ability_on:
                 A.on_switch_in(self, f, w, ev)           # 위협 ...
                 SM.on_enter_abilities(self, f, w, ev)    # 가뭄·잔비 같은 날씨·필드

@@ -90,7 +90,9 @@ class FakeApi(object):
               "games": 10, "wins": 6, "losses": 4, "nextTier": "hyper",
               "nextTierKr": "하이퍼볼", "rpToNext": 380, "floorRp": 300,
               "firstWinToday": False, "teamRegistered": True, "teamSize": 6,
-              "title": "시즌 1 상위권", "frameColor": None}
+              "title": "시즌 1 상위권", "frameColor": None,
+              # 1.9.0: 오늘 랜덤 배틀을 몇 판 더 걸 수 있나
+              "fight": {"foughtToday": 8, "dailyBattles": 20, "left": 12}}
         if self.old_server:
             for r in rows:
                 for k in ("rp", "tier", "tierKr", "title", "frame", "frameColor"):
@@ -211,6 +213,15 @@ def main():
         and "이로치사탕 1개" in t, t)
     chk("레벨 상한 규칙", "Lv.50 상한" in t)
     chk("시즌 끝나는 날", "10월 27일까지" in rw.sub.cget("text"), rw.sub.cget("text"))
+    sub = rw.sub.cget("text")
+    chk("머리줄: 전적 다음에 오늘 몇 판 가능한지 (1.9.0)",
+        "10전 6승 4패  ·  오늘 12판 가능  ·  10월 27일까지" in sub, sub)
+    chk("  다 썼으면 그렇게 적는다", ui_rank.today_text({"left": 0, "dailyBattles": 20})
+        == "오늘은 다 했습니다 (20판)" and ui_rank.today_text({"left": 1, "dailyBattles": 20})
+        == "오늘 1판 가능")
+    rw.sub.update_idletasks()
+    chk("  머리줄 글이 잘리지 않는다", rw.sub.winfo_width() >= rw.sub.winfo_reqwidth(),
+        (rw.sub.winfo_width(), rw.sub.winfo_reqwidth()))
     chk("명예의 전당", "시즌 1 명예의 전당" in t)
     rw._random()
     pump(root, lambda: "초 뒤에" in rw.status._label.cget("text"))

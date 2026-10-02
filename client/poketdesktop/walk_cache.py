@@ -12,8 +12,9 @@
 Charge, Shoot, Hop. 종마다 있는 것이 다르므로(11~37개) 없는 동작은
 ok:false 로 적어 두고 부르는 쪽이 대신할 것을 고른다.
 
-**걷는 도트가 아예 없는 종도 있다**(1025 중 57마리, 대부분 9세대).
-그건 배틀 도트로 대신하고, 다른 동작도 쓸 수 없다.
+**걷는 도트가 아예 없는 종도 있었다**(1025 중 57마리, 대부분 9세대). 서버가
+둘째(HGSS 풍)·셋째(GBA 풍, 1.9.0) 출처에서 메워 준다. 그 출처들에는 걷기밖에
+없어서, 거기서 온 종은 다른 동작을 쓰지 않는다 (WALK_ONLY).
 
 **이로치는 옆 폴더(0025s)에 따로 받는다** (1.4.0). 이로치 시트가 없는 종은
 보통 색 시트로 걷는다 - 배틀 도트로 굳는 것보다 낫다. 받은 시트를 담는
@@ -37,6 +38,14 @@ ANIMS = ("Idle", "Sleep", "Sit", "Laying", "Wake", "Hop", "Hurt",
 _lock = threading.Lock()
 _failed = {}
 RETRY_AFTER = 300.0        # 못 받았을 때 다시 시도하기까지 (초)
+# '이 종에는 걷는 도트가 없다' 는 표시의 세대 (서버의 MISS_GEN 과 같은 뜻).
+# 서버에 출처가 늘면 올린다. 1.9.0 에서 세 번째 출처가 붙어 미라이돈 등 40종과
+# 메가 19폼이 걷게 됐는데, 이 PC 에 '없다' 고 적어 둔 것을 그대로 믿으면
+# 영영 안 물어본다. 세대가 낮은 표시는 못 본 것으로 치고 다시 묻는다.
+MISS_GEN = 2
+# 걷기밖에 없는 출처. 여기서 온 종은 다른 동작(서기·자기)을 쓰지 않는다 -
+# 다른 출처의 그림을 섞으면 서 있을 때만 그림체가 바뀐다.
+WALK_ONLY = ("follow", "ow")
 
 
 def walk_dir():
@@ -120,10 +129,18 @@ def local(num, name="Walk", shiny=False):
     except (OSError, ValueError):
         return None, None
     if not meta.get("ok"):
+        if name == "Walk" and int(meta.get("gen") or 1) < MISS_GEN:
+            return None, None           # 출처가 늘기 전의 표시다. 다시 물어본다
         return None, meta
     if os.path.exists(png) and os.path.getsize(png) > 0:
         return png, meta
     return None, None
+
+
+def walk_only(num):
+    """이 종의 걷기가 걷기밖에 없는 출처에서 왔는가 (받아 둔 것만 본다)."""
+    _png, meta = local(num, "Walk")
+    return bool(meta and meta.get("ok") and meta.get("src") in WALK_ONLY)
 
 
 def ensure(api, num, name="Walk", shiny=False):
@@ -135,6 +152,8 @@ def ensure(api, num, name="Walk", shiny=False):
     if not num:
         return None, None
     num = int(num)
+    if name != "Walk" and walk_only(num):
+        return None, None
     shiny = T.norm(shiny)
     if isinstance(shiny, str):
         return _ensure_tinted(api, num, name, shiny)
@@ -226,7 +245,7 @@ def _ensure_one(api, num, name, shiny):
         # 없다는 사실을 남겨 둔다. 다음부터 안 물어본다.
         try:
             with open(meta_path, "w", encoding="utf-8") as f:
-                json.dump({"ok": False}, f)
+                json.dump({"ok": False, "gen": MISS_GEN}, f)
         except OSError:
             pass
         return None, None

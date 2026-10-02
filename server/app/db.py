@@ -161,7 +161,10 @@ CREATE TABLE IF NOT EXISTS board_post (
     body        TEXT NOT NULL,
     created_at  TEXT NOT NULL,
     updated_at  TEXT,
-    deleted     INTEGER NOT NULL DEFAULT 0
+    deleted     INTEGER NOT NULL DEFAULT 0,
+    -- 서버가 스스로 올린 글의 열쇠 (1.9.0). 패치노트는 'patch:1.9.0' -
+    -- 같은 버전을 두 번 올리지 않으려고 본다. 사람이 쓴 글은 NULL.
+    ref         TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_board_post_kind ON board_post(kind, deleted, id);
 CREATE INDEX IF NOT EXISTS idx_board_post_user ON board_post(user_id, created_at);
@@ -179,6 +182,30 @@ CREATE TABLE IF NOT EXISTS board_comment (
 );
 CREATE INDEX IF NOT EXISTS idx_board_comment_post ON board_comment(post_id, id);
 CREATE INDEX IF NOT EXISTS idx_board_comment_user ON board_comment(user_id, created_at);
+
+-- 좋아요 (1.9.0). 글 하나에 한 사람이 한 번. 다시 누르면 줄을 지운다.
+CREATE TABLE IF NOT EXISTS board_like (
+    post_id     INTEGER NOT NULL REFERENCES board_post(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_board_like_user ON board_like(user_id);
+
+-- 게시판 알림 (1.9.0). 내 글에 댓글이 달렸거나(comment) 내 댓글에 답글이
+-- 달렸을 때(reply) 받는 사람 앞으로 한 줄. **그 글을 열어 보면 줄을 지운다** -
+-- 본 알림은 쌓아 두지 않는다 (seen 칸은 늘 0 이다. 처음 만들 때의 흔적).
+CREATE TABLE IF NOT EXISTS board_notify (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id     INTEGER NOT NULL REFERENCES board_post(id) ON DELETE CASCADE,
+    comment_id  INTEGER NOT NULL REFERENCES board_comment(id) ON DELETE CASCADE,
+    kind        TEXT NOT NULL,          -- comment / reply
+    actor       TEXT NOT NULL,          -- 쓴 사람의 그때 닉네임
+    created_at  TEXT NOT NULL,
+    seen        INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_board_notify_user ON board_notify(user_id, seen, id);
 
 -- PC 박스 이름. 안 바꾼 박스는 여기 줄이 없다 (기본 이름은 클라가 짓는다).
 CREATE TABLE IF NOT EXISTS box_name (
@@ -799,6 +826,8 @@ MIGRATIONS = [
      "ALTER TABLE live_match ADD COLUMN recorded INTEGER NOT NULL DEFAULT 0"),
     # 시즌 3 개발 중에 만든 DB 에는 이 칸이 없다
     ("bond", "seen", "ALTER TABLE bond ADD COLUMN seen INTEGER NOT NULL DEFAULT 0"),
+    # 1.9.0: 서버가 올린 글의 열쇠 (패치노트)
+    ("board_post", "ref", "ALTER TABLE board_post ADD COLUMN ref TEXT"),
 ]
 
 

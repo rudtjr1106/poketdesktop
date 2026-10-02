@@ -179,6 +179,66 @@ def marker_label(parent, text, bg=None, color=FG_DIM, mark=ACCENT):
     return row
 
 
+# ---------------------------------------------------------------- 작은 그림
+# 이모지(👍 ⚙)를 글자로 쓰지 않는다. 운영체제마다 모양과 색이 다르고, 맥의 Tk 는
+# 색 이모지를 그리다 죽는 판이 있다. Canvas 에 선으로 그리면 어디서나 같다.
+def draw_thumb(cv, x, y, size, color, filled=False, bg=None):
+    """엄지척. (x, y) 가 왼쪽 위, size 가 한 변. 그린 것들의 id 를 돌려준다."""
+    k = size / 20.0
+    bg = bg or cv["bg"]
+    hand = [7.5, 9, 10.5, 2.5, 12.5, 2.5, 13.2, 4, 12.3, 8, 17, 8, 18.2, 9.5,
+            16.8, 17.5, 7.5, 17.5]
+    pts = [(x + v * k) if i % 2 == 0 else (y + v * k) for i, v in enumerate(hand)]
+    w = max(1, int(round(1.6 * k)))
+    fill = color if filled else bg
+    return [cv.create_polygon(pts, fill=fill, outline=color, width=w, joinstyle="round"),
+            cv.create_rectangle(x + 2 * k, y + 9 * k, x + 5.6 * k, y + 17.5 * k,
+                                fill=fill, outline=color, width=w)]
+
+
+def thumb_icon(parent, size=18, color=FG_DIM, filled=False, bg=None):
+    """엄지척 그림 하나 (Canvas)."""
+    bg = bg or parent["bg"]
+    cv = tk.Canvas(parent, width=size, height=size, bg=bg, highlightthickness=0, bd=0)
+    draw_thumb(cv, 0, 0, size, color, filled, bg)
+    return cv
+
+
+def gear_icon(parent, size=22, color=FG_DIM, bg=None):
+    """톱니바퀴 (Canvas). 이가 여덟 개, 가운데 구멍."""
+    import math
+    bg = bg or parent["bg"]
+    cv = tk.Canvas(parent, width=size, height=size, bg=bg, highlightthickness=0, bd=0)
+    c = size / 2.0
+    r_out, r_in, r_hole = size * 0.46, size * 0.33, size * 0.15
+    pts = []
+    for i in range(8):
+        a = math.pi * 2 * i / 8
+        for da, r in ((-0.27, r_in), (-0.16, r_out), (0.16, r_out), (0.27, r_in)):
+            pts += [c + r * math.cos(a + da), c + r * math.sin(a + da)]
+    cv.gear = cv.create_polygon(pts, fill=color, outline=color)
+    cv.hole = cv.create_oval(c - r_hole, c - r_hole, c + r_hole, c + r_hole,
+                             fill=bg, outline=bg)
+    return cv
+
+
+def icon_button(parent, icon, command, tip=None, hover=None):
+    """그림 하나짜리 단추. icon 은 gear_icon 같은 Canvas. 올리면 색이 밝아진다."""
+    base = icon.itemcget(getattr(icon, "gear", 1), "fill")
+    hover = hover or ACCENT
+
+    def paint(col):
+        try:
+            icon.itemconfigure(icon.gear, fill=col, outline=col)
+        except (tk.TclError, AttributeError):
+            pass
+    icon.configure(cursor="hand2")
+    icon.bind("<Enter>", lambda _e: paint(hover))
+    icon.bind("<Leave>", lambda _e: paint(base))
+    icon.bind("<Button-1>", lambda _e: command())
+    return icon
+
+
 class Segmented(object):
     """나란히 붙은 고르기 단추 ([도구 | 기술머신], [전체 | 공지 | 자유]).
 
@@ -289,6 +349,9 @@ class PushButton(object):
     def grid(self, **kw):
         self.holder.grid(**kw)
         return self
+
+    def pack_forget(self):
+        self.holder.pack_forget()
 
     def configure(self, text=None, state=None):
         # 글씨가 그대로면 건드리지 않는다. 고를 때마다 같은 글씨로 다시

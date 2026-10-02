@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""1.0.13 에서 들어온 창 셋이 제 크기로 만들어지는가.
+"""1.0.13 에서 들어온 창들이 제 크기로 만들어지는가.
+
+(패치노트 창은 1.9.0 에서 없앴다 - 게시판의 패치노트 칸으로 갔다.)
 
     python client/smoke_new_windows.py
 
@@ -33,8 +35,6 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 import tkinter as tk                                       # noqa: E402
 
-from common import patchnotes                              # noqa: E402
-from common.version import VERSION                         # noqa: E402
 from poketdesktop import config, ui_settings, ui_update    # noqa: E402
 from poketdesktop import ui_common as U                    # noqa: E402
 from poketdesktop import platform_os as PLAT               # noqa: E402
@@ -132,21 +132,6 @@ def main():
         "설정=%r" % app.settings["notifyImportant"])
     sw.close()
 
-    # ---------------- 패치노트 창 ----------------
-    print("새로운 기능 창")
-    entry = patchnotes.entry(VERSION) or patchnotes.latest()
-    chk("보여줄 패치노트가 있다", entry is not None)
-    if entry:
-        pn = ui_update.PatchNotes(root, entry, greet=True)
-        pn.win.update_idletasks()
-        lines = int(pn.txt.index("end-1c").split(".")[0])
-        print("  본문 %d줄" % lines)
-        # 항목마다 제목 한 줄, 설명 있으면 한 줄. 적어도 항목 수만큼은 있다.
-        chk("항목이 본문에 다 들어갔다", lines >= len(entry["items"]),
-            "lines=%d items=%d" % (lines, len(entry["items"])))
-        chk("스크롤이 달려 있다", pn.txt.cget("yscrollcommand") != "")
-        pn.close()
-
     # ---------------- 새 버전 묻는 창 ----------------
     print("새 버전 묻는 창")
     body = open(os.path.join(os.path.dirname(HERE), ".github",
@@ -170,13 +155,6 @@ def main():
     # withdraw 해서, 여기 세 창이 맥에서 한 번도 안 떴다. 이 러너의 root
     # 도 withdraw 돼 있으니, 앱과 같은 조건이다.
     print("창이 보이는가")
-    shown = ui_update.PatchNotes(root, entry)
-    shown.show()
-    root.update_idletasks()
-    chk("새로운 기능 창이 화면에 있다",
-        shown.win.state() == "normal" and shown.win.winfo_viewable() == 1,
-        "state=%s viewable=%s" % (shown.win.state(), shown.win.winfo_viewable()))
-    shown.close()
 
     ask = ui_update.NewVersionAsk(root, {"version": "9.9.9", "size": 0,
                                          "notes": ""})

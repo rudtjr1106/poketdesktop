@@ -32,7 +32,7 @@ from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
 from . import (achievements, auth, battle_routes, board, board_routes, mega, config, db, deps, eggs, item_routes,  # noqa: E402
-               errors, items, live, live_routes, migrations, pvp, pvp_routes,
+               errors, items, live, live_routes, migrations, mypage, pvp, pvp_routes,
                raid, raid_routes,
                gym_routes, social_routes, tm_routes, tms, walk)
 
@@ -46,6 +46,7 @@ app.include_router(gym_routes.router)
 app.include_router(raid_routes.router)
 app.include_router(live_routes.router)
 app.include_router(board_routes.router)
+app.include_router(mypage.router)
 
 RNG = deps.RNG
 
@@ -68,6 +69,14 @@ def _startup():
         threading.Thread(target=_warm_sprites, daemon=True).start()
     db.init()
     migrations.run()
+    # 게시판의 패치노트 글 (1.9.0). 새 판으로 처음 뜰 때 그 판의 글이 생긴다.
+    try:
+        made = board.ensure_patch_posts()
+        if made:
+            print("[board] 패치노트 글 %d개를 올렸습니다 (%s ~ %s)"
+                  % (len(made), made[0], made[-1]))
+    except Exception as e:                                  # noqa: BLE001
+        print("[board] 패치노트 글을 올리지 못했습니다: %s" % e)
     auth.purge_expired()
     # 양쪽이 다 본 오래된 대전 로그를 치운다. 한 판에 수십 KB 라
     # 그냥 두면 Turso 용량을 제일 먼저 먹는다. 전적은 그대로 남는다.
@@ -393,7 +402,16 @@ WALK_BASE = "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/spr
 # 다르지만, 걷지도 않는 정면 도트보다는 낫다. **여기에는 걷기밖에 없다.**
 FOLLOW_BASE = ("https://raw.githubusercontent.com/baptiste-ro/"
                "pokemon-followers-sprites/main/followsprites")
+# 세 번째 출처 (1.9.0). 위 둘에 없는 종(미라이돈·패러독스·재앙 등 40종)과
+# 메가 폼 19개(메가보만다·메가메타그로스 …)의 걷는 도트가 여기 있다.
+# GBA 풍 4방향, 방향마다 두 칸. 한 줄짜리 그림이라 받아서 우리 시트 꼴로
+# 다시 짠다 (pngmini.overworld_sheet). **걷기밖에 없다.** 팬이 그린 도트다.
+OW_BASE = ("https://raw.githubusercontent.com/rh-hideout/"
+           "pokeemerald-expansion/master/graphics/pokemon")
 WALK_DIR = os.environ.get("POKET_WALK_DIR", os.path.join(SPRITE_DIR, "walk"))
+# '이 종에는 걷는 도트가 없다' 는 표시의 세대. 출처가 늘면 올린다 - 예전에
+# 없다고 적어 둔 종을 새 출처에서 한 번 더 찾아보게 된다 (_anim_meta).
+MISS_GEN = 2
 
 # 받아도 되는 애니메이션 이름. **이름이 URL 에서 오므로 반드시 막아야
 # 한다** - 안 그러면 남의 저장소 아무 경로나 우리 서버로 받아오게 시킬 수
@@ -415,6 +433,14 @@ ANIM_NAMES = ("Walk", "Idle", "Sleep", "EventSleep", "Wake", "Sit", "Laying",
 ROWMAP_PMD = {"down": 0, "downright": 1, "right": 2, "upright": 3,
               "up": 4, "upleft": 5, "left": 6, "downleft": 7}
 ROWMAP_FOLLOW = {"down": 0, "left": 1, "right": 2, "up": 3}
+
+
+def ow_folder(en):
+    """영어 이름을 세 번째 출처의 폴더 이름으로. 'Iron Treads' -> 'iron_treads'."""
+    import re
+    s = (en or "").lower().replace("♀", "_f").replace("♂", "_m").replace("é", "e")
+    s = re.sub(r"[.':]", "", s)
+    return re.sub(r"[\s\-]+", "_", s).strip("_")
 
 
 def _anim_paths(num, name, shiny=False):
@@ -525,6 +551,11 @@ def _anim_fetch(num, name, shiny=False):
     png_path, meta_path = _anim_paths(num, name, shiny)
     os.makedirs(os.path.dirname(png_path), exist_ok=True)
     mega = _mega_walk(num)
+    if mega and mega.startswith(OW_MARK):
+        # 세 번째 출처에만 있는 메가 폼 (1.9.0). 거기에는 걷기밖에 없다.
+        if name != "Walk":
+            return _mark_missing(meta_path)
+        return _walk_fetch_ow(mega[len(OW_MARK):], png_path, meta_path, shiny)
     if mega:
         # 메가 폼 (1.8.0). SpriteCollab 은 폼을 종 아래 폴더로 둔다
         # (sprite/0006/0001/ = 메가리자몽X). 이로치는 그 아래 0001.
@@ -552,11 +583,13 @@ def _anim_fetch(num, name, shiny=False):
                     return None             # 저쪽이 잠깐 안 된다. 다음에 다시
             elif isinstance(e, OSError):
                 return None                 # 끊김·시간초과. 없는 종인지 모른다
-            if name == "Walk" and not mega \
-                    and (_anim_meta(num, "Walk") or {}).get("src") == "follow":
+            src = (_anim_meta(num, "Walk") or {}).get("src") if name == "Walk" and not mega else None
+            if src == "follow":
                 # 보통 걷기도 두 번째 출처에서 온 종이면 이로치도 거기서. 보통은
                 # SpriteCollab 인데 이로치만 followers 로 받으면 그림체가 바뀐다.
                 return _walk_fetch_follow(num, png_path, meta_path, shiny=True)
+            if src == "ow":
+                return _walk_fetch_ow(_ow_path(num), png_path, meta_path, True)
             return _mark_missing(meta_path)
         if mega:
             # 메가 폼은 두 번째 출처가 없다. **404 일 때만** 없다고 적는다.
@@ -594,10 +627,14 @@ def _anim_fetch(num, name, shiny=False):
 
 
 def _mark_missing(meta_path):
-    """이 종에 이 동작이 없다고 적어 둔다. 다음부터 안 물어본다."""
+    """이 종에 이 동작이 없다고 적어 둔다. 다음부터 안 물어본다.
+
+    gen 은 '출처 몇 개를 다 뒤져 보고 적은 것인가' 다 (MISS_GEN).
+    """
     try:
+        os.makedirs(os.path.dirname(meta_path), exist_ok=True)
         with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump({"ok": False}, f)
+            json.dump({"ok": False, "gen": MISS_GEN}, f)
     except OSError:
         pass
     return None
@@ -624,8 +661,11 @@ def _walk_fetch_follow(num, png_path, meta_path, shiny=False):
             # 저쪽이 잠깐 맛이 간 것이다. 표시를 남기면 안 된다 -
             # 한 번 실패한 종이 영영 안 걷게 된다.
             return None
-        # 404 라야 '어느 쪽에도 없는 종' 이다. 그때만 남긴다.
-        return _mark_missing(meta_path)
+        # 여기에도 없다. 세 번째 출처를 본다 (1.9.0). 이로치는 보통 걷기가
+        # 이 출처에서 온 종만 여기로 오므로(_anim_fetch) 그대로 없다고 적는다.
+        if shiny:
+            return _mark_missing(meta_path)
+        return _walk_fetch_ow(_ow_path(num), png_path, meta_path, False)
     except (urllib.error.URLError, OSError, ValueError):
         # network 오류·시간초과·깨진 파일. 없는 종인지 알 수 없으므로
         # 아무것도 남기지 않고 다음에 다시 물어본다.
@@ -645,21 +685,110 @@ def _walk_fetch_follow(num, png_path, meta_path, shiny=False):
     return meta
 
 
+# 메가 폼의 walk 칸에 이 머리말이 붙어 있으면 세 번째 출처의 경로다
+# ("ow:salamence/mega"). SpriteCollab 경로("0006/0001")와 한 칸을 같이 쓴다 -
+# 화면은 walk 가 비었는지만 보므로 옛 클라이언트도 그대로 걷게 된다.
+OW_MARK = "ow:"
+OW_TICKS = [12, 12]           # 두 칸을 번갈아. 1/60초 틱 (한 걸음 0.2초)
+
+
+def _ow_path(num):
+    """기본 종의 세 번째 출처 폴더 ('miraidon'). 도감의 영어 이름에서 만든다."""
+    return ow_folder((dex().by_num.get(num) or {}).get("en"))
+
+
+def _ow_fetch(url, timeout=12):
+    import urllib.request
+    with urllib.request.urlopen(url, timeout=timeout) as r:
+        return r.read()
+
+
+def _walk_fetch_ow(path, png_path, meta_path, shiny=False):
+    """세 번째 출처(pokeemerald-expansion)에서 걷는 도트를 받아 우리 시트로 바꾼다.
+
+    path 는 그 저장소의 폴더다 ('miraidon', 'salamence/mega'). 한 줄 여섯 칸짜리
+    팔레트 그림을 네 줄 x 두 칸 RGBA 로 다시 짠다 (pngmini). 이로치는 그림이
+    따로 없고 팔레트 파일만 달라서, 팔레트를 받아 같은 그림에 입힌다.
+
+    다른 출처와 같은 약속: **404 일 때만** 없다고 적는다. 끊겼거나 저쪽이
+    잠깐 안 되면 None - 다음에 다시 물어본다.
+    """
+    import re
+    import urllib.error
+    import zlib
+    from . import pngmini
+    if not path or not re.match(r"^[a-z0-9_]+(/[a-z0-9_]+)?$", path):
+        return _mark_missing(meta_path)          # 경로가 URL 에 들어간다
+    try:
+        raw = _ow_fetch("%s/%s/overworld.png" % (OW_BASE, path))
+        pal = None
+        if shiny:
+            pal = pngmini.parse_pal(_ow_fetch(
+                "%s/%s/overworld_shiny.pal" % (OW_BASE, path)).decode("utf-8", "replace"))
+        png, cell = pngmini.overworld_sheet(raw, pal)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            return None
+        return _mark_missing(meta_path)
+    except (urllib.error.URLError, OSError):
+        return None
+    except (ValueError, IndexError, zlib.error):
+        # 받기는 했는데 우리가 아는 꼴이 아니다. 다시 받아도 같다.
+        return _mark_missing(meta_path)
+
+    os.makedirs(os.path.dirname(png_path), exist_ok=True)
+    tmp = png_path + ".part"
+    with open(tmp, "wb") as f:
+        f.write(png)
+    os.replace(tmp, png_path)
+    meta = {"ok": True, "frameW": cell, "frameH": cell,
+            "durations": list(OW_TICKS), "frames": 2, "rows": 4,
+            "rowmap": ROWMAP_FOLLOW, "src": "ow", "anim": "Walk"}
+    if shiny:
+        meta["shiny"] = True
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f)
+    return meta
+
+
+def _walk_only(num):
+    """이 종의 걷기가 걷기밖에 없는 출처(follow·ow)에서 왔는가. 받아 둔 것만 본다."""
+    _png, meta_path = _anim_paths(num, "Walk")
+    try:
+        with open(meta_path, encoding="utf-8") as f:
+            return json.load(f).get("src") in ("follow", "ow")
+    except (OSError, ValueError):
+        return False
+
+
 def _anim_meta(num, name, shiny=False):
     if name == "Walk" and not shiny:
         _migrate_old_walk(num)
+    if name != "Walk" and _walk_only(num):
+        # 걷기를 둘째·셋째 출처에서 받은 종이다. 그 출처에는 걷기밖에 없다.
+        # SpriteCollab 에 Idle 만 덩그러니 있는 종이 있는데(무쇠바퀴·딩루),
+        # 그걸 섞으면 서 있을 때만 그림체가 바뀐다. 없는 것으로 한다.
+        return {"ok": False}
     _png, meta_path = _anim_paths(num, name, shiny)
     if os.path.exists(meta_path):
         try:
             with open(meta_path, encoding="utf-8") as f:
-                return json.load(f)
+                meta = json.load(f)
+            # **출처가 늘기 전에 '없다' 고 적어 둔 걷기는 한 번 더 찾아본다.**
+            # 그대로 믿으면 새 출처에 있는 종이 영영 안 걷는다.
+            if not (name == "Walk" and not meta.get("ok")
+                    and int(meta.get("gen") or 1) < MISS_GEN):
+                return meta
         except (OSError, ValueError):
             pass
     return _anim_fetch(num, name, shiny)
 
 
 def _mega_walk(num):
-    """메가 폼 번호면 SpriteCollab 의 걷는 도트 경로("0006/0001"). 아니면 None.
+    """메가 폼 번호면 걷는 도트의 경로. 아니면 None.
+
+    SpriteCollab 의 경로("0006/0001")이거나, 세 번째 출처의 경로에 머리말을
+    붙인 것("ow:salamence/mega", 1.9.0)이다.
 
     경로는 도감 자료가 정한다 (tools/add_megas.py 의 walk). 번호가 URL 에서
     오므로, 도감에 적힌 폼만 통과시킨다.
@@ -961,7 +1090,7 @@ def me(ctx=Depends(current)):
         # 메가진화 (시즌 3): 키스톤·빛나는 돌을 띄울 개체·받을 스톤
         "bond": mega.me_card(uid),
         # 게시판 (1.8.0): 가장 최근 공지의 번호. 화면이 '새 공지' 를 표시한다
-        "board": board.me_card(),
+        "board": board.me_card(uid),
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 

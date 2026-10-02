@@ -241,6 +241,9 @@ jobs:
         run: python client/test_bag_tabs.py
       - name: 게시판 화면 (진짜 Tk)
         run: python client/test_board_ui.py
+      # 1.9.0: 마이페이지 (설정 탭 자리) - 내 기록, 칭호 줄바꿈, 톱니바퀴 = 설정
+      - name: 마이페이지 화면 (진짜 Tk)
+        run: python client/test_mypage_ui.py
       # 1.8.0: 메가진화한 모습으로 바탕화면 걷기 + 메가진화 연출 (바탕화면·배틀 창)
       - name: 메가 폼으로 걷기·메가진화 연출 (진짜 Tk)
         run: python client/test_mega_walk.py
@@ -330,6 +333,9 @@ jobs:
         run: python client/test_bag_tabs.py
       - name: 게시판 화면 (진짜 Tk)
         run: python client/test_board_ui.py
+      # 1.9.0: 마이페이지 (설정 탭 자리) - 내 기록, 칭호 줄바꿈, 톱니바퀴 = 설정
+      - name: 마이페이지 화면 (진짜 Tk)
+        run: python client/test_mypage_ui.py
       # 1.8.0: 메가진화한 모습으로 바탕화면 걷기 + 메가진화 연출 (바탕화면·배틀 창)
       - name: 메가 폼으로 걷기·메가진화 연출 (진짜 Tk)
         run: python client/test_mega_walk.py
@@ -400,6 +406,8 @@ jobs:
           python test_mega.py
           python test_legend_limit.py
           python test_board.py
+          python test_mypage.py
+          python test_walk_ow.py
           python test_s3_void.py
           python test_catch_exp.py
 

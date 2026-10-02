@@ -58,7 +58,9 @@ class Row(object):
 
 class SettingsWindow(object):
 
-    def __init__(self, app, parent=None):
+    def __init__(self, app, parent=None, header=True):
+        """header=False 면 '설정' 머리줄을 안 그린다 - 마이페이지 안에 들어갈 때는
+        그쪽 머리줄이 이미 '설정' 이라고 적는다 (1.9.0)."""
         self.app = app
         self.root = app.root
         s = app.settings
@@ -72,12 +74,13 @@ class SettingsWindow(object):
             # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
             U.install_wheel(self.win)
 
-        head = tk.Frame(self.win, bg=U.BG2, height=U.h(56))
-        head.pack(fill="x")
-        head.pack_propagate(False)
-        tk.Label(head, text="설정", bg=U.BG2, fg=U.FG,
-                 font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=16, pady=15)
-        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+        if header:
+            head = tk.Frame(self.win, bg=U.BG2, height=U.h(56))
+            head.pack(fill="x")
+            head.pack_propagate(False)
+            tk.Label(head, text="설정", bg=U.BG2, fg=U.FG,
+                     font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=16, pady=15)
+            tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
         # **스크롤을 붙인다.** 이 창은 690px 를 바라는데 허브 탭
         # 안쪽은 640px 밖에 안 된다. 그냥 두면 아래가 잘려서 자동
@@ -103,6 +106,15 @@ class SettingsWindow(object):
         Row(p, "포켓몬 크기", "도트를 이 높이에 맞춰 통일합니다.",
             24, 120, s["targetHeight"], "%.0f px",
             lambda v: self._set_size(int(v)), step=4)
+        # 투명도는 '얼마나 비치는가' 로 보여 준다 (0% = 그대로). 설정에는 또렷한
+        # 정도(petOpacity, 100 = 그대로)로 적는다 - 기본값이 0 이 아니라 100 이라
+        # 값이 없던 옛 설정 파일에서도 그대로 보인다.
+        Row(p, "포켓몬 투명도",
+            "올릴수록 뒤가 비쳐 보입니다. 바탕화면을 걸어다니는 포켓몬과 "
+            "거기서 싸우는 포켓몬에 적용됩니다. 99% 면 거의 보이지 않습니다.",
+            0, 100 - config.PET_OPACITY_MIN,
+            100 - int(round(config.pet_alpha(s) * 100)), "%.0f%%",
+            lambda v: self._set_alpha(int(round(v))), step=1)
         Row(p, "걷는 속도", "느리게 두면 더 느긋하게 돌아다닙니다.",
             0.3, 3.0, s["walkSpeed"], "x%.1f",
             lambda v: self._set("walkSpeed", round(v, 1)), step=0.1)
@@ -146,7 +158,7 @@ class SettingsWindow(object):
         self.names = tk.BooleanVar(value=bool(s.get("showNames")))
         self.grass = tk.BooleanVar(value=bool(s.get("showGrass", True)))
         self.notif = tk.BooleanVar(value=bool(s.get("notifyImportant", True)))
-        # **알림은 둘만 띄운다** - 새 버전과 친구 요청. 게임 안에서
+        # **알림은 셋만 띄운다** - 새 버전, 친구 요청, 게시판 댓글(1.9.0). 게임 안에서
         # 벌어지는 일(잡았다, 레벨이 올랐다)은 이걸 켜도 안 띄운다.
         # 바탕화면에서 눈으로 보이는 것으로 충분하고, 그런 것까지 화면
         # 구석에서 튀어나오면 하던 일을 방해한다 (app.toast 를 보라).
@@ -160,9 +172,10 @@ class SettingsWindow(object):
                 (self.grass, "풀숲 띄우기", "showGrass",
                  "끄면 야생이 돋지 않습니다. 데려온 포켓몬은 그대로"
                  " 걸어다닙니다.", self._toggle_grass),
-                (self.notif, "새 버전·친구 요청 알림", "notifyImportant",
-                 "화면에 자국이 안 남는 이 둘만 알립니다. 잡았다·레벨업"
-                 " 같은 것은 띄우지 않습니다.", self._toggle_plain)):
+                (self.notif, "새 버전·친구 요청·게시판 댓글 알림", "notifyImportant",
+                 "화면에 자국이 안 남는 이 셋만 알립니다. 게시판은 내 글에 댓글이,"
+                 " 내 댓글에 답글이 달렸을 때입니다. 잡았다·레벨업 같은 것은"
+                 " 띄우지 않습니다.", self._toggle_plain)):
             c = tk.Checkbutton(
                 box, text=label, variable=var, bg=U.BG, fg=U.FG,
                 selectcolor=U.INK, activebackground=U.BG,
@@ -306,6 +319,13 @@ class SettingsWindow(object):
         self.app.settings[key] = value
         self._save()
 
+    def _set_alpha(self, transparent):
+        """투명도(0 = 그대로)를 받아 또렷한 정도로 적고, 떠 있는 도트에 바로 입힌다."""
+        self.app.settings["petOpacity"] = max(config.PET_OPACITY_MIN, 100 - int(transparent))
+        self._save()
+        if self.app.overlay:
+            self.app.overlay.apply_alpha()
+
     def _set_size(self, px):
         # 크기는 도트를 다시 만들어야 해서 앱 쪽 경로를 그대로 쓴다.
         self.app.set_size(px)
@@ -344,7 +364,9 @@ class SettingsWindow(object):
         # 한 판을 다시 물어본다.
         keep = {k: self.app.settings[k]
                 for k in ("server", "lastBall", "autostart",
-                          "lastRunVersion", "updateSkipped")
+                          "lastRunVersion", "updateSkipped",
+                          # 어디까지 읽었는지도 기록이다 (지우면 '새 글' 표시가 다시 뜬다)
+                          "noticeSeen", "patchSeen")
                 if k in self.app.settings}
         self.app.settings.clear()
         self.app.settings.update(dict(config.DEFAULTS))
@@ -353,6 +375,8 @@ class SettingsWindow(object):
         U.set_status(self.status, "기본값으로 되돌렸습니다. 창을 다시 열면"
                                   " 값이 보입니다.")
         self.app.set_size(self.app.settings["targetHeight"])
+        if self.app.overlay:
+            self.app.overlay.apply_alpha()      # 투명도도 그대로(100%)로
         self._paint_area()          # 직접 그린 영역도 기본값으로 빠졌다
         # 풀숲은 **무조건 다시 맞춘다.** 위에서 설정 값이 이미 기본값으로
         # 바뀌어 있어서, set_show_grass 로 가면 "안 바뀌었다" 며 그냥
