@@ -167,6 +167,8 @@ def _make_mon(uid, species, rng, now, egg_slot=None):
             slot = egg_slot
     if slot is not None:
         db.run("UPDATE pokemon SET on_desktop=1, slot=? WHERE id=?", (slot, pid))
+    else:
+        deps.to_box(uid, pid)            # 파티가 찼다. 자리 있는 박스로 (1.9.1)
     items.mark_seen(uid, species, True, now)
     from . import achievements
     achievements.on_obtain(uid, mon, "hatch", now=now)

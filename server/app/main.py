@@ -285,15 +285,23 @@ def _sprite_fetch(num, shiny):
     import urllib.request
     os.makedirs(SPRITE_DIR, exist_ok=True)
     sub = "shiny/" if shiny else ""
-    sources = list(SPRITE_SOURCES)
-    if SF.source(num):
-        sources.insert(0, (SF.source(num), ".gif"))       # 납작한 쇼다운 도트 대신
-    for pat, ext in sources:
-        url = "%s/%s" % (SPRITE_BASE, pat % (sub, num))
+    sources = [("%s/%s" % (SPRITE_BASE, pat % (sub, num)), ext) for pat, ext in SPRITE_SOURCES]
+    if SF.source(num):                                   # 납작한 쇼다운 도트 대신
+        sources.insert(0, ("%s/%s" % (SPRITE_BASE, SF.source(num) % (sub, num)), ".gif"))
+    site_url, site_ext = SF.site(num, shiny)
+    if site_url:
+        # 레전드 Z-A 의 메가 폼 (1.9.1). PokeAPI 저장소에는 도트가 없어서 쇼다운
+        # 사이트에서 직접 받는다. 못 받으면 아래 예전 차례(아이콘·일러스트)로 간다.
+        sources.insert(0, (site_url, site_ext))
+    for url, ext in sources:
         try:
             # 짧게 잡는다. 세 군데를 도는데 각각 25초면 최악에 75초가 되고,
             # 그 전에 클라이언트가 먼저 포기해서 그림이 안 뜬다.
-            with urllib.request.urlopen(url, timeout=8) as r:
+            # 쇼다운 사이트는 파이썬 기본 이름표(User-Agent)를 막을 수 있어 이름을 댄다.
+            # PokeAPI 쪽은 예전처럼 주소만 넘긴다.
+            target = (urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 poketdesktop"})
+                      if url.startswith(SF.SITE_BASE) else url)
+            with urllib.request.urlopen(target, timeout=8) as r:
                 data = r.read()
         except (urllib.error.URLError, OSError):
             continue
@@ -1294,7 +1302,9 @@ def set_desktop(pid: int, body: DesktopIn, ctx=Depends(current)):
                                 % config.MAX_PARTY)
         db.run("UPDATE pokemon SET on_desktop=1, slot=? WHERE id=?", (slot, pid))
     else:
-        db.run("UPDATE pokemon SET on_desktop=0, slot=NULL WHERE id=?", (pid,))
+        # 원래 있던 박스로 돌아가되, 그사이 거기가 찼으면 자리 있는 박스로 (1.9.1).
+        row = _own(uid, pid)
+        deps.to_box(uid, pid, prefer=(row["box"] if "box" in row.keys() else 0) or 0)
     return {"ok": True, "pokemon": _decorate(db.row_to_mon(_own(uid, pid)))}
 
 

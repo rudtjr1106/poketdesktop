@@ -664,7 +664,8 @@ def main():
         all(r["rp"] is None and r["tierKr"] is None for r in season.hall(1)))
     names = [n for n, _f in migrations.ONCE]
     # 0300 (첫날 0~9시 판 지우기) 은 시즌을 연 **다음에** 돌아야 한다.
-    chk("손질 차례: 0290(시즌 3 열기) 다음에 0300", names[-2:]
+    i = names.index("0290-season3-open")
+    chk("손질 차례: 0290(시즌 3 열기) 다음에 0300", names[i:i + 2]
         == ["0290-season3-open", "0300-s3-void-early"], names[-3:])
     chk("시즌 3 은 10/2 부터 2주", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
         == (3, "2026-10-02", "2026-10-16"))

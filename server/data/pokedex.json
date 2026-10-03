@@ -5511,7 +5511,7 @@
    },
    "baseExp": 218,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "bug"
    ],
@@ -5681,7 +5681,7 @@
    },
    "baseExp": 234,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "indeterminate"
    ],
@@ -5737,7 +5737,7 @@
    },
    "baseExp": 239,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -5793,7 +5793,7 @@
    },
    "baseExp": 240,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -5849,7 +5849,7 @@
    },
    "baseExp": 239,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "water1"
    ],
@@ -5905,7 +5905,7 @@
    },
    "baseExp": 177,
    "catch": 65,
-   "dot": false,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -6017,7 +6017,7 @@
    },
    "baseExp": 169,
    "catch": 80,
-   "dot": false,
+   "dot": true,
    "egg": [
     "water1",
     "water2"
@@ -6074,7 +6074,7 @@
    },
    "baseExp": 175,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "water3"
    ],
@@ -6362,7 +6362,7 @@
    },
    "baseExp": 165,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "fairy",
     "mineral"
@@ -6418,7 +6418,7 @@
    },
    "baseExp": 218,
    "catch": 75,
-   "dot": false,
+   "dot": true,
    "egg": [
     "ground",
     "fairy"
@@ -6474,7 +6474,7 @@
    },
    "baseExp": 218,
    "catch": 75,
-   "dot": false,
+   "dot": true,
    "egg": [
     "ground",
     "fairy"
@@ -6530,7 +6530,7 @@
    },
    "baseExp": 159,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "indeterminate"
    ],
@@ -6586,7 +6586,7 @@
    },
    "baseExp": 163,
    "catch": 30,
-   "dot": false,
+   "dot": true,
    "egg": [
     "ground"
    ],
@@ -6642,7 +6642,7 @@
    },
    "baseExp": 218,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "flying"
    ],
@@ -6698,7 +6698,7 @@
    },
    "baseExp": 270,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "monster",
     "dragon"
@@ -6754,7 +6754,7 @@
    },
    "baseExp": 184,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "ground",
     "humanshape"
@@ -6926,7 +6926,7 @@
    },
    "baseExp": 169,
    "catch": 90,
-   "dot": false,
+   "dot": true,
    "egg": [
     "mineral"
    ],
@@ -7037,7 +7037,7 @@
    },
    "baseExp": 167,
    "catch": 60,
-   "dot": false,
+   "dot": true,
    "egg": [
     "water3"
    ],
@@ -7093,7 +7093,7 @@
    },
    "baseExp": 186,
    "catch": 45,
-   "dot": false,
+   "dot": true,
    "egg": [
     "bug",
     "water3"
@@ -7264,7 +7264,7 @@
    },
    "baseExp": 170,
    "catch": 75,
-   "dot": false,
+   "dot": true,
    "egg": [
     "plant"
    ],
@@ -7320,7 +7320,7 @@
    },
    "baseExp": 184,
    "catch": 25,
-   "dot": false,
+   "dot": true,
    "egg": [
     "mineral"
    ],
@@ -7434,7 +7434,7 @@
    },
    "baseExp": 300,
    "catch": 10,
-   "dot": false,
+   "dot": true,
    "egg": [
     "dragon",
     "mineral"

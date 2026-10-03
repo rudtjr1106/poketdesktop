@@ -35,6 +35,8 @@ megas 까지 본다.
            "ow:salamence/mega" (1.9.0, 19폼 - GBA 풍 4방향).
   · dot  — showdown 배틀 도트(gif)가 있는가. 걷는 도트가 없으면 이걸로
            선다 (정면 고정 - 걷는 도트가 없는 57종과 같은 방식).
+           PokeAPI 저장소에 없고 쇼다운 사이트에만 있는 22폼은 서버가 거기서
+           직접 받는다 (1.9.1, common/sprite_fix.SITE).
 
 둘 다 없으면(Z-A 신규 대부분) 바탕화면에서는 메가 모습이 안 된다.
 자료는 tools/_cache 의 두 파일에서 온다 (없으면 지금 도감의 값을 그대로 둔다):
@@ -56,6 +58,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, ROOT)
+from common import sprite_fix as SF                         # noqa: E402
 C = os.path.join(HERE, "_cache")
 DEX = os.path.join(ROOT, "server", "data", "pokedex.json")
 ITEMS = os.path.join(ROOT, "server", "data", "items.json")
@@ -230,6 +234,9 @@ def annotate_sprites(megas, dex, by_int):
                     break
         if showdown is not None:
             dot = bool(showdown.get(str(m["num"])))
+        # 쇼다운 사이트에서 직접 받는 폼 (1.9.1, common/sprite_fix.SITE)
+        if m["num"] in SF.SITE:
+            dot = True
         if not walk or str(walk).startswith(OW_MARK):
             # SpriteCollab 에 없다. 세 번째 출처에 있으면 그 경로를 적는다.
             prev_ow = prev.get("walk") if str(prev.get("walk") or "").startswith(OW_MARK) else None

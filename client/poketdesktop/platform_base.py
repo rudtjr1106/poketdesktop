@@ -219,6 +219,14 @@ def screens(fallback_w, fallback_h):
     return [(0, 0, fallback_w, fallback_h)]
 
 
+def screen_works(fallback_w, fallback_h):
+    """화면마다 작업표시줄·독을 뺀 영역. screens() 와 같은 차례다 (1.9.1).
+
+    '왼쪽 화면 / 오른쪽 화면' 을 통째로 활동 영역으로 고를 때 쓴다.
+    """
+    return [work_area(fallback_w, fallback_h)]
+
+
 def virtual_screen(fallback_w, fallback_h):
     """모니터를 전부 아우르는 사각형 (x1, y1, x2, y2). 한 대면 그 화면.
 

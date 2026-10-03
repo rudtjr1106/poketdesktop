@@ -640,6 +640,27 @@ def screens(fallback_w, fallback_h):
         return [(0, 0, fallback_w, fallback_h)]
 
 
+def screen_works(fallback_w, fallback_h):
+    """화면마다 메뉴 막대와 독을 뺀 영역 (Tk 좌표). screens() 와 같은 차례다 (1.9.1)."""
+    if not _ok:
+        return [work_area(fallback_w, fallback_h)]
+    try:
+        scrs = AppKit.NSScreen.screens()
+        if not scrs:
+            return [work_area(fallback_w, fallback_h)]
+        h0 = scrs[0].frame().size.height
+        out = []
+        for s in scrs:
+            v = s.visibleFrame()
+            out.append((int(round(v.origin.x)),
+                        int(round(h0 - (v.origin.y + v.size.height))),
+                        int(round(v.origin.x + v.size.width)),
+                        int(round(h0 - v.origin.y))))
+        return out
+    except Exception:                                       # noqa: BLE001
+        return [work_area(fallback_w, fallback_h)]
+
+
 def virtual_screen(fallback_w, fallback_h):
     """모니터 전부를 아우르는 사각형 (Tk 좌표). 주 화면 왼쪽에 둔 화면은 x 가 음수다."""
     scrs = screens(fallback_w, fallback_h)

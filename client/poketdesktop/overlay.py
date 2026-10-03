@@ -44,6 +44,10 @@ SLEEP_AFTER_MS = 1800000
 # 그래서 없는 것은 빼고 있는 것 중에서만 고른다 - 늘 자기만 하지 않게.
 REST_POSES = ("Sit", "Laying", "Sleep")
 
+# 들어서 옮기기 (1.9.1, 설정 petDrag). 누른 채 이만큼(px) 움직여야 '들었다' 로
+# 친다 - 그냥 누르거나 두 번 누를 때 손이 조금 떨려도 끌려가지 않는다.
+DRAG_START = 5
+
 # 직접 그린 영역이 이보다 작으면 포켓몬이 들어갈 자리가 없다 (ui_area.MIN_* 와 짝).
 MIN_AREA_W, MIN_AREA_H = 120, 100
 
@@ -69,6 +73,33 @@ def drawn_area(rect, screen):
     if x2 - x1 < MIN_AREA_W or y2 - y1 < MIN_AREA_H:
         return None
     return x1, y1, x2, y2
+
+
+def screen_choices(screens, works):
+    """모니터가 둘 이상일 때 '어느 화면에 둘까' 로 고를 것들. [(이름, 그 화면의 영역)].
+
+    영역은 작업표시줄·독을 뺀 자리다. 한 대뿐이면 고를 것이 없다 (빈 목록).
+    둘이면 놓인 자리대로 '왼쪽 화면 / 오른쪽 화면' (위아래로 쌓았으면 '위 / 아래'),
+    셋 이상이면 왼쪽부터 '화면 1, 2, 3'. (1.9.1 - 제보: 듀얼 모니터에서 왼쪽·오른쪽
+    화면을 고를 수 있으면 좋겠다)
+    """
+    pairs = [(s, w) for s, w in zip(screens or [], works or [])
+             if s and w and w[2] - w[0] >= MIN_AREA_W and w[3] - w[1] >= MIN_AREA_H]
+    if len(pairs) < 2:
+        return []
+    pairs.sort(key=lambda p: (p[0][0], p[0][1]))
+    if len(pairs) == 2:
+        (a, _wa), (b, _wb) = pairs
+        # 가로로 더 많이 떨어져 있으면 좌우, 아니면 위아래
+        side = abs(b[0] - a[0]) >= abs(b[1] - a[1])
+        if side:
+            names = ["왼쪽 화면", "오른쪽 화면"]
+        else:
+            pairs.sort(key=lambda p: (p[0][1], p[0][0]))
+            names = ["위 화면", "아래 화면"]
+    else:
+        names = ["화면 %d" % (i + 1) for i in range(len(pairs))]
+    return [(n, tuple(int(v) for v in w)) for n, (_s, w) in zip(names, pairs)]
 
 
 # '항상 위' 를 다시 거는 주기(ms).
@@ -175,12 +206,19 @@ class Pet(object):
         self.sleeping = False        # 자는 중. 자면 돌아다니지 않는다
         self.rest_pose = None        # 서 있을 때 취할 자세 (앉기/눕기)
 
+        # 들어서 옮기는 중인가, 어디를 잡았나 (grab 을 보라)
+        self.dragging = False
+        self._grab = None
+
         self.label.bind("<Enter>", self.on_enter)
         self.label.bind("<Leave>", self.on_leave)
-        # 끌어서 옮기는 기능은 뺐다. 쓰다 보면 쓰다듬으려다 실수로 끌려가서
-        # 오히려 불편했다. 누르고 떼는 것만 남긴다 —
-        # 야생 포켓몬을 왼쪽 클릭해 배틀을 걸 때 이게 필요하다.
+        # **끌어서 옮기기는 설정(petDrag)을 켠 사람만 된다 (1.9.1).**
+        # 예전에는 늘 됐다가 뺐다 - 쓰다듬으려다 실수로 끌려가서 오히려
+        # 불편했다. 그래도 원하는 자리에 두고 싶다는 사람이 있어서, 기본은
+        # 꺼 두고 켠 사람만 쓰게 한다. 꺼져 있으면 예전처럼 누르고 떼는
+        # 것뿐이다 (야생 포켓몬을 왼쪽 클릭해 배틀을 걸 때 이게 필요하다).
         self.label.bind("<Button-1>", self.on_press)
+        self.label.bind("<B1-Motion>", self.on_motion)
         self.label.bind("<ButtonRelease-1>", self.on_release)
         PLAT.bind_right(self.label, self.on_menu)
         self.label.bind("<Double-Button-1>", self.on_double)
@@ -342,14 +380,95 @@ class Pet(object):
 
     # ---------------- 입력 ----------------
     def on_press(self, e):
-        # 누르고 있는 동안만 잠깐 멈춘다. 위치는 건드리지 않는다.
+        # 누르고 있는 동안만 잠깐 멈춘다. 끌기 전에는 위치를 건드리지 않는다.
         self.wake()
         self.state = "held"
         self.hide_tip()
+        self.grab(e)
+
+    def on_motion(self, e):
+        self.drag_to(e.x_root, e.y_root)
 
     def on_release(self, e):
+        dropped = self.end_drag()
         self.state = "idle"
-        self.timer = random.randint(20, 60)
+        # 내려놓은 자리에서는 조금 더 서 있다가 걷는다 - 놓자마자 걸어가
+        # 버리면 옮긴 보람이 없다.
+        self.timer = (random.randint(70, 150) if dropped
+                      else random.randint(20, 60))
+
+    # ---------------- 들어서 옮기기 (1.9.1) ----------------
+    def can_drag(self):
+        """마우스로 들어서 옮길 수 있는가.
+
+        설정(petDrag)을 켠 사람만, 그리고 스스로 돌아다니는 동안에만 된다.
+        배틀·진화·메가진화 연출은 도트를 정해진 자리에 세워 두고 돌리므로
+        (battling) 그 사이에 옮기면 연출이 허공에서 벌어진다.
+        """
+        return bool(self.ov.settings.get("petDrag")) and not self.battling
+
+    def grab(self, e):
+        """누른 자리를 적어 둔다. 끌기 시작하면 여기서부터 따라간다.
+
+        **몸의 기준점에서 얼마나 떨어진 곳을 잡았는지**로 적는다. 창 왼쪽
+        위로 적으면, 들고 있는 동안 동작이 바뀔 때(자다 깨면 Wake → Idle)
+        칸 크기가 달라져서 도트가 손에서 미끄러진다 (play 를 보라).
+        """
+        self.dragging = False
+        self._grab = None
+        if e is None or not self.can_drag():
+            return
+        try:
+            px, py = int(e.x_root), int(e.y_root)
+        except (AttributeError, TypeError, ValueError):
+            return
+        self._grab = (px, py, px - (self.x + self.ax), py - (self.y + self.ay))
+
+    def drag_to(self, px, py):
+        """커서가 (px, py) 로 갔다. 들고 있으면 따라간다. 옮겼으면 True.
+
+        활동 영역 밖으로는 못 나간다 - 밖에 내려놓아도 어차피 다음 걸음에
+        영역 안으로 끌려 들어온다 (update). 가장자리에서 멈추는 쪽이 읽힌다.
+        """
+        g = self._grab
+        if g is None or self.state != "held" or not self.can_drag():
+            return False
+        if not self.dragging:
+            if abs(px - g[0]) < DRAG_START and abs(py - g[1]) < DRAG_START:
+                return False
+            self.dragging = True
+            self.cancel_tip()
+        self.x = px - g[2] - self.ax
+        self.y = py - g[3] - self.ay
+        self.clamp()
+        self.place()
+        return True
+
+    def follow_pointer(self):
+        """끄는 동안 커서를 직접 좇는다 (**맥에서만 하는 일이다**).
+
+        맥의 Tk 은 앱이 활성이 아닐 때 '움직였다' 와 '뗐다' 를 빠뜨리는
+        일이 있다 (app._unstick). 그래서 눌린 단추가 있다고 맥이 말하는
+        동안에는 커서 자리를 물어서 따라간다. 윈도우는 단추 상태를 묻지
+        않으므로(mouse_buttons_down 이 늘 0) 여기서 아무것도 안 하고,
+        Tk 이 주는 <B1-Motion> 만 쓴다.
+        """
+        if getattr(self, "_grab", None) is None or self.state != "held":
+            return
+        if not PLAT.mouse_buttons_down():
+            return
+        try:
+            px, py = self.ov.root.winfo_pointerxy()
+        except Exception:                                   # noqa: BLE001
+            return
+        self.drag_to(px, py)
+
+    def end_drag(self):
+        """손을 뗐다. 들고 있었으면 True."""
+        was = bool(getattr(self, "dragging", False))
+        self.dragging = False
+        self._grab = None
+        return was
 
     def on_menu(self, e):
         self.wake()
@@ -707,6 +826,8 @@ class Pet(object):
             self.redraw()
 
     def update(self, ms):
+        if self.state == "held":
+            self.follow_pointer()    # 들고 있으면 커서를 따라간다 (맥)
         self.advance(ms)
         if self.once:
             return                   # 한 번짜리 동작 중에는 안 움직인다

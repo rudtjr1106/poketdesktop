@@ -21,6 +21,7 @@ from common import tint as T
 from common.korean import natural
 
 from . import item_icons, sprite_cache, sprites
+from . import platform_os as PLAT
 from . import ui_common as U
 from .overlay import Pet
 
@@ -90,9 +91,28 @@ class EggPet(Pet):
     # ---- 입력: 누르면 상태만 보여준다 ----
     def on_press(self, e):
         self.show_tip()
+        self.grab(e)
+        if self._grab is not None:
+            self.state = "held"
 
     def on_release(self, e):
-        pass
+        self.end_drag()
+        self.state = "idle"
+        if self._shake is not None:
+            # 흔들리던 중에 옮겼으면 새 자리에서 마저 흔들린다. 그대로 두면
+            # 흔들기가 끝날 때 원래 자리로 튕겨 돌아간다.
+            seq, i, _hx, done = self._shake
+            self._shake = (seq, i, self.x, done)
+
+    def can_drag(self):
+        """알도 들어서 옮길 수 있다 (1.9.1, 설정 petDrag).
+
+        알은 걸어다니지 않아서 처음 놓인 자리에 계속 있다 - 옮기고 싶은
+        것은 오히려 이쪽이다. battling 은 '혼자 돌아다니지 않는다' 는
+        뜻으로 늘 켜 두므로 Pet 의 판정을 그대로 못 쓴다. 부화하는
+        동안에는 못 옮긴다.
+        """
+        return bool(self.ov.settings.get("petDrag")) and not self.hatching
 
     def on_menu(self, e):
         self.show_tip()
@@ -102,6 +122,15 @@ class EggPet(Pet):
 
     # ---- 흔들기 ----
     def update(self, ms):
+        if self._grab is not None:
+            if PLAT.NEEDS_HIT_TRACKING and not PLAT.mouse_buttons_down():
+                # 맥: '뗐다' 를 못 받았다. 알은 app._unstick 이 보지 않으므로
+                # 여기서 푼다 - 안 풀면 다음에 아무 데나 누를 때 따라온다.
+                self.on_release(None)
+            else:
+                self.follow_pointer()
+            if self.dragging:
+                return                 # 들고 있는 동안에는 흔들리지 않는다
         if self._shake is not None:
             seq, i, hx, done = self._shake
             if i >= len(seq):

@@ -14,6 +14,8 @@
   4. **404 일 때만** 없다고 적는다. 끊긴 것은 다음에 다시 묻는다.
   5. 출처가 늘기 전에 '없다' 고 적어 둔 걷기는 한 번 더 찾아본다.
   6. 걷기밖에 없는 출처에서 온 종은 다른 동작을 주지 않는다 (그림체가 섞인다).
+  7. (1.9.1) 레전드 Z-A 의 메가 22폼은 **배틀 도트**를 쇼다운 사이트에서 받는다.
+     걷는 도트는 어디에도 없어서, 이 폼들은 배틀 도트로 서서 움직인다.
 """
 import io
 import json
@@ -31,6 +33,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 TMP = tempfile.mkdtemp(prefix="poket-walk-ow-")
 os.environ["POKET_DB"] = os.path.join(TMP, "t.db")
 os.environ["POKET_WALK_DIR"] = os.path.join(TMP, "walk")
+os.environ["POKET_SPRITE_DIR"] = os.path.join(TMP, "sprites")
 os.environ["POKET_WARM_SPRITES"] = "0"
 os.environ.pop("POKET_TURSO_URL", None)
 os.environ["POKET_POKEDEX"] = os.path.join(HERE, "data", "pokedex.json")
@@ -141,6 +144,7 @@ class Net(object):
         self.table, self.calls = table, []
 
     def __call__(self, url, timeout=None):
+        url = getattr(url, "full_url", url)          # Request 로 부르는 곳도 있다
         self.calls.append(url)
         for part, got in self.table:
             if part in url:
@@ -337,6 +341,50 @@ def main():
         net = urllib.request.urlopen = Net([])
         chk("걷기가 아닌 동작의 옛 '없음' 은 그대로 믿는다", M._anim_meta(25, "Sleep") == {"ok": False}
             and net.calls == [], net.calls)
+
+        print("\n=== 메가 폼의 배틀 도트: 쇼다운 사이트에서 (1.9.1) ===")
+        # 레전드 Z-A 의 메가 폼은 PokeAPI 저장소에 도트가 없어 아이콘·일러스트가
+        # 나왔고, 바탕화면에서 메가 모습이 될 수 없었다. 22폼은 쇼다운에 있다.
+        from common import sprite_fix as SF
+        gren = [m for m in d.raw["megas"] if m["internal"] == "GRENINJA_MEGA"][0]["num"]
+        absz = [m for m in d.raw["megas"] if m["internal"] == "ABSOL_MEGA_Z"][0]["num"]
+        chk("스물두 폼", len(SF.SITE) == 22 and gren in SF.SITE and absz in SF.SITE, len(SF.SITE))
+        chk("주소와 확장자", SF.site(gren) == (SF.SITE_BASE + "/ani/greninja-mega.gif", ".gif")
+            and SF.site(absz) == (SF.SITE_BASE + "/gen5/absol-megaz.png", ".png"), SF.site(gren))
+        chk("이로치 그림이 있는 폼은 -shiny 폴더", SF.site(absz, True)[0]
+            == SF.SITE_BASE + "/gen5-shiny/absol-megaz.png", SF.site(absz, True))
+        chk("이로치 그림이 없는 폼은 보통 색 그림을 쓴다", SF.site(gren, True) == SF.site(gren))
+        chk("표에 없는 번호는 없다", SF.site(25) == (None, None) and SF.site(10034) == (None, None))
+        chk("캐시 이름에 판이 붙는다 (예전에 받은 아이콘을 안 쓴다)",
+            SF.rev(gren) == SF.SITE_REV and SF.rev(25) == "" and SF.rev(618) == "r2")
+        chk("도감에 배틀 도트가 있다고 적혀 있다", all(
+            (d.by_num.get(n) or {}).get("dot") is True for n in SF.SITE))
+        os.makedirs(M.SPRITE_DIR, exist_ok=True)
+        with open(os.path.join(M.SPRITE_DIR, "%04d.png" % gren), "wb") as f:
+            f.write(b"old-icon")                         # 1.9.0 까지 받아 둔 아이콘
+        chk("예전 이름의 캐시는 못 본 것으로 친다", M._sprite_cached(gren, False) == (None, None))
+        net = urllib.request.urlopen = Net([("play.pokemonshowdown.com/sprites/ani/greninja-mega.gif",
+                                             b"GIF89a-mega")])
+        path, ext = M._sprite_fetch(gren, False)
+        chk("쇼다운 사이트에서 먼저 받는다", ext == ".gif" and len(net.calls) == 1
+            and open(path, "rb").read() == b"GIF89a-mega"
+            and os.path.basename(path) == "%04d-%s.gif" % (gren, SF.SITE_REV),
+            (path, net.calls))
+        chk("두 번째부터는 캐시", M._sprite_cached(gren, False) == (path, ".gif"))
+        net = urllib.request.urlopen = Net([("gen5-shiny/absol-megaz.png", b"PNG-shiny")])
+        path, ext = M._sprite_fetch(absz, True)
+        chk("이로치는 -shiny 폴더에서", ext == ".png" and open(path, "rb").read() == b"PNG-shiny"
+            and os.path.basename(path) == "%04ds-%s.png" % (absz, SF.SITE_REV), path)
+        net = urllib.request.urlopen = Net([("other/official-artwork", b"PNG-art")])
+        gol = [m for m in d.raw["megas"] if m["internal"] == "GOLURK_MEGA"][0]["num"]
+        path, ext = M._sprite_fetch(gol, False)
+        chk("사이트에서 못 받으면 예전 차례(아이콘·일러스트)로 간다", ext == ".png"
+            and "play.pokemonshowdown.com" in net.calls[0] and open(path, "rb").read() == b"PNG-art",
+            net.calls)
+        net = urllib.request.urlopen = Net([("other/showdown/25.gif", b"GIF-pika")])
+        path, ext = M._sprite_fetch(25, False)
+        chk("보통 종은 예전 그대로 (PokeAPI 에서)", ext == ".gif" and len(net.calls) == 1
+            and "PokeAPI" in net.calls[0] and os.path.basename(path) == "0025.gif", net.calls)
     finally:
         urllib.request.urlopen = real
 

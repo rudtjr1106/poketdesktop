@@ -158,6 +158,7 @@ class SettingsWindow(object):
         self.names = tk.BooleanVar(value=bool(s.get("showNames")))
         self.grass = tk.BooleanVar(value=bool(s.get("showGrass", True)))
         self.notif = tk.BooleanVar(value=bool(s.get("notifyImportant", True)))
+        self.drag = tk.BooleanVar(value=bool(s.get("petDrag", False)))
         # **알림은 셋만 띄운다** - 새 버전, 친구 요청, 게시판 댓글(1.9.0). 게임 안에서
         # 벌어지는 일(잡았다, 레벨이 올랐다)은 이걸 켜도 안 띄운다.
         # 바탕화면에서 눈으로 보이는 것으로 충분하고, 그런 것까지 화면
@@ -169,6 +170,13 @@ class SettingsWindow(object):
         for var, label, key, note, how in (
                 (self.names, "이름표 보이기", "showNames",
                  "포켓몬 위에 이름과 레벨을 띄웁니다.", self._toggle),
+                # 도트는 누를 때마다 설정을 본다 (overlay.Pet.can_drag). 그래서
+                # 저장만 하면 지금 떠 있는 포켓몬에도 바로 통한다.
+                (self.drag, "포켓몬 들어서 옮기기", "petDrag",
+                 "켜면 포켓몬과 알을 마우스로 누른 채 끌어서 원하는 자리에 "
+                 "내려놓을 수 있습니다. 돌아다닐 영역 안에서만 옮겨지고, 포켓몬은 "
+                 "내려놓으면 잠깐 서 있다가 다시 걸어다닙니다. 야생 포켓몬과 배틀 "
+                 "중인 포켓몬은 옮길 수 없습니다.", self._toggle_plain),
                 (self.grass, "풀숲 띄우기", "showGrass",
                  "끄면 야생이 돋지 않습니다. 데려온 포켓몬은 그대로"
                  " 걸어다닙니다.", self._toggle_grass),
@@ -183,10 +191,12 @@ class SettingsWindow(object):
                 highlightthickness=0, bd=0,
                 command=(lambda k=key, v=var, f=how: f(k, v)))
             c.pack(fill="x")
-            tk.Label(box, text=note, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS,
-                     anchor="w", justify="left",
-                     wraplength=W - 60).pack(fill="x", padx=(22, 0),
-                                             pady=(0, 6))
+            lbl = tk.Label(box, text=note, bg=U.BG, fg=U.FG_FAINT,
+                           font=U.FONT_XS, anchor="w", justify="left",
+                           wraplength=W - 60)
+            lbl.pack(fill="x", padx=(22, 0), pady=(0, 6))
+            # 긴 설명은 상수 폭으로는 스크롤바 옆에서 끝이 잘린다 (_catch_row)
+            U.wrap_to_width(lbl)
         self._area_row(box, s)
         self._catch_row(box, s)
         self._autostart_row(box)
@@ -204,6 +214,19 @@ class SettingsWindow(object):
         U.ghost_button(row, "화면에 그리기", self._pick_area, height=30).pack(side="left")
         U.ghost_button(row, "기본 자리로", self._clear_area, height=30).pack(
             side="left", padx=(8, 0))
+        # 모니터가 둘 이상이면 화면을 통째로 고르는 단추 (1.9.1). 한 대면 없다.
+        get = getattr(self.app, "screen_choices", None)
+        self.screen_btns = []
+        choices = list(get()) if get else []
+        if choices:
+            row2 = tk.Frame(box, bg=U.BG)
+            row2.pack(fill="x", pady=(0, 6))
+            for i, (name, rect) in enumerate(choices):
+                b = U.ghost_button(row2, "%s 전체" % name,
+                                   (lambda r, n: lambda: self._pick_screen(r, n))(rect, name),
+                                   height=30)
+                b.pack(side="left", padx=(0 if i == 0 else 8, 0))
+                self.screen_btns.append((name, rect, b))
 
     def _area_text(self, s):
         rect = s.get("areaRect")
@@ -216,6 +239,11 @@ class SettingsWindow(object):
     def _pick_area(self):
         self.app.pick_area()
         self._paint_area()
+
+    def _pick_screen(self, rect, name):
+        self.app.set_area_screen(rect, name)
+        self._paint_area()
+        U.set_status(self.status, "영역을 %s 전체로 정했습니다." % name, U.GOOD)
 
     def _clear_area(self):
         self.app.set_area_rect(None)

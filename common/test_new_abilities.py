@@ -394,6 +394,74 @@ def main():
         b.status == "poison" and not b.cond.get("confused"), (b.status, b.cond))
     chk("채운 목록에 들어갔다", "POISONPUPPETEER" in A.IMPLEMENTED)
 
+    print("=== 배틀스위치 (킬가르도, 1.9.1) ===")
+    # 제보: "킬가르도 배틀스위치 특성이 적용이 안돼요 (관장전)". 설명만 있고 폼이
+    # 바뀌는 동작이 없어서, 늘 실드폼(공격 종족값 50)으로 때리고 있었다.
+    bt, a, b = duel("AEGISLASH", "GYARADOS", a_moves=("IRONHEAD", "KINGSSHIELD", "SHADOWBALL"),
+                    a_ab="STANCECHANGE", b_ab="INTIMIDATE")
+    sp = DEX.get("AEGISLASH")
+    blade = dict(sp)
+    blade["base"] = dict(sp["base"], atk=sp["base"]["def"], spa=sp["base"]["spd"])
+    blade["base"]["def"], blade["base"]["spd"] = sp["base"]["atk"], sp["base"]["spa"]
+    want = P.calc_all_stats(blade, a.mon["ivs"], a.mon["evs"], a.mon["level"], a.mon["nature"])
+    shield_atk, shield_def = a.stat("atk"), a.stat("def")
+    chk("처음에는 실드폼 (공격이 낮고 방어가 높다)", not a.cond.get("blade") and shield_def > shield_atk * 2,
+        (shield_atk, shield_def))
+    est = B.damage(DEX, bt.move_of("IRONHEAD"), a, b, B.MAX_RNG, crit=False)[0]
+    chk("고를 때(AI·잡기 모드)는 블레이드폼의 공격으로 센다", not a.cond.get("blade") and est > 0, est)
+    ev = []
+    bt._use("me", a, b, "IRONHEAD", ev)
+    msgs = [e.get("text") for e in ev if e.get("t") == "msg"]
+    chk("때리는 기술을 쓰면 블레이드폼이 된다", a.cond.get("blade") is True
+        and any("블레이드폼" in (t or "") for t in msgs), msgs)
+    chk("  특성 이름이 뜬다", any(e.get("t") == "ability" and e.get("ability") == "STANCECHANGE" for e in ev))
+    chk("  폼이 기술보다 먼저 바뀐다", [e.get("t") for e in ev].index("msg")
+        < [e.get("t") for e in ev].index("move"), [e.get("t") for e in ev][:5])
+    chk("블레이드폼의 능력치는 종족값을 바꿔 다시 센 값 (공격 140·방어 50)",
+        (a.stat("atk", stages=False), a.stat("def"), a.stat("spa"), a.stat("spd"))
+        == (want["atk"], want["def"], want["spa"], want["spd"])
+        and a.stat("atk", stages=False) > shield_atk * 2 and a.stat("def") < shield_def / 2,
+        (a.stat("atk", stages=False), want["atk"], a.stat("def"), want["def"]))
+    chk("체력과 스피드는 그대로", a.maxhp == a.base["hp"] and a.stat("spe") == a.base["spe"])
+    hit = [e for e in ev if e.get("t") == "hit"]
+    bt0, a0, b0 = duel("AEGISLASH", "GYARADOS", a_moves=("IRONHEAD",), a_ab="STANCECHANGE", b_ab="INTIMIDATE")
+    a0.ability_on = False
+    ev0 = []
+    bt0._use("me", a0, b0, "IRONHEAD", ev0)
+    hit0 = [e for e in ev0 if e.get("t") == "hit"]
+    if hit and hit0:
+        chk("데미지가 실드폼으로 때릴 때보다 훨씬 크다", hit[0]["damage"] > hit0[0]["damage"] * 1.8,
+            (hit[0]["damage"], hit0[0]["damage"]))
+    chk("특성이 꺼진 판(야생)에서는 폼이 안 바뀐다", not a0.cond.get("blade")
+        and not any("블레이드폼" in (e.get("text") or "") for e in ev0))
+    ev = []
+    bt._use("me", a, b, "SHADOWBALL", ev)
+    chk("이미 블레이드폼이면 또 알리지 않는다", a.cond.get("blade") is True
+        and not any("폼이 되었다" in (e.get("text") or "") for e in ev))
+    v = a.volatile()
+    fresh = B.Fighter(DEX, a.mon)
+    fresh.ability_on = True
+    fresh.load_volatile(v)
+    chk("저장했다 불러와도 블레이드폼", fresh.cond.get("blade") is True
+        and fresh.stat("atk", stages=False) == want["atk"])
+    ev = []
+    bt._use("me", a, b, "KINGSSHIELD", ev)
+    chk("킹실드를 쓰면 실드폼으로 돌아온다", not a.cond.get("blade")
+        and any("실드폼" in (e.get("text") or "") for e in ev) and a.stat("def") == shield_def,
+        [e.get("text") for e in ev if e.get("t") == "msg"])
+    ev = []
+    bt._use("me", a, b, "KINGSSHIELD", ev)
+    chk("실드폼에서 킹실드를 써도 알리지 않는다", not any("폼이 되었다" in (e.get("text") or "") for e in ev))
+    bt._use("me", a, b, "IRONHEAD", [])
+    a.clear_volatile()
+    chk("물러나면 실드폼으로 돌아간다", not a.cond.get("blade") and a.stat("def") == shield_def)
+    bt1, a1, b1 = duel("GYARADOS", "SNORLAX", a_moves=("TACKLE",), a_ab="STANCECHANGE")
+    ev = []
+    bt1._use("me", a1, b1, "TACKLE", ev)
+    chk("킬가르도가 아니면 아무 일도 없다", not a1.cond.get("blade")
+        and not any("폼" in (e.get("text") or "") for e in ev))
+    chk("채운 목록에 들어갔다", "STANCECHANGE" in A.IMPLEMENTED)
+
     print("=== 얼마나 채웠나 ===")
     import collections
     use = collections.Counter()

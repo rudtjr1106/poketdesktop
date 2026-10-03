@@ -8,6 +8,12 @@
 [PokeAPI/sprites](https://github.com/PokeAPI/sprites) 와
 [msikma/pokesprite](https://github.com/msikma/pokesprite).
 
+PokeAPI 에 아직 그림이 없는 레전드 Z-A 의 새 메가 폼 22개(메가개굴닌자,
+메가라이츄X·Y …)는 1.9.1 부터
+[Pokémon Showdown](https://play.pokemonshowdown.com/sprites/) 의 스프라이트를
+받아 쓴다 (`common/sprite_fix.py` 의 `SITE`). 이 폼들은 걷는 도트가 어느
+출처에도 없어서, 바탕화면에서도 이 배틀 도트로 움직인다.
+
 ## 걷는 도트 (바탕화면을 돌아다니는 4방향 애니메이션)
 [PMDCollab / SpriteCollab](https://github.com/PMDCollab/SpriteCollab) —
 포켓몬 불가사의 던전 풍으로 팬들이 그린 스프라이트다.

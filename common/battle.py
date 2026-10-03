@@ -176,6 +176,9 @@ class Fighter(object):
         # 메가진화한 폼 열쇠 (시즌 3). **교체해도 안 풀린다** (본가와 같다) -
         # 그래서 물러날 때 지워지는 cond 가 아니라 따로 둔다.
         self.mega = None
+        # 킬가르도의 블레이드폼 능력치 (처음 쓸 때 센다). 지금 폼은 cond["blade"] -
+        # 물러나면 cond 가 비워져 실드폼으로 돌아간다 (본가와 같다).
+        self._blade = None
 
     # ---- 지닌 도구: 금제·매직룸이면 없는 것처럼 ----
     @property
@@ -303,12 +306,42 @@ class Fighter(object):
             out.append(extra)
         return out
 
+    # ---- 킬가르도의 배틀스위치 (1.9.1) ----
+    def stance_ok(self):
+        """배틀스위치가 도는가: 킬가르도이고, 특성이 켜진 판이고, 그 특성이 살아 있다."""
+        return bool(self.ability_on and (self.species or {}).get("internal") == "AEGISLASH"
+                    and A.has(self, "STANCECHANGE"))
+
+    def blade_base(self):
+        """블레이드폼의 능력치.
+
+        킬가르도는 폼이 둘이고 종족값의 공격↔방어, 특수공격↔특수방어가 뒤바뀐다
+        (실드 50/140/50/140, 블레이드 140/50/140/50). 계산된 값을 맞바꾸면 틀린다 -
+        개체값·노력치·성격은 자리를 안 바꾸므로, 종족값만 바꿔 다시 센다.
+        """
+        if self._blade is None:
+            sp = dict(self._dex.get(self.mon["species"]) or {})
+            b = dict(sp.get("base") or {})
+            b["atk"], b["def"] = b.get("def"), b.get("atk")
+            b["spa"], b["spd"] = b.get("spd"), b.get("spa")
+            sp["base"] = b
+            out = P.calc_all_stats(sp, P.effective_ivs(self.mon), self.mon.get("evs", {}),
+                                   self.mon.get("level", 1), self.mon.get("nature", "HARDY"))
+            boost = self.mon.get("statBoost")
+            if boost:
+                out = dict((k, int(round(v * float(boost)))) for k, v in out.items())
+            self._blade = out
+        return self._blade
+
     def stat(self, key, crit=False, stages=True):
         fld = self.field
         raw = key
         if fld is not None and fld.room("wonderroom") and key in ("def", "spd"):
             raw = "spd" if key == "def" else "def"      # 원더룸: 방어와 특수방어가 뒤바뀐다
-        v = self.base.get(raw, 1)
+        src = self.base
+        if self.cond.get("blade") and raw != "hp" and self.stance_ok():
+            src = self.blade_base()                     # 킬가르도: 블레이드폼
+        v = src.get(raw, 1)
         s = self.stages.get(key, 0) if stages else 0
         if crit and s < 0:                  # 급소는 상대의 방어 상승/내 공격 하락을 무시
             s = 0
@@ -376,6 +409,25 @@ def accuracy_check(dex, move, user, target, rng):
 
 
 def damage(dex, move, user, target, rng, crit=None):
+    """(데미지, 급소여부, 상성배율) 을 돌려준다. 아래 _damage 를 감싼 것이다.
+
+    킬가르도(배틀스위치)는 **때리는 순간 블레이드폼**이다. 실제로 쓸 때는
+    _stance 가 먼저 바꿔 놓지만, 기술을 고를 때(AI·잡기 모드)는 아직 실드폼이라
+    그대로 세면 공격 종족값 50 으로 세어 때리는 기술을 얕본다. 그래서 세는
+    동안만 블레이드폼으로 본다.
+    """
+    peek = (not user.cond.get("blade") and MC.attacks(move)
+            and getattr(user, "stance_ok", None) is not None and user.stance_ok())
+    if not peek:
+        return _damage(dex, move, user, target, rng, crit)
+    user.cond["blade"] = True
+    try:
+        return _damage(dex, move, user, target, rng, crit)
+    finally:
+        user.cond.pop("blade", None)
+
+
+def _damage(dex, move, user, target, rng, crit=None):
     """(데미지, 급소여부, 상성배율) 을 돌려준다.
 
     위력이 원작 공식으로 정해지는 기술(안다리걸기·바둥바둥 ...)은 movecalc 가
@@ -1116,6 +1168,24 @@ class Battle(object):
         SM.enter(self, who, ev)
         self._suppress_weather()
 
+    def _stance(self, who, user, move, k, ev):
+        """킬가르도의 배틀스위치: 때리는 기술을 쓰면 블레이드폼, 킹실드를 쓰면 실드폼.
+
+        **기술이 나가기 전에** 바뀐다 - 그 기술의 데미지부터 블레이드폼의
+        공격으로 센다. 못 움직인 턴(잠듦·풀죽음)에는 여기까지 오지 않는다.
+        """
+        blade = bool(user.cond.get("blade"))
+        if MC.attacks(move) and not blade:
+            user.cond["blade"] = True
+            A.pop(self, user, who, ev)
+            ev.append({"t": "msg", "who": who, "form": "blade",
+                       "text": "%s 은(는) 블레이드폼이 되었다!" % user.name})
+        elif k == "KINGSSHIELD" and blade:
+            user.cond.pop("blade", None)
+            A.pop(self, user, who, ev)
+            ev.append({"t": "msg", "who": who, "form": "shield",
+                       "text": "%s 은(는) 실드폼이 되었다!" % user.name})
+
     def _use(self, who, user, target, key, ev, called=False, instructed=False, bounced=False):
         """기술 하나를 쓴다.
 
@@ -1148,6 +1218,8 @@ class Battle(object):
         abil = user.ability_on or target.ability_on
         tw = "foe" if who == "me" else "me"
         k = MC.key(move) if key != STRUGGLE else STRUGGLE
+        if not bounced and user.stance_ok():
+            self._stance(who, user, move, k, ev)
         charging = k == "BIDE" and bool(user.bide)
         # 두 턴에 걸쳐 쓰는 기술의 둘째 턴. PP 는 첫 턴에 이미 들었다.
         second_turn = bool(not called and k in SM.CHARGE2

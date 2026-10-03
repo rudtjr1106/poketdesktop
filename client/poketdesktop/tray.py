@@ -144,10 +144,26 @@ class TrayBase(object):
             for label, w, h in AREA_PRESETS]
         # 직접 그리기. 미리 정한 네 가지로는 '작업표시줄 위 띠' 나 '둘째 모니터'
         # 같은 자리를 만들 수가 없다.
+        # 모니터가 둘 이상이면 화면을 통째로 고를 수 있다 (1.9.1 - 왼쪽 화면 / 오른쪽 화면).
+        # 한 대면 이 줄들은 없다.
+        try:
+            choices = list(a.screen_choices())
+        except Exception:                                   # noqa: BLE001
+            choices = []
+        screen_rects = [list(r) for _n, r in choices]
+        if choices:
+            area_items = area_items + [SEP] + [
+                Item("%s 전체" % name,
+                     (lambda r, n: lambda: self.call(a.set_area_screen, r, n))(rect, name),
+                     checked=(lambda r: lambda: list(s.get("areaRect") or []) == list(r))(rect),
+                     radio=True)
+                for name, rect in choices]
         area_items = area_items + [
             SEP,
             Item("화면에 직접 그리기...", lambda: self.call(a.pick_area),
-                 checked=lambda: bool(s.get("areaRect")), radio=True),
+                 # 화면을 통째로 고른 것도 areaRect 에 든다 - 그건 위 줄에 표시된다
+                 checked=lambda: bool(s.get("areaRect"))
+                 and list(s.get("areaRect")) not in screen_rects, radio=True),
         ]
 
         return [

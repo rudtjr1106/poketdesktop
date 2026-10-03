@@ -105,6 +105,36 @@ def free_slot(uid, exclude=None, exclude_egg=None):
     return None
 
 
+def box_for(uid, prefer=None, exclude=None):
+    """포켓몬 하나를 넣을 박스 번호.
+
+    prefer(원래 있던 박스)에 자리가 있으면 그곳, 아니면 **번호가 가장 낮은
+    자리 있는 박스**다. exclude 는 지금 넣으려는 그 포켓몬을 빼고 센다는 뜻.
+
+    예전에는 새로 잡은 포켓몬이 늘 0번 박스로 갔다 (칸의 기본값이 0 이라서).
+    30마리가 차도 계속 들어가서 한 박스에 200마리까지 쌓였다 (제보, 1.9.1).
+    전부 찼으면(보유 상한이 박스 전체보다 작아 그럴 일은 없다) prefer 나 0 을 준다.
+    """
+    used = dict((r["box"], r["n"]) for r in db.q(
+        "SELECT box, COUNT(*) AS n FROM pokemon WHERE user_id=? AND on_desktop=0"
+        " AND id IS NOT ? GROUP BY box", (uid, exclude)))
+    size = config.BOX_SIZE
+    if prefer is not None and 0 <= int(prefer) < config.BOX_COUNT \
+            and used.get(int(prefer), 0) < size:
+        return int(prefer)
+    for no in range(config.BOX_COUNT):
+        if used.get(no, 0) < size:
+            return no
+    return int(prefer) if prefer is not None else 0
+
+
+def to_box(uid, pid, prefer=None):
+    """이 포켓몬을 박스에 넣는다 (데리고 다니던 애를 거두거나, 새로 얻었을 때)."""
+    no = box_for(uid, prefer, exclude=pid)
+    db.run("UPDATE pokemon SET box=?, on_desktop=0, slot=NULL WHERE id=?", (no, pid))
+    return no
+
+
 # ---------------------------------------------------------------- 성장
 MAX_MOVES = P.MAX_MOVES        # 규칙은 common/pokelogic.py 에 있다
 

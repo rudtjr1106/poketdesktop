@@ -18,7 +18,7 @@ db.MIGRATIONS 는 '칸 추가' 만 한다. 없는 칸을 더하는 일이라 몇
 """
 import datetime
 
-from . import db
+from . import config, db
 
 # 없앤 회복약과 그때의 매입가. 가방에 남아 있으면 이 값으로 사 준다.
 #
@@ -515,6 +515,39 @@ def _mmr_recenter(conn):
     return "%d명 숨은 점수 1000" % n
 
 
+def _box_overflow(conn):
+    """1.9.1: 30마리를 넘겨 담긴 박스를 푼다.
+
+    새로 얻은 포켓몬이 늘 0번 박스로 가서(자리 있는 박스를 찾지 않았다) 한
+    박스에 수십~수백 마리가 들어 있었다. **박스마다 먼저 들어온 30마리는 그대로
+    두고**, 넘친 것(나중에 얻은 것)을 번호가 낮은 자리 있는 박스로 옮긴다.
+    데리고 다니는 포켓몬은 박스를 차지하지 않으므로 건드리지 않는다.
+    """
+    size, count = int(config.BOX_SIZE), int(config.BOX_COUNT)
+    users = [r[0] for r in conn.execute(
+        "SELECT DISTINCT user_id FROM pokemon WHERE on_desktop=0"
+        " GROUP BY user_id, box HAVING COUNT(*) > ?", (size,)).fetchall()]
+    moved = 0
+    for uid in users:
+        rows = conn.execute("SELECT id, box FROM pokemon WHERE user_id=? AND on_desktop=0"
+                            " ORDER BY id", (uid,)).fetchall()
+        used, extra = {}, []
+        for pid, box in rows:
+            box = int(box or 0)
+            if used.get(box, 0) < size:
+                used[box] = used.get(box, 0) + 1
+            else:
+                extra.append(pid)
+        for pid in extra:
+            no = next((n for n in range(count) if used.get(n, 0) < size), None)
+            if no is None:
+                break                          # 박스가 전부 찼다 (보유 상한상 없을 일)
+            conn.execute("UPDATE pokemon SET box=? WHERE id=?", (no, pid))
+            used[no] = used.get(no, 0) + 1
+            moved += 1
+    return "유저 %d명, 포켓몬 %d마리를 자리 있는 박스로" % (len(users), moved)
+
+
 ONCE = [
     ("0140-refund-heals", _refund_heals),
     ("0190-season1-reset", _season1_reset),
@@ -525,6 +558,7 @@ ONCE = [
     # 시즌 3 (1.7.0, 2026-10-02). 서버가 새 판으로 뜨는 순간 한 번 돈다.
     ("0290-season3-open", _season3_open),
     ("0300-s3-void-early", _s3_void_early),
+    ("0310-box-overflow", _box_overflow),
 ]
 
 

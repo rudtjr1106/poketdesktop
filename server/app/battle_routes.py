@@ -407,6 +407,7 @@ def store_caught(uid, mon):
         where = "party"
     else:
         where = "box"
+        deps.to_box(uid, mid)            # 자리 있는 박스로 (1.9.1 - 늘 0번으로 가던 것)
     got = db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (mid,)))
     return deps.decorate(got), where
 

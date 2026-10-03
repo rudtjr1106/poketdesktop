@@ -189,8 +189,12 @@ def dex_part():
     dot = [m for m in DEX.megas if m.get("dot")]
     # 1.9.0: 세 번째 출처(GBA 풍)로 19폼이 더 걷는다 (메가보만다·메가메타그로스 …)
     ow = [m for m in walk if str(m["walk"]).startswith("ow:")]
-    chk("걷는 도트가 있는 폼 60 (그중 세 번째 출처 19), 배틀 도트가 있는 폼 57",
-        (len(walk), len(ow), len(dot)) == (60, 19, 57), (len(walk), len(ow), len(dot)))
+    # 1.9.1: 레전드 Z-A 의 메가 22폼은 쇼다운 사이트의 배틀 도트로 선다 (걷는 도트는 없다)
+    chk("걷는 도트가 있는 폼 60 (그중 세 번째 출처 19), 배틀 도트가 있는 폼 79",
+        (len(walk), len(ow), len(dot)) == (60, 19, 79), (len(walk), len(ow), len(dot)))
+    neither = [m["internal"] for m in DEX.megas if not m.get("walk") and not m.get("dot")]
+    chk("둘 다 없는 폼은 넷뿐 (히드런·냐오닉스 암수·마기아나)", sorted(neither) == sorted(
+        ["HEATRAN_MEGA", "MEOWSTIC_MEGA", "MEOWSTIC_MEGA_F", "MAGEARNA_MEGA"]), neither)
     chk("메가 폼의 번호는 모두 10000 이상 (오버레이가 이걸로 가른다)",
         all(m["num"] >= overlay.MEGA_FROM for m in DEX.megas))
 

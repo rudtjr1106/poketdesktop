@@ -171,13 +171,24 @@ class WildPet(Pet):
                 "\n오른쪽 클릭 = 볼 고르기"
                 "\n두 번 클릭 = 바로 던지기")
 
+    def can_drag(self):
+        """야생은 들어서 옮기지 못한다 (1.9.1).
+
+        풀숲에서 돋은 자리에 있어야 하고, 왼쪽 클릭이 배틀이라 끌다가 놓는
+        순간 싸움이 걸리면 어리둥절하다.
+        """
+        return False
+
     def on_press(self, e):
         Pet.on_press(self, e)
-        self._down = (e.x_root, e.y_root)
+        self._down = (e.x_root, e.y_root) if e is not None else None
 
     def on_release(self, e):
         d = getattr(self, "_down", None)
-        moved = bool(d) and (abs(e.x_root - d[0]) > 4 or abs(e.y_root - d[1]) > 4)
+        # e 가 없으면 맥이 '뗐다' 를 못 받아서 app._unstick 이 대신 풀어 주는
+        # 것이다. 사람이 누른 것이 아니므로 배틀을 걸지 않는다.
+        moved = e is None or (bool(d) and (abs(e.x_root - d[0]) > 4
+                                           or abs(e.y_root - d[1]) > 4))
         Pet.on_release(self, e)
         if moved:
             return

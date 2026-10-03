@@ -20,7 +20,7 @@ from .platform_base import (NATIVE_MENU, RIGHT_CLICK,   # noqa: F401
                             SpriteView, accept_first_click, activate, keep_focus,
                             bind_right, data_dir, mouse_buttons_down,
                             take_right_clicks, watch_right_click,
-                            hide_from_dock, screens, show_again,
+                            hide_from_dock, show_again,
                             own_dialog, surface)
 
 
@@ -113,6 +113,69 @@ def work_area(fallback_w, fallback_h):
     except Exception:                                       # noqa: BLE001
         pass
     return 0, 0, fallback_w, fallback_h
+
+
+def _monitors():
+    """[(화면 사각형, 작업 영역 사각형, 주 화면인가)] - EnumDisplayMonitors.
+
+    좌표는 이 프로세스가 보는 화면 좌표다 (Tk 가 창을 놓을 때 쓰는 것과 같다).
+    왼쪽이나 위에 둔 모니터는 음수가 된다.
+    """
+    from ctypes import wintypes
+    out = []
+
+    class MONITORINFO(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT),
+                    ("rcWork", wintypes.RECT), ("dwFlags", wintypes.DWORD)]
+
+    user32 = ctypes.windll.user32
+    proc_t = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p,
+                                ctypes.POINTER(wintypes.RECT), ctypes.c_void_p)
+
+    def each(hmon, _hdc, _rect, _data):
+        mi = MONITORINFO()
+        mi.cbSize = ctypes.sizeof(MONITORINFO)
+        get = user32.GetMonitorInfoW
+        get.argtypes = [ctypes.c_void_p, ctypes.POINTER(MONITORINFO)]
+        if get(hmon, ctypes.byref(mi)):
+            m, w = mi.rcMonitor, mi.rcWork
+            out.append(((m.left, m.top, m.right, m.bottom),
+                        (w.left, w.top, w.right, w.bottom),
+                        bool(mi.dwFlags & 1)))               # MONITORINFOF_PRIMARY
+        return 1
+
+    cb = proc_t(each)
+    enum = user32.EnumDisplayMonitors
+    enum.argtypes = [ctypes.c_void_p, ctypes.c_void_p, proc_t, ctypes.c_void_p]
+    enum(None, None, cb, None)
+    out.sort(key=lambda t: (not t[2], t[0][0], t[0][1]))      # 주 화면이 맨 앞
+    return out
+
+
+def screens(fallback_w, fallback_h):
+    """모든 화면을 Tk 좌표로. 첫 번째가 주 화면 (1.9.1).
+
+    **그동안 윈도우에서는 주 화면 하나만 돌려줬다** (기본 구현을 그대로 썼다).
+    모니터가 둘이어도 둘째 화면을 몰라서, 화면을 골라 영역으로 삼을 수가 없었다.
+    """
+    try:
+        got = [m[0] for m in _monitors() if m[0][2] > m[0][0] and m[0][3] > m[0][1]]
+        if got:
+            return got
+    except Exception:                                       # noqa: BLE001
+        pass
+    return [(0, 0, fallback_w, fallback_h)]
+
+
+def screen_works(fallback_w, fallback_h):
+    """화면마다 작업표시줄을 뺀 영역. screens() 와 같은 차례다."""
+    try:
+        got = [m[1] for m in _monitors() if m[0][2] > m[0][0] and m[0][3] > m[0][1]]
+        if got:
+            return got
+    except Exception:                                       # noqa: BLE001
+        pass
+    return [work_area(fallback_w, fallback_h)]
 
 
 def virtual_screen(fallback_w, fallback_h):

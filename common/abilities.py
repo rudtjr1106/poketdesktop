@@ -137,7 +137,9 @@ IMPLEMENTED = (
        "LIQUIDOOZE", "STALL", "MYCELIUMMIGHT", "HEAVYMETAL", "LIGHTMETAL",
        "GLUTTONY", "CHEEKPOUCH", "RIPEN",
        # 1.8.1 뒤에 채운 것
-       "POISONPUPPETEER"}
+       "POISONPUPPETEER",
+       # 1.9.1: 킬가르도의 폼 바꾸기 (battle.Fighter.stance_ok / Battle._stance)
+       "STANCECHANGE"}
     | set(PRIORITY_GUARD) | set(TRAP_ABILITY))
 
 STAGE_STATS = ("atk", "def", "spa", "spd", "spe")

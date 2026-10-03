@@ -39,6 +39,9 @@ make_click_through = _M.make_click_through
 SpriteView = _M.SpriteView
 work_area = _M.work_area
 screens = _M.screens
+# 화면마다 작업표시줄·독을 뺀 영역 (1.9.1). screens 와 같은 차례.
+screen_works = getattr(_M, "screen_works",
+                       lambda w, h: [_M.work_area(w, h)])
 # 모니터 전부를 아우르는 사각형 (영역 직접 그리기가 이 위에 덮개를 깐다).
 virtual_screen = getattr(_M, "virtual_screen",
                          lambda w, h: (0, 0, w, h))

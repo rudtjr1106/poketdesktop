@@ -2008,6 +2008,21 @@ class App(object):
         self.settings["areaRect"] = list(rect) if rect else None
         self._area_changed()
 
+    def screen_choices(self):
+        """모니터가 둘 이상일 때 고를 화면들 [(이름, 영역)]. 한 대면 빈 목록."""
+        from .overlay import screen_choices
+        try:
+            sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+            return screen_choices(PLAT.screens(sw, sh), PLAT.screen_works(sw, sh))
+        except Exception as e:                              # noqa: BLE001
+            config.log("화면 목록을 못 읽었습니다: %s" % e)
+            return []
+
+    def set_area_screen(self, rect, name=""):
+        """그 화면 전체를 활동 영역으로 (트레이·설정의 '왼쪽 화면 / 오른쪽 화면')."""
+        self.set_area_rect(rect)
+        self.notify("포켓몬이 돌아다닐 영역을 %s 전체로 정했습니다." % (name or "그 화면"))
+
     def pick_area(self):
         """화면에 끌어서 활동 영역을 그린다 (캡처처럼)."""
         from .ui_area import pick_area
