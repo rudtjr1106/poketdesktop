@@ -81,8 +81,14 @@ DAILY_BATTLES = 20
 # 자른 값이다. 가까운 띠부터 보고, 그 안에서 가장 가까운 몇 명 중에 고른다.
 POWER_BANDS = (0.10, 0.25)
 PICK_CLOSEST = 3
-# 전력이 같으면 숨은 점수도 가까운 사람을. 400점 차이를 전력 10% 차이로 친다.
-MMR_WEIGHT = 0.10 / 400.0
+# 전력이 같으면 숨은 점수도 가까운 사람을. 400점 차이를 전력 30% 차이로 친다.
+#
+# **0.10 이었을 때 숨은 점수가 사실상 무시됐다.** 전력은 종족값 x 레벨만 보는데
+# 랭크는 전원 Lv.50 이라 사실상 종족값 합계다 - 노력치를 꽉 채운 팀과 0 인 팀이
+# 같은 전력으로 잡힌다. 그 상태에서 493점 차이가 전력 12% 로만 쳐지니 10% 띠
+# 안에서 순위만 조금 밀릴 뿐 걸러지지 않았다. 1493 짜리가 1000(한 판도 안 뛴
+# 기본값) 짜리를 사흘 동안 60번 만나 6턴에 전멸시킨 판이 그렇게 나왔다.
+MMR_WEIGHT = 0.30 / 400.0
 
 # 랜덤 배틀 상대를 고를 때는 최근에 붙은 사람을 이만큼 건너뛴다.
 # 직접 지목하는 쪽(PAIR_COOLDOWN_MIN)보다 길게 본다 - 후보가 서른 명
@@ -594,9 +600,12 @@ def find_opponent(uid, rng=None):
     skip.add(uid)
 
     my_power = team_power(mine) or 1.0
-    ratings = dict((r["user_id"], r["rating"]) for r in
-                   db.q("SELECT user_id, rating FROM rank_stat"))
+    ratings, played = {}, {}
+    for r in db.q("SELECT user_id, rating, games FROM rank_stat"):
+        ratings[r["user_id"]] = r["rating"]
+        played[r["user_id"]] = r["games"]
     my_mmr = ratings.get(uid, BASE_RATING)
+    my_placed = played.get(uid, 0) >= PLACEMENT
 
     pool = []
     for other, mons in teams.items():
@@ -606,12 +615,20 @@ def find_opponent(uid, rng=None):
         pool.append((gap, other))
     if not pool:
         return None
+    # **배치고사를 마친 사람과 아직인 사람을 갈라 붙인다.** 전력은 노력치를
+    # 안 보기 때문에, 갈라 두지 않으면 잘 키운 사람이 한 판도 안 뛴 사람만
+    # 골라 만나게 된다 (6턴에 여섯 마리가 다 눕는 판이 그것이다).
+    # 같은 쪽에서 못 찾으면 전체로 넓힌다 - 상대가 없어 배틀이 아예 안
+    # 성사되는 것보다는 낫다.
+    same = [(g, u) for g, u in pool
+            if (played.get(u, 0) >= PLACEMENT) == my_placed]
     # 가까운 띠부터. 넓혀도 없으면 안 붙인다 - 기울어진 판을 억지로
     # 만드는 것보다 '지금은 상대가 없다' 가 낫다.
-    for band in POWER_BANDS:
-        near = [(g, u) for g, u in pool if g <= band]
-        if near:
-            return _pick_fresh(uid, near, rng, ratings, my_mmr)
+    for cands in (same, pool):
+        for band in POWER_BANDS:
+            near = [(g, u) for g, u in cands if g <= band]
+            if near:
+                return _pick_fresh(uid, near, rng, ratings, my_mmr)
     return None
 
 
