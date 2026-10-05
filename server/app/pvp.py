@@ -624,12 +624,41 @@ def find_opponent(uid, rng=None):
             if (played.get(u, 0) >= PLACEMENT) == my_placed]
     # 가까운 띠부터. 넓혀도 없으면 안 붙인다 - 기울어진 판을 억지로
     # 만드는 것보다 '지금은 상대가 없다' 가 낫다.
-    for cands in (same, pool):
+    for stage, cands in (("same", same), ("all", pool)):
         for band in POWER_BANDS:
             near = [(g, u) for g, u in cands if g <= band]
             if near:
-                return _pick_fresh(uid, near, rng, ratings, my_mmr)
+                got = _pick_fresh(uid, near, rng, ratings, my_mmr)
+                _log_pick(uid, stage, band, near, got, played,
+                          my_placed, len(pool), len(same))
+                return got
+    _log_pick(uid, "none", None, [], None, played, my_placed,
+              len(pool), len(same))
     return None
+
+
+def _log_pick(uid, stage, band, near, got, played, my_placed, npool, nsame):
+    """어느 단계에서 상대를 골랐는지 남긴다.
+
+    **진단용이다. 원인을 잡으면 이 함수와 match_log 표를 지운다.**
+    배치고사를 마친 사람끼리 붙이는 1차(same)에서 골랐는지, 거기 아무도
+    없어 전체(all)로 넓혔는지를 봐야 한다 - 같은 날 같은 코드에서 어떤
+    사람은 미배치 상대를 0% 만나고 어떤 사람은 65% 를 만났다.
+
+    여기서 난 예외가 배틀을 막으면 안 된다. 전부 감싸고 조용히 넘어간다.
+    """
+    try:
+        placed_near = sum(1 for _g, u in near
+                          if played.get(u, 0) >= PLACEMENT)
+        db.run(
+            "INSERT INTO match_log (at, user_id, stage, band, pool, same_n,"
+            " near, near_placed, my_placed, foe_id, foe_games)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (_iso(), uid, stage, band, npool, nsame, len(near), placed_near,
+             1 if my_placed else 0, got,
+             played.get(got, 0) if got is not None else None))
+    except Exception:                                       # noqa: BLE001
+        pass
 
 
 def _pick_fresh(uid, cands, rng, ratings=None, my_mmr=BASE_RATING):

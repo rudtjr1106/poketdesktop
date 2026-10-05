@@ -628,6 +628,26 @@ CREATE TABLE IF NOT EXISTS server_error (
 );
 CREATE INDEX IF NOT EXISTS idx_error_at ON server_error(at);
 
+-- **진단용. 원인을 잡으면 지운다.** 랜덤 배틀 상대를 고를 때 어느 단계에서
+-- 골랐는지 남긴다 - 배치고사를 마친 사람끼리 붙이는 1차에서 골랐는지(same),
+-- 거기 아무도 없어 전체로 넓혔는지(all). server_error 에 적으면 /api/health
+-- 의 오류 수가 튀어서 keepalive 워크플로가 실패하므로 따로 둔다.
+CREATE TABLE IF NOT EXISTS match_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    at          TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    stage       TEXT NOT NULL,          -- same / all / none
+    band        REAL,
+    pool        INTEGER NOT NULL,       -- 붙을 수 있는 사람 수
+    same_n      INTEGER NOT NULL,       -- 그중 나와 같은 배치 상태
+    near        INTEGER NOT NULL,       -- 띠 안 후보
+    near_placed INTEGER NOT NULL,       -- 그중 배치고사를 마친 사람
+    my_placed   INTEGER NOT NULL,
+    foe_id      INTEGER,
+    foe_games   INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_match_log_at ON match_log(at);
+
 -- 서버가 스스로 기억해야 하는 잡다한 것. 지금은 '어떤 자료 손질까지
 -- 끝냈는가' 를 적는 데 쓴다.
 CREATE TABLE IF NOT EXISTS meta (
