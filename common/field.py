@@ -56,6 +56,7 @@ class Field(object):
         self.sides = {"me": {}, "foe": {}}
         self.suppressed = False       # 날씨부정·에어록이 서 있다 (저장하지 않는다 - 서 있는 포켓몬으로 매번 정한다)
         self.last_move = None         # 판에서 마지막으로 쓰인 기술 (흉내쟁이)
+        self.clock = 0                # 이 판에서 몇 번째 턴인가 (원수갚기가 '앞 턴' 을 센다)
 
     # ---- 저장 ----
     def dump(self):
@@ -63,6 +64,7 @@ class Field(object):
                 or self.last_move):
             return None
         return {"weather": self.weather, "weatherTurns": self.weather_turns, "lastMove": self.last_move,
+                "clock": self.clock,
                 "terrain": self.terrain, "terrainTurns": self.terrain_turns,
                 "rooms": dict(self.rooms),
                 "sides": {"me": dict(self.sides["me"]), "foe": dict(self.sides["foe"])}}
@@ -78,6 +80,7 @@ class Field(object):
         f.terrain_turns = int(d.get("terrainTurns") or 0)
         f.rooms = dict(d.get("rooms") or {})
         f.last_move = d.get("lastMove")
+        f.clock = int(d.get("clock") or 0)
         sides = d.get("sides") or {}
         f.sides = {"me": dict(sides.get("me") or {}), "foe": dict(sides.get("foe") or {})}
         return f

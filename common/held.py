@@ -196,6 +196,10 @@ def _chip(f, who, amount, ev, text):
 
 def _consume(f):
     """이 판에서는 사라진다. 판이 끝나면 돌아온다 (머리말 규칙 2)."""
+    if str(f._held or "").endswith("BERRY"):
+        f.cond["ateBerry"] = True          # 트림은 나무열매를 먹은 뒤에만 쓸 수 있다
+        f.cond["lastBerry"] = f._held      # 수확·되새김질이 다시 꺼낸다
+        f.cond["cudNew"] = f._held         # 되새김질: 다음 턴 끝에 한 번 더 먹는다
     f.used = True
 
 
@@ -468,8 +472,9 @@ def end_of_turn(bt, f, who, ev):
         _chip(f, who, f.maxhp // 8, ev,
               "%s 은(는) 끈적끈적바늘 때문에 데미지를 입었다!" % f.name)
     elif h == "TOXICORB" and not f.status:
-        # 엔진에 맹독이 없어서 독으로 건다. 독 타입이면 _apply_status 가 막는다.
-        bt._apply_status(f, "poison", ev)
+        # 맹독으로 건다 (1.9.2 - 예전에는 엔진에 맹독이 없어서 그냥 독이었다).
+        # 독 타입이면 _apply_status 가 막는다.
+        bt._apply_status(f, "bad-poison", ev)
     elif h == "FLAMEORB" and not f.status:
         bt._apply_status(f, "burn", ev)
     check_hp(bt, f, who, ev)

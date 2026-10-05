@@ -78,6 +78,19 @@ SKIP_TEXT = {
 }
 
 
+# 방금 쓴 기술 이름의 글자색. 다른 글씨(급소·효과·대미지)와 안 겹치는 흰색.
+MOVE_COLOR = "#ffffff"
+
+
+def move_text(ev):
+    """기술 이벤트 하나 -> 머리 위에 띄울 글. 띄울 것이 없으면 빈 문자열.
+
+    이름은 안 적는다 - 누가 썼는지는 글씨가 뜬 자리를 보면 안다.
+    """
+    move = ev.get("move")
+    return "%s!" % move if move else ""
+
+
 def _short(text):
     """'○○ 은(는) ...' 에서 뒷부분만. 이름은 도트를 보면 안다."""
     t = (text or "").split(" 은(는) ")[-1]
@@ -252,6 +265,22 @@ class Arena(object):
             self.plates.extend([r, t])
         else:
             self.plates.append(t)
+
+    # ---------------- 방금 쓴 기술 ----------------
+    def _show_move(self, ev):
+        """방금 쓴 기술 이름을 **쓴 포켓몬 머리 위에** 띄운다 (1.9.2).
+
+        이펙트만 보고는 무슨 기술인지 알 수 없었다. 불꽃이 튀면 불꽃 기술인
+        줄은 알아도 화염방사인지 불대문자인지는 모른다 - 랜덤 배틀은 내가
+        고른 기술이 아니라 더 그렇다.
+
+        '효과가 별로...' 와 같은 글씨다 - 도트 바로 위에 떠올랐다 사라진다.
+        따로 띠나 판을 깔지 않는다.
+        """
+        text = move_text(ev)
+        pet = self.active.get(ev.get("who"))
+        if text and pet and not getattr(pet, "down", False):
+            self.float_over(pet, text, MOVE_COLOR)
 
     @staticmethod
     def same_team(pets, roster):
@@ -526,6 +555,8 @@ class Arena(object):
 
         src = self.active.get(who)
         dst = self.active.get("foe" if who == "me" else "me")
+        if t == "move":
+            self._show_move(ev)
         if t == "move" and src and dst and self.layer:
             move = self.find_move(ev)
             self.fx = FX.Effect(self, move, self.center(src), self.center(dst),

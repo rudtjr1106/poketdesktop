@@ -197,6 +197,39 @@ def main():
     chk("b 기준 승리", lb.outcome("b") == "win")
     chk("끝났다고 알린다", any(e["t"] == "over" for e in ev))
 
+    print("=== 기권: 내 차례가 아니어도 된다 (제보, 1.9.2) ===")
+    # 상대가 다음 포켓몬을 고르는 동안에는 '고를 차례가 아닙니다' 로 거절돼서,
+    # 판이 안 끝나고 창이 껐다 켜도 다시 떴다.
+    lb = build()
+    lb.start()
+    lb.b.mon.hp = 0
+    lb.b.need_switch = True
+    chk("상대가 다음 포켓몬을 고르는 중이다", lb.phase() == "switch" and not lb.can_act("a"),
+        (lb.phase(), lb.can_act("a")))
+    try:
+        lb.choose("a", "forfeit")
+        ok = True
+    except ValueError as e:
+        ok = str(e)
+    chk("그때도 기권을 받는다", ok is True, ok)
+    chk("상대를 안 기다리고 바로 끝난다", lb.ready())
+    ev = lb.resolve()
+    chk("건 사람이 진다 (교체 단계)", lb.over and lb.result == "b" and lb.reason == "forfeit",
+        (lb.over, lb.result, lb.reason))
+    try:
+        lb.choose("a", "forfeit")
+        chk("끝난 판에서는 거절", False)
+    except ValueError as e:
+        chk("끝난 판에서는 거절", "끝난" in str(e), str(e))
+    lb = build()
+    lb.start()
+    lb.a.forfeited = True
+    try:
+        lb.choose("a", "forfeit")
+        chk("이미 그만둔 사람은 다시 못 건다", False)
+    except ValueError as e:
+        chk("이미 그만둔 사람은 다시 못 건다", "끝난" in str(e), str(e))
+
     print("=== 전멸 ===")
     lb = build()
     lb.start()

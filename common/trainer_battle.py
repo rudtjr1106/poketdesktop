@@ -54,6 +54,7 @@ PvP 와 야생은 battle.Battle.choose_for 를 쓴다. 관장은 **여기서 따
 import random
 
 from . import abilities as A
+from . import attackfx as AF
 from . import battle as B
 from . import field as FD
 from . import held as H
@@ -100,7 +101,7 @@ def works(md):
     k = MC.key(md)
     if k in SM.AI_DEAD:
         return False                      # 1:1 에서 실패하거나 AI 가 쓸 일이 없는 것
-    if k in SM.HANDLERS or MC.attacks(md) or md.get("heal"):
+    if k in SM.HANDLERS or k in AF.HANDLERS or MC.attacks(md) or md.get("heal"):
         return True
     if md.get("ail") in B.HANDLED_STATUS or md.get("ail") == "leech-seed":
         return True
@@ -140,6 +141,7 @@ class Duel(B.Battle):
         for who, f in (("foe", self.foe), ("me", self.me)):
             if not f.alive() and not f.ab.get("fainted"):
                 f.ab["fainted"] = True
+                self._note_fall(who)            # 다음 턴의 원수갚기가 본다
                 prefix = "상대 " if who == "foe" else ""
                 ev.append({"t": "faint", "who": who,
                            "text": "%s%s 은(는) 쓰러졌다!" % (prefix, f.name)})
@@ -381,7 +383,10 @@ class TrainerBattle(object):
                 rows.append([k, None, md])
                 continue
             d = self._est(user, target, k)
-            if d <= 0:
+            # 지금 쓰면 실패하는 기술(잠 안 든 상대에게 꿈먹기), 쓰면 내가 쓰러지는 기술,
+            # 다음 턴을 쉬는 기술은 그만큼 낮게 친다 (attackfx.ai_mult).
+            am = AF.ai_mult(bt, MC.key(md), md, user, target)
+            if d <= 0 or am <= 0:
                 rows.append([k, 0.0, md])
                 continue
             acc = self._hit_rate(md, user, target)
@@ -403,6 +408,7 @@ class TrainerBattle(object):
                 score = target.hp * acc * (3.0 if first else 1.6)
             if their_ko and not first:
                 score *= 0.35                              # 쓰기 전에 쓰러질 공산이 크다
+            score *= am
             if dealt * acc > dmg_best:
                 dmg_best, main = dealt * acc, ("atk" if md.get("cat") == "physical" else "spa")
             rows.append([k, score, md])
@@ -425,7 +431,9 @@ class TrainerBattle(object):
         """변화기의 값을 '한 대 때린 것' 과 같은 단위로. 쓸모없으면 0."""
         if not works(md):
             return 0.0
-        v = SM.value(self.bt, MC.key(md), md, user, target, "foe", base)
+        v = AF.status_value(self.bt, MC.key(md), md, user, target, base)
+        if v is None:
+            v = SM.value(self.bt, MC.key(md), md, user, target, "foe", base)
         if v is not None:
             return v * self._acc(md)
         if their_d * KO_ROLL >= user.hp and not self._first(user, target, md, their_md):
@@ -551,7 +559,7 @@ class TrainerBattle(object):
 
     def _foe_wants_switch(self):
         """상대가 이번 턴에 바꾸고 싶은 자리. 안 바꾸면 None."""
-        if self.foe_switched_last or SM.trapped(self.bt, self.foe):
+        if self.foe_switched_last or SM.trapped(self.bt, self.foe) or SM.must_stay(self.foe):
             return None
         others = [i for i, f in enumerate(self.foe_team) if f.alive() and i != self.fi]
         if not others:
@@ -627,6 +635,8 @@ class TrainerBattle(object):
             raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
         if kind == "switch" and SM.trapped(self.bt, self.me):
             raise ValueError("%s 은(는) 붙잡혀 있어서 교체할 수 없습니다." % self.me.name)
+        if kind == "switch" and SM.must_stay(self.me):
+            raise ValueError(SM.must_stay(self.me))     # 반동 턴·날뛰는 중·모으는 중
         if kind == "move":
             # 역린류·2턴 기술로 잠겨 있으면 그것으로 바꿔 받는다 (거절하지 않는다)
             value = SM.locked_move(self.me, self.bt) or value
@@ -673,6 +683,8 @@ class TrainerBattle(object):
         me, foe = self.me, self.foe
         me.flinched = False
         foe.flinched = False
+        # 이 턴에 누가 무엇을 하려는지 (교체한 쪽은 None) - 기습·질풍신뢰가 본다
+        bt.pending = {"me": me_move, "foe": foe_move}
         if me_move and foe_move:
             order = bt._order(me_move, foe_move, ev)
         elif me_move:

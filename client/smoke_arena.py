@@ -87,9 +87,10 @@ def cached_nums(k):
     from client.poketdesktop import sprite_cache as SC
     from client.poketdesktop import walk_cache as WC
     nums = []
+    # 지금은 번호 폴더(0025/Walk.png)다. 옛 캐시는 0025.png 였다 - 둘 다 본다.
     for f in sorted(os.listdir(WC.walk_dir())):
         stem, ext = os.path.splitext(f)
-        if ext != ".png" or not stem.isdigit():
+        if ext not in ("", ".png") or not stem.isdigit():
             continue
         n = int(stem)
         if WC.local(n)[0] and SC.find_local(n, False):
@@ -205,6 +206,25 @@ def main():
     foe_pets, stage_rect, walked = [], None, 0
 
     bars_drawn = [0]
+    # 방금 쓴 기술 이름 (1.9.2). 쓴 포켓몬 머리 위에 글씨로 뜬다 - 뜨는 순간을 적어 둔다.
+    said = []
+    keep_float = ar.float_over
+
+    def float_over(pet, text, color):
+        said.append({"pet": pet, "text": text, "color": color,
+                     "who": next((s for s in ("me", "foe") if ar.active.get(s) is pet), None),
+                     "before": len(ar.texts)})
+        keep_float(pet, text, color)
+        said[-1]["drawn"] = len(ar.texts) - said[-1]["before"]
+    ar.float_over = float_over
+    played = []
+    keep_render = ar._render
+
+    def render(ev, done):
+        if ev.get("t") == "move":
+            played.append((ev, ar.active.get(ev.get("who")), len(said)))
+        return keep_render(ev, done)
+    ar._render = render
 
     def peek():
         # 재생 도중에 한 번 들여다본다. 끝나면 다 정리돼서 못 본다.
@@ -234,6 +254,25 @@ def main():
     chk("기술 이펙트가 실제로 돌았다 (%d회)" % FX_RUNS[0], FX_RUNS[0] > 0)
     chk("체력바가 화면에 그려졌다 (조각 %d개)" % bars_drawn[0],
         bars_drawn[0] > 0)
+    moves = [e for e in ar.view["events"] if e.get("t") == "move"]
+    chk("기술 이벤트를 다 재생했다 (%d번)" % len(played),
+        len(played) == len(moves) and len(moves) > 0, (len(played), len(moves)))
+    # 그 이벤트를 그리자마자 뜬 첫 글씨가 기술 이름이어야 한다
+    firsts = [(ev, pet, said[n] if n < len(said) else None) for ev, pet, n in played if pet]
+    chk("쓴 기술마다 이름이 뜬다 (%d번)" % len(firsts),
+        firsts and all(f and f["text"] == "%s!" % ev["move"] for ev, _p, f in firsts),
+        [(ev["move"], f and f["text"]) for ev, _p, f in firsts][:4])
+    chk("  쓴 포켓몬의 머리 위에 뜬다",
+        all(f and f["pet"] is pet and f["who"] == ev["who"] for ev, pet, f in firsts),
+        [(ev["who"], f and f["who"]) for ev, _p, f in firsts][:6])
+    chk("  실제로 그려진다 (떠오르는 글씨 하나씩)",
+        all(f and f["drawn"] == 1 for _e, _p, f in firsts),
+        [f and f["drawn"] for _e, _p, f in firsts][:6])
+    chk("  색은 흰색 (급소·효과 글씨와 구별된다)",
+        all(f and f["color"] == A.MOVE_COLOR for _e, _p, f in firsts))
+    chk("  띠나 판은 안 깐다 (글씨만)", not hasattr(ar, "banner"))
+    chk("  글은 기술 이름만", A.move_text({"move": "몸통박치기", "name": "피카츄"}) == "몸통박치기!"
+        and A.move_text({"t": "move"}) == "")
     chk("상대가 걷는 도트로 나왔다 (%d/%d)" % (walked, len(foe_pets)),
         len(foe_pets) > 0 and walked == len(foe_pets),
         [p.walking_sprite for p in foe_pets])

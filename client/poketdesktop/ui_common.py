@@ -1245,12 +1245,29 @@ class PopupMenu(object):
         self._on_close = on_close
         self._was_down = PLAT.mouse_buttons_down()
         close_all()
+        self.cols = self._columns_for(rows, x, y)
         self._build(rows)
         self._place(x, y, anchor)
         PopupMenu._open.append(self)
         self._watch()
 
     # ---------------- 만들기 ----------------
+    def _columns_for(self, rows, x, y):
+        """몇 단으로 놓을까. 한 단으로 그 화면에 다 안 들어가면 옆으로 나눈다.
+
+        박스 고르기는 서른두 줄이다 (1.9.2). 화면이 낮으면 아래 줄이 화면
+        밖으로 나가 누를 수가 없다. 글자를 줄이지 않고 단을 늘린다.
+        """
+        try:
+            from tkinter import font as tkfont
+            line = tkfont.Font(root=self.root, font=FONT).metrics("linespace") + 5
+            _x1, sy1, _x2, sy2 = screen_at(self.root, x, y)
+            room = max(line * 4, (sy2 - sy1) - 60)
+        except Exception:                                   # noqa: BLE001
+            return 1
+        need = sum(h(9) if r is None else line for r in rows) + 12
+        return max(1, -(-int(need) // int(room)))
+
     def _build(self, rows):
         cat = tk.Toplevel(self.root)
         cat.overrideredirect(True)
@@ -1275,11 +1292,26 @@ class PopupMenu(object):
 
         body = tk.Frame(win, bg=BG2)
         body.pack(fill="both", expand=True, padx=1, pady=6)
-        for row in rows:
-            if row is None:
-                tk.Frame(body, bg=LINE, height=h(1)).pack(fill="x", padx=8, pady=4)
-                continue
-            self._row(body, row)
+        cols = max(1, min(getattr(self, "cols", 1), len(rows) or 1))
+        if cols > 1:
+            # 단마다 같은 폭. 창 폭은 _place 가 width 로 못박으므로 여기서 늘린다.
+            per = -(-len(rows) // cols)
+            groups = [rows[i:i + per] for i in range(0, len(rows), per)]
+            self.width = self.width * len(groups)
+            holders = []
+            for i, _g in enumerate(groups):
+                body.columnconfigure(i, weight=1, uniform="col")
+                col = tk.Frame(body, bg=BG2)
+                col.grid(row=0, column=i, sticky="new")
+                holders.append(col)
+        else:
+            groups, holders = [rows], [body]
+        for group, holder in zip(groups, holders):
+            for row in group:
+                if row is None:
+                    tk.Frame(holder, bg=LINE, height=h(1)).pack(fill="x", padx=8, pady=4)
+                    continue
+                self._row(holder, row)
 
     def _row(self, body, row):
         text = row.get("text", "")

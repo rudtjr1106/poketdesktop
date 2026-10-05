@@ -230,8 +230,9 @@ class TrayBase(object):
             # 예전의 '새로운 기능' 창은 게시판의 패치노트 칸으로 갔다 (1.9.0)
             Item("패치노트 보기", lambda: self.call(a.open_patchnotes)),
             Item("설정", lambda: self.call(a.open_settings)),
-            Item("로그아웃", lambda: self.call(a.logout)),
-            Item("회원탈퇴", lambda: self.call(a.delete_account)),
+            # 로그아웃·회원탈퇴는 여기 없다 (1.9.2). '종료' 바로 위에 있어서
+            # 끄려다 잘못 누를까 겁난다는 말이 있었다. 마이페이지 맨 아래
+            # '계정' 칸으로 갔다 (ui_mypage._account).
             SEP,
             Item("종료", lambda: self.call(a.quit)),
         ]

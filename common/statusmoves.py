@@ -69,6 +69,72 @@ CALL_BAN = {"ASSIST", "BANEFULBUNKER", "BEAKBLAST", "BELCH", "BESTOW", "CELEBRAT
             "SHEDTAIL", "REVIVALBLESSING", "TERASTARSTORM", "BLAZINGTORQUE", "COMBATTORQUE",
             "MAGICALTORQUE", "NOXIOUSTORQUE", "WICKEDTORQUE", "DOODLE", "INSTRUCT", "ALLYSWITCH",
             "AFTERYOU", "SHELLTRAP", "SKETCH", "SPECTRALTHIEF", "SNIPESHOT"}
+# **부르는 기술마다 못 부르는 것이 다르다** (1.9.2). 전에는 위의 CALL_BAN 하나로 다 봤는데,
+# 그러면 손가락흔들기가 전용기(V제너레이트·근원의파동 ...)를 부르고 잠꼬대는 방어를 못
+# 불렀다. 아래는 Showdown 의 기술 플래그(nosleeptalk·failcopycat·failmimic·failinstruct·
+# failencore, 그리고 metronome 이 없는 것)를 그대로 옮긴 것이다. 참기(BIDE)만 우리 쪽 사정으로
+# 더 넣었다 - 불려 나온 참기는 다음 턴으로 이어지지 못한다.
+NO_SLEEPTALK = {"ASSIST", "BEAKBLAST", "BELCH", "BIDE", "BLAZINGTORQUE", "BOUNCE", "CELEBRATE",
+                "CHATTER", "COMBATTORQUE", "COPYCAT", "DIG", "DIVE", "DYNAMAXCANNON", "FLY",
+                "FOCUSPUNCH", "FREEZESHOCK", "GEOMANCY", "HOLDHANDS", "ICEBURN", "MAGICALTORQUE",
+                "MEFIRST", "METRONOME", "MIMIC", "MIRRORMOVE", "NATUREPOWER", "NOXIOUSTORQUE",
+                "PHANTOMFORCE", "RAZORWIND", "SHADOWFORCE", "SHELLTRAP", "SKETCH", "SKULLBASH",
+                "SKYATTACK", "SKYDROP", "SLEEPTALK", "SOLARBEAM", "SOLARBLADE", "STRUGGLE",
+                "UPROAR", "WICKEDTORQUE"}
+NO_COPYCAT = {"ASSIST", "BANEFULBUNKER", "BEAKBLAST", "BEHEMOTHBASH", "BEHEMOTHBLADE", "BELCH",
+              "BESTOW", "BIDE", "BLAZINGTORQUE", "BURNINGBULWARK", "CELEBRATE", "CHATTER",
+              "CIRCLETHROW", "COMBATTORQUE", "COPYCAT", "COUNTER", "COVET", "DESTINYBOND",
+              "DETECT", "DRAGONTAIL", "DYNAMAXCANNON", "ENDURE", "FEINT", "FOCUSPUNCH",
+              "FOLLOWME", "HELPINGHAND", "HOLDHANDS", "KINGSSHIELD", "MAGICALTORQUE", "MATBLOCK",
+              "MEFIRST", "METRONOME", "MIMIC", "MIRRORMOVE", "NATUREPOWER", "NOXIOUSTORQUE",
+              "PROTECT", "RAGEPOWDER", "ROAR", "SHELLTRAP", "SKETCH", "SLEEPTALK", "SNATCH",
+              "SPIKYSHIELD", "SPOTLIGHT", "STRUGGLE", "SWITCHEROO", "TERASTARSTORM", "THIEF",
+              "TRANSFORM", "TRICK", "WHIRLWIND", "WICKEDTORQUE"}
+NO_MIMIC = {"ASSIST", "BEHEMOTHBASH", "BEHEMOTHBLADE", "BELCH", "BIDE", "BLAZINGTORQUE",
+            "CELEBRATE", "CHATTER", "COMBATTORQUE", "COPYCAT", "DYNAMAXCANNON", "HOLDHANDS",
+            "MAGICALTORQUE", "MEFIRST", "METRONOME", "MIMIC", "MIRRORMOVE", "NATUREPOWER",
+            "NOXIOUSTORQUE", "SKETCH", "SLEEPTALK", "STRUGGLE", "TERASTARSTORM", "TRANSFORM",
+            "WICKEDTORQUE"}
+NO_INSTRUCT = {"ASSIST", "BEAKBLAST", "BELCH", "BIDE", "BLAZINGTORQUE", "BOUNCE", "CELEBRATE",
+               "CHATTER", "COMBATTORQUE", "COPYCAT", "DIG", "DIVE", "DYNAMAXCANNON", "FLY",
+               "FOCUSPUNCH", "FREEZESHOCK", "GEOMANCY", "HOLDHANDS", "ICEBALL", "ICEBURN",
+               "INSTRUCT", "KINGSSHIELD", "MAGICALTORQUE", "MEFIRST", "METEORASSAULT", "METRONOME",
+               "MIMIC", "MIRRORMOVE", "NATUREPOWER", "NOXIOUSTORQUE", "OBSTRUCT", "OUTRAGE",
+               "PETALDANCE", "PHANTOMFORCE", "RAZORWIND", "ROLLOUT", "SHADOWFORCE", "SHELLTRAP",
+               "SKETCH", "SKULLBASH", "SKYATTACK", "SKYDROP", "SLEEPTALK", "SOLARBEAM",
+               "SOLARBLADE", "STRUGGLE", "THRASH", "TRANSFORM", "UPROAR", "WICKEDTORQUE"}
+NO_ENCORE = {"ASSIST", "BLAZINGTORQUE", "COMBATTORQUE", "COPYCAT", "DYNAMAXCANNON", "ENCORE",
+             "MAGICALTORQUE", "MEFIRST", "METRONOME", "MIMIC", "MIRRORMOVE", "NATUREPOWER",
+             "NOXIOUSTORQUE", "SKETCH", "SLEEPTALK", "STRUGGLE", "TRANSFORM", "WICKEDTORQUE"}
+NO_METRONOME = {
+    "AFTERYOU", "APPLEACID", "ARMORCANNON", "ASSIST", "ASTRALBARRAGE", "AURAWHEEL", "BADDYBAD",
+    "BANEFULBUNKER", "BEAKBLAST", "BEHEMOTHBASH", "BEHEMOTHBLADE", "BELCH", "BESTOW", "BIDE",
+    "BLAZINGTORQUE", "BODYPRESS", "BOUNCYBUBBLE", "BRANCHPOKE", "BREAKINGSWIPE", "BUZZYBUZZ",
+    "CELEBRATE", "CHATTER", "CHILLINGWATER", "CHILLYRECEPTION", "CLANGOROUSSOUL",
+    "COLLISIONCOURSE", "COMBATTORQUE", "COMEUPPANCE", "COPYCAT", "COUNTER", "COVET",
+    "CRAFTYSHIELD", "DECORATE", "DESTINYBOND", "DETECT", "DIAMONDSTORM", "DOODLE",
+    "DOUBLEIRONBASH", "DOUBLESHOCK", "DRAGONASCENT", "DRAGONENERGY", "DRUMBEATING",
+    "DYNAMAXCANNON", "ELECTRODRIFT", "ENDURE", "ETERNABEAM", "FALSESURRENDER", "FEINT",
+    "FIERYWRATH", "FILLETAWAY", "FLEURCANNON", "FLOATYFALL", "FOCUSPUNCH", "FOLLOWME",
+    "FREEZESHOCK", "FREEZINGGLARE", "FREEZYFROST", "GLACIALLANCE", "GLITZYGLOW", "GRAVAPPLE",
+    "HELPINGHAND", "HOLDHANDS", "HYPERDRILL", "HYPERSPACEFURY", "HYPERSPACEHOLE", "ICEBURN",
+    "INSTRUCT", "JETPUNCH", "JUNGLEHEALING", "KINGSSHIELD", "LIFEDEW", "LIGHTOFRUIN",
+    "MAGICALTORQUE", "MAKEITRAIN", "MATBLOCK", "MEFIRST", "METEORASSAULT", "METRONOME", "MIMIC",
+    "MINDBLOWN", "MIRRORCOAT", "MIRRORMOVE", "MOONGEISTBEAM", "NATUREPOWER", "NATURESMADNESS",
+    "NOXIOUSTORQUE", "OBSTRUCT", "ORDERUP", "ORIGINPULSE", "OVERDRIVE", "PHOTONGEYSER",
+    "PIKAPAPOW", "PLASMAFISTS", "POPULATIONBOMB", "POUNCE", "POWERSHIFT", "PRECIPICEBLADES",
+    "PROTECT", "PYROBALL", "QUASH", "QUICKGUARD", "RAGEFIST", "RAGEPOWDER", "RAGINGBULL",
+    "RAGINGFURY", "RELICSONG", "REVIVALBLESSING", "RUINATION", "SALTCURE", "SAPPYSEED",
+    "SECRETSWORD", "SHEDTAIL", "SHELLTRAP", "SILKTRAP", "SIZZLYSLIDE", "SKETCH", "SLEEPTALK",
+    "SNAPTRAP", "SNARL", "SNATCH", "SNORE", "SNOWSCAPE", "SPARKLYSWIRL", "SPECTRALTHIEF",
+    "SPICYEXTRACT", "SPIKYSHIELD", "SPIRITBREAK", "SPLISHYSPLASH", "SPOTLIGHT",
+    "SPRINGTIDESTORM", "STEAMERUPTION", "STEELBEAM", "STRANGESTEAM", "STRUGGLE",
+    "SUNSTEELSTRIKE", "SURGINGSTRIKES", "SWITCHEROO", "TECHNOBLAST", "TERASTARSTORM", "THIEF",
+    "THOUSANDARROWS", "THOUSANDWAVES", "THUNDERCAGE", "THUNDEROUSKICK", "TIDYUP", "TRAILBLAZE",
+    "TRANSFORM", "TRICK", "TWINBEAM", "VCREATE", "VEEVEEVOLLEY", "WICKEDBLOW", "WICKEDTORQUE",
+    "WIDEGUARD", "ZIPPYZAP"}
+# 연달아 못 쓰는 기술 (거대해머·블러드문). 사슬묶기처럼 칸이 흐려진다.
+NO_REPEAT = {"GIGATONHAMMER", "BLOODMOON"}
 # 역린류: 쓰면 2~3턴 이어지고, 끝나면 혼란에 빠진다. 소란피기는 혼란이 없다.
 RAGE_MOVES = {"OUTRAGE", "THRASH", "PETALDANCE", "RAGINGFURY"}
 LOCK_MOVES = RAGE_MOVES | {"UPROAR"}
@@ -92,6 +158,9 @@ CHARGE2 = {
     "DIVE": ("%s 은(는) 물속으로 숨었다!", "dive", None),
     "PHANTOMFORCE": ("%s 은(는) 모습을 감췄다!", "vanish", None),
     "SHADOWFORCE": ("%s 은(는) 모습을 감췄다!", "vanish", None),
+    # 프리폴 (1.9.2): 첫 턴에 상대를 데리고 올라가고(상대는 그 턴에 못 움직인다) 다음 턴에
+    # 떨어뜨린다. 붙잡는 일은 attackfx.sky_drop_up 이 한다.
+    "SKYDROP": ("%s 은(는) 상대를 하늘 높이 데려갔다!", "fly", None),
 }
 # 숨어 있어도 맞는 기술 (본가 그대로)
 HITS_HIDDEN = {
@@ -154,7 +223,7 @@ def grounded(f):
         return True
     if "FLYING" in f.types():
         return False
-    if A.has(f, "LEVITATE"):
+    if A.has(f, *A.LEVITATORS):
         return False
     if f.cond.get("magnetrise") or f.cond.get("telekinesis"):
         return False
@@ -163,6 +232,8 @@ def grounded(f):
 
 def weather(f):
     fl = f.field
+    if A.has(f, "MEGASOL"):
+        return "sun"                # 메가솔라: 이 포켓몬이 쓰는 기술은 늘 쾌청 아래다
     if fl is None or fl.suppressed:
         return None
     return fl.weather
@@ -195,6 +266,10 @@ def restricted(bt, f, k):
             and not blocked(bt, f, ch.get("move")):
         return "%s 은(는) %s 을(를) 준비하는 중이다!" % (
             f.name, bt.move_name(ch.get("move")))
+    ro = c.get("roll")
+    if ro and ro.get("move") != k and f.pp.get(ro.get("move"), 0) > 0 \
+            and not blocked(bt, f, ro.get("move")):
+        return "%s 은(는) %s 을(를) 멈출 수 없다!" % (f.name, bt.move_name(ro.get("move")))
     return blocked(bt, f, k)
 
 
@@ -211,6 +286,8 @@ def blocked(bt, f, k):
         return "%s 의 %s 은(는) 사슬묶기로 쓸 수 없다!" % (f.name, bt.move_name(k))
     if c.get("torment") and c.get("lastMove") == k:
         return "%s 은(는) 트집 때문에 같은 기술을 연달아 쓸 수 없다!" % f.name
+    if k in NO_REPEAT and c.get("lastMove") == k and len([m for m in f.moves if f.pp.get(m, 0) > 0]) > 1:
+        return "%s 은(는) %s 을(를) 연달아 쓸 수 없다!" % (f.name, bt.move_name(k))
     opp = bt.foe if f is bt.me else bt.me
     if opp is not None and k in (opp.cond.get("imprison") or []):
         return "%s 은(는) 봉인당해서 %s 을(를) 쓸 수 없다!" % (f.name, bt.move_name(k))
@@ -240,7 +317,7 @@ def locked_move(f, bt=None):
     "사슬묶기로 쓸 수 없다" 로 거절되고 사람은 턴을 날렸다.
     """
     c = f.cond or {}
-    for name in ("rage", "charge2"):
+    for name in ("rage", "charge2", "roll"):     # roll = 구르기·아이스볼 (attackfx.after_use)
         lock = c.get(name)
         if not lock or not lock.get("move"):
             continue
@@ -491,6 +568,7 @@ def set_weather(bt, w, ev, who=None):
         return False
     fl.weather, fl.weather_turns = w, 5
     ev.append({"t": "msg", "who": who, "text": FD.WEATHER_START[w]})
+    A.weather_changed(bt, ev)       # 캐스퐁의 모습, 빙큐보의 얼음
     return True
 
 
@@ -607,6 +685,26 @@ def on_leave(bt, who):
         by = v.get("by") if isinstance(v, dict) else v
         if by == who:
             opp.cond.pop(k, None)
+
+
+def must_stay(f):
+    """기술 때문에 자리를 못 뜨나 - 까닭(문구)을 돌려준다. 아니면 None. (1.9.2)
+
+    본가에서는 이럴 때 고르는 화면 자체가 안 뜬다: 파괴광선류를 쓴 다음 턴(반동),
+    역린류로 날뛰는 중, 두 턴 기술을 모으는 중, 프리폴에 붙잡힌 턴. 전에는 이 사이에
+    교체가 되어서, 파괴광선을 쏘고 쉬어야 할 턴에 그냥 바꿔 나갈 수 있었다.
+    **갇힌 것(trapped)과 다르다** - 고스트 타입도 못 빠져나가고, 쓰러져서 바꾸는 것은 된다.
+    """
+    c = getattr(f, "cond", None) or {}
+    if c.get("recharge"):
+        return "%s 은(는) 반동으로 움직일 수 없어 교체할 수 없다!" % f.name
+    if c.get("skydrop"):
+        return "%s 은(는) 하늘에 붙잡혀 있어 교체할 수 없다!" % f.name
+    for name in ("rage", "charge2", "roll"):
+        lock = c.get(name)
+        if lock and lock.get("move") and f.pp.get(lock["move"], 0) > 0:
+            return "%s 은(는) 기술을 쓰는 중이라 교체할 수 없다!" % f.name
+    return None
 
 
 def trapped(bt, f):
@@ -773,8 +871,7 @@ def h_torment(bt, move, who, user, target, tw, ev):
 
 def h_encore(bt, move, who, user, target, tw, ev):
     last = _last(target)
-    if (not last or target.cond.get("encore") or last in ("ENCORE", "TRANSFORM", "MIMIC", "SKETCH",
-                                                          "MIRRORMOVE", "STRUGGLE", "SLEEPTALK")
+    if (not last or target.cond.get("encore") or last in NO_ENCORE
             or target.pp.get(last, 0) <= 0 or last not in target.moves):
         return fail(ev, who)
     if _mental_blocked(bt, user, target, tw, ev):
@@ -1039,7 +1136,7 @@ def h_transform(bt, move, who, user, target, tw, ev):
 
 def h_mimic(bt, move, who, user, target, tw, ev):
     last = _last(target)
-    if not last or last in CALL_BAN or last in user.moves or "MIMIC" not in user.moves:
+    if not last or last in NO_MIMIC or last in user.moves or "MIMIC" not in user.moves:
         return fail(ev, who)
     _changing(user)
     i = user.moves.index("MIMIC")
@@ -1353,7 +1450,9 @@ def h_magiccoat(bt, move, who, user, target, tw, ev):
 
 def h_instruct(bt, move, who, user, target, tw, ev):
     last = _last(target)
-    if not last or last in CALL_BAN or last in CHARGE_BAN or target.pp.get(last, 0) <= 0 \
+    # 모았다 쓰는 기술·쓰고 쉬는 기술(파괴광선류)도 지휘로는 다시 못 쓴다
+    if not last or last in NO_INSTRUCT or last in CHARGE_BAN \
+            or "recharge" in flags(bt.move_of(last)) or target.pp.get(last, 0) <= 0 \
             or last not in target.moves or not target.alive():
         return fail(ev, who)
     say(ev, tw, "%s 은(는) 지휘를 받아 다시 기술을 썼다!" % target.name)
@@ -1369,7 +1468,7 @@ def _call(bt, who, user, target, k2, ev, text=None):
 
 def h_metronome(bt, move, who, user, target, tw, ev):
     pool = sorted(k for k, md in bt.dex.moves.items()
-                  if k not in CALL_BAN and md.get("id", 0) < 10000 and "SPECIAL" not in k
+                  if k not in NO_METRONOME and md.get("id", 0) < 10000 and "SPECIAL" not in k
                   and not k.endswith("PHYSICAL") and not k.startswith("MAX") and not k.startswith("GMAX")
                   and (MC.attacks(md) or md.get("cat") == "status"))
     _call(bt, who, user, target, bt.rng.choice(pool), ev)
@@ -1377,14 +1476,15 @@ def h_metronome(bt, move, who, user, target, tw, ev):
 
 def h_copycat(bt, move, who, user, target, tw, ev):
     last = getattr(bt, "last_before", None)
-    if not last or last in CALL_BAN:
+    if not last or last in NO_COPYCAT:
         return fail(ev, who)
     _call(bt, who, user, target, last, ev)
 
 
 def h_mirrormove(bt, move, who, user, target, tw, ev):
     last = _last(target)
-    if not last or last in CALL_BAN or "mirror" not in flags(bt.move_of(last)):
+    # 따라하기는 '따라 할 수 있다' 는 플래그만 본다 (본가). 참기만 우리 사정으로 뺀다.
+    if not last or last in ("BIDE", "STRUGGLE") or "mirror" not in flags(bt.move_of(last)):
         return fail(ev, who)
     _call(bt, who, user, target, last, ev)
 
@@ -1397,7 +1497,8 @@ def h_naturepower(bt, move, who, user, target, tw, ev):
 def h_sleeptalk(bt, move, who, user, target, tw, ev):
     if user.status != "sleep":
         return fail(ev, who)
-    pool = [m for m in user.moves if m != "SLEEPTALK" and m not in CALL_BAN and m not in CHARGE_BAN]
+    # 모았다 쓰는 기술은 플래그로 빠진다 (메테오빔·일렉트로빔까지)
+    pool = [m for m in user.moves if m not in NO_SLEEPTALK and m not in CHARGE_BAN]
     if not pool:
         return fail(ev, who)
     _call(bt, who, user, target, bt.rng.choice(pool), ev)
@@ -1462,6 +1563,8 @@ def eat_berry(bt, f, fw, ev):
             if f.pp.get(m, 0) < mx:
                 f.pp[m] = min(mx, f.pp.get(m, 0) + 10)
                 break
+    f.cond["ateBerry"] = True
+    f.cond["lastBerry"] = f._held
     f.used = True
     return True
 
@@ -1631,7 +1734,7 @@ def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
         target.cond["smackdown"] = True
         target.cond.pop("magnetrise", None)
         target.cond.pop("telekinesis", None)
-        if "FLYING" in target.types() or A.has(target, "LEVITATE"):
+        if "FLYING" in target.types() or A.has(target, *A.LEVITATORS):
             say(ev, tw, "%s 은(는) 땅으로 떨어졌다!" % target.name)
     if k in DRAG_ATTACKS and total and target.alive() and user.alive() and not sub_hit:
         if not target.cond.get("ingrain") and not (A.has(target, "SUCTIONCUPS") and not A.breaks(user)):
@@ -1759,7 +1862,8 @@ def enter(bt, who, ev):
             side.pop("toxicspikes", None)
             say(ev, who, "%s 은(는) 독압정을 흡수했다!" % f.name)
         elif not f.status and "STEEL" not in f.types() and not side.get("safeguard"):
-            bt._apply_status(f, "poison", ev)
+            # 두 겹이면 맹독이다 (턴마다 커진다)
+            bt._apply_status(f, "bad-poison" if int(side["toxicspikes"]) >= 2 else "poison", ev)
     if side.get("stickyweb") and ground and f.alive():
         say(ev, who, "%s 은(는) 끈적끈적네트에 걸렸다!" % f.name)
         bt._change_stat(f, "spe", -1, ev, who, source=bt.fighter(other(who)))
@@ -1931,6 +2035,7 @@ def end_turn_post(bt, ev, sides=("me", "foe"), field=True):
         if fl.weather_turns <= 0:
             say(ev, None, FD.WEATHER_END[fl.weather])
             fl.weather = None
+            A.weather_changed(bt, ev)
 
 
 # ---------------------------------------------------------------- AI: 이 변화기가 지금 얼마나 값지나
@@ -2105,7 +2210,7 @@ def value(bt, k, move, user, target, who, base):
         return base * (0.8 if theirs > mine * 1.15 else 0.0)
     if k in ("MIMIC", "SKETCH"):
         last = _last(target)
-        if not last or last in CALL_BAN or last in user.moves:
+        if not last or last in (NO_MIMIC if k == "MIMIC" else CALL_BAN) or last in user.moves:
             return 0.0
         return base * 0.3
     if k == "PSYCHUP":
@@ -2208,7 +2313,7 @@ def value(bt, k, move, user, target, who, base):
         return base * 0.55
     if k in ("COPYCAT", "MIRRORMOVE"):
         last = fl.__dict__.get("last_move") if k == "COPYCAT" else _last(target)
-        if not last or last in CALL_BAN:
+        if not last or last in (NO_COPYCAT if k == "COPYCAT" else ("BIDE", "STRUGGLE")):
             return 0.0
         md = bt.move_of(last)
         if k == "MIRRORMOVE" and "mirror" not in flags(md):

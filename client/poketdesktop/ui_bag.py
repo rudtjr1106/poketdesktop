@@ -1064,7 +1064,8 @@ class BagWindow(object):
             if level >= P.LEVEL_MAX:
                 # 레벨은 못 올려도 진화 조건이 되면 진화한다 (서버가 본다)
                 return False, False, "최고 레벨 · 진화할 수 있으면 진화", U.FG_DIM
-            return False, False, "Lv.%d → %d" % (
+            # 양쪽에 다 'Lv.' 를 붙인다. 'Lv.5 → 6' 은 56 레벨로 읽혔다.
+            return False, False, "Lv.%d → Lv.%d" % (
                 level, min(P.LEVEL_MAX, level + int(eff.get("amount", 1)))), U.INFO
 
         if kind == "noevolve":

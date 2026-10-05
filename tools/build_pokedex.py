@@ -143,6 +143,17 @@ SD_STAT = {"atk": "atk", "def": "def", "spa": "spa", "spd": "spd", "spe": "spe",
 SD_FLAG = {"bypasssub": "authentic", "bullet": "ballistics", "nonsky": "non-sky-battle"}
 
 
+# 손으로 고치는 기술 자료. PokeAPI 에 효과 표는 있는데 플래그가 통째로 빈 기술, 본가와 숫자가
+# 다른 기술이다. Showdown 과 기계로 대조해서 찾았다 (1.9.2). **여기 안 적으면 도감을 다시
+# 만들 때 되돌아간다** (server/data/pokedex.json 에도 같은 값을 넣어 두었다).
+MOVE_FIXES = {
+    # 시럽봄: 플래그가 비어 있어 방어를 뚫었고(protect) 방탄(ballistics)도 안 통했다. 스피드는
+    # 맞는 순간이 아니라 턴 끝마다 3턴 동안 떨어진다 (common/attackfx 가 한다).
+    "SYRUPBOMB": {"flags": ["ballistics", "mirror", "protect"], "stat": [], "statChance": 0},
+    "TAKEHEART": {"pp": 15},
+}
+
+
 def showdown_moves():
     p = os.path.join(CACHE, "showdown_moves.json")
     if not os.path.exists(p) or os.path.getsize(p) == 0:
@@ -441,6 +452,10 @@ def build():
             # (튀어오르기 같은 것)까지 바꾸면 안 된다.
             if sd and not move_out[ident]["flags"]:
                 move_out[ident]["flags"] = flags_from_showdown(sd, known_flags)
+
+    for ident, fix in MOVE_FIXES.items():
+        if ident in move_out:
+            move_out[ident].update(fix)
 
     sys.stderr.write("  PokeAPI 에 효과가 없어 Showdown 으로 채운 공격기: %d개\n" % len(filled))
 

@@ -166,6 +166,15 @@ class FakeApp(object):
     def set_show_grass(self, on):
         self.settings["showGrass"] = bool(on)
 
+    def screen_choices(self):
+        return []
+
+    def logout(self):
+        self.account = getattr(self, "account", []) + ["logout"]
+
+    def delete_account(self):
+        self.account = getattr(self, "account", []) + ["delete"]
+
 
 def wait(root, cond, sec=6.0):
     end = time.time() + sec
@@ -399,6 +408,32 @@ def main():
     chk("실패하면 아래 줄에 적고 보던 화면은 그대로", "연결할 수 없습니다" in w.status._label.cget("text")
         and "나여조경석" in texts(top))
     app.api.fail = None
+
+    print("\n=== 계정 (1.9.2: 트레이 메뉴에서 옮겨 왔다) ===")
+    tx = texts(top)
+    chk("맨 아래에 '계정' 칸", "계정" in tx and tx.index("계정") > tx.index("시즌 기록"), tx[-12:])
+    chk("로그아웃·회원탈퇴 단추가 있다",
+        sorted(w.account_btns) == ["로그아웃", "회원탈퇴"]
+        and all(b.holder.winfo_ismapped() for b in w.account_btns.values()),
+        sorted(w.account_btns))
+    chk("무슨 일이 일어나는지 적혀 있다",
+        any("로그인 화면으로 돌아갑니다" in x for x in tx)
+        and any("되돌릴 수 없습니다" in x for x in tx))
+    w.account_btns["로그아웃"]._release(None)
+    chk("로그아웃 단추는 앱의 로그아웃을 부른다", getattr(app, "account", []) == ["logout"],
+        getattr(app, "account", []))
+    w.account_btns["회원탈퇴"]._release(None)
+    chk("회원탈퇴 단추는 앱의 탈퇴를 부른다 (확인·비밀번호는 거기서 묻는다)",
+        app.account == ["logout", "delete"], app.account)
+    from poketdesktop import tray as TRAY
+    menu = [it for it in TRAY.TrayBase(app).spec() if it is not TRAY.SEP]
+    names = [it.text for it in menu if not callable(it.text)]
+    chk("트레이 메뉴에는 로그아웃·회원탈퇴가 없다",
+        "로그아웃" not in names and "회원탈퇴" not in names and "종료" in names, names)
+    chk("'종료' 바로 위는 설정이다", names[names.index("종료") - 1] == "설정",
+        names[-4:])
+    bad = squeezed(top)
+    chk("눌린 위젯 없음 (계정 칸까지)", not bad, bad[:3])
 
     print("\n=== 톱니바퀴 = 설정 ===")
     chk("머리줄에 톱니바퀴와 '설정' 글자", w.gear.winfo_ismapped() == 1 and "설정" in texts(top))

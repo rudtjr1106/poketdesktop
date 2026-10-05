@@ -33678,7 +33678,11 @@
    "drain": 0,
    "eff": 0,
    "en": "Syrup Bomb",
-   "flags": [],
+   "flags": [
+    "ballistics",
+    "mirror",
+    "protect"
+   ],
    "flinch": 0,
    "heal": 0,
    "hits": [
@@ -33690,13 +33694,8 @@
    "power": 60,
    "pp": 10,
    "pri": 0,
-   "stat": [
-    [
-     "spe",
-     -1
-    ]
-   ],
-   "statChance": 100,
+   "stat": [],
+   "statChance": 0,
    "statSelf": false,
    "target": 10,
    "type": "GRASS"
@@ -33942,7 +33941,7 @@
    "id": 850,
    "kr": "브레이브차지",
    "power": 0,
-   "pp": 10,
+   "pp": 15,
    "pri": 0,
    "target": 15,
    "type": "PSYCHIC"

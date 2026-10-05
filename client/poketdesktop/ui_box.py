@@ -468,7 +468,10 @@ class BoxWindow(object):
                                  font=U.FONT_XS, width=16, anchor="center",
                                  cursor="hand2")
         self.lbl_page.pack(side="left")
-        self.lbl_page.bind("<Button-1>", lambda _e: self.rename_box())
+        # 이름표를 누르면 **박스 고르기** 가 열린다 (1.9.2). 전에는 이름
+        # 바꾸기가 떴는데 그건 옆 단추가 이미 한다 - 끝 박스까지 화살표를
+        # 서른 번 누르게 해 놓고 정작 이름표는 엉뚱한 일을 했다.
+        self.lbl_page.bind("<Button-1>", lambda _e: self.open_box_menu())
         self.btn_next = U.ghost_button(bar, "▶", lambda: self._page(1), height=26)
         self.btn_next.pack(side="left")
         self.btn_rename = U.ghost_button(bar, "이름 바꾸기", self.rename_box,
@@ -1034,13 +1037,36 @@ class BoxWindow(object):
             for b in (self.btn_prev, self.btn_next, self.btn_rename):
                 b.configure(state="disabled")
             return
-        self.lbl_page.configure(text="%s  %d/%d" % (self.box_name(self.box_no),
-                                                    self.box_used(self.box_no),
-                                                    self.box_size()))
+        # 끝의 ▾ 가 "누르면 고를 수 있다" 는 표시다.
+        self.lbl_page.configure(text="%s  %d/%d ▾" % (self.box_name(self.box_no),
+                                                      self.box_used(self.box_no),
+                                                      self.box_size()))
         self.btn_rename.configure(state="normal")
         self.btn_prev.configure(state="normal" if self.box_no > 0 else "disabled")
         self.btn_next.configure(
             state="normal" if self.box_no < self.box_count() - 1 else "disabled")
+
+    def _box_rows(self):
+        """박스 고르기 줄. 지금 보는 박스에 표시가 붙는다."""
+        rows = []
+        for no in range(self.box_count()):
+            rows.append({
+                "text": "%s  (%d/%d)" % (self.box_name(no), self.box_used(no),
+                                         self.box_size()),
+                "checked": no == self.box_no,
+                "command": (lambda x=no: self.goto_box(x)),
+            })
+        return rows
+
+    def open_box_menu(self):
+        """이름표를 누르면 뜨는 박스 목록. 고르면 그 박스로 바로 간다."""
+        if self._searching():
+            return self.say("찾는 중에는 박스를 고를 수 없습니다. 거르기를 먼저 지워 주세요.",
+                            U.DANGER)
+        return self._menu(self.lbl_page, self._box_rows(), below=True)
+
+    def goto_box(self, no):
+        self._page(int(no) - self.box_no)
 
     def rename_box(self):
         """박스 이름 바꾸기. 비우면 기본 이름으로 돌아간다."""
@@ -1102,13 +1128,19 @@ class BoxWindow(object):
             self.reload()
         U.run_async(self.root, work, done)
 
-    def _menu(self, btn, rows):
+    def _menu(self, btn, rows, below=False):
         """단추 아래 드롭다운. 맥에서는 tk.Menu 가 after 타이머와 부딪혀
-        앱이 죽으므로 U.PopupMenu 를 쓴다 (_open_type_menu 와 같다)."""
+        앱이 죽으므로 U.PopupMenu 를 쓴다 (_open_type_menu 와 같다).
+
+        btn 은 PushButton(바깥 틀이 holder) 이거나 그냥 위젯이다. below 면
+        그 바로 밑에 연다.
+        """
         from . import platform_os as PLAT
-        w = getattr(btn, "holder", None)
+        w = getattr(btn, "holder", None) or btn
         try:
-            x, y = w.winfo_rootx(), w.winfo_rooty() - U.h(20)
+            x = w.winfo_rootx()
+            y = (w.winfo_rooty() + w.winfo_height() + 2 if below
+                 else w.winfo_rooty() - U.h(20))
         except Exception:                                   # noqa: BLE001
             x, y = self.win.winfo_rootx() + 80, self.win.winfo_rooty() + 120
         if not PLAT.NATIVE_MENU:

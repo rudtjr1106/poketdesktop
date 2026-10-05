@@ -38,7 +38,58 @@ IGNORABLE = {
     "KEENEYE", "CONTRARY", "SIMPLE", "UNAWARE", "LIMBER", "INSOMNIA", "VITALSPIRIT",
     "IMMUNITY", "WATERVEIL", "MAGMAARMOR", "INNERFOCUS", "SHIELDDUST", "WONDERSKIN",
     "SWEETVEIL", "PASTELVEIL", "THERMALEXCHANGE", "MINDSEYE",
+    "EELEVATE", "ICEFACE", "TERASHIFT", "FLOWERGIFT", "TABLETSOFRUIN", "VESSELOFRUIN",
 }
+
+# 화학변화가스로도 안 꺼지는 것 (폼이 걸려 있는 특성)
+UNSUPPRESSABLE = {"NEUTRALIZINGGAS", "MULTITYPE", "STANCECHANGE", "SCHOOLING", "COMATOSE",
+                  "SHIELDSDOWN", "DISGUISE", "RKSSYSTEM", "BATTLEBOND", "POWERCONSTRUCT",
+                  "ICEFACE", "GULPMISSILE", "ZEROTOHERO", "COMMANDER", "ZENMODE", "TERASHIFT"}
+
+# 배틀 중에 모습이 바뀌는 종: (종, 폼) -> 달라지는 종족값·타입. 체력은 그대로다.
+# 지금 폼은 Fighter.cond["form"] 에 적는다 (물러나면 풀리고, 나올 때 다시 정한다).
+FORMS = {
+    ("MINIOR", "core"): {"base": {"atk": 100, "def": 60, "spa": 100, "spd": 60, "spe": 120},
+                         "kr": "코어폼"},
+    ("WISHIWASHI", "school"): {"base": {"atk": 140, "def": 130, "spa": 140, "spd": 135, "spe": 30},
+                               "kr": "군집의 모습"},
+    ("DARMANITAN", "zen"): {"base": {"atk": 30, "def": 105, "spa": 140, "spd": 105, "spe": 55},
+                            "types": ["FIRE", "PSYCHIC"], "kr": "달마모드"},
+    ("PALAFIN", "hero"): {"base": {"atk": 160, "def": 97, "spa": 106, "spd": 87, "spe": 100},
+                          "kr": "마이티폼"},
+    ("EISCUE", "noice"): {"base": {"def": 70, "spd": 50, "spe": 130}, "kr": "나이스페이스"},
+    ("TERAPAGOS", "terastal"): {"base": {"atk": 95, "def": 110, "spa": 105, "spd": 110, "spe": 85},
+                                "kr": "테라스탈폼"},
+    ("CASTFORM", "sunny"): {"types": ["FIRE"], "kr": "태양의 모습"},
+    ("CASTFORM", "rainy"): {"types": ["WATER"], "kr": "빗방울의 모습"},
+    ("CASTFORM", "snowy"): {"types": ["ICE"], "kr": "설운의 모습"},
+    # 옛노래로 바뀐다 (특성이 아니라 기술이다 - attackfx.after_attack)
+    ("MELOETTA", "pirouette"): {"base": {"atk": 128, "def": 90, "spa": 77, "spd": 77, "spe": 128},
+                                "types": ["NORMAL", "FIGHTING"], "kr": "스텝폼"},
+}
+# 재앙 시리즈: (깎이는 능력치). 자신을 뺀 모두에게 통한다 - 1:1 이라 상대에게.
+RUIN = {"SWORDOFRUIN": "def", "BEADSOFRUIN": "spd", "TABLETSOFRUIN": "atk", "VESSELOFRUIN": "spa"}
+AURA = {"FAIRYAURA": "FAIRY", "DARKAURA": "DARK"}
+# 등장했을 때 한마디만 하는 것 (효과는 다른 자리에서 늘 걸려 있다)
+ENTRY_SAY = {
+    "NEUTRALIZINGGAS": "주위에 화학변화가스가 가득 찼다!",
+    "FAIRYAURA": "%s 은(는) 페어리오라를 발산하고 있다!",
+    "DARKAURA": "%s 은(는) 다크오라를 발산하고 있다!",
+    "AURABREAK": "%s 은(는) 모든 오라를 제압한다!",
+    "SWORDOFRUIN": "%s 의 재앙의검으로 주위의 방어가 약해졌다!",
+    "BEADSOFRUIN": "%s 의 재앙의구슬로 주위의 특수방어가 약해졌다!",
+    "TABLETSOFRUIN": "%s 의 재앙의목간으로 주위의 공격이 약해졌다!",
+    "VESSELOFRUIN": "%s 의 재앙의그릇으로 주위의 특수공격이 약해졌다!",
+    "DELTASTREAM": "수수께끼의 난기류가 비행 포켓몬을 지킨다!",
+    "MEGASOL": "%s 의 머리 위에만 강한 햇살이 내리쬔다!",
+}
+# 메모리 (AR시스템). 지금 도구 목록에는 없지만 들어오면 그대로 통한다.
+MEMORY_TYPE = {"FIREMEMORY": "FIRE", "WATERMEMORY": "WATER", "ELECTRICMEMORY": "ELECTRIC",
+               "GRASSMEMORY": "GRASS", "ICEMEMORY": "ICE", "FIGHTINGMEMORY": "FIGHTING",
+               "POISONMEMORY": "POISON", "GROUNDMEMORY": "GROUND", "FLYINGMEMORY": "FLYING",
+               "PSYCHICMEMORY": "PSYCHIC", "BUGMEMORY": "BUG", "ROCKMEMORY": "ROCK",
+               "GHOSTMEMORY": "GHOST", "DRAGONMEMORY": "DRAGON", "DARKMEMORY": "DARK",
+               "STEELMEMORY": "STEEL", "FAIRYMEMORY": "FAIRY"}
 
 # 트레이스로 못 베끼는 것
 UNTRACEABLE = {"TRACE", "MULTITYPE", "STANCECHANGE", "SCHOOLING", "COMATOSE", "SHIELDSDOWN",
@@ -53,15 +104,17 @@ SLICING = {"AERIALACE", "AIRCUTTER", "AIRSLASH", "AQUACUTTER", "BEHEMOTHBLADE", 
            "MIGHTYCLEAVE", "NIGHTSLASH", "POPULATIONBOMB", "PSYBLADE", "PSYCHOCUT", "RAZORLEAF",
            "RAZORSHELL", "SACREDSWORD", "SECRETSWORD", "SLASH", "SOLARBLADE", "STONEAXE",
            "TACHYONCUTTER", "XSCISSOR"}
-WIND = {"AIRCUTTER", "BLEAKWINDSTORM", "BLIZZARD", "FAIRYWIND", "GUST", "HEATWAVE", "HURRICANE",
+WIND = {"AEROBLAST", "AIRCUTTER", "BLEAKWINDSTORM", "BLIZZARD", "FAIRYWIND", "GUST", "HEATWAVE", "HURRICANE",
         "ICYWIND", "PETALBLIZZARD", "SANDSEARSTORM", "SANDSTORM", "SPRINGTIDESTORM", "TAILWIND",
         "TWISTER", "WHIRLWIND", "WILDBOLTSTORM"}
 
-ATE = {"PIXILATE": "FAIRY", "AERILATE": "FLYING", "REFRIGERATE": "ICE", "GALVANIZE": "ELECTRIC"}
+ATE = {"PIXILATE": "FAIRY", "AERILATE": "FLYING", "REFRIGERATE": "ICE", "GALVANIZE": "ELECTRIC",
+       "DRAGONIZE": "DRAGON"}
 PINCH = {"BLAZE": "FIRE", "TORRENT": "WATER", "OVERGROW": "GRASS", "SWARM": "BUG"}
 TYPE_BOOST = {"STEELWORKER": ("STEEL", 1.5), "STEELYSPIRIT": ("STEEL", 1.5),
               "TRANSISTOR": ("ELECTRIC", 1.3), "DRAGONSMAW": ("DRAGON", 1.5),
-              "ROCKYPAYLOAD": ("ROCK", 1.5), "WATERBUBBLE": ("WATER", 2.0)}
+              "ROCKYPAYLOAD": ("ROCK", 1.5), "WATERBUBBLE": ("WATER", 2.0),
+              "FIREMANE": ("FIRE", 1.5)}
 FLAG_BOOST = {"IRONFIST": ("punch", 1.2), "STRONGJAW": ("bite", 1.5),
               "MEGALAUNCHER": ("pulse", 1.5), "TOUGHCLAWS": ("contact", 1.3),
               "PUNKROCK": ("sound", 1.3)}
@@ -73,8 +126,10 @@ ABSORB = {
     "LIGHTNINGROD": ("ELECTRIC", ("spa", 1)), "STORMDRAIN": ("WATER", ("spa", 1)),
     "MOTORDRIVE": ("ELECTRIC", ("spe", 1)), "SAPSIPPER": ("GRASS", ("atk", 1)),
     "WELLBAKEDBODY": ("FIRE", ("def", 2)), "FLASHFIRE": ("FIRE", "flash"),
-    "LEVITATE": ("GROUND", "immune"),
+    "LEVITATE": ("GROUND", "immune"), "EELEVATE": ("GROUND", "immune"),
 }
+# 떠 있다 (땅 기술·압정·끈적끈적네트를 안 받는다)
+LEVITATORS = ("LEVITATE", "EELEVATE")
 STATUS_IMMUNE = {
     "LIMBER": {"paralysis"}, "INSOMNIA": {"sleep"}, "VITALSPIRIT": {"sleep"},
     "SWEETVEIL": {"sleep"}, "IMMUNITY": {"poison"}, "PASTELVEIL": {"poison"},
@@ -139,8 +194,21 @@ IMPLEMENTED = (
        # 1.8.1 뒤에 채운 것
        "POISONPUPPETEER",
        # 1.9.1: 킬가르도의 폼 바꾸기 (battle.Fighter.stance_ok / Battle._stance)
-       "STANCECHANGE"}
-    | set(PRIORITY_GUARD) | set(TRAP_ABILITY))
+       "STANCECHANGE",
+       # 1.9.2: 남아 있던 것 중 1:1 에서 뜻이 있는 것 전부
+       "NEUTRALIZINGGAS", "UNSEENFIST", "PIERCINGDRILL", "PARENTALBOND", "OPPORTUNIST",
+       "WANDERINGSPIRIT", "PICKPOCKET", "MAGICIAN", "HARVEST", "CUDCHEW", "SPICYSPRAY",
+       "MEGASOL", "DELTASTREAM", "IMPOSTER", "DANCER", "GULPMISSILE", "EMERGENCYEXIT", "WIMPOUT",
+       "MULTITYPE", "RKSSYSTEM", "FORECAST", "FLOWERGIFT", "HUNGERSWITCH", "SHIELDSDOWN",
+       "SCHOOLING", "ZENMODE", "ZEROTOHERO", "ICEFACE", "TERASHIFT", "AURABREAK"}
+    | set(PRIORITY_GUARD) | set(TRAP_ABILITY) | set(RUIN) | set(AURA))
+
+# 1:1 배틀에서는 원작도 아무 일이 없는 특성 (같은 편이 있어야 하거나 배틀 밖의 것).
+# 화면이 '이 판에서는 효과가 없다' 고 적을 수 있게 따로 둔다.
+SINGLES_NOTHING = {"TELEPATHY", "HEALER", "PLUS", "MINUS", "FRIENDGUARD", "FLOWERVEIL", "SYMBIOSIS",
+                   "HOSPITALITY", "POWERSPOT", "BATTERY", "RECEIVER", "POWEROFALCHEMY", "COSTAR",
+                   "STALWART", "PROPELLERTAIL", "COMMANDER", "PICKUP", "HONEYGATHER", "BALLFETCH",
+                   "ILLUSION"}
 
 STAGE_STATS = ("atk", "def", "spa", "spd", "spe")
 
@@ -152,8 +220,17 @@ OPP_TARGETS = {6, 8, 9, 10, 11, 14}
 # ---------------------------------------------------------------- 도우미
 def on(f):
     # 위액을 맞으면 특성이 없는 것과 같다
-    return bool(f is not None and getattr(f, "ability_on", False) and f.ability
-                and not (getattr(f, "cond", None) or {}).get("gastro"))
+    if not (f is not None and getattr(f, "ability_on", False) and f.ability
+            and not (getattr(f, "cond", None) or {}).get("gastro")):
+        return False
+    # 화학변화가스: 맞은편이 뿜고 있으면 내 특성이 꺼진다 (폼이 걸린 특성은 그대로)
+    r = getattr(f, "rival", None)
+    if r is not None and r is not f and r.ability == "NEUTRALIZINGGAS" \
+            and getattr(r, "ability_on", False) and r.hp > 0 \
+            and not (getattr(r, "cond", None) or {}).get("gastro") \
+            and f.ability not in UNSUPPRESSABLE:
+        return False
+    return True
 
 
 def _weather(f):
@@ -179,6 +256,8 @@ def has(f, *keys):
 
 
 def breaks(user):
+    if user is not None and (getattr(user, "cond", None) or {}).get("breaker"):
+        return True                 # 섀도레이·메테오드라이브·포톤가이저를 쓰는 동안
     return has(user, *MOLD_BREAKERS)
 
 
@@ -301,6 +380,8 @@ def stat_mult(f, key):
                 or (a == "SANDRUSH" and w == "sand") or (a == "SLUSHRUSH" and w in ("hail", "snow")):
             return 2.0
     if key == "spa" and a == "SOLARPOWER" and w == "sun":
+        return 1.5
+    if key in ("atk", "spd") and a == "FLOWERGIFT" and w == "sun":
         return 1.5
     if key == "atk" and a == "ORICHALCUMPULSE" and w == "sun":
         return 5461 / 4096.0
@@ -450,6 +531,32 @@ def attack_mult(user, target, move, mtype, eff):
     return m
 
 
+def aura_mult(user, target, mtype):
+    """페어리오라·다크오라: **판에 있는 모두**의 그 타입 기술이 4/3 배. 오라브레이크가 있으면 3/4 배."""
+    on_field = [f for f in (user, target) if on(f)]
+    if not any(AURA.get(f.ability) == mtype for f in on_field):
+        return 1.0
+    if any(f.ability == "AURABREAK" for f in on_field):
+        return 0.75
+    return 4.0 / 3.0
+
+
+def ruin_mult(user, target, atk_key, def_key):
+    """재앙 시리즈: (공격 쪽에 곱할 값, 방어 쪽에 곱할 값). 같은 특성끼리는 안 통한다."""
+    a = d = 1.0
+    if on(target) and RUIN.get(target.ability) == atk_key and not has(user, target.ability) \
+            and not (breaks(user) and target.ability in IGNORABLE):
+        a = 0.75                       # 재앙의목간·재앙의그릇: 때리는 쪽의 공격·특수공격
+    if on(user) and RUIN.get(user.ability) == def_key and not has(target, user.ability):
+        d = 0.75                       # 재앙의검·재앙의구슬: 맞는 쪽의 방어·특수방어
+    return a, d
+
+
+def delta_stream(user, target):
+    """델타스트림: 비행 타입의 약점이 사라진다 (판에 있기만 하면 된다)."""
+    return has(user, "DELTASTREAM") or has(target, "DELTASTREAM")
+
+
 def defense_mult(user, target, move, mtype, eff):
     g = guard(user, target)
     if not g:
@@ -482,6 +589,10 @@ def defense_mult(user, target, move, mtype, eff):
         m *= 0.75
     if on(target) and target.ability == "SHADOWSHIELD" and target.hp >= target.maxhp:
         m *= 0.5
+    # 테라셸(테라체인지한 테라파고스): 체력이 가득하면 무엇이든 '효과가 별로' 다
+    if g == "TERASHIFT" and target.hp >= target.maxhp and eff >= 1 \
+            and (getattr(target, "cond", None) or {}).get("form") == "terastal":
+        m *= 0.5 / eff
     return m
 
 
@@ -530,9 +641,8 @@ def blocks(bt, user, uwho, target, twho, move, key, ev):
         return False
     fl = flags(move)
     wk = key_of(move)
-    if g == "LEVITATE" and _forced_grounded(target):
-        g = None                               # 중력·뿌리박기로 땅에 붙었다
-        return False
+    if g in LEVITATORS and (_forced_grounded(target) or wk == "THOUSANDARROWS"):
+        return False                           # 중력·뿌리박기로 땅에 붙었다 / 사우전드애로는 떠 있어도 맞힌다
     if g in ABSORB and mtype == ABSORB[g][0]:
         what = ABSORB[g][1]
         if what == "immune":
@@ -587,7 +697,7 @@ def would_block(user, target, move):
         return False
     mtype = move_type(user, move)
     fl = flags(move)
-    if g == "LEVITATE" and _forced_grounded(target):
+    if g in LEVITATORS and (_forced_grounded(target) or key_of(move) == "THOUSANDARROWS"):
         return False
     if g in ABSORB and mtype == ABSORB[g][0]:
         return not (ABSORB[g][1] == "immune" and is_status(move))
@@ -613,6 +723,26 @@ def on_switch_in(bt, f, who, ev):
     f.ab["fresh"] = True        # 나온 턴에는 가속이 안 붙는다
     a = f.ability
     foe, fwho = other(bt, who)
+    # ---- 1.9.2: 늘 걸려 있는 특성은 나올 때 한마디 한다 (화면에 아무 말이 없으면 없는 것과 같다)
+    if a in ENTRY_SAY:
+        pop(bt, f, who, ev)
+        text = ENTRY_SAY[a]
+        ev.append({"t": "msg", "who": who, "text": (text % f.name) if "%s" in text else text})
+    if a in ("MULTITYPE", "RKSSYSTEM"):
+        # 지닌 플레이트(메모리)의 타입이 된다. 물러나면 풀리고 나올 때 다시 정한다.
+        t = (MC.PLATE_TYPE if a == "MULTITYPE" else MEMORY_TYPE).get(f._held)
+        if t and f.types() != [t]:
+            f.types_override = [t]
+            pop(bt, f, who, ev)
+            ev.append({"t": "msg", "who": who,
+                       "text": "%s 은(는) %s 타입이 되었다!" % (f.name, bt.dex.type_name(t))})
+    update_form(bt, f, who, ev)             # 어군·마이티폼·테라스탈폼·날씨에 따른 모습
+    if a == "IMPOSTER" and foe is not None and foe.alive() and not foe.cond.get("sub") \
+            and not foe.cond.get("transformed") and not f.cond.get("transformed"):
+        from . import statusmoves as SM
+        pop(bt, f, who, ev)
+        SM.h_transform(bt, None, who, f, foe, fwho, ev)
+        return
     if a == "INTIMIDATE" and foe is not None and foe.alive():
         pop(bt, f, who, ev)
         if has(foe, *INTIMIDATE_IMMUNE):
@@ -725,6 +855,8 @@ def on_switch_out(f):
     if f.ability == "NATURALCURE" and f.status:
         f.status = None
         f.sleep_turns = 0
+    if f.ability == "ZEROTOHERO" and f.alive():
+        f.ab["hero"] = True         # 마이티체인지: 한 번 물러났다 나오면 마이티폼이다
 
 
 # ---------------------------------------------------------------- 기술을 쓸 때
@@ -766,6 +898,14 @@ def survive(bt, user, uwho, target, twho, move, dmg, ev):
         pop(bt, target, twho, ev)
         ev.append({"t": "msg", "who": twho, "text": "%s 은(는) 공격을 버텼다!" % target.name})
         return target.hp - 1
+    if g == "ICEFACE" and not target.ab.get("noice") and move.get("cat") == "physical" \
+            and dmg > 0 and (target.mon or {}).get("species") == "EISCUE":
+        # 아이스페이스: 물리 공격 한 번을 머리의 얼음이 대신 맞는다 (탈과 달리 체력은 안 준다)
+        target.ab["noice"] = True
+        pop(bt, target, twho, ev)
+        ev.append({"t": "msg", "who": twho, "text": "머리의 얼음이 대신 공격을 받았다!"})
+        update_form(bt, target, twho, ev, quiet=True)
+        return 0
     return dmg
 
 
@@ -819,6 +959,40 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
             target.cond["perish"] = 3
             ev.append({"t": "msg", "who": twho,
                        "text": "양쪽 모두 3턴 뒤에 쓰러진다!"})
+        elif t == "WANDERINGSPIRIT" and user.ability_on and user.ability \
+                and user.ability not in UNTRACEABLE and user.ability != t:
+            # 떠도는영혼: 닿은 상대와 특성을 맞바꾼다
+            pop(bt, target, twho, ev)
+            user.ability, target.ability = t, user.ability
+            ev.append({"t": "msg", "who": uwho,
+                       "text": "%s 와(과) %s 의 특성이 서로 바뀌었다!" % (user.name, target.name)})
+        elif t == "PICKPOCKET" and target.alive() and not MC.item_on(target) and MC.item_on(user) \
+                and not _is_mega_stone(user._held) and not has(user, "STICKYHOLD"):
+            # 나쁜손버릇: 닿은 상대의 도구를 훔친다 (이 판에서만)
+            pop(bt, target, twho, ev)
+            got = user.held
+            user.held, user.item_gone, user.used = None, True, True
+            target.held, target.item_gone, target.used = got, False, False
+            ev.append({"t": "msg", "who": twho,
+                       "text": "%s 은(는) %s 의 %s 을(를) 훔쳤다!" % (target.name, user.name, _item_name(got))})
+    # 하바네로분출: 닿지 않아도, 기술로 데미지를 받으면 상대가 데인다
+    if on(target) and target.ability == "SPICYSPRAY" and user.alive() and not user.status:
+        pop(bt, target, twho, ev)
+        bt._apply_status(user, "burn", ev, source=target)
+    # 그대로꿀꺽미사일: 물고 있던 먹이를 뱉어 되갚는다
+    if on(target) and target.ability == "GULPMISSILE" and target.ab.get("prey") and user.alive():
+        prey = target.ab.pop("prey")
+        pop(bt, target, twho, ev)
+        if not has(user, "MAGICGUARD"):
+            d = max(1, user.maxhp // 4)
+            user.hp = max(0, user.hp - d)
+            ev.append({"t": "chip", "who": uwho, "damage": d, "hp": user.hp, "maxhp": user.maxhp,
+                       "text": "%s 은(는) 먹이를 뱉어 %s 을(를) 맞혔다!" % (target.name, user.name)})
+        if user.alive():
+            if prey == "gorge":
+                bt._apply_status(user, "paralysis", ev, source=target)
+            else:
+                bt._change_stat(user, "def", -1, ev, uwho, source=target)
     # 저주받은바디는 접촉이 아니어도 된다
     if on(target) and target.ability == "CURSEDBODY" and user.alive() \
             and not user.cond.get("disable") and key_of(move) != "STRUGGLE" \
@@ -837,6 +1011,16 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
             and rng.random() < 0.3:
         pop(bt, user, uwho, ev)
         bt._apply_status(target, "bad-poison", ev, source=user)
+    if has(user, "MAGICIAN") and user.alive() and not MC.item_on(user) and MC.item_on(target) \
+            and not _is_mega_stone(target._held) and not _is_mega_stone(user._held) \
+            and not (has(target, "STICKYHOLD") and not breaks(user)):
+        # 매지션: 기술을 맞은 상대의 도구를 빼앗는다 (이 판에서만)
+        pop(bt, user, uwho, ev)
+        got = target.held
+        target.held, target.item_gone, target.used = None, True, True
+        user.held, user.item_gone, user.used = got, False, False
+        ev.append({"t": "msg", "who": uwho,
+                   "text": "%s 은(는) %s 의 %s 을(를) 빼앗았다!" % (user.name, target.name, _item_name(got))})
 
     # ---- 맞는 쪽이 판을 바꾸는 것 (살아 있든 아니든)
     if on(target):
@@ -931,6 +1115,12 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
         pop(bt, target, twho, ev)
         for s, c in (("def", -1), ("spd", -1), ("atk", 1), ("spa", 1), ("spe", 1)):
             bt._change_stat(target, s, c, ev, twho, source=target)
+    elif t in ("EMERGENCYEXIT", "WIMPOUT") and crossed and bt.kind != "wild":
+        # 위기회피·도망태세: 체력이 절반 아래로 내려가면 스스로 물러난다 (바꿀 동료가 있을 때)
+        from . import statusmoves as SM
+        if SM._team_others(bt, twho, target):
+            pop(bt, target, twho, ev)
+            bt.request_switch(twho, "out", ev, key_of(move))
 
 
 def after_ko(bt, user, uwho, ev):
@@ -988,9 +1178,46 @@ def no_recoil(user):
 def status_blocked(f, ail, source=None):
     if not on(f):
         return False
+    if f.ability == "SHIELDSDOWN" and (f.mon or {}).get("species") == "MINIOR" \
+            and (getattr(f, "cond", None) or {}).get("form") != "core":
+        return True                 # 리밋실드: 껍질이 있는 동안은 상태이상에 안 걸린다
     if source is not None and breaks(source) and f.ability in IGNORABLE:
         return False
     return ail in STATUS_IMMUNE.get(f.ability, ())
+
+
+_AIL_KR = {"burn": "화상", "paralysis": "마비", "poison": "독", "sleep": "잠듦", "freeze": "얼음"}
+
+
+def settle_status(bt, ev):
+    """특성 때문에 걸릴 수 없는 상태이상이 걸려 있으면 그 자리에서 낫는다 (1.9.2).
+
+    걸리는 길은 status_blocked 가 막지만, **걸린 뒤에 특성이 바뀌는 길**이 있다:
+    화상을 입은 채 동료만들기·스킬스왑·역할놀이로 수포를 받거나, 틀깨기에게 맞아 유연인데
+    마비됐을 때. 본가는 이럴 때 바로 낫는다. 전에는 수포를 가지고도 화상 데미지를 계속 입었다
+    (무작위 대전을 돌려 찾았다). 기술 하나가 끝날 때마다, 그리고 턴 끝에 본다.
+    """
+    for who in ("me", "foe"):
+        f = bt.fighter(who)
+        if f is None or not f.alive() or not on(f):
+            continue
+        if f.status and f.status in STATUS_IMMUNE.get(f.ability, ()):
+            was = f.status
+            f.status = None
+            f.sleep_turns = 0
+            f.cond.pop("toxic", None)
+            f.cond.pop("nightmare", None)
+            pop(bt, f, who, ev)
+            ev.append({"t": "cure", "who": who,
+                       "text": "%s 의 %s 이(가) 나았다!" % (f.name, _AIL_KR.get(was, was))})
+        if f.ability == "OWNTEMPO" and f.cond.get("confused"):
+            f.cond.pop("confused", None)
+            pop(bt, f, who, ev)
+            ev.append({"t": "cure", "who": who, "text": "%s 의 혼란이 풀렸다!" % f.name})
+        if f.ability == "OBLIVIOUS" and f.cond.get("attract"):
+            f.cond.pop("attract", None)
+            pop(bt, f, who, ev)
+            ev.append({"t": "cure", "who": who, "text": "%s 은(는) 헤롱헤롱에서 벗어났다!" % f.name})
 
 
 def can_poison_types(source):
@@ -1101,11 +1328,159 @@ def _end_of_turn(bt, f, who, ev):
             down = [s for s in STAGE_STATS if s != s1 and f.stages.get(s, 0) > -6]
             if down:
                 bt._change_stat(f, bt.rng.choice(down), -1, ev, who, source=f)
+    if a == "HARVEST" and f.used and not f.item_gone and str(f._held or "").endswith("BERRY") \
+            and (_weather(f) == "sun" or bt.rng.random() < 0.5):
+        # 수확: 먹은 나무열매가 다시 열린다 (쾌청이면 반드시)
+        f.used = False
+        pop(bt, f, who, ev)
+        ev.append({"t": "msg", "who": who,
+                   "text": "%s 은(는) %s 을(를) 다시 수확했다!" % (f.name, _item_name(f._held))})
+    elif a == "CUDCHEW":
+        _cud_chew(bt, f, who, ev)
+    elif a == "HUNGERSWITCH" and (f.mon or {}).get("species") == "MORPEKO":
+        hangry = not f.cond.get("hangry")
+        if hangry:
+            f.cond["hangry"] = True
+        else:
+            f.cond.pop("hangry", None)
+        pop(bt, f, who, ev)
+        ev.append({"t": "msg", "who": who, "form": "hangry" if hangry else "base",
+                   "text": "%s 은(는) %s 모양이 되었다!" % (f.name, "배고픈" if hangry else "배부른")})
+    update_form(bt, f, who, ev)             # 달마모드·리밋실드·어군은 턴 끝에 모습이 바뀐다
     if st.get("slow", 0) > 0:
         st["slow"] -= 1
         if st["slow"] == 0:
             ev.append({"t": "msg", "who": who, "text": "%s 은(는) 드디어 제 힘을 되찾았다!" % f.name})
     st["fresh"] = False
+
+
+def _is_mega_stone(item):
+    from . import held as H
+    return H.is_mega_stone(item)
+
+
+def _item_name(item):
+    from . import held as H
+    return H.name(item) or item
+
+
+def _cud_chew(bt, f, who, ev):
+    """되새김질: 나무열매를 먹으면 다음 턴 끝에 한 번 더 먹는다."""
+    c = f.cond
+    new = c.pop("cudNew", None)
+    cud = c.get("cud")
+    if cud:
+        cud["turns"] = int(cud.get("turns") or 0) - 1
+        if cud["turns"] <= 0:
+            c.pop("cud", None)
+            from . import statusmoves as SM
+            mine, gone, used = f._held, f.item_gone, f.used
+            f.held, f.item_gone, f.used = cud.get("berry"), False, False
+            if f.held:
+                pop(bt, f, who, ev)
+                SM.eat_berry(bt, f, who, ev)
+            f.held, f.item_gone, f.used = mine, gone, used
+    elif new:
+        c["cud"] = {"berry": new, "turns": 1}
+
+
+# ---------------------------------------------------------------- 폼 (1.9.2)
+def want_form(bt, f):
+    """지금 이 포켓몬이 취해야 할 모습. 원래 모습이면 None."""
+    sp = (f.mon or {}).get("species")
+    if sp == "MELOETTA":
+        # 옛노래로 오가는 모습은 특성과 상관없다 (특성을 끈 배틀에서도 바뀐다)
+        return "pirouette" if (f.cond or {}).get("pirouette") and not getattr(f, "mega", None) else None
+    if not getattr(f, "ability_on", False) or getattr(f, "mega", None):
+        return None
+    a = f.ability
+    if a == "SHIELDSDOWN" and sp == "MINIOR":
+        return "core" if f.hp * 2 <= f.maxhp else None
+    if a == "SCHOOLING" and sp == "WISHIWASHI":
+        return "school" if f.level >= 20 and f.hp * 4 > f.maxhp else None
+    if a == "ZENMODE" and sp == "DARMANITAN":
+        return "zen" if f.hp * 2 <= f.maxhp else None
+    if a == "ZEROTOHERO" and sp == "PALAFIN":
+        return "hero" if f.ab.get("hero") else None
+    if a == "ICEFACE" and sp == "EISCUE":
+        return "noice" if f.ab.get("noice") else None
+    if a == "TERASHIFT" and sp == "TERAPAGOS":
+        return "terastal"
+    if a == "FORECAST" and sp == "CASTFORM":
+        return {"sun": "sunny", "rain": "rainy", "hail": "snowy", "snow": "snowy"}.get(_weather(f))
+    return None
+
+
+def update_form(bt, f, who, ev, quiet=False):
+    """모습이 바뀔 때가 됐으면 바꾼다 (능력치·타입은 battle.Fighter 가 cond["form"] 을 보고 센다)."""
+    if f is None or not f.alive():
+        return
+    sp = (f.mon or {}).get("species")
+    if not any(k[0] == sp for k in FORMS):
+        return
+    want = want_form(bt, f)
+    cur = f.cond.get("form")
+    if want == cur:
+        return
+    if want:
+        f.cond["form"] = want
+    else:
+        f.cond.pop("form", None)
+    if getattr(f, "types_override", None) and (sp, want or cur) in FORMS \
+            and FORMS[(sp, want or cur)].get("types"):
+        f.types_override = None             # 모습이 바뀌면 타입도 그 모습의 것이다
+    if not quiet:
+        pop(bt, f, who, ev)
+    kr = FORMS[(sp, want)]["kr"] if want else "원래 모습"
+    ev.append({"t": "msg", "who": who, "form": want or "base",
+               "text": "%s 은(는) %s(으)로 변했다!" % (f.name, kr)})
+
+
+def weather_changed(bt, ev):
+    """날씨가 바뀌었다: 캐스퐁의 모습, 빙큐보의 얼음."""
+    for who in ("me", "foe"):
+        f = bt.fighter(who)
+        if f is None or not f.alive() or not getattr(f, "ability_on", False):
+            continue
+        if f.ability == "ICEFACE" and f.ab.get("noice") and _weather(f) in ("hail", "snow"):
+            f.ab.pop("noice", None)         # 눈이 내리면 머리의 얼음이 다시 언다
+        update_form(bt, f, who, ev)
+
+
+def after_boost(bt, f, who, stat, change, ev):
+    """편승: 상대의 능력이 오르면 나도 그만큼 오른다."""
+    if change <= 0 or getattr(bt, "_riding", False):
+        return
+    opp, ow = other(bt, who)
+    if opp is None or not opp.alive() or not has(opp, "OPPORTUNIST"):
+        return
+    bt._riding = True                       # 편승끼리 주고받으며 끝없이 오르지 않게
+    try:
+        pop(bt, opp, ow, ev)
+        bt._change_stat(opp, stat, change, ev, ow, source=opp)
+    finally:
+        bt._riding = False
+
+
+def after_move(bt, k, raw_key, move, who, user, target, tw, new_ev, ev):
+    """기술 하나가 끝난 뒤 (그대로꿀꺽미사일의 먹이, 무희)."""
+    launched = any(e.get("t") == "move" and e.get("who") == who for e in new_ev)
+    if not launched:
+        return
+    hit = any(e.get("t") == "hit" and e.get("who") == who for e in new_ev)
+    if has(user, "GULPMISSILE") and k in ("SURF", "DIVE") and hit and user.alive() \
+            and not user.ab.get("prey") and (user.mon or {}).get("species") == "CRAMORANT":
+        user.ab["prey"] = "gulp" if user.hp * 2 > user.maxhp else "gorge"
+        pop(bt, user, who, ev)
+        ev.append({"t": "msg", "who": who, "text": "%s 은(는) 먹이를 물어 왔다!" % user.name})
+    if "dance" in flags(move) and has(target, "DANCER") and target.alive() and user.alive() \
+            and not getattr(bt, "_dancing", False):
+        bt._dancing = True                  # 무희끼리 끝없이 따라 추지 않게
+        try:
+            pop(bt, target, tw, ev)
+            bt._use(tw, target, user, raw_key, ev, called=True)
+        finally:
+            bt._dancing = False
 
 
 def state(f):

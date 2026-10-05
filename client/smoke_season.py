@@ -251,7 +251,7 @@ def main():
         tw.status._label.cget("text"))
     tw.toggle(5)
     chk("처음에는 지금 파티가 골라져 있다", tw.picked == [1, 2], tw.picked)
-    chk("레벨 상한이 줄에 적힌다", "Lv.80 → 50" in texts(tw.win))
+    chk("레벨 상한이 줄에 적힌다", "Lv.80 → Lv.50" in texts(tw.win))
     tw.toggle(3)
     tw.toggle(1)
     chk("누르면 넣고 빼기", tw.picked == [2, 3], tw.picked)
@@ -370,6 +370,13 @@ def main():
     st = ui_bag.BagWindow._target_state(None, candy, {"shiny": False, "info": {}})
     chk("아니면 쓸 수 있다", not st[1], st)
     chk("가방에서 쓸 수 있는 도구", "shiny" in ui_bag.USABLE)
+    # 'Lv.5 → 6' 은 56 레벨로 읽혔다 (1.9.2). 양쪽에 다 Lv. 를 붙인다.
+    rare = {"id": "RARECANDY", "kr": "이상한사탕", "cat": "misc",
+            "effect": {"kind": "level", "amount": 1}}
+    st = ui_bag.BagWindow._target_state(None, rare, {"level": 5, "info": {}})
+    chk("이상한사탕 줄은 'Lv.5 → Lv.6'", st[2] == "Lv.5 → Lv.6" and not st[1], st)
+    st = ui_bag.BagWindow._target_state(None, rare, {"level": 99, "info": {}})
+    chk("  99 는 'Lv.99 → Lv.100'", st[2] == "Lv.99 → Lv.100", st)
     from poketdesktop import ui_shop
     chk("상점 탭도 '쓸 수 없는 물건' 이라고 안 적는다",
         "쓸 수 없" not in ui_shop.effect_text(candy)

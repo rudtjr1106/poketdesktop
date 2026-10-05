@@ -348,6 +348,42 @@ def main():
     w.close()
     chk("창이 닫힌다", not w.alive)
 
+    print("=== 기권: 상대가 교체를 고르는 중에도 (1.9.2) ===")
+    # 제보: 기권을 눌러도 창이 안 꺼지고, 껐다 켜도 다시 떴다. 상대가 다음
+    # 포켓몬을 고르는 동안은 내가 '고를 차례' 가 아니라서 서버가 기권까지
+    # 거절했다 - 판이 안 끝나니 창을 닫아도 확인(check_live)이 다시 열었다.
+    from poketdesktop import ui_box
+    api3 = FakeApi(dex)
+    app3 = FakeApp(root, api3, dex)
+    w3 = LUI.LiveBattleWindow(app3, api3.match())
+    pump(root, lambda: not w3.busy, timeout=25)
+    api3.auto_foe = False             # 상대는 고르지 않고 있다
+    api3.lb.b.mon.hp = 0
+    api3.lb.b.mon.ab["fainted"] = True
+    api3.lb._settle([])
+    api3.events = []
+    w3.sync(api3.match())
+    w3.show_commands()
+    rest(root, 0.3)
+    chk("상대가 고르는 중이라 내 차례가 아니다",
+        not api3.lb.can_act("a") and api3.lb.can_act("b"),
+        (api3.lb.can_act("a"), api3.lb.can_act("b")))
+    keep_confirm = ui_box.confirm
+    ui_box.confirm = lambda *a, **k: True
+    try:
+        w3.forfeit()
+    finally:
+        ui_box.confirm = keep_confirm
+    gone = pump(root, lambda: not w3.alive, timeout=15)
+    chk("기권이 서버에 받아들여진다", any(c.startswith("act:") for c in api3.calls)
+        and api3.state == "done" and api3.lb.reason == "forfeit",
+        (api3.calls[-3:], api3.state, api3.lb.reason))
+    chk("졌다고 기록된다", api3.lb.outcome("a") == "lose", api3.lb.outcome("a"))
+    chk("결과를 봤다고 먼저 알린다 (안 그러면 확인이 창을 다시 연다)",
+        api3.seen == 1, api3.seen)
+    chk("'닫기' 를 누르지 않아도 창이 닫힌다", gone and not w3.alive, w3.alive)
+    chk("결과 칸을 따로 그리지 않았다", w3._result_shown and not errors, errors[:1])
+
     print("=== 좁은 화면 ===")
     real_area = PLAT.work_area
     try:

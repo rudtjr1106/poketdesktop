@@ -457,6 +457,39 @@ def main():
             any(e["t"] == "heal" and e.get("p") == who for e in ev),
             [(e["t"], e.get("p")) for e in ev if e["t"] == "heal"])
 
+    print("=== 제보: 레이드에서 소금절이 (1.9.2) ===")
+    # "첫 턴에 소금절이를 쓰고 교체했는데 '소금에 절여지고 있다' 를 못 봤다."
+    # 절이는 규칙이 아예 없었다 (attackfx). 레이드는 요청마다 저장했다 되살리고
+    # 턴 끝을 첫 사람만 보스 몫까지 돌리므로, 그 둘을 다 거쳐도 남는지 본다.
+    def salty():
+        return [(i + 1, "P%d" % (i + 1),
+                 [R.leveled(mon("GARGANACL", 50, ["SALTCURE", "TACKLE"]), 50),
+                  R.leveled(mon("SNORLAX", 50, ["TACKLE"]), 50)]) for i in range(2)]
+    rb = R.RaidBattle(DEX, mon("MEWTWO", 60), salty(), hp_mult=6, max_rounds=15,
+                      rng=random.Random(3))
+    rb.start()
+
+    def salt_round(rb, choices):
+        for i, c in enumerate(choices):
+            rb.choose(i, *c)
+        ev = rb.resolve()
+        return ev, R.RaidBattle.load(DEX, json.loads(json.dumps(rb.dump())))
+
+    def salt_chip(ev):
+        return [e.get("damage") for e in ev
+                if e.get("t") == "chip" and "소금절이" in (e.get("text") or "")]
+    ev, rb = salt_round(rb, [("move", "SALTCURE"), ("move", "TACKLE")])
+    said = [e.get("text") for e in ev if e.get("text")]
+    chk("쓰면 보스가 소금에 절여진다", any("소금에 절여졌다" in t for t in said), said)
+    chk("그 턴 끝부터 최대 체력의 1/8 을 잃는다", salt_chip(ev) == [rb.boss.maxhp // 8],
+        (salt_chip(ev), rb.boss.maxhp // 8))
+    chk("저장했다 되살려도 절여져 있다", rb.boss.cond.get("saltcure") is True, rb.boss.cond)
+    ev, rb = salt_round(rb, [("switch", 1), ("move", "TACKLE")])
+    chk("건 포켓몬이 교체해도 계속 깎인다", salt_chip(ev) == [rb.boss.maxhp // 8], salt_chip(ev))
+    ev, rb = salt_round(rb, [("move", "TACKLE"), ("move", "TACKLE")])
+    chk("둘이 있어도 한 턴에 한 번만 (사람 수만큼이 아니다)",
+        salt_chip(ev) == [rb.boss.maxhp // 8], salt_chip(ev))
+
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
 

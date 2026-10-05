@@ -93,6 +93,7 @@ class RaidDuel(B.Battle):
         for who, f in (("foe", self.foe), ("me", self.me)):
             if f is not None and not f.alive() and not f.ab.get("fainted"):
                 f.ab["fainted"] = True
+                self._note_fall(who)            # 다음 턴의 원수갚기가 본다
                 ev.append({"t": "faint", "who": who,
                            "text": "%s 은(는) 쓰러졌다!" % f.name})
 
@@ -306,6 +307,9 @@ class RaidBattle(object):
                 raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
             if SM.trapped(p.bt, p.mon):
                 raise ValueError("%s 은(는) 붙잡혀 있어서 교체할 수 없습니다." % p.mon.name)
+            stay = SM.must_stay(p.mon)       # 반동 턴·날뛰는 중·모으는 중
+            if stay:
+                raise ValueError(stay)
             p.choice = ("switch", slot)
         else:
             raise ValueError("무엇을 할지 알 수 없습니다.")

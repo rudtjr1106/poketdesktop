@@ -911,6 +911,8 @@ class LiveBattleWindow(object):
                 self.say(getattr(err, "message", str(err)))
                 return self.show_commands()
             got = step_of(r)
+            if kind == "forfeit" and r.get("state") == "done":
+                return self._leave_after_forfeit(r)
             if got > self.played or (r.get("state") == "done"):
                 self.played = got
                 self.sent = False
@@ -918,6 +920,24 @@ class LiveBattleWindow(object):
             self.sync(r)
             self.show_commands()
         run_async(self.root, lambda: self.app.api.live_act(kind, move, slot, mega=mega), done)
+
+    def _leave_after_forfeit(self, room):
+        """내가 기권했다 - 결과 창을 따로 띄우지 않고 닫는다 (제보, 1.9.2).
+
+        그만두겠다고 한 사람에게 '패배... [닫기]' 를 한 번 더 누르게 할 까닭이
+        없다. **결과를 봤다고 서버에 먼저 알리고** 닫는다 - 순서가 바뀌면 그
+        사이에 도는 확인(app.check_live)이 '안 본 결과가 있다' 며 창을 다시 연다.
+        """
+        self.played = max(self.played, step_of(room))
+        self.sync(room)
+        self._result_shown = True
+        self.hide_commands()
+        self.say("승부를 포기했습니다.")
+        self._seen_sent = True
+
+        def bye(_r, _e):
+            self.close()
+        run_async(self.root, lambda: self.app.api.live_seen(), bye)
 
     def use_move(self, key):
         self._send("move", move=key)

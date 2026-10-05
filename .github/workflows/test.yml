@@ -107,6 +107,14 @@ jobs:
       # 게으름·독치장 같은 특성과 역린류·2턴 기술, 속이기의 '첫 턴에만'.
       - name: 특성·턴제 기술 (엔진)
         run: python common/test_new_abilities.py
+      # 본가 규칙 (1.9.2): 쓰면 쓰러지는 기술·한 턴 쉬는 기술·연달아 못 쓰는 기술(강철해머),
+      # 사우전드애로·소금절이·맹독·미래예지 ... 공격기에 붙은 효과 80여 개.
+      - name: 공격기 효과 (엔진)
+        run: python common/test_attackfx.py
+      # 폼이 바뀌는 특성(어군·달마모드·마이티폼·리밋실드), 재앙·오라, 열매 특성 ...
+      # 도감에 있는 특성이 전부 구현됐거나 '1:1 에서는 할 일이 없다' 에 적혀 있는가.
+      - name: 특성 2 (엔진)
+        run: python common/test_abilities2.py
       # 메가진화 (시즌 3): 폼 바꾸기·한 판 한 번·키스톤·스톤 보호·높은 관장
       - name: 메가진화 (엔진)
         run: python common/test_mega.py

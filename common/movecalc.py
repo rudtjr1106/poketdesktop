@@ -228,7 +228,10 @@ def power(move, user, target):
     if k in USER_HP:
         return max(1, USER_HP[k] * user.hp // max(1, user.maxhp))
     if k in TARGET_HP:
-        return max(1, TARGET_HP[k] * target.hp // max(1, target.maxhp))
+        # 본가는 체력 비율을 1/4096 단위로 내림한 뒤 '반 내림' 한다. 그냥 나누면 비율이 딱
+        # 떨어지는 자리(체력이 정확히 1/5, 2/5 ...)에서 위력이 1 높게 나온다.
+        frac = target.hp * 4096 // max(1, target.maxhp)
+        return max(1, (TARGET_HP[k] * 100 * frac + 2047) // 4096 // 100)
     if k == "ELECTROBALL":
         r = _stat(user, "spe") / float(max(1, _stat(target, "spe")))
         for limit, p in ((4, 150), (3, 120), (2, 80), (1, 60)):
@@ -329,7 +332,11 @@ def fixed(move, user, target, rng):
         got = hurt_this_turn(user, kind)
         return int(got * mult) if got else 0
     if k == "PSYWAVE":
-        return max(1, int(user.level * rng.uniform(0.5, 1.5)))
+        # 0~100 의 **정수**를 뽑는다. 0.5~1.5 를 실수로 뽑으면 1.5배(레벨 50 이면 75)가 절대
+        # 안 나온다. uniform 만 쓰는 까닭: 점수를 매길 때 넘어오는 가짜 rng(battle._EstRng)
+        # 에는 uniform 밖에 없다.
+        x = min(100, int(rng.uniform(0, 101)))
+        return max(1, user.level * (x + 50) // 100)
     if k == "ENDEAVOR":
         return max(0, target.hp - user.hp)
     if k == "FINALGAMBIT":

@@ -13,6 +13,7 @@
   · 시즌 기록  지금 시즌과 지난 시즌들의 순위·티어·전적
   · 게시판     [알림 | 내 글 | 내 댓글] 중 하나를 한 쪽(다섯 줄)씩 - 누르면 그 글로 간다.
                활동이 아무리 쌓여도 이 칸의 높이는 같다 (쪽은 ◀ ▶ 로 넘긴다)
+  · 계정       로그아웃 · 회원탈퇴 (1.9.2 - 트레이 메뉴에서 여기로 옮겼다)
 
 창을 열 때와 '새로고침' 을 누를 때만 서버를 부른다.
 """
@@ -290,6 +291,7 @@ class MyPageWindow(object):
         self._titles(d)
         self._seasons(d)
         self._board(d)
+        self._account()
         tk.Frame(self.inner, bg=U.BG, height=U.h(12)).pack(fill="x")
         self.root.after_idle(self._reflow)
 
@@ -595,6 +597,38 @@ class MyPageWindow(object):
             self.load_tab()
 
     # ---------------- 끝 ----------------
+    # ---------------- 계정 ----------------
+    # 로그아웃과 회원탈퇴는 트레이 메뉴의 '종료' 바로 위에 있었다. 끄려다
+    # 잘못 누를까 겁난다는 말이 있어 여기 맨 아래로 옮겼다 (1.9.2).
+    # 하는 일은 그대로다 - 둘 다 확인 창을 거치고, 탈퇴는 비밀번호까지
+    # 묻는다 (app.logout / app.delete_account).
+    def account_rows(self):
+        """(설명, 단추 글자, 할 일, 위험한가). 화면과 검사가 같이 쓴다."""
+        a = self.app
+        return [
+            ("이 기기에 저장된 로그인을 지우고 로그인 화면으로 돌아갑니다.",
+             "로그아웃", a.logout, False),
+            ("계정과 가진 포켓몬이 모두 지워집니다. 되돌릴 수 없습니다.",
+             "회원탈퇴", a.delete_account, True),
+        ]
+
+    def _account(self):
+        box = self._section("계정")
+        self.account_btns = {}
+        for i, (text, label, fn, danger) in enumerate(self.account_rows()):
+            if i:
+                tk.Frame(box, bg=U.LINE, height=U.h(1)).pack(fill="x", padx=14)
+            row = tk.Frame(box, bg=CARD)
+            row.pack(fill="x", padx=14, pady=10)
+            make = U.danger_button if danger else U.ghost_button
+            btn = make(row, label, fn, height=32)
+            btn.pack(side="right", padx=(12, 0))
+            self.account_btns[label] = btn
+            lb = tk.Label(row, text=text, bg=CARD, fg=U.FG_DIM, font=U.FONT_S,
+                          anchor="w", justify="left")
+            lb.pack(side="left", fill="x", expand=True)
+            U.wrap_to_width(lb)
+
     def close(self):
         self.alive = False
         self._gen += 1

@@ -689,7 +689,7 @@ def _many(root, dex, app, win, party, box, big):
 
     # ---- 박스 넘기기·이름·옮기기 ----
     pages = (len(box) + ui_box.BOX_SIZE - 1) // ui_box.BOX_SIZE
-    chk("박스 이름표에 이름과 마릿수", win.lbl_page.cget("text") == "박스 1  30/30",
+    chk("박스 이름표에 이름과 마릿수", win.lbl_page.cget("text") == "박스 1  30/30 ▾",
         win.lbl_page.cget("text"))
     win._page(1)
     settle_rows(root, win)
@@ -701,6 +701,71 @@ def _many(root, dex, app, win, party, box, big):
     settle_rows(root, win)
     chk("돌아온다", layout(win) == full_layout(party_ids, page_ids(box_ids)),
         layout(win)[:12])
+
+    # 이름표를 누르면 **박스 고르기** 다 (1.9.2). 전에는 이름 바꾸기가 떴다 -
+    # 옆에 그 단추가 따로 있는데도. 끝 박스로 가려면 화살표를 서른 번 눌렀다.
+    asked = []
+    keep_ask, keep_menu = ui_box.ask_text, win._menu
+    ui_box.ask_text = lambda *a, **k: asked.append(a) or None
+    opened = []
+    win._menu = lambda w, rows, below=False: opened.append((w, rows, below))
+    try:
+        win.lbl_page.event_generate("<Button-1>", x=4, y=4)
+        root.update()
+    finally:
+        ui_box.ask_text, win._menu = keep_ask, keep_menu
+    chk("이름표를 눌러도 이름 바꾸기 창이 안 뜬다", not asked, asked)
+    chk("대신 박스 목록이 이름표 밑에 열린다",
+        len(opened) == 1 and opened[0][0] is win.lbl_page and opened[0][2] is True,
+        [(o[0], o[2]) for o in opened])
+    rows = win._box_rows()
+    chk("목록에는 박스가 다 있다", len(rows) == win.box_count(), len(rows))
+    chk("줄마다 이름과 마릿수", rows[0]["text"] == "박스 1  (30/30)", rows[0]["text"])
+    chk("지금 보는 박스에 표시", [i for i, r in enumerate(rows) if r["checked"]] == [0],
+        [i for i, r in enumerate(rows) if r["checked"]])
+    end = win.box_count() - 1
+    rows[end]["command"]()
+    settle_rows(root, win)
+    chk("고르면 그 박스로 바로 간다", win.box_no == end, win.box_no)
+    chk("이름표도 그 박스다",
+        win.lbl_page.cget("text").startswith("박스 %d " % (end + 1)),
+        win.lbl_page.cget("text"))
+    chk("끝 박스에서는 ▶ 가 꺼지고 ◀ 는 켜진다",
+        not win.btn_next.enabled and win.btn_prev.enabled,
+        (win.btn_next.enabled, win.btn_prev.enabled))
+    win._box_rows()[0]["command"]()
+    settle_rows(root, win)
+    chk("첫 박스로 돌아온다", win.box_no == 0
+        and layout(win) == full_layout(party_ids, page_ids(box_ids)), win.box_no)
+    # 서른두 줄짜리 목록이다. 화면이 낮으면 한 단으로는 아래 줄이 화면 밖으로
+    # 나가 누를 수가 없다 - 단을 나눠 화면 안에 넣는다 (글자는 안 줄인다).
+    # 직접 그리는 메뉴는 맥에서만 쓴다 (윈도우는 스스로 굴러가는 tk.Menu).
+    if not PLAT.NATIVE_MENU:
+        from poketdesktop import ui_common as UC
+        real_screen = UC.screen_at
+        try:
+            for label, scr, want in (("낮은 화면(1024x640)", (0, 0, 1024, 640), 2),
+                                     ("넉넉한 화면(1920x1080)", (0, 0, 1920, 1080), 1)):
+                UC.screen_at = lambda r, x, y, s=scr: s
+                menu = UC.PopupMenu(root, win._box_rows(), 300, 100, width=220)
+                root.update()
+                chk("%s: 박스 목록이 %d단" % (label, want), menu.cols == want, menu.cols)
+                chk("  화면 안에 다 들어온다",
+                    menu.win.winfo_rooty() + menu.win.winfo_height() <= scr[3]
+                    and menu.win.winfo_rootx() + menu.win.winfo_width() <= scr[2],
+                    (menu.win.winfo_rooty(), menu.win.winfo_height(), menu.win.winfo_width()))
+                menu.close()
+        finally:
+            UC.screen_at = real_screen
+        root.update()
+
+    asked = []
+    ui_box.ask_text = lambda *a, **k: asked.append(a) or None
+    try:
+        win.btn_rename.command()
+    finally:
+        ui_box.ask_text = keep_ask
+    chk("이름 바꾸기는 그 단추가 한다", len(asked) == 1, asked)
 
     # 이름 바꾸기
     app.api.set_box_name(0, "불꽃방")
@@ -739,6 +804,9 @@ def _many(root, dex, app, win, party, box, big):
     chk("찾을 때는 박스를 넘어 다 뒤진다",
         win._searching() and "찾는 중" in win.lbl_page.cget("text"),
         win.lbl_page.cget("text"))
+    win.open_box_menu()
+    chk("찾는 중에는 박스 목록 대신 안내가 뜬다",
+        "박스를 고를 수 없습니다" in win.status.cget("text"), win.status.cget("text"))
     win.f_query.set("")
     settle_rows(root, win)
 

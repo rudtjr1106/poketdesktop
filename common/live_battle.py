@@ -68,6 +68,7 @@ class LiveDuel(B.Battle):
         for who, f in (("foe", self.foe), ("me", self.me)):
             if not f.alive() and not f.ab.get("fainted"):
                 f.ab["fainted"] = True
+                self._note_fall(who)            # 다음 턴의 원수갚기가 본다
                 prefix = self.foe_prefix if who == "foe" else ""
                 ev.append({"t": "faint", "who": who,
                            "text": "%s%s 은(는) 쓰러졌다!" % (prefix, f.name)})
@@ -222,11 +223,17 @@ class LiveBattle(object):
             and self.bt.can_mega(self._seat(who)) is not None
         if self.over:
             raise ValueError("이미 끝난 승부입니다.")
-        if not self.can_act(who):
-            raise ValueError("지금은 고를 차례가 아닙니다.")
         if kind == "forfeit":
+            # **기권은 내 차례가 아니어도 된다.** 예전에는 아래의 '고를 차례' 판정을
+            # 먼저 봐서, 상대가 다음 포켓몬을 고르는 동안에는 "지금은 고를 차례가
+            # 아닙니다" 로 거절됐다. 판이 안 끝나니 창을 닫아도, 껐다 켜도 다시 떴다
+            # (제보, 1.9.2). 아직 이 판에 남아 있는 사람이면 언제든 그만둘 수 있다.
+            if not p.playing():
+                raise ValueError("이미 끝난 승부입니다.")
             p.choice = ("forfeit", None)
             return p.choice
+        if not self.can_act(who):
+            raise ValueError("지금은 고를 차례가 아닙니다.")
         if self.phase() == "switch" and kind != "switch":
             raise ValueError("다음 포켓몬을 골라야 합니다.")
         if kind == "switch":
@@ -235,6 +242,10 @@ class LiveBattle(object):
                 raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
             if self.phase() != "switch" and SM.trapped(self.bt, p.mon):
                 raise ValueError("%s 은(는) 붙잡혀 있어서 교체할 수 없습니다." % p.mon.name)
+            # 반동으로 쉬는 턴·날뛰는 중·모으는 중에는 자리를 못 뜬다 (본가는 고르는 화면이 안 뜬다)
+            stay = SM.must_stay(p.mon) if self.phase() != "switch" else None
+            if stay:
+                raise ValueError(stay)
             p.choice = ("switch", slot)
         elif kind == "move":
             # 역린류·2턴 기술로 잠겨 있으면 그것으로 바꿔 받는다
@@ -374,6 +385,8 @@ class LiveBattle(object):
         me.flinched = False
         foe.flinched = False
         mm, fm = moves.get("me"), moves.get("foe")
+        # 이 턴에 누가 무엇을 하려는지 (교체한 쪽은 None) - 기습·질풍신뢰가 본다
+        self.bt.pending = {"me": mm, "foe": fm}
         if mm and fm:
             order = self.bt._order(mm, fm, ev)
         elif mm:

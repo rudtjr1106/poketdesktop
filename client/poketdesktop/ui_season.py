@@ -184,7 +184,7 @@ class TeamWindow(object):
                  font=U.FONT_B).pack(side="left")
         lv_text = "Lv.%d" % lv
         if lv > self.cap:
-            lv_text += " → %d" % self.cap
+            lv_text += " → Lv.%d" % self.cap       # 가방의 사탕 줄과 같은 꼴
         tk.Label(line, text=lv_text, bg=U.INK, fg=U.FG_DIM,
                  font=U.FONT_S).pack(side="left", padx=(8, 0))
         species = info.get("species") or ""
