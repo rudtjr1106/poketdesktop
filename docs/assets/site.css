@@ -108,9 +108,13 @@ kbd { display: inline-block; padding: 0 0.4em; border: 1px solid var(--line2); b
   background: repeating-linear-gradient(100deg, transparent 0 7px, var(--grass) 7px 9px, transparent 9px 15px),
               repeating-linear-gradient(80deg, transparent 0 11px, var(--grass) 11px 13px, transparent 13px 21px);
   -webkit-mask-image: linear-gradient(to top, #000 15%, transparent); mask-image: linear-gradient(to top, #000 15%, transparent); }
-.pet { position: absolute; left: 0; top: 0; width: 48px; height: 48px; cursor: pointer; will-change: transform; }
-.pet i { display: block; width: 100%; height: 100%; background: url("../sprites/critters.png") no-repeat; background-size: 192px 576px; image-rendering: pixelated; }
+/* 도트와 풀숲의 크기·그림은 pets.js 가 직접 입힌다 (스타일이 옛것으로 남은 브라우저에서도 보이게) */
+.pet, .tuft { will-change: transform; }
+.tuft i { transform-origin: 50% 100%; }
+.tuft:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: var(--r-s); }
 @keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-14px); } }
+@keyframes sprout { from { transform: scaleY(0); } 60% { transform: scaleY(1.18); } to { transform: scaleY(1); } }
+.meadow-tip { margin-top: 0.55rem; font-size: 0.88rem; color: var(--faint); }
 
 /* ============================================================ 첫 화면 */
 .wrap { max-width: var(--page); margin: 0 auto; padding: 0 1.25rem; }
@@ -274,6 +278,7 @@ details .a strong { color: var(--fg); }
   .hero .screen { animation: rise 0.9s var(--ease) 0.15s both; }
   /* 내려가며 읽을 때: 화면에 들어오는 덩어리가 올라온다. 지원하지 않는 브라우저에서는 그냥 보인다 */
   .pet.hop i { animation: hop 0.42s var(--ease); }
+  .tuft i { animation: sprout 0.5s var(--ease) both; }
   @supports (animation-timeline: view()) {
     .reveal { animation: rise linear both; animation-timeline: view(); animation-range: entry 0% entry 45%; }
   }
