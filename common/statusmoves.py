@@ -1460,6 +1460,11 @@ def h_instruct(bt, move, who, user, target, tw, ev):
 
 
 # ---- 다른 기술을 부른다
+# 본가에서 '다른 기술을 부르는 기술' 로 치는 것. 이 기술 자체로는 변환자재가 발동하지 않고,
+# **불려 나온 기술**이 나갈 때 그 타입으로 바뀐다 (battle._do_use).
+CALLS_MOVE = {"ASSIST", "COPYCAT", "MEFIRST", "METRONOME", "MIRRORMOVE", "NATUREPOWER", "SLEEPTALK"}
+
+
 def _call(bt, who, user, target, k2, ev, text=None):
     if text:
         say(ev, who, text)

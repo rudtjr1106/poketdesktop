@@ -34,6 +34,7 @@ from common import tint as TINT            # noqa: E402
 from . import (achievements, auth, battle_routes, board, board_routes, mega, config, db, deps, eggs, item_routes,  # noqa: E402
                errors, items, live, live_routes, migrations, mypage, pvp, pvp_routes,
                raid, raid_routes,
+               guild, guild_routes, guild_ws,
                gym_routes, social_routes, tm_routes, tms, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
@@ -47,6 +48,8 @@ app.include_router(raid_routes.router)
 app.include_router(live_routes.router)
 app.include_router(board_routes.router)
 app.include_router(mypage.router)
+app.include_router(guild_routes.router)
+app.include_router(guild_ws.router)
 
 RNG = deps.RNG
 
@@ -1022,6 +1025,8 @@ def delete_account(body: DeleteIn, ctx=Depends(current)):
     if not auth.verify_password(body.password, u["pw_hash"], u["pw_salt"], u["pw_iter"]):
         raise HTTPException(401, "비밀번호가 맞지 않습니다.")
     n = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=?", (u["id"],))["c"]
+    # 길드 마스터가 그냥 사라지면 마스터 없는 길드가 남는다. 자리를 넘기고 지운다.
+    guild.on_user_deleted(u["id"])
     db.run("DELETE FROM users WHERE id=?", (u["id"],))
     return {"ok": True, "deletedPokemon": n,
             "message": "계정과 포켓몬 %d마리를 삭제했습니다." % n}

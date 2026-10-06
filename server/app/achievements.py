@@ -350,6 +350,9 @@ def on_obtain(uid, mon, how, ball=None, now=None):
     이로치 수와 숨은 업적(자정·럭셔리볼 전설)은 **얻는 순간에만** 알 수
     있어서 여기서 적는다. 나머지는 도감(seen)으로 센다.
     """
+    if how == "catch":
+        from . import guild                 # 길드 일일 미션 (1.10.0). 잡는 길은 다 여기를 지난다.
+        guild.note_safe(uid, "catch")
     try:
         _ensure_shiny(uid)
         if mon.get("shiny") and how in ("catch", "hatch"):

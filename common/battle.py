@@ -451,6 +451,22 @@ def accuracy_check(dex, move, user, target, rng):
     return rng.uniform(0, 100) < rate
 
 
+def typed(move, user, target):
+    """이 기술이 **지금 실제로 나갈 타입**을 적은 기술. damage() 가 정하는 순서 그대로다.
+
+    잠재파워·심판의뭉치(개체값·도구) → 웨더볼·대지의파동(날씨·필드) → 잠재댄스·오라휠(쓰는 쪽).
+    변환자재가 이걸 본다 - 도감에 적힌 타입을 보면 비 오는 날 웨더볼(물)을 쓰고 노말이 된다.
+    특성이 바꾸는 타입(스카이스킨 ...)은 A.move_type 이 이 위에 얹는다.
+    """
+    if not move:
+        return move
+    t = MC.move_type(move, user)
+    m = move if t == move.get("type") else dict(move, type=t)
+    m = SM.resolve(m, user, target)
+    t2 = AF.move_type(m, user)
+    return dict(m, type=t2) if t2 and t2 != m.get("type") else m
+
+
 def damage(dex, move, user, target, rng, crit=None):
     """(데미지, 급소여부, 상성배율) 을 돌려준다. 아래 _damage 를 감싼 것이다.
 
@@ -1415,14 +1431,19 @@ class Battle(object):
             user.cond["lastMove"] = key
             self.last_before = self.field.last_move      # 흉내쟁이는 자기 직전의 기술을 본다
             self.field.last_move = key
-        if abil and key != STRUGGLE and not charging and not bounced:
-            A.before_move(self, user, who, move, ev)
-            if A.blocks(self, user, who, target, tw, move, key, ev):
-                return
+        # 송전·플라스마피스트가 바꾼 타입은 **특성이 보기 전에** 정한다. 뒤에 두면 전기가 된
+        # 기술을 축전·피뢰침이 못 받고, 변환자재가 바뀌기 전의 타입(노말)이 된다.
         if user.cond.get("electrify") and MC.attacks(move):
             move = dict(move, type="ELECTRIC")    # 송전
         elif self.field.sides["me"].get("ion") and MC.attacks(move) and move.get("type") == "NORMAL":
             move = dict(move, type="ELECTRIC")    # 플라스마피스트를 쓴 턴: 노말 기술이 전기가 된다
+        if abil and key != STRUGGLE and not charging and not bounced:
+            # 다른 기술을 부르는 기술(흉내쟁이·잠꼬대 ...)은 건너뛴다 - 불려 나온 기술이 여기를
+            # 다시 지나갈 때 그 타입으로 바뀐다. 여기서 바꾸면 노말이 되고 한 번뿐인 기회가 끝난다.
+            if k not in SM.CALLS_MOVE:
+                A.before_move(self, user, who, typed(move, user, target), ev)
+            if A.blocks(self, user, who, target, tw, move, key, ev):
+                return
 
         # ---- 조건이 안 맞으면 실패한다 (꿈먹기·기습·힘껏펀치·비장의무기 ...) ----
         if not bounced and AF.cant_use(self, k, move, who, user, target, tw, ev,
@@ -1746,7 +1767,9 @@ class Battle(object):
     def _charge_turn(self, who, user, key, k, move, ev):
         """두 턴에 걸쳐 쓰는 기술의 첫 턴. 이번 턴을 여기서 끝내면 True.
 
-        솔라빔은 햇빛이면, 파워허브를 지녔으면 한 턴에 나간다 (본가와 같다).
+        솔라빔은 햇빛이면, 일렉트로빔은 비가 오면, 파워허브를 지녔으면 한 턴에 나간다
+        (본가와 같다). 한 턴에 나가더라도 **첫 턴에 오르는 능력은 그대로 오른다**
+        (일렉트로빔·메테오빔의 특수공격, 로켓박치기의 방어).
         """
         spec = SM.CHARGE2.get(k)
         if not spec:
@@ -1758,11 +1781,18 @@ class Battle(object):
         text, hide, stat = spec
         if k in ("SOLARBEAM", "SOLARBLADE") and SM.weather(user) == "sun":
             return False                           # 쾌청 (메가솔라는 혼자만 쾌청이다)
+        if k == "ELECTROSHOT" and SM.weather(user) == "rain":
+            # 비가 오면 모으자마자 쏜다. 파워허브보다 먼저 본다 - 허브는 아낀다.
+            ev.append({"t": "msg", "who": who, "text": text % user.name})
+            self._change_stat(user, stat, 1, ev, who, source=user)
+            return False
         if user.held == "POWERHERB":
             user.held = None
             user.used = True
             ev.append({"t": "msg", "who": who,
                        "text": "%s 은(는) 파워허브로 힘을 모았다!" % user.name})
+            if stat:
+                self._change_stat(user, stat, 1, ev, who, source=user)
             return False
         user.cond["charge2"] = {"move": k}
         if hide:

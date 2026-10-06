@@ -1,5 +1,8 @@
 fastapi>=0.110,<1.0
 uvicorn>=0.27,<1.0
+# 길드 채팅의 웹소켓 (1.10.0). uvicorn 은 이게 깔려 있어야 웹소켓을 받는다 -
+# 없으면 /ws/guild 가 404 로 떨어지고 화면은 2초 폴링으로 돌아간다.
+websockets>=12,<16
 pydantic>=2.5,<3.0
 # Turso(libSQL). POKET_TURSO_URL 이 없으면 불러오지도 않는다.
 libsql>=0.1.11,<1.0

@@ -307,6 +307,22 @@ RAID_FAIL_PRIZE = _int("POKET_RAID_FAIL_PRIZE", 500)  # 져도 준다
 RAID_TOP_PRIZE = (3000, 2000, 1000)                   # 기여 1~3위 덤
 
 
+# ---------------------------------------------------------------- 길드 (1.10.0)
+# 만드는 값. 가볍게 만들었다 버리지 않게 꽤 비싸게 둔다 (관장 Lv.50 을 스무 번 이긴 돈).
+GUILD_CREATE_COST = _int("POKET_GUILD_CREATE_COST", 50000)
+# 정원. 전체 인원이 200명 안팎이라 크게 잡으면 길드 두셋으로 끝난다.
+GUILD_MAX_MEMBERS = _int("POKET_GUILD_MAX_MEMBERS", 15)
+GUILD_MAX_SUBS = _int("POKET_GUILD_MAX_SUBS", 1)              # 부마스터 수
+# 나온(또는 내보내진) 뒤 다른 길드에 들어가거나 새로 만들 수 있을 때까지.
+GUILD_REJOIN_HOURS = _int("POKET_GUILD_REJOIN_HOURS", 24)
+GUILD_MAX_REQUESTS = _int("POKET_GUILD_MAX_REQUESTS", 3)      # 동시에 넣어 둘 수 있는 가입 신청
+GUILD_CHAT_LEN = _int("POKET_GUILD_CHAT_LEN", 200)            # 채팅 한 줄 글자 수
+GUILD_CHAT_KEEP = _int("POKET_GUILD_CHAT_KEEP", 500)          # 길드마다 남겨 두는 줄 수
+GUILD_CHAT_PER_MIN = _int("POKET_GUILD_CHAT_PER_MIN", 20)     # 한 사람이 1분에 보낼 수 있는 줄 수
+# 길드 코인 하나의 값(원). 코인 상점의 값은 '상점 값 / 이 값' 을 올림한 것이다.
+GUILD_COIN_WON = _int("POKET_GUILD_COIN_WON", 250)
+
+
 # ---------------------------------------------------------------- 실시간 배틀
 # 친구끼리 **둘 다 접속한 채로** 두는 1:1. 지금까지의 유저 배틀은 매칭
 # 순간 서버가 판 전체를 돌려 로그로 남기는 비동기였다(party_battle) -

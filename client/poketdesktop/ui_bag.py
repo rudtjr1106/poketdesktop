@@ -1607,5 +1607,7 @@ def announce_evolve(parent, app, info):
     row.pack(fill="x", pady=(14, 0))
     U.PushButton(row, "좋아!", win.destroy, height=34,
                  font=U.FONT_B).pack(side="right")
+    # 맥은 줄이 높아서 316 으로는 '좋아!' 단추가 아래에서 눌렸다. 모자라면 늘린다.
+    ui_box.grow(win)
     win.grab_set()
     parent.wait_window(win)

@@ -18,6 +18,11 @@
 
 전부 Canvas 도형으로 그린다. 이미지가 아니라서 크기를 바꿔도 깨지지 않고,
 저작권 있는 그림을 쓰지 않는다.
+
+**이 파일은 갈래를 고르는 일과 뼈대(Effect), 그리고 예전부터 있던 수수한 연출을
+맡는다.** 많이 쓰이는 기술의 전용 연출(문포스의 달, 화염방사의 불길, 지진의 갈라진
+땅 ...)과 맞는 순간의 타입별 충격은 move_fx.py 에 있다 (1.10.0). style_of 가 먼저
+여기서 갈래를 고르고, move_fx.pick 이 그 기술만의 연출이 있으면 바꾼다.
 """
 import math
 import re
@@ -47,6 +52,9 @@ TYPE_FX = {
     "GHOST":    ("#b9a8e0", "#5a4a8f"),
 }
 DEFAULT_FX = ("#f0f0f0", "#9a9a9a")
+
+# 검사에서만 켠다. 켜면 연출 중의 예외를 삼키지 않고 그대로 올린다.
+DEBUG = False
 
 
 def colors(mtype):
@@ -129,7 +137,17 @@ def _by_name(move):
 
 
 def style_of(move):
-    """기술 하나가 어떤 연출을 쓸지 고른다.
+    """기술 하나가 쓸 연출 이름.
+
+    먼저 아래 _base_style 로 갈래를 고르고, move_fx 가 그 기술만의 연출이
+    있으면 그것으로 바꾼다 (문포스·화염방사·지진 ...).
+    """
+    from . import move_fx                    # 저쪽이 이 모듈의 도형을 쓴다 - 부를 때 불러온다
+    return move_fx.pick(move, _base_style(move))
+
+
+def _base_style(move):
+    """기술 하나가 어떤 갈래인지 고른다.
 
     세 겹으로 고른다. 위에서 걸리면 아래는 안 본다.
       1. **이름의 낱말** - 칼춤이면 칼, 뼈다귀면 뼈. 눈에 띄는 기술들이
@@ -199,11 +217,6 @@ def style_of(move):
     if cat == "status":
         return "hex"
     return "beam"
-
-
-def contact_style(style):
-    """때리는 쪽이 달려들어야 하는 연출인지."""
-    return style in ("contact", "punch", "bite", "kick", "slash", "multi")
 
 
 # ---------------------------------------------------------------- 도형 조각
@@ -329,6 +342,9 @@ class Effect(object):
         self.move = move or {}
         self.type = self.move.get("type") or "NORMAL"
         self.style = style_of(self.move)
+        # 센 기술일수록 크게 그린다 (변화기는 1.0)
+        p = self.move.get("power") or 0
+        self.big = 1.0 if not p else 0.85 if p < 60 else 1.0 if p < 100 else 1.18 if p < 130 else 1.35
         self.src = src
         self.dst = dst
         self.on_done = on_done
@@ -378,10 +394,14 @@ class Effect(object):
         # 달라서 창이 커졌다 작아지는데, 이 연출은 도트 좌표를 잡아 두고
         # 그리는 것이라 그 사이에 그림이 튄다. 기술 이펙트만으로도
         # 누가 무엇을 했는지는 읽힌다.
-        fn = getattr(self, "_" + self.style, None) or self._beam
+        from . import move_fx
+        sig = move_fx.STYLES.get(self.style)
+        fn = (lambda: sig(self)) if sig else (getattr(self, "_" + self.style, None) or self._beam)
         try:
             fn()
         except Exception:
+            if DEBUG:
+                raise
             self.finish()
 
     # ---- 각 연출 ----
@@ -409,50 +429,6 @@ class Effect(object):
                     if self.items:
                         self.cv.delete(self.items.pop(0))
             self.after(26, lambda: step(i + 1))
-        step(0)
-
-    def _ball(self):
-        """둥근 것이 포물선으로 날아간다."""
-        sx, sy = self.src
-        tx, ty = self.dst
-        light, dark = colors(self.type)
-        core = self.add(_blob(self.cv, sx, sy, 11, dark, light))
-        n = 18
-
-        def step(i):
-            if self.dead:
-                return
-            if i > n:
-                return self.burst()
-            t = i / float(n)
-            x = sx + (tx - sx) * t
-            y = sy + (ty - sy) * t - 70 * (t - t * t) * 4
-            self.cv.coords(core, x - 11, y - 11, x + 11, y + 11)
-            trail = self.add(_blob(self.cv, x, y, 6, light))
-            self.after(180, lambda it=trail: self.cv.delete(it))
-            self.after(24, lambda: step(i + 1))
-        step(0)
-
-    def _pulse(self):
-        """고리가 퍼지며 날아간다."""
-        sx, sy = self.src
-        tx, ty = self.dst
-        light, dark = colors(self.type)
-        n = 16
-
-        def step(i):
-            if self.dead:
-                return
-            if i > n:
-                return self.burst()
-            t = i / float(n)
-            x = sx + (tx - sx) * t
-            y = sy + (ty - sy) * t
-            r = 10 + i * 1.6
-            ring = self.add(self.cv.create_oval(x - r, y - r * 0.7, x + r, y + r * 0.7,
-                                                outline=light, width=3))
-            self.after(220, lambda it=ring: self.cv.delete(it))
-            self.after(28, lambda: step(i + 1))
         step(0)
 
     def _sound(self):
@@ -562,10 +538,10 @@ class Effect(object):
             self.after(34, lambda: step(i + 1))
         step(0)
 
-    # ---- 접촉기: 때리는 쪽이 달려든 뒤 자국이 남는다 ----
     # ------------------------------------------------------------------
     # 아래는 이름으로 갈라진 연출들. 예전에는 919종 중 350종이 전부
     # 같은 'beam' 이라 뼈다귀치기와 냉동빔이 구분되지 않았다.
+    # (베기·발톱·주먹·구슬·파동처럼 많이 쓰이는 갈래는 move_fx 로 옮겨 갔다.)
     # ------------------------------------------------------------------
     def _fly(self, shape, n=14, spin=0, arc=0):
         """무언가를 상대에게 날린다.
@@ -610,32 +586,6 @@ class Effect(object):
             self.after(gap, lambda: one(i + 1))
         one(0)
 
-    def _claw(self):
-        """발톱 자국 - 나란한 사선 세 줄, 끝으로 갈수록 가늘어진다."""
-        light, dark = colors(self.type)
-
-        def maker(x, y, i):
-            o = -14 + i * 14
-            return self.cv.create_line(x - 22 + o, y - 20, x + 16 + o, y + 20,
-                                       fill=light, width=6 - i, capstyle="round")
-        self._marks(self.dst, maker, n=3, gap=70)
-
-    def _stab(self):
-        """뾰족한 것이 돌면서 파고든다."""
-        light, dark = colors(self.type)
-
-        def shape(x, y, t):
-            a = t * 900.0
-            r = 12
-            pts = []
-            for k in range(3):
-                ang = math.radians(a + k * 120)
-                rr = r if k == 0 else r * 0.55
-                pts += [x + rr * math.cos(ang), y + rr * math.sin(ang)]
-            return self.cv.create_polygon(*pts, fill=light, outline=dark,
-                                          width=2)
-        self._fly(shape, n=14)
-
     def _bone(self):
         """뼈가 빙글빙글 돌면서 날아간다."""
         def shape(x, y, t):
@@ -647,84 +597,6 @@ class Effect(object):
                                        fill="#f0ece0", width=5,
                                        capstyle="round")
         self._fly(shape, n=16, arc=18)
-
-    def _slash(self):
-        """칼자국 세 줄이 비스듬히 그어진다."""
-        def maker(x, y, i):
-            o = -18 + i * 16
-            return self.cv.create_line(x - 26 + o, y - 24, x + 22 + o, y + 24,
-                                       fill="#ffffff", width=5, capstyle="round")
-        self._marks(self.dst, maker, n=3, gap=80)
-
-    def _kick(self):
-        """발차기 - 호를 그리며 차고 충격이 튄다."""
-        light, dark = colors(self.type)
-
-        def maker(x, y, i):
-            r = 20 + i * 9
-            return self.cv.create_arc(x - r, y - r, x + r, y + r,
-                                      start=200 + i * 20, extent=110,
-                                      style="arc", outline=light, width=5)
-        self._marks(self.dst, maker, n=3, gap=70)
-
-    def _quake(self):
-        """땅이 갈라진다."""
-        light, dark = colors(self.type)
-
-        def maker(x, y, i):
-            w = 40 + i * 26
-            pts = []
-            for k in range(7):
-                pts += [x - w + (2 * w) * k / 6.0,
-                        y + 22 + (6 if k % 2 else -6)]
-            return self.cv.create_line(*pts, fill=dark, width=5)
-        self._marks(self.dst, maker, n=4, gap=90)
-
-    def _boom(self):
-        """한가운데서 터진다."""
-        light, dark = colors(self.type)
-        tx, ty = self.dst
-
-        def one(i):
-            if self.dead:
-                return
-            if i > 8:
-                return self.burst()
-            r = 12 + i * 11
-            it = self.add(self.cv.create_oval(tx - r, ty - r, tx + r, ty + r,
-                                              outline=light if i % 2 else dark,
-                                              width=4))
-            self.after(200, lambda v=it: self.cv.delete(v))
-            self.after(34, lambda: one(i + 1))
-        one(0)
-
-    def _rock(self):
-        """돌덩이가 여러 개 날아간다."""
-        light, dark = colors(self.type)
-
-        def one(k):
-            if self.dead:
-                return
-            if k >= 4:
-                return self.after(180, self.burst)
-            off = random.uniform(-22, 22)
-
-            def shape(x, y, t, o=off):
-                r = 8
-                return self.cv.create_polygon(
-                    x - r, y + o, x, y - r + o, x + r, y + o * 0.6,
-                    x + r * 0.4, y + r + o, fill=dark, outline=light, width=2)
-            self._fly(shape, n=10, arc=14)
-            self.after(70, lambda: one(k + 1))
-        one(0)
-
-    def _leaf(self):
-        """잎이 흩날리며 날아간다."""
-        light, dark = colors(self.type)
-
-        def shape(x, y, t):
-            return _leaf_shape(self.cv, x, y, 9, light, dark, t * 360)
-        self._fly(shape, n=15, arc=22)
 
     def _ice(self):
         """얼음 조각이 박힌다."""
@@ -752,22 +624,6 @@ class Effect(object):
             return self.cv.create_line(sx, sy + o, tx, ty + o,
                                        fill=light, width=3, dash=(14, 9))
         self._marks(self.dst, maker, n=4, gap=60)
-
-    def _flash(self):
-        """화면이 번쩍인다."""
-        light, dark = colors(self.type)
-        tx, ty = self.dst
-
-        def one(i):
-            if self.dead:
-                return
-            if i > 5:
-                return self.burst()
-            r = 60 - i * 9
-            it = self.add(_blob(self.cv, tx, ty, r, light))
-            self.after(90, lambda v=it: self.cv.delete(v))
-            self.after(60, lambda: one(i + 1))
-        one(0)
 
     def _dance(self):
         """자기 둘레를 돈다. 칼춤 계열은 칼이 돈다."""
@@ -842,52 +698,6 @@ class Effect(object):
             self.after(60, lambda: one(i + 1))
         one(0)
 
-    def _drain(self):
-        """상대에게서 빨아온다. 방향이 반대다."""
-        light, dark = colors(self.type)
-        sx, sy = self.src
-        tx, ty = self.dst
-
-        def one(k):
-            if self.dead:
-                return
-            if k >= 7:
-                return self.after(160, self.burst)
-            cur = [None]
-
-            def step(i):
-                if self.dead:
-                    return
-                if i > 9:
-                    if cur[0]:
-                        self.cv.delete(cur[0])
-                    return
-                t = i / 9.0
-                x = tx + (sx - tx) * t
-                y = ty + (sy - ty) * t - 16 * (t - t * t) * 4
-                if cur[0]:
-                    self.cv.delete(cur[0])
-                cur[0] = _blob(self.cv, x, y, 5, light)
-                self.items.append(cur[0])
-                self.after(26, lambda: step(i + 1))
-            step(0)
-            self.after(55, lambda: one(k + 1))
-        one(0)
-
-    def _recoil(self):
-        """때리고 나도 아프다. 부딪히고 터진다."""
-        self.st.lunge(self.src_side(), self._boom)
-
-    def _multi(self):
-        """여러 번 때린다."""
-        light, dark = colors(self.type)
-
-        def maker(x, y, i):
-            o = random.uniform(-16, 16)
-            return self.cv.create_line(x - 20 + o, y - 16, x + 20 + o, y + 16,
-                                       fill=light, width=4, capstyle="round")
-        self._marks(self.dst, maker, n=5, gap=55, done_after=180)
-
     def _arrows(self, at, up, color):
         """화살표가 위/아래로 흐른다. 랭크 변화 표시."""
         x, y = at
@@ -918,9 +728,6 @@ class Effect(object):
     def _contact(self):
         self.st.lunge(self.src_side(), lambda: self.slash())
 
-    def _punch(self):
-        self.st.lunge(self.src_side(), lambda: self.fist())
-
     def _bite(self):
         self.st.lunge(self.src_side(), lambda: self.fangs())
 
@@ -937,18 +744,6 @@ class Effect(object):
                                          ty + 30, fill=light, width=5))
             self.add(self.cv.create_line(tx - 28 + off, ty - 28, tx + 28 + off,
                                          ty + 28, fill=dark, width=2))
-        self.after(200, self.burst)
-
-    def fist(self):
-        """주먹 충격."""
-        tx, ty = self.dst
-        light, dark = colors(self.type)
-        for k in range(8):
-            a = 2 * math.pi * k / 8
-            self.add(self.cv.create_line(tx + math.cos(a) * 16, ty + math.sin(a) * 16,
-                                         tx + math.cos(a) * 42, ty + math.sin(a) * 42,
-                                         fill=light, width=4))
-        self.add(_blob(self.cv, tx, ty, 15, dark, light))
         self.after(200, self.burst)
 
     def fangs(self):
@@ -984,23 +779,7 @@ class Effect(object):
 
     # ---- 마무리 충격 ----
     def burst(self):
+        """맞는 순간. 타입에 맞는 조각이 튄다 (move_fx.impact)."""
         self.clear()
-        tx, ty = self.dst
-        light, dark = colors(self.type)
-        rings = []
-
-        def step(i):
-            if self.dead:
-                return
-            if i > 7:
-                return self.finish()
-            for it in rings:
-                self.cv.delete(it)
-            del rings[:]
-            r = 12 + i * 9
-            rings.append(self.cv.create_oval(tx - r, ty - r, tx + r, ty + r,
-                                             outline=light if i % 2 else dark,
-                                             width=max(1, 6 - i)))
-            self.items.extend(rings)
-            self.after(30, lambda: step(i + 1))
-        step(0)
+        from . import move_fx
+        move_fx.impact(self)

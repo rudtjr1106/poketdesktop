@@ -83,6 +83,23 @@ def season_line(s):
     return head, " · ".join(bits)
 
 
+def tile_items(d):
+    """(이름, 값, 덧붙임) 목록. 화면과 검사가 같이 쓴다."""
+    c, g, r = d.get("counts") or {}, d.get("gym") or {}, d.get("raid") or {}
+    return [
+        ("포켓몬", "%d마리" % int(c.get("pokemon") or 0),
+         "가장 높은 레벨 %d" % int(c.get("topLevel") or 0) if c.get("topLevel") else ""),
+        ("색이 다른 포켓몬", "%d마리" % int(c.get("shiny") or 0), ""),
+        ("도감", "%d / %d" % (int(c.get("dexCaught") or 0), int(c.get("dexTotal") or 0)),
+         "본 종 %d" % int(c.get("dexSeen") or 0)),
+        ("이긴 관장", "%d / %d" % (int(g.get("cleared") or 0), int(g.get("total") or 0)),
+         "모두 %d번 승리" % int(g.get("wins") or 0) if g.get("wins") else ""),
+        ("레이드", "%d승" % int(r.get("wins") or 0),
+         "%d판 참가" % int(r.get("games") or 0) if r.get("games") else ""),
+        ("친구", "%d명" % int(c.get("friends") or 0), ""),
+    ]
+
+
 class Flow(object):
     """칩을 왼쪽부터 채우고 넘치면 다음 줄로. Tk 에는 이런 배치가 없다.
 
@@ -333,20 +350,7 @@ class MyPageWindow(object):
                  anchor="w").pack(fill="x", padx=16, pady=(0, 14))
 
     def tiles(self, d):
-        """(이름, 값, 덧붙임) 목록. 화면과 검사가 같이 쓴다."""
-        c, g, r = d.get("counts") or {}, d.get("gym") or {}, d.get("raid") or {}
-        return [
-            ("포켓몬", "%d마리" % int(c.get("pokemon") or 0),
-             "가장 높은 레벨 %d" % int(c.get("topLevel") or 0) if c.get("topLevel") else ""),
-            ("색이 다른 포켓몬", "%d마리" % int(c.get("shiny") or 0), ""),
-            ("도감", "%d / %d" % (int(c.get("dexCaught") or 0), int(c.get("dexTotal") or 0)),
-             "본 종 %d" % int(c.get("dexSeen") or 0)),
-            ("이긴 관장", "%d / %d" % (int(g.get("cleared") or 0), int(g.get("total") or 0)),
-             "모두 %d번 승리" % int(g.get("wins") or 0) if g.get("wins") else ""),
-            ("레이드", "%d승" % int(r.get("wins") or 0),
-             "%d판 참가" % int(r.get("games") or 0) if r.get("games") else ""),
-            ("친구", "%d명" % int(c.get("friends") or 0), ""),
-        ]
+        return tile_items(d)
 
     def _tiles(self, d):
         grid = tk.Frame(self.inner, bg=U.BG)

@@ -12,6 +12,7 @@ from tkinter import ttk
 
 from common.korean import natural
 
+from . import box_filter
 from . import ui_common as U
 from . import ui_loading
 from .ui_common import run_async
@@ -69,6 +70,8 @@ class TeamWindow(object):
         self.max = 6
         self.cap = 50
         self.rows = {}
+        self.row_box = {}              # id -> 그 줄을 담은 틀 (찾기로 숨겼다 담았다 한다)
+        self.visible = []              # 지금 목록에 담긴 id, 화면 순서대로
         self.restricted = set()        # 전설·환상 도감 번호
         self.restricted_max = 1
 
@@ -97,6 +100,18 @@ class TeamWindow(object):
         self.slots = tk.Frame(self.win, bg=U.BG)
         self.slots.pack(fill="x", padx=16, pady=(4, 8))
 
+        # 찾기 (1.10.0). 포켓몬이 수백 마리가 되면 레벨 순 목록을 끝까지 굴려야 했다.
+        # 포켓몬 관리의 '이름 찾기' 와 같은 규칙이다 - 별명·종 이름·도감 번호를 다 본다.
+        find = tk.Frame(self.win, bg=U.BG)
+        find.pack(fill="x", padx=16, pady=(0, 8))
+        tk.Label(find, text="포켓몬 찾기", bg=U.BG, fg=U.FG_DIM, font=U.FONT_XS).pack(side="left")
+        self.q = tk.StringVar()
+        self.q.trace_add("write", lambda *_a: self._filter())
+        self.q_box = U.entry(find, self.q, width=18)
+        self.q_box.pack(side="left", padx=(8, 0))
+        self.found = tk.Label(find, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS)
+        self.found.pack(side="left", padx=(10, 0))
+
         holder = tk.Frame(self.win, bg=U.BG)
         holder.pack(fill="both", expand=True, padx=16)
         self.cv = tk.Canvas(holder, bg=U.INK, highlightthickness=2,
@@ -109,6 +124,7 @@ class TeamWindow(object):
         self._wid = self.cv.create_window((0, 0), window=self.inner, anchor="nw")
         self.fit = U.scroll_fitter(self.cv, self.inner, self._wid)
         U.scrollable(self.cv, 60)
+        self.nomatch = tk.Label(self.inner, text="", bg=U.INK, fg=U.FG_FAINT, font=U.FONT_S)
 
         bar = tk.Frame(self.win, bg=U.BG)
         bar.pack(fill="x", padx=16, pady=(10, 4))
@@ -161,7 +177,8 @@ class TeamWindow(object):
             self.unreg_btn.pack(side="left", padx=(8, 0))
         for m in self.mons:
             self._row(m)
-        self.fit.schedule()
+        self.visible = [m["id"] for m in self.mons]
+        self._filter()
         self._paint()
         extra = self._restricted_count(self.picked) - self.restricted_max
         if extra > 0:
@@ -169,9 +186,37 @@ class TeamWindow(object):
                      "등록하려면 %d마리를 빼세요." % (extra, self.restricted_max, extra),
                      U.ACCENT)
 
+    def _filter(self):
+        """찾기 칸의 글에 맞는 포켓몬만 목록에 담는다. 고른 것은 안 보여도 고른 그대로다."""
+        q = self.q.get()
+        dex = getattr(self.app, "dex", None)
+        want = [m["id"] for m in self.mons if box_filter.matches(m, dex, None, q)]
+        if want != self.visible:
+            for pid in self.visible:
+                self.row_box[pid].pack_forget()
+            for pid in want:
+                self.row_box[pid].pack(fill="x")
+            self.visible = want
+            try:
+                self.cv.yview_moveto(0)
+            except tk.TclError:
+                pass
+            self.fit.schedule()
+        if self.mons and not want:
+            self.nomatch.configure(text=natural("'%s' 에 맞는 포켓몬이 없습니다." % q.strip()))
+            self.nomatch.pack(pady=22)
+        else:
+            self.nomatch.pack_forget()
+        self.found.configure(text=("%d마리 중 %d마리" % (len(self.mons), len(want))) if q.strip()
+                             else "%d마리" % len(self.mons))
+
     def _row(self, m):
         info = m.get("info") or {}
-        f = tk.Frame(self.inner, bg=U.INK, cursor="hand2")
+        # 줄과 그 아래 선을 한 틀에 담는다 - 찾기로 숨길 때 둘이 같이 빠져야 한다.
+        box = tk.Frame(self.inner, bg=U.INK)
+        box.pack(fill="x")
+        self.row_box[m["id"]] = box
+        f = tk.Frame(box, bg=U.INK, cursor="hand2")
         f.pack(fill="x")
         line = tk.Frame(f, bg=U.INK)
         line.pack(fill="x", padx=10, pady=6)
@@ -197,7 +242,7 @@ class TeamWindow(object):
         if self._is_restricted(m):
             tk.Label(line, text="전설·환상", bg=U.INK, fg=U.SHINY,
                      font=U.FONT_XS).pack(side="right", padx=(0, 8))
-        tk.Frame(self.inner, bg="#1a1f2e", height=U.h(1)).pack(fill="x")
+        tk.Frame(box, bg="#1a1f2e", height=U.h(1)).pack(fill="x")
         pid = m["id"]
         for w in (f, line) + tuple(line.winfo_children()):
             w.bind("<Button-1>", lambda _e, p=pid: self.toggle(p))

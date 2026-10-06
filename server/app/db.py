@@ -648,6 +648,72 @@ CREATE TABLE IF NOT EXISTS match_log (
 );
 CREATE INDEX IF NOT EXISTS idx_match_log_at ON match_log(at);
 
+-- ---------------------------------------------------------------------------
+-- 길드 (1.10.0). 한 사람은 한 길드에만 든다 - guild_member 의 기본키가 user_id 다.
+CREATE TABLE IF NOT EXISTS guild (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    intro       TEXT NOT NULL DEFAULT '',
+    join_mode   TEXT NOT NULL DEFAULT 'open',      -- open(자유 가입) / approve(승인 필요)
+    master_id   INTEGER NOT NULL,
+    created_at  TEXT NOT NULL,
+    points      INTEGER NOT NULL DEFAULT 0          -- 지금까지 쌓은 미션 점수
+);
+CREATE TABLE IF NOT EXISTS guild_member (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    guild_id    INTEGER NOT NULL REFERENCES guild(id) ON DELETE CASCADE,
+    role        TEXT NOT NULL DEFAULT 'member',     -- master / sub / member
+    joined_at   TEXT NOT NULL,
+    points      INTEGER NOT NULL DEFAULT 0          -- 이 길드에서 쌓은 미션 점수
+);
+CREATE INDEX IF NOT EXISTS idx_guild_member_g ON guild_member(guild_id);
+-- 승인이 필요한 길드에 넣어 둔 가입 신청
+CREATE TABLE IF NOT EXISTS guild_request (
+    guild_id    INTEGER NOT NULL REFERENCES guild(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    message     TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_guild_request_u ON guild_request(user_id);
+-- 채팅. user_id 가 NULL 이면 알림 줄이다 (가입·탈퇴·미션 달성).
+-- **쓴 사람이 탈퇴해도 줄은 남는다** - 이름을 같이 적어 두는 까닭이다.
+CREATE TABLE IF NOT EXISTS guild_chat (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id    INTEGER NOT NULL REFERENCES guild(id) ON DELETE CASCADE,
+    user_id     INTEGER,
+    name        TEXT NOT NULL DEFAULT '',
+    body        TEXT NOT NULL,
+    at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_guild_chat_g ON guild_chat(guild_id, id);
+-- 일일 미션: 그날(KST) 그 사람이 그 미션을 얼마나 했나. done 이 되는 순간 점수가 길드에 쌓인다.
+-- 길드를 나가도 그날 쌓은 점수는 그 길드에 남는다 (guild_id 로 센다).
+CREATE TABLE IF NOT EXISTS guild_mission (
+    guild_id    INTEGER NOT NULL REFERENCES guild(id) ON DELETE CASCADE,
+    day         TEXT NOT NULL,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key         TEXT NOT NULL,
+    n           INTEGER NOT NULL DEFAULT 0,
+    done        INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, day, user_id, key)
+);
+-- 사람마다 따로 갖는 것: 길드 코인(길드를 옮겨도 남는다)과 마지막으로 나온 때.
+CREATE TABLE IF NOT EXISTS guild_user (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    coin        INTEGER NOT NULL DEFAULT 0,
+    left_at     TEXT
+);
+-- 그날 받은 단계 보상. **길드가 아니라 사람에게 건다** - 길드를 옮겨 다니며
+-- 같은 날 같은 단계를 두 번 받을 수 없다.
+CREATE TABLE IF NOT EXISTS guild_claim (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day         TEXT NOT NULL,
+    tier        INTEGER NOT NULL,
+    at          TEXT NOT NULL,
+    PRIMARY KEY (user_id, day, tier)
+);
+
 -- 서버가 스스로 기억해야 하는 잡다한 것. 지금은 '어떤 자료 손질까지
 -- 끝냈는가' 를 적는 데 쓴다.
 CREATE TABLE IF NOT EXISTS meta (

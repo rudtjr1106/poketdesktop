@@ -663,6 +663,7 @@ def ask_password(root, title, message):
 
     win.bind("<Return>", lambda ev: ok())
     win.after(60, pin.focus)
+    U.fit_window(win, 360, lo=220)      # 글이 길거나 줄이 높으면(맥) 단추가 눌린다
     win.grab_set()
     root.wait_window(win)
     return out.get("pw")

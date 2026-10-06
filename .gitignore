@@ -52,3 +52,6 @@ shot_*.png
 # 공개라 한 번 올라가면 지워도 기록에 남는다. 아예 들어오지 못하게 막는다.
 *.sql
 *.sql.enc
+
+# tools/fx_preview.py 가 그려 두는 기술 연출 미리보기 (GIF·PNG)
+fx_preview_out/

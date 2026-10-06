@@ -28,7 +28,7 @@ class Item(object):
     """메뉴 한 줄. 어느 트레이 라이브러리에도 안 매인 형태로 적는다.
 
     text/checked/enabled 는 값이어도 되고 인자 없는 함수여도 된다.
-    함수로 주면 메뉴를 열 때마다 다시 물어본다 (받은 대전 개수처럼
+    함수로 주면 메뉴를 열 때마다 다시 물어본다 (친구 요청 개수처럼
     수시로 바뀌는 것).
     """
 
@@ -175,18 +175,10 @@ class TrayBase(object):
             Item("랜덤 배틀", lambda: self.call(a.pvp_random)),
             # 관장 도전은 지도에서 고르는 것이라 탭으로 바로 연다.
             Item("관장 도전", lambda: self.call(a.open_gym)),
-            # 레이드는 정해진 시각에만 열린다. 싸우던 판이 있으면 배틀
-            # 창으로, 없으면 일정 화면으로 간다 (app.resume_raid).
-            Item("레이드", lambda: self.call(a.resume_raid)),
-            # 알림을 안 띄우기로 했으니, 놓치면 안 되는 것은 메뉴에
-            # 남는다. 상대가 걸어온 대전은 화면에 아무 자국도 없어서
-            # 여기 없으면 알 길이 없다. **대전 탭을 없앤 뒤로는** 여기가
-            # 유일한 길이다 - 투기장에서 가장 최근 판을 재생한다.
-            Item(lambda: ("받은 대전 보기  (%d)" % a.pvp_unseen
-                          if getattr(a, "pvp_unseen", 0)
-                          else "받은 대전 보기"),
-                 lambda: self.call(a.watch_pending)),
-            # 친구 요청도 화면에 자국이 없다. 알림을 껐거나 놓쳤을 때
+            # '레이드' 는 1.10.0 에서 탭과 같이 뺐다 (ui_hub.TABS 를 보라).
+            # '받은 대전 보기' 는 1.10.0 에서 뺐다 (app.watch_pending 도 같이).
+            # 알림을 안 띄우기로 했으니, 놓치면 안 되는 것은 메뉴에 남는다.
+            # 친구 요청은 화면에 자국이 없다. 알림을 껐거나 놓쳤을 때
             # 여기 숫자가 유일한 단서다.
             Item(lambda: ("친구 요청 보기  (%d)" % a.friend_unseen
                           if getattr(a, "friend_unseen", 0)

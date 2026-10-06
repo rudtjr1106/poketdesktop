@@ -97,6 +97,8 @@ def clears(uid):
 
 def record_win(uid, t, turns, now):
     """이긴 것을 적고 상금을 정한다. (상금, 처음 이겼나)"""
+    from . import guild                     # 길드 일일 미션 (1.10.0)
+    guild.note_safe(uid, "gym")
     region = t["region"]
     row = db.q1("SELECT * FROM gym_clear WHERE user_id=? AND region=?", (uid, region))
     today = today_kst()

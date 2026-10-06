@@ -56,6 +56,26 @@ walk.settle(b); back(b, walk.TICK+5)
 walk.settle(b)
 chk("럭셔리볼 +2", happy(b)[0]==72, happy(b))
 
+print("\n=== 평온의방울은 1.5배 - 한 칸씩 들어와도 ===")
+# 대부분의 요청은 한 칸(20분)씩 정산한다. 1 x 1.5 를 정수로 자르면 1 이라, 평온의방울이
+# 아무 효과가 없었다 (두 칸이 한꺼번에 들어올 때만 +3). 반 점은 두 칸에 한 번 얹는다.
+base=walk._now(); clock=[base]; real_now=walk._now
+walk._now=lambda: clock[0]
+s_=mkuser("zzw_s", 2, 70)
+db.run("UPDATE pokemon SET held='SOOTHEBELL' WHERE user_id=? AND slot=0",(s_,))
+l_=mkuser("zzw_l", 1, 70, luxury=True)
+db.run("UPDATE pokemon SET held='SOOTHEBELL' WHERE user_id=?",(l_,))
+walk.settle(s_); walk.settle(l_)
+for i in range(4):
+    clock[0]=base+datetime.timedelta(seconds=(i+1)*walk.TICK+1)
+    chk("  %d번째 칸은 한 칸씩 들어온다"%(i+1), walk.settle(s_)==1)
+    walk.settle(l_)
+walk._now=real_now
+h=happy(s_)
+chk("네 칸에 +6 (안 지닌 쪽은 +4)", h[0]==76 and h[1]==74, h)
+chk("럭셔리볼 + 평온의방울은 칸마다 +3", happy(l_)[0]==70+12, happy(l_))
+chk("남은 시간도 1.5배로 줄여 보여 준다", abs(walk.hours_to(70,160,soothe=True)-walk.hours_to(70,160)/1.5)<1e-9)
+
 print("\n=== 상한 ===")
 c=mkuser("zzw_c", 1, 254)
 walk.settle(c); back(c, walk.TICK*3)

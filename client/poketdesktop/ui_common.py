@@ -512,17 +512,74 @@ def style_window(win, title, w=None, h=None):
     win.configure(bg=BG)
     window_icon(win)
     if w and h:
-        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
-        try:
-            x1, y1, x2, y2 = PLAT.work_area(sw, sh)
-        except Exception:                                   # noqa: BLE001
-            x1, y1, x2, y2 = 0, 0, sw, sh
-        w = max(320, min(w, (x2 - x1) - 16))
-        h = max(320, min(h, (y2 - y1) - CHROME_H))
-        x = x1 + max(0, ((x2 - x1) - w) // 2)
-        y = y1 + max(0, ((y2 - y1) - h - 30) // 3)
-        win.geometry("%dx%d+%d+%d" % (w, h, x, y))
+        place_window(win, w, h)
     return win
+
+
+def place_window(win, w, h, keep_pos=False):
+    """창 크기와 자리를 잡는다. 작업 영역보다 크면 거기까지 줄인다. 잡은 (w, h) 를 돌려준다.
+
+    **받은 크기보다 키우지 않는다.** 처음에는 `max(320, min(h, ...))` 로 바닥을 뒀는데,
+    그 바닥이 화면이 좁을 때만이 아니라 **늘** 걸려서 되묻는 창(196)·이름 묻는 창(216)
+    같은 작은 창이 전부 320 으로 부풀었다 - 글 한 줄에 단추 둘인 창의 아래 절반이
+    빈칸이었다. 바닥은 '작업 영역을 잘못 읽었을 때 너무 줄이지 않는다' 는 뜻으로만 쓴다.
+
+    keep_pos=True 면 이미 떠 있는 창의 자리(왼쪽 위)를 그대로 두고 크기만 바꾼다 -
+    내용을 받아 온 뒤 높이를 다시 맞출 때 창이 튀지 않게. 아래가 화면 밖으로 나가면
+    그만큼만 올린다.
+    """
+    sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+    try:
+        x1, y1, x2, y2 = PLAT.work_area(sw, sh)
+    except Exception:                                       # noqa: BLE001
+        x1, y1, x2, y2 = 0, 0, sw, sh
+    w = int(min(w, max(320, (x2 - x1) - 16)))
+    h = int(min(h, max(320, (y2 - y1) - CHROME_H)))
+    x = x1 + max(0, ((x2 - x1) - w) // 2)
+    y = y1 + max(0, ((y2 - y1) - h - 30) // 3)
+    if keep_pos:
+        try:
+            x = win.winfo_x()
+            y = max(y1, min(win.winfo_y(), y2 - h - CHROME_H))
+        except tk.TclError:
+            pass
+    win.geometry("%dx%d+%d+%d" % (w, h, x, y))
+    return w, h
+
+
+def fit_window(win, w, lo=0, hi=None, scroll=None, keep_pos=False):
+    """창 높이를 **내용이 바라는 만큼**으로 다시 잡는다 (너비 w 는 그대로). 잡은 높이를 돌려준다.
+
+    높이를 숫자로 박아 두면 둘 중 하나가 된다 - 글이 길어지거나 글꼴이 크면 아래 단추가
+    잘리고, 그게 무서워 넉넉하게 잡으면 빈칸이 남는다. 그래서 내용을 다 담은 뒤에 재서 맞춘다.
+
+        lo        이보다 작게는 안 한다. 원래 쓰던 높이를 주면 '모자랄 때만 늘린다' 가 된다
+                  (그림이 나중에 와서 자리가 더 필요한 창은 이렇게 쓴다).
+        hi        이보다 크게는 안 한다. 넘치는 내용은 창을 키우지 않고 **안쪽을 굴린다** -
+                  scroll=(캔버스, 그 안의 틀) 로 굴러가는 칸을 알려 준다.
+        keep_pos  이미 떠 있는 창이다 (내용을 받아 온 뒤 다시 맞춘다). 자리를 안 옮긴다.
+
+    아직 안 뜬 창은 잠깐 숨겼다가 맞춘 뒤에 띄운다 - 안 그러면 처음 크기로 떴다가
+    바로 크기가 바뀌어서 깜빡인다.
+    """
+    try:
+        hide = not keep_pos and not win.winfo_ismapped()
+        if hide:
+            win.withdraw()
+        win.update_idletasks()
+        if scroll:
+            cv, inner = scroll
+            cv.configure(height=max(1, inner.winfo_reqheight()))
+            win.update_idletasks()
+        h = max(lo, win.winfo_reqheight())
+        if hi:
+            h = min(h, max(lo, hi))
+        _w, h = place_window(win, w, h, keep_pos=keep_pos)
+        if hide:
+            win.deiconify()
+        return h
+    except tk.TclError:
+        return None
 
 
 def panel(parent, root, title, w=None, h=None,

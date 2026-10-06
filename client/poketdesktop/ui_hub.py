@@ -20,9 +20,9 @@ from .ui_board import BoardWindow
 from .ui_box import BoxWindow
 from .ui_dex import DexWindow
 from .ui_friends import FriendsWindow
+from .ui_guild import GuildWindow
 from .ui_gym import GymWindow
 from .ui_mypage import MyPageWindow
-from .ui_raid import RaidWindow
 from .ui_rank import RankWindow
 from .ui_shop import ShopWindow
 
@@ -36,8 +36,11 @@ TABS = [
     ("shop", "상점", ShopWindow, True),
     ("dex", "도감", DexWindow, False),
     ("friends", "친구", FriendsWindow, False),
+    ("guild", "길드", GuildWindow, False),            # 1.10.0
     ("gym", "관장", GymWindow, True),
-    ("raid", "레이드", RaidWindow, False),
+    # 레이드 탭은 1.10.0 에서 뺐다 (이벤트가 2026-10-06 에 끝났다). 다시 열 때는 여기에
+    # ("raid", "레이드", RaidWindow, False) 를 되살리고, 트레이의 '레이드' 줄과
+    # app.sync 의 announce_raid 도 같이 되살린다 - 화면(ui_raid*.py)은 그대로 있다.
     ("rank", "랭킹", RankWindow, False),
     ("board", "게시판", BoardWindow, False),
     # 설정은 마이페이지 머리줄의 톱니바퀴 안으로 들어갔다 (1.9.0)

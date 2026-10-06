@@ -14,6 +14,7 @@
   8. 레쿠쟈는 스톤 없이 화룡점정을 알면 된다. 냐오닉스는 성별로 고른다.
   9. AI 쪽(auto_mega)은 알아서 바뀐다.
 """
+import json
 import os
 import random
 import sys
@@ -179,6 +180,26 @@ def main():
         (fresh.mega, fresh.ability))
     a8.clear_volatile()
     chk("교체해도 메가 그대로", a8.mega == "GENGAR_MEGA" and a8.types() == fresh.types())
+
+    # 제보 #123: 메가개굴닌자가 물수리검으로 물 타입이 됐는데 다음 턴에 물/악으로 돌아가
+    # 치근거리기를 2배로 맞았다. 턴마다 잤다 깨는 배틀(관장·실시간·레이드)이 메가를 다시
+    # 입히면서, 메가진화한 **뒤에** 바뀐 타입·특성까지 지우고 있었다.
+    from common import live_battle as LB, raid_battle as RB, trainer_battle as TB
+    bt14, a14, _ = duel(mon("GRENINJA", "GRENINJITE", ("WATERSHURIKEN",)), mon("SNORLAX"))
+    bt14.take_turn("WATERSHURIKEN", mega=True)
+    chk("메가개굴닌자의 변환자재: 물수리검을 쓰면 물 타입",
+        a14.mega == "GRENINJA_MEGA" and a14.types() == ["WATER"], (a14.mega, a14.types()))
+    for kr, cls in (("관장", TB.TrainerBattle), ("실시간", LB.LiveBattle), ("레이드", RB.RaidBattle)):
+        host = cls.__new__(cls)
+        host.dex = DEX
+        back = host._load_fighter(json.loads(json.dumps(cls._dump_fighter(a14))))
+        chk("%s: 불러와도 바뀐 타입 그대로" % kr,
+            back.mega == "GRENINJA_MEGA" and back.types() == ["WATER"], (back.mega, back.types()))
+        chk("  변환자재는 쓴 것으로 남는다 (다시 안 바뀐다)", back.ab.get("protean"), back.ab)
+        a14.ability, keep = "MUMMY", a14.ability       # 미라에 닿아 특성이 바뀌었다
+        back = host._load_fighter(json.loads(json.dumps(cls._dump_fighter(a14))))
+        a14.ability = keep
+        chk("  불러와도 바뀐 특성 그대로", back.ability == "MUMMY", back.ability)
 
     print("\n=== 스톤은 못 뺏는다 ===")
     bt9, a9, b9 = duel(mon("KANGASKHAN", "KANGASKHANITE"),

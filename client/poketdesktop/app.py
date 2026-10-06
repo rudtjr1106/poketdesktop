@@ -97,13 +97,12 @@ class App(object):
         self._gift_showing = False
         self._learn_asking = False
         self.friends_win = None
+        self.guild_window = None
         self.dex_window = None
         self.settings_win = None
         # 마지막으로 있었던 일. 트레이 메뉴에서 보여준다.
         self.last_message = ""
-        # 상대가 걸어온, 아직 안 본 대전 수. 트레이에 표시한다.
-        self.pvp_unseen = 0
-        # 받아 놓고 아직 안 받아준 친구 요청 수. 대전과 같은 이유로
+        # 받아 놓고 아직 안 받아준 친구 요청 수.
         # 트레이에 숫자로 남긴다 - 화면에 아무 자국이 없다.
         self.friend_unseen = 0
         # 게시판 (1.8.0): 서버가 알려 준 가장 최근 공지 번호. 마지막으로 본
@@ -596,9 +595,6 @@ class App(object):
             if me:
                 self.balls = me.get("balls", self.balls)
                 self.money = me.get("money", self.money)
-                # 상대가 걸어온 대전은 서버가 이 응답에 개수로 실어 준다.
-                # 이걸 위해 폴링을 새로 두지 않는다.
-                self.announce_pvp(me.get("pvpUnseen", 0))
                 # 운영자가 보낸 선물. 서버가 /api/me 에서 이미 지급했고
                 # 여기서는 알리기만 한다.
                 self.announce_gifts(me.get("gifts") or [])
@@ -612,8 +608,8 @@ class App(object):
                 self.note_board(me.get("board"))
                 self.keystone = bool(((me.get("bond") or {}).get("keystone") or {}).get("has"))
                 self.user_id = (me.get("user") or {}).get("id", self.user_id)
-                # 레이드 안내. 이벤트 기간이 아니면 None 이라 아무 일도 안 한다.
-                self.announce_raid(me.get("raid"))
+                # 레이드 안내(announce_raid)는 1.10.0 에서 끊었다 - 레이드 탭을 뺐으므로
+                # 빛기둥·결과 알림이 없는 탭을 가리키면 안 된다 (ui_hub.TABS 를 보라).
                 # 실시간 배틀. 걸려온 초대·싸우던 판·안 본 결과가 있으면
                 # 한 번 더 물어본다 (여기 실린 것은 요약이라 판 자체는 없다).
                 live = me.get("live")
@@ -1014,6 +1010,9 @@ class App(object):
     def open_friends(self):
         self.friends_win = self._tab("friends")
 
+    def open_guild(self):
+        self.guild_window = self._tab("guild")
+
     def open_dex(self):
         self.dex_window = self._tab("dex")
 
@@ -1409,21 +1408,6 @@ class App(object):
         self.notify(head + ("  (" + " · ".join(bits) + ")" if bits else ""))
         self.sync()
 
-    def announce_pvp(self, n):
-        """상대가 걸어온 대전이 몇 개인지. sync 응답에 실려 온다.
-
-        알림을 띄우지 않으므로 트레이 메뉴에 숫자로 남긴다. 대전은
-        화면에 아무 자국도 남기지 않아서, 여기 없으면 상대가 걸어온
-        것을 알 길이 없다.
-        """
-        n = int(n or 0)
-        if n == self.pvp_unseen:
-            return
-        self.pvp_unseen = n
-        if n:
-            config.log("확인하지 않은 대전 %d개" % n)
-        self.refresh_tray()
-
     def announce_hatch(self, eggs):
         """부화한 알을 하나씩 보여준다. 배틀·진화·선물 창이 끝난 뒤에.
 
@@ -1623,23 +1607,6 @@ class App(object):
             self.toast("친구 요청 %d건이 새로 왔습니다" % len(names),
                        ", ".join(names[:4]), kind="friend")
         self.notify("친구 요청이 왔습니다 - " + ", ".join(names))
-
-    def watch_pending(self):
-        """상대가 걸어온 대전 중 가장 최근 것을 본다."""
-        if self.arena:
-            return
-        if not self.api:
-            return self.notify("로그인이 필요합니다.")
-
-        def done(r, err):
-            if err:
-                return self.notify(getattr(err, "message", str(err)))
-            got = [m for m in (r or {}).get("matches") or []
-                   if not m.get("attacked")]
-            if not got:
-                return self.notify("새로 받은 대전이 없습니다.")
-            self.watch_match(got[0]["id"])
-        run_async(self.root, lambda: self.api.pvp_pending(), done)
 
     def close_windows(self):
         """열려 있는 창을 전부 닫는다. 로그아웃·탈퇴·종료 때 부른다."""

@@ -774,7 +774,7 @@ class RaidWindow(object):
         if not confirm(self.win if not U.is_embedded(self.win) else self.root,
                        "나가기", "이 방에서 나갈까요?", danger=True, ok_text="나가기"):
             return
-        self._send(lambda: self.app.api.raid_leave(), "방에서 나왔습니다.")
+        self._send(lambda: self.app.api.raid_leave(lobby=True), "방에서 나왔습니다.")
 
     def _to_battle(self, room):
         """판이 열렸다. 배틀 창으로 넘긴다."""

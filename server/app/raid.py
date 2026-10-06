@@ -439,11 +439,20 @@ def _keep_alive(row, now=None):
         _touch(row["id"], now)
 
 
-def leave(uid, now=None):
-    """방에서 나간다. 싸우는 중이면 그 사람만 물러난다."""
+def leave(uid, now=None, lobby_only=False):
+    """방에서 나간다. 싸우는 중이면 그 사람만 물러난다.
+
+    lobby_only: **대기실에서 누른 나가기**다. 그 사이에 판이 열렸으면 받지 않는다
+    (ValueError). 되묻는 창에 답하는 1~2초 사이에 방장이 시작을 누르면, 대기실에서
+    나가려던 요청이 배틀 기권으로 처리되어 참가 횟수만 잃었다 (2026-10-06 21시,
+    제보 #127: 시작 2초 뒤에 도착). 받지 않으면 그 사람은 판에 그대로 있고, 화면은
+    다음 폴링에 배틀 창으로 넘어간다 - 정말 물러나려면 거기서 누르면 된다.
+    """
     row = my_room(uid)
     if not row:
         return None
+    if lobby_only and row["state"] != "lobby":
+        raise ValueError("방금 레이드가 시작됐습니다. 배틀 창에서 이어집니다.")
     if row["state"] == "lobby":
         db.run("DELETE FROM raid_member WHERE room_id=? AND user_id=?", (row["id"], uid))
         left = [m for m in members(row["id"]) if not m["left_at"]]

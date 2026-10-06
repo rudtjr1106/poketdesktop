@@ -577,7 +577,6 @@ def test_tray_menu():
 
     app = FakeApp()
     app.username = "나"
-    app.pvp_unseen = 2
     app.friend_unseen = 3
     app.balls = 5
     t = traymod.TrayBase(app)
@@ -603,6 +602,10 @@ def test_tray_menu():
     chk("친구 요청 줄에 개수가 붙는다",
         any("친구 요청" in x and "3" in x for x in labels),
         "labels=%r" % [x for x in labels if "친구" in x])
+    chk("'받은 대전 보기' 줄은 없다 (1.10.0 에서 뺐다)", not any("받은 대전" in x for x in labels),
+        [x for x in labels if "대전" in x])
+    chk("'레이드' 줄도 없다 (1.10.0 에서 탭과 같이 뺐다)", not any("레이드" in x for x in labels),
+        [x for x in labels if "레이드" in x])
     chk("풀숲 줄이 있다", any("풀숲" in x for x in labels))
     chk("패치노트 보기 줄이 있다 (1.9.0 - 예전의 '새로운 기능')",
         any(x == "패치노트 보기" for x in labels), labels)

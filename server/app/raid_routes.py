@@ -17,6 +17,8 @@
 (raid.tick). 레이드 창은 열려 있는 동안 1~2초마다 방을 물어보므로, 누가
 창을 닫고 사라져도 남은 사람의 폴링이 라운드를 넘긴다.
 """
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -27,6 +29,12 @@ router = APIRouter()
 
 class JoinIn(BaseModel):
     code: str = ""
+
+
+class LeaveIn(BaseModel):
+    # 대기실에서 누른 나가기. 그 사이에 판이 열렸으면 409 로 돌려보낸다 (raid.leave).
+    # 1.9.2 까지의 클라는 이 칸을 안 보낸다 - 예전처럼 어느 쪽이든 나간다.
+    lobby: bool = False
 
 
 class ActIn(BaseModel):
@@ -155,9 +163,12 @@ def act(body: ActIn, ctx=Depends(deps.current)):
 
 
 @router.post("/api/raid/leave")
-def leave(ctx=Depends(deps.current)):
+def leave(body: Optional[LeaveIn] = None, ctx=Depends(deps.current)):
     uid = ctx["user"]["id"]
-    row = raid.leave(uid)
+    try:
+        row = raid.leave(uid, lobby_only=bool(body and body.lobby))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
     if not row:
         raise HTTPException(404, "들어가 있는 레이드 방이 없습니다.")
     return {"ok": True}

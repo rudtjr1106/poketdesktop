@@ -267,6 +267,39 @@ def main():
     chk("등록 풀기는 빈 목록", app.api.sent_team[-1] == [], app.api.sent_team)
     tw.fill_party()
     chk("바탕화면 파티로 채우기", tw.picked == [1, 2], tw.picked)
+
+    print("랭크 팀 - 찾기 (1.10.0)")
+    pump(root, lambda: False, 0.3)
+    order = [1, 3, 5, 6, 2, 4]                        # 레벨 높은 순 (80·55·50·40·30·5)
+    chk("처음에는 전부, 레벨 높은 순", tw.visible == order and "6마리" in tw.found.cget("text"),
+        (tw.visible, tw.found.cget("text")))
+    chk("찾기 칸이 있다", "포켓몬 찾기" in texts(tw.win))
+    bad = squeezed(tw.win)
+    chk("눌린 위젯 없음", not bad, bad[:3])
+    tw.q.set("뮤")
+    pump(root, lambda: False, 0.3)
+    packed = [pid for pid in order if tw.row_box[pid].winfo_manager()]
+    chk("이름 일부로 찾는다 (뮤츠·뮤)", tw.visible == [5, 6] and packed == [5, 6]
+        and tw.found.cget("text") == "6마리 중 2마리", (tw.visible, packed, tw.found.cget("text")))
+    chk("  고른 것은 안 보여도 그대로다", tw.picked == [1, 2] and "1. 피카츄" in texts(tw.slots),
+        tw.picked)
+    tw.toggle(5)
+    chk("  찾은 줄을 눌러 팀에 넣는다", tw.picked == [1, 2, 5], tw.picked)
+    tw.q.set("150")
+    pump(root, lambda: False, 0.2)
+    chk("도감 번호로도 찾는다", tw.visible == [5], tw.visible)
+    tw.q.set("없는이름")
+    pump(root, lambda: False, 0.2)
+    chk("맞는 것이 없으면 그렇다고 알려 준다", tw.visible == [] and tw.nomatch.winfo_manager()
+        and "없는이름" in tw.nomatch.cget("text") and tw.found.cget("text") == "6마리 중 0마리",
+        tw.nomatch.cget("text"))
+    tw.q.set("")
+    pump(root, lambda: False, 0.3)
+    packed = [pid for pid in order if tw.row_box[pid].winfo_manager()]
+    chk("지우면 전부 다시, 순서 그대로", tw.visible == order and packed == order
+        and not tw.nomatch.winfo_manager(), (tw.visible, packed))
+    ys = [tw.row_box[pid].winfo_y() for pid in order]
+    chk("  화면에서도 레벨 높은 순", ys == sorted(ys), ys)
     tw.close()
 
     print("칭호·명패")

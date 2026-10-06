@@ -371,6 +371,10 @@ class BoxWindow(object):
         self._shown = {"party": [], "box": []}   # 지금 담긴 줄 id, 화면 순서대로
         self._by_id = {}         # {id: 포켓몬} — 받은 목록
         self.box_no = 0          # 지금 보고 있는 PC 박스
+        # 개체값 높은 순으로 보기 (1.10.0). 켜면 **박스를 넘어 전부**를 개체값 순으로 줄 세워
+        # 한 박스 크기씩(rank_page) 보여 준다. 서버의 박스는 그대로다 - 보는 순서만 바뀐다.
+        self.sort_iv = False
+        self.rank_page = 0
         self.boxes = {}          # 서버가 준 박스 정보 (size/count/names/used)
         self._rows_job = None    # 줄을 나눠 만들고 담는 일 (U.Chunked)
         self._sep_on = False     # 'PC 박스' 머리가 담겨 있나
@@ -489,9 +493,16 @@ class BoxWindow(object):
         head.pack(fill="x")
         head.pack_propagate(False)
         for title, x, w, anchor in COLS:
-            tk.Label(head, text=title, bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS,
-                     anchor=anchor if anchor != "center" else "center"
-                     ).place(x=x, y=0, width=w, relheight=1.0)
+            lb = tk.Label(head, text=title, bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS,
+                          anchor=anchor if anchor != "center" else "center")
+            lb.place(x=x, y=0, width=w, relheight=1.0)
+            if title == "개체값":
+                # 이 머리글을 누르면 개체값 높은 순으로 본다. 위 막대에는 단추를 더 넣을
+                # 자리가 없다 (지금도 윈도우에서 꽉 찬다).
+                self.head_iv = lb
+                lb.configure(cursor="hand2")
+                lb.bind("<Button-1>", lambda _e: self.toggle_sort())
+        self._paint_sort()
         tk.Frame(wrap, bg=U.LINE, height=U.h(2)).pack(fill="x")
 
         holder = tk.Frame(wrap, bg=U.BG)
@@ -1023,7 +1034,35 @@ class BoxWindow(object):
         """거르기가 걸려 있으면 **박스를 넘어 다 뒤진다** (찾기)."""
         return bool(self.f_type or self.f_query.get().strip())
 
+    def toggle_sort(self):
+        """'개체값' 머리글을 눌렀다: 개체값 높은 순 ↔ 박스 순서."""
+        self.sort_iv = not self.sort_iv
+        self.rank_page = 0
+        self._paint_sort()
+        self.say("PC 박스 전체를 개체값 높은 순으로 봅니다. '개체값' 을 다시 누르면 박스로 돌아갑니다."
+                 if self.sort_iv else "박스 순서로 돌아왔습니다.", U.FG_DIM)
+        self._show(self.sel)
+
+    def _paint_sort(self):
+        """머리글의 표시. 켜져 있으면 ▼ 가 금색, 꺼져 있으면 흐린 ▾ (누를 수 있다는 표시)."""
+        try:
+            self.head_iv.configure(text="개체값▼" if self.sort_iv else "개체값▾",
+                                   fg=U.ACCENT if self.sort_iv else U.FG_FAINT)
+        except (AttributeError, tk.TclError):
+            pass
+
+    def rank_pages(self, total):
+        """개체값 순으로 볼 때의 쪽 수 (한 쪽 = 한 박스 크기)."""
+        return max(1, -(-int(total) // self.box_size()))
+
     def _page(self, delta):
+        if self.sort_iv and not self._searching():
+            total = sum(1 for m in self.mons if not m.get("onDesktop"))
+            no = max(0, min(self.rank_page + delta, self.rank_pages(total) - 1))
+            if no == self.rank_page:
+                return
+            self.rank_page = no
+            return self._show(self.sel)
         no = max(0, min(self.box_no + delta, self.box_count() - 1))
         if no == self.box_no:
             return
@@ -1036,6 +1075,16 @@ class BoxWindow(object):
             self.lbl_page.configure(text="찾는 중 · %d마리" % total)
             for b in (self.btn_prev, self.btn_next, self.btn_rename):
                 b.configure(state="disabled")
+            return
+        if self.sort_iv:
+            # 박스 대신 순위로 넘긴다: "1~30위 / 412"
+            size, pages = self.box_size(), self.rank_pages(total)
+            first = self.rank_page * size + 1
+            self.lbl_page.configure(text=("%d~%d위 / %d" % (first, min(total, first + size - 1), total))
+                                    if total else "0마리")
+            self.btn_rename.configure(state="disabled")
+            self.btn_prev.configure(state="normal" if self.rank_page > 0 else "disabled")
+            self.btn_next.configure(state="normal" if self.rank_page < pages - 1 else "disabled")
             return
         # 끝의 ▾ 가 "누르면 고를 수 있다" 는 표시다.
         self.lbl_page.configure(text="%s  %d/%d ▾" % (self.box_name(self.box_no),
@@ -1063,6 +1112,9 @@ class BoxWindow(object):
         if self._searching():
             return self.say("찾는 중에는 박스를 고를 수 없습니다. 거르기를 먼저 지워 주세요.",
                             U.DANGER)
+        if self.sort_iv:
+            return self.say("개체값 순으로 보는 중입니다. '개체값' 머리글을 다시 누르면 박스로 "
+                            "돌아갑니다.", U.DANGER)
         return self._menu(self.lbl_page, self._box_rows(), below=True)
 
     def goto_box(self, no):
@@ -1070,8 +1122,9 @@ class BoxWindow(object):
 
     def rename_box(self):
         """박스 이름 바꾸기. 비우면 기본 이름으로 돌아간다."""
-        if self._searching():
-            return self.say("찾는 중에는 박스 이름을 바꿀 수 없습니다.", U.DANGER)
+        if self._searching() or self.sort_iv:
+            return self.say("찾는 중이거나 개체값 순으로 보는 중에는 박스 이름을 바꿀 수 없습니다.",
+                            U.DANGER)
         no = self.box_no
         cur = (self.boxes.get("names") or {}).get(str(no), "")
         name = ask_text(self.win, "박스 이름", "이 박스를 뭐라고 부를까요?",
@@ -1175,6 +1228,9 @@ class BoxWindow(object):
                 self.f_type = None
                 self.f_query.set("")
                 self._show_type()
+            if self.sort_iv:
+                self.sort_iv = False            # 그 포켓몬이 든 박스를 보여 줘야 한다
+                self._paint_sort()
             if not m.get("onDesktop"):
                 self.box_no = int(m.get("box") or 0)
             self._show(pid)
@@ -1233,10 +1289,17 @@ class BoxWindow(object):
                                           self.f_query.get())
         box_all = len(self.mons) - len(party)
         filtered = bool(self.f_type or self.f_query.get().strip())
+        if self.sort_iv:
+            box = box_filter.sort_iv(box)
         # **한 박스만 그린다.** 줄 하나에 위젯이 열서너 개라 수백 마리를 다
         # 만들면 창이 느려진다. 거르기가 걸려 있으면 박스를 넘어 다 뒤진다.
         if self._searching():
             page_box = box
+        elif self.sort_iv:
+            # 개체값 순: 박스를 넘어 전부를 줄 세우되, 한 번에 한 박스 크기만큼만 그린다.
+            size = self.box_size()
+            self.rank_page = max(0, min(self.rank_page, self.rank_pages(len(box)) - 1))
+            page_box = box[self.rank_page * size:(self.rank_page + 1) * size]
         else:
             page_box = [m for m in box if int(m.get("box") or 0) == self.box_no]
         self._paint_page(len(box))
@@ -1261,7 +1324,8 @@ class BoxWindow(object):
             self._sep_label.configure(
                 # 이 박스에 몇 마리인지는 위 막대(박스 이름표)가 보여준다.
                 text=("PC 박스 · %d마리 중 %d마리" % (box_all, len(box)) if filtered
-                      else "PC 박스 · %d마리" % box_all))
+                      else "PC 박스 · %d마리" % box_all)
+                + (" · 개체값 높은 순" if self.sort_iv else ""))
             if not self._sep_on:
                 # 박스가 비어 있었으니 담긴 박스 줄이 없다. 끝에 붙이면 된다.
                 self._sep.pack(fill="x")
@@ -1609,6 +1673,8 @@ class BoxWindow(object):
             msg = "조금만 더 데리고 다니면 진화합니다"
         if f.get("luxury"):
             msg += "  (럭셔리볼 2배)"
+        if f.get("soothe"):
+            msg += "  (평온의방울 1.5배)"
         tk.Label(box, text=msg, bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS,
                  anchor="w").pack(fill="x", pady=(2, 0))
 
@@ -2411,7 +2477,47 @@ def _shell(parent, title, w, h, danger=False):
     tk.Frame(win, bg=U.DANGER_LINE if danger else U.LINE2, height=U.h(2)).pack(fill="x")
     body = tk.Frame(win, bg=U.BG)
     body.pack(fill="both", expand=True, padx=18, pady=16)
+    win.shell_w, win.shell_h = w, h
     return win, body
+
+
+def fit(win, lo=0, hi=None, scroll=None, keep_pos=False):
+    """_shell 로 만든 창의 높이를 내용에 맞춘다 (U.fit_window 를 보라)."""
+    return U.fit_window(win, win.shell_w, lo=lo, hi=hi, scroll=scroll, keep_pos=keep_pos)
+
+
+def grow(win):
+    """_shell 로 만든 창이 내용보다 작으면 그만큼 늘린다. 넉넉하면 그대로 둔다."""
+    return U.fit_window(win, win.shell_w, lo=win.shell_h)
+
+
+def scroll_body(body):
+    """_shell 이 준 칸 안에 굴러가는 칸을 만든다. (안쪽 틀, 캔버스) 를 돌려준다.
+
+    내용이 다 보이면 스크롤바는 숨는다. fit(win, hi=..., scroll=(캔버스, 안쪽 틀)) 과 같이 쓴다.
+    """
+    wrap = tk.Frame(body, bg=U.BG)
+    wrap.pack(fill="both", expand=True)
+    cv = tk.Canvas(wrap, bg=U.BG, highlightthickness=0, bd=0, height=1)
+    sb = tk.Scrollbar(wrap, orient="vertical", command=cv.yview)
+    inner = tk.Frame(cv, bg=U.BG)
+    wid = cv.create_window((0, 0), window=inner, anchor="nw")
+    U.scroll_fitter(cv, inner, wid)
+
+    def on_scroll(lo, hi):
+        sb.set(lo, hi)
+        try:
+            if float(hi) - float(lo) >= 0.999:
+                sb.pack_forget()                 # 다 보인다 - 막대를 숨긴다
+            elif not sb.winfo_ismapped():
+                sb.pack(side="right", fill="y", before=cv)
+        except tk.TclError:
+            pass
+    cv.configure(yscrollcommand=on_scroll)
+    cv.pack(side="left", fill="both", expand=True)
+    U.scrollable(cv, 120)
+    U.install_wheel(body.winfo_toplevel())
+    return inner, cv
 
 
 def ask_text(parent, title, message, hint="", initial=""):
@@ -2436,6 +2542,7 @@ def ask_text(parent, title, message, hint="", initial=""):
                                                            padx=(0, 8))
     win.bind("<Return>", lambda ev: ok())
     win.after(60, lambda: box.entry.focus_set())
+    fit(win)
     win.grab_set()
     parent.wait_window(win)
     return out.get("v")
@@ -2463,6 +2570,7 @@ def confirm(parent, title, message, danger=True, ok_text="확인"):
         U.PushButton(row, ok_text, ok, height=34, font=U.FONT_B).pack(side="right")
     U.ghost_button(row, "취소", win.destroy, height=34).pack(side="right",
                                                            padx=(0, 8))
+    fit(win)
     win.grab_set()
     parent.wait_window(win)
     return out["v"]
@@ -2514,6 +2622,7 @@ def confirm_release(parent, app, mon):
     U.danger_button(brow, "놓아주기", ok, height=34).pack(side="right")
     U.ghost_button(brow, "취소", win.destroy, height=34).pack(side="right",
                                                             padx=(0, 8))
+    grow(win)
     win.grab_set()
     parent.wait_window(win)
     return out["v"]

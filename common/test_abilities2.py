@@ -19,6 +19,7 @@ sys.path.insert(0, ROOT)
 from common import abilities as A           # noqa: E402
 from common import attackfx as AF           # noqa: E402
 from common import battle as B              # noqa: E402
+from common import movecalc as MC           # noqa: E402
 from common import pokelogic as P           # noqa: E402
 from common import statusmoves as SM        # noqa: E402
 
@@ -457,6 +458,90 @@ def t_moves_with_abilities():
     chk("  안 닿는 기술은 괜찮다", foe.status is None)
 
 
+def t_protean():
+    """변환자재·리베로 (1.10.0 에서 본가와 다른 세 곳을 고쳤다).
+
+    9세대 규칙이다: **나와 있는 동안 한 번만** 바뀐다 (8세대까지는 기술을 쓸 때마다였다).
+    바뀌는 타입은 '도감에 적힌 타입' 이 아니라 **그 기술이 지금 실제로 나가는 타입**이고,
+    다른 기술을 부르는 기술(흉내쟁이·잠꼬대·손가락흔들기 ...)은 **불려 나온 기술**의 타입이다.
+    """
+    print("-- 변환자재·리베로")
+    G = lambda moves, ab="PROTEAN": mon("GRENINJA", 50, moves, ability=ab)   # noqa: E731
+
+    bt, me, foe = fight(G(["ICEBEAM", "DARKPULSE"]), mon("SNORLAX", 50, ["TACKLE"]))
+    ev = use(bt, "me", "ICEBEAM")
+    chk("쓰는 기술의 타입 하나가 된다", me.types() == ["ICE"] and "얼음 타입이 되었다" in texts(ev), texts(ev))
+    use(bt, "me", "DARKPULSE")
+    chk("  나와 있는 동안 한 번만 (두 번째 기술에는 그대로)", me.types() == ["ICE"], me.types())
+    me.types_override = None                       # 물러났다 (드라이버가 지운다)
+    A.on_switch_in(bt, me, "me", [])
+    use(bt, "me", "DARKPULSE")
+    chk("  물러났다 나오면 다시 한 번", me.types() == ["DARK"], me.types())
+    d = {}
+    for ab in ("PROTEAN", "TORRENT"):
+        bt, me, foe = fight(G(["THUNDERBOLT"], ab), mon("BLISSEY", 50, ["SPLASH"]))
+        hp = foe.hp
+        use(bt, "me", "THUNDERBOLT")
+        d[ab] = hp - foe.hp
+    chk("  바뀐 타입으로 자속이 붙는다 (1.5배)", 1.4 < d["PROTEAN"] / float(max(1, d["TORRENT"])) < 1.6, d)
+    bt, me, foe = fight(mon("FROAKIE", 50, ["WATERGUN", "ICEBEAM"], ability="PROTEAN"), mon("SNORLAX", 50))
+    use(bt, "me", "WATERGUN")
+    first = me.types()
+    use(bt, "me", "ICEBEAM")
+    chk("  이미 그 타입 하나뿐이면 아껴 둔다", first == ["WATER"] and me.types() == ["ICE"], (first, me.types()))
+    bt, me, foe = fight(G(["SURF"]), mon("SNORLAX", 50))
+    use(bt, "me", None)
+    chk("  발버둥으로는 안 바뀐다", me.types() == ["WATER", "DARK"], me.types())
+    bt, me, foe = fight(mon("CINDERACE", 50, ["UTURN"], ability="LIBERO"), mon("SNORLAX", 50))
+    use(bt, "me", "UTURN")
+    chk("  리베로도 같다", me.types() == ["BUG"], me.types())
+
+    # --- 다른 기술을 부르는 기술: 불려 나온 기술의 타입 (예전에는 부르는 기술의 노말이 되고 끝났다)
+    bt, me, foe = fight(G(["COPYCAT"]), mon("CHARIZARD", 50, ["FLAMETHROWER"]))
+    use(bt, "foe", "FLAMETHROWER")
+    ev = use(bt, "me", "COPYCAT")
+    chk("흉내쟁이로 화염방사를 쓰면 불꽃이 된다", me.types() == ["FIRE"], (me.types(), texts(ev)))
+    bt, me, foe = fight(G(["SLEEPTALK", "ICEBEAM"]), mon("SNORLAX", 50))
+    me.status, me.sleep_turns = "sleep", 3
+    ev = use(bt, "me", "SLEEPTALK")
+    chk("잠꼬대로 냉동빔이 나가면 얼음이 된다", me.types() == ["ICE"], (me.types(), texts(ev)))
+    bt, me, foe = fight(G(["METRONOME"]), mon("SNORLAX", 50), seed=4)
+    ev = use(bt, "me", "METRONOME")
+    out = [e for e in ev if e.get("t") == "move"]
+    chk("손가락흔들기는 나온 기술의 타입이 된다", len(out) == 2 and me.types() == [out[1]["moveType"]],
+        (me.types(), [(e["move"], e["moveType"]) for e in out]))
+    bt, me, foe = fight(G(["COPYCAT"]), mon("SNORLAX", 50))
+    ev = use(bt, "me", "COPYCAT")
+    chk("  부를 기술이 없어 실패하면 안 바뀌고, 다음 기술에 쓸 수 있다", me.types() == ["WATER", "DARK"]
+        and not me.ab.get("protean"), (me.types(), texts(ev)))
+
+    # --- 타입이 그때그때 정해지는 기술: 실제로 나가는 타입
+    bt, me, foe = fight(G(["WEATHERBALL"]), mon("BLISSEY", 50, ["SPLASH"]))
+    bt.field.weather, bt.field.weather_turns = "rain", 5
+    ev = use(bt, "me", "WEATHERBALL")
+    chk("비 올 때 웨더볼은 물 → 물 타입이 된다", me.types() == ["WATER"], (me.types(), texts(ev)))
+    bt, me, foe = fight(G(["WEATHERBALL"]), mon("BLISSEY", 50, ["SPLASH"]))
+    use(bt, "me", "WEATHERBALL")
+    chk("  날씨가 없으면 노말", me.types() == ["NORMAL"], me.types())
+    m = G(["HIDDENPOWER"])
+    bt, me, foe = fight(m, mon("BLISSEY", 50, ["SPLASH"]))
+    want = MC.move_type(DEX.move("HIDDENPOWER"), me)
+    use(bt, "me", "HIDDENPOWER")
+    chk("잠재파워는 그 포켓몬의 잠재파워 타입", me.types() == [want] and want != "NORMAL", (me.types(), want))
+
+    # --- 송전: 전기가 된 기술
+    bt, me, foe = fight(G(["TACKLE"]), mon("SNORLAX", 50))
+    me.cond["electrify"] = True
+    ev = use(bt, "me", "TACKLE")
+    chk("송전에 걸려 전기가 된 몸통박치기 → 전기 타입", me.types() == ["ELECTRIC"], (me.types(), texts(ev)))
+    bt, me, foe = fight(mon("SNORLAX", 50, ["TACKLE"]), mon("JOLTEON", 50, ["TACKLE"], ability="VOLTABSORB"))
+    me.cond["electrify"] = True
+    foe.hp = foe.maxhp // 2
+    hp = foe.hp
+    ev = use(bt, "me", "TACKLE")
+    chk("  전기가 된 기술은 축전이 받아먹는다", foe.hp > hp and not hits(ev), (hp, foe.hp, texts(ev)))
+
+
 def t_coverage():
     print("-- 남은 것")
     have = set()
@@ -480,6 +565,7 @@ def main():
     t_items()
     t_forms()
     t_moves_with_abilities()
+    t_protean()
     t_coverage()
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0

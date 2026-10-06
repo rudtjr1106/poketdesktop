@@ -336,6 +336,74 @@ class Api(object):
     def profile(self, uid):
         return self._call("GET", "/api/users/%d/profile" % uid)
 
+    # ---------------- 길드 (1.10.0) ----------------
+    # 채팅(guild_chat)만 폴링이 붙는다 - 채팅 칸을 띄워 둔 동안 2초마다.
+    # 나머지는 길드 탭을 열 때와 무언가를 한 뒤에만 부른다.
+    def guild(self):
+        return self._call("GET", "/api/guild")
+
+    def guild_list(self, q="", page=1):
+        import urllib.parse
+        return self._call("GET", "/api/guild/list?q=%s&page=%d"
+                          % (urllib.parse.quote(q or ""), int(page or 1)))
+
+    def guild_create(self, name, intro="", mode="open"):
+        return self._call("POST", "/api/guild", {"name": name, "intro": intro, "mode": mode})
+
+    def guild_disband(self):
+        return self._call("DELETE", "/api/guild")
+
+    def guild_settings(self, intro=None, mode=None):
+        body = {}
+        if intro is not None:
+            body["intro"] = intro
+        if mode is not None:
+            body["mode"] = mode
+        return self._call("POST", "/api/guild/settings", body)
+
+    def guild_profile(self, uid):
+        """길드원 프로필: 마이페이지에 보이는 것 (같은 길드원만 볼 수 있다)."""
+        return self._call("GET", "/api/guild/members/%d/profile" % uid)
+
+    def guild_leave(self):
+        return self._call("POST", "/api/guild/leave", {})
+
+    def guild_join(self, gid, message=""):
+        return self._call("POST", "/api/guild/%d/join" % gid, {"message": message})
+
+    def guild_cancel(self, gid):
+        return self._call("DELETE", "/api/guild/%d/join" % gid)
+
+    def guild_accept(self, uid):
+        return self._call("POST", "/api/guild/requests/%d/accept" % uid, {})
+
+    def guild_reject(self, uid):
+        return self._call("DELETE", "/api/guild/requests/%d" % uid)
+
+    def guild_kick(self, uid):
+        return self._call("POST", "/api/guild/members/%d/kick" % uid, {})
+
+    def guild_role(self, uid, role):
+        return self._call("POST", "/api/guild/members/%d/role" % uid, {"role": role})
+
+    def guild_master(self, uid):
+        return self._call("POST", "/api/guild/members/%d/master" % uid, {})
+
+    def guild_chat(self, after=0):
+        return self._call("GET", "/api/guild/chat?after=%d" % int(after or 0))
+
+    def guild_say(self, body):
+        return self._call("POST", "/api/guild/chat", {"body": body})
+
+    def guild_claim(self, tier):
+        return self._call("POST", "/api/guild/mission/%d/claim" % int(tier), {})
+
+    def guild_shop(self):
+        return self._call("GET", "/api/guild/shop")
+
+    def guild_buy(self, item, count=1):
+        return self._call("POST", "/api/guild/shop/buy", {"item": item, "count": int(count)})
+
     # 도감 업적 (시즌 3)
     def achievements(self):
         return self._call("GET", "/api/achievements")
@@ -371,9 +439,6 @@ class Api(object):
     def pvp_challenge(self, uid):
         """친구를 지목해서 붙는다. 수락을 기다리지 않는다."""
         return self._call("POST", "/api/pvp/challenge/%d" % uid, {})
-
-    def pvp_pending(self):
-        return self._call("GET", "/api/pvp/pending")
 
     # 랭크 팀 (시즌 2). 등록하지 않았으면 바탕화면 파티로 싸운다.
     def pvp_team(self):
@@ -483,8 +548,9 @@ class Api(object):
                           {"kind": kind, "move": move, "slot": int(slot), "mega": bool(mega)},
                           timeout=RAID_TIMEOUT)
 
-    def raid_leave(self):
-        return self._call("POST", "/api/raid/leave", {})
+    def raid_leave(self, lobby=False):
+        """lobby: 대기실에서 누른 나가기 (그 사이에 판이 열렸으면 서버가 409 로 막는다)."""
+        return self._call("POST", "/api/raid/leave", {"lobby": bool(lobby)})
 
     def raid_seen(self):
         return self._call("POST", "/api/raid/seen", {})

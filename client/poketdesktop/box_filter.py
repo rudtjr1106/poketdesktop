@@ -57,6 +57,33 @@ def apply_box(mons, dex, type_id=None, query=""):
     return party, apply(box, dex, type_id, query)
 
 
+def iv_of(mon):
+    """개체값 % (0~100). 알은 개체값이 없다 - 늘 맨 뒤로 가게 -1."""
+    if mon.get("isEgg"):
+        return -1.0
+    try:
+        return float((mon.get("info") or {}).get("ivPercent") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def sort_iv(mons):
+    """개체값 높은 순 (1.10.0). 받은 목록은 그대로 두고 새 목록을 준다.
+
+    개체값이 같으면 개체값 합(병뚜껑을 쓴 것까지 친 값) → 레벨 높은 순 → 도감 번호 →
+    먼저 잡은 순. 늘 같은 순서가 나와야 다시 불러올 때마다 줄이 뒤바뀌지 않는다.
+    """
+    def key(m):
+        info = m.get("info") or {}
+        try:
+            level = int(m.get("level") or 0)
+        except (TypeError, ValueError):
+            level = 0
+        return (-iv_of(m), -int(info.get("ivTotal") or 0), -level, int(m.get("num") or 0),
+                m.get("id") or 0)
+    return sorted(mons, key=key)
+
+
 def egg_row(egg):
     """알 하나를 목록의 한 줄감으로 (1.4.1 - 알도 포켓몬처럼 관리한다).
 

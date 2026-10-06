@@ -62,6 +62,9 @@ jobs:
           python client/test_walk_bounds.py
           python client/test_anims.py
 
+      - name: 기술 연출 (919종 끝까지 가는지, 찌꺼기)
+        run: python client/test_move_fx.py
+
       - name: 휠 한 칸
         run: python client/test_wheel.py
 
@@ -228,6 +231,9 @@ jobs:
       # 잘려 있었다. 글꼴이 다른 두 OS 에서 다 재 본다.
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
+      # 리눅스 작업에서는 화면이 없어 진짜 Tk 캔버스 확인을 건너뛴다. 여기서 본다.
+      - name: 기술 연출 (진짜 Tk 캔버스가 옵션을 다 받는지)
+        run: python client/test_move_fx.py
       # 레이드 탭·배틀 창·바탕화면 빛기둥. 여섯 명이 한 화면에 들어가는지 본다.
       - name: 레이드 화면 (진짜 Tk)
         run: python client/test_raid_ui.py
@@ -252,6 +258,9 @@ jobs:
       # 1.9.0: 마이페이지 (설정 탭 자리) - 내 기록, 칭호 줄바꿈, 톱니바퀴 = 설정
       - name: 마이페이지 화면 (진짜 Tk)
         run: python client/test_mypage_ui.py
+      # 길드 창 (1.10.0): 찾기·만들기, 채팅 폴링, 자리마다 다른 화면, 눌린 위젯
+      - name: 길드 창
+        run: python client/test_guild_ui.py
       # 1.9.1: 포켓몬을 마우스로 들어서 옮기기 (설정 petDrag, 기본 꺼짐)
       - name: 포켓몬 들어서 옮기기 (진짜 Tk)
         run: python client/test_pet_drag.py
@@ -347,6 +356,9 @@ jobs:
       # 1.9.0: 마이페이지 (설정 탭 자리) - 내 기록, 칭호 줄바꿈, 톱니바퀴 = 설정
       - name: 마이페이지 화면 (진짜 Tk)
         run: python client/test_mypage_ui.py
+      # 길드 창 (1.10.0): 찾기·만들기, 채팅 폴링, 자리마다 다른 화면, 눌린 위젯
+      - name: 길드 창
+        run: python client/test_guild_ui.py
       # 1.9.1: 포켓몬을 마우스로 들어서 옮기기 (설정 petDrag, 기본 꺼짐)
       - name: 포켓몬 들어서 옮기기 (진짜 Tk)
         run: python client/test_pet_drag.py
@@ -424,6 +436,8 @@ jobs:
           python test_walk_ow.py
           python test_s3_void.py
           python test_catch_exp.py
+          # 길드 (1.10.0): 만들기·가입·권한·채팅·일일 미션·단계 보상·코인 상점
+          python test_guild.py
 
       - name: 서버 띄우기
         env:
@@ -508,6 +522,9 @@ jobs:
           python server/test_board_api.py http://127.0.0.1:8788
           # 이로치 색 고르기 (1.8.0): 이로치만·값 검사·목록과 대전 자료에 실리는지
           python server/test_tint.py http://127.0.0.1:8788 /tmp/poket-test.db
+          # 길드 웹소켓 (1.10.0): 진짜로 붙어서 새 줄이 밀려오는지, 내보내지면 끊기는지.
+          # 길드를 만들 돈만 DB 로 넣는다.
+          python server/test_guild_ws.py http://127.0.0.1:8788 /tmp/poket-test.db
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

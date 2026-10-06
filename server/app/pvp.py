@@ -474,6 +474,8 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
     lost = 1 if result == "lose" else 0
     drew = 1 if result == "draw" else 0
     if kind == "random":
+        from . import guild                 # 길드 일일 미션 (1.10.0): 내가 건 랜덤 배틀만 센다
+        guild.note_safe(uid, "rank")
         games = row["games"] + 1
         streak = (max(1, row["streak"] + 1) if won else
                   min(-1, row["streak"] - 1) if lost else 0)

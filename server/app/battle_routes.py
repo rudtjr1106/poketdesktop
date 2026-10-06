@@ -21,7 +21,7 @@ from common import held as HELD
 from common import pokelogic as P
 from common import statusmoves as SM
 
-from . import achievements, auth, config, db, deps, items, tms, walk, mega
+from . import achievements, auth, config, db, deps, guild, items, tms, walk, mega
 
 router = APIRouter()
 
@@ -557,6 +557,7 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
                " ON CONFLICT(user_id) DO UPDATE SET wins=wins+1", (uid,))
         out["exp"] = award(d, uid, foe, row["mine_id"], hour)
         mega.on_ko(uid, row["mine_id"])                  # 유대 미션 ② (시즌 3)
+        guild.note_safe(uid, "battle")                   # 길드 일일 미션 (1.10.0)
         items.mark_seen(uid, foe.mon["species"], False, auth.now_iso())
         # 쓰러뜨려도 도구가 떨어진다. 포획보다는 덜 나온다.
         # 볼이 다 떨어져도 배틀로는 다시 일어설 수 있어야 하기 때문이다.

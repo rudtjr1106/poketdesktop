@@ -82,9 +82,15 @@ def _raid(uid):
         return {"games": 0, "wins": 0, "damage": 0}
 
 
-def build(user, dex, now=None):
-    uid = user["id"]
+def card(uid, dex, now=None):
+    """마이페이지에서 **남에게 보여 줘도 되는 부분.** 없는 사람이면 None.
+
+    길드원 프로필(GET /api/guild/members/{uid}/profile)이 쓴다. 소지금과 게시판
+    활동(알림·내 글)은 싣지 않는다 - 그건 본인만 본다 (build 가 덧붙인다).
+    """
     u = db.q1("SELECT * FROM users WHERE id=?", (uid,))
+    if not u:
+        return None
     deco = season.deco(uid)
     mons = db.q1("SELECT COUNT(*) c, SUM(shiny) s, MAX(level) lv FROM pokemon WHERE user_id=?",
                  (uid,))
@@ -102,8 +108,7 @@ def build(user, dex, now=None):
         "user": {"id": uid, "name": u["username"], "createdAt": u["created_at"],
                  "days": _days_since(u["created_at"], now),
                  "title": deco.get("title"), "frameColor": deco.get("frameColor"),
-                 "tier": deco.get("tier"), "tierKr": deco.get("tierKr"),
-                 "admin": board.is_admin(user), "money": u["money"]},
+                 "tier": deco.get("tier"), "tierKr": deco.get("tierKr")},
         "counts": {"pokemon": int(mons["c"] or 0), "shiny": int(mons["s"] or 0),
                    "topLevel": int(mons["lv"] or 0),
                    "dexCaught": int(seen["k"] or 0), "dexSeen": int(seen["c"] or 0),
@@ -117,11 +122,20 @@ def build(user, dex, now=None):
                    "equipped": deco.get("title")},
         "seasons": _seasons(uid),
         "raid": _raid(uid),
-        # 게시판 활동은 **수와 첫 쪽만** 싣는다. 나머지는 화면이 탭을 누르거나
-        # 쪽을 넘길 때 /api/board/mine 으로 받는다 - 활동이 쌓여도 길어지지 않게.
-        # 안 본 알림이 있으면 그 탭부터, 없으면 내 글부터 보여 준다.
-        "board": _board(uid, now),
     }
+
+
+def build(user, dex, now=None):
+    uid = user["id"]
+    out = card(uid, dex, now)
+    u = db.q1("SELECT money FROM users WHERE id=?", (uid,))
+    out["user"]["admin"] = board.is_admin(user)
+    out["user"]["money"] = u["money"]
+    # 게시판 활동은 **수와 첫 쪽만** 싣는다. 나머지는 화면이 탭을 누르거나
+    # 쪽을 넘길 때 /api/board/mine 으로 받는다 - 활동이 쌓여도 길어지지 않게.
+    # 안 본 알림이 있으면 그 탭부터, 없으면 내 글부터 보여 준다.
+    out["board"] = _board(uid, now)
+    return out
 
 
 def _board(uid, now=None):

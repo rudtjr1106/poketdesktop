@@ -63,11 +63,13 @@ def decorate(mon):
         if want:
             from . import walk
             now = int(mon.get("happiness", 0))
+            soothe = held == "SOOTHEBELL"
             out["friendship"] = {
                 "now": now, "need": want,
-                "hours": round(walk.hours_to(now, want,
-                                             bool(mon.get("luxury"))), 1),
+                "hours": round(walk.hours_to(now, want, bool(mon.get("luxury")),
+                                             soothe=soothe), 1),
                 "luxury": bool(mon.get("luxury")),
+                "soothe": soothe,
             }
     return out
 

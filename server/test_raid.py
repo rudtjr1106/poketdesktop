@@ -400,6 +400,29 @@ def main():
     row = raid.begin(raid.room(row["id"]), t2)
     chk("방장이 먼저 시작할 수 있다", row["state"] == "fighting", row["state"])
 
+    print("=== 대기실 나가기가 시작 뒤에 도착했다 (제보 #127) ===")
+    # 대기실에서 '나가기' 를 눌러 되묻는 창에 답하는 사이에 방장이 시작을 눌렀다.
+    # 그 요청을 배틀 기권으로 받으면, 대기실에서 나가려던 사람이 참가 횟수만 잃는다
+    # (2026-10-06 21시: 시작 2초 뒤에 도착했고 "오늘은 이미 참가했습니다" 가 떴다).
+    try:
+        raid.leave(friend, t2, lobby_only=True)
+        chk("시작된 방에서는 대기실 나가기를 받지 않는다", False)
+    except ValueError as e:
+        chk("시작된 방에서는 대기실 나가기를 받지 않는다", "시작" in str(e), str(e))
+    chk("  나간 것으로 찍히지 않는다",
+        db.q1("SELECT left_at FROM raid_member WHERE room_id=? AND user_id=?", (row["id"], friend))["left_at"] is None)
+    chk("  방에 그대로 있다 (배틀로 이어진다)", (raid.my_room(friend) or {"id": None})["id"] == row["id"])
+    v = raid.public(raid.room(row["id"]), friend)
+    chk("  판에서도 물러나지 않았다", not [p for p in v["battle"]["players"] if p.get("me")][0]["left"]
+        if any(p.get("me") for p in v["battle"]["players"]) else not v["battle"]["players"][1]["left"],
+        v["battle"]["players"])
+    lob = raid.create_code(mkuser("대기방장"), "대기방장", t2)
+    waiter = mkuser("대기손님")
+    raid.join(waiter, "대기손님", lob["code"], t2)
+    raid.leave(waiter, t2, lobby_only=True)
+    chk("대기실에서는 그대로 나가진다", raid.my_room(waiter) is None)
+    chk("  참가 횟수도 안 깎인다", raid.played_today(waiter, t2) is None)
+
     print("=== 나가기 ===")
     row2 = raid.leave(host)
     v = raid.public(raid.room(row["id"]), friend)

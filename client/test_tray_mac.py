@@ -51,7 +51,7 @@ class FakeApp(object):
         self.overlay = None
         self.balls = 3
         self.money = 100
-        self.pvp_unseen = 2
+        self.friend_unseen = 2
         self.settings = {"targetHeight": 48, "areaW": 520, "areaH": 360,
                          "showNames": True, "autostart": False}
         self.called = []
@@ -168,7 +168,9 @@ def main():
     chk("항목이 여럿 있다", len(ts) > 8, len(ts))
     chk("'종료' 가 있다", any(x.strip() == "종료" for x in ts), ts)
     chk("'열기...' 가 있다", any("열기" in x for x in ts), ts)
-    chk("받은 대전 개수가 붙는다", any("받은 대전" in x and "2" in x for x in ts), ts)
+    chk("친구 요청 개수가 붙는다", any("친구 요청" in x and "2" in x for x in ts), ts)
+    chk("'받은 대전 보기' 와 '레이드' 는 뺐다 (1.10.0)",
+        not any("받은 대전" in x or "레이드" in x for x in ts), ts)
     chk("'바로 가기' 는 뺐다", not any("바로 가기" in x for x in ts), ts)
     chk("하위 메뉴 제목이 펼쳐진다", any("포켓몬 크기" in x for x in ts), ts)
     chk("체크 표시가 붙는다", any(x.startswith("✓") for x in ts),
@@ -248,14 +250,14 @@ def main():
     t.open()
     root.update()
     chk("열려 있다", t.is_open())
-    app.pvp_unseen = 7
+    app.friend_unseen = 7
     t.refresh()
     root.update()
     chk("갱신 뒤에도 열려 있다", t.is_open())
     chk("바뀐 값이 반영된다",
-        any("받은 대전" in x and "7" in x for x in rows(t.popup.win)),
+        any("친구 요청" in x and "7" in x for x in rows(t.popup.win)),
         rows(t.popup.win))
-    app.pvp_unseen = 2
+    app.friend_unseen = 2
     t.close()
 
     section("메뉴를 만들다 터져도 앱이 안 죽는다")

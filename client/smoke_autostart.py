@@ -96,7 +96,6 @@ class FakeApp(object):
     balls = 3
     money = 0
     overlay = None
-    pvp_unseen = 0
     api = None                      # 로그인 전
 
     def __init__(self, root):

@@ -130,6 +130,9 @@ def build(onedir=False):
         # 인증서 꾸러미. 없으면 업데이트 확인이 SSL 에서 조용히 실패한다.
         "--hidden-import", "certifi",
         "--collect-data", "certifi",
+        # 길드 채팅의 웹소켓 (websocket-client). try 안에서 불러서 못 찾을 수 있어 적어 둔다 -
+        # 빠지면 오류 없이 채팅이 2초 폴링으로만 돈다 (눈에 안 띄는 고장).
+        "--hidden-import", "websocket",
         # 안 쓰는 무거운 것들은 뺀다
         "--exclude-module", "numpy",
         "--exclude-module", "scipy",

@@ -841,8 +841,10 @@ class TrainerBattle(object):
         f.sleep_turns = d.get("sleep", 0)
         f.load_held(d.get("held"))
         f.ability_on = True
-        A.load(f, d.get("abil"))
+        # 메가를 다시 입히는 일(load_volatile)이 먼저다. 메가진화는 특성·타입을 그 폼의
+        # 것으로 되돌리므로, 뒤에 하면 그 뒤에 바뀐 것(변환자재의 타입, 미라)이 지워진다.
         f.load_volatile(d.get("vol"))
+        A.load(f, d.get("abil"))
         return f
 
     def dump(self):

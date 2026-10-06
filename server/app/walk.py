@@ -37,8 +37,12 @@ MAX_TICKS = 2
 # 본가 상한
 MAX_HAPPINESS = 255
 
-# 배틀에서 쓰러지면 깎인다. 본가와 같은 방향이되 훨씬 약하게.
-FAINT_LOSS = 3
+# 야생 배틀에서 쓰러지면 깎인다. 본가와 같은 1점.
+#
+# 처음에는 3점이었다. 걷기가 20분에 1점이라 **한 번 쓰러지면 한 시간어치**가 날아갔고,
+# 약한 포켓몬을 야생 배틀로 키우는 사람은 친밀도가 오르기는커녕 계속 내려갔다
+# (2026-10-06 제보 #128: 토게피가 하루에 42번 쓰러져 -126점, 그동안 걷기로는 +30점).
+FAINT_LOSS = 1
 
 
 def _now():
@@ -88,13 +92,22 @@ def settle(uid, st=None):
     got = ticks * GAIN
     # 데리고 다니는 애들만 오른다. 박스에 있는 건 같이 걷지 않는다.
     # 럭셔리볼로 잡은 개체는 두 배로 오른다(본가와 같다).
-    # 평온의방울을 지닌 개체는 1.5배 (본가와 같다). 정수 칸이라 잘라 넣는다.
+    # 평온의방울을 지닌 개체는 1.5배 (본가와 같다).
+    #
+    # **반 점은 두 칸에 한 번 얹는다.** 예전에는 `CAST(칸수 x 1.5 AS INTEGER)` 였는데,
+    # 요청은 거의 늘 한 칸(20분)씩 들어오고 1 x 1.5 를 자르면 1 이다 - 평온의방울이
+    # 아무 효과가 없었다 (두 칸이 한꺼번에 들어올 때만 +3). 칸에 번호를 매겨 짝수 칸에만
+    # 1점을 더 준다. walk_at 은 칸 단위로만 앞으로 가므로 번호가 건너뛰거나 겹치지 않는다.
+    # 럭셔리볼(2점)은 1.5배가 3점으로 딱 떨어져서 칸마다 1점씩 더 준다.
+    first = int(last.timestamp() // TICK) + 1
+    half = sum(1 for k in range(first, first + ticks) if k % 2 == 0) * GAIN
     db.run(
-        "UPDATE pokemon SET happiness = MIN(?, happiness + CAST(? * "
-        " (CASE WHEN luxury=1 THEN 2 ELSE 1 END) * "
-        " (CASE WHEN held='SOOTHEBELL' THEN 1.5 ELSE 1 END) AS INTEGER))"
+        "UPDATE pokemon SET happiness = MIN(?, happiness"
+        " + ? * (CASE WHEN luxury=1 THEN 2 ELSE 1 END)"
+        " + (CASE WHEN held='SOOTHEBELL' THEN (CASE WHEN luxury=1 THEN ? ELSE ? END)"
+        "    ELSE 0 END))"
         " WHERE user_id=? AND on_desktop=1 AND happiness < ?",
-        (MAX_HAPPINESS, got, uid, MAX_HAPPINESS))
+        (MAX_HAPPINESS, got, got, half, uid, MAX_HAPPINESS))
     return got
 
 
@@ -104,10 +117,10 @@ def on_faint(uid, mon_id):
            " WHERE id=? AND user_id=?", (FAINT_LOSS, mon_id, uid))
 
 
-def hours_to(happiness, want, luxury=False):
+def hours_to(happiness, want, luxury=False, soothe=False):
     """저 점수까지 몇 시간 더 켜 둬야 하는지. 화면에 보여주려고."""
     need = max(0, int(want) - int(happiness))
     if need <= 0:
         return 0.0
-    per_hour = (3600.0 / TICK) * GAIN * (2 if luxury else 1)
+    per_hour = (3600.0 / TICK) * GAIN * (2 if luxury else 1) * (1.5 if soothe else 1)
     return need / per_hour

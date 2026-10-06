@@ -414,6 +414,9 @@ def build():
         # 인증서 꾸러미. 없으면 업데이트 확인이 SSL 에서 조용히 실패한다.
         "--hidden-import", "certifi",
         "--collect-data", "certifi",
+        # 길드 채팅의 웹소켓 (websocket-client). try 안에서 불러서 못 찾을 수 있어 적어 둔다 -
+        # 빠지면 오류 없이 채팅이 2초 폴링으로만 돈다 (눈에 안 띄는 고장).
+        "--hidden-import", "websocket",
         # 맥 전용. 이것들이 빠지면 창이 투명해지지 않고 메뉴 막대에
         # 아이콘이 안 올라간다 - 둘 다 없으면 게임을 조작할 수 없다.
         "--hidden-import", "poketdesktop.platform_mac",

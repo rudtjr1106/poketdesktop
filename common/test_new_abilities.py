@@ -247,6 +247,41 @@ def main():
     bt._use("me", a, b, "SOLARBEAM", ev)
     chk("파워허브로도 한 턴에", b.hp < 9999, b.hp)
     chk("파워허브는 없어진다", not a.held)
+    # 일렉트로빔 (제보 #126: 비바라기를 깔고 교체해 썼는데 한 턴을 모았다).
+    # 본가: 첫 턴에 특수공격이 오르고 다음 턴에 쏜다. **비가 오면 그 턴에 바로 쏜다** -
+    # 그때도 특수공격은 오른다.
+    bt, a, b = duel("ARCHALUDON", "SNORLAX", a_moves=("ELECTROSHOT",))
+    b.hp = b.maxhp = 9999
+    ev = []
+    bt._use("me", a, b, "ELECTROSHOT", ev)
+    chk("일렉트로빔: 맑으면 첫 턴은 모으기만 한다 (특수공격 +1)",
+        b.hp == 9999 and a.stages["spa"] == 1 and a.cond.get("charge2"), (b.hp, a.stages["spa"]))
+    bt, a, b = duel("ARCHALUDON", "SNORLAX", a_moves=("ELECTROSHOT",))
+    b.hp = b.maxhp = 9999
+    bt.field.weather, bt.field.weather_turns = "rain", 5
+    ev = []
+    bt._use("me", a, b, "ELECTROSHOT", ev)
+    chk("일렉트로빔: 비가 오면 한 턴에 나간다", b.hp < 9999, b.hp)
+    chk("  그때도 특수공격은 오른다", a.stages["spa"] == 1, a.stages["spa"])
+    chk("  모으는 중으로 남지 않는다", not a.cond.get("charge2"), a.cond.get("charge2"))
+    order = [e.get("t") for e in ev if e.get("t") in ("move", "hit")]
+    chk("  기술은 한 번만 나간다", order.count("move") == 1 and order.count("hit") == 1, order)
+    # 파워허브로 한 턴에 쓸 때도 첫 턴에 오르는 능력은 오른다 (메테오빔·로켓박치기)
+    bt, a, b = duel("ARCHALUDON", "SNORLAX", a_moves=("METEORBEAM",))
+    b.hp = b.maxhp = 9999
+    a.held = "POWERHERB"
+    ev = []
+    bt._use("me", a, b, "METEORBEAM", ev)
+    chk("파워허브 메테오빔: 한 턴에 나가고 특수공격 +1", b.hp < 9999 and a.stages["spa"] == 1 and not a.held,
+        (b.hp, a.stages["spa"], a.held))
+    # 비가 오는데 파워허브도 지녔으면 허브는 안 쓴다
+    bt, a, b = duel("ARCHALUDON", "SNORLAX", a_moves=("ELECTROSHOT",))
+    b.hp = b.maxhp = 9999
+    a.held = "POWERHERB"
+    bt.field.weather, bt.field.weather_turns = "rain", 5
+    bt._use("me", a, b, "ELECTROSHOT", [])
+    chk("비가 오면 파워허브는 아낀다", b.hp < 9999 and a.held == "POWERHERB" and a.stages["spa"] == 1,
+        (b.hp, a.held, a.stages["spa"]))
 
     print("=== 그 밖에 채운 특성 ===")
     # 무기력

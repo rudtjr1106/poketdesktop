@@ -1,5 +1,7 @@
 pillow>=10.0
 requests>=2.28
+# 길드 채팅의 웹소켓 (1.10.0). 없으면 채팅이 2초 폴링으로 돈다 (guild_ws.available).
+websocket-client>=1.6,<2
 
 # 트레이 아이콘. 맥에서는 안 쓴다 - pystray 의 맥 백엔드가
 # NSApplication.run() 을 부르는데, tkinter 와 스레드가 부딪혀서
