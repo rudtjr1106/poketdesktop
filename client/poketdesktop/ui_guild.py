@@ -993,6 +993,10 @@ class GuildWindow(object):
         # 글이 막대 밑으로 들어가서 잘리는 것보다 오른쪽이 조금 비는 편이 낫다.
         width = PROFILE_W - 4 - 36 - PROFILE_BAR
         pad = (0, 6)
+        # 카드 안의 글이 접히는 폭. 카드 오른쪽 여백 6 + 테두리 2 + 안쪽 여백 14x2, 그리고
+        # **라벨 자신의 여백 6**(tk 기본 padx 1 + bd 2, 양쪽)을 뺀다. 처음에는 30 만 뺐는데,
+        # 윈도우 글꼴에서는 한 줄이 351 로 나와 칸(347)을 4px 넘겼다 (CI 윈도우 잡이 잡음).
+        wrap = width - 6 - 2 - 28 - 6 - 2
 
         box = tk.Frame(inner, bg=CARD, highlightthickness=1, highlightbackground=U.ACCENT_SHADOW)
         box.pack(fill="x", padx=pad)
@@ -1008,7 +1012,7 @@ class GuildWindow(object):
             tk.Label(top, text=text, bg=CARD, fg=color, font=U.FONT_XS).pack(side="right")
         for line, fg, font in profile_head(p):
             tk.Label(box, text=line, bg=CARD, fg=fg, font=font, anchor="w", justify="left",
-                     wraplength=width - 30).pack(fill="x", padx=14, pady=(2, 0))
+                     wraplength=wrap).pack(fill="x", padx=14, pady=(2, 0))
         tk.Frame(box, bg=CARD, height=U.h(10)).pack(fill="x")
 
         # 숫자 칸. 마이페이지는 셋씩 놓지만 이 창은 좁아서 둘씩 놓는다 (글자를 줄이지 않는다).
@@ -1048,7 +1052,7 @@ class GuildWindow(object):
             tk.Label(row, text=head, bg=CARD, fg=U.ACCENT if sn.get("current") else U.FG,
                      font=U.FONT_B, anchor="w").pack(fill="x")
             tk.Label(row, text=body, bg=CARD, fg=U.FG_DIM, font=U.FONT_S, anchor="w",
-                     justify="left", wraplength=width - 30).pack(fill="x", pady=(2, 0))
+                     justify="left", wraplength=wrap).pack(fill="x", pady=(2, 0))
         if not rows:
             tk.Label(box, text="시즌 기록이 없습니다.", bg=CARD, fg=U.FG_FAINT, font=U.FONT_S,
                      anchor="w").pack(fill="x", padx=14, pady=12)
