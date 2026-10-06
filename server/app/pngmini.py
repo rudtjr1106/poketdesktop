@@ -18,6 +18,9 @@
 
 여기서 읽는 PNG 는 **팔레트 그림(색 종류 3), 인터레이스 없음**뿐이다. 다른
 꼴이면 ValueError - 부르는 쪽이 '이 종에는 없다' 로 다룬다.
+
+(1.10.1) 이로치 시트를 만들려고 SpriteCollab 의 시트·얼굴 그림도 읽는다
+(read_rgba). 그쪽은 RGBA 8비트(색 종류 6)다. 팔레트·RGB 그림도 받는다.
 """
 import struct
 import zlib
@@ -45,27 +48,36 @@ def _paeth(a, b, c):
     return b if pb <= pc else c
 
 
-def read_indexed(data):
-    """팔레트 PNG 를 읽는다. (가로, 세로, 줄마다 색 번호 목록, [(r,g,b)...]) 를 준다."""
-    w = h = depth = None
-    palette, raw = [], []
+def _header(data, limit):
+    """IHDR·PLTE·tRNS 와 이어 붙인 IDAT 를 읽는다."""
+    w = h = depth = ctype = None
+    palette, trns, raw = [], b"", []
     for kind, body in _chunks(data):
         if kind == b"IHDR":
             w, h, depth, ctype, _comp, _filt, lace = struct.unpack(">IIBBBBB", body)
-            if ctype != 3 or lace != 0 or depth not in (1, 2, 4, 8):
-                raise ValueError("팔레트 그림이 아니다 (종류 %d, 깊이 %d)" % (ctype, depth))
+            if lace != 0:
+                raise ValueError("인터레이스 그림은 못 읽는다")
         elif kind == b"PLTE":
             palette = [tuple(body[i:i + 3]) for i in range(0, len(body) - 2, 3)]
+        elif kind == b"tRNS":
+            trns = body
         elif kind == b"IDAT":
             raw.append(body)
         elif kind == b"IEND":
             break
-    if not w or not h or not palette or not raw:
+    if not w or not h or not raw:
         raise ValueError("그림이 비었다")
-    if w > 1024 or h > 1024:
+    if w > limit or h > limit:
         raise ValueError("그림이 너무 크다")
-    flat = zlib.decompress(b"".join(raw))
-    stride = (w * depth + 7) // 8
+    return w, h, depth, ctype, palette, trns, zlib.decompress(b"".join(raw))
+
+
+def _unfilter(flat, h, stride, bpp):
+    """줄마다 붙은 필터를 푼다. bpp 는 한 화소의 바이트 수 (1 바이트 이하면 1).
+
+    필터 1·3·4 의 '왼쪽' 은 한 화소 앞이다. 팔레트 그림은 1바이트 앞, RGBA 는
+    4바이트 앞.
+    """
     if len(flat) < (stride + 1) * h:
         raise ValueError("그림이 잘렸다")
     rows, prev = [], bytearray(stride)
@@ -74,25 +86,39 @@ def read_indexed(data):
         f = flat[pos]
         line = bytearray(flat[pos + 1:pos + 1 + stride])
         pos += stride + 1
-        # 필터를 푼다. 팔레트 그림은 한 화소가 1바이트 이하라 왼쪽은 늘 1바이트 앞이다.
         if f == 1:
-            for i in range(1, stride):
-                line[i] = (line[i] + line[i - 1]) & 255
+            for i in range(bpp, stride):
+                line[i] = (line[i] + line[i - bpp]) & 255
         elif f == 2:
             for i in range(stride):
                 line[i] = (line[i] + prev[i]) & 255
         elif f == 3:
             for i in range(stride):
-                left = line[i - 1] if i else 0
+                left = line[i - bpp] if i >= bpp else 0
                 line[i] = (line[i] + ((left + prev[i]) >> 1)) & 255
         elif f == 4:
             for i in range(stride):
-                left = line[i - 1] if i else 0
-                up_left = prev[i - 1] if i else 0
-                line[i] = (line[i] + _paeth(left, prev[i], up_left)) & 255
+                if i >= bpp:
+                    line[i] = (line[i] + _paeth(line[i - bpp], prev[i], prev[i - bpp])) & 255
+                else:
+                    line[i] = (line[i] + prev[i]) & 255     # 왼쪽이 0 이면 paeth 는 위
         elif f != 0:
             raise ValueError("모르는 필터 %d" % f)
+        rows.append(line)
         prev = line
+    return rows
+
+
+def read_indexed(data, limit=1024):
+    """팔레트 PNG 를 읽는다. (가로, 세로, 줄마다 색 번호 목록, [(r,g,b)...]) 를 준다."""
+    w, h, depth, ctype, palette, _trns, flat = _header(data, limit)
+    if ctype != 3 or depth not in (1, 2, 4, 8):
+        raise ValueError("팔레트 그림이 아니다 (종류 %d, 깊이 %d)" % (ctype, depth))
+    if not palette:
+        raise ValueError("그림이 비었다")
+    stride = (w * depth + 7) // 8
+    rows = []
+    for line in _unfilter(flat, h, stride, 1):
         if depth == 8:
             rows.append(list(line[:w]))
         else:
@@ -103,6 +129,35 @@ def read_indexed(data):
                     out.append((b >> (8 - depth * (k + 1))) & mask)
             rows.append(out[:w])
     return w, h, rows, palette
+
+
+def read_rgba(data, limit=4096):
+    """PNG 를 RGBA 로 읽는다 (1.10.1). (가로, 세로, 줄마다 bytearray(가로*4)) 를 준다.
+
+    SpriteCollab 의 동작 시트는 1024 를 넘는 것이 있다 (코라이돈 Hop 이 640x1152).
+    그래서 한도를 따로 받는다. 받는 꼴: RGBA·RGB 8비트, 팔레트 (tRNS 투명 포함).
+    """
+    w, h, depth, ctype, palette, trns, flat = _header(data, limit)
+    if ctype == 6 and depth == 8:
+        return w, h, _unfilter(flat, h, w * 4, 4)
+    if ctype == 2 and depth == 8:
+        clear = trns[1::2] if len(trns) == 6 else None      # 투명으로 칠 한 색
+        rows = []
+        for line in _unfilter(flat, h, w * 3, 3):
+            out = bytearray(w * 4)
+            for x in range(w):
+                rgb = line[x * 3:x * 3 + 3]
+                out[x * 4:x * 4 + 3] = rgb
+                out[x * 4 + 3] = 0 if rgb == clear else 255
+            rows.append(out)
+        return w, h, rows
+    if ctype == 3:
+        _w, _h, idx_rows, pal = read_indexed(data, limit)
+        rgba = [bytes(c) + bytes((trns[i] if i < len(trns) else 255,)) for i, c in enumerate(pal)]
+        clear = b"\x00\x00\x00\x00"
+        return w, h, [bytearray(b"".join(rgba[c] if c < len(rgba) else clear for c in r))
+                      for r in idx_rows]
+    raise ValueError("못 읽는 꼴 (종류 %d, 깊이 %d)" % (ctype, depth))
 
 
 def write_rgba(w, h, pixels):
