@@ -476,14 +476,21 @@ def main():
         "name": "bro2000", "tierKr": "챔피언", "title": "시즌 1 챔피언",
         "frameColor": "#ffc043"}})
     arena.Arena._name_plates(fa)
-    chk("상대 이름표에 티어·칭호·명패 색",
-        fa.plates[0] == ("챔피언  bro2000  ·  시즌 1 챔피언", "#ffc043", "se"),
+    chk("상대 이름표: 첫 줄 닉네임·칭호, 둘째 줄 티어, 명패 색",
+        fa.plates[0] == ("bro2000  ·  시즌 1 챔피언\n챔피언", "#ffc043", "se"),
         fa.plates)
-    chk("랭크 배틀이면 레벨 상한 이름표", any("Lv.50 상한" in p[0] for p in fa.plates),
+    chk("'Lv.50 상한' 글은 링에 적지 않는다 (1.10.2 - 규칙은 그대로다)",
+        len(fa.plates) == 1 and not any("상한" in p[0] for p in fa.plates), fa.plates)
+    fa = FakeArena({"levelCap": 50, "foe": {
+        "name": "bro2000", "tierKr": "챔피언", "title": "시즌 1 챔피언",
+        "frameColor": "#ffc043", "guild": "나여"}})
+    arena.Arena._name_plates(fa)
+    chk("길드에 든 상대는 닉네임 앞에 [길드명] (1.10.2)",
+        fa.plates[0] == ("[나여] bro2000  ·  시즌 1 챔피언\n챔피언", "#ffc043", "se"),
         fa.plates)
     fa = FakeArena({"levelCap": None, "foe": {"name": "친구"}})
     arena.Arena._name_plates(fa)
-    chk("친구 배틀은 이름만, 상한 이름표 없음",
+    chk("친구 배틀은 이름만 (티어가 없으면 한 줄)",
         fa.plates == [("친구", "#ffb0b0", "se")], fa.plates)
 
     chk("그리는 중에 난 오류가 없다", not ERRORS,

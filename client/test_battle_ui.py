@@ -841,6 +841,63 @@ def t_잡으면_끝낸다():
         undo()
 
 
+def t_상대_이름표는_두_줄이다():
+    """랜덤 배틀의 링 위 이름표 (1.10.2). 첫 줄에 [길드명] 닉네임 · 칭호, 둘째 줄에 티어."""
+    full = {"name": "bro2000", "tierKr": "챔피언", "title": "시즌 1 챔피언", "guild": "나여"}
+    chk("첫 줄 [길드명] 닉네임 · 칭호, 둘째 줄 티어",
+        AR.plate_text(full) == "[나여] bro2000  ·  시즌 1 챔피언\n챔피언", AR.plate_text(full))
+    chk("  칭호가 없으면 그 부분만 빠진다",
+        AR.plate_text({"name": "bro2000", "tierKr": "챔피언", "guild": "나여"})
+        == "[나여] bro2000\n챔피언")
+    solo = {"name": "bro2000", "tierKr": "챔피언", "title": "시즌 1 챔피언"}
+    chk("길드가 없으면 첫 줄은 닉네임 · 칭호",
+        AR.plate_text(solo) == "bro2000  ·  시즌 1 챔피언\n챔피언", AR.plate_text(solo))
+    chk("  빈 길드 이름도 없는 것으로 친다",
+        AR.plate_text(dict(solo, guild="")) == AR.plate_text(solo)
+        and AR.plate_text(dict(solo, guild=None)) == AR.plate_text(solo))
+    chk("티어가 없으면 한 줄",
+        AR.plate_text({"name": "bro2000", "title": "칭호", "guild": "나여"}) == "[나여] bro2000  ·  칭호")
+    chk("아무것도 없으면 이름만, 이름도 없으면 '상대'",
+        AR.plate_text({"name": "친구"}) == "친구" and AR.plate_text({}) == "상대"
+        and AR.plate_text(None) == "상대")
+
+    class Cv(object):
+        """캔버스 흉내 - 글을 어떻게 그리라고 했는지만 적어 둔다."""
+        def __init__(self):
+            self.texts, self.rects, self.lowered = [], [], []
+
+        def create_text(self, x, y, **kw):
+            self.texts.append((x, y, kw))
+            return 1
+
+        def bbox(self, _item):
+            return (100, 50, 300, 90)
+
+        def create_rectangle(self, *xy, **kw):
+            self.rects.append(xy)
+            return 2
+
+        def tag_lower(self, a, b):
+            self.lowered.append((a, b))
+
+    class Ring(object):
+        _plate = AR.Arena._plate
+
+        def __init__(self):
+            self.cv, self.plates = Cv(), []
+
+        def to_local(self, x, y):
+            return x, y
+
+    ring = Ring()
+    ring._plate(490, 290, AR.plate_text(full), "#ffc043", anchor="se")
+    kw = ring.cv.texts[0][2]
+    chk("둘째 줄(티어)은 첫 줄의 가운데에 온다", kw.get("justify") == "center", kw)
+    chk("  이름표는 그대로 링 오른쪽 아래에 붙고, 뒤에 판을 깐다",
+        kw.get("anchor") == "se" and ring.cv.rects == [(94, 47, 306, 93)]
+        and ring.cv.lowered == [(2, 1)] and ring.plates == [2, 1], (kw, ring.cv.rects))
+
+
 def main():
     for fn in (t_체력을_그대로_반영한다, t_교체하면_새_포켓몬_체력으로_바뀐다,
                t_숨은_도트의_체력바는_안_그린다, t_맞는_순간_그_쪽만_준다,
@@ -852,7 +909,7 @@ def main():
                t_턴마다_잡기_설정을_보낸다, t_멈추라고_하면_10초_기다렸다가_끝까지_싸운다,
                t_왼쪽_클릭하면_바로_싸운다, t_볼_메뉴가_열린_동안은_싸우지_않는다,
                t_바쁠_때_던진_볼은_턴이_끝나고_던진다, t_멈춘_채_던졌다가_놓치면_10초를_새로_센다,
-               t_잡으면_끝낸다):
+               t_잡으면_끝낸다, t_상대_이름표는_두_줄이다):
         print("-- %s" % fn.__name__[2:])
         fn()
     print()

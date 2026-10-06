@@ -826,6 +826,16 @@ def match_view(uid, mid):
     for k in ("title", "frame", "frameColor", "tier", "tierKr"):
         if d.get(k):
             foe[k] = d[k]
+    # 길드 이름도 지금 값이다 (1.10.2). 길드에 든 상대는 이름표에 티어 대신
+    # [길드명] 이 붙는다 - 고르는 것은 화면이다 (arena.plate_text). 길드 쪽에서
+    # 무슨 일이 나도 다시보기가 막히면 안 된다.
+    try:
+        from . import guild
+        g = guild.name_for(foe_id)
+        if g:
+            foe["guild"] = g
+    except Exception:                                       # noqa: BLE001
+        pass
     rec = db.q1("SELECT rp_delta, rp FROM battle_record WHERE match_id=?"
                 " AND user_id=?", (mid, uid))
     return {

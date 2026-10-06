@@ -138,6 +138,19 @@ def guild_of(gid):
     return db.q1("SELECT * FROM guild WHERE id=?", (gid,))
 
 
+def name_for(uid):
+    """그 사람이 든 길드의 이름. 길드가 없으면 None.
+
+    랜덤 배틀의 상대 이름표에 붙는다 (1.10.2, pvp.match_view) - 길드에 든 사람은 티어
+    대신 [길드명] 이 보인다.
+    """
+    if uid is None:
+        return None
+    r = db.q1("SELECT g.name FROM guild_member m JOIN guild g ON g.id=m.guild_id"
+              " WHERE m.user_id=?", (uid,))
+    return r["name"] if r else None
+
+
 def _count(gid):
     r = db.q1("SELECT COUNT(*) c FROM guild_member WHERE guild_id=?", (gid,))
     return r["c"] if r else 0

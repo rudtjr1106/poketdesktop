@@ -91,6 +91,26 @@ def move_text(ev):
     return "%s!" % move if move else ""
 
 
+def plate_text(info):
+    """링 위에 적는 상대 이름표의 글 (1.10.2 부터 두 줄).
+
+        [길드명] 닉네임  ·  칭호
+                 티어                    (첫 줄의 가운데에 온다 - _plate)
+
+    길드가 없으면 [길드명] 이, 칭호가 없으면 '· 칭호' 가 빠진다. 티어가 없으면
+    (배치를 안 마친 친구) 한 줄이다.
+    """
+    info = info or {}
+    name = info.get("name") or "상대"
+    if info.get("guild"):
+        name = "[%s] %s" % (info["guild"], name)
+    if info.get("title"):
+        name = "%s  ·  %s" % (name, info["title"])
+    if info.get("tierKr"):
+        name = "%s\n%s" % (name, info["tierKr"])
+    return name
+
+
 def _short(text):
     """'○○ 은(는) ...' 에서 뒷부분만. 이름은 도트를 보면 안다."""
     t = (text or "").split(" 은(는) ")[-1]
@@ -232,21 +252,13 @@ class Arena(object):
         # 이름표 때문에 재생 전체가 접히면 안 된다.
         # 내 이름은 안 적는다. 내가 누군지는 이미 알고 있다.
         info = self.view.get("foe") or {}
-        foe = info.get("name") or "상대"
-        # 티어와 칭호를 같이 적는다. 명패를 단 사람은 그 색으로.
-        if info.get("tierKr"):
-            foe = "%s  %s" % (info["tierKr"], foe)
-        if info.get("title"):
-            foe = "%s  ·  %s" % (foe, info["title"])
-        x1, _y1, x2, y2 = self.ring["rect"]
+        # 길드·닉네임·칭호를 첫 줄에, 티어를 둘째 줄에 적는다. 명패를 단 사람은 그 색으로.
+        foe = plate_text(info)
+        _x1, _y1, x2, y2 = self.ring["rect"]
         self._plate(x2 - 10, y2 - 10, foe, info.get("frameColor") or "#ffb0b0",
                     anchor="se")
-        # 랭크 배틀은 레벨 상한을 걸고 싸운다. 안 적으면 "내 Lv.80 이 왜
-        # Lv.50 이지" 가 된다.
-        cap = self.view.get("levelCap")
-        if cap:
-            self._plate(x1 + 10, y2 - 10, "랭크 배틀 · Lv.%d 상한" % cap,
-                        "#b9c2dc", anchor="sw")
+        # 왼쪽 아래의 '랭크 배틀 · Lv.50 상한' 글은 뺐다 (1.10.2). 상한 규칙은 그대로이고
+        # 랭킹 탭의 규칙과 랭크 팀 화면에 적혀 있다.
 
     def _plate(self, sx, sy, text, color, anchor="center"):
         cv = self.cv
@@ -254,7 +266,9 @@ class Arena(object):
             return
         x, y = self.to_local(sx, sy)
         # 글자만 그리면 도트와 겹쳐 안 보인다. 뒤에 판을 깔고 그 위에 쓴다.
+        # 여러 줄이면(상대 이름표의 둘째 줄 = 티어) 줄끼리는 가운데로 맞춘다.
         t = cv.create_text(x, y, text=text, fill=color, anchor=anchor,
+                           justify="center",
                            font=(U.FAMILY, U.pt(10), "bold"))
         bx = cv.bbox(t)
         if bx:

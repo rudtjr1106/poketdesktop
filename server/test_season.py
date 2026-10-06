@@ -37,7 +37,7 @@ os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
 
 from fastapi import HTTPException                          # noqa: E402
 
-from app import config, db, deps, eggs, items, migrations, pvp, season, social  # noqa: E402
+from app import config, db, deps, eggs, guild, items, migrations, pvp, season, social  # noqa: E402
 
 OK = FAIL = 0
 
@@ -179,6 +179,20 @@ def main():
     chk("친구 배틀은 원래 레벨(80)로 싸운다",
         set(m["level"] for m in teams["me"]) == {80})
     chk("친구 배틀 다시보기에는 상한이 없다", v2["levelCap"] is None)
+
+    print("\n=== 이름표에 실리는 것: 상대의 길드 이름 (1.10.2) ===")
+    chk("상대가 길드에 없으면 길드 이름이 없다", "guild" not in v["foe"], v["foe"])
+    chk("  길드 이름을 묻는 함수도 None", guild.name_for(hi2) is None and guild.name_for(None) is None)
+    db.run("UPDATE users SET money=? WHERE id=?", (config.GUILD_CREATE_COST, hi2))
+    guild.create(hi2, "이름표단", "", "open")
+    v3 = pvp.match_view(hi, r["matchId"])
+    chk("상대가 길드에 들어 있으면 그 이름이 실려 온다", v3["foe"].get("guild") == "이름표단"
+        and v3["foe"].get("name") == "ss_hi2", v3["foe"])
+    v4 = pvp.match_view(hi2, r["matchId"])
+    chk("  내가 든 길드가 상대 쪽에 실리지는 않는다", "guild" not in v4["foe"], v4["foe"])
+    guild.join(hi, guild.member(hi2)["guild_id"], "")
+    v5 = pvp.match_view(hi2, r["matchId"])
+    chk("  길드원으로 들어온 사람도 같은 이름", v5["foe"].get("guild") == "이름표단", v5["foe"])
 
     print("\n=== 랜덤 배틀 30초 쿨타임 ===")
     chk("쿨타임은 30초", config.RANDOM_COOLDOWN_SEC == 30, config.RANDOM_COOLDOWN_SEC)
