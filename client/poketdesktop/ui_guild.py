@@ -1325,9 +1325,12 @@ class GuildWindow(object):
         self.shop_cards = [(it, self._shop_card(inner, it, have, int(bag.get(it["id"]) or 0)))
                            for it in s.get("items") or []]
         self._shop_cols = 0
+        # **폭을 듣는 것을 먼저 건다.** 처음 담을 때는 칸의 폭을 아직 모르고(석 장으로 담는다),
+        # 진짜 폭은 fit_now 가 밀린 배치를 끝내는 순간에 온다. 담은 뒤에 걸면 그 한 번을
+        # 놓쳐서, 넓은 창에서도 석 장으로 굳었다 (CI 가 잡음: 폭 947 에 석 장).
+        inner.master.bind("<Configure>", lambda e: self._shop_resized(e.width), add="+")
         self._shop_layout()
         self.shop_q.trace_add("write", lambda *_a: self._shop_search())
-        inner.master.bind("<Configure>", lambda e: self._shop_resized(e.width), add="+")
 
     def _shop_card(self, parent, it, have, owned):
         """코인 상점의 카드 한 장: 그림 · 이름 · 값 · 설명 · 사기 단추."""
