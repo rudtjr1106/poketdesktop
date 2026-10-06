@@ -419,10 +419,15 @@ FOLLOW_BASE = ("https://raw.githubusercontent.com/baptiste-ro/"
 # 다시 짠다 (pngmini.overworld_sheet). **걷기밖에 없다.** 팬이 그린 도트다.
 OW_BASE = ("https://raw.githubusercontent.com/rh-hideout/"
            "pokeemerald-expansion/master/graphics/pokemon")
+# SpriteCollab 의 얼굴 그림 (1.10.1). 이로치 시트가 없는 종의 이로치 색을 여기서
+# 뽑는다 (_shiny_recolor, recolor.py). 얼굴 그림은 이로치가 거의 다 있다.
+PORTRAIT_BASE = "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/portrait"
 WALK_DIR = os.environ.get("POKET_WALK_DIR", os.path.join(SPRITE_DIR, "walk"))
 # '이 종에는 걷는 도트가 없다' 는 표시의 세대. 출처가 늘면 올린다 - 예전에
 # 없다고 적어 둔 종을 새 출처에서 한 번 더 찾아보게 된다 (_anim_meta).
-MISS_GEN = 2
+# 3 (1.10.1): 이로치 시트를 얼굴 그림으로 만드는 길이 붙었다. 이로치의 '없음' 은
+# 걷기가 아닌 동작도 다시 찾아본다 (레시라무는 앉기·눕기 등만 이로치가 없다).
+MISS_GEN = 3
 
 # 받아도 되는 애니메이션 이름. **이름이 URL 에서 오므로 반드시 막아야
 # 한다** - 안 그러면 남의 저장소 아무 경로나 우리 서버로 받아오게 시킬 수
@@ -463,8 +468,8 @@ def _anim_paths(num, name, shiny=False):
 
 
 # SpriteCollab 은 폼 0000 아래 0001 에 이로치 시트를 둔다 (sprite/0025/0000/0001/).
-# 동작 이름·AnimData 규격은 보통 시트와 같다. 없는 종은 클라이언트가 보통
-# 색으로 대신 걷는다.
+# 동작 이름·AnimData 규격은 보통 시트와 같다. 없는 종은 얼굴 그림의 이로치 색을
+# 보통 시트에 입혀 만든다 (1.10.1). 그것도 안 되면 클라이언트가 보통 색으로 걷는다.
 SHINY_SUBDIR = "0000/0001/"
 
 
@@ -601,7 +606,7 @@ def _anim_fetch(num, name, shiny=False):
                 return _walk_fetch_follow(num, png_path, meta_path, shiny=True)
             if src == "ow":
                 return _walk_fetch_ow(_ow_path(num), png_path, meta_path, True)
-            return _mark_missing(meta_path)
+            return _shiny_recolor(num, name, mega, png_path, meta_path)
         if mega:
             # 메가 폼은 두 번째 출처가 없다. **404 일 때만** 없다고 적는다.
             if isinstance(e, urllib.error.HTTPError) and e.code != 404:
@@ -649,6 +654,68 @@ def _mark_missing(meta_path):
     except OSError:
         pass
     return None
+
+
+def _shiny_recolor(num, name, mega, png_path, meta_path):
+    """이로치 시트가 없으면 보통 시트에 얼굴 그림의 이로치 색을 입혀 만든다 (1.10.1).
+
+    SpriteCollab 에는 보통 시트만 있고 이로치가 없는 종이 있다. 코라이돈·딱정곤·
+    요씽리스 등 8종과 메가 4폼은 이로치 시트가 통째로 없고, 레시라무·루가루암 등
+    28종은 이로치 쪽에 앉기·눕기 같은 동작만 빠져 있다. 그대로 두면 이로치사탕을
+    먹여도 보통 색으로 걷거나, 걸을 때만 이로치고 앉으면 보통 색이 된다.
+
+    같은 저장소의 얼굴 그림에는 이로치가 있어서, 보통 얼굴과 이로치 얼굴을 맞대
+    색 표를 뽑고 그걸 보통 시트에 입힌다 (recolor.py). 첫째 출처의 시트만 한다 -
+    다른 출처는 그림체가 달라서 얼굴 그림의 색과 맞지 않는다.
+
+    다른 출처와 같은 약속: **404 일 때만** 없다고 적는다. 끊겼거나 저쪽이
+    잠깐 안 되면 None - 다음에 다시 물어본다.
+    """
+    import urllib.error
+    import urllib.request
+    import zlib
+    from . import recolor
+    normal = _anim_meta(num, name)
+    if normal is None:
+        # 방금 '없다' 고 적었을 수도 있다 (_mark_missing 은 None 을 준다). 적힌 것을 본다.
+        try:
+            with open(_anim_paths(num, name)[1], encoding="utf-8") as f:
+                normal = json.load(f)
+        except (OSError, ValueError):
+            return None                     # 보통 시트도 지금은 모른다. 다음에 다시
+    if not normal.get("ok") or normal.get("src") != "pmd":
+        return _mark_missing(meta_path)
+    d = (mega + "/") if mega else "%04d/" % num
+    shiny_d = d + ("0001/" if mega else SHINY_SUBDIR)
+
+    def grab(path):
+        with urllib.request.urlopen("%s/%sNormal.png" % (PORTRAIT_BASE, path), timeout=12) as r:
+            return r.read()
+
+    try:
+        pairs = recolor.table(grab(d), grab(shiny_d))
+        with open(_anim_paths(num, name)[0], "rb") as f:
+            png = recolor.apply(f.read(), pairs)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            return None
+        return _mark_missing(meta_path)
+    except (urllib.error.URLError, OSError):
+        return None
+    except (ValueError, IndexError, zlib.error):
+        # 얼굴 두 장이 색만 바꾼 그림이 아니거나 우리가 못 읽는 꼴. 다시 받아도 같다.
+        return _mark_missing(meta_path)
+
+    tmp = png_path + ".part"
+    with open(tmp, "wb") as f:
+        f.write(png)
+    os.replace(tmp, png_path)
+    meta = dict(normal)
+    meta["shiny"] = True
+    meta["recolor"] = "portrait"            # 진짜 이로치 시트가 아니라 만든 것
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f)
+    return meta
 
 
 def _walk_fetch_follow(num, png_path, meta_path, shiny=False):
@@ -786,8 +853,9 @@ def _anim_meta(num, name, shiny=False):
             with open(meta_path, encoding="utf-8") as f:
                 meta = json.load(f)
             # **출처가 늘기 전에 '없다' 고 적어 둔 걷기는 한 번 더 찾아본다.**
-            # 그대로 믿으면 새 출처에 있는 종이 영영 안 걷는다.
-            if not (name == "Walk" and not meta.get("ok")
+            # 그대로 믿으면 새 출처에 있는 종이 영영 안 걷는다. 이로치는 다른
+            # 동작도 (1.10.1 - 얼굴 그림으로 만드는 길은 모든 동작에 붙었다).
+            if not ((name == "Walk" or shiny) and not meta.get("ok")
                     and int(meta.get("gen") or 1) < MISS_GEN):
                 return meta
         except (OSError, ValueError):

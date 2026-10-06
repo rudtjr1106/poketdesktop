@@ -10,6 +10,7 @@
   3. 옛 서버가 ?shiny 를 모르고 보통 시트를 주면(shiny 표시 없음) 이로치
      폴더에 굳혀 두지 않는다 - 서버가 바뀐 뒤에 영영 보통 색이 된다.
   4. ensure_many 의 열쇠: 보통은 번호, 이로치는 (번호, True).
+  5. (1.10.1) 옛 판이 남긴 '이로치 없음' 은 걷기가 아닌 동작도 다시 묻는다.
 """
 import json
 import os
@@ -136,6 +137,38 @@ def t_new_source():
     chk("첫째 출처에서 온 종은 그대로 다른 동작을 받는다", WC.walk_only(25) is False)
 
 
+def t_recolor():
+    """1.10.1: 서버가 이로치 시트가 없는 종(코라이돈 등)의 이로치를 만들어 준다.
+
+    이 PC 에 '이로치 없음' 으로 적어 둔 것을 그대로 믿으면 영영 보통 색으로 걷는다.
+    코라이돈은 걷기뿐 아니라 서기·자기 등 열 가지 동작이 다 그렇게 적혀 있었다.
+    """
+    print("\n=== 옛 '이로치 없음' 표시는 다시 묻는다 (1.10.1) ===")
+    WC._failed.clear()
+    for name in ("Walk", "Idle", "Sleep"):
+        png, meta_path = WC._paths(1007, name, True)
+        os.makedirs(os.path.dirname(png), exist_ok=True)
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump({"ok": False, "gen": 2}, f)            # 1.10.0 까지의 판이 남긴 표시
+    chk("옛 세대의 이로치 '없음' 은 걷기가 아니어도 못 본 것으로 친다",
+        WC.local(1007, "Idle", True) == (None, None) and WC.local(1007, "Walk", True) == (None, None))
+    api = FakeApi(shiny_nums={1007})
+    for name in ("Walk", "Idle", "Sleep"):
+        png, meta = WC.ensure(api, 1007, name, shiny=True)
+        chk("  %s: 서버에 다시 물어 이로치 시트를 받는다" % name,
+            png and open(png, "rb").read().endswith(b"S") and meta.get("shiny") is True, (png, meta))
+    n = len(api.calls)
+    WC.ensure(api, 1007, "Idle", shiny=True)
+    chk("받은 다음부터는 안 묻는다", len(api.calls) == n, api.calls[n:])
+
+    png, meta_path = WC._paths(1008, "Idle", True)
+    os.makedirs(os.path.dirname(png), exist_ok=True)
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump({"ok": False, "gen": WC.MISS_GEN}, f)
+    chk("지금 세대의 이로치 '없음' 은 믿는다",
+        WC.local(1008, "Idle", True) == (None, {"ok": False, "gen": WC.MISS_GEN}))
+
+
 def main():
     print("=== 열쇠 ===")
     chk("보통은 번호 그대로", WC.key(25) == 25 and WC.key(25, False) == 25)
@@ -194,6 +227,7 @@ def main():
     chk("이로치 열쇠에는 이로치 시트", open(got[(25, True)][0], "rb").read().endswith(b"S"))
 
     t_new_source()
+    t_recolor()
 
     shutil.rmtree(HOME, ignore_errors=True)
     print("\n  합계  OK %d   FAIL %d" % (OK, FAIL))

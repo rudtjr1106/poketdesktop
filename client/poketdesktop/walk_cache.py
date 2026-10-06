@@ -42,7 +42,9 @@ RETRY_AFTER = 300.0        # 못 받았을 때 다시 시도하기까지 (초)
 # 서버에 출처가 늘면 올린다. 1.9.0 에서 세 번째 출처가 붙어 미라이돈 등 40종과
 # 메가 19폼이 걷게 됐는데, 이 PC 에 '없다' 고 적어 둔 것을 그대로 믿으면
 # 영영 안 물어본다. 세대가 낮은 표시는 못 본 것으로 치고 다시 묻는다.
-MISS_GEN = 2
+# 3 (1.10.1): 서버가 이로치 시트가 없는 종(코라이돈 등)의 이로치를 얼굴 그림으로
+# 만들어 준다. 이로치의 '없음' 은 걷기가 아닌 동작도 다시 묻는다.
+MISS_GEN = 3
 # 걷기밖에 없는 출처. 여기서 온 종은 다른 동작(서기·자기)을 쓰지 않는다 -
 # 다른 출처의 그림을 섞으면 서 있을 때만 그림체가 바뀐다.
 WALK_ONLY = ("follow", "ow")
@@ -129,7 +131,7 @@ def local(num, name="Walk", shiny=False):
     except (OSError, ValueError):
         return None, None
     if not meta.get("ok"):
-        if name == "Walk" and int(meta.get("gen") or 1) < MISS_GEN:
+        if (name == "Walk" or shiny) and int(meta.get("gen") or 1) < MISS_GEN:
             return None, None           # 출처가 늘기 전의 표시다. 다시 물어본다
         return None, meta
     if os.path.exists(png) and os.path.getsize(png) > 0:
