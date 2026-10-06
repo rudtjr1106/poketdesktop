@@ -202,6 +202,8 @@ class Row(object):
         # 것인지 그냥 누른 것인지 구분할 수 있다.
         self.dnd = dnd or {}
         self.selected = False
+        self.iv_cell = None           # 개체값 칸 (알 줄에는 없다)
+        self._bst_on = False
         info = mon.get("info", {})
         self.party = bool(mon.get("onDesktop"))
         # 알 줄 (1.4.1). 종·성별·성격이 없다. 그 칸에 종류·남은 시간·자란 정도.
@@ -277,9 +279,11 @@ class Row(object):
         else:
             self._cell(info.get("nature", ""), COLS[4], dim, U.FONT_XS)
             iv = info.get("ivPercent", 0)
-            self._cell("%.0f%%" % iv, COLS[5],
-                       U.GOOD if iv >= 75 else (U.FG if self.party else dim),
-                       U.FONT_XS)
+            # 이 칸은 종족값 순으로 볼 때 종족값 합계로 바뀐다 (show_bst). 두 쪽 글을 다 들고 있는다.
+            self._iv_text = ("%.0f%%" % iv, U.GOOD if iv >= 75 else (U.FG if self.party else dim))
+            bst = box_filter.bst_of(mon, dex)
+            self._bst_text = ("%d" % bst, U.GOOD if bst >= 600 else (U.FG if self.party else dim))
+            self.iv_cell = self._cell(self._iv_text[0], COLS[5], self._iv_text[1], U.FONT_XS)
         self._cell("따라다님" if self.party else "박스", COLS[6],
                    U.GOOD if self.party else U.FG_FAINT, U.FONT_XS)
 
@@ -302,6 +306,18 @@ class Row(object):
     def _egg_fg(self):
         """알 줄의 이름 색. 알이 아니면 None."""
         return _egg_color(self.egg.get("kind")) if self.egg else None
+
+    def show_bst(self, on):
+        """개체값 칸에 종족값 합계를 대신 적는다 (종족값 순으로 볼 때). 알 줄은 그대로다."""
+        on = bool(on)
+        if self.iv_cell is None or on == self._bst_on:
+            return
+        self._bst_on = on
+        text, fg = self._bst_text if on else self._iv_text
+        try:
+            self.iv_cell.configure(text=text, fg=fg)
+        except tk.TclError:
+            pass
 
     def _cell(self, text, col, fg, font):
         title, x, w, anchor = col
@@ -371,9 +387,10 @@ class BoxWindow(object):
         self._shown = {"party": [], "box": []}   # 지금 담긴 줄 id, 화면 순서대로
         self._by_id = {}         # {id: 포켓몬} — 받은 목록
         self.box_no = 0          # 지금 보고 있는 PC 박스
-        # 개체값 높은 순으로 보기 (1.10.0). 켜면 **박스를 넘어 전부**를 개체값 순으로 줄 세워
-        # 한 박스 크기씩(rank_page) 보여 준다. 서버의 박스는 그대로다 - 보는 순서만 바뀐다.
-        self.sort_iv = False
+        # 종족값 높은 순으로 보기 (1.10.1, 1.10.0 에서는 개체값 순이었다). 켜면 **박스를 넘어
+        # 전부**를 종족값 순으로 줄 세워 한 박스 크기씩(rank_page) 보여 준다. 서버의 박스는
+        # 그대로다 - 보는 순서만 바뀐다. 켜져 있는 동안 '개체값' 칸은 종족값 합계를 적는다.
+        self.sort_bst = False
         self.rank_page = 0
         self.boxes = {}          # 서버가 준 박스 정보 (size/count/names/used)
         self._rows_job = None    # 줄을 나눠 만들고 담는 일 (U.Chunked)
@@ -497,8 +514,8 @@ class BoxWindow(object):
                           anchor=anchor if anchor != "center" else "center")
             lb.place(x=x, y=0, width=w, relheight=1.0)
             if title == "개체값":
-                # 이 머리글을 누르면 개체값 높은 순으로 본다. 위 막대에는 단추를 더 넣을
-                # 자리가 없다 (지금도 윈도우에서 꽉 찬다).
+                # 이 머리글을 누르면 종족값 높은 순으로 본다 (이 칸도 종족값 합계로 바뀐다).
+                # 위 막대에는 단추를 더 넣을 자리가 없다 (지금도 윈도우에서 꽉 찬다).
                 self.head_iv = lb
                 lb.configure(cursor="hand2")
                 lb.bind("<Button-1>", lambda _e: self.toggle_sort())
@@ -1035,28 +1052,34 @@ class BoxWindow(object):
         return bool(self.f_type or self.f_query.get().strip())
 
     def toggle_sort(self):
-        """'개체값' 머리글을 눌렀다: 개체값 높은 순 ↔ 박스 순서."""
-        self.sort_iv = not self.sort_iv
+        """'개체값' 머리글을 눌렀다: 종족값 높은 순 ↔ 박스 순서."""
+        self.sort_bst = not self.sort_bst
         self.rank_page = 0
         self._paint_sort()
-        self.say("PC 박스 전체를 개체값 높은 순으로 봅니다. '개체값' 을 다시 누르면 박스로 돌아갑니다."
-                 if self.sort_iv else "박스 순서로 돌아왔습니다.", U.FG_DIM)
+        self.say("PC 박스 전체를 종족값 높은 순으로 봅니다. '종족값' 머리글을 다시 누르면 박스로 "
+                 "돌아갑니다." if self.sort_bst else "박스 순서로 돌아왔습니다.", U.FG_DIM)
         self._show(self.sel)
 
     def _paint_sort(self):
-        """머리글의 표시. 켜져 있으면 ▼ 가 금색, 꺼져 있으면 흐린 ▾ (누를 수 있다는 표시)."""
+        """머리글과 그 칸의 표시.
+
+        꺼져 있으면 '개체값▾' (흐린 ▾ 는 누를 수 있다는 표시), 켜면 '종족값▼' 이 금색이 되고
+        줄마다 그 칸에 종족값 합계가 적힌다 - 머리글은 늘 그 칸에 적힌 것의 이름이다.
+        """
         try:
-            self.head_iv.configure(text="개체값▼" if self.sort_iv else "개체값▾",
-                                   fg=U.ACCENT if self.sort_iv else U.FG_FAINT)
+            self.head_iv.configure(text="종족값▼" if self.sort_bst else "개체값▾",
+                                   fg=U.ACCENT if self.sort_bst else U.FG_FAINT)
         except (AttributeError, tk.TclError):
             pass
+        for row in list(getattr(self, "rows", {}).values()):
+            row.show_bst(self.sort_bst)
 
     def rank_pages(self, total):
-        """개체값 순으로 볼 때의 쪽 수 (한 쪽 = 한 박스 크기)."""
+        """종족값 순으로 볼 때의 쪽 수 (한 쪽 = 한 박스 크기)."""
         return max(1, -(-int(total) // self.box_size()))
 
     def _page(self, delta):
-        if self.sort_iv and not self._searching():
+        if self.sort_bst and not self._searching():
             total = sum(1 for m in self.mons if not m.get("onDesktop"))
             no = max(0, min(self.rank_page + delta, self.rank_pages(total) - 1))
             if no == self.rank_page:
@@ -1076,7 +1099,7 @@ class BoxWindow(object):
             for b in (self.btn_prev, self.btn_next, self.btn_rename):
                 b.configure(state="disabled")
             return
-        if self.sort_iv:
+        if self.sort_bst:
             # 박스 대신 순위로 넘긴다: "1~30위 / 412"
             size, pages = self.box_size(), self.rank_pages(total)
             first = self.rank_page * size + 1
@@ -1112,8 +1135,8 @@ class BoxWindow(object):
         if self._searching():
             return self.say("찾는 중에는 박스를 고를 수 없습니다. 거르기를 먼저 지워 주세요.",
                             U.DANGER)
-        if self.sort_iv:
-            return self.say("개체값 순으로 보는 중입니다. '개체값' 머리글을 다시 누르면 박스로 "
+        if self.sort_bst:
+            return self.say("종족값 순으로 보는 중입니다. '종족값' 머리글을 다시 누르면 박스로 "
                             "돌아갑니다.", U.DANGER)
         return self._menu(self.lbl_page, self._box_rows(), below=True)
 
@@ -1122,8 +1145,8 @@ class BoxWindow(object):
 
     def rename_box(self):
         """박스 이름 바꾸기. 비우면 기본 이름으로 돌아간다."""
-        if self._searching() or self.sort_iv:
-            return self.say("찾는 중이거나 개체값 순으로 보는 중에는 박스 이름을 바꿀 수 없습니다.",
+        if self._searching() or self.sort_bst:
+            return self.say("찾는 중이거나 종족값 순으로 보는 중에는 박스 이름을 바꿀 수 없습니다.",
                             U.DANGER)
         no = self.box_no
         cur = (self.boxes.get("names") or {}).get(str(no), "")
@@ -1228,8 +1251,8 @@ class BoxWindow(object):
                 self.f_type = None
                 self.f_query.set("")
                 self._show_type()
-            if self.sort_iv:
-                self.sort_iv = False            # 그 포켓몬이 든 박스를 보여 줘야 한다
+            if self.sort_bst:
+                self.sort_bst = False            # 그 포켓몬이 든 박스를 보여 줘야 한다
                 self._paint_sort()
             if not m.get("onDesktop"):
                 self.box_no = int(m.get("box") or 0)
@@ -1289,14 +1312,14 @@ class BoxWindow(object):
                                           self.f_query.get())
         box_all = len(self.mons) - len(party)
         filtered = bool(self.f_type or self.f_query.get().strip())
-        if self.sort_iv:
-            box = box_filter.sort_iv(box)
+        if self.sort_bst:
+            box = box_filter.sort_bst(box, self.app.dex)
         # **한 박스만 그린다.** 줄 하나에 위젯이 열서너 개라 수백 마리를 다
         # 만들면 창이 느려진다. 거르기가 걸려 있으면 박스를 넘어 다 뒤진다.
         if self._searching():
             page_box = box
-        elif self.sort_iv:
-            # 개체값 순: 박스를 넘어 전부를 줄 세우되, 한 번에 한 박스 크기만큼만 그린다.
+        elif self.sort_bst:
+            # 종족값 순: 박스를 넘어 전부를 줄 세우되, 한 번에 한 박스 크기만큼만 그린다.
             size = self.box_size()
             self.rank_page = max(0, min(self.rank_page, self.rank_pages(len(box)) - 1))
             page_box = box[self.rank_page * size:(self.rank_page + 1) * size]
@@ -1325,7 +1348,7 @@ class BoxWindow(object):
                 # 이 박스에 몇 마리인지는 위 막대(박스 이름표)가 보여준다.
                 text=("PC 박스 · %d마리 중 %d마리" % (box_all, len(box)) if filtered
                       else "PC 박스 · %d마리" % box_all)
-                + (" · 개체값 높은 순" if self.sort_iv else ""))
+                + (" · 종족값 높은 순" if self.sort_bst else ""))
             if not self._sep_on:
                 # 박스가 비어 있었으니 담긴 박스 줄이 없다. 끝에 붙이면 된다.
                 self._sep.pack(fill="x")
@@ -1384,6 +1407,7 @@ class BoxWindow(object):
             # 고름은 만들 때 칠한다. 다 만든 뒤 이백 줄을 다시 칠하지 않는다.
             row = Row(self.inner, m, self.app.dex, self.select, self._dnd,
                       selected=(pid == self.sel))
+            row.show_bst(self.sort_bst)     # 종족값 순으로 보는 중에 새로 만든 줄
             self.rows[pid] = row
         if sec is None:
             return                          # 안 보일 줄. 만들어만 둔다

@@ -6,7 +6,9 @@
 서버 흉내(FakeServer)는 server/app/guild.py 의 응답 모양 그대로다. 규칙 자체(돈·정원·
 권한·보상)는 server/test_guild.py 가 본다. 여기서는 **화면**을 본다:
 
-  · 길드가 없으면 찾기·만들기, 있으면 다섯 칸 (채팅·길드원·미션·코인 상점·관리)
+  · 길드가 없으면 찾기·만들기, 있으면 여섯 칸 (채팅·길드원·미션·코인 상점·다른 길드·관리)
+  · (1.10.1) 코인 상점은 그림이 있는 카드 격자이고 이름으로 찾는다. 길드에 든 채로
+    다른 길드를 둘러볼 수 있다.
   · 채팅: 웹소켓이 붙어 있으면 밀려오는 줄을 받고 서버에 묻지 않는다. 끊기면 2초마다
     묻는 길로 돌아간다. 두 길로 온 줄이 겹치거나 빠지지 않는다
   · 사람 수가 바뀌면 머리만 고친다 (채팅 칸은 그대로), 다른 칸에 있으면 안 읽은 수가 붙는다
@@ -69,6 +71,7 @@ class FakeServer(object):
         self.claimed = {}             # {uid: set(tier)}
         self.calls = []
         self.long_profile = False     # 프로필에 칭호·시즌을 잔뜩 싣는다 (창 안쪽이 굴러가나 본다)
+        self.others = []              # 목록에 같이 나오는 남의 길드들 (다른 길드 둘러보기)
 
     def fail(self, msg, code=400):
         raise apimod.ApiError(msg, code)
@@ -146,6 +149,7 @@ class Api(object):
                          "masterName": s.names[s.g["master"]], "members": len(s.roles), "max": MAXN,
                          "points": 0, "full": False,
                          "requested": any(u == self.me for u, _m in s.reqs)})
+        rows += [dict(g) for g in s.others if not q or q in g["name"]]
         return {"guilds": rows, "page": 1, "pages": 1, "total": len(rows), "query": q}
 
     def guild_create(self, name, intro="", mode="open"):
@@ -480,8 +484,15 @@ def main():
 
     print("\n=== 채팅 ===")
     chk("만들어졌다는 알림 줄", "피카단 길드가 만들어졌습니다" in w.chat_text(), w.chat_text())
-    chk("칸 다섯: 채팅·길드원·미션·코인 상점·관리", [lb.cget("text") for lb in w.seg.cells.values()]
-        == ["채팅", "길드원", "미션", "코인 상점", "관리"])
+    chk("칸 여섯: 채팅·길드원·미션·코인 상점·다른 길드·관리",
+        [lb.cget("text") for lb in w.seg.cells.values()]
+        == ["채팅", "길드원", "미션", "코인 상점", "다른 길드", "관리"])
+    root.update_idletasks()
+    cells = list(w.seg.cells.values())
+    chk("  여섯 칸이 한 줄에 다 들어간다 (잘린 글자 없음)",
+        all(c.winfo_reqwidth() <= c.winfo_width() + 1 for c in cells)
+        and cells[-1].winfo_rootx() + cells[-1].winfo_width() <= top.winfo_rootx() + top.winfo_width(),
+        [(c.cget("text"), c.winfo_reqwidth(), c.winfo_width()) for c in cells])
     w.chat_var.set("  안녕하세요   반갑습니다 ")
     w.send_chat()
     wait(root, lambda: "반갑습니다" in w.chat_text(), 3)
@@ -647,6 +658,10 @@ def main():
 
     print("\n=== 코인 상점 ===")
     srv.coin[1] = 12
+    # 몬스터볼 그림 하나를 이 PC 에 받아 둔 것으로 친다 (나머지는 그림 없이 자리만 있다)
+    from PIL import Image
+    from poketdesktop import item_icons
+    Image.new("RGBA", (30, 30), (220, 60, 60, 255)).save(os.path.join(item_icons.icon_dir(), "POKEBALL.png"))
     w.show_tab("shop")
     wait(root, lambda: w.shop is not None, 4)
     settle(root)
@@ -659,12 +674,128 @@ def main():
                    ("ULTRABALL", 10): False, ("RARECANDY", 1): False, ("RARECANDY", 10): False}, on)
     bad = squeezed(top)
     chk("눌린 위젯 없음 (긴 설명이 줄을 바꾼다)", not bad, bad[:3])
+
+    print("  -- 카드 격자·그림·찾기 (1.10.1)")
+    root.update_idletasks()
+    cards = [c for _it, c in w.shop_cards]
+    cvw = w.shop_inner.master.winfo_width()
+    cols = ui_guild.shop_cols(cvw)
+    chk("폭을 모르면 석 장, 좁으면 두 장, 넓으면 넉 장까지", ui_guild.shop_cols(1) == 3
+        and ui_guild.shop_cols(500) == 2 and ui_guild.shop_cols(700) == 3
+        and ui_guild.shop_cols(940) == 4 and ui_guild.shop_cols(3000) == 4)
+    n = min(cols, len(cards))
+    chk("카드가 격자로 놓인다 (한 줄에 %d장)" % cols, w._shop_cols == cols and cols >= 2
+        and len(set(c.winfo_y() for c in cards[:n])) == 1 and len(set(c.winfo_x() for c in cards[:n])) == n,
+        (cvw, cols, [(c.winfo_x(), c.winfo_y()) for c in cards]))
+    chk("  카드 폭이 같다", max(c.winfo_width() for c in cards[:n]) - min(c.winfo_width() for c in cards[:n]) <= 2,
+        [c.winfo_width() for c in cards])
+    chk("  같은 줄의 카드는 높이가 같다 (단추가 가지런하다)", len(set(c.winfo_height() for c in cards[:n])) == 1
+        and len(set(w.shop_btns[(it["id"], 1)].holder.winfo_rooty() for it, _c in w.shop_cards[:n])) == 1,
+        [c.winfo_height() for c in cards])
+    chk("  칸 밖으로 나간 카드가 없다", all(c.winfo_x() + c.winfo_width() <= cvw + 1 for c in cards),
+        [(c.winfo_x(), c.winfo_width()) for c in cards])
+    wide = clipped_wide(w.shop_inner)
+    chk("  카드 안에 옆으로 잘린 글이 없다", not wide, wide[:3])
+
+    def pictures(card):
+        out = []
+
+        def walk(x):
+            for c in x.winfo_children():
+                try:
+                    if c.winfo_class() == "Label" and str(c.cget("image")):
+                        out.append(c)
+                except Exception:                           # noqa: BLE001
+                    pass
+                walk(c)
+        walk(card)
+        return out
+
+    def holders(card):
+        return [c for a in card.winfo_children() for c in a.winfo_children()
+                if c.winfo_class() == "Frame" and c.winfo_width() == ui_guild.SHOP_ICON
+                and c.winfo_height() == ui_guild.SHOP_ICON]
+    chk("받아 둔 그림이 카드에 보인다 (몬스터볼)", len(pictures(cards[0])) == 1, pictures(cards[0]))
+    chk("  그림이 없어도 자리는 같다 (%dpx)" % ui_guild.SHOP_ICON,
+        all(len(holders(c)) == 1 for c in cards) and not pictures(cards[2]),
+        [len(holders(c)) for c in cards])
+    w.shop_q.set("볼")
+    settle(root, 0.25)
+    chk("'볼' 로 찾으면 볼만 남는다", [it["id"] for it in w.shop_shown()] == ["POKEBALL", "ULTRABALL"]
+        and [bool(c.winfo_ismapped()) for c in cards] == [True, True, False],
+        [bool(c.winfo_ismapped()) for c in cards])
+    chk("  몇 개인지 적힌다", w.shop_count.cget("text") == "2개", w.shop_count.cget("text"))
+    w.shop_q.set("사 탕")
+    settle(root, 0.25)
+    chk("띄어쓰기는 안 가린다", [it["id"] for it in w.shop_shown()] == ["RARECANDY"]
+        and cards[2].winfo_ismapped() and not cards[0].winfo_ismapped(),
+        [it["id"] for it in w.shop_shown()])
+    w.shop_q.set("없는도구")
+    settle(root, 0.25)
+    chk("맞는 것이 없으면 없다고 알린다", not any(c.winfo_ismapped() for c in cards)
+        and w.shop_none.winfo_ismapped() and "없는도구" in w.shop_none.cget("text"),
+        w.shop_none.cget("text"))
+    w.shop_q.set("볼")
+    settle(root, 0.25)
+    w.buy("POKEBALL", 1)
+    wait(root, lambda: srv.coin[1] == 11, 4)
+    wait(root, lambda: w.shop is not None and w.shop.get("coin") == 11, 4)
+    settle(root, 0.3)
+    chk("사고 나서 다시 그려도 찾던 말은 남는다", w.shop_q.get() == "볼"
+        and [it["id"] for it in w.shop_shown()] == ["POKEBALL", "ULTRABALL"], w.shop_q.get())
+    w.shop_q.set("")
+    settle(root, 0.25)
+    chk("지우면 다 나온다", all(c.winfo_ismapped() for _it, c in w.shop_cards)
+        and w.shop_count.cget("text") == "", w.shop_count.cget("text"))
+    srv.coin[1] = 12
+    srv.balls[1] -= 1
+    w.shop = None
+    w._draw_tab()
+    wait(root, lambda: w.shop is not None, 4)
+    settle(root)
+
     w.buy("POKEBALL", 10)
     wait(root, lambda: srv.coin[1] == 2, 4)
     wait(root, lambda: w.shop is not None and w.shop.get("coin") == 2, 4)
     settle(root, 0.3)
     chk("사면 코인이 줄고 머리의 숫자도 바뀐다", srv.balls[1] == 25 and w.h_coin.cget("text") == "길드 코인 2개",
         w.h_coin.cget("text"))
+
+    print("\n=== 다른 길드 둘러보기 (1.10.1) ===")
+    srv.others = [{"id": 2, "name": "꼬부기단", "intro": "물 타입만 받습니다. 매일 미션 열 점씩 채우실 분.",
+                   "joinMode": "approve", "masterName": "라온", "members": MAXN, "max": MAXN,
+                   "points": 1234, "full": True, "requested": False},
+                  {"id": 3, "name": "파이리단", "intro": "", "joinMode": "open", "masterName": "마루",
+                   "members": 3, "max": MAXN, "points": 20, "full": False, "requested": False}]
+    w.show_tab("guilds")
+    wait(root, lambda: w.found is not None and len(w.found.get("guilds") or []) == 3, 4)
+    settle(root)
+    tx = texts(top)
+    chk("길드에 든 채로 다른 길드가 보인다", "꼬부기단" in tx and "파이리단" in tx and tx.count("피카단") >= 2,
+        tx[-24:])
+    chk("  인원·마스터·누적 점수·소개가 보인다", "%d / %d명" % (MAXN, MAXN) in tx and "마스터 라온" in tx
+        and "누적 1,234점" in tx and any("물 타입만 받습니다" in x for x in tx), tx[-24:])
+    chk("  내 길드에는 표시가 붙는다", len(labels(top, "내 길드")) == 1, len(labels(top, "내 길드")))
+    chk("  가입 단추는 없다 (지금 길드를 나온 뒤에야 가입할 수 있다)",
+        not labels(top, "가입") and not labels(top, "가입 신청") and not labels(top, "신청 취소"))
+    bad = squeezed(top)
+    chk("  눌린 위젯 없음", not bad, bad[:3])
+    w.q_var.set("꼬부기")
+    w.do_search()
+    wait(root, lambda: len((w.found or {}).get("guilds") or []) == 1, 4)
+    settle(root)
+    tx = texts(top)
+    chk("이름으로 찾는다", "꼬부기단" in tx and "파이리단" not in tx, tx[-12:])
+    chk("  채팅·미션은 그대로 내 길드 것이다", w.mode == "guild" and w.h_name.cget("text") == "피카단")
+    w.q_var.set("")
+    w.do_search()
+    wait(root, lambda: len((w.found or {}).get("guilds") or []) == 3, 4)
+    srv.others = []
+    w.show_tab("chat")
+    settle(root)
+    w.show_tab("guilds")
+    wait(root, lambda: w.found is not None and len(w.found.get("guilds") or []) == 1, 4)
+    chk("칸을 다시 열면 새로 받는다", len(w.found.get("guilds") or []) == 1, w.found)
 
     print("\n=== 관리 (마스터) ===")
     w.show_tab("manage")

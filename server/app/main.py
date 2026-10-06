@@ -1172,6 +1172,8 @@ def me(ctx=Depends(current)):
         "bond": mega.me_card(uid),
         # 게시판 (1.8.0): 가장 최근 공지의 번호. 화면이 '새 공지' 를 표시한다
         "board": board.me_card(uid),
+        # 길드 (1.10.1): 남이 쓴 가장 최근 채팅 줄의 번호. 화면이 길드 탭에 점을 찍는다
+        "guild": guild.me_card(uid),
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 

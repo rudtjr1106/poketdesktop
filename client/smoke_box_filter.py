@@ -498,7 +498,7 @@ def main():
 
     many(root, dex)
     hyper_and_evs(root, dex)
-    sort_by_iv(root, dex)
+    sort_by_bst(root, dex)
 
     try:
         root.destroy()
@@ -511,26 +511,36 @@ def main():
     return 1 if FAIL else 0
 
 
-def sort_by_iv(root, dex):
-    """개체값 높은 순으로 보기 (1.10.0) - '개체값' 머리글을 누른다."""
-    print("-- 개체값 높은 순")
+def sort_by_bst(root, dex):
+    """종족값 높은 순으로 보기 (1.10.1, 1.10.0 에서는 개체값 순) - '개체값' 머리글을 누른다."""
+    print("-- 종족값 높은 순")
     party = [mon(dex, 7, 5001, on=True), mon(dex, 4, 5002, on=True)]
     box = [mon(dex, n, 6000 + n) for n in range(10, 45)]         # 박스 서른다섯 마리
     for i, m in enumerate(box):
         m["box"] = i // 30                                       # 박스 0 에 서른, 박스 1 에 다섯
         m["info"]["ivPercent"] = float((i * 37) % 101)           # 뒤죽박죽인 개체값
         m["info"]["ivTotal"] = int(m["info"]["ivPercent"] * 186 // 100)
-    box[3]["info"]["ivPercent"] = box[20]["info"]["ivPercent"] = 100.0   # 같은 값 둘
-    box[3]["info"]["ivTotal"] = box[20]["info"]["ivTotal"] = 186
-    box[3]["level"], box[20]["level"] = 30, 55                   # 같으면 레벨 높은 쪽이 먼저
+    # 같은 종 둘 (종족값이 같다): 개체값 높은 쪽이 먼저, 그것도 같으면 레벨 높은 쪽
+    twin = mon(dex, 36, 6999)                                    # 픽시 한 마리 더
+    twin["box"] = 1
+    twin["info"]["ivPercent"], box[26]["info"]["ivPercent"] = 90.0, 40.0     # box[26] = 36번
+    box.append(twin)
     egg = box_filter.egg_row({"id": 9, "name": "포켓몬 알", "needSec": 100, "gotSec": 10})
-    want = box_filter.sort_iv(box)
-    ivs = [m["info"]["ivPercent"] for m in want]
-    chk("높은 것부터 낮은 것으로", ivs == sorted(ivs, reverse=True), ivs[:6])
-    chk("개체값이 같으면 레벨 높은 쪽이 먼저", [m["id"] for m in want[:2]] == [box[20]["id"], box[3]["id"]],
-        [m["id"] for m in want[:3]])
-    chk("받은 목록은 그대로 둔다", [m["id"] for m in box] == [6000 + n for n in range(10, 45)])
-    chk("알은 맨 뒤", box_filter.sort_iv([egg] + box[:3])[-1] is egg)
+    bst = lambda m: box_filter.bst_of(m, dex)                    # noqa: E731
+    want = box_filter.sort_bst(box, dex)
+    totals = [bst(m) for m in want]
+    chk("종족값 합계는 여섯 능력치를 더한 것 (이상해꽃 525, 픽시 483)",
+        box_filter.bst_of({"species": "VENUSAUR"}, dex) == 525 and bst(twin) == 483,
+        (box_filter.bst_of({"species": "VENUSAUR"}, dex), bst(twin)))
+    chk("높은 것부터 낮은 것으로", totals == sorted(totals, reverse=True) and totals[0] > totals[-1],
+        totals[:6])
+    at = [m["id"] for m in want]
+    chk("종족값이 같으면(같은 종) 개체값 높은 쪽이 먼저", at.index(twin["id"]) < at.index(box[26]["id"]),
+        (at.index(twin["id"]), at.index(box[26]["id"])))
+    chk("개체값 순서와는 다르다 (개체값이 높아도 종족값이 낮으면 뒤)",
+        at != [m["id"] for m in sorted(box, key=lambda m: -m["info"]["ivPercent"])])
+    chk("받은 목록은 그대로 둔다", [m["id"] for m in box][:35] == [6000 + n for n in range(10, 45)])
+    chk("알은 맨 뒤", box_filter.sort_bst([egg] + box[:3], dex)[-1] is egg and box_filter.bst_of(egg, dex) == -1)
 
     app = FakeApp(root, dex, party + box)
     win = ui_box.BoxWindow(root, app)
@@ -539,58 +549,75 @@ def sort_by_iv(root, dex):
     party_ids = [m["id"] for m in party]
     box_ids = [m["id"] for m in box]
     want_ids = [m["id"] for m in want]
+    first_box = [m["id"] for m in box if m["box"] == 0]
     try:
-        chk("처음에는 박스 순서 (첫 박스의 서른 마리)", shown(win) == party_ids + box_ids[:30],
+        chk("처음에는 박스 순서 (첫 박스의 서른 마리)", shown(win) == party_ids + first_box,
             shown(win)[:5])
         chk("머리글에 누를 수 있다는 표시(▾)", win.head_iv.cget("text") == "개체값▾"
             and win.head_iv.cget("cursor") == "hand2", win.head_iv.cget("text"))
+        top = want[0]
+        chk("  그 칸에는 개체값이 적혀 있다", win.rows[first_box[0]].iv_cell.cget("text").endswith("%"),
+            win.rows[first_box[0]].iv_cell.cget("text"))
         win.head_iv.event_generate("<Button-1>", x=3, y=3)       # 머리글을 진짜로 누른다
         settle_rows(root, win)
-        chk("'개체값' 을 누르면 박스를 넘어 개체값 높은 순", win.sort_iv
+        chk("머리글을 누르면 박스를 넘어 종족값 높은 순", win.sort_bst
             and shown(win) == party_ids + want_ids[:30], shown(win)[:6])
         chk("  데리고 다니는 포켓몬은 그대로 맨 위", shown(win)[:2] == party_ids)
-        chk("  머리글이 ▼ 로 바뀐다", win.head_iv.cget("text") == "개체값▼"
+        chk("  머리글이 '종족값▼' 로 바뀐다", win.head_iv.cget("text") == "종족값▼"
             and str(win.head_iv.cget("fg")) == U.ACCENT, win.head_iv.cget("text"))
-        chk("  몇 위부터 몇 위까지인지 적힌다", win.lbl_page.cget("text") == "1~30위 / 35",
+        chk("  그 칸에 종족값 합계가 적힌다 (데리고 다니는 줄도)",
+            win.rows[top["id"]].iv_cell.cget("text") == str(bst(top))
+            and win.rows[party_ids[0]].iv_cell.cget("text") == str(bst(party[0])),
+            (win.rows[top["id"]].iv_cell.cget("text"), bst(top)))
+        chk("  몇 위부터 몇 위까지인지 적힌다", win.lbl_page.cget("text") == "1~30위 / 36",
             win.lbl_page.cget("text"))
         chk("  이름 바꾸기는 꺼지고 ▶ 는 켜진다", win.btn_rename.enabled is False
             and win.btn_next.enabled is True and win.btn_prev.enabled is False)
-        chk("  'PC 박스' 줄에도 적힌다", "개체값 높은 순" in win._sep_label.cget("text"),
+        chk("  'PC 박스' 줄에도 적힌다", "종족값 높은 순" in win._sep_label.cget("text"),
             win._sep_label.cget("text"))
         root.update_idletasks()
         chk("  머리글의 글자가 칸에 다 들어간다", win.head_iv.winfo_reqwidth() <= win.head_iv.winfo_width(),
             (win.head_iv.winfo_reqwidth(), win.head_iv.winfo_width()))
+        cell = win.rows[top["id"]].iv_cell
+        chk("  줄의 숫자도 칸에 다 들어간다", cell.winfo_reqwidth() <= cell.winfo_width(),
+            (cell.winfo_reqwidth(), cell.winfo_width()))
         win._page(1)
         settle_rows(root, win)
         chk("▶ 를 누르면 다음 순위들", shown(win) == party_ids + want_ids[30:]
-            and win.lbl_page.cget("text") == "31~35위 / 35", (shown(win)[2:], win.lbl_page.cget("text")))
+            and win.lbl_page.cget("text") == "31~36위 / 36", (shown(win)[2:], win.lbl_page.cget("text")))
+        chk("  새로 그려진 줄에도 종족값이 적힌다",
+            win.rows[want_ids[-1]].iv_cell.cget("text") == str(bst(want[-1])),
+            win.rows[want_ids[-1]].iv_cell.cget("text"))
         chk("  끝에서는 ▶ 가 꺼진다", win.btn_next.enabled is False and win.btn_prev.enabled is True)
         win._page(1)
         chk("  더 넘어가지 않는다", win.rank_page == 1)
         win.open_box_menu()
-        chk("박스 고르기는 안 열리고 까닭을 알려 준다", "개체값" in win.status.cget("text"),
+        chk("박스 고르기는 안 열리고 까닭을 알려 준다", "종족값" in win.status.cget("text"),
             win.status.cget("text"))
         win.f_query.set("이")
         settle_rows(root, win)
         _p, hit = box_filter.apply_box(party + box, dex, None, "이")
-        chk("이름으로 걸러도 개체값 순서", shown(win) == party_ids + [m["id"] for m in box_filter.sort_iv(hit)]
-            and len(hit) > 1, shown(win)[2:8])
+        chk("이름으로 걸러도 종족값 순서",
+            shown(win) == party_ids + [m["id"] for m in box_filter.sort_bst(hit, dex)] and len(hit) > 1,
+            shown(win)[2:8])
         win.f_query.set("")
         settle_rows(root, win)
         chk("  거름망을 지우면 첫 순위부터", win.rank_page == 0 or shown(win)[2:] == want_ids[30:],
             win.rank_page)
         win.toggle_sort()
         settle_rows(root, win)
-        chk("다시 누르면 박스 순서로 돌아온다", not win.sort_iv and shown(win) == party_ids + box_ids[:30]
+        chk("다시 누르면 박스 순서로 돌아온다", not win.sort_bst and shown(win) == party_ids + first_box
             and win.head_iv.cget("text") == "개체값▾" and "위" not in win.lbl_page.cget("text"),
             (shown(win)[:4], win.lbl_page.cget("text")))
+        chk("  그 칸은 다시 개체값", all(win.rows[i].iv_cell.cget("text").endswith("%") for i in shown(win)),
+            [win.rows[i].iv_cell.cget("text") for i in shown(win)][:4])
         win.toggle_sort()
         settle_rows(root, win)
         win._reveal(box_ids[33])                                 # 바탕화면 도트를 두 번 눌러 열었다
         settle_rows(root, win)
-        chk("어떤 포켓몬을 찾아 열면 그 포켓몬의 박스가 보인다 (정렬은 풀린다)", not win.sort_iv
+        chk("어떤 포켓몬을 찾아 열면 그 포켓몬의 박스가 보인다 (정렬은 풀린다)", not win.sort_bst
             and win.box_no == 1 and box_ids[33] in shown(win) and win.sel == box_ids[33],
-            (win.sort_iv, win.box_no, win.sel))
+            (win.sort_bst, win.box_no, win.sel))
     finally:
         try:
             win.close()

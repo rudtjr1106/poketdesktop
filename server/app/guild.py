@@ -565,19 +565,25 @@ def _stamp(gid):
 
 
 def chat(uid, after=0, now=None):
-    """after 번 뒤의 줄. after 가 0 이면 마지막 CHAT_FIRST 줄."""
+    """after 번 뒤의 줄. after 가 0 이면 마지막 CHAT_FIRST 줄.
+
+    **내가 들어온 뒤의 줄만 준다** (1.10.1). 새로 가입한 사람이 그 전에 길드원끼리 나눈
+    말을 거슬러 읽을 수 없다 - '○○ 님이 들어왔습니다' 알림 줄부터 보인다. 나갔다가 다시
+    들어오면 다시 들어온 때부터다.
+    """
     m = member(uid)
     if not m:
         return {"guild": None, "messages": [], "last": 0}
     gid = m["guild_id"]
+    since = m["joined_at"] or ""
     after = max(0, int(after or 0))
     if after:
-        rows = db.q("SELECT * FROM guild_chat WHERE guild_id=? AND id>? ORDER BY id LIMIT ?",
-                    (gid, after, CHAT_STEP))
+        rows = db.q("SELECT * FROM guild_chat WHERE guild_id=? AND id>? AND at>=?"
+                    " ORDER BY id LIMIT ?", (gid, after, since, CHAT_STEP))
     else:
         rows = list(reversed(db.q(
-            "SELECT * FROM guild_chat WHERE guild_id=? ORDER BY id DESC LIMIT ?",
-            (gid, CHAT_FIRST))))
+            "SELECT * FROM guild_chat WHERE guild_id=? AND at>=? ORDER BY id DESC LIMIT ?",
+            (gid, since, CHAT_FIRST))))
     out = [{"id": r["id"], "userId": r["user_id"], "name": r["name"], "body": r["body"],
             "at": r["at"], "ago": _ago(r["at"], now), "mine": r["user_id"] == uid,
             "system": r["user_id"] is None} for r in rows]
@@ -793,6 +799,23 @@ def peer(uid, other, now=None):
 
 
 # ---------------------------------------------------------------- 화면 하나에 줄 것
+def me_card(uid):
+    """/api/me 에 얹는 것 (1.10.1): 내 길드 번호와, **남이 쓴** 가장 최근 채팅 줄의 번호.
+
+    화면은 이 번호가 '본 데까지' 보다 크면 길드 탭에 점을 찍는다. 1.10.0 에서는 길드 탭을
+    한 번 열어야(웹소켓이 붙어야) 점이 찍혀서, 프로그램을 켜고 다른 탭만 보던 사람은
+    채팅이 온 줄 몰랐다. 길드가 없으면 None. 알림 줄(가입·미션)과 내가 쓴 줄은 안 친다.
+    """
+    m = member(uid)
+    if not m:
+        return None
+    # (guild_id, id) 색인을 뒤에서부터 훑어 처음 맞는 줄에서 멈춘다
+    # 들어오기 전의 줄은 내가 볼 수 없는 줄이다 (chat) - 안 읽은 것으로도 치지 않는다.
+    r = db.q1("SELECT id FROM guild_chat WHERE guild_id=? AND user_id IS NOT NULL AND user_id<>?"
+              " AND at>=? ORDER BY id DESC LIMIT 1", (m["guild_id"], uid, m["joined_at"] or ""))
+    return {"id": m["guild_id"], "chat": int(r["id"]) if r else 0}
+
+
 def state(uid, now=None):
     """길드 탭을 열 때 한 번에 받는 것. 길드가 없으면 만들기·찾기에 쓸 것만."""
     u = db.q1("SELECT money FROM users WHERE id=?", (uid,))

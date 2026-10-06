@@ -241,6 +241,29 @@ def main():
     guild.join(c, gid, now=later(30))
     chk("사람이 바뀌면 stamp 가 달라진다 (화면이 다시 받을 때를 안다)", guild.chat(a, new["last"])["stamp"] != s1)
 
+    print("\n=== 들어오기 전의 채팅은 못 본다 (1.10.1) ===")
+    seen_c = guild.chat(c, now=later(31))["messages"]
+    chk("새로 들어온 사람은 들어온 때부터만 본다", seen_c and all(m["at"] >= later(30).isoformat()[:19] for m in seen_c)
+        and not any("안녕하세요" in m["body"] or "어서 오세요" in m["body"] for m in seen_c),
+        [(m["at"], m["body"]) for m in seen_c])
+    chk("  '들어왔습니다' 알림 줄부터 보인다", seen_c[0]["system"] and "다" in seen_c[0]["body"]
+        and len(seen_c) == 1, [(m["system"], m["body"]) for m in seen_c])
+    chk("  번호를 0 부터 달라고 해도(after) 그 전 줄은 안 온다",
+        [m["id"] for m in guild.chat(c, 1, now=later(31))["messages"]] == [m["id"] for m in seen_c])
+    chk("  전부터 있던 사람은 그대로 다 본다",
+        any("안녕하세요" in m["body"] for m in guild.chat(a, now=later(31))["messages"])
+        and any("어서 오세요" in m["body"] for m in guild.chat(b, now=later(31))["messages"]))
+    card_c = guild.me_card(c)
+    chk("  들어오기 전의 줄은 안 읽은 것으로도 안 친다 (길드 탭의 점)", card_c == {"id": gid, "chat": 0}, card_c)
+    guild._SENT.clear()
+    sent = guild.chat_send(a, "새로 오신 분 환영합니다", now=later(40))
+    after_c = guild.chat(c, now=later(41))["messages"]
+    chk("들어온 뒤의 말은 보인다", [m["body"] for m in after_c][-1] == "새로 오신 분 환영합니다" and len(after_c) == 2,
+        [m["body"] for m in after_c])
+    chk("  그 줄이 안 읽은 줄이 된다 (쓴 사람에게는 아니다)", guild.me_card(c)["chat"] == after_c[-1]["id"]
+        and guild.me_card(a)["chat"] < after_c[-1]["id"], (guild.me_card(c), guild.me_card(a), sent))
+    chk("  길드가 없는 사람에게는 안내가 없다", guild.me_card(mkuser("길드없음")) is None)
+
     print("\n=== 밀어 주기 (웹소켓이 받는 것) ===")
     got = []
     guild.listeners.append(lambda kind, target, payload: got.append((kind, target, payload)))

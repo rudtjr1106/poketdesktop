@@ -65,6 +65,9 @@ jobs:
       - name: 기술 연출 (919종 끝까지 가는지, 찌꺼기)
         run: python client/test_move_fx.py
 
+      - name: 길드 탭의 점·코인 상점 계산
+        run: python client/test_guild_badge.py
+
       - name: 휠 한 칸
         run: python client/test_wheel.py
 
@@ -434,6 +437,7 @@ jobs:
           python test_board.py
           python test_mypage.py
           python test_walk_ow.py
+          python test_shiny_recolor.py
           python test_s3_void.py
           python test_catch_exp.py
           # 길드 (1.10.0): 만들기·가입·권한·채팅·일일 미션·단계 보상·코인 상점

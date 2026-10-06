@@ -26,6 +26,7 @@ import tkinter as tk
 from common.korean import natural
 
 from . import guild_ws as WS
+from . import item_icons
 from . import ui_common as U
 from .ui_common import run_async
 
@@ -36,7 +37,9 @@ CARD = "#161b28"
 PROFILE_W, PROFILE_H = 440, 460     # 프로필 창. 높이는 '넘지 않는' 값이다 - 넘치면 안쪽이 굴러간다
 PROFILE_BAR = 16                    # 굴러가는 막대의 몫
 TABS = (("chat", "채팅"), ("members", "길드원"), ("mission", "미션"),
-        ("shop", "코인 상점"), ("manage", "관리"))
+        ("shop", "코인 상점"), ("guilds", "다른 길드"), ("manage", "관리"))
+SHOP_ICON = 40              # 코인 상점 카드의 도구 그림
+SHOP_CARD_W = 232           # 카드 한 칸이 바라는 폭. 칸이 이보다 좁아지면 한 줄에 놓는 수를 줄인다
 MODE_KR = {"open": "자유 가입", "approve": "승인 필요"}
 ROLE_COLOR = {"master": U.ACCENT, "sub": U.INFO}
 
@@ -55,6 +58,25 @@ def make_socket(app, on_event):
     if not (WS.available() and base and token):
         return None
     return WS.GuildSocket(app.root, base, token, on_event).start()
+
+
+def shop_cols(width):
+    """코인 상점의 카드를 한 줄에 몇 장 놓나 (2~4). 아직 폭을 모르면(그리기 전) 석 장."""
+    try:
+        width = int(width)
+    except (TypeError, ValueError):
+        return 3
+    if width < 50:
+        return 3
+    return max(2, min(4, width // SHOP_CARD_W))
+
+
+def shop_match(it, q):
+    """찾는 말이 그 도구의 이름에 들어 있나. 띄어쓰기·대소문자는 안 가린다."""
+    q = "".join((q or "").lower().split())
+    if not q:
+        return True
+    return q in "".join(str(it.get("kr") or "").lower().split()) or q in str(it.get("id") or "").lower()
 
 
 def span(sec):
@@ -103,6 +125,9 @@ class GuildWindow(object):
         self.page = 1
         self.found = None             # 길드 찾기 결과
         self.shop = None
+        self.shop_query = ""          # 코인 상점에서 찾는 말 (사고 나서 다시 그려도 남는다)
+        self.shop_cards = []
+        self.shop_btns = {}
         # 채팅
         self.chat_last = 0
         self.chat_box = None
@@ -288,10 +313,16 @@ class GuildWindow(object):
                            lambda gid=p["guildId"]: self.act(lambda: self.app.api.guild_cancel(gid)),
                            height=28).pack(side="right")
 
-        # 찾기
-        bar = tk.Frame(self.body, bg=U.BG)
+        self._finder(self.body)
+
+    def _finder(self, parent, title="길드 찾기"):
+        """길드 찾기 칸: 이름으로 찾기 + 목록 + 쪽 넘기기.
+
+        길드가 없을 때의 첫 화면과, 길드에 든 뒤의 '다른 길드' 칸이 같이 쓴다 (1.10.1).
+        """
+        bar = tk.Frame(parent, bg=U.BG)
         bar.pack(fill="x", padx=16, pady=(14, 6))
-        U.marker_label(bar, "길드 찾기", bg=U.BG, color=U.FG).pack(side="left")
+        U.marker_label(bar, title, bg=U.BG, color=U.FG).pack(side="left")
         self.q_var = tk.StringVar(value=self.query)
         U.ghost_button(bar, "찾기", self.do_search, height=30).pack(side="right")
         box = U.entry(bar, self.q_var, width=16)
@@ -300,13 +331,17 @@ class GuildWindow(object):
         tk.Label(bar, text="이름 일부만 적어도 됩니다", bg=U.BG, fg=U.FG_FAINT,
                  font=U.FONT_XS).pack(side="right", padx=(0, 10))
 
-        self.pager = tk.Frame(self.body, bg=U.BG)
+        self.pager = tk.Frame(parent, bg=U.BG)
         self.pager.pack(side="bottom", fill="x", padx=16, pady=(6, 0))
-        self.list, self.list_fit = self._scroll(self.body)
+        self.list, self.list_fit = self._scroll(parent)
         if self.found is None:
             self.load_list()
         else:
             self._fill_list()
+
+    def finding(self):
+        """지금 길드 목록을 보고 있나 (길드가 없을 때의 첫 화면이거나 '다른 길드' 칸)."""
+        return self.mode == "none" or (self.mode == "guild" and self.tab == "guilds")
 
     def _scroll(self, parent, pad=16):
         """굴러가는 칸 하나. (안쪽 틀, 맞추는 것) 을 돌려준다."""
@@ -338,7 +373,7 @@ class GuildWindow(object):
         q, page = self.query, self.page
 
         def done(r, err):
-            if not self.alive or gen != self._gen or self.mode != "none":
+            if not self.alive or gen != self._gen or not self.finding():
                 return
             if err:
                 return self.say(_err(err), U.DANGER)
@@ -388,8 +423,15 @@ class GuildWindow(object):
             side="left", padx=(10, 0))
         tk.Label(row, text="마스터 %s" % g.get("masterName", "?"), bg=U.BG3, fg=U.FG_FAINT,
                  font=U.FONT_XS).pack(side="left", padx=(10, 0))
+        tk.Label(row, text="누적 %s점" % format(int(g.get("points") or 0), ","), bg=U.BG3,
+                 fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left", padx=(10, 0))
         gid = g["id"]
-        if g.get("requested"):
+        mine = ((self.data or {}).get("guild") or {}).get("id")
+        if mine is not None:
+            # 길드에 든 채로 둘러보는 중이다 (1.10.1). 가입은 지금 길드를 나온 뒤에야 된다.
+            if gid == mine:
+                U.chip(row, "내 길드", U.ACCENT, fg=U.ACCENT_DARK, padx=7).pack(side="right")
+        elif g.get("requested"):
             U.ghost_button(row, "신청 취소",
                            lambda: self.act(lambda: self.app.api.guild_cancel(gid)),
                            height=28).pack(side="right")
@@ -561,6 +603,8 @@ class GuildWindow(object):
     def show_tab(self, key):
         if key == self.tab and self.mode == "guild":
             return
+        if key == "guilds":
+            self.found = None                 # 칸을 열 때마다 새로 받는다
         self.tab = key
         try:
             self.seg.set(key)
@@ -578,6 +622,12 @@ class GuildWindow(object):
             self.unread = 0
         self._paint_unread()
         getattr(self, "_tab_" + self.tab)()
+
+    # ---------------- 다른 길드 (1.10.1) ----------------
+    def _tab_guilds(self):
+        """다른 길드 둘러보기. 길드에 들고 나면 목록을 볼 길이 없었다 - 어느 길드가 몇 명이고
+        점수가 얼마인지 볼 수 있다. 가입 단추는 없다 (지금 길드를 나온 뒤에야 가입할 수 있다)."""
+        self._finder(self.content, title="다른 길드")
 
     # ---------------- 채팅 ----------------
     def _tab_chat(self):
@@ -685,12 +735,32 @@ class GuildWindow(object):
         # 웹소켓이 붙어 있으면 밀려오는 것만 받는다. 끊겨 있을 때만 묻는다.
         if self.chat_visible() and not self.live:
             self._poll_chat()
-        if self._badged and self.pane_visible():
-            self._badge(False)               # 길드 탭으로 돌아왔다 - 탭의 점은 지운다
+        if self.pane_visible():
+            if self._badged:
+                self._badge(False)           # 길드 탭으로 돌아왔다 - 탭의 점은 지운다
+            self._tell_app()
         try:
             self._chat_job = self.root.after(CHAT_MS, self._chat_tick)
         except Exception:                                   # noqa: BLE001
             self._chat_job = None
+
+    def _tell_app(self):
+        """앱에 알린다: 채팅 칸을 보고 있으면 '여기까지 읽었다', 아니면 '탭을 보고 있다'.
+
+        허브의 길드 탭에 찍는 점은 앱이 그린다 (1.10.1) - 안 읽은 줄이 남았는지는 앱이 안다
+        (app.mark_guild_chat_seen / _paint_guild). 검사용 앱처럼 그런 것이 없으면 아무 일도 없다.
+        """
+        try:
+            if self.chat_visible() and self.chat_ready and self.chat_last:
+                fn = getattr(self.app, "mark_guild_chat_seen", None)
+                if fn is not None:
+                    fn(self.chat_last)
+            else:
+                fn = getattr(self.app, "_paint_guild", None)
+                if fn is not None:
+                    fn()
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def _poll_chat(self, first=False):
         if self._chat_busy or self.chat_box is None:
@@ -758,6 +828,15 @@ class GuildWindow(object):
                 self.sock = make_socket(self.app, self._on_ws)
             except Exception:                               # noqa: BLE001
                 self.sock = None             # 못 만들면 폴링으로 돈다
+            if self.sock is not None:
+                # 이 탭이 듣기 시작했다. 탭이 없는 동안 앱이 붙여 둔 것은 끊는다 (1.10.1) -
+                # 한 PC 에서 연결을 둘씩 쓰지 않는다.
+                stop = getattr(self.app, "_stop_guild_sock", None)
+                if stop is not None:
+                    try:
+                        stop()
+                    except Exception:                       # noqa: BLE001
+                        pass
 
     def _stop_socket(self):
         if self.sock is not None:
@@ -789,6 +868,10 @@ class GuildWindow(object):
             return self._reload_soon()
         if t == "chat":
             m = ev.get("m") or {}
+            if m.get("userId") != self.my_id and not m.get("system"):
+                note = getattr(self.app, "note_guild_chat", None)
+                if note is not None:
+                    note(m.get("id"))        # 안 읽은 줄이 생겼다 (점은 앱이 그린다)
             if self.chat_box is None:
                 # 다른 칸을 보고 있다. 줄은 채팅 칸을 열 때 받고, 여기서는 수만 센다.
                 if m.get("userId") != self.my_id and not m.get("system"):
@@ -831,12 +914,15 @@ class GuildWindow(object):
         on = bool(on)
         if on != self._badged:
             self._badged = on
+            painter = getattr(self.app, "_paint_guild", None)
             hub = getattr(self.app, "hub", None)
-            if hub is not None:
-                try:
+            try:
+                if painter is not None:
+                    painter()                # 진짜 앱: 점은 앱이 그린다 (1.10.1)
+                elif hub is not None:
                     hub.set_badge("guild", on)
-                except Exception:                           # noqa: BLE001
-                    pass
+            except Exception:                               # noqa: BLE001
+                pass
         if not on and self.tab == "chat":
             self.unread = 0
 
@@ -1188,6 +1274,17 @@ class GuildWindow(object):
                      font=U.FONT_S).pack(pady=24)
             gen, api, mode, tab = self._gen, self.app.api, self.mode, self.tab
 
+            def work():
+                r = api.guild_shop()
+                # 카드의 그림도 여기서(작업 스레드) 받아 크기를 맞춰 둔다. 못 받아도 상점은
+                # 뜬다 - 그림 자리만 빈다.
+                try:
+                    item_icons.prefetch(api, [i["id"] for i in (r or {}).get("items") or []],
+                                        sizes=(SHOP_ICON,))
+                except Exception:                           # noqa: BLE001
+                    pass
+                return r
+
             def done(r, err):
                 if not self.alive or gen != self._gen or self.mode != mode \
                         or (mode == "guild" and self.tab != tab):
@@ -1197,7 +1294,7 @@ class GuildWindow(object):
                 self.shop = r or {}
                 self._clear(self.content)
                 self._fill_shop()
-            return run_async(self.root, lambda: api.guild_shop(), done)
+            return run_async(self.root, work, done)
         self._fill_shop()
 
     def _fill_shop(self):
@@ -1210,38 +1307,123 @@ class GuildWindow(object):
                  font=U.FONT_B).pack(side="left")
         tk.Label(head, text="일일 미션의 단계 보상으로 모읍니다. 길드를 나가도 남습니다.", bg=U.BG,
                  fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left", padx=(12, 0))
+        # 찾기 (1.10.1). 적는 대로 걸러진다.
+        bar = tk.Frame(self.content, bg=U.BG)
+        bar.pack(fill="x", padx=16, pady=(10, 0))
+        tk.Label(bar, text="도구 찾기", bg=U.BG, fg=U.FG_DIM, font=U.FONT_XS).pack(side="left")
+        self.shop_q = tk.StringVar(value=self.shop_query)
+        U.entry(bar, self.shop_q, width=14).pack(side="left", padx=(8, 0))
+        self.shop_count = tk.Label(bar, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS)
+        self.shop_count.pack(side="left", padx=(10, 0))
+        # 카드 격자 (1.10.1). 예전에는 한 줄에 하나씩이라 스무 개를 보려면 한참 내려야 했다.
         inner, fit = self._scroll(self.content)
+        self.shop_inner, self.shop_fit = inner, fit
+        self.shop_none = tk.Label(inner, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S)
         bag = s.get("bag") or {}
         self.shop_btns = {}           # {(도구, 몇 개): 단추} - 코인이 모자라면 꺼져 있다
-        for it in s.get("items") or []:
-            self._shop_row(inner, it, have, int(bag.get(it["id"]) or 0))
-        fit.fit_now()
+        # 카드는 한 번만 만든다. 찾기와 창 크기 바꾸기는 만들어 둔 것을 담았다 뺐다만 한다.
+        self.shop_cards = [(it, self._shop_card(inner, it, have, int(bag.get(it["id"]) or 0)))
+                           for it in s.get("items") or []]
+        self._shop_cols = 0
+        self._shop_layout()
+        self.shop_q.trace_add("write", lambda *_a: self._shop_search())
+        inner.master.bind("<Configure>", lambda e: self._shop_resized(e.width), add="+")
 
-    def _shop_row(self, parent, it, have, owned):
+    def _shop_card(self, parent, it, have, owned):
+        """코인 상점의 카드 한 장: 그림 · 이름 · 값 · 설명 · 사기 단추."""
         c = U.framed(parent, bg=U.BG3)
-        c.pack(fill="x", pady=3)
-        row = tk.Frame(c, bg=U.BG3)
-        row.pack(fill="x", padx=12, pady=8)
         price = int(it.get("coin") or 0)
         iid = it["id"]
-        for n in (10, 1):
-            b = U.ghost_button(row, "%d개 사기" % n, lambda n=n: self.buy(iid, n), height=28)
-            b.pack(side="right", padx=(6, 0))
+        # 단추는 바닥에 붙인다 - 같은 줄의 카드는 높이가 같아지므로(설명이 긴 쪽에 맞춘다)
+        # 단추가 한 줄로 가지런하다.
+        btns = tk.Frame(c, bg=U.BG3)
+        btns.pack(side="bottom", fill="x", padx=10, pady=(0, 10))
+        for n in (1, 10):
+            b = U.ghost_button(btns, "%d개 사기" % n, lambda n=n: self.buy(iid, n), height=28)
+            b.pack(side="left", padx=(0, 6))
             if have < price * n:
                 b.configure(state="disabled")
             self.shop_btns[(iid, n)] = b
-        tk.Label(row, text="코인 %d" % price, bg=U.BG3, fg=U.ACCENT if have >= price else U.DANGER,
-                 font=U.FONT_B, width=8, anchor="e").pack(side="right", padx=(0, 6))
-        tk.Label(row, text=it.get("kr", iid), bg=U.BG3, fg=U.FG, font=U.FONT_B).pack(side="left")
+        top = tk.Frame(c, bg=U.BG3)
+        top.pack(fill="x", padx=10, pady=(10, 4))
+        holder = tk.Frame(top, bg=U.BG3, width=SHOP_ICON, height=SHOP_ICON)
+        holder.pack_propagate(False)             # 그림이 아직 없어도 자리는 그대로다
+        holder.pack(side="left")
+        pic = tk.Label(holder, bg=U.BG3, bd=0)
+        pic.pack(expand=True)
+        ph = item_icons.photo(iid, SHOP_ICON)
+        if ph is not None:
+            pic.configure(image=ph)
+            pic.image = ph                       # 참조를 놓으면 tk 가 그림을 지운다
+        txt = tk.Frame(top, bg=U.BG3)
+        txt.pack(side="left", fill="x", expand=True, padx=(8, 0))
+        name = tk.Label(txt, text=it.get("kr", iid), bg=U.BG3, fg=U.FG, font=U.FONT_B,
+                        anchor="w", justify="left")
+        name.pack(fill="x")
+        U.wrap_to_width(name)
+        line = tk.Frame(txt, bg=U.BG3)
+        line.pack(fill="x")
+        tk.Label(line, text="코인 %d" % price, bg=U.BG3,
+                 fg=U.ACCENT if have >= price else U.DANGER, font=U.FONT_B).pack(side="left")
         if owned:
-            tk.Label(row, text="가진 것 %d" % owned, bg=U.BG3, fg=U.FG_FAINT,
+            tk.Label(line, text="가진 것 %d" % owned, bg=U.BG3, fg=U.FG_FAINT,
                      font=U.FONT_XS).pack(side="left", padx=(8, 0))
         note = it.get("note") or it.get("heldNote") or it.get("desc") or ""
         if note:
             lb = tk.Label(c, text=natural(note), bg=U.BG3, fg=U.FG_FAINT, font=U.FONT_XS,
-                          anchor="w", justify="left")
-            lb.pack(fill="x", padx=12, pady=(0, 8))
+                          anchor="nw", justify="left")
+            lb.pack(fill="x", padx=10, pady=(0, 8))
             U.wrap_to_width(lb)
+        return c
+
+    def shop_shown(self):
+        """지금 찾는 말에 맞는 도구들 (화면 순서)."""
+        q = self.shop_query
+        return [it for it, _c in self.shop_cards if shop_match(it, q)]
+
+    def _shop_layout(self, width=None):
+        """카드를 격자에 담는다: 찾는 말에 맞는 것만, 한 줄에 shop_cols 장."""
+        try:
+            inner = self.shop_inner
+            if width is None:
+                width = inner.master.winfo_width()
+            cols = shop_cols(width)
+            q = self.shop_query
+            shown = [c for it, c in self.shop_cards if shop_match(it, q)]
+            for _it, c in self.shop_cards:
+                c.grid_forget()
+            self.shop_none.grid_forget()
+            for k in range(4):
+                inner.grid_columnconfigure(k, weight=1 if k < cols else 0,
+                                           uniform="shop" if k < cols else "")
+            for i, c in enumerate(shown):
+                c.grid(row=i // cols, column=i % cols, sticky="nsew", padx=3, pady=3)
+            if not shown:
+                self.shop_none.configure(
+                    text=("'%s' (이)가 들어간 도구가 없습니다." % q.strip()) if q.strip()
+                    else "살 수 있는 도구가 없습니다.")
+                self.shop_none.grid(row=0, column=0, columnspan=cols, pady=24)
+            self._shop_cols = cols
+            self.shop_count.configure(text="%d개" % len(shown) if q.strip() else "")
+            self.shop_fit.fit_now()
+        except (tk.TclError, AttributeError):
+            pass                                 # 그 사이에 칸을 떠났다
+
+    def _shop_search(self):
+        try:
+            self.shop_query = self.shop_q.get() or ""
+        except tk.TclError:
+            return
+        self._shop_layout()
+        try:
+            self.shop_inner.master.yview_moveto(0)
+        except (tk.TclError, AttributeError):
+            pass
+
+    def _shop_resized(self, width):
+        """칸의 폭이 바뀌었다. 한 줄에 놓는 수가 달라질 때만 다시 담는다."""
+        if self.alive and self.shop_cards and shop_cols(width) != self._shop_cols:
+            self._shop_layout(width)
 
     def buy(self, item, n):
         def after(r):

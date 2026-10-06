@@ -151,6 +151,27 @@ def main():
     chk("값이 비어도 안 터진다", F.egg_progress({}) == (0, 1), F.egg_progress({}))
     chk("알이 없으면 목록 그대로", F.merge_eggs(ms, None) == ms)
 
+    print("-- 종족값 높은 순 (1.10.1)")
+    chk("종족값 합계: 이상해꽃 525 · 뮤츠 680 · 잉어킹 200",
+        [F.bst_of(mon(dex, n), dex) for n in (3, 150, 129)] == [525, 680, 200],
+        [F.bst_of(mon(dex, n), dex) for n in (3, 150, 129)])
+    pool = [mon(dex, n) for n in (129, 3, 150, 25, 6, 143)]      # 잉어킹·이상해꽃·뮤츠·피카츄·리자몽·잠만보
+    pool[4]["info"]["ivPercent"], pool[4]["level"] = 10.0, 5     # 리자몽: 개체값·레벨이 낮아도
+    pool[3]["info"]["ivPercent"], pool[3]["level"] = 100.0, 99   # 피카츄: 개체값·레벨이 높아도
+    got = [m["num"] for m in F.sort_bst(pool, dex)]
+    chk("개체값·레벨이 아니라 종족값이 순서를 정한다", got == [150, 143, 6, 3, 25, 129], got)
+    chk("받은 목록은 그대로 둔다", [m["num"] for m in pool] == [129, 3, 150, 25, 6, 143])
+    a, b, c = mon(dex, 6, pid=1), mon(dex, 6, pid=2), mon(dex, 6, pid=3)
+    a["info"]["ivPercent"], b["info"]["ivPercent"], c["info"]["ivPercent"] = 50.0, 90.0, 50.0
+    a["level"], c["level"] = 30, 60
+    chk("같은 종이면 개체값 높은 순, 그것도 같으면 레벨 높은 순",
+        [m["id"] for m in F.sort_bst([a, b, c], dex)] == [2, 3, 1], [m["id"] for m in F.sort_bst([a, b, c], dex)])
+    egg_row = F.egg_row({"id": 9, "name": "포켓몬 알", "needSec": 100, "gotSec": 10})
+    chk("알은 맨 뒤", F.sort_bst([egg_row] + pool, dex)[-1] is egg_row and F.bst_of(egg_row, dex) == -1)
+    chk("도감이 없거나 모르는 종이어도 안 터진다", F.bst_of(pool[0], None) == 0
+        and F.bst_of({"species": "NOPE"}, dex) == 0 and len(F.sort_bst(pool, None)) == len(pool))
+    chk("개체값 순 정렬은 없앴다 (1.10.0 의 것)", not hasattr(F, "sort_iv"))
+
     print("-- 도감이 없어도 안 터진다")
     chk("dex None 이면 타입 거르기는 전부 걸러진다", F.apply(mons, None, type_id="FIRE") == [])
     chk("dex None 이어도 이름으로는 찾는다", [m["num"] for m in F.apply(mons, None, query="불꽃이")] == [4])
