@@ -23,7 +23,7 @@
     <nav class="nav-links" aria-label="사이트">
       <a href="guide/">안내서</a>
       <a class="opt" href="https://github.com/rudtjr1106/poketdesktop/releases">패치노트</a>
-      <a class="btn small" href="https://github.com/rudtjr1106/poketdesktop/releases/latest">최신 버전 받기</a>
+      <a class="btn small" data-download="auto" href="https://github.com/rudtjr1106/poketdesktop/releases/latest">최신 버전 받기</a>
     </nav>
   </div>
 </header>
@@ -35,7 +35,7 @@
       <h1>일하는 화면 한켠에서 <span>포켓몬이 걸어다닙니다</span></h1>
       <p class="sub">켜 두면 풀숲이 돋고 야생 포켓몬이 나타납니다. 잡아서 키우고, 관장과 다른 사람에게 도전하세요.</p>
       <div class="cta">
-        <a class="btn" href="https://github.com/rudtjr1106/poketdesktop/releases/latest"><i class="ph ph-download-simple" aria-hidden="true"></i>최신 버전 받기</a>
+        <a class="btn" data-download="auto" href="https://github.com/rudtjr1106/poketdesktop/releases/latest"><i class="ph ph-download-simple" aria-hidden="true"></i>최신 버전 받기</a>
         <a class="btn ghost" href="guide/">안내서 읽기</a>
       </div>
     </div>
@@ -44,7 +44,7 @@
       <figcaption>창이 아니라 바탕화면 위를 직접 걸어다닙니다. 가운데 위의 풀이 풀숲입니다.</figcaption>
     </figure>
   </div>
-  <div class="wrap"><div class="grass" aria-hidden="true"></div></div>
+  <div class="wrap"><div class="meadow" aria-hidden="true"></div></div>
 
   <section class="wrap band walk">
     <figure class="screen reveal">
@@ -149,8 +149,9 @@
       <div>
         <h2 class="h2">받아서 켜 두세요</h2>
         <p>윈도우와 맥(Apple 실리콘)에서 돌아갑니다. 무료입니다.</p>
+        <p class="files">다른 기기에서 쓸 파일: <a data-download="win" href="https://github.com/rudtjr1106/poketdesktop/releases/latest">윈도우 zip</a>, <a data-download="mac" href="https://github.com/rudtjr1106/poketdesktop/releases/latest">맥 dmg</a><span data-version></span></p>
       </div>
-      <a class="btn" href="https://github.com/rudtjr1106/poketdesktop/releases/latest"><i class="ph ph-download-simple" aria-hidden="true"></i>최신 버전 받기</a>
+      <a class="btn" data-download="auto" href="https://github.com/rudtjr1106/poketdesktop/releases/latest"><i class="ph ph-download-simple" aria-hidden="true"></i>최신 버전 받기</a>
     </div>
   </section>
 </main>
@@ -159,5 +160,7 @@
   <span>포켓몬은 닌텐도 / Game Freak / 포켓몬 컴퍼니의 저작물입니다. 포스크탑은 팬이 만든 비상업 프로젝트입니다.</span>
   <span>걷는 도트는 PMDCollab/SpriteCollab (CC BY-NC 4.0) 을 씁니다. 자세한 출처는 <a href="https://github.com/rudtjr1106/poketdesktop/blob/main/CREDITS.md">CREDITS.md</a> 에 있습니다.</span>
 </footer>
+<script src="assets/download.js" defer></script>
+<script src="assets/pets.js" defer></script>
 </body>
 </html>
