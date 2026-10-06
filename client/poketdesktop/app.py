@@ -797,8 +797,37 @@ class App(object):
         # 같은 길드면 웹소켓으로 먼저 안 번호가 더 클 수 있다 - 뒤로 물리지 않는다
         self.guild_chat = max(latest, self.guild_chat) if gid and gid == self.guild_id else latest
         self.guild_id = gid
+        if gid:
+            self._guild_first_sight(latest)
         self._watch_guild(bool(gid))
         self._paint_guild()
+
+    def _guild_first_sight(self, latest):
+        """이 PC 가 이 계정·이 길드의 채팅을 처음 본다면, 지금까지의 줄은 본 것으로 친다 (1.10.2).
+
+        '본 데' 는 PC 마다 적는다. 처음에는 0 이라, 1.10.1 로 올린 직후나 새 PC 에서는 이미
+        읽은 옛 줄 때문에 점이 켜졌다 - 내 길드에는 새 말이 없는데 점이 떠서 다른 길드의 일로
+        켜지는 것처럼 보였다. 계정이나 길드가 바뀌어도 새로 잡는다: 줄 번호는 길드를 가리지
+        않고 이어지므로, 앞 길드에서 적어 둔 번호를 새 길드에 그대로 대면 안 된다.
+        """
+        if self.user_id is None:
+            return                           # 아직 누구인지 모른다 - 엉뚱한 주인으로 적지 않는다
+        who = "%s:%s" % (self.user_id, self.guild_id)
+        had = self.settings.get("guildChatFor")
+        if had == who:
+            return
+        try:
+            seen = int(self.settings.get("guildChatSeen") or 0)
+        except (TypeError, ValueError):
+            seen = 0
+        # 주인 표시 없이 번호만 있으면 1.10.1 에서 읽어 둔 것이다 - 그대로 쓴다
+        if had or not seen:
+            self.settings["guildChatSeen"] = int(latest or 0)
+        self.settings["guildChatFor"] = who
+        try:
+            config.save_settings(self.settings)
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def note_guild_chat(self, mid):
         """방금 온 채팅 줄의 번호 (웹소켓). 남이 쓴 줄만 넘긴다."""

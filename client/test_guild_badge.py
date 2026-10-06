@@ -23,7 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
-from poketdesktop import ui_guild                              # noqa: E402
+from poketdesktop import config, ui_guild, ui_hub              # noqa: E402
 from poketdesktop.app import App                               # noqa: E402
 
 OK = FAIL = 0
@@ -63,17 +63,118 @@ class Sock(object):
         self.stopped = True
 
 
+class Box(object):
+    """채팅 칸 흉내 (화면에 보이나, 끝으로 내리기)."""
+    def __init__(self):
+        self.viewable = True
+
+    def winfo_viewable(self):
+        return self.viewable
+
+    def see(self, _index):
+        pass
+
+
+class Cell(object):
+    def __init__(self):
+        self.text = None
+
+    def configure(self, text=None, **_kw):
+        self.text = text
+
+
+class Seg(object):
+    def __init__(self):
+        self.cells = {"chat": Cell()}
+
+
+class Api(object):
+    def __init__(self):
+        self.reply = {}
+
+    def guild_chat(self, _after):
+        return self.reply
+
+
+class Win(object):
+    """길드 창 흉내. **채팅을 받고 읽음을 알리는 함수는 GuildWindow 의 진짜 것**을 빌려 쓴다."""
+    _poll_chat = ui_guild.GuildWindow._poll_chat
+    _add_lines = ui_guild.GuildWindow._add_lines
+    _tell_app = ui_guild.GuildWindow._tell_app
+    _on_ws = ui_guild.GuildWindow._on_ws
+    _paint_unread = ui_guild.GuildWindow._paint_unread
+    chat_visible = ui_guild.GuildWindow.chat_visible
+
+    def __init__(self, app):
+        self.app, self.root = app, None
+        app.api = Api()
+        self.alive, self.mode, self.tab, self.live = True, "guild", "chat", True
+        self.chat_box, self.chat_last, self.chat_ready = Box(), 0, False
+        self._chat_busy, self._pending, self._stamp = False, [], "s"
+        self.my_id, self.unread, self.shown, self.seg = app.user_id, 0, True, Seg()
+        self.badged = []
+
+    def _append(self, _msgs):
+        pass
+
+    def pane_visible(self):
+        return self.shown
+
+    def _badge(self, on):
+        self.badged.append(on)
+
+    def load(self, quiet=False):
+        pass
+
+    def say(self, *_a, **_k):
+        pass
+
+
+class Nb(object):
+    def __init__(self):
+        self.at = 0
+
+    def index(self, _what):
+        return self.at
+
+
+class TkWin(object):
+    def __init__(self):
+        self.jobs = []
+
+    def after(self, ms, fn):
+        self.jobs.append((ms, fn))
+
+
+class FakeHub(Hub):
+    """허브 흉내. 탭이 바뀔 때 하는 일(_on_tab)은 HubWindow 의 진짜 것."""
+    _on_tab = ui_hub.HubWindow._on_tab
+    _key_at = ui_hub.HubWindow._key_at
+
+    def __init__(self, app):
+        Hub.__init__(self)
+        self.app, self.nb, self.root = app, Nb(), TkWin()
+        self.order = [t[0] for t in ui_hub.TABS]
+        self.built = []
+
+    def _build(self, key):
+        self.built.append(key)
+
+
 class FakeApp(object):
-    def __init__(self, hub=True):
-        self.settings = {"guildChatSeen": 0}
+    def __init__(self, hub=True, settings=None, uid=7):
+        # 기본은 '이 계정·이 길드를 이미 아는 PC' 다 (처음 보는 PC 는 따로 본다)
+        self.settings = {"guildChatSeen": 0, "guildChatFor": "7:1"} if settings is None \
+            else dict(settings)
         self.hub = Hub() if hub else None
-        self.user_id = 7
+        self.user_id = uid
         self.guild_id, self.guild_chat, self.guild_sock, self._guild_dot = None, 0, None, None
 
     # App 의 실제 메서드를 빌려 쓴다 (가짜로 다시 쓰지 않는다)
     _guild_pane = App._guild_pane
     guild_unseen = App.guild_unseen
     note_guild = App.note_guild
+    _guild_first_sight = App._guild_first_sight
     note_guild_chat = App.note_guild_chat
     mark_guild_chat_seen = App.mark_guild_chat_seen
     _paint_guild = App._paint_guild
@@ -109,7 +210,6 @@ def main():
         and app.settings["guildChatSeen"] == 5 and not app.guild_unseen, app.hub.badges)
     app.mark_guild_chat_seen(3)
     chk("  본 데는 뒤로 물리지 않는다", app.settings["guildChatSeen"] == 5)
-    from poketdesktop import config
     chk("  껐다 켜도 남게 설정에 적는다", config.load_settings().get("guildChatSeen") == 5,
         config.load_settings().get("guildChatSeen"))
 
@@ -145,11 +245,114 @@ def main():
     chk("길드가 없어지면 점도 꺼진다", not app.guild_unseen and app.guild_chat == 0
         and app.hub.badges[-1] == ("guild", False) and app.guild_id is None, app.hub.badges[-2:])
     app.note_guild({"id": 2, "chat": 3})
-    chk("다른 길드에 들어가면 그 길드의 번호로 다시 센다 (본 데 5 보다 앞이면 점 없음)",
-        app.guild_chat == 3 and not app.guild_unseen and len(socks) == 3, (app.guild_chat, len(socks)))
+    chk("다른 길드에 들어가면 그 길드의 번호로 다시 센다 (거기까지는 본 것으로 친다)",
+        app.guild_chat == 3 and not app.guild_unseen and len(socks) == 3
+        and app.settings["guildChatSeen"] == 3 and app.settings["guildChatFor"] == "7:2",
+        (app.guild_chat, len(socks), app.settings))
     socks[2].gave_up = 4404
     app.note_guild({"id": 2, "chat": 3})
     chk("서버가 '다시 오지 마라' 로 끊은 연결은 새로 만든다", len(socks) == 4 and socks[2].stopped)
+
+    print("\n=== 이 PC 가 처음 보는 길드 채팅 (1.10.2) ===")
+    # 운영에서 있던 그대로다: 내 길드(1번)의 남이 쓴 마지막 줄은 110번이고 나는 이미 읽었다.
+    # 그 뒤 111~124번은 전부 **다른 길드(2번)** 의 줄이다. 1.10.1 로 올리고 처음 켜면 '본 데'
+    # 가 0 이라 110 > 0 으로 점이 켜졌다 - 내 길드에는 새 말이 없는데 점이 떠서, 다른 길드에
+    # 일이 생기면 뜨는 것처럼 보였다.
+    new = FakeApp(settings={}, uid=27)
+    new.note_guild({"id": 1, "chat": 110})
+    chk("처음 켠 PC: 이미 있던 줄로는 점이 안 켜진다", not new.guild_unseen
+        and ("guild", True) not in new.hub.badges, (new.settings, new.hub.badges))
+    chk("  거기까지를 본 것으로 적고, 누구의 어느 길드 것인지도 적는다",
+        new.settings.get("guildChatSeen") == 110 and new.settings.get("guildChatFor") == "27:1",
+        new.settings)
+    chk("  껐다 켜도 남는다", config.load_settings().get("guildChatFor") == "27:1"
+        and config.load_settings().get("guildChatSeen") == 110, config.load_settings())
+    new.note_guild({"id": 1, "chat": 110})
+    chk("  다른 길드에 줄이 아무리 쌓여도(111~124) 내 번호는 그대로라 점이 없다", not new.guild_unseen)
+    socks[-1].on_event({"t": "chat", "m": {"id": 126, "userId": 36, "system": False}})
+    chk("그 뒤 내 길드에서 남이 말하면 점이 켜진다", new.guild_unseen
+        and new.hub.badges[-1] == ("guild", True), new.hub.badges[-2:])
+    new.note_guild({"id": 1, "chat": 126})
+    chk("  다음 동기화가 그걸 다시 '본 것' 으로 덮지 않는다", new.guild_unseen
+        and new.settings["guildChatSeen"] == 110, new.settings)
+
+    old = FakeApp(settings={"guildChatSeen": 105})
+    old.note_guild({"id": 1, "chat": 110})
+    chk("1.10.1 에서 읽어 둔 번호는 그대로 쓴다 (그 뒤의 줄은 안 읽은 줄)", old.guild_unseen
+        and old.settings["guildChatSeen"] == 105 and old.settings["guildChatFor"] == "7:1",
+        old.settings)
+
+    other = FakeApp(settings={"guildChatSeen": 124, "guildChatFor": "9:2"})
+    other.note_guild({"id": 1, "chat": 110})
+    chk("같은 PC 에서 다른 계정으로 들어오면 그 계정의 번호로 새로 잡는다",
+        not other.guild_unseen and other.settings["guildChatSeen"] == 110
+        and other.settings["guildChatFor"] == "7:1", other.settings)
+
+    anon = FakeApp(settings={}, uid=None)
+    anon.note_guild({"id": 1, "chat": 110})
+    chk("내 번호를 아직 모르면 아무것도 적지 않는다 (엉뚱한 주인으로 적지 않는다)",
+        "guildChatFor" not in anon.settings, anon.settings)
+
+    print("\n=== 채팅 칸이 뜨는 순간 읽은 것으로 (1.10.2) ===")
+    # 1.10.1 은 2초마다 도는 틱에서만 '읽었다' 를 적었다. 채팅을 흘끗 보고 바로 다른 칸으로
+    # 가면 안 읽은 채로 남아, 길드 탭을 나온 뒤(다음 동기화 때) 점이 다시 켜졌다.
+    ui_guild.run_async = lambda _root, fn, done: done(fn(), None)       # 바로 답이 온다
+    me = FakeApp(settings={"guildChatSeen": 100, "guildChatFor": "27:1"}, uid=27)
+    me.note_guild({"id": 1, "chat": 110})
+    win = Win(me)
+    me.hub.panes["guild"] = win
+    chk("(준비) 안 읽은 줄이 있다", me.guild_unseen)
+    me.api.reply = {"guild": 1, "last": 125, "stamp": "s", "messages": [
+        {"id": 110, "userId": 36, "name": "남", "body": "ㅎ", "system": False},
+        {"id": 125, "userId": None, "name": "", "body": "미션 달성", "system": True}]}
+    win._poll_chat(first=True)
+    chk("채팅을 다 받으면 틱을 기다리지 않고 거기까지 읽은 것으로 적는다",
+        me.settings["guildChatSeen"] == 125 and not me.guild_unseen, me.settings)
+    win._on_ws({"t": "chat", "m": {"id": 126, "userId": 36, "name": "남", "body": "새 말",
+                                    "system": False}})
+    chk("채팅 칸을 보는 중에 온 줄도 바로 읽은 것이 된다", me.settings["guildChatSeen"] == 126
+        and not me.guild_unseen, me.settings)
+    win.chat_box.viewable = False
+    win.shown = False                        # 다른 탭으로 갔다
+    win._on_ws({"t": "chat", "m": {"id": 127, "userId": 36, "name": "남", "body": "또",
+                                    "system": False}})
+    chk("안 보는 동안 온 줄은 읽은 것이 아니다 (점이 켜진다)", me.settings["guildChatSeen"] == 126
+        and me.guild_unseen and me.hub.badges[-1] == ("guild", True), (me.settings, me.hub.badges[-2:]))
+
+    print("\n=== 다른 칸을 보고 있을 때 '채팅' 칸의 표시 ===")
+    win.tab, win.chat_box, win.shown, win.unread = "shop", None, True, 0
+    win._paint_unread()
+    chk("안 읽은 줄이 남았으면 '채팅' 칸 이름에 점 (무엇이 안 읽혔는지 알 수 있다)",
+        win.seg.cells["chat"].text == "채팅 ●", win.seg.cells["chat"].text)
+    win.unread = 2
+    win._paint_unread()
+    chk("  세어 둔 수가 있으면 수를 쓴다", win.seg.cells["chat"].text == "채팅 2")
+    me.mark_guild_chat_seen(127)
+    win.unread = 0
+    win._paint_unread()
+    chk("  다 읽었으면 그냥 '채팅'", win.seg.cells["chat"].text == "채팅")
+
+    print("\n=== 탭을 옮기면 점을 바로 다시 그린다 ===")
+    # 1.10.1 은 길드 탭에서 나와도 다음 동기화(최대 90초 뒤)에야 점을 다시 찍었다 -
+    # 아무 일도 없는데 한참 뒤에 점이 켜지니 남의 길드 일로 켜지는 것처럼 보였다.
+    walker = FakeApp(settings={"guildChatSeen": 100, "guildChatFor": "7:1"})
+    walker.hub = FakeHub(walker)
+    pane = Pane(visible=True)
+    walker.hub.panes["guild"] = pane
+    walker.note_guild({"id": 1, "chat": 110})
+    chk("(준비) 길드 탭을 보는 동안에는 점이 없다", walker.hub.badges[-1] == ("guild", False))
+    pane.visible = False                     # 다른 탭을 눌렀다
+    walker.hub._on_tab()
+    for _ms, fn in walker.hub.root.jobs:
+        fn()
+    chk("길드 탭에서 나오면 안 읽은 줄이 남았을 때 점이 바로 찍힌다",
+        walker.hub.badges[-1] == ("guild", True) and walker.hub.built, walker.hub.badges)
+    pane.visible = True
+    walker.hub.root.jobs = []
+    walker.hub._on_tab()
+    for _ms, fn in walker.hub.root.jobs:
+        fn()
+    chk("길드 탭으로 돌아오면 점이 바로 꺼진다", walker.hub.badges[-1] == ("guild", False))
 
     print("\n=== 창이 없을 때 ===")
     bare = FakeApp(hub=False)

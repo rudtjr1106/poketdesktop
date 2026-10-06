@@ -1094,6 +1094,50 @@ def main():
         and len(made) == 2, len(made))
     w4.close()
     chk("닫으면 웹소켓도 끈다", made[-1].stopped and w4.sock is None)
+
+    print("\n=== 읽은 데를 앱에 알린다 (1.10.2) ===")
+    # 진짜 앱은 허브의 길드 탭에 찍는 점을 스스로 그린다 (app.mark_guild_chat_seen).
+    # 창이 '여기까지 읽었다' 를 언제 알리는지 본다. 2초 틱만 믿으면, 채팅을 흘끗 보고 다른
+    # 칸으로 간 사람은 안 읽은 채로 남아 나중에 점이 다시 켜진다.
+    app6 = FakeApp(root, A2)
+    app6.seen, app6.guild_unseen = [], False
+    app6.mark_guild_chat_seen = lambda n=None: app6.seen.append(n)
+    app6._paint_guild = lambda: None
+    w6 = ui_guild.GuildWindow(app6)
+    top6 = w6.win.winfo_toplevel()
+    top6.deiconify()
+    top6.geometry("1000x680+90+60")
+    wait(root, lambda: w6.in_guild() and w6.chat_box is not None and w6.chat_ready)
+    got = wait(root, lambda: bool(app6.seen), 3)
+    chk("채팅 칸이 뜨면 거기까지 읽었다고 알린다", got and app6.seen[-1] == w6.chat_last > 0,
+        (app6.seen[-3:], w6.chat_last))
+    sock6 = made[-1]
+    sock6.push({"t": "open", "userId": 1, "guild": 1, "last": len(srv2.chat)})
+    settle(root, 0.3)
+    try:
+        root.after_cancel(w6._chat_job)          # 틱을 세운다 - 아래는 틱 없이도 되어야 한다
+    except Exception:                            # noqa: BLE001
+        pass
+    w6._chat_job = None
+    srv2.say("보는 중에 온 말", 2)
+    sock6.push({"t": "chat", "m": dict(srv2.chat[-1], system=False)})
+    root.update()
+    chk("보는 중에 온 줄은 틱을 기다리지 않고 바로 읽은 것이 된다",
+        app6.seen and app6.seen[-1] == srv2.chat[-1]["id"] == w6.chat_last,
+        (app6.seen[-2:], srv2.chat[-1]["id"], w6.chat_last))
+    app6.guild_unseen = True                     # 앱이 안다: 안 읽은 줄이 남았다
+    w6.show_tab("members")
+    settle(root, 0.3)
+    chk("다른 칸에 있을 때 안 읽은 채팅이 남았으면 '채팅 ●'",
+        w6.seg.cells["chat"].cget("text") == "채팅 ●", w6.seg.cells["chat"].cget("text"))
+    bad = squeezed(top6)
+    chk("  눌린 위젯 없음", not bad, bad[:3])
+    app6.guild_unseen = False
+    w6.show_tab("chat")
+    wait(root, lambda: w6.chat_ready, 3)
+    chk("채팅 칸으로 오면 표시가 사라진다", w6.seg.cells["chat"].cget("text") == "채팅",
+        w6.seg.cells["chat"].cget("text"))
+    w6.close()
     ui_guild.make_socket = keep_make
     app5 = FakeApp(root, A2)
     chk("붙을 수 없는 앱이면 None (폴링으로 돈다)", ui_guild.make_socket(app5, lambda ev: None) is None)

@@ -786,6 +786,9 @@ class GuildWindow(object):
             self.chat_ready = True
             pend, self._pending = self._pending, []
             self._add_lines(pend)
+            # 눈앞에 떴으면 그 자리에서 읽은 것이다 (1.10.2). 2초 틱만 믿으면, 채팅을 흘끗
+            # 보고 바로 다른 칸으로 간 사람은 안 읽은 채로 남아 나중에 점이 다시 켜진다.
+            self._tell_app()
             if first:
                 try:
                     box.see("end")
@@ -883,8 +886,9 @@ class GuildWindow(object):
             if not self.chat_ready or self._chat_busy:
                 return self._pending.append(m)       # 지난 줄을 받는 중이다 - 그 뒤에 붙인다
             fresh = self._add_lines([m])
-            if fresh and not self.pane_visible() and m.get("userId") != self.my_id \
-                    and not m.get("system"):
+            if fresh and self.pane_visible():
+                self._tell_app()             # 보고 있는 칸에 떴다 - 바로 읽은 것이다
+            elif fresh and m.get("userId") != self.my_id and not m.get("system"):
                 self.unread += 1
                 self._badge(True)
 
@@ -927,12 +931,21 @@ class GuildWindow(object):
             self.unread = 0
 
     def _paint_unread(self):
-        """'채팅' 칸 이름 옆에 안 읽은 수."""
+        """'채팅' 칸 이름 옆에 안 읽은 수.
+
+        이 창이 세어 둔 수가 없어도 앱이 '안 읽은 줄이 남았다' 고 알면 점을 찍는다 (1.10.2) -
+        허브의 길드 탭에 점이 켜진 까닭이 채팅이라는 것을 여기서 알 수 있어야 한다.
+        """
         seg = getattr(self, "seg", None)
+        text = "채팅"
+        if self.tab != "chat":
+            if self.unread:
+                text = "채팅 %d" % self.unread
+            elif getattr(self.app, "guild_unseen", False):
+                text = "채팅 ●"
         try:
             if seg is not None and "chat" in seg.cells:
-                seg.cells["chat"].configure(
-                    text="채팅 %d" % self.unread if self.unread and self.tab != "chat" else "채팅")
+                seg.cells["chat"].configure(text=text)
         except tk.TclError:
             pass
 

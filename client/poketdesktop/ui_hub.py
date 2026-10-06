@@ -87,6 +87,16 @@ class HubWindow(object):
         key = self._key_at(self.nb.index("current"))
         if key:
             self._build(key)
+        # 길드 탭의 점은 '안 읽은 채팅이 남았고 지금 그 탭을 안 보고 있다' 는 뜻이다. 탭을
+        # 옮겼으면 바로 다시 본다 (1.10.2) - 전에는 다음 동기화(최대 90초 뒤)에야 다시 찍혀서,
+        # 아무 일도 없는데 한참 뒤에 점이 켜지는 것처럼 보였다. 새 탭이 화면에 붙은 뒤에 본다.
+        # (root 에 건다 - 이 창에 걸면 그사이 창을 닫았을 때 없어진 명령을 부른다.)
+        paint = getattr(self.app, "_paint_guild", None)
+        if paint is not None:
+            try:
+                self.root.after(80, paint)
+            except Exception:                               # noqa: BLE001
+                pass
 
     def _build(self, key):
         """그 탭을 처음 눌렀으면 그때 만든다."""
