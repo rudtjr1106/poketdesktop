@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>포스크탑</title>
+<meta name="description" content="바탕화면에서 포켓몬을 만나고 키우는 데스크톱 펫 게임. 윈도우와 맥에서 무료로 돌아갑니다.">
+<meta property="og:title" content="포스크탑">
+<meta property="og:description" content="일하는 화면 한켠에서 포켓몬이 걸어다닙니다.">
+<meta property="og:image" content="https://rudtjr1106.github.io/poketdesktop/images/desktop.png">
+<link rel="icon" href="images/icon.png">
+<link rel="preload" as="image" href="images/desktop.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1" defer></script>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="./"><img src="images/icon.png" alt="" width="28" height="28"><b>포스크탑</b></a>
+    <nav class="nav-links" aria-label="사이트">
+      <a href="guide/">안내서</a>
+      <a class="opt" href="https://github.com/rudtjr1106/poketdesktop/releases">패치노트</a>
+      <a class="btn small" href="https://github.com/rudtjr1106/poketdesktop/releases/latest">최신 버전 받기</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div class="hero-copy">
+      <p class="eyebrow">바탕화면 포켓몬 육성</p>
+      <h1>일하는 화면 한켠에서 <span>포켓몬이 걸어다닙니다</span></h1>
+      <p class="sub">켜 두면 풀숲이 돋고 야생 포켓몬이 나타납니다. 잡아서 키우고, 관장과 다른 사람에게 도전하세요.</p>
+      <div class="cta">
+        <a class="btn" href="https://github.com/rudtjr1106/poketdesktop/releases/latest"><i class="ph ph-download-simple" aria-hidden="true"></i>최신 버전 받기</a>
+        <a class="btn ghost" href="guide/">안내서 읽기</a>
+      </div>
+    </div>
+    <figure class="screen">
+      <img src="images/desktop.png" alt="바탕화면의 풀밭 배경 위를 포켓몬 여섯 마리가 걸어다니고, 풀숲 하나와 몬스터볼이 놓여 있다" width="560" height="380">
+      <figcaption>창이 아니라 바탕화면 위를 직접 걸어다닙니다. 가운데 위의 풀이 풀숲입니다.</figcaption>
+    </figure>
+  </div>
+  <div class="wrap"><div class="grass" aria-hidden="true"></div></div>
+
+  <section class="wrap band walk">
+    <figure class="screen reveal">
+      <img src="images/walk-directions.png" alt="피카츄, 파이리, 이브이, 리자몽이 아래, 오른쪽, 위, 왼쪽을 향해 걷는 도트" width="872" height="680" loading="lazy">
+      <figcaption>방향마다 도트가 다릅니다.</figcaption>
+    </figure>
+    <div class="reveal">
+      <h2 class="h2">미끄러지지 않고 발이 바뀝니다</h2>
+      <p class="sub">가는 방향에 따라 몸을 돌리고, 위로 올라가면 등이 보입니다. 한동안 안 건드리면 그 자리에서 잠듭니다.</p>
+    </div>
+  </section>
+
+  <section class="wrap band">
+    <div class="reveal">
+      <h2 class="h2">켜 두면 생기는 일</h2>
+      <p class="sub">별도 화면이 없습니다. 풀숲도 배틀도 진화도 바탕화면 그 자리에서 벌어집니다.</p>
+    </div>
+    <div class="loop reveal">
+      <div><i class="ph ph-plant" aria-hidden="true"></i><b>풀숲이 돋습니다</b><span>5~7분에 한 번입니다. 누르면 야생 포켓몬이 나옵니다.</span></div>
+      <div><i class="ph ph-cursor-click" aria-hidden="true"></i><b>싸우거나 던집니다</b><span>왼쪽 클릭은 배틀, 오른쪽 클릭은 던질 볼 고르기입니다.</span></div>
+      <div><i class="ph ph-trend-up" aria-hidden="true"></i><b>자라고 진화합니다</b><span>레벨이 오르면 기술을 배우고, 조건이 맞으면 그 자리에서 진화합니다.</span></div>
+      <div><i class="ph ph-package" aria-hidden="true"></i><b>도구가 떨어집니다</b><span>잡으면 30%, 쓰러뜨리면 45% 로 도구를 줍습니다.</span></div>
+      <div><i class="ph ph-users-three" aria-hidden="true"></i><b>팀이 생깁니다</b><span>여섯 마리를 데리고 다니고 나머지는 PC 박스에 둡니다.</span></div>
+    </div>
+  </section>
+
+  <section class="wrap band">
+    <div class="reveal">
+      <h2 class="h2">다 키웠다면</h2>
+      <p class="sub">혼자 키우는 데서 끝나지 않습니다. 전국의 관장, 다른 사람의 팀, 같은 길드의 사람들이 기다립니다.</p>
+    </div>
+    <div class="bento reveal">
+      <a class="cell pic c-gym" href="guide/#gym">
+        <img src="images/site-gym-map.png" alt="서울의 구마다 트레이너 레벨이 색으로 칠해진 관장 지도" width="612" height="538" loading="lazy">
+        <b>대한민국 시·군·구 256곳의 관장</b>
+        <span>원작의 관장과 챔피언이 지역마다 기다립니다. 여기서는 기술을 직접 고릅니다.</span>
+      </a>
+      <a class="cell pic c-arena" href="guide/#battle">
+        <img src="images/mac-arena.png" alt="바탕화면에서 여섯 마리씩 반원으로 모여 싸우는 투기장" width="613" height="362" loading="lazy">
+        <b>바탕화면이 투기장으로</b>
+        <span>랜덤 배틀과 랭크 시즌</span>
+      </a>
+      <a class="cell c-mega" href="guide/#mega">
+        <b>메가진화</b>
+        <span>관장 8곳을 이기면 키스톤을 받습니다.</span>
+      </a>
+      <a class="cell c-guild" href="guide/#guild">
+        <b>길드</b>
+        <span>15명이 같이 채팅하고, 일일 미션을 채워 코인을 받습니다.</span>
+      </a>
+      <a class="cell c-dex" href="guide/#dex">
+        <em>1025</em>
+        <span><b>1~9세대 전부</b><br>도감 업적 50개가 칭호로 돌아옵니다.</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="wrap band">
+    <div class="reveal">
+      <h2 class="h2">설치 없이 5분</h2>
+      <p class="sub">받아서 풀고 실행하면 끝입니다. 한 번 받으면 새 버전은 켤 때 알아서 받습니다.</p>
+    </div>
+    <div class="start reveal">
+      <div><b>받습니다</b><span>윈도우는 zip 을 폴더째 풀고 안의 exe 를 실행합니다. 맥은 dmg 를 열어 Applications 로 끌어다 놓습니다.</span></div>
+      <div><b>가입합니다</b><span>닉네임과 숫자 4자리면 됩니다. 윈도우와 맥이 같은 서버를 씁니다.</span></div>
+      <div><b>고릅니다</b><span>1~9세대 스타팅 27마리 중 하나를 고르면 바탕화면에 나타납니다.</span></div>
+    </div>
+  </section>
+
+  <section class="wrap band">
+    <div class="reveal">
+      <h2 class="h2">안내서에 다 있습니다</h2>
+      <p class="sub">숫자와 규칙은 게임에서 실제로 쓰는 값 그대로 적었습니다.</p>
+    </div>
+    <div class="index reveal">
+      <div>
+        <h3>처음이라면</h3>
+        <a href="guide/#start"><b>시작하기</b><span>처음 5분, 창 하나에 탭 열 개</span></a>
+        <a href="guide/#desktop"><b>바탕화면</b><span>풀숲, 클릭 세 가지, 잡기 좋게 싸우기</span></a>
+        <a href="guide/#settings"><b>설정</b><span>돌아다닐 영역, 투명도, 자동 시작</span></a>
+        <a href="guide/#help"><b>문제 해결</b><span>탭이 안 보일 때, 백신이 막을 때</span></a>
+      </div>
+      <div>
+        <h3>키우기</h3>
+        <a href="guide/#raise"><b>키우기</b><span>파티와 박스, 기술, 진화, 친밀도</span></a>
+        <a href="guide/#items"><b>도구·상점</b><span>떨어지고, 팔고, 사는 것</span></a>
+        <a href="guide/#mega"><b>메가진화</b><span>키스톤과 유대 미션</span></a>
+        <a href="guide/#dex"><b>도감·게시판</b><span>업적과 칭호, 버그 제보</span></a>
+      </div>
+      <div>
+        <h3>겨루기</h3>
+        <a href="guide/#gym"><b>관장</b><span>도전하는 법과 보상</span></a>
+        <a href="guide/#battle"><b>배틀</b><span>랜덤, 친구, 실시간. 기술을 고르는 방식</span></a>
+        <a href="guide/#rank"><b>랭크</b><span>티어와 RP 가 오르내리는 법</span></a>
+        <a href="guide/#guild"><b>길드</b><span>채팅, 일일 미션, 코인 상점</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="last">
+    <div class="wrap">
+      <div>
+        <h2 class="h2">받아서 켜 두세요</h2>
+        <p>윈도우와 맥(Apple 실리콘)에서 돌아갑니다. 무료입니다.</p>
+      </div>
+      <a class="btn" href="https://github.com/rudtjr1106/poketdesktop/releases/latest"><i class="ph ph-download-simple" aria-hidden="true"></i>최신 버전 받기</a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>포켓몬은 닌텐도 / Game Freak / 포켓몬 컴퍼니의 저작물입니다. 포스크탑은 팬이 만든 비상업 프로젝트입니다.</span>
+  <span>걷는 도트는 PMDCollab/SpriteCollab (CC BY-NC 4.0) 을 씁니다. 자세한 출처는 <a href="https://github.com/rudtjr1106/poketdesktop/blob/main/CREDITS.md">CREDITS.md</a> 에 있습니다.</span>
+</footer>
+</body>
+</html>

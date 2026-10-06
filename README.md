@@ -10,7 +10,7 @@
 가끔 풀숲이 돋아나고, 야생 포켓몬이 나타나고, 잡아서 키웁니다.
 다 키웠으면 친구와 붙거나, 대한민국 곳곳의 관장에게 도전합니다.
 
-[**최신 버전 받기**](https://github.com/rudtjr1106/poketdesktop/releases/latest) · [쓰인 자료](CREDITS.md)
+[**최신 버전 받기**](https://github.com/rudtjr1106/poketdesktop/releases/latest) · [안내서](https://rudtjr1106.github.io/poketdesktop/guide/) · [쓰인 자료](CREDITS.md)
 
 </div>
 
