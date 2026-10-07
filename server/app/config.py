@@ -61,7 +61,6 @@ PIN_DIGITS = _int("POKET_PIN_DIGITS", 4)
 MIN_PASSWORD = PIN_DIGITS
 
 # ---- 게임 규칙 ----
-MAX_BOX = _int("POKET_MAX_BOX", 300)                   # 보유 상한
 # 데리고 다니는 포켓몬 수. 이 숫자가 곧 바탕화면에 나오는 수이기도 하다.
 # 넘치면 PC 박스로 들어간다.
 MAX_PARTY = _int("POKET_MAX_PARTY", 6)
@@ -73,6 +72,10 @@ MAX_DESKTOP = MAX_PARTY
 # 30 x 32 = 960마리. 본가(30 x 32)와 같게 잡았다.
 BOX_SIZE = _int("POKET_BOX_SIZE", 30)
 BOX_COUNT = _int("POKET_BOX_COUNT", 32)
+# 보유 상한. 이만큼 가지면 풀숲이 돋지 않는다 (main.wild_state).
+# **박스 용량과 같게 둔다.** 박스가 생기기 전의 300 이 남아 있어서, 300마리를 채운 사람은
+# 박스가 스물두 개 비어 있는데도 풀숲이 돋지 않았다 (제보: 빡 규·WhiteSna, 2026-10-07).
+MAX_BOX = _int("POKET_MAX_BOX", BOX_SIZE * BOX_COUNT)
 # 야생 레벨은 파티 수준을 따라간다.
 # 고정해두면 시작하자마자 도저히 못 이기는 상대를 만나 재미가 없다.
 WILD_MIN_LEVEL = _int("POKET_WILD_MIN_LEVEL", 2)      # 절대 하한

@@ -276,6 +276,21 @@ def main_():
 
     t_191(size)
 
+    print("\n=== 풀숲: 박스에 자리가 남았으면 돋는다 (보유 상한 = 박스 용량) ===")
+    # 보유 상한이 박스가 생기기 전의 300 으로 남아 있었다. 300마리를 채운 사람은 박스가
+    # 스물두 개 비어 있는데도 풀숲이 돋지 않았고, 까닭도 화면에 보이지 않았다.
+    cap = config.BOX_SIZE * config.BOX_COUNT
+    chk("보유 상한이 박스 용량과 같다 (30 x 32 = 960)", config.MAX_BOX == cap == 960, config.MAX_BOX)
+    many, _ids = mkuser("many300", 300)
+    r = main.wild_state({"user": {"id": many, "balls": 10}})
+    chk("300마리를 가져도 풀숲이 돋는다", bool(r.get("wild")) and r["wild"].get("state") == "grass"
+        and "boxFull" not in r, dict((k, r.get(k)) for k in ("wild", "boxFull", "nextInSeconds")))
+    packed, _ids = mkuser("packed", cap)
+    r = main.wild_state({"user": {"id": packed, "balls": 10}})
+    chk("박스가 다 찼을 때만 안 돋고, 까닭과 다음 시각을 알린다", r.get("wild") is None
+        and ("%d마리" % cap) in (r.get("boxFull") or {}).get("message", "") and r.get("nextInSeconds", 0) > 0,
+        dict((k, r.get(k)) for k in ("wild", "boxFull", "nextInSeconds")))
+
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
 
