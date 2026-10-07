@@ -1,0 +1,11 @@
+# 올리지 않는 것. 원본은 ~/StudioProjects/posktop-avatar-proto 에 있다.
+#
+#   .env      제미나이 API 키
+#   photos/   올린 사람의 사진
+#   out/      만든 결과물 (받아 둔 그림 포함)
+#   refs/     틀에 놓는 예시 도트 (원작 게임의 그림이라 저장소에 넣지 않는다)
+.env
+photos/
+out/
+refs/
+__pycache__/
