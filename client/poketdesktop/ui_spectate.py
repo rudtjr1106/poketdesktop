@@ -179,6 +179,7 @@ class Friendly(object):
         self.listeners = []           # 모습이 바뀌면 부를 함수들 (길드 탭)
         self.error = None             # 마지막으로 실패한 까닭 (길드 탭이 한 번 보여 주고 지운다)
         self.pushed = 0.0             # 마지막으로 무언가 밀려온 때
+        self.pushes = 0               # 밀려온 횟수 (묻는 사이에 밀려왔는지 가린다 - 시계로는 못 가린다)
         self.chat_open = None         # 길드 채팅을 지금 보고 있나 (길드 탭이 넣는 함수) - 보고 있으면 알리지 않는다
         self._due = None              # '상대 구함' 의 시간이 다 될 때 서버에 다시 묻는 예약
 
@@ -248,10 +249,12 @@ class Friendly(object):
             return True
         if t == "friendly":
             self.pushed = time.monotonic()
+            self.pushes += 1
             self.set_view(ev)
             return True
         if t == "friendly_fight":
             self.pushed = time.monotonic()
+            self.pushes += 1
             self.fight(ev.get("fight") or {})
             return True
         if t == "left":
@@ -362,12 +365,14 @@ class Friendly(object):
         if api is None:
             return
 
-        sent = time.monotonic()
+        # **번호로 가린다.** 시각으로 가렸더니(밀려온 때 > 물은 때) 윈도우에서 틀렸다: 그쪽 시계는
+        # 16ms 씩 뛰어서, 묻자마자 밀려온 것이 '같은 때' 로 찍혀 늦게 온 옛 답이 새 모습을 덮었다.
+        seq = self.pushes
 
         def done(r, err):
             if err or not isinstance(r, dict):
                 return
-            if self.pushed > sent:
+            if self.pushes != seq:
                 return                       # 묻는 사이에 새 것이 밀려왔다 - 묻던 때의 옛 모습으로 덮지 않는다
             self.set_view(r, tell=False)
         run_async(self.root, api.guild_friendly, done)

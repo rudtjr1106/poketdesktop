@@ -436,10 +436,13 @@ def main():
         and sp["b"][0] - sp["a"][0] == F.GAP and sp["a"][1] == area[3] - F.LIFT and sp["b"][0] <= area[2], (sc.spot, area))
     chk("  체력 막대·글씨·기술 연출을 그릴 투명 레이어가 깔린다 (클릭이 통과한다)", host.layer is not None
         and host.layer.click_through and host.cv is host.layer.cv)
+    root.update()                           # (이름표 창이 화면에 놓일 때까지 - 스스로 도는 것은 세워 뒀다)
     px, py, pw, ph = duel.plate.winfo_x(), duel.plate.winfo_y(), duel.plate.winfo_width(), duel.plate.winfo_height()
     chk("  그 위에 작은 이름표 하나: 누구와 누구인지, 그만 보기(×)", duel.names == (n2, n3) and n2 in texts(duel.plate)
         and n3 in texts(duel.plate) and "×" in texts(duel.plate) and bool(duel.plate.overrideredirect())
-        and ph < 40 and py + ph < sp["a"][1] - 100 and px >= area[0] and px + pw <= area[2], (px, py, pw, ph))
+        and ph < 40 and py + ph < sp["a"][1] - 100 and px >= area[0] and px + pw <= area[2],
+        (px, py, pw, ph, duel.names, texts(duel.plate), duel.plate.winfo_ismapped(), duel.plate.winfo_viewable(),
+         duel.plate.overrideredirect(), sp, area))
     A, B = sc.sides["a"], sc.sides["b"]
     t = time.monotonic() + 1.0
     duel.step(t)

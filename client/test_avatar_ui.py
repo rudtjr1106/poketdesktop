@@ -140,8 +140,13 @@ def main():
         [t[1].winfo_width() for t in tiles.values()][:4])
     chk("지금 고른 칸에만 금테", [v for v, t in tiles.items() if gold(t[0])] == [A.DEFAULT["hair"]])
     chk("색 칸에도 지금 색에만 금테", [n for n, d in ed.dots["hair"].items() if gold(d)] == [A.DEFAULT["hairColor"]])
-    chk("칸이 굴리지 않아도 다 보인다", ed.inner.winfo_reqheight() <= ed.cv.winfo_height() + 1,
-        (ed.inner.winfo_reqheight(), ed.cv.winfo_height()))
+    # 창 높이는 MAX_H 를 넘지 않고, 넘치면 오른쪽 칸이 굴러간다 (ui_avatar). 맥에서는 다 보이는데
+    # 윈도우는 글자가 높아 머리 탭이 넘친다 - 그때는 굴러가는지를 본다.
+    def scrolls():
+        lo, hi = ed.cv.yview()
+        return (hi - lo) < 0.999
+    chk("칸이 다 보이거나, 넘치면 굴러간다", ed.inner.winfo_reqheight() <= ed.cv.winfo_height() + 1 or scrolls(),
+        (ed.inner.winfo_reqheight(), ed.cv.winfo_height(), ed.cv.yview()))
     chk("처음에는 되돌릴 것이 없다 (단추가 꺼져 있다)", ed.undo_btn.enabled is False)
     chk("'초기화' 단추가 있다. 기본 캐릭터일 때는 꺼져 있다", len(find(ed.win, "초기화")) == 1
         and ed.reset_btn.enabled is False)
@@ -180,13 +185,13 @@ def main():
         for cell, _art, lb in ed.tiles[tab].values():
             if lb.winfo_reqwidth() > lb.winfo_width() + 1 or cell.winfo_reqwidth() > cell.winfo_width() + 1:
                 wide.append((tab, lb.cget("text"), lb.winfo_reqwidth(), lb.winfo_width()))
-        if page.winfo_reqheight() > ed.cv.winfo_height() + 1:
+        if page.winfo_reqheight() > ed.cv.winfo_height() + 1 and not scrolls():
             tall.append((tab, page.winfo_reqheight(), ed.cv.winfo_height()))
     chk("탭을 누르면 그 탭이 맨 위로 올라온다", not raised, raised)
     chk("탭을 바꿔도 창 크기가 그대로다", sizes == {size0}, sizes)
     chk("탭마다 칸에 그림이 그려진다", not painted, painted)
     chk("어느 탭도 옆으로 넘치지 않는다 (이름이 잘리지 않는다)", not wide, wide[:3])
-    chk("어느 탭도 아래로 넘치지 않는다", not tall, tall[:3])
+    chk("어느 탭도 아래로 잘리지 않는다 (다 보이거나 굴러간다)", not tall, tall[:3])
     chk("칸 수: 머리 13 · 모자 7 · 안경 5 · 윗옷 9 · 바지 3 · 신발 2 · 가방 4 · 피부 0",
         [len(ed.tiles[t]) for t, _n in UA.TABS] == [0, 13, 7, 5, 9, 3, 2, 4], [len(ed.tiles[t]) for t, _n in UA.TABS])
     chk("피부는 색 여섯 칸만", len(ed.dots["skin"]) == 6 and not ed.tiles["skin"])
