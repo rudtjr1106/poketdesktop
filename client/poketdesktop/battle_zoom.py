@@ -122,6 +122,22 @@ def forget(app):
         pass
 
 
+def button_box(zoom, right):
+    """명령 칸 오른쪽 줄의 단추 둘(교체 · 기권)이 들어갈 틀과 놓는 법: (틀, 첫 단추 pack, 둘째 단추 pack, 높이).
+
+    **창을 줄였으면(배율 < 1) 둘을 옆으로 나란히 놓는다.** 그 아래 칸에는 기술 설명이 뜨는데
+    (윈도우에서 가장 긴 것이 다섯 줄), 줄인 창에서는 위아래로 쌓은 단추 둘이 자리를 다 먹어
+    설명이 잘렸다 - 글자는 7pt 아래로 안 줄고 여백도 그대로라, 창이 작아질수록 그 칸만 좁아진다.
+    나란히 놓으면 단추 하나의 높이가 그 칸으로 간다. 줄이지 않은 창은 예전 그대로 (pack 은 None).
+    """
+    if zoom >= 1.0:
+        return right, None, None, None
+    row = tk.Frame(right, bg=right["bg"])
+    row.pack(fill="x", pady=(px(6), 0))
+    side = {"side": "left", "fill": "x", "expand": True}
+    return row, dict(side, padx=(0, 3)), dict(side, padx=(3, 0)), 34
+
+
 class _Zoomed(object):
     """ui_common 그대로인데 **크기에 관한 것만** 배율을 탄다. 배틀 창이 U 대신 쓴다."""
 

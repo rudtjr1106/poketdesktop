@@ -14,6 +14,9 @@ test_raid_ui 의 것) **크기를 바꿔 가며** 본다. 관장 창은 test_gym
      **포켓몬이 이름표에 가려지지 않는다** - 가장 작게 줄였을 때도 (내 포켓몬의 머리가 상대 이름표
      뒤로 들어갔었다. 그래서 기술 카드를 줄이고 장면을 가장 낮게 했을 때의 높이를 올렸다).
      글자는 7pt 아래로 안 내려간다 - 그래서 창도 어느 크기 아래로는 안 줄어든다.
+  3-1. **줄인 창에서는 교체·기권 단추가 옆으로 나란히 선다** - 그 아래의 기술 설명 칸이 다섯 줄
+     (윈도우에서 가장 긴 설명)을 담게. 위아래로 쌓으면 줄인 창에서 설명이 잘렸다 (글자는 7pt 아래로
+     안 줄고 여백도 그대로라 그 칸만 좁아진다). 줄이지 않은 창은 예전처럼 위아래다.
   4. **크기를 바꿔도 판은 그대로다**: 나와 있는 포켓몬, 고르던 칸(기술·교체·기다리는 중·결과),
      마지막 말, 켜 둔 메가진화. 연출이 도는 중에 바꿔도 끝까지 간다 (오류 없이).
   5. 바꾼 크기는 창 종류마다 기억해서 다음 판도 그 크기로 뜬다. 화면보다 크게는 안 뜬다.
@@ -91,6 +94,21 @@ def hidden(cv, sprite, box):
     w = min(a[2], b[2]) - max(a[0], b[0])
     h = min(a[3], b[3]) - max(a[1], b[1])
     return max(0, w) * max(0, h)
+
+
+def hint_room(label):
+    """기술 설명 칸이 **윈도우 글꼴로** 다섯 줄을 담나: (받은 높이, 다섯 줄에 드는 높이).
+
+    맥의 글꼴은 줄이 낮아서 맥에서 재면 늘 넉넉하다. 윈도우(맑은 고딕)는 한 줄이 글자 크기(pt)의
+    두 배쯤이다 (8pt 두 줄이 32px 였다 - 1.6.0 의 CI). 가장 긴 설명 68자가 윈도우에서 다섯 줄이다.
+    """
+    pt = abs(int(label.tk.splitlist(label.cget("font"))[1]))
+    return label.winfo_height(), 5 * 2 * pt
+
+
+def side_by_side(a, b):
+    """두 단추가 옆으로 나란히 섰나 (같은 줄)."""
+    return abs(a.holder.winfo_rooty() - b.holder.winfo_rooty()) <= 2 and a.holder.winfo_rootx() < b.holder.winfo_rootx()
 
 
 def resize(root, w, ww, wh, sec=6.0):
@@ -225,6 +243,10 @@ def main():
             w.cv.winfo_width() >= w.win.winfo_width() - 6 and abs(w.cv.winfo_height() - w.sh) <= 1
             and abs((w.sh + Z.U.h(LUI.MSG_H) + Z.U.h(LUI.CMD_H) + 4) - w.win.winfo_height()) <= 1
             and abs(w.zoom - k) < 1e-6, (w.cv.winfo_width(), w.cv.winfo_height(), w.sh, w.win.winfo_width(), w.win.winfo_height(), w.zoom, k))
+        got_h, need_h = hint_room(w.hint)
+        row = side_by_side(w.switch_btn, w.forfeit_btn)
+        chk("  %s: 기술 설명 칸이 윈도우 글꼴로도 다섯 줄을 담는다 (%d >= %d). 단추는 %s" % (tag, got_h, need_h, "옆으로 나란히" if row else "위아래"),
+            got_h >= need_h and row == (w.zoom < 1.0), (got_h, need_h, row, w.zoom))
         if not (w._result_shown or w.busy):
             L.pump(root, lambda: all(w.cv.itemcget(w.sprite[who], "image") for who in ("me", "foe")), timeout=10)
             cover = (hidden(w.cv, w.sprite["me"], w.box["foe"]["bg"]), hidden(w.cv, w.sprite["foe"], w.box["me"]["bg"]))
@@ -371,6 +393,13 @@ def main():
     PLAT.work_area = keep_area
 
     print("\n=== 레이드 배틀 창 ===")
+    # (작업 영역은 그사이 몇 픽셀 달라질 수 있다 - 맥의 독은 아이콘이 늘면 낮아진다. 지금 것으로 다시 잰다)
+    try:
+        now_area = tuple(PLAT.work_area(sw_, sh_))
+    except Exception:                                       # noqa: BLE001
+        now_area = real_area
+    room_w = (now_area[2] - now_area[0]) - U.h(16)
+    room_h = (now_area[3] - now_area[1]) - Z.CHROME
     api3 = R.FakeApi(dex, n=6, revealed=True)
     room = api3.begin()
     app3 = R.FakeApp(root, api3, dex)
@@ -392,6 +421,16 @@ def main():
         inside = all(R.inside(bw.cv, bw.slots[i]["name"])[0] for i in range(6)) and R.inside(bw.cv, bw.boss_name)[0]
         sizes = font_sizes(bw.win)
         zooms.append(bw.zoom)
+        keep = bw.hint.cget("text")
+        bw.hint.configure(text=L.LONGEST_DESC)
+        bw.win.update_idletasks()
+        fits = bw.hint.winfo_reqheight() <= bw.hint.winfo_height()
+        got_h, need_h = hint_room(bw.hint)
+        row = side_by_side(bw.switch_btn, bw.leave_btn)
+        bw.hint.configure(text=keep)
+        chk("%s: 가장 긴 기술 설명이 안 잘리고, 줄인 창에서는 단추가 나란히 서서 설명 칸이 다섯 줄을 담는다 (%d / %d, 나란히 %s)"
+            % (got, got_h, need_h, row), fits and row == (bw.zoom < 1.0) and (got_h >= need_h or bw.zoom >= 1.0),
+            (fits, got_h, need_h, row, bw.zoom))
         L.pump(root, lambda: all(bw.cv.itemcget(bw.sprite[i], "image") for i in range(6)), timeout=10)
         tops = [bw.cv.bbox(bw.sprite[i])[1] for i in range(6) if bw.cv.bbox(bw.sprite[i])]
         marks = [bw.cv.bbox(bw.slots[i]["mark"])[3] for i in range(6) if bw.cv.bbox(bw.slots[i]["mark"])]

@@ -299,15 +299,17 @@ class LiveBattleWindow(Z.Resizable):
                                  font=U.FONT_XS, anchor="w")
         self.turn_lbl.pack(fill="x")
         # (단추와 여백은 조금씩 줄여 뒀다 - 명령 칸을 낮추고도 아래의 기술 설명이 안 눌리게. CMD_H 의 설명)
-        self.switch_btn = U.ghost_button(right, "포켓몬 교체", self.open_switch, height=36)
-        self.switch_btn.pack(fill="x", pady=(6, 0))
-        self.forfeit_btn = U.PushButton(right, "기권", self.forfeit, fill=U.DANGER_BG,
+        # 창을 줄였으면 단추 둘을 옆으로 나란히 놓는다 - 아래의 기술 설명이 잘리지 않게 (Z.button_box)
+        box, kw_a, kw_b, same = Z.button_box(self.zoom, right)
+        self.switch_btn = U.ghost_button(box, "포켓몬 교체", self.open_switch, height=same or 36)
+        self.switch_btn.pack(**(kw_a or {"fill": "x", "pady": (6, 0)}))
+        self.forfeit_btn = U.PushButton(box, "기권", self.forfeit, fill=U.DANGER_BG,
                                         fg=U.DANGER, shadow="#1a1013", hover="#3a2028",
-                                        height=32, border=U.DANGER_LINE, font=U.FONT_S)
-        self.forfeit_btn.pack(fill="x", pady=(6, 0))
+                                        height=same or 32, border=U.DANGER_LINE, font=U.FONT_S)
+        self.forfeit_btn.pack(**(kw_b or {"fill": "x", "pady": (6, 0)}))
         self.hint = tk.Label(right, text="", bg=U.BG, fg=U.FG_DIM, font=U.FONT_XS,
                              anchor="nw", justify="left")
-        self.hint.pack(fill="both", expand=True, pady=(8, 0))
+        self.hint.pack(fill="both", expand=True, pady=(Z.px(8) if same else 8, 0))
         U.wrap_to_width(self.hint)
 
     # ---------------- 그림 ----------------

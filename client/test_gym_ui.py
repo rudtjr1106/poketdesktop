@@ -551,6 +551,19 @@ def main():
         and b.mode == mode0 and [t for t in texts(b.left) if "PP" in t] == moves0 and b.msg.cget("text") == said0
         and pump(root, lambda: b.photos.get("trainer") is not None and all(cv.itemcget(b.sprite[w_], "image") for w_ in ("me", "foe")), 10),
         (b.mode, b.msg.cget("text")))
+    # 줄인 창에서는 교체·기권이 옆으로 나란히 서서, 아래의 기술 설명 칸이 다섯 줄(윈도우에서 가장 긴 설명)을 담는다
+    long_desc = ("상대의 지닌 물건을 탁 쳐서 떨어뜨려 배틀이 끝날 때까지 사용할 수 "
+                 "없게 한다. 물건을 가진 상대에게는 데미지를 더 준다.")
+    keep_hint = b.hint.cget("text")
+    b.hint.configure(text=long_desc)
+    b.win.update_idletasks()
+    hint_pt = abs(int(b.hint.tk.splitlist(b.hint.cget("font"))[1]))
+    same_row = abs(b.switch_btn.holder.winfo_rooty() - b.forfeit_btn.holder.winfo_rooty()) <= 2
+    chk("  줄인 창: 교체·기권 단추가 옆으로 나란히 서고, 기술 설명 칸이 가장 긴 설명을 담는다 (윈도우 글꼴로 다섯 줄 %d <= %d)"
+        % (5 * 2 * hint_pt, b.hint.winfo_height()), same_row and b.hint.winfo_reqheight() <= b.hint.winfo_height()
+        and b.hint.winfo_height() >= 5 * 2 * hint_pt and not squeezed(b.win),
+        (same_row, b.hint.winfo_reqheight(), b.hint.winfo_height(), hint_pt, squeezed(b.win)[:2]))
+    b.hint.configure(text=keep_hint)
     chk("  그 크기를 기억해 둔다 (관장 창의 것으로)", app.settings.get("battleSize", {}).get("gym") == [lo_w, lo_h], app.settings.get("battleSize"))
     b.win.geometry("%dx%d" % size0)
     pump(root, lambda: b._zoom_size == size0 and b._zoom_job is None, 8)
