@@ -80,8 +80,10 @@ class SettingsWindow(object):
             head = tk.Frame(self.win, bg=U.BG2, height=U.h(56))
             head.pack(fill="x")
             head.pack_propagate(False)
+            # 위아래 여백을 주지 않는다 - 머리줄(56)에서 여백 30 을 빼면 윈도우에서 글자(34)가
+            # 눌린다. 그냥 두면 세로 가운데에 선다.
             tk.Label(head, text="설정", bg=U.BG2, fg=U.FG,
-                     font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=16, pady=15)
+                     font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=16)
             tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
         # **스크롤을 붙인다.** 이 창은 690px 를 바라는데 허브 탭

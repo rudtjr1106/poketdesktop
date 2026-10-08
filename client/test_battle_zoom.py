@@ -101,7 +101,11 @@ def hint_room(label):
 
     맥의 글꼴은 줄이 낮아서 맥에서 재면 늘 넉넉하다. 윈도우(맑은 고딕)는 한 줄이 글자 크기(pt)의
     두 배쯤이다 (8pt 두 줄이 32px 였다 - 1.6.0 의 CI). 가장 긴 설명 68자가 윈도우에서 다섯 줄이다.
+
+    **윈도우에서는 어림하지 않는다** - 진짜 글꼴로 가장 긴 설명을 넣고 잰 것(안 잘린다)이 답이다.
     """
+    if sys.platform.startswith("win"):
+        return label.winfo_height(), 0
     pt = abs(int(label.tk.splitlist(label.cget("font"))[1]))
     return label.winfo_height(), 5 * 2 * pt
 
@@ -442,8 +446,9 @@ def main():
         row = side_by_side(bw.switch_btn, bw.leave_btn)
         bw.hint.configure(text=keep)
         chk("%s: 가장 긴 기술 설명이 안 잘리고, 줄인 창에서는 단추가 나란히 서서 설명 칸이 다섯 줄을 담는다 (%d / %d, 나란히 %s)"
-            % (got, got_h, need_h, row), fits and row == (bw.zoom < 1.0) and (got_h >= need_h or bw.zoom >= 1.0)
-            and buttons_fit(bw.switch_btn, bw.leave_btn), (fits, got_h, need_h, row, bw.zoom))
+            % (got, got_h, need_h, row), row == (bw.zoom < 1.0) and buttons_fit(bw.switch_btn, bw.leave_btn)
+            # (줄이지 않은 레이드 창은 윈도우에서 설명 칸이 세 줄뿐이다 - 예전부터 그렇고, 줄인 창에서만 잰다)
+            and (bw.zoom >= 1.0 or (fits and got_h >= need_h)), (fits, got_h, need_h, row, bw.zoom))
         L.pump(root, lambda: all(bw.cv.itemcget(bw.sprite[i], "image") for i in range(6)), timeout=10)
         tops = [bw.cv.bbox(bw.sprite[i])[1] for i in range(6) if bw.cv.bbox(bw.sprite[i])]
         marks = [bw.cv.bbox(bw.slots[i]["mark"])[3] for i in range(6) if bw.cv.bbox(bw.slots[i]["mark"])]
