@@ -271,6 +271,8 @@ class RaidBattleWindow(Z.Resizable):
                                       fg=U.DANGER, shadow="#1a1013", hover="#3a2028",
                                       height=same or 34, border=U.DANGER_LINE, font=U.FONT_S)
         self.leave_btn.pack(**(kw_b or {"fill": "x", "pady": (8, 0)}))
+        if same:
+            Z.share_row(self.switch_btn, self.leave_btn)
         self.hint = tk.Label(right, text="", bg=U.BG, fg=U.FG_DIM, font=U.FONT_XS,
                              anchor="nw", justify="left")
         self.hint.pack(fill="both", expand=True, pady=(Z.px(8) if same else 10, 0))

@@ -111,6 +111,17 @@ def side_by_side(a, b):
     return abs(a.holder.winfo_rooty() - b.holder.winfo_rooty()) <= 2 and a.holder.winfo_rootx() < b.holder.winfo_rootx()
 
 
+def buttons_fit(*buttons):
+    """단추들이 제 줄 안에 들어가고(바라는 폭 <= 받은 폭), 글자가 단추 안에 들어가나."""
+    for b in buttons:
+        if b.holder.winfo_reqwidth() > b.holder.winfo_width() + 1:
+            return False
+        if b.label.winfo_reqwidth() > b.box.winfo_width() - 3:
+            return False
+    row = buttons[0].holder.master
+    return row.winfo_reqwidth() <= row.winfo_width() + 1
+
+
 def resize(root, w, ww, wh, sec=6.0):
     """창을 끌어 그 크기로 만든 것처럼: 크기를 바꾸고, 따라 다시 지을 때까지 기다린다."""
     w.win.geometry("%dx%d" % (int(ww), int(wh)))
@@ -246,7 +257,9 @@ def main():
         got_h, need_h = hint_room(w.hint)
         row = side_by_side(w.switch_btn, w.forfeit_btn)
         chk("  %s: 기술 설명 칸이 윈도우 글꼴로도 다섯 줄을 담는다 (%d >= %d). 단추는 %s" % (tag, got_h, need_h, "옆으로 나란히" if row else "위아래"),
-            got_h >= need_h and row == (w.zoom < 1.0), (got_h, need_h, row, w.zoom))
+            got_h >= need_h and row == (w.zoom < 1.0) and buttons_fit(w.switch_btn, w.forfeit_btn),
+            (got_h, need_h, row, w.zoom, [(b.holder.winfo_reqwidth(), b.holder.winfo_width(), b.label.winfo_reqwidth(), b.box.winfo_width())
+                                          for b in (w.switch_btn, w.forfeit_btn)]))
         if not (w._result_shown or w.busy):
             L.pump(root, lambda: all(w.cv.itemcget(w.sprite[who], "image") for who in ("me", "foe")), timeout=10)
             cover = (hidden(w.cv, w.sprite["me"], w.box["foe"]["bg"]), hidden(w.cv, w.sprite["foe"], w.box["me"]["bg"]))
@@ -429,8 +442,8 @@ def main():
         row = side_by_side(bw.switch_btn, bw.leave_btn)
         bw.hint.configure(text=keep)
         chk("%s: 가장 긴 기술 설명이 안 잘리고, 줄인 창에서는 단추가 나란히 서서 설명 칸이 다섯 줄을 담는다 (%d / %d, 나란히 %s)"
-            % (got, got_h, need_h, row), fits and row == (bw.zoom < 1.0) and (got_h >= need_h or bw.zoom >= 1.0),
-            (fits, got_h, need_h, row, bw.zoom))
+            % (got, got_h, need_h, row), fits and row == (bw.zoom < 1.0) and (got_h >= need_h or bw.zoom >= 1.0)
+            and buttons_fit(bw.switch_btn, bw.leave_btn), (fits, got_h, need_h, row, bw.zoom))
         L.pump(root, lambda: all(bw.cv.itemcget(bw.sprite[i], "image") for i in range(6)), timeout=10)
         tops = [bw.cv.bbox(bw.sprite[i])[1] for i in range(6) if bw.cv.bbox(bw.sprite[i])]
         marks = [bw.cv.bbox(bw.slots[i]["mark"])[3] for i in range(6) if bw.cv.bbox(bw.slots[i]["mark"])]

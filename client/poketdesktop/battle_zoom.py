@@ -138,6 +138,20 @@ def button_box(zoom, right):
     return row, dict(side, padx=(0, 3)), dict(side, padx=(3, 0)), 34
 
 
+def share_row(*buttons):
+    """옆으로 나란히 놓은 단추들이 줄을 **똑같이 나눠** 쓰게 한다.
+
+    단추(PushButton)는 글자 폭 + 34 (적어도 72)를 제 폭으로 바란다. 좁은 줄에 둘을 놓으면 그 합이
+    줄보다 커서 눌린 것이 된다 (윈도우의 줄인 창: 줄 160 에 94 + 72). 바라는 폭을 없애면 pack 이
+    줄을 반씩 준다 - 글자는 그 안에 들어간다.
+    """
+    for b in buttons:
+        try:
+            b.holder.configure(width=1)
+        except tk.TclError:
+            pass
+
+
 class _Zoomed(object):
     """ui_common 그대로인데 **크기에 관한 것만** 배율을 탄다. 배틀 창이 U 대신 쓴다."""
 
