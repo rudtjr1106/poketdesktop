@@ -177,6 +177,9 @@ class Fighter(object):
         # 메가진화한 폼 열쇠 (시즌 3). **교체해도 안 풀린다** (본가와 같다) -
         # 그래서 물러날 때 지워지는 cond 가 아니라 따로 둔다.
         self.mega = None
+        # 메가진화하면서 바뀐 기술 {원래 열쇠: 바뀐 열쇠} (attackfx.MEGA_MOVES). 메가진화하는 그 턴에는
+        # 고른 기술이 아직 원래 열쇠로 넘어오므로, 쓰는 순간에 이것을 보고 바꿔 쓴다 (Battle._use).
+        self.alias = {}
         # 킬가르도의 블레이드폼 능력치 (처음 쓸 때 센다). 지금 폼은 cond["blade"] -
         # 물러나면 cond 가 비워져 실드폼으로 돌아간다 (본가와 같다).
         self._blade = None
@@ -300,6 +303,23 @@ class Fighter(object):
         self.mega = form["internal"]
         if not self.mon.get("nickname"):
             self.name = form["kr"]
+        for old, new in (AF.MEGA_MOVES.get(form["internal"]) or {}).items():
+            # 메가진화해 있는 동안 바뀌는 기술 (코어퍼니셔 -> 니힐레이저). **이 판 안에서만이다** -
+            # moves 는 판이 시작할 때 베껴 둔 것이라 포켓몬이 아는 기술은 그대로다.
+            if old not in self.moves or not self._dex.move(new):
+                continue
+            self.moves[self.moves.index(old)] = new
+            self.alias[old] = new
+            # PP 는 이어받는다. 원래 열쇠의 칸은 지우지 않는다 - 이 턴에 고른 기술이 아직 그 열쇠라서
+            # '그 기술의 PP 가 남았나' 를 보는 자리들이 그것을 본다. (저장했다 다시 읽을 때는 바뀐 열쇠의
+            # 칸이 이미 있으므로 덮어쓰지 않는다.)
+            if new not in self.pp:
+                self.pp[new] = self.pp.get(old, (self._dex.move(new) or {}).get("pp", 5))
+            for k, v in list(self.cond.items()):             # 앙코르·사슬묶기처럼 그 기술을 가리키던 것
+                if v == old:
+                    self.cond[k] = new
+                elif isinstance(v, dict) and v.get("move") == old:
+                    self.cond[k] = dict(v, move=new)
 
     def form_spec(self):
         """지금 취한 폼의 자료 (abilities.FORMS 의 한 줄). 원래 모습이면 None."""
@@ -611,6 +631,8 @@ def type_eff(dex, move, mtype, user, target, abil):
         elif mk != "THOUSANDARROWS" and not SM.forced_grounded(target) \
                 and (target.cond.get("magnetrise") or target.cond.get("telekinesis")):
             return 0.0
+    if mk in AF.HITS_FAIRY and mtype == "DRAGON" and "FAIRY" in ttypes:
+        ttypes = [t for t in ttypes if t != "FAIRY"]     # 니힐레이저: 페어리에게도 맞는다 (나머지 타입만 본다)
     eff = effectiveness(dex, mtype, ttypes)
     if mk == "FLYINGPRESS":
         eff = AF.flying_press(dex, eff, ttypes)
@@ -1318,6 +1340,7 @@ class Battle(object):
         _do_use 는 중간에 돌아가는 자리가 많아서, 끝난 뒤에 이벤트를 보고 정한다
         (attackfx.after_use).
         """
+        key = user.alias.get(key, key)            # 메가진화하며 바뀐 기술 (코어퍼니셔 -> 니힐레이저)
         top = not called and not bounced          # 진짜 한 수 (다른 기술이 부른 것이 아니다)
         n0 = len(ev)
         prev = user.cond.get("lastMove")

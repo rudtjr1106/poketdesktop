@@ -5,6 +5,13 @@
 '데리고 다니는 6마리' 와 'PC 박스' 사이에 구분선을 넣으려면 그래야 한다.
 
 오른쪽 상세에는 **실제 도트**가 제자리에서 움직인다.
+
+## 파티 프리셋 (1.10.3)
+
+목록 맨 위에 [파티 1][파티 2] ... 다섯 칸이 있다. 누르면 데리고 다니는 파티가 그 번호의 것으로
+바뀐다 (서버의 party.py). **저장 단추는 없다** - 지금 데리고 다니는 파티가 곧 지금 번호의 파티라,
+다른 번호로 갈 때 서버가 알아서 적어 둔다. 이름은 '이름 바꾸기' 로 붙인다 ('랭크', '레이드' ...).
+옛 서버(프리셋이 없다)에 붙으면 이 줄을 숨긴다.
 """
 import tkinter as tk
 import tkinter.font as tkfont
@@ -26,6 +33,7 @@ from .ui_bond import BondPanel
 
 ROW_H = U.h(30)
 DETAIL_W = 340
+PARTY_TABS = 5               # 파티 프리셋 칸 수 (서버의 party.COUNT)
 # PC 박스 한 쪽에 몇 마리. **한 쪽만 그린다.**
 # 예전에는 거름망에 걸러진 것까지 가진 포켓몬 전부의 줄을 미리 만들어 뒀다
 # (거르기를 풀 때 새로 안 만들려고). 줄 하나에 위젯이 열서너 개라, 수백
@@ -393,6 +401,8 @@ class BoxWindow(object):
         self.sort_bst = False
         self.rank_page = 0
         self.boxes = {}          # 서버가 준 박스 정보 (size/count/names/used)
+        self.party = None        # 서버가 준 파티 프리셋 (active/presets ...). 옛 서버면 None
+        self._party_busy = False # 갈아타는 중 (답이 오기 전에 또 누르지 못하게)
         self._rows_job = None    # 줄을 나눠 만들고 담는 일 (U.Chunked)
         self._sep_on = False     # 'PC 박스' 머리가 담겨 있나
         self._wait = None        # 불러오는 중 표시
@@ -467,11 +477,24 @@ class BoxWindow(object):
         wrap = tk.Frame(parent, bg=U.BG)
         wrap.pack(side="left", fill="both", expand=True)
 
+        # 파티 프리셋 (1.10.3). 서버가 프리셋을 줄 때만 담는다 (_paint_party).
+        self.party_bar = pbar = tk.Frame(wrap, bg=U.BG2, height=U.h(40))
+        pbar.pack_propagate(False)
+        tk.Label(pbar, text="파티", bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS).pack(
+            side="left", padx=(12, 8))
+        self.party_seg = U.Segmented(pbar, [(i, "파티 %d" % i) for i in range(1, PARTY_TABS + 1)],
+                                     1, self.use_party)
+        self.party_seg.frame.pack(side="left")
+        self.btn_party_name = U.ghost_button(pbar, "이름 바꾸기", self.rename_party, height=26)
+        self.btn_party_name.pack(side="left", padx=(10, 0))
+        self.party_line = tk.Frame(wrap, bg=U.LINE, height=U.h(1))
+        self._party_shown = False
+
         # 거르기. **PC 박스에만** 걸린다 - 데리고 다니는 여섯은 늘 보인다.
         # 타입은 드롭다운이다. 처음에는 칩으로 깔았는데 박스가 차면 타입이
         # 열댓 개가 되어 줄이 잘려 나갔다. 이름은 별명·종 이름·도감 번호를
         # 다 본다 (box_filter).
-        bar = tk.Frame(wrap, bg=U.BG2, height=U.h(40))
+        self.filter_bar = bar = tk.Frame(wrap, bg=U.BG2, height=U.h(40))
         bar.pack(fill="x")
         bar.pack_propagate(False)
         tk.Label(bar, text="PC 박스", bg=U.BG2, fg=U.FG_DIM,
@@ -931,8 +954,13 @@ class BoxWindow(object):
             sprite_cache.ensure_many(
                 api, [(m.get("num"), T.skin(m)) for m in mons if m.get("onDesktop")])
             eggs_ui.fetch_icons(api, eggs)
+            # 파티 프리셋 (1.10.3). 옛 서버에는 없다 - 없으면 그 줄을 숨길 뿐이다.
+            try:
+                party = api.party()
+            except Exception:                               # noqa: BLE001
+                party = None
             # 알도 한 줄씩 (1.4.1). 파티는 자리 순서, 박스는 알이 먼저.
-            return box_filter.merge_eggs(mons, eggs), boxes
+            return box_filter.merge_eggs(mons, eggs), boxes, party
         U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, got, err):
@@ -942,9 +970,12 @@ class BoxWindow(object):
                 w.close()
             return self.say(getattr(err, "message", str(err)), U.DANGER)
         try:
-            mons, boxes = got if isinstance(got, tuple) else (got, None)
+            got = got if isinstance(got, tuple) else (got, None)
+            mons, boxes = got[0], got[1]
             if boxes:
                 self.boxes = boxes
+            self.party = got[2] if len(got) > 2 else None
+            self._paint_party()
             self.mons = mons or []
             self._refresh_filter_bar()
             # 다시 불러온 까닭(떠올리기 결과 같은 것)이 있으면 지우지 않고 남긴다.
@@ -960,6 +991,79 @@ class BoxWindow(object):
                     self.root.after_idle(w.close)
                 except tk.TclError:
                     w.close()
+
+    # ---------------- 파티 프리셋 (1.10.3) ----------------
+    def party_presets(self):
+        """서버가 준 프리셋 목록 (번호 순). 없으면 빈 목록."""
+        return list((self.party or {}).get("presets") or [])
+
+    def party_active(self):
+        return int((self.party or {}).get("active") or 1)
+
+    def _paint_party(self):
+        """프리셋 줄을 서버가 준 대로 칠한다. 프리셋이 없는 서버면 줄을 숨긴다."""
+        rows = self.party_presets()
+        try:
+            if not rows:
+                if self._party_shown:
+                    self.party_bar.pack_forget()
+                    self.party_line.pack_forget()
+                    self._party_shown = False
+                return
+            if not self._party_shown:
+                self.party_bar.pack(fill="x", before=self.filter_bar)
+                self.party_line.pack(fill="x", before=self.filter_bar)
+                self._party_shown = True
+            for p in rows:
+                cell = self.party_seg.cells.get(p.get("no"))
+                if cell is not None:
+                    cell.configure(text=p.get("name") or "파티 %d" % p.get("no"))
+            self.party_seg.set(self.party_active())
+        except tk.TclError:
+            pass
+
+    def use_party(self, no):
+        """그 번호의 파티로 갈아탄다. 지금 파티는 서버가 지금 번호에 적어 둔다."""
+        if self._party_busy or no == self.party_active():
+            return
+        self._party_busy = True
+        self.say("파티를 바꾸는 중...")
+        api = self.app.api
+
+        def done(r, err):
+            self._party_busy = False
+            if err:
+                return self.say(getattr(err, "message", str(err)), U.DANGER)
+            self.party = r or self.party
+            self._paint_party()
+            # 다시 불러온 뒤에도 '무엇으로 바꿨는지' 가 남게 한다 (_loaded 가 _note 를 적는다)
+            self._note = ((r or {}).get("message") or "파티를 바꿨습니다.", U.GOOD)
+            self.sel = None
+            self.reload()
+            self.app.request_sync()               # 바탕화면의 포켓몬이 바뀐다
+        U.run_async(self.root, lambda: api.party_use(no), done)
+
+    def rename_party(self):
+        no = self.party_active()
+        now = next((p for p in self.party_presets() if p.get("no") == no), None) or {}
+        limit = int((self.party or {}).get("nameMax") or 4)
+        name = ask_text(self.win, "파티 이름",
+                        "지금 쓰는 파티(%d번)의 이름을 적어 주세요. 비우면 '파티 %d' 로 돌아갑니다." % (no, no),
+                        hint="%d자까지. 예: 랭크, 레이드, 바탕화면" % limit,
+                        initial=now.get("name") if now.get("named") else "")
+        if name is None:
+            return
+        if len(name) > limit:
+            return self.say("파티 이름은 %d자까지입니다." % limit, U.DANGER)
+        api = self.app.api
+
+        def done(r, err):
+            if err:
+                return self.say(getattr(err, "message", str(err)), U.DANGER)
+            self.party = r or self.party
+            self._paint_party()
+            self.say((r or {}).get("message") or "", U.GOOD)
+        U.run_async(self.root, lambda: api.party_rename(no, name), done)
 
     # ---------------- 거르기 ----------------
     def _refresh_filter_bar(self):

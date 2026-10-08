@@ -511,13 +511,55 @@ def main():
     b.set_mon("foe", dict(was, num=9998))              # 다른 검사와 캐시가 안 겹치는 번호
     pump(root, lambda: b.anims.get("foe") and b.anims["foe"][0][0].width() > 200, 10)
     wbb = cv.bbox(b.sprite["foe"])
-    cap = U.h(GB.MON_W["foe"])
+    cap = GB.U.h(GB.MON_W["foe"])                       # (배틀 창 크기 배율을 탄 값 - battle_zoom)
     chk("옆으로 긴 도트는 받침 폭(%dpx)을 안 넘는다" % cap,
         wbb is not None and wbb[2] - wbb[0] <= cap + 1, wbb)
     chk("  그래도 화면 안에 있다", canvas_inside(cv, b.sprite["foe"])[0], wbb)
     api.png = keep_png
     b.set_mon("foe", was)
     pump(root, lambda: b.anims.get("foe") and b.anims["foe"][0][0].width() < 200, 10)
+
+    # 창을 끌어서 크기를 바꾼다 (1.10.3, battle_zoom). 자세한 것은 test_battle_zoom 이 실시간·레이드
+    # 창으로 본다 - 여기서는 관장 창도 같은 길을 타는지만 본다.
+    print("\n=== 배틀 창 크기 바꾸기 ===")
+    chk("관장 배틀 창도 끌어서 크기를 바꿀 수 있다", tuple(bool(x) for x in b.win.resizable()) == (True, True)
+        and tuple(b.win.minsize()) == b.zoom_min(), (b.win.resizable(), b.win.minsize()))
+    size0 = (b.win.winfo_width(), b.win.winfo_height())
+    zoom0, shown0, mode0 = b.zoom, (b.shown["me"]["name"], b.shown["foe"]["name"]), b.mode
+    said0, moves0 = b.msg.cget("text"), [t for t in texts(b.left) if "PP" in t]
+    lo_w, lo_h = b.zoom_min()
+    b.win.geometry("%dx%d" % (lo_w, lo_h))
+    pump(root, lambda: b._zoom_size == (lo_w, lo_h) and b._zoom_job is None, 8)
+    pump(root, lambda: False, 0.4)
+    b.win.update_idletasks()
+    bad = squeezed(b.win)
+    ins = [canvas_inside(b.cv, b.box[w_]["bg"])[0] and canvas_inside(b.cv, b.box[w_]["name"])[0] for w_ in ("me", "foe")]
+    chk("  가장 작게 줄인다 (%d x %d, 배율 %.2f): 그 크기로 남고, 눌린 것 없이 이름표가 장면 안에 있다" % (lo_w, lo_h, b.zoom),
+        (b.win.winfo_width(), b.win.winfo_height()) == (lo_w, lo_h) and b.zoom <= zoom0 and not bad and all(ins),
+        (b.win.winfo_width(), b.win.winfo_height(), b.zoom, bad[:3], ins))
+    pump(root, lambda: all(cv.itemcget(b.sprite[w_], "image") for w_ in ("me", "foe")), 10)
+
+    def covered(sprite, box):
+        a_, b_ = cv.bbox(sprite), cv.bbox(box)
+        if not a_ or not b_:
+            return 0
+        return max(0, min(a_[2], b_[2]) - max(a_[0], b_[0])) * max(0, min(a_[3], b_[3]) - max(a_[1], b_[1]))
+    cover = (covered(b.sprite["me"], b.box["foe"]["bg"]), covered(b.sprite["foe"], b.box["me"]["bg"]))
+    chk("  **가장 작게 줄여도 포켓몬이 이름표에 가려지지 않는다** (내 포켓몬 ↔ 상대 이름표, 상대 포켓몬 ↔ 내 이름표)", cover == (0, 0),
+        (cover, cv.bbox(b.sprite["me"]), cv.bbox(b.box["foe"]["bg"]), cv.bbox(b.sprite["foe"]), cv.bbox(b.box["me"]["bg"])))
+    chk("  판은 그대로다: 나와 있는 포켓몬, 기술 칸, 마지막 말, 트레이너 그림", (b.shown["me"]["name"], b.shown["foe"]["name"]) == shown0
+        and b.mode == mode0 and [t for t in texts(b.left) if "PP" in t] == moves0 and b.msg.cget("text") == said0
+        and pump(root, lambda: b.photos.get("trainer") is not None and all(cv.itemcget(b.sprite[w_], "image") for w_ in ("me", "foe")), 10),
+        (b.mode, b.msg.cget("text")))
+    chk("  그 크기를 기억해 둔다 (관장 창의 것으로)", app.settings.get("battleSize", {}).get("gym") == [lo_w, lo_h], app.settings.get("battleSize"))
+    b.win.geometry("%dx%d" % size0)
+    pump(root, lambda: b._zoom_size == size0 and b._zoom_job is None, 8)
+    pump(root, lambda: all(cv.itemcget(b.sprite[w_], "image") for w_ in ("me", "foe")), 10)
+    pump(root, lambda: False, 0.3)
+    bad = squeezed(b.win)
+    chk("  처음 크기로 되돌리면 처음 배율이다", b.zoom == zoom0 and (b.win.winfo_width(), b.win.winfo_height()) == size0 and not bad,
+        (b.zoom, zoom0, bad[:3]))
+    app.settings.pop("battleSize", None)                # (뒤의 검사들은 기본 크기로 뜬 창을 본다)
     chk("트레이너 도트가 선다", pump(root, lambda: cv.itemcget(b.trainer_item, "image"), 10))
     cells = b.left.winfo_children()[0].winfo_children()
     chk("기술 네 칸", len(cells) == 4, len(cells))
@@ -655,7 +697,8 @@ def main():
     chk("다시 뜬다", pump(root, lambda: gw.battle is not None and not gw.battle.busy, 30))
     b = gw.battle
     chk("이스터에그 배틀: 혼자 선 그림", pump(root, lambda: b.photos.get("trainer") is not None, 10)
-        and b.photos["trainer"].width() == 47, b.photos.get("trainer") and b.photos["trainer"].width())
+        and b.photos["trainer"].width() == int(round(47 * GB.Z.K)),      # (배틀 창 크기 배율만큼 늘린다)
+        b.photos.get("trainer") and b.photos["trainer"].width())
     inside, bb = canvas_inside(b.cv, b.trainer_item)
     chk("이스터에그 배틀: 그림이 장면 안에 있다", inside and bb[1] >= 0, (bb, b.cv.winfo_width()))
     b._send("forfeit")

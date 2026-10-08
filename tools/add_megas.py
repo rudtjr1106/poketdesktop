@@ -273,6 +273,20 @@ def ow_path(base, m):
                           suffix.lower() if suffix in ("_X", "_Y", "_Z") else "")
 
 
+# 메가진화해 있는 동안에만 쓰는 기술. 원본(PokeAPI)에 아직 없어서 여기서 직접 넣는다.
+# 어느 기술이 이것으로 바뀌는지는 common/attackfx.MEGA_MOVES 가 정한다.
+MEGA_MOVES = {
+    # 니힐레이저 (레전드 Z-A): 메가지가르데가 되면 코어퍼니셔가 이것으로 바뀐다. 게시판 #158.
+    "NIHILLIGHT": {
+        "acc": 100, "ail": None, "ailChance": 0, "cat": "special", "crit": 0,
+        "desc": "온갖 법칙을 무시하는 강한 빛을 발사한다. 페어리타입 포켓몬에게도 맞으며 상대의 능력 변화에 상관없이 데미지를 준다.",
+        "drain": 0, "eff": 0, "en": "Nihil Light", "flags": ["mirror", "protect"], "flinch": 0, "heal": 0,
+        "hits": [1, 1], "id": 920, "kr": "니힐레이저", "power": 200, "pp": 10, "pri": 0, "stat": [],
+        "statChance": 0, "statSelf": False, "target": 11, "type": "DRAGON",
+    },
+}
+
+
 def main():
     check = "--check" in sys.argv
     with open(DEX, encoding="utf-8") as f:
@@ -280,12 +294,14 @@ def main():
     with open(ITEMS, encoding="utf-8") as f:
         items = json.load(f)
     megas, stones, notes = build(dex, items)
+    moves = dict(dex["moves"])
+    moves.update(MEGA_MOVES)
     # items.json 의 items 는 {id: 도구} 사전이다.
     new_items = dict((k, v) for k, v in items["items"].items()
                      if v.get("cat") != "megastone")
     for st in stones:
         new_items[st["id"]] = st
-    changed = dex.get("megas") != megas or items["items"] != new_items
+    changed = dex.get("megas") != megas or items["items"] != new_items or dex["moves"] != moves
     print("메가 폼 %d개 · 메가스톤 %d개 · 레쿠쟈는 화룡점정" % (len(megas), len(stones)))
     for n in notes:
         print("  -", n)
@@ -293,6 +309,7 @@ def main():
         print("바뀔 것이 있다" if changed else "그대로다")
         return 1 if changed else 0
     dex["megas"] = megas
+    dex["moves"] = moves
     items["items"] = new_items
     # 원래 파일과 **같은 형식**으로 쓴다(sort_keys, 들여쓰기 1, 끝 줄바꿈 없음).
     # 다르면 한 줄도 안 바뀐 곳까지 전부 바뀐 것처럼 보인다.

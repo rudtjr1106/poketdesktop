@@ -201,6 +201,76 @@ def main():
         a14.ability = keep
         chk("  불러와도 바뀐 특성 그대로", back.ability == "MUMMY", back.ability)
 
+    print("\n=== 메가지가르데: 코어퍼니셔 -> 니힐레이저 (1.10.3, 게시판 #158) ===")
+    from common import attackfx as AFX, statusmoves as SMX
+    nl = DEX.move("NIHILLIGHT")
+    chk("니힐레이저가 도감에 있다: 드래곤·특수·위력 200", nl and (nl["kr"], nl["type"], nl["cat"], nl["power"]) ==
+        ("니힐레이저", "DRAGON", "special", 200), nl)
+    zy = mon("ZYGARDE", "ZYGARDITE", ("COREENFORCER", "EARTHQUAKE"))
+
+    def zduel(foe, seed=3):
+        return duel(mon("ZYGARDE", "ZYGARDITE", ("COREENFORCER", "EARTHQUAKE")), foe, seed=seed)
+    btz, az, bz = zduel(mon("CLEFABLE", moves=("SPLASH",)))
+    hp0 = bz.hp
+    ev = btz.take_turn("COREENFORCER", mega=False)
+    chk("메가진화 전: 코어퍼니셔는 페어리에게 안 통한다 (드래곤 기술)", bz.hp == hp0
+        and any(e.get("t") == "move" and e.get("move") == "코어퍼니셔" for e in ev), [e.get("text") for e in ev][:4])
+    pp_before = az.pp["COREENFORCER"]
+    ev = btz.take_turn("COREENFORCER", mega=True)            # 이 턴에 고른 것은 아직 '코어퍼니셔' 다
+    used = [e for e in ev if e.get("t") == "move" and e.get("who") == "me"]
+    chk("**메가진화하면 코어퍼니셔가 니힐레이저로 바뀐다**", az.mega == "ZYGARDE_MEGA" and az.moves == ["NIHILLIGHT", "EARTHQUAKE"]
+        and az.alias == {"COREENFORCER": "NIHILLIGHT"}, (az.mega, az.moves))
+    chk("  그 턴에 고른 코어퍼니셔가 니힐레이저로 나간다", used and used[0].get("move") == "니힐레이저", used[:1])
+    chk("  **페어리에게도 맞는다**", bz.hp < hp0, (hp0, bz.hp))
+    chk("  PP 는 이어받아 한 번 쓴 만큼 준다", az.pp["NIHILLIGHT"] == pp_before - 1, (pp_before, az.pp))
+    chk("  포켓몬이 아는 기술은 그대로다 (이 판 안에서만 바뀐다)", az.mon["moves"] == ["COREENFORCER", "EARTHQUAKE"]
+        and zy["moves"] == ["COREENFORCER", "EARTHQUAKE"])
+    chk("  상성은 페어리를 뺀 나머지 타입만 본다", B.type_eff(DEX, nl, "DRAGON", az, bz, True) == 1.0
+        and B.type_eff(DEX, DEX.move("COREENFORCER"), "DRAGON", az, bz, True) == 0.0)
+    _b2, a2z, b2z = zduel(mon("ALTARIA", "ALTARIANITE", moves=("SPLASH",)))
+    b2z.mega_evolve(DEX.get("ALTARIA_MEGA"))                  # 드래곤·페어리
+    chk("  드래곤·페어리에게는 효과가 굉장하다 (드래곤만 본다)", b2z.types() == ["DRAGON", "FAIRY"]
+        and B.type_eff(DEX, nl, "DRAGON", a2z, b2z, True) == 2.0, b2z.types())
+
+    def nihil_damage(stages):
+        bt_, a_, b_ = zduel(mon("SNORLAX", moves=("SPLASH",)), seed=11)
+        a_.mega_evolve(DEX.get("ZYGARDE_MEGA"))
+        b_.stages["spd"] = stages
+        h = b_.hp
+        bt_.rng = random.Random(5)
+        bt_._use("me", a_, b_, "NIHILLIGHT", [])
+        return h - b_.hp
+    base_d, up_d, down_d = nihil_damage(0), nihil_damage(6), nihil_damage(-6)
+    chk("  **상대의 능력 변화를 무시한다** (특수방어를 여섯 단계 올려도, 내려도 데미지가 같다)",
+        base_d > 0 and base_d == up_d == down_d, (base_d, up_d, down_d))
+    bt3, a3z, b3z = zduel(mon("SNORLAX", moves=("SPLASH",)))
+    a3z.mega_evolve(DEX.get("ZYGARDE_MEGA"))
+    bt3.acted = {"foe"}
+    ev3 = []
+    bt3._use("me", a3z, b3z, "NIHILLIGHT", ev3)
+    chk("  코어퍼니셔의 '특성을 없앤다' 는 없다", not b3z.cond.get("gastro"), b3z.cond)
+    chk("  손가락흔들기로는 안 나온다", "NIHILLIGHT" in SMX.NO_METRONOME and "NIHILLIGHT" in AFX.IGNORE_STAGES)
+    for kr, cls in (("관장", TB.TrainerBattle), ("실시간", LB.LiveBattle), ("레이드", RB.RaidBattle)):
+        host = cls.__new__(cls)
+        host.dex = DEX
+        back = host._load_fighter(json.loads(json.dumps(cls._dump_fighter(az))))
+        chk("%s: 저장했다 불러와도 니힐레이저 그대로 (PP 도)" % kr, back.moves == ["NIHILLIGHT", "EARTHQUAKE"]
+            and back.pp["NIHILLIGHT"] == az.pp["NIHILLIGHT"] and back.alias == {"COREENFORCER": "NIHILLIGHT"},
+            (back.moves, back.pp))
+    az.cond["encore"] = {"move": "COREENFORCER", "turns": 2}
+    plain = B.Fighter(DEX, mon("ZYGARDE", "ZYGARDITE", ("COREENFORCER",)))
+    plain.cond["encore"] = {"move": "COREENFORCER", "turns": 2}
+    plain.cond["lastMove"] = "COREENFORCER"
+    plain.mega_evolve(DEX.get("ZYGARDE_MEGA"))
+    chk("  앙코르처럼 그 기술을 가리키던 것도 따라 바뀐다", plain.cond["encore"]["move"] == "NIHILLIGHT"
+        and plain.cond["lastMove"] == "NIHILLIGHT", plain.cond)
+    other = B.Fighter(DEX, mon("ZYGARDE", "ZYGARDITE", ("EARTHQUAKE",)))
+    other.mega_evolve(DEX.get("ZYGARDE_MEGA"))
+    chk("  코어퍼니셔를 모르는 지가르데는 메가진화해도 니힐레이저가 안 생긴다", other.moves == ["EARTHQUAKE"] and other.alias == {})
+    g = B.Fighter(DEX, mon("GENGAR", "GENGARITE", ("SHADOWBALL",)))
+    g.mega_evolve(DEX.get("GENGAR_MEGA"))
+    chk("  다른 메가는 기술이 안 바뀐다", g.moves == ["SHADOWBALL"] and g.alias == {})
+
     print("\n=== 스톤은 못 뺏는다 ===")
     bt9, a9, b9 = duel(mon("KANGASKHAN", "KANGASKHANITE"),
                        mon("ALAKAZAM", "LEFTOVERS", ("TRICK", "KNOCKOFF")))

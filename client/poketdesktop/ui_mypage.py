@@ -7,7 +7,8 @@
 
 보여 주는 것 (서버의 GET /api/mypage 한 번):
 
-  · 나         이름·칭호·티어, 가입한 지 며칠째
+  · 나         이름·칭호·티어, 가입한 지 며칠째. **닉네임 왼쪽에 내 캐릭터** (1.10.3) -
+               누르거나 '캐릭터 만들기' 를 누르면 꾸미기 창(ui_avatar)이 뜬다
   · 모은 것    포켓몬, 색이 다른 포켓몬, 도감, 이긴 관장, 친구, 레이드
   · 칭호       가진 칭호들 (달고 있는 것은 금색)
   · 시즌 기록  지금 시즌과 지난 시즌들의 순위·티어·전적
@@ -152,6 +153,7 @@ class MyPageWindow(object):
         self.data = None
         self.view = "page"            # page / settings
         self.settings = None          # 설정 화면 (처음 눌렀을 때 만든다)
+        self.editor = None            # 캐릭터 꾸미기 창 (떠 있을 때만)
         self._gen = 0
         self.cv = None
         self.fit = None
@@ -327,8 +329,21 @@ class MyPageWindow(object):
         box = tk.Frame(self.inner, bg=CARD, highlightthickness=1,
                        highlightbackground=U.ACCENT_SHADOW)
         box.pack(fill="x", padx=(0, 8))
-        top = tk.Frame(box, bg=CARD)
-        top.pack(fill="x", padx=16, pady=(14, 4))
+        row = tk.Frame(box, bg=CARD)
+        row.pack(fill="x", padx=16, pady=14)
+        # 캐릭터 (1.10.3): 닉네임 왼쪽. 아직 안 만들었으면 그림자가 서 있다. 누르면 꾸미기 창.
+        # **지금은 보류 중이라 안 보인다** (ui_avatar.ENABLED).
+        from . import ui_avatar
+        self.av_art = self.av_btn = self.av_swap = None
+        if ui_avatar.ENABLED:
+            self.av_art = tk.Label(row, bg=TILE, bd=0, padx=0, pady=0, cursor="hand2", highlightthickness=1,
+                                   highlightbackground=U.LINE)
+            self.av_art.pack(side="left", anchor="n", padx=(0, 14))
+            self.av_art.bind("<Button-1>", lambda _e: self.open_avatar())
+        col = tk.Frame(row, bg=CARD)
+        col.pack(side="left", fill="x", expand=True)
+        top = tk.Frame(col, bg=CARD)
+        top.pack(fill="x")
         tk.Label(top, text=u.get("name") or "?", bg=CARD, fg=u.get("frameColor") or U.FG,
                  font=(U.FAMILY_BLACK, U.pt(17))).pack(side="left")
         if u.get("admin"):
@@ -346,8 +361,77 @@ class MyPageWindow(object):
             bits.append("%s 가입" % _date(u.get("createdAt")))
         if u.get("money") is not None:
             bits.append("소지금 {:,}원".format(int(u.get("money") or 0)))
-        tk.Label(box, text="  ·  ".join(bits), bg=CARD, fg=U.FG_DIM, font=U.FONT_S,
-                 anchor="w").pack(fill="x", padx=16, pady=(0, 14))
+        lb = tk.Label(col, text="  ·  ".join(bits), bg=CARD, fg=U.FG_DIM, font=U.FONT_S,
+                      anchor="w", justify="left")
+        lb.pack(fill="x", pady=(4, 0))
+        U.wrap_to_width(lb)
+        if ui_avatar.ENABLED:
+            btns = tk.Frame(col, bg=CARD)
+            btns.pack(anchor="w", pady=(10, 0))
+            self.av_btn = U.ghost_button(btns, "캐릭터 만들기", self.open_avatar, height=30)
+            self.av_btn.pack(side="left")
+            self.av_swap = U.ghost_button(btns, "직접 그린 도트 쓰기", self.swap_avatar, height=30)
+            self._paint_avatar()
+
+    # ---------------- 캐릭터 (1.10.3) ----------------
+    def avatar(self):
+        """서버가 준 내 캐릭터 ({"spec": 고른 것, "image": 직접 그린 도트 ...}). 안 만들었으면 None."""
+        return (self.data or {}).get("avatar") or None
+
+    def _paint_avatar(self):
+        if getattr(self, "av_art", None) is None:
+            return                           # 보류 중이라 캐릭터 칸이 없다
+        av = self.avatar()
+        try:
+            from . import ui_avatar
+            self._av_photo = ui_avatar.portrait(av) if av else ui_avatar.placeholder()
+            self.av_art.configure(image=self._av_photo)
+            self.av_btn.configure(text="캐릭터 바꾸기" if av else "캐릭터 만들기")
+            # 직접 그린 도트를 넣어 둔 사람에게만: 그 도트와 꾸민 캐릭터 사이를 오가는 단추
+            if av and av.get("hasImage"):
+                self.av_swap.configure(text="꾸민 캐릭터 쓰기" if av.get("image") else "직접 그린 도트 쓰기")
+                if not self.av_swap.holder.winfo_ismapped():
+                    self.av_swap.pack(side="left", padx=(8, 0))
+            else:
+                self.av_swap.pack_forget()
+        except tk.TclError:
+            pass
+
+    def swap_avatar(self):
+        """넣어 둔 '직접 그린 도트' 와 꾸민 캐릭터 사이를 오간다."""
+        av = self.avatar() or {}
+        if not av.get("hasImage"):
+            return
+        on = not av.get("image")
+        api = self.app.api
+
+        def done(r, err):
+            if not self.alive:
+                return
+            if err:
+                return self.say(_err(err), U.DANGER)
+            self._avatar_saved((r or {}).get("avatar") or av, (r or {}).get("message"))
+        run_async(self.root, lambda: api.avatar_image(on), done)
+
+    def open_avatar(self):
+        from . import ui_avatar
+        ed = self.editor
+        if ed is not None and ed.alive:             # 이미 떠 있다 - 하나 더 띄우지 않는다
+            try:
+                ed.win.lift()
+                return ed
+            except tk.TclError:
+                pass
+        self.editor = ui_avatar.open_editor(self.win, self.app, self.avatar(), self._avatar_saved)
+        return self.editor
+
+    def _avatar_saved(self, av, message=None):
+        if not self.alive:
+            return
+        if self.data is not None:
+            self.data["avatar"] = av
+        self._paint_avatar()
+        self.say(message or "캐릭터를 저장했습니다.")
 
     def tiles(self, d):
         return tile_items(d)
@@ -636,6 +720,12 @@ class MyPageWindow(object):
     def close(self):
         self.alive = False
         self._gen += 1
+        if self.editor is not None:
+            try:
+                self.editor.close()
+            except Exception:                               # noqa: BLE001
+                pass
+            self.editor = None
         if self.settings is not None:
             try:
                 self.settings.close()

@@ -16,6 +16,7 @@
   6. 코인 상점은 상점에서 파는 것만, 코인으로만 판다.
 """
 import datetime
+import time
 import os
 import sys
 import tempfile
@@ -72,6 +73,12 @@ def money(uid):
 
 def balls(uid):
     return db.q1("SELECT balls FROM users WHERE id=?", (uid,))["balls"]
+
+
+def claims(uid, day):
+    """그 날(시각으로 준다) 그 사람이 받은 단계들."""
+    return [r["tier"] for r in db.q("SELECT tier FROM guild_claim WHERE user_id=? AND day=? ORDER BY tier",
+                                    (uid, guild.today(day)))]
 
 
 def lines(gid):
@@ -350,40 +357,77 @@ def main():
     chk("미션에서 오류가 나도 부른 쪽은 멀쩡하다 (note_safe)", True)
     db.run("DELETE FROM server_error")
 
-    print("\n=== 단계 보상 ===")
+    print("\n=== 단계 보상: 저절로 들어온다 (1.10.3) ===")
     ms = guild.missions(a, now=day)
-    chk("점수가 모자라면 못 받는다", (err(guild.claim, a, 1, now=day) or (0,))[0] == 400
-        and not ms["tiers"][0]["canClaim"], ms["guildPoints"])
+    chk("점수가 모자라면 아직 아무것도 없다", not ms["tiers"][0]["reached"] and not ms["tiers"][0]["claimed"]
+        and claims(a, day) == [], (ms["guildPoints"], claims(a, day)))
+    chk("  손으로 받기(옛 판)도 못 받는다", (err(guild.claim, a, 1, now=day) or (0,))[0] == 400)
+    chk("화면에 '저절로 들어온다' 고 알린다 ('받기' 단추를 안 그린다)", ms["auto"] is True
+        and not any(t["canClaim"] for t in ms["tiers"]))
+    ba, bb, bc = balls(a), balls(b), balls(c)
     for u in (a, b):
         for k, _n, goal, _p in guild.MISSIONS:
             guild.note(u, k, goal, now=day)
     ms = guild.missions(a, now=day)
-    chk("둘이 다 하면 20점 - 1단계가 열린다", ms["guildPoints"] == 20 and ms["tiers"][0]["canClaim"]
+    chk("둘이 다 하면 20점 - 1단계를 넘는다", ms["guildPoints"] == 20 and ms["tiers"][0]["reached"]
         and not ms["tiers"][1]["reached"], ms["guildPoints"])
-    chk("  단계를 넘는 순간 채팅에 알린다", sum(1 for x in lines(gid) if "1단계 달성" in x) == 1, lines(gid)[-4:])
-    chk("한 점도 안 보탠 사람은 못 받는다", (err(guild.claim, c, 1, now=day) or (0,))[0] == 400
-        and not guild.missions(c, now=day)["tiers"][0]["canClaim"])
-    b0 = balls(a)
-    r = guild.claim(a, 1, now=day)
-    chk("1단계: 몬스터볼 5개", balls(a) == b0 + 5 and "몬스터볼 5개" in r["message"], r)
-    chk("두 번은 못 받는다", (err(guild.claim, a, 1, now=day) or (0,))[0] == 409 and balls(a) == b0 + 5)
-    chk("받은 단계는 claimed 로 나온다", guild.missions(a, now=day)["tiers"][0]["claimed"])
+    chk("  넘는 순간 미션을 한 길드원 모두에게 들어온다: 몬스터볼 5개", balls(a) == ba + 5 and balls(b) == bb + 5
+        and claims(a, day) == [1] and claims(b, day) == [1], (balls(a) - ba, balls(b) - bb))
+    chk("  받은 단계는 claimed 로 나온다", ms["tiers"][0]["claimed"] and not ms["tiers"][0]["canClaim"])
+    chk("  채팅에 한 번 알린다 (무엇을 보냈는지까지)", sum(1 for x in lines(gid) if "1단계 달성" in x) == 1
+        and any("1단계 달성" in x and "몬스터볼 5개" in x and "보냈습니다" in x for x in lines(gid)), lines(gid)[-4:])
+    chk("한 점도 안 보탠 사람에게는 안 들어온다", balls(c) == bc and claims(c, day) == []
+        and not guild.missions(c, now=day)["tiers"][0]["claimed"])
+    chk("  손으로 받으려 해도 안 된다", (err(guild.claim, c, 1, now=day) or (0,))[0] == 400)
+    chk("몇 번을 훑어도 두 번 나가지 않는다", guild.settle(gid, guild.today(day), day) == []
+        and guild.settle_all(day) == [] and balls(a) == ba + 5 and balls(b) == bb + 5)
+    chk("  손으로 받기(옛 판의 단추)는 '이미 받은 보상'", (err(guild.claim, a, 1, now=day) or (0,))[0] == 409
+        and balls(a) == ba + 5)
     chk("없는 단계", (err(guild.claim, a, 9, now=day) or (0,))[0] == 404)
-    guild.note(c, "catch", 5, now=day)
+    # 이미 넘어 있는 단계: 뒤늦게 첫 미션을 끝낸 사람에게 그때 들어온다
+    guild.note(c, "catch", 3, now=day)            # 앞에서 한 마리 잡아 뒀다 - 4/5
+    chk("미션을 하다 만 사람은 아직이다 (점수가 0)", balls(c) == bc and claims(c, day) == [])
+    guild.note(c, "catch", 1, now=day)            # 20 + 2 = 22
+    chk("**첫 미션을 끝내는 순간** 이미 넘어 있던 1단계가 들어온다", balls(c) == bc + 5 and claims(c, day) == [1],
+        (balls(c) - bc, claims(c, day)))
+    ca, cb, cc = guild.coin(a), guild.coin(b), guild.coin(c)
     guild.note(c, "battle", 5, now=day)
-    guild.note(c, "attend", now=day)              # 20 + 2 + 2 + 1 = 25
-    r = guild.claim(b, 2, now=day)
-    chk("2단계: 길드 코인 10개", guild.coin(b) == 10 and "길드 코인 10개" in r["message"], guild.coin(b))
+    guild.note(c, "attend", now=day)              # 22 + 2 + 1 = 25
+    chk("25점 - 2단계: 셋 모두에게 길드 코인 10개", (guild.coin(a), guild.coin(b), guild.coin(c)) == (ca + 10, cb + 10, cc + 10)
+        and claims(a, day) == [1, 2] and claims(c, day) == [1, 2], (guild.coin(a), guild.coin(b), guild.coin(c)))
+    chk("  자정 직전에 넘어도 그 자리에서 들어온다 (날이 바뀌어도 잃지 않는다)",
+        guild.missions(a, now=day)["tiers"][1]["claimed"])
+    # 나간 사람·내보내진 사람에게는 안 간다
+    solo2 = mkuser("나갈사람")
+    guild.join(solo2, gid, now=day)
+    guild.note(solo2, "catch", 5, now=day)        # 27. 1·2단계는 이 사람에게도 들어온다
+    chk("뒤늦게 들어와 미션을 한 사람도 넘어 있던 단계를 받는다", claims(solo2, day) == [1, 2])
+    guild.leave(solo2, now=day)
+    db.run("DELETE FROM guild_claim WHERE user_id=?", (solo2,))               # 안 받은 것으로 돌려놓고
+    chk("  길드를 나간 사람에게는 더 보내지 않는다", guild.settle(gid, guild.today(day), day) == []
+        and claims(solo2, day) == [])
+    # 서버가 뜰 때: 이 기능이 들어오기 전에 오늘 넘어 있던 단계를 챙긴다
+    db.run("DELETE FROM guild_claim WHERE user_id=? AND day=?", (a, guild.today(day)))
+    b0, c0 = balls(a), guild.coin(a)
+    sent = guild.settle_all(day)
+    chk("서버가 뜰 때 오늘 넘어 있던 단계를 챙긴다 (settle_all)", sorted(sent) == [(a, 1), (a, 2)]
+        and balls(a) == b0 + 5 and guild.coin(a) == c0 + 10, sent)
+    db.run("DELETE FROM guild_claim WHERE user_id=? AND day=?", (a, guild.today(day)))
+    b0 = balls(a)
+    guild.missions(a, now=day)
+    chk("미션 칸을 열어도 남은 것이 들어온다 (내 것만)", claims(a, day) == [1, 2] and balls(a) == b0 + 5)
+    chk("  지난 날의 것은 건드리지 않는다", guild.settle_all(later(72)) == [])
     # 길드를 옮겨도 같은 날 같은 단계를 두 번 못 받는다
     guild.leave(b, now=day)
     db.run("UPDATE guild_user SET left_at=NULL WHERE user_id=?", (b,))        # 기다림은 건너뛴다
     db.run("UPDATE users SET money=? WHERE id=?", (cost, b))
     guild.create(b, "둘째길드", now=day)
+    bb = balls(b)
     for k, _n, goal, _p in guild.MISSIONS:
         guild.note(b, k, goal, now=day)
     chk("새 길드에서 다시 10점을 모아도", guild.missions(b, now=day)["guildPoints"] == 10)
-    chk("  같은 날 1단계는 한 번뿐이다 (보상은 사람에게 건다)",
-        err(guild.claim, b, 1, now=day) is None and (err(guild.claim, b, 1, now=day) or (0,))[0] == 409)
+    chk("  같은 날 1단계는 한 번뿐이다 (보상은 사람에게 건다)", balls(b) == bb and claims(b, day) == [1, 2]
+        and (err(guild.claim, b, 1, now=day) or (0,))[0] == 409, (balls(b) - bb, claims(b, day)))
     chk("날이 바뀌면 미션도 보상도 새로 시작한다", guild.missions(a, now=later(72))["guildPoints"] == 0
         and not guild.missions(a, now=later(72))["tiers"][0]["claimed"])
     chk("자정까지 남은 시간", 0 < guild.missions(a, now=day)["resetIn"] <= 86400)
@@ -456,6 +500,62 @@ def main():
     chk("길드에 없던 사람의 탈퇴는 아무 일도 없다", guild.on_user_deleted(d) is None)
     chk("오류 기록이 없다", db.q1("SELECT COUNT(*) c FROM server_error")["c"] == 0,
         db.q("SELECT path, detail FROM server_error LIMIT 3"))
+
+    print("\n=== 채팅 보관: 일주일, 거슬러 받기 (1.10.3) ===")
+    keep_rate, keep_cap = config.GUILD_CHAT_PER_MIN, config.GUILD_CHAT_KEEP
+    config.GUILD_CHAT_PER_MIN = 10 ** 6
+    w, x = mkuser("보관", cost), mkuser("보관둘")
+    guild.create(w, "보관길드", now=T0)
+    wg = guild.member(w)["guild_id"]
+    guild.join(x, wg, now=T0)
+    step = datetime.timedelta(minutes=50)                 # 260줄이 아흐레에 걸친다
+    for i in range(260):
+        guild.chat_send(w if i % 2 else x, "줄 %03d" % i, now=T0 + step * i)
+    NOW = T0 + step * 259 + datetime.timedelta(minutes=1)
+    cut = (NOW - datetime.timedelta(days=guild.CHAT_DAYS)).isoformat()
+    inside = [r["body"] for r in db.q("SELECT body FROM guild_chat WHERE guild_id=? AND at>=? ORDER BY id", (wg, cut))]
+    chk("(준비) 일주일 안의 줄과 밖의 줄이 다 있다", 150 < len(inside) < 260 and len(lines(wg)) > len(inside),
+        (len(inside), len(lines(wg))))
+    first = guild.chat(w, now=NOW)
+    chk("처음에는 마지막 %d줄, 앞에 더 있다고 알린다" % guild.CHAT_FIRST, len(first["messages"]) == guild.CHAT_FIRST
+        and first["more"] is True and first["first"] == first["messages"][0]["id"]
+        and first["messages"][-1]["body"] == "줄 259" and first["days"] == 7, (len(first["messages"]), first["more"]))
+    got, page, pages = list(first["messages"]), first, 0
+    while page["more"] and pages < 20:
+        page = guild.chat(w, before=page["first"], now=NOW)
+        pages += 1
+        got = page["messages"] + got
+    ids = [m["id"] for m in got]
+    chk("거슬러 받으면 한 번에 %d줄까지, 순서대로 이어진다" % guild.CHAT_STEP, ids == sorted(set(ids))
+        and pages == 2 and len(guild.chat(w, before=first["first"], now=NOW)["messages"]) == guild.CHAT_STEP, (pages, len(ids)))
+    chk("끝까지 가면 **일주일 안의 줄 전부**다 (그보다 옛 줄은 안 온다)", [m["body"] for m in got] == inside
+        and all(m["at"] >= cut for m in got) and page["more"] is False, (len(got), len(inside), got[0]["body"], inside[0]))
+    chk("맨 앞에서 더 달라고 하면 빈 목록", guild.chat(w, before=got[0]["id"], now=NOW)["messages"] == []
+        and guild.chat(w, before=got[0]["id"], now=NOW)["more"] is False)
+    chk("새 줄 받기(after)는 그대로다", guild.chat(w, after=first["last"], now=NOW)["messages"] == []
+        and [m["body"] for m in guild.chat(w, after=first["first"], now=NOW)["messages"]][-1] == "줄 259")
+    late = mkuser("늦게온")
+    joined = NOW - datetime.timedelta(hours=10)
+    guild.join(late, wg, now=joined)
+    seen = guild.chat(late, now=NOW)
+    back = guild.chat(late, before=seen["first"], now=NOW)
+    chk("늦게 들어온 사람은 거슬러 올라가도 들어오기 전의 줄을 못 본다", back["messages"] == [] and seen["more"] is False
+        and 0 < len(seen["messages"]) < 20 and all(m["at"] >= joined.isoformat() for m in seen["messages"]),
+        (len(seen["messages"]), len(back["messages"]), seen["more"]))
+    guild._SWEPT[0] = time.time()
+    chk("지우는 일은 한 시간에 한 번만 돈다", guild.sweep_chat(NOW) == 0 and len(lines(wg)) > len(inside) + 1)
+    n = guild.sweep_chat(NOW, force=True)
+    left = db.q1("SELECT COUNT(*) c, MIN(at) lo FROM guild_chat WHERE guild_id=?", (wg,))
+    chk("일주일 지난 줄은 지워진다", n > 0 and left["lo"] >= cut and left["c"] == len(inside) + 1, (n, left["c"], len(inside)))
+    chk("  다시 돌려도 더 지울 것이 없다", guild.sweep_chat(NOW, force=True) == 0)
+    chk("  화면에 보이던 것은 그대로다", [m["body"] for m in guild.chat(w, now=NOW)["messages"]
+                                 if not m["system"]][-1] == "줄 259" and guild.chat(w, now=NOW)["more"] is True)
+    config.GUILD_CHAT_KEEP = 30
+    guild.sweep_chat(NOW, force=True)
+    rest = lines(wg)
+    chk("도배 안전판: 길드마다 줄 수의 상한을 넘으면 옛 줄부터 지운다", len(rest) == 30 and rest[-2] == "줄 259", (len(rest), rest[-2:]))
+    config.GUILD_CHAT_PER_MIN, config.GUILD_CHAT_KEEP = keep_rate, keep_cap
+    chk("상한의 기본값은 일주일 치보다 넉넉하다", config.GUILD_CHAT_KEEP >= 10000, config.GUILD_CHAT_KEEP)
 
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0

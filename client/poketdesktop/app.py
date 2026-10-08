@@ -75,6 +75,9 @@ class _FakeEvent(object):
         self.x_root, self.y_root, self.num = x, y, 2
 
 
+HOT_MS = 70                   # 긴급 숨기기 단축키가 눌렸는지 묻는 간격
+
+
 class App(object):
     def __init__(self):
         self.settings = config.load_settings()
@@ -98,6 +101,7 @@ class App(object):
         self._learn_asking = False
         self.friends_win = None
         self.guild_window = None
+        self.friendly = None          # 길드 친선전의 지금 모습과 오른쪽 아래의 창 (ui_spectate.Friendly)
         # 길드 채팅 표시 (1.10.1). 남이 쓴 가장 최근 줄의 번호 - 본 데(settings.guildChatSeen)
         # 보다 뒤면 길드 탭에 점을 찍는다. 길드 탭이 떠 있지 않은 동안에는 여기서 웹소켓을
         # 하나 붙여 바로 안다 (guild_sock). 못 붙으면 동기화(90초)에 실려 오는 번호로 안다.
@@ -180,6 +184,71 @@ class App(object):
         PLAT.dpi_aware()
         U.init_fonts(self.root)
         apply_theme(self.root)
+        # 긴급 숨기기 (1.10.3): 떠 있는 것을 전부 치웠다 되돌린다. 단축키는 설정에서 고른
+        # 사람에게만 등록한다 (기본은 꺼짐). 트레이 메뉴에는 늘 있다.
+        from . import hotkey as HOTKEY
+        from . import stealth as STEALTH
+        self.stealth = STEALTH.Stealth(self)
+        self.hotkey = HOTKEY.Hotkey()
+        self._hot_job = None
+        self.boss_key_error = ""      # 단축키를 등록하지 못한 까닭 (설정 창이 보여 준다)
+        self.apply_boss_key()
+
+    # ---------------------------------------------------------------- 긴급 숨기기
+    def stealth_on(self):
+        return bool(self.stealth is not None and self.stealth.on)
+
+    def toggle_stealth(self):
+        """화면의 포스크탑을 전부 숨긴다 / 되돌린다 (단축키·트레이 메뉴)."""
+        on = self.stealth.toggle()
+        self.refresh_tray()
+        return on
+
+    def wake(self):
+        """숨겨 둔 것이 있으면 되돌린다. 트레이 메뉴에서 다른 것을 고르면 먼저 이걸 한다 -
+        숨긴 채로 창을 열면 아무것도 안 보여 고장처럼 보인다."""
+        if self.stealth_on():
+            self.stealth.show()
+            self.refresh_tray()
+
+    def boss_key(self):
+        from . import hotkey as HOTKEY
+        return HOTKEY.clean(self.settings.get("bossKey"))
+
+    def apply_boss_key(self, combo=None):
+        """설정에 적힌 단축키를 등록한다 (combo 를 주면 그것으로 바꿔 적고). (됐나, 까닭)."""
+        from . import hotkey as HOTKEY
+        if combo is not None:
+            self.settings["bossKey"] = HOTKEY.clean(combo)
+            config.save_settings(self.settings)
+        want = self.boss_key()
+        ok, why = self.hotkey.start(want)
+        self.boss_key_error = "" if ok else why
+        if not ok:
+            config.log("긴급 숨기기 단축키를 등록하지 못했습니다 (%s): %s" % (want, why))
+        if self._hot_job is not None:
+            try:
+                self.root.after_cancel(self._hot_job)
+            except Exception:                               # noqa: BLE001
+                pass
+            self._hot_job = None
+        if ok and want:
+            self._hot_job = self.root.after(HOT_MS, self._hot_tick)
+        self.refresh_tray()
+        return ok, why
+
+    def _hot_tick(self):
+        """단축키가 눌렸는지 가끔 묻는다. 눌린 것은 다른 스레드(윈도우)나 이벤트 처리 중(맥)에
+        표시만 해 두므로, Tk 를 건드리는 일은 여기서 한다."""
+        self._hot_job = None
+        try:
+            if self.hotkey.fired():
+                self.toggle_stealth()
+        except Exception:                                   # noqa: BLE001
+            import traceback
+            config.log("긴급 숨기기 실패\n" + traceback.format_exc())
+        if self.hotkey.combo and not self._quitting:
+            self._hot_job = self.root.after(HOT_MS, self._hot_tick)
 
     # ---------------------------------------------------------------- 시작
     def check_update(self):
@@ -799,6 +868,7 @@ class App(object):
         self.guild_id = gid
         if gid:
             self._guild_first_sight(latest)
+        self.guild_friendly(bool(gid))
         self._watch_guild(bool(gid))
         self._paint_guild()
 
@@ -870,6 +940,16 @@ class App(object):
         except Exception:                                   # noqa: BLE001
             pass
 
+    def guild_friendly(self, on=True):
+        """길드 친선전을 들고 있는 것 (ui_spectate.Friendly). 길드에 들어 있는 동안만 있다."""
+        if on and self.friendly is None:
+            from . import ui_spectate
+            self.friendly = ui_spectate.Friendly(self)
+        elif not on and self.friendly is not None:
+            self.friendly.close()
+            self.friendly = None
+        return self.friendly
+
     def _watch_guild(self, on):
         """길드 탭이 안 떠 있는 동안 채팅이 오는지 듣는다. 탭이 뜨면 그 탭의 웹소켓이 듣는다
         (한 PC 에서 연결을 둘씩 쓰지 않는다 - 서버는 한 사람에 셋까지만 받는다)."""
@@ -894,6 +974,9 @@ class App(object):
 
     def _on_guild_ws(self, ev):
         t = (ev or {}).get("t")
+        if self.friendly is not None and t in ("live", "friendly", "friendly_fight"):
+            self.friendly.on_event(ev)       # 길드 친선전 (ui_spectate)
+            return
         if t == "chat":
             m = ev.get("m") or {}
             if not m.get("system") and m.get("userId") != self.user_id:
@@ -2456,6 +2539,7 @@ class App(object):
 
     def _restart_login(self):
         self._stop_guild_sock()
+        self.guild_friendly(False)
         self.guild_id, self.guild_chat, self._guild_dot = None, 0, None
         self.close_arena()
         if self.wild:
@@ -2509,7 +2593,12 @@ class App(object):
         if self._quitting:
             return
         self._quitting = True
+        try:
+            self.hotkey.stop()                # 등록해 둔 단축키를 운영체제에 돌려준다
+        except Exception:                                   # noqa: BLE001
+            pass
         self._stop_guild_sock()
+        self.guild_friendly(False)
         if self._update_job is not None:
             try:
                 self.root.after_cancel(self._update_job)

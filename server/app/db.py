@@ -659,6 +659,30 @@ CREATE TABLE IF NOT EXISTS guild (
     created_at  TEXT NOT NULL,
     points      INTEGER NOT NULL DEFAULT 0          -- 지금까지 쌓은 미션 점수
 );
+-- 파티 프리셋 (1.10.3). 데리고 다니는 파티를 몇 벌 두고 번호로 갈아탄다 (party.py).
+-- **지금 쓰는 번호(active)의 내용은 여기 적힌 것이 아니라 지금 데리고 다니는 포켓몬이다** -
+-- ids 는 다른 번호로 갈아탈 때 적어 둔다. saved=0 은 이름만 붙였고 아직 안 쓴 번호.
+CREATE TABLE IF NOT EXISTS party_preset (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    no          INTEGER NOT NULL,
+    name        TEXT,
+    ids         TEXT NOT NULL DEFAULT '[]',
+    active      INTEGER NOT NULL DEFAULT 0,
+    saved       INTEGER NOT NULL DEFAULT 0,
+    updated_at  TEXT,
+    PRIMARY KEY (user_id, no)
+);
+-- 캐릭터 (1.10.3). 마이페이지에서 만든다. **그림이 아니라 고른 것(spec)을 적는다** -
+-- 그림은 common/avatar_art 가 그때그때 그린다 (서버도 화면도 같은 코드).
+-- image 는 **직접 그린 도트** (걷기 시트 PNG 의 base64, common/avatar_sheet). 화면이 올리는 길은
+-- 없고 운영자가 넣어 준다 (avatar_tool.py). image_on 이 1 이면 꾸민 캐릭터 대신 이것이 보인다.
+CREATE TABLE IF NOT EXISTS avatar (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    spec        TEXT NOT NULL DEFAULT '{}',
+    updated_at  TEXT NOT NULL,
+    image       TEXT,
+    image_on    INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS guild_member (
     user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     guild_id    INTEGER NOT NULL REFERENCES guild(id) ON DELETE CASCADE,
@@ -684,7 +708,8 @@ CREATE TABLE IF NOT EXISTS guild_chat (
     user_id     INTEGER,
     name        TEXT NOT NULL DEFAULT '',
     body        TEXT NOT NULL,
-    at          TEXT NOT NULL
+    at          TEXT NOT NULL,
+    card        TEXT NOT NULL DEFAULT ''   -- 줄이 카드면 그 모습(JSON). 친선전: 상대 구함 -> 진행 중 -> 끝
 );
 CREATE INDEX IF NOT EXISTS idx_guild_chat_g ON guild_chat(guild_id, id);
 -- 일일 미션: 그날(KST) 그 사람이 그 미션을 얼마나 했나. done 이 되는 순간 점수가 길드에 쌓인다.
@@ -914,6 +939,8 @@ MIGRATIONS = [
     ("bond", "seen", "ALTER TABLE bond ADD COLUMN seen INTEGER NOT NULL DEFAULT 0"),
     # 1.9.0: 서버가 올린 글의 열쇠 (패치노트)
     ("board_post", "ref", "ALTER TABLE board_post ADD COLUMN ref TEXT"),
+    # 1.10.3: 채팅에 놓이는 카드 (길드 친선전). 빈 글이면 보통 줄이다
+    ("guild_chat", "card", "ALTER TABLE guild_chat ADD COLUMN card TEXT NOT NULL DEFAULT ''"),
 ]
 
 

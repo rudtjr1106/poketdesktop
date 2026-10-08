@@ -24878,6 +24878,37 @@
    "target": 10,
    "type": "DARK"
   },
+  "NIHILLIGHT": {
+   "acc": 100,
+   "ail": null,
+   "ailChance": 0,
+   "cat": "special",
+   "crit": 0,
+   "desc": "온갖 법칙을 무시하는 강한 빛을 발사한다. 페어리타입 포켓몬에게도 맞으며 상대의 능력 변화에 상관없이 데미지를 준다.",
+   "drain": 0,
+   "eff": 0,
+   "en": "Nihil Light",
+   "flags": [
+    "mirror",
+    "protect"
+   ],
+   "flinch": 0,
+   "heal": 0,
+   "hits": [
+    1,
+    1
+   ],
+   "id": 920,
+   "kr": "니힐레이저",
+   "power": 200,
+   "pp": 10,
+   "pri": 0,
+   "stat": [],
+   "statChance": 0,
+   "statSelf": false,
+   "target": 11,
+   "type": "DRAGON"
+  },
   "NOBLEROAR": {
    "acc": 100,
    "ail": null,

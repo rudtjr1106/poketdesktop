@@ -29,12 +29,13 @@ TEXT = "메가진화"
 
 
 class MegaToggle(object):
-    def __init__(self, bar, before=None, height=34):
+    def __init__(self, bar, before=None, height=34, make=None):
+        """make: 단추를 만드는 함수 (기본 U.ghost_button). 배틀 창은 크기 배율을 타는 것을 넘긴다."""
         self.bar = bar
         self.before = before
         self.on = False
         self.shown = False
-        self.btn = U.ghost_button(bar, TEXT, self.toggle, height=height)
+        self.btn = (make or U.ghost_button)(bar, TEXT, self.toggle, height=height)
         b = self.btn
         self._off = (b.fill, b._fg, b.hover, b._shadow)
 

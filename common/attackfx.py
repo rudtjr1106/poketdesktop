@@ -60,7 +60,12 @@ ATK_BY_DEF = {"BODYPRESS"}                               # 내 방어로 때린�
 ATK_BY_FOE = {"FOULPLAY"}                                # 상대의 공격으로 때린다
 HITS_DEF = {"PSYSHOCK", "PSYSTRIKE", "SECRETSWORD"}      # 특수기인데 상대의 방어로 받는다
 HIGHER_STAT = {"PHOTONGEYSER", "TERABLAST", "TERASTARSTORM"}   # 공격·특수공격 중 높은 쪽
-IGNORE_STAGES = {"CHIPAWAY", "DARKESTLARIAT", "SACREDSWORD"}   # 상대의 방어·회피 랭크 무시
+IGNORE_STAGES = {"CHIPAWAY", "DARKESTLARIAT", "SACREDSWORD", "NIHILLIGHT"}   # 상대의 방어·회피 랭크 무시
+# 메가진화해 있는 동안 다른 기술로 바뀌는 기술 {메가 폼: {원래 기술: 바뀐 기술}}.
+# 니힐레이저 (레전드 Z-A, 게시판 #158): 메가지가르데가 되면 코어퍼니셔가 이것으로 바뀐다 - 드래곤 기술인데
+# 페어리에게도 맞고(상성은 나머지 타입만 본다), 상대의 능력 변화를 무시한다. 코어퍼니셔의 '특성을 없앤다' 는 없다.
+MEGA_MOVES = {"ZYGARDE_MEGA": {"COREENFORCER": "NIHILLIGHT"}}
+HITS_FAIRY = {"NIHILLIGHT"}          # 드래곤 기술이지만 페어리의 무효를 뚫는다
 # 상대의 특성을 무시하고 때린다 (그 기술을 쓰는 동안만 틀깨기)
 IGNORE_ABILITY = {"MOONGEISTBEAM", "SUNSTEELSTRIKE", "PHOTONGEYSER"}
 # 효과가 굉장하면 위력이 더 오른다 (5461/4096)

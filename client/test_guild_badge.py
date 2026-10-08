@@ -74,6 +74,12 @@ class Box(object):
     def see(self, _index):
         pass
 
+    def update_idletasks(self):
+        pass
+
+    def yview(self, *_a):
+        return (0.5, 1.0)             # 줄이 넉넉해서 맨 위가 아니다 (앞의 줄을 더 받지 않는다)
+
 
 class Cell(object):
     def __init__(self):
@@ -110,11 +116,19 @@ class Win(object):
         app.api = Api()
         self.alive, self.mode, self.tab, self.live = True, "guild", "chat", True
         self.chat_box, self.chat_last, self.chat_ready = Box(), 0, False
+        # 거슬러 받기 (1.10.3) 가 보는 것들. 이 검사는 탭의 점만 본다 - 줄을 그리지는 않는다.
+        self.chat_rows, self.chat_more, self.chat_days, self.chat_first = [], False, 0, 0
         self._chat_busy, self._pending, self._stamp = False, [], "s"
         self.my_id, self.unread, self.shown, self.seg = app.user_id, 0, True, Seg()
         self.badged = []
 
     def _append(self, _msgs):
+        pass
+
+    def _prepend(self, _msgs, _more):
+        pass
+
+    def _want_older(self):
         pass
 
     def pane_visible(self):
@@ -169,6 +183,7 @@ class FakeApp(object):
         self.hub = Hub() if hub else None
         self.user_id = uid
         self.guild_id, self.guild_chat, self.guild_sock, self._guild_dot = None, 0, None, None
+        self.friendly = None              # 길드 친선전 (1.10.3) - 길드에 들어 있는 동안만 있다
 
     # App 의 실제 메서드를 빌려 쓴다 (가짜로 다시 쓰지 않는다)
     _guild_pane = App._guild_pane
@@ -179,6 +194,7 @@ class FakeApp(object):
     mark_guild_chat_seen = App.mark_guild_chat_seen
     _paint_guild = App._paint_guild
     _watch_guild = App._watch_guild
+    guild_friendly = App.guild_friendly
     _stop_guild_sock = App._stop_guild_sock
     _on_guild_ws = App._on_guild_ws
 
@@ -374,8 +390,21 @@ def main():
     chk("한 줄에 2~4장: 폭 %d 에 한 장씩" % ui_guild.SHOP_CARD_W,
         [ui_guild.shop_cols(w) for w in (0, 300, 470, 700, 930, 2000)] == [3, 2, 2, 3, 4, 4],
         [ui_guild.shop_cols(w) for w in (0, 300, 470, 700, 930, 2000)])
-    chk("다른 길드 칸이 있다", [k for k, _l in ui_guild.TABS]
+    chk("칸: 채팅·길드원·미션·코인 상점·다른 길드·관리 (친선전은 칸이 아니다 - 채팅에서 한다)", [k for k, _l in ui_guild.TABS]
         == ["chat", "members", "mission", "shop", "guilds", "manage"], ui_guild.TABS)
+
+    print("\n=== 길드 친선전 (1.10.3) ===")
+    from poketdesktop import ui_spectate
+    app.note_guild({"id": 1, "chat": 5})
+    fr = app.friendly
+    chk("길드에 들어 있는 동안 친선전을 들고 있다 (알림·구경용)", isinstance(fr, ui_spectate.Friendly))
+    app.check_live = lambda: seen.append("live") if isinstance(seen, list) else None
+    seen = []
+    app._on_guild_ws({"t": "live"})
+    app._on_guild_ws({"t": "friendly", "seeking": [], "fights": [], "limit": 3})
+    chk("  앱의 웹소켓으로 온 친선전 소식은 그쪽으로 넘긴다 (탭이 없어도 알림이 뜬다)", seen == ["live"] and fr.view["limit"] == 3)
+    app.note_guild(None)
+    chk("  길드에서 나오면 치운다", app.friendly is None and fr.listeners == [])
 
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0

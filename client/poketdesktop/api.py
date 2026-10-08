@@ -202,6 +202,18 @@ class Api(object):
                               {"on": bool(on)})
         return self._call("POST", "/api/pokemon/%d/desktop" % pid, {"on": bool(on)})
 
+    # ---------------- 파티 프리셋 (1.10.3) ----------------
+    def party(self):
+        """파티 프리셋 다섯 벌과 지금 쓰는 번호."""
+        return self._call("GET", "/api/party")
+
+    def party_use(self, no):
+        """그 번호의 파티로 갈아탄다. 지금 파티는 지금 번호에 적혀 남는다."""
+        return self._call("POST", "/api/party/%d/use" % int(no), {})
+
+    def party_rename(self, no, name):
+        return self._call("POST", "/api/party/%d/name" % int(no), {"name": name})
+
     def set_order(self, ids):
         """데리고 다니는 순서. 화면에 보이는 차례대로 넘긴다 (음수는 알)."""
         return self._call("POST", "/api/pokemon/order",
@@ -389,11 +401,30 @@ class Api(object):
     def guild_master(self, uid):
         return self._call("POST", "/api/guild/members/%d/master" % uid, {})
 
-    def guild_chat(self, after=0):
+    def guild_chat(self, after=0, before=0):
+        """채팅 줄. after = 그 번호 뒤의 새 줄, before = 그 번호 앞의 옛 줄 (거슬러 올라가기, 1.10.3)."""
+        if before:
+            return self._call("GET", "/api/guild/chat?before=%d" % int(before))
         return self._call("GET", "/api/guild/chat?after=%d" % int(after or 0))
 
     def guild_say(self, body):
         return self._call("POST", "/api/guild/chat", {"body": body})
+
+    # 길드 친선전 (1.10.3): 길드원끼리의 실시간 배틀을 쉽게 열고 구경한다
+    def guild_friendly(self):
+        """상대를 구하는 길드원들과 진행 중인 판들."""
+        return self._call("GET", "/api/guild/friendly")
+
+    def guild_friendly_seek(self, on=True):
+        return self._call("POST", "/api/guild/friendly/seek", {"on": bool(on)})
+
+    def guild_friendly_accept(self, uid):
+        """상대를 구하는 길드원의 것을 받는다 - 바로 시작한다."""
+        return self._call("POST", "/api/guild/friendly/accept/%d" % int(uid), {})
+
+    def guild_friendly_ask(self, uid):
+        """접속 중인 길드원에게 직접 신청한다 (상대가 받아야 시작한다)."""
+        return self._call("POST", "/api/guild/friendly/ask/%d" % int(uid), {})
 
     def guild_claim(self, tier):
         return self._call("POST", "/api/guild/mission/%d/claim" % int(tier), {})
@@ -640,6 +671,19 @@ class Api(object):
     def mypage(self):
         """내 정보와 기록을 한 번에 (칭호·관장·시즌·게시판 활동)."""
         return self._call("GET", "/api/mypage")
+
+    # ---------------- 캐릭터 (1.10.3) ----------------
+    def avatar(self):
+        """내 캐릭터. 안 만들었으면 avatar 가 None."""
+        return self._call("GET", "/api/avatar")
+
+    def avatar_image(self, on):
+        """넣어 둔 '직접 그린 도트' 를 쓸지 말지 (운영자가 넣어 준 사람만)."""
+        return self._call("POST", "/api/avatar/image", {"on": bool(on)})
+
+    def avatar_save(self, spec):
+        """고른 것(머리·옷·색 ...)을 저장한다. 그림은 보내지 않는다 - 서버도 같은 코드로 그린다."""
+        return self._call("PUT", "/api/avatar", {"spec": spec})
 
     # ---------------- 메가진화 (시즌 3) ----------------
     def bond(self, pid):

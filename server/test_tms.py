@@ -212,6 +212,20 @@ def main():
     chk("358개가 전부 도감에 있는 기술", not bad, bad[:5])
     chk("이름이 읽을 만하다", tms.label(1).startswith("기술머신001"), tms.label(1))
 
+    print("\n=== 알 기술도 그 기술의 기술머신으로 배운다 (1.10.3, 게시판 #156) ===")
+    roost = [no for no, t in tms.all_tms().items() if t["move"] == "ROOST"]
+    chk("날개쉬기 기술머신이 있다", len(roost) == 1, roost)
+    r = roost[0]
+    chk("**아머까오가 날개쉬기를 배운다** (원작에서는 파라꼬의 알 기술 - 교배가 없으니 기술머신으로)",
+        tms.can_learn(823, r))
+    chk("  진화 전 단계의 알 기술은 진화형도 배운다 (파라꼬 -> 파크로우 -> 아머까오)", tms.can_learn(821, r) and tms.can_learn(822, r))
+    chk("  팽도리 계열·윽우지·떨구새도", all(tms.can_learn(n, r) for n in (393, 394, 395, 845, 962)))
+    chk("  원작에서 어떤 길로도 못 배우는 종은 여전히 못 배운다 (갸라도스·레쿠쟈)", not tms.can_learn(130, r) and not tms.can_learn(384, r))
+    c = tms.data()["counts"]
+    chk("  자료에 알 기술로 들어간 줄 수가 적혀 있다 (전 세대 기술머신 61463줄 + 알 기술)", c.get("eggRows", 0) > 1000
+        and c["rows"] == 61463 + c["eggRows"], c)
+    chk("  기술머신의 수는 그대로다 (새 기술머신을 만들지 않는다)", tms.count() == 358)
+
     print("\n=== 누가 배울 수 있나 ===")
     # 이상해씨(1) 는 배울 게 많고, 메타몽(132) 은 하나도 못 배운다.
     chk("이상해씨는 배울 게 있다", len(tms.learnable(1)) > 10,

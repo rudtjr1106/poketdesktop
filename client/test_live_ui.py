@@ -209,8 +209,18 @@ def main():
     api = FakeApi(dex)
     app = FakeApp(root, api, dex)
     w = LUI.LiveBattleWindow(app, api.match())
+    from poketdesktop import enter_fx as EF
+    dark = [i for i in w.cv.find_all() if w.cv.type(i) == "rectangle" and w.cv.itemcget(i, "fill") == EF.BLACK]
+    covered = sum((c[2] - c[0]) * (c[3] - c[1]) for c in (w.cv.coords(i) for i in dark
+                                                          if w.cv.itemcget(i, "state") != "hidden"))
+    chk("창이 불쑥 뜨지 않는다 (1.10.3): 비치는 데서 시작하고, 장면은 검은 띠로 덮여 있다",
+        float(w.win.attributes("-alpha")) < 0.5 and len(dark) == EF.ROWS and covered >= w.sw * w.sh * 0.99,
+        (w.win.attributes("-alpha"), len(dark), covered, w.sw * w.sh))
     pump(root, lambda: not w.busy, timeout=25)
     rest(root, 0.4)
+    chk("  곧 또렷해지고 띠가 걷힌다 (띠는 지운다)", float(w.win.attributes("-alpha")) == 1.0
+        and not [i for i in w.cv.find_all() if w.cv.type(i) == "rectangle" and w.cv.itemcget(i, "fill") == EF.BLACK
+                 and i in dark], w.win.attributes("-alpha"))
     w.win.update_idletasks()
     sw_, sh_ = root.winfo_screenwidth(), root.winfo_screenheight()
     try:

@@ -31,19 +31,28 @@ from common.korean import natural
 
 from . import battle_fx as FX
 from . import sprite_cache, sprites
+from . import battle_zoom as Z
 from . import platform_os as PLAT
-from . import ui_common as U
 from .ui_common import run_async
 from .ui_gym import shade
 from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
 from . import ui_mega
 from .ui_mega import MegaToggle
 
+# **이 창은 가장자리를 끌어서 크기를 바꾼다** (battle_zoom.Resizable). 창 크기에서 배율이 나오고,
+# U 는 ui_common 그대로인데 h · pt · FONT_* · 단추 높이가 그 배율을 탄다 - 그래서 아래 코드는
+# 평소처럼 U.h(...) 로 적는다. 픽셀로 적어 둔 값(도트 높이처럼 글꼴 배율을 안 타는 것)에는 Z.px 를 건다.
+U = Z.U
+
+# **가장 낮은 장면(MIN_SCENE_H)은 도트가 글자를 안 가리는 높이다** (1.10.3). 창을 가장 작게 줄이면
+# 장면이 이 비율이 된다. 250 이었을 때는 참가자의 도트가 제 이름·체력 막대 위로 올라왔다:
+# 도트의 꼭대기는 0.965 x 장면 + 4 - 66, 그 위 글자의 바닥은 0.705 x 장면 + 26 → 장면이 338 은 돼야 한다.
+# 이 장면은 원래 크기(348)에서도 빈틈없이 짜여 있다.
 W = 960
 SCENE_H = 348
 MSG_H = 54
 CMD_H = 226
-MIN_SCENE_H = 250
+MIN_SCENE_H = 340
 STEP_MS = 560
 POLL_MS = 1500              # 방을 물어보는 주기
 BOSS_H = 130                # 보스 도트 높이(px)
@@ -62,7 +71,9 @@ def _key(ev):
     return p if isinstance(p, int) else None
 
 
-class RaidBattleWindow(object):
+class RaidBattleWindow(Z.Resizable):
+    ZOOM_KIND = "raid"
+    ZOOM_W, ZOOM_SCENE, ZOOM_MSG, ZOOM_CMD, ZOOM_MIN_SCENE = W, SCENE_H, MSG_H, CMD_H, MIN_SCENE_H
 
     def __init__(self, app, data, on_close=None):
         self.app = app
@@ -89,40 +100,26 @@ class RaidBattleWindow(object):
         self._deadline = 0.0
         self._seen_sent = False
         self._result_shown = False
+        self._switching = False     # 교체 칸을 열어 뒀나
+        self._shield_now = None     # 지금 그려 둔 보호막 (창 크기를 바꿔 다시 지을 때 되돌린다)
 
+        # 처음 크기: 지난번에 끌어 놓은 크기(없으면 기본 크기). 배율도 여기서 잡힌다.
+        # 기본 크기가 화면에 안 들어가면 줄인다 - 가로도 (노트북 화면이 1024 면 참가자 여섯째 칸과
+        # 물러나기 단추가 밖으로 나갔었다).
+        ww, wh, gx, gy = self.zoom_open()
         self.win = tk.Toplevel(self.root)
-        ww = U.h(W)
-        self.scene_h = U.h(SCENE_H)
-        wh = self.scene_h + U.h(MSG_H) + U.h(CMD_H) + 4
-        sw_, sh_ = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        try:
-            x1, y1, x2, y2 = PLAT.work_area(sw_, sh_)
-        except Exception:                                   # noqa: BLE001
-            x1, y1, x2, y2 = 0, 0, sw_, sh_
-        room = (y2 - y1) - 44
-        if wh > room:
-            cut = min(wh - room, self.scene_h - U.h(MIN_SCENE_H))
-            self.scene_h -= max(0, cut)
-            wh -= max(0, cut)
-        # **가로도 화면 안에 넣는다.** 글꼴이 큰 화면에서는 U.h(960) 이
-        # 1152 까지 커지는데, 노트북 화면이 1024 면 오른쪽이 통째로 밖으로
-        # 나간다(참가자 여섯째 칸과 물러나기 단추가 안 보인다).
-        ww = min(ww, (x2 - x1) - U.h(16))
-        self.ww = ww
         boss = (self.view.get("boss") or {}).get("name") or "레이드"
         U.style_window(self.win, "레이드 — %s" % boss, ww, wh)
-        gx = x1 + max(0, ((x2 - x1) - ww) // 2)
-        gy = y1 + max(0, ((y2 - y1) - wh - 30) // 3)
         self.win.geometry("%dx%d+%d+%d" % (ww, wh, gx, gy))
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2, highlightbackground=U.LINE2)
-        self.win.resizable(False, False)
         self.win.protocol("WM_DELETE_WINDOW", self.request_close)
         app.raid_battle = self
 
         self._scene()
         self._message()
         self._commands()
+        self.zoom_watch()                    # 이제부터 창을 끌어 크기를 바꾸면 따라간다
 
         events = data.get("events") or []
         if self.played == 0 and events:
@@ -151,6 +148,7 @@ class RaidBattleWindow(object):
         return j
 
     def say(self, text):
+        self._said = text or ""              # (창 크기를 바꿔 다시 지을 때 되돌린다)
         try:
             self.msg.configure(text=natural(text or ""))
         except tk.TclError:
@@ -163,10 +161,16 @@ class RaidBattleWindow(object):
     def _scene(self):
         s = U.h
         self.sw, self.sh = self.ww - 4, self.scene_h
-        cv = tk.Canvas(self.win, width=self.sw, height=self.sh, bg="#171326",
-                       highlightthickness=0)
-        cv.pack(fill="x")
-        self.cv = cv
+        cv = getattr(self, "cv", None)
+        if cv is None:
+            cv = tk.Canvas(self.win, width=self.sw, height=self.sh, bg="#171326",
+                           highlightthickness=0)
+            cv.pack(fill="x")
+            self.cv = cv
+        else:
+            # 창 크기를 바꿨다 - **같은 캔버스를 비우고** 새 크기로 다시 그린다 (battle_zoom)
+            cv.delete("all")
+            cv.configure(width=self.sw, height=self.sh)
         sw, sh = self.sw, self.sh
         cv.create_rectangle(0, int(sh * 0.62), sw, sh, fill="#1e1a33", outline="")
         cv.create_line(0, int(sh * 0.62), sw, int(sh * 0.62), fill="#2d2749")
@@ -237,12 +241,13 @@ class RaidBattleWindow(object):
         f = tk.Frame(self.win, bg="#0f141d", height=U.h(MSG_H), highlightthickness=0)
         f.pack(fill="x")
         f.pack_propagate(False)
+        self.msg_frame = f
         tk.Frame(f, bg=U.ACCENT, width=4).pack(side="left", fill="y")
         self.msg = tk.Label(f, text="", bg="#0f141d", fg=U.FG,
                             font=(U.FAMILY, U.pt(12)), anchor="w", justify="left")
         self.msg.pack(side="left", fill="both", expand=True, padx=14)
         U.wrap_to_width(self.msg)
-        self.mega = MegaToggle(f, before=self.msg)       # 시즌 3, 고를 때만 보인다
+        self.mega = MegaToggle(f, before=self.msg, make=U.ghost_button)   # 시즌 3, 고를 때만 보인다
 
     def _commands(self):
         self.cmd = tk.Frame(self.win, bg=U.BG)
@@ -271,6 +276,7 @@ class RaidBattleWindow(object):
 
     # ---------------- 그림 ----------------
     def set_mon(self, key, mon, boss=False):
+        self.zoom_use()
         self.shown[key] = dict(mon) if mon else None
         self._stop_anim(key)
         try:
@@ -388,6 +394,7 @@ class RaidBattleWindow(object):
         self.cv.itemconfigure(it["bar"], fill=hp_color(frac))
 
     def _shield(self, sh):
+        self._shield_now = dict(sh) if sh else None
         x0, y0, bw, bh = self.shield_geom
         if not sh:
             self.cv.itemconfigure(self.shield_bg, state="hidden")
@@ -527,8 +534,9 @@ class RaidBattleWindow(object):
             self.fx = None
             self.later(70, self._next)
 
+        self._fx_done = done                  # (창 크기를 바꾸면 이 연출을 끝내고 다음으로 넘긴다)
         try:
-            k = FX_SCALE
+            k = FX_SCALE * Z.K
             self._fx_actor = src
             (sx, sy), (tx, ty) = self._center(src), self._center(dst)
             self.fx = FX.Effect(_FxStage(self, k), self._find_move(ev),
@@ -560,6 +568,7 @@ class RaidBattleWindow(object):
     def _next(self):
         if not self.alive:
             return
+        self.zoom_use()
         if not self.queue:
             return self._finish_play()
         ev = self.queue.pop(0)
@@ -749,6 +758,9 @@ class RaidBattleWindow(object):
             else:
                 self.shown[i] = dict(mon)
                 self._paint(i)
+        self._paint_round()
+
+    def _paint_round(self):
         self.cv.itemconfigure(
             self.round_text,
             text="%d / %d 라운드%s" % (self.view.get("round", 0),
@@ -758,6 +770,28 @@ class RaidBattleWindow(object):
         self.turn_lbl.configure(text="%d명 참가" % sum(
             1 for p in self.view.get("players") or []
             if not p.get("left") and not p.get("out")))
+
+    def _restore(self):
+        """창 크기를 바꿔 다시 지은 화면을, 들고 있던 것으로 되돌린다 (battle_zoom.Resizable)."""
+        shield = self._shield_now
+        for key, mon in list(self.shown.items()):
+            if key in self.sprite:
+                self.set_mon(key, mon, boss=(key == BOSS))
+        for key in [BOSS] + list(range(self._n())):
+            if key not in self.shown:
+                self._paint(key)             # 아직 포켓몬이 안 선 자리도 이름은 적는다
+        self._shield(shield)
+        self._paint_round()
+        self._paint_timer()
+        switching = self._switching
+        if self._result_shown:
+            self._paint_result()
+        elif self.busy:
+            self.hide_commands()             # 재생 중이다 - 고를 것이 없다
+        elif switching and (self.view.get("me") or {}).get("canAct") and not self.sent:
+            self.open_switch()
+        else:
+            self.show_commands()
 
     # ---------------- 폴링 ----------------
     def _poll(self):
@@ -808,6 +842,7 @@ class RaidBattleWindow(object):
 
     # ---------------- 명령 ----------------
     def hide_commands(self):
+        self._switching = False
         for w in self.left.winfo_children():
             w.destroy()
         for b in (self.switch_btn, self.leave_btn):
@@ -815,6 +850,8 @@ class RaidBattleWindow(object):
         self.mega.show(False)
 
     def show_commands(self):
+        self.zoom_use()
+        self._switching = False
         for w in self.left.winfo_children():
             w.destroy()
         me = self.view.get("me") or {}
@@ -912,6 +949,8 @@ class RaidBattleWindow(object):
                 w.bind("<Button-1>", lambda _e, k=m.get("key"): self.use_move(k))
 
     def open_switch(self):
+        self.zoom_use()
+        self._switching = True               # (창 크기를 바꿔도 교체 칸은 그대로 둔다)
         me = self.view.get("me") or {}
         for w in self.left.winfo_children():
             w.destroy()
@@ -1005,6 +1044,12 @@ class RaidBattleWindow(object):
         if self._result_shown:
             return
         self._result_shown = True
+        self._paint_result()
+        self._mark_seen()
+
+    def _paint_result(self):
+        """결과 칸을 그린다 (창 크기를 바꿔 다시 지을 때도 부른다 - 한 번만 할 일은 show_result 에)."""
+        self.zoom_use()
         self.hide_commands()
         res = self.view.get("result") or self.room.get("result")
         title = {"won": "레이드 성공!", "lost": "전멸...",
@@ -1017,7 +1062,7 @@ class RaidBattleWindow(object):
         inner.pack(fill="both", expand=True, padx=16, pady=10)
         side = tk.Frame(inner, bg=U.BG2)
         side.pack(side="right", fill="y", padx=(12, 0))
-        U.PushButton(side, "닫기", self.close, height=U.h(38)).pack(side="bottom")
+        U.PushButton(side, "닫기", self.close, height=Z.base_h(38)).pack(side="bottom")
         body = tk.Frame(inner, bg=U.BG2)
         body.pack(side="left", fill="both", expand=True)
         tk.Label(body, text=title, bg=U.BG2, fg=color,
@@ -1050,7 +1095,6 @@ class RaidBattleWindow(object):
             lab.pack(fill="x", pady=(2, 0))
             U.wrap_to_width(lab)
         self.say(title)
-        self._mark_seen()
 
     def _mark_seen(self):
         if self._seen_sent:
@@ -1072,6 +1116,7 @@ class RaidBattleWindow(object):
         if not self.alive:
             return
         self.alive = False
+        self.zoom_close()
         for e in self.effects + ([self.fx] if self.fx is not None else []):
             try:
                 e.stop()

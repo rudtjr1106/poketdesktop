@@ -71,14 +71,35 @@ class FakeServer(object):
         self.claimed = {}             # {uid: set(tier)}
         self.calls = []
         self.long_profile = False     # 프로필에 칭호·시즌을 잔뜩 싣는다 (창 안쪽이 굴러가나 본다)
+        self.avatar = None            # 그 길드원이 만든 캐릭터 (1.10.3). 안 만들었으면 None
+        # 1.10.3 서버의 동작. 꺼 두면(기본) 1.10.2 까지의 서버처럼 답한다 - 새 화면이 옛 서버에도 붙어야 한다.
+        self.auto = False             # 미션 보상이 저절로 들어온다 ('받기' 가 없다)
+        self.seeking = {}             # 길드 친선전: 상대를 구하는 사람 {번호: 이름}
+        self.seek_card = {}           # 그 사람이 채팅에 놓은 카드 {번호: 채팅 줄 번호}
+        self.fights = []              # 진행 중인 친선전 (구경용 모습)
+        self.fr_calls = []            # 친선전으로 부른 것들
+        self.fr_fail = None           # 다음 받기·신청이 실패할 까닭
+        self.paged = False            # 채팅을 마지막 50줄만 주고, before 로 거슬러 받는다
         self.others = []              # 목록에 같이 나오는 남의 길드들 (다른 길드 둘러보기)
 
     def fail(self, msg, code=400):
         raise apimod.ApiError(msg, code)
 
-    def say(self, body, uid=None):
-        self.chat.append({"id": len(self.chat) + 1, "userId": uid, "name": self.names.get(uid, ""),
-                          "body": body, "at": "2026-10-06T03:04:05+00:00"})
+    def say(self, body, uid=None, at="2026-10-06T03:04:05+00:00", card=None):
+        row = {"id": len(self.chat) + 1, "userId": uid, "name": self.names.get(uid, ""), "body": body, "at": at}
+        if card:
+            row["card"] = card            # 채팅에 놓이는 카드 (길드 친선전)
+        self.chat.append(row)
+        return row
+
+    def card(self, line, card):
+        """채팅에 놓인 카드의 모습을 바꾼다 (진짜 서버의 guild.card_set)."""
+        for m in self.chat:
+            if m["id"] == line:
+                m["card"] = card
+
+    def who(self, uid):
+        return {"id": uid, "name": self.names[uid]}
 
     def points(self, uid=None):
         pts = dict((m[0], m[3]) for m in MISSIONS)
@@ -110,6 +131,12 @@ class Api(object):
             return base
         s.done.setdefault(me, set()).add("attend")
         total, mine = s.points(), s.points(me)
+        if s.auto and mine > 0:                   # 넘은 단계는 그 자리에서 들어온다 (서버의 settle)
+            for i, (need, b, c) in enumerate(TIERS):
+                if total >= need and (i + 1) not in s.claimed.setdefault(me, set()):
+                    s.claimed[me].add(i + 1)
+                    s.balls[me] += b
+                    s.coin[me] += c
         role = s.roles[me]
         members = [{"id": u, "name": s.names[u], "role": r, "roleKr": ROLE_KR[r], "online": u == me,
                     "lastSeenAgo": 7200, "points": s.points(u), "today": s.points(u),
@@ -126,6 +153,7 @@ class Api(object):
                           "ranked": False} for u, m in s.reqs] if role != "member" else [],
             "mission": {
                 "day": "2026-10-06", "resetIn": 3 * 3600 + 720, "myPoints": mine, "myMax": 10,
+                "auto": bool(s.auto),
                 "guildPoints": total, "guildMax": 100,
                 "missions": [{"key": k, "name": n, "goal": goal, "points": p,
                               "n": goal if k in s.done.get(me, ()) else 0,
@@ -134,7 +162,7 @@ class Api(object):
                            "reward": " · ".join(x for x in (("몬스터볼 %d개" % b) if b else "",
                                                              ("길드 코인 %d개" % c) if c else "") if x),
                            "reached": total >= need, "claimed": (i + 1) in s.claimed.get(me, ()),
-                           "canClaim": total >= need and mine > 0
+                           "canClaim": (not s.auto) and total >= need and mine > 0
                            and (i + 1) not in s.claimed.get(me, ())}
                           for i, (need, b, c) in enumerate(TIERS)]},
             "chatLast": len(s.chat), "stamp": s.stamp(),
@@ -231,20 +259,73 @@ class Api(object):
         return {"ok": True, "message": "해산했습니다."}
 
     # ---- 채팅
-    def guild_chat(self, after=0):
+    def guild_chat(self, after=0, before=0):
         s, me = self.s, self.me
-        s.calls.append(("chat", after))
+        s.calls.append(("chat", after) if not before else ("older", before))
         if not s.g or me not in s.roles:
             return {"guild": None, "messages": [], "last": 0}
-        rows = [dict(m, mine=m["userId"] == me, system=m["userId"] is None, ago=1)
-                for m in s.chat if m["id"] > after]
-        return {"guild": 1, "messages": rows, "last": s.chat[-1]["id"] if s.chat else after,
-                "stamp": s.stamp()}
+        rows = [dict(m, mine=m["userId"] == me, system=m["userId"] is None, ago=1) for m in s.chat]
+        if not s.paged:                           # 1.10.2 까지: 그 번호 뒤의 줄 전부. 거슬러 받기는 없다
+            rows = [m for m in rows if m["id"] > after]
+            return {"guild": 1, "messages": rows, "last": s.chat[-1]["id"] if s.chat else after,
+                    "stamp": s.stamp()}
+        if before:
+            rows = [m for m in rows if m["id"] < before][-100:]
+        elif after:
+            rows = [m for m in rows if m["id"] > after][:100]
+        else:
+            rows = rows[-50:]
+        more = bool(rows) and not after and rows[0]["id"] > s.chat[0]["id"]
+        return {"guild": 1, "messages": rows, "last": rows[-1]["id"] if rows else after,
+                "first": rows[0]["id"] if rows else 0, "more": more, "days": 7, "stamp": s.stamp()}
 
     def guild_say(self, body):
         s = self.s
         s.say(body, self.me)
         return {"ok": True, "id": len(s.chat)}
+
+    # ---- 친선전 (1.10.3)
+    def _friendly(self):
+        s = self.s
+        return {"seeking": [{"id": u, "name": n, "left": 120, "card": s.seek_card.get(u)}
+                            for u, n in s.seeking.items()],
+                "fights": list(s.fights), "limit": 3}
+
+    def guild_friendly(self):
+        self.s.fr_calls.append(("state", self.me))
+        return self._friendly()
+
+    def guild_friendly_seek(self, on=True):
+        s = self.s
+        s.fr_calls.append(("seek", self.me, bool(on)))
+        me = s.who(self.me)
+        if on and self.me not in s.seeking:      # 채팅에 카드 한 장을 놓는다
+            s.seeking[self.me] = me["name"]
+            s.seek_card[self.me] = s.say("%s 님이 친선전 상대를 구합니다." % me["name"],
+                                         card={"k": "friendly", "s": "seek", "a": me})["id"]
+        elif not on and s.seeking.pop(self.me, None):
+            s.card(s.seek_card.pop(self.me, 0), {"k": "friendly", "s": "closed", "a": me})
+        return self._friendly()
+
+    def _fail(self):
+        why, self.s.fr_fail = self.s.fr_fail, None
+        if why:
+            e = Exception(why)
+            e.message = why
+            raise e
+
+    def guild_friendly_accept(self, uid):
+        s = self.s
+        s.fr_calls.append(("accept", self.me, uid))
+        self._fail()
+        s.seeking.pop(uid, None)
+        s.card(s.seek_card.pop(uid, 0), {"k": "friendly", "s": "fight", "a": s.who(uid), "b": s.who(self.me), "mid": 9})
+        return {"match": {"id": 9, "state": "fighting"}}
+
+    def guild_friendly_ask(self, uid):
+        self.s.fr_calls.append(("ask", self.me, uid))
+        self._fail()
+        return {"match": {"id": 8, "state": "invited"}}
 
     # ---- 미션·상점
     def guild_claim(self, tier):
@@ -302,6 +383,7 @@ class Api(object):
                 "raid": {"games": 9, "wins": 5, "damage": 0},
                 "titles": {"owned": own, "count": len(own), "total": 40, "equipped": "도감 수집가"},
                 "seasons": seasons,
+                "avatar": s.avatar,
                 "guild": {"role": s.roles[uid], "roleKr": ROLE_KR[s.roles[uid]],
                           "joinedAt": "2026-10-05T00:00:00+00:00", "points": 120, "today": 4,
                           "online": False, "lastSeenAgo": 7200, "me": uid == self.me}}
@@ -344,6 +426,22 @@ def labels(w, text):
                 pass
             walk(c)
     walk(w)
+    return out
+
+
+def art_labels(win):
+    """창 안에서 그림을 올린 라벨들 (프로필의 캐릭터)."""
+    out = []
+
+    def walk(x):
+        for c in x.winfo_children():
+            try:
+                if c.winfo_class() == "Label" and str(c.cget("image")) and c.winfo_ismapped():
+                    out.append(c)
+            except Exception:                               # noqa: BLE001
+                pass
+            walk(c)
+    walk(win)
     return out
 
 
@@ -484,7 +582,7 @@ def main():
 
     print("\n=== 채팅 ===")
     chk("만들어졌다는 알림 줄", "피카단 길드가 만들어졌습니다" in w.chat_text(), w.chat_text())
-    chk("칸 여섯: 채팅·길드원·미션·코인 상점·다른 길드·관리",
+    chk("칸 여섯: 채팅·길드원·미션·코인 상점·다른 길드·관리 (친선전은 채팅에서 한다)",
         [lb.cget("text") for lb in w.seg.cells.values()]
         == ["채팅", "길드원", "미션", "코인 상점", "다른 길드", "관리"])
     root.update_idletasks()
@@ -509,8 +607,13 @@ def main():
     chk("사람 수가 바뀌면 머리가 따라 바뀐다", any("길드원 2 / 15명" in x for x in texts(top)))
     chk("  채팅 칸은 다시 그리지 않는다 (쓰던 글·읽던 자리가 그대로)", w.chat_box is box
         and "반갑습니다" in w.chat_text())
-    lines = w.chat_text().split("\n")
+    lines = w.chat_bodies()                       # 날짜 줄은 빼고 말 줄만
     chk("줄마다 한 번씩만 들어온다", len(lines) == len(set(lines)) == w.chat_lines, lines)
+    chk("맨 위에 날짜 줄이 하나 선다 (1.10.3)", w.chat_text().split("\n")[0] == ui_guild.day_label(
+        ui_guild.chat_day("2026-10-06T03:04:05+00:00")) and [r[0] for r in w.chat_rows].count("day") == 1,
+        w.chat_text().split("\n")[:2])
+    chk("옛 서버(거슬러 받기가 없다)에서는 위로 굴려도 더 묻지 않는다", w.chat_more is False
+        and not any(c[0] == "older" for c in srv.calls if isinstance(c, tuple)))
     w.chat_var.set("가" * 201)
     w.send_chat()
     chk("너무 긴 말은 보내지 않고 알려 준다", "200자" in w.status._label.cget("text")
@@ -601,6 +704,43 @@ def main():
     chk("  눌린 위젯 없음", not bad, bad[:3])
     dlg.destroy()
     srv.long_profile = False
+
+    print("\n=== 프로필의 캐릭터 (1.10.3 - 보류 중) ===")
+    from poketdesktop import ui_avatar as _UA
+    srv.avatar = {"spec": {"hair": "pony", "hairColor": "pink", "hat": "cap", "top": "hoodie"}}
+    dlg = w.profile_dialog(2)
+    wait(root, lambda: dlg.profile is not None, 4)
+    settle(root, 0.4)
+    chk("**캐릭터는 보류 중이라, 만든 사람의 프로필에도 그림을 안 그린다**", _UA.ENABLED is False and art_labels(dlg) == [],
+        len(art_labels(dlg)))
+    dlg.destroy()
+    _UA.ENABLED = True                    # 아래는 다시 켰을 때의 동작이다 (코드는 남겨 두었다)
+    srv.avatar = None
+    dlg = w.profile_dialog(2)
+    wait(root, lambda: dlg.profile is not None, 4)
+    settle(root, 0.4)
+    chk("캐릭터를 안 만든 사람의 프로필에는 그림이 없다", art_labels(dlg) == [], len(art_labels(dlg)))
+    dlg.destroy()
+    srv.avatar = {"spec": {"hair": "pony", "hairColor": "pink", "hat": "cap", "top": "hoodie"}}
+    dlg = w.profile_dialog(2)
+    wait(root, lambda: dlg.profile is not None, 4)
+    settle(root, 0.4)
+    pics = art_labels(dlg)
+    who = labels(dlg, "나래")[0]
+    chk("만든 사람이면 캐릭터가 64x64 로 선다", len(pics) == 1 and (pics[0].winfo_width(), pics[0].winfo_height()) == (64, 64),
+        [(x.winfo_width(), x.winfo_height()) for x in pics])
+    chk("  이름의 왼쪽에", pics and pics[0].winfo_rootx() + pics[0].winfo_width() <= who.winfo_rootx(),
+        (pics and pics[0].winfo_rootx(), who.winfo_rootx()))
+    tx = texts(dlg)
+    chk("  나머지는 그대로 보인다", "슈퍼볼" in tx and any("함께한 지 13일째" in x for x in tx) and "시즌 기록" in tx)
+    wide = clipped_wide(canvas_of(dlg))
+    chk("  그림만큼 좁아진 칸에서도 옆으로 잘린 글이 없다", not wide, wide[:3])
+    bad = squeezed(dlg)
+    chk("  눌린 위젯 없음", not bad, bad[:3])
+    chk("  창이 정해 둔 크기를 안 넘는다", dlg.winfo_width() == ui_guild.PROFILE_W
+        and dlg.winfo_height() <= ui_guild.PROFILE_H, size(dlg))
+    dlg.destroy()
+    srv.avatar = None
 
     print("\n=== 작은 창들의 크기 ===")
     one = next(m for m in w.data["members"] if not m["me"])
@@ -1007,7 +1147,7 @@ def main():
     chk("받는 사이에 밀려온 줄 때문에 앞 줄이 빠지지 않는다", "끊긴 사이의 말" in body
         and body.index("끊긴 사이의 말") < body.index("다시 붙은 뒤의 말")
         and body.count("다시 붙은 뒤의 말") == 1, body[-80:])
-    lines = [x for x in w4.chat_text().split("\n") if x.strip()]
+    lines = w4.chat_bodies()
     chk("줄 수가 서버의 줄 수와 같다", len(lines) == len(srv2.chat) == w4.chat_lines, (len(lines), len(srv2.chat)))
 
     print("\n=== 다른 칸·다른 탭에 있을 때 ===")
@@ -1072,7 +1212,7 @@ def main():
     sock.push({"t": "open", "userId": 1, "guild": 1, "last": len(srv2.chat)})
     settle(root, 0.3)
     chk("다시 붙으면 '실시간' 으로", w4.live and "실시간" in w4.chat_state.cget("text"))
-    lines = [x for x in w4.chat_text().split("\n") if x.strip()]
+    lines = w4.chat_bodies()
     chk("오가는 동안 겹치거나 빠진 줄이 없다", len(lines) == len(srv2.chat) and len(set(lines)) == len(lines),
         (len(lines), len(srv2.chat)))
     B2.guild_kick(1) if False else None
@@ -1157,6 +1297,126 @@ def main():
     from poketdesktop import guild_ws
     chk("웹소켓 주소", guild_ws.ws_url("https://posktop.duckdns.org") == "wss://posktop.duckdns.org/ws/guild"
         and guild_ws.ws_url("http://127.0.0.1:8788/") == "ws://127.0.0.1:8788/ws/guild")
+
+    print("\n=== 미션 보상이 저절로 들어오는 서버 (1.10.3) ===")
+    srv7 = FakeServer()
+    srv7.auto = True
+    A7, B7 = Api(srv7, 1), Api(srv7, 2)
+    A7.guild_create("자동단", "", "open")
+    B7.guild_join(1)
+    app7 = FakeApp(root, A7)
+    w7 = ui_guild.GuildWindow(app7)
+    top7 = w7.win.winfo_toplevel()
+    top7.deiconify()
+    top7.geometry("1000x680+90+60")
+    wait(root, lambda: w7.in_guild() and w7.chat_box is not None and w7.chat_ready)
+    srv7.done[2] = set(m[0] for m in MISSIONS)               # 다른 길드원이 10점을 채웠다 (나는 출석 1점)
+    w7.show_tab("mission")
+    w7.refresh()
+    wait(root, lambda: w7.data["mission"]["guildPoints"] >= 11, 4)
+    settle(root, 0.4)
+    tx = texts(top7)
+    chk("안내가 '자동으로 들어온다' 고 말한다", any("자동으로 들어옵니다" in x and "받기를 누를 필요가 없습니다" in x for x in tx),
+        [x for x in tx if "보상" in x][:2])
+    chk("넘은 단계는 '받기' 없이 '받음 (자동)'", "받음 (자동)" in tx and not labels(top7, "받기")
+        and 1 in srv7.claimed.get(1, ()) and srv7.balls[1] == 15, (srv7.claimed, srv7.balls[1]))
+    chk("  아직 못 넘은 단계는 남은 점수", any("점 남음" in x for x in tx))
+    bad = squeezed(top7)
+    chk("  눌린 위젯 없음", not bad, bad[:3])
+    chk("한 줄의 글 (계산)", ui_guild.tier_state({"claimed": True}, {"auto": True}) == ("claimed", "받음 (자동)")
+        and ui_guild.tier_state({"claimed": True}, {}) == ("claimed", "받음")
+        and ui_guild.tier_state({"reached": True}, {"auto": True}) == ("wait", "미션을 하나라도 하면 바로 들어옵니다")
+        and ui_guild.tier_state({"canClaim": True, "reached": True}, {}) == ("claim", "받기")
+        and ui_guild.tier_state({"need": 25}, {"guildPoints": 11}) == ("left", "14점 남음"))
+    w7.close()
+
+    print("\n=== 채팅: 거슬러 받기와 날짜 줄 (1.10.3) ===")
+    srv8 = FakeServer()
+    srv8.paged = True
+    A8, B8 = Api(srv8, 1), Api(srv8, 2)
+    A8.guild_create("기록단", "", "open")
+    B8.guild_join(1)
+    del srv8.chat[:]
+    for i in range(230):                                     # 사흘에 걸친 230줄
+        srv8.say("줄 %03d" % i, 1 + i % 2, at="2026-10-0%dT0%d:%02d:00+00:00" % (4 + i // 80, 1 + (i % 80) // 30, i % 30))
+    app8 = FakeApp(root, A8)
+    w8 = ui_guild.GuildWindow(app8)
+    top8 = w8.win.winfo_toplevel()
+    top8.deiconify()
+    top8.geometry("1000x680+110+70")
+    wait(root, lambda: w8.in_guild() and w8.chat_box is not None and w8.chat_ready)
+    settle(root, 0.4)
+    older = lambda: [c for c in srv8.calls if isinstance(c, tuple) and c[0] == "older"]     # noqa: E731
+    chk("처음에는 마지막 50줄만 받는다", w8.chat_lines == 50 and w8.chat_bodies()[-1].endswith("줄 229")
+        and w8.chat_first == 181 and w8.chat_more is True and not older(), (w8.chat_lines, w8.chat_first, older()))
+    chk("  맨 아래를 보고 있다", w8.chat_box.yview()[1] >= 0.999)
+    chk("  맨 위에 날짜 줄이 선다", w8.chat_rows[0][0] == "day" and w8.chat_text().split("\n")[0].endswith("요일"),
+        w8.chat_text().split("\n")[:2])
+    w8.chat_box.yview_moveto(0.0)                             # 맨 위까지 굴린다
+    wait(root, lambda: w8.chat_lines == 150, 4)
+    settle(root, 0.3)
+    chk("맨 위까지 굴리면 앞의 100줄을 받아 붙인다", w8.chat_lines == 150 and older() == [("older", 181)]
+        and w8.chat_first == 81 and w8.chat_more is True, (w8.chat_lines, older()))
+    top_line = w8.chat_box.get("@0,0 linestart", "@0,0 lineend")
+    # 처음 받은 50줄의 첫 줄은 181번 줄 = '줄 180' 이다 (번호는 1부터, 글은 000부터)
+    chk("  **보던 자리가 그대로다** (방금까지 맨 위였던 줄이 맨 위에)", "줄 180" in top_line
+        or top_line.endswith("요일"), top_line)
+    bodies = [b.split("  ")[-1] for b in w8.chat_bodies()]
+    chk("  순서대로, 겹치거나 빠진 줄 없이", bodies == ["줄 %03d" % i for i in range(80, 230)], bodies[:3])
+    w8.chat_box.yview_moveto(0.0)
+    wait(root, lambda: w8.chat_lines == 230, 4)
+    settle(root, 0.3)
+    chk("끝까지 가면 전부 온다, 더 없다는 것을 안다", w8.chat_lines == 230 and w8.chat_more is False
+        and [b.split("  ")[-1] for b in w8.chat_bodies()] == ["줄 %03d" % i for i in range(230)], w8.chat_lines)
+    first_lines = w8.chat_text().split("\n")[:2]
+    chk("  맨 위에 '채팅은 7일 동안 보관됩니다' 가 적힌다", first_lines[0] == "채팅은 7일 동안 보관됩니다."
+        and first_lines[1].endswith("요일") and w8.chat_rows[0][0] == "head", first_lines)
+    days = [r[1] for r in w8.chat_rows if r[0] == "day"]
+    chk("날이 바뀌는 자리마다 날짜 줄이 하나씩 (사흘 = 셋)", len(days) == 3 and days == sorted(set(days)), days)
+    kinds = [r[0] for r in w8.chat_rows]
+    chk("  날짜 줄 바로 다음은 늘 말 줄이다", all(kinds[i + 1] == "msg" for i, k in enumerate(kinds) if k == "day"))
+    chk("  화면의 줄 수 = 말 + 날짜 + 안내", len(w8.chat_text().split("\n")) == 230 + 3 + 1 == len(w8.chat_rows),
+        (len(w8.chat_text().split("\n")), len(w8.chat_rows)))
+    n = len(older())
+    w8.chat_box.yview_moveto(0.0)
+    settle(root, 0.4)
+    chk("더 없으면 맨 위로 굴려도 묻지 않는다", len(older()) == n)
+    pos = w8.chat_box.yview()
+    srv8.say("새로 온 말", 2, at="2026-10-06T05:00:00+00:00")
+    w8._poll_chat()
+    wait(root, lambda: w8.chat_lines == 231, 3)
+    settle(root, 0.2)
+    chk("위를 읽는 동안 새 말이 와도 화면이 아래로 튀지 않는다", w8.chat_lines == 231
+        and abs(w8.chat_box.yview()[0] - pos[0]) < 0.02 and w8.chat_bodies()[-1].endswith("새로 온 말"),
+        (pos, w8.chat_box.yview()))
+    chk("  같은 날의 말에는 날짜 줄이 또 서지 않는다", [r[0] for r in w8.chat_rows].count("day") == 3)
+    bad = squeezed(top8)
+    chk("눌린 위젯 없음", not bad, bad[:3])
+    # 오래 띄워 두면 줄이 쌓인다: 위에서부터 걷고, 걷힌 줄은 다시 거슬러 받을 수 있다
+    keep_n = ui_guild.CHAT_KEEP
+    ui_guild.CHAT_KEEP = 60
+    w8.chat_box.yview_moveto(1.0)
+    settle(root, 0.2)
+    srv8.say("걷기 전의 마지막 말", 2, at="2026-10-06T05:01:00+00:00")
+    w8._poll_chat()
+    wait(root, lambda: w8.chat_bodies()[-1].endswith("걷기 전의 마지막 말"), 3)
+    settle(root, 0.2)
+    chk("줄이 너무 쌓이면 위에서부터 걷는다 (화면의 줄 %d)" % 60, len(w8.chat_rows) <= 61 and w8.chat_more is True
+        and w8.chat_rows[0][0] == "day" and w8.chat_first > 150, (len(w8.chat_rows), w8.chat_first))
+    ui_guild.CHAT_KEEP = keep_n
+    before = w8.chat_lines
+    w8.chat_box.yview_moveto(0.0)
+    wait(root, lambda: w8.chat_lines > before, 4)
+    settle(root, 0.3)
+    got = [b.split("  ")[-1] for b in w8.chat_bodies()]
+    nums = [int(x.split()[1]) for x in got if x.startswith("줄 ")]
+    chk("  걷힌 줄은 위로 굴리면 다시 온다 (이어진다)", w8.chat_lines == before + 100 and len(set(got)) == len(got)
+        and nums == list(range(nums[0], 230)) and got[-2:] == ["새로 온 말", "걷기 전의 마지막 말"],
+        (before, w8.chat_lines, nums[:2], got[-2:]))
+    chk("날짜 계산은 깨진 값에도 안 죽는다", ui_guild.chat_day(None) == "" and ui_guild.chat_day("x") == ""
+        and ui_guild.day_label("") == "" and ui_guild.day_label("2026-10-06") == "10월 6일 화요일"
+        and [r[0] for r in ui_guild.chat_rows([{"at": None, "id": 1}, {"at": "x", "id": 2}])] == ["msg", "msg"])
+    w8.close()
 
     w.close()
     chk("닫으면 채팅을 묻는 예약이 남지 않는다", w._chat_job is None and not w.alive)

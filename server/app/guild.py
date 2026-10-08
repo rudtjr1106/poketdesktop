@@ -26,6 +26,14 @@
 단계(TIERS)를 넘을 때마다 그날 한 점이라도 보탠 길드원이 보상을 받는다.
 하루는 한국 시각 자정에 바뀐다 (랭크 배틀과 같다).
 
+**보상은 저절로 들어온다** (1.10.3, settle). 전에는 미션 칸에서 '받기' 를 눌러야 했는데,
+자정 직전에 다른 길드원이 단계를 넘기면 받을 틈이 없었다 (자고 있는 사이에 넘고, 일어나면
+날이 바뀌어 있다). 이제 조건이 맞는 순간에 준다 - 조건이 바뀌는 곳은 미션을 끝냈을 때
+(note) 하나뿐이라, 거기서 한 번 훑으면 놓치는 것이 없다:
+
+  · 길드 점수가 단계를 넘었다       -> 오늘 미션을 한 길드원 모두에게
+  · 내가 오늘 첫 미션을 끝냈다      -> 이미 넘어 있던 단계들을 나에게
+
 보상은 **사람에게** 건다 (guild_claim). 길드를 옮겨 다녀도 같은 날 같은 단계를
 두 번 받을 수 없다. 길드 코인도 사람이 갖는다 - 길드를 나가도 남는다.
 
@@ -41,8 +49,14 @@ listeners 에 건 함수를 부르고, 그쪽이 붙어 있는 길드원에게 �
 웹소켓이 막힌 망(회사·학교)도 있어서 **폴링 길도 그대로 둔다**: GET /api/guild/chat?after=
 는 '이 번호 뒤의 줄' 을 준다. 화면은 웹소켓이 붙어 있으면 밀려오는 것만 받고, 끊기면
 2초마다 이 길로 묻는다. 줄 번호(id)가 곧 순서라 두 길이 섞여도 겹치거나 빠지지 않는다.
+
+**일주일 동안 둔다** (1.10.3, CHAT_DAYS). 전에는 길드마다 줄 수로 잘랐고 화면도 마지막 쉰 줄만
+받아서, 조금만 말이 오가도 위의 내용을 볼 수 없었다. 이제 GET /api/guild/chat?before= 로
+'이 번호 앞의 줄' 을 거슬러 받는다 (화면은 맨 위까지 굴리면 더 받는다). 일주일이 지난 줄은
+주지 않고, 가끔(sweep_chat) 지운다.
 """
 import datetime
+import json
 import math
 import sqlite3
 import time
@@ -60,6 +74,8 @@ MESSAGE_MAX = 60
 PAGE = 10
 CHAT_FIRST = 50            # 처음 열 때 주는 줄 수
 CHAT_STEP = 100            # 한 번에 더 주는 줄 수
+CHAT_DAYS = 7              # 채팅을 두는 날 수. 이보다 오래된 줄은 주지 않고 지운다
+CHAT_SWEEP_SEC = 3600      # 오래된 줄을 지우는 간격
 
 ROLE_KR = {"master": "마스터", "sub": "부마스터", "member": "길드원"}
 MODES = ("open", "approve")
@@ -223,17 +239,54 @@ def _changed(gid):
     _emit("guild", gid, {"t": "changed"})
 
 
-def _line(mid, uid, name, body, at):
-    """채팅 한 줄을 보낼 꼴로. (mine 은 받는 사람마다 다르므로 화면이 userId 로 정한다)"""
-    return {"id": mid, "userId": uid, "name": name, "body": body, "at": at, "system": uid is None}
+def _card_of(raw):
+    """저장해 둔 카드(JSON 글)를 푼다. 카드가 아닌 줄이면 None."""
+    if not raw:
+        return None
+    try:
+        c = json.loads(raw)
+    except ValueError:
+        return None
+    return c if isinstance(c, dict) else None
+
+
+def _line(mid, uid, name, body, at, card=None):
+    """채팅 한 줄을 보낼 꼴로. (mine 은 받는 사람마다 다르므로 화면이 userId 로 정한다)
+
+    card 가 있으면 그 줄은 **카드**다 (1.10.3 길드 친선전). 카드를 모르는 옛 화면은 body 를
+    알림 줄로 그린다 - 그래서 body 는 카드 없이 읽어도 말이 되게 적는다.
+    """
+    out = {"id": mid, "userId": uid, "name": name, "body": body, "at": at, "system": uid is None}
+    if card:
+        out["card"] = card
+    return out
 
 
 # ---------------------------------------------------------------- 알림 줄
-def _say(gid, text, now=None):
+def _say(gid, text, now=None, card=None):
+    """알림 줄 하나를 적는다 (card 를 주면 카드로). 그 줄의 번호를 돌려준다."""
     at = _iso(now)
-    cur = db.run("INSERT INTO guild_chat (guild_id, user_id, name, body, at) VALUES (?,NULL,'',?,?)",
-                 (gid, text, at))
-    _emit("guild", gid, {"t": "chat", "m": _line(cur.lastrowid, None, "", text, at)})
+    cur = db.run("INSERT INTO guild_chat (guild_id, user_id, name, body, at, card) VALUES (?,NULL,'',?,?,?)",
+                 (gid, text, at, json.dumps(card, ensure_ascii=False) if card else ""))
+    mid = cur.lastrowid
+    _emit("guild", gid, {"t": "chat", "m": _line(mid, None, "", text, at, card)})
+    return mid
+
+
+def card_set(gid, mid, card, body=None):
+    """채팅에 이미 놓인 카드의 모습을 바꾼다 (같은 줄이 상대 구함 -> 진행 중 -> 끝 으로 바뀐다).
+
+    줄을 새로 적지 않는다 - 친선전 한 판에 채팅이 세 줄씩 밀려 올라가지 않게.
+    """
+    raw = json.dumps(card, ensure_ascii=False)
+    if body is None:
+        db.run("UPDATE guild_chat SET card=? WHERE id=? AND guild_id=?", (raw, mid, gid))
+    else:
+        db.run("UPDATE guild_chat SET card=?, body=? WHERE id=? AND guild_id=?", (raw, body, mid, gid))
+    ev = {"t": "card", "id": mid, "card": card}
+    if body is not None:
+        ev["body"] = body
+    _emit("guild", gid, ev)
 
 
 # ---------------------------------------------------------------- 목록
@@ -577,20 +630,65 @@ def _stamp(gid):
     return "%d.%d.%d.%x.%s" % (n, r, g["points"], intro, g["join_mode"])
 
 
-def chat(uid, after=0, now=None):
-    """after 번 뒤의 줄. after 가 0 이면 마지막 CHAT_FIRST 줄.
+def _chat_cut(now=None):
+    """이 시각보다 앞선 줄은 일주일이 지난 것이다."""
+    return _iso((now or _now()) - datetime.timedelta(days=CHAT_DAYS))
+
+
+_SWEPT = [0.0]              # 마지막으로 오래된 줄을 지운 때 (메모리. 재시작하면 한 번 더 돈다)
+
+
+def sweep_chat(now=None, force=False):
+    """일주일 지난 채팅을 지운다. 지운 줄 수를 돌려준다.
+
+    채팅을 읽거나 보낼 때 부르지만 **한 시간에 한 번만** 실제로 돈다. 안 지워진 옛 줄이
+    남아 있어도 읽는 쪽(chat)이 날짜로 거르므로 화면에는 안 나온다.
+
+    길드마다 줄 수의 상한(config.GUILD_CHAT_KEEP)도 같이 본다 - 도배로 표가 끝없이
+    자라지 않게 하는 안전판이다. 보통은 일주일 치가 거기에 한참 못 미친다.
+    """
+    t = time.time()
+    if not force and t - _SWEPT[0] < CHAT_SWEEP_SEC:
+        return 0
+    _SWEPT[0] = t
+    n = db.run("DELETE FROM guild_chat WHERE at < ?", (_chat_cut(now),)).rowcount or 0
+    keep = int(config.GUILD_CHAT_KEEP)
+    for g in db.q("SELECT guild_id, COUNT(*) c FROM guild_chat GROUP BY guild_id"):
+        if g["c"] <= keep:
+            continue
+        edge = db.q1("SELECT id FROM guild_chat WHERE guild_id=? ORDER BY id DESC LIMIT 1 OFFSET ?",
+                     (g["guild_id"], keep))
+        if edge:
+            n += db.run("DELETE FROM guild_chat WHERE guild_id=? AND id<=?",
+                        (g["guild_id"], edge["id"])).rowcount or 0
+    return n
+
+
+def chat(uid, after=0, now=None, before=0):
+    """채팅 줄.
+
+        after=N     N 번 뒤의 줄 (새로 온 것. 웹소켓이 끊겼을 때 2초마다 묻는다)
+        before=N    N 번 앞의 줄 (거슬러 올라간다. 화면을 맨 위까지 굴렸을 때)
+        둘 다 0     마지막 CHAT_FIRST 줄 (처음 열 때)
+
+    more 는 '돌려준 것보다 앞의 줄이 더 있다' 는 뜻이다 - 화면은 이것이 참일 때만 더 받는다.
 
     **내가 들어온 뒤의 줄만 준다** (1.10.1). 새로 가입한 사람이 그 전에 길드원끼리 나눈
     말을 거슬러 읽을 수 없다 - '○○ 님이 들어왔습니다' 알림 줄부터 보인다. 나갔다가 다시
-    들어오면 다시 들어온 때부터다.
+    들어오면 다시 들어온 때부터다. 그리고 **일주일이 지난 줄은 주지 않는다** (1.10.3).
     """
     m = member(uid)
     if not m:
         return {"guild": None, "messages": [], "last": 0}
     gid = m["guild_id"]
-    since = m["joined_at"] or ""
-    after = max(0, int(after or 0))
-    if after:
+    since = max(m["joined_at"] or "", _chat_cut(now))
+    after, before = max(0, int(after or 0)), max(0, int(before or 0))
+    sweep_chat(now)
+    if before:
+        rows = list(reversed(db.q(
+            "SELECT * FROM guild_chat WHERE guild_id=? AND id<? AND at>=? ORDER BY id DESC LIMIT ?",
+            (gid, before, since, CHAT_STEP))))
+    elif after:
         rows = db.q("SELECT * FROM guild_chat WHERE guild_id=? AND id>? AND at>=?"
                     " ORDER BY id LIMIT ?", (gid, after, since, CHAT_STEP))
     else:
@@ -600,7 +698,16 @@ def chat(uid, after=0, now=None):
     out = [{"id": r["id"], "userId": r["user_id"], "name": r["name"], "body": r["body"],
             "at": r["at"], "ago": _ago(r["at"], now), "mine": r["user_id"] == uid,
             "system": r["user_id"] is None} for r in rows]
+    for line, r in zip(out, rows):
+        card = _card_of(r["card"])
+        if card:
+            line["card"] = card
+    more = False
+    if out and not after:
+        more = db.q1("SELECT 1 x FROM guild_chat WHERE guild_id=? AND id<? AND at>=? LIMIT 1",
+                     (gid, out[0]["id"], since)) is not None
     return {"guild": gid, "messages": out, "last": out[-1]["id"] if out else after,
+            "first": out[0]["id"] if out else 0, "more": more, "days": CHAT_DAYS,
             "stamp": _stamp(gid)}
 
 
@@ -619,9 +726,7 @@ def chat_send(uid, body, now=None):
                  (gid, uid, name, text, at))
     mid = cur.lastrowid
     _emit("guild", gid, {"t": "chat", "m": _line(mid, uid, name, text, at)})
-    if mid % 50 == 0:                       # 가끔 옛 줄을 치운다
-        db.run("DELETE FROM guild_chat WHERE guild_id=? AND id <= ?",
-               (gid, mid - config.GUILD_CHAT_KEEP))
+    sweep_chat(now)                         # 일주일 지난 줄을 치운다 (한 시간에 한 번만 돈다)
     return {"ok": True, "id": mid}
 
 
@@ -661,10 +766,13 @@ def note(uid, key, n=1, now=None):
     db.run("UPDATE guild_member SET points = points + ? WHERE user_id=?", (pts, uid))
     db.run("UPDATE guild SET points = points + ? WHERE id=?", (pts, gid))
     total, _by = _day_points(gid, day)
-    for i, (need, _balls, _coin) in enumerate(TIERS):
+    for i, (need, balls, coins) in enumerate(TIERS):
         if total - pts < need <= total:
-            _say(gid, "오늘의 길드 미션 %d단계 달성! (길드 점수 %d) 미션 칸에서 보상을 받으세요."
-                 % (i + 1, total), now)
+            _say(gid, "오늘의 길드 미션 %d단계 달성! (길드 점수 %d) 오늘 미션을 한 길드원에게 "
+                      "보상을 보냈습니다: %s" % (i + 1, total, _reward_text(balls, coins)), now)
+    # 보상은 저절로 들어온다 (1.10.3). 점수가 바뀌는 곳이 여기 하나라, 여기서 훑으면
+    # '단계를 방금 넘었다' 도 '이미 넘은 단계가 있는데 내가 이제 첫 미션을 끝냈다' 도 다 걸린다.
+    settle(gid, day, now)
     _changed(gid)                           # 다른 길드원의 미션 칸도 따라 오른다
 
 
@@ -695,6 +803,9 @@ def missions(uid, now=None, m=None):
     if not m:
         return None
     gid, day = m["guild_id"], today(now)
+    # 받을 것이 남아 있으면 지금 준다. 보통은 note 가 이미 줬다 - 이 판을 올린 날처럼
+    # '오늘 이미 넘어 있던 단계' 를 여기서 마저 챙긴다.
+    settle(gid, day, now, only=uid)
     # 줄(Row)은 dict 가 아닐 수 있다 (로컬 sqlite 는 sqlite3.Row 다) - 값을 꺼내 담는다.
     mine = dict((r["key"], (int(r["n"] or 0), bool(r["done"]))) for r in db.q(
         "SELECT key, n, done FROM guild_mission WHERE guild_id=? AND day=? AND user_id=?",
@@ -705,6 +816,7 @@ def missions(uid, now=None, m=None):
     my = by.get(uid, 0)
     return {
         "day": day, "resetIn": reset_in(now), "myPoints": my, "myMax": DAY_MAX,
+        "auto": True,                       # 보상이 저절로 들어온다 (화면이 '받기' 단추를 안 그린다)
         "guildPoints": total, "guildMax": TIERS[-1][0],
         "missions": [{"key": k, "name": name, "goal": goal, "points": pts,
                       "n": min(goal, mine.get(k, (0, False))[0]),
@@ -725,7 +837,67 @@ def _coin_add(uid, n):
            " ON CONFLICT(user_id) DO UPDATE SET coin = coin + ?", (uid, n, n))
 
 
+def _grant(uid, day, tier, now=None):
+    """그 날 그 단계의 보상을 한 번 준다. 이미 받았으면 False.
+
+    받았다는 줄(guild_claim)을 **먼저** 넣는다 - 기본키가 (사람, 날, 단계)라 두 번째는
+    여기서 걸려 물건이 두 번 나가지 않는다.
+    """
+    need, balls, coins = TIERS[tier - 1]
+    try:
+        db.run("INSERT INTO guild_claim (user_id, day, tier, at) VALUES (?,?,?,?)",
+               (uid, day, tier, _iso(now)))
+    except Exception as e:                                  # noqa: BLE001
+        if _dup(e):
+            return False
+        raise
+    if balls:
+        items.bag_add(uid, items.BALL_ITEM, balls)
+    if coins:
+        _coin_add(uid, coins)
+    return True
+
+
+def settle(gid, day=None, now=None, only=None):
+    """넘은 단계의 보상을 받을 사람에게 준다 (자동 수령). [(사람, 단계)] 를 돌려준다.
+
+    받을 사람 = **지금 이 길드에 있고**, 그날 이 길드에 한 점이라도 보탰고, 그 단계를 아직
+    안 받은 사람. only 를 주면 그 사람 것만 본다. 몇 번을 불러도 같은 보상은 한 번만 나간다.
+    """
+    day = day or today(now)
+    total, by = _day_points(gid, day)
+    tiers = [i + 1 for i, t in enumerate(TIERS) if total >= t[0]]
+    who = [u for u, p in by.items() if p > 0 and (only is None or u == only)]
+    if not tiers or not who:
+        return []
+    here = set(r["user_id"] for r in db.q("SELECT user_id FROM guild_member WHERE guild_id=?", (gid,)))
+    who = [u for u in who if u in here]
+    if not who:
+        return []
+    marks = ",".join("?" * len(who))
+    got = set((r["user_id"], r["tier"]) for r in db.q(
+        "SELECT user_id, tier FROM guild_claim WHERE day=? AND user_id IN (%s)" % marks,
+        (day,) + tuple(who)))
+    out = []
+    for u in who:
+        for t in tiers:
+            if (u, t) not in got and _grant(u, day, t, now):
+                out.append((u, t))
+    return out
+
+
+def settle_all(now=None):
+    """오늘 점수가 있는 길드를 전부 훑는다. 서버가 뜰 때 한 번 부른다 - 이 기능이 들어오기 전에
+    넘어 있던 오늘의 단계를 챙긴다. 지난 날의 것은 건드리지 않는다."""
+    day, out = today(now), []
+    for g in db.q("SELECT DISTINCT guild_id FROM guild_mission WHERE day=? AND done=1", (day,)):
+        out += settle(g["guild_id"], day, now)
+    return out
+
+
 def claim(uid, tier, now=None):
+    """손으로 받기. **옛 판(1.10.2 까지)의 '받기' 단추가 부른다** - 지금은 보상이 저절로 들어와서
+    (settle) 새 판은 이 길을 쓰지 않는다. 이미 들어온 보상이면 '이미 받은 보상' 이다."""
     m = _need(uid)
     tier = int(tier)
     if not (1 <= tier <= len(TIERS)):
@@ -737,17 +909,8 @@ def claim(uid, tier, now=None):
         raise HTTPException(400, "아직 길드 점수가 모자랍니다. (%d / %d)" % (total, need))
     if by.get(uid, 0) <= 0:
         raise HTTPException(400, "오늘 미션을 하나라도 한 길드원만 받을 수 있습니다.")
-    try:
-        db.run("INSERT INTO guild_claim (user_id, day, tier, at) VALUES (?,?,?,?)",
-               (uid, day, tier, _iso(now)))
-    except Exception as e:                                  # noqa: BLE001
-        if _dup(e):
-            raise HTTPException(409, "이미 받은 보상입니다.")
-        raise
-    if balls:
-        items.bag_add(uid, items.BALL_ITEM, balls)
-    if coins:
-        _coin_add(uid, coins)
+    if not _grant(uid, day, tier, now):
+        raise HTTPException(409, "이미 받은 보상입니다.")
     return {"ok": True, "message": "%d단계 보상을 받았습니다: %s" % (tier, _reward_text(balls, coins)),
             "coin": coin(uid)}
 

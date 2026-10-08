@@ -15,6 +15,7 @@
     POST   /api/guild/members/{uid}/master  마스터 넘기기
     GET    /api/guild/members/{uid}/profile 길드원 프로필 (마이페이지에 보이는 것 - 같은 길드원만)
     GET    /api/guild/chat?after=           채팅 (처음 열 때, 그리고 웹소켓이 끊겼을 때 2초마다)
+    GET    /api/guild/chat?before=          그 번호 앞의 줄 (거슬러 올라가기. 일주일 치까지)
     POST   /api/guild/chat                  한 줄 보내기
     POST   /api/guild/mission/{tier}/claim  단계 보상 받기
     GET    /api/guild/shop                  코인 상점        POST /api/guild/shop/buy
@@ -97,8 +98,8 @@ def leave(ctx=Depends(deps.current)):
 # 고정 경로(/chat, /shop ...)를 {gid} 보다 **먼저** 건다. 순서가 바뀌면 "chat" 을
 # 길드 번호로 읽으려다 422 가 난다.
 @router.get("/api/guild/chat")
-def chat(after: int = 0, ctx=Depends(deps.current)):
-    return guild.chat(_uid(ctx), after)
+def chat(after: int = 0, before: int = 0, ctx=Depends(deps.current)):
+    return guild.chat(_uid(ctx), after, before=before)
 
 
 @router.post("/api/guild/chat")

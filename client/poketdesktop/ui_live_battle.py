@@ -32,19 +32,36 @@ from common.korean import natural
 
 from . import battle_fx as FX
 from . import effects, sprite_cache, sprites
+from . import battle_zoom as Z
 from . import platform_os as PLAT
-from . import ui_common as U
 from .ui_common import run_async
 from .ui_gym import shade
 from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
 from . import ui_mega
 from .ui_mega import MegaToggle
 
+# **이 창은 가장자리를 끌어서 크기를 바꾼다** (battle_zoom.Resizable). 창 크기에서 배율이 나오고,
+# U 는 ui_common 그대로인데 h · pt · FONT_* · 단추 높이가 그 배율을 탄다 - 그래서 아래 코드는
+# 평소처럼 U.h(...) 로 적는다. 픽셀로 적어 둔 값(도트 높이처럼 글꼴 배율을 안 타는 것)에는 Z.px 를 건다.
+U = Z.U
+
+# 설계 크기. 창 높이 = 장면 + 말풍선 + 명령 칸.
+#
+# **명령 칸(기술 카드)은 필요한 만큼만** (1.10.3). 예전 278 은 카드 하나가 안에 든 글의 두 배
+# 높이였고, 그만큼 장면이 좁았다. 줄인 만큼(30)은 장면에 줬다 (창 높이는 그대로다).
+# 더 줄이면 오른쪽 줄의 기술 설명이 눌린다: 윈도우에서 가장 긴 설명이 다섯 줄(80px)인데,
+# 남은 시간(27)·턴(16)·단추 둘(40 + 36)·사이 여백(20)과 위아래 여백(18)을 빼면 그 칸에
+# 248 - 157 = 91 이 남는다. (그래서 단추와 여백도 조금씩 줄였다 - _commands)
+#
+# **가장 낮은 장면(MIN_SCENE_H)은 포켓몬이 이름표에 안 가려지는 높이다.** 창을 가장 작게 줄이면
+# 장면이 이 비율이 된다. 225 였을 때는 내 포켓몬의 머리가 상대 이름표 뒤로 들어갔다:
+# 내 도트의 꼭대기는 0.93 x 장면 + 10 - 128, 상대 이름표의 바닥은 12 + 104 → 장면이 256 은 돼야 한다
+# (상대 도트의 발과 내 이름표도 같은 식으로 244).
 W = 880
-SCENE_H = 306
+SCENE_H = 336
 MSG_H = 54
-CMD_H = 278
-MIN_SCENE_H = 225
+CMD_H = 248
+MIN_SCENE_H = 261
 STEP_MS = 600
 POLL_MS = 1500
 MON_H = {"me": 128, "foe": 108}
@@ -61,7 +78,9 @@ def step_of(m):
     return int((m or {}).get("step") or (m or {}).get("turn") or 0)
 
 
-class LiveBattleWindow(object):
+class LiveBattleWindow(Z.Resizable):
+    ZOOM_KIND = "live"
+    ZOOM_W, ZOOM_SCENE, ZOOM_MSG, ZOOM_CMD, ZOOM_MIN_SCENE = W, SCENE_H, MSG_H, CMD_H, MIN_SCENE_H
 
     def __init__(self, app, data, on_close=None):
         self.app = app
@@ -89,32 +108,18 @@ class LiveBattleWindow(object):
         self._deadline = 0.0
         self._seen_sent = False
         self._result_shown = False
+        self._result_painted = False  # 결과 칸을 그려 뒀나 (기권하고 나갈 때는 안 그린다)
+        self._switching = False       # 스스로 교체 칸을 열어 뒀나
         self._pending = None
 
+        # 처음 크기: 지난번에 끌어 놓은 크기(없으면 기본 크기). 배율도 여기서 잡힌다.
+        ww, wh, gx, gy = self.zoom_open()
         self.win = tk.Toplevel(self.root)
-        ww = U.h(W)
-        self.scene_h = U.h(SCENE_H)
-        wh = self.scene_h + U.h(MSG_H) + U.h(CMD_H) + 4
-        sw_, sh_ = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        try:
-            x1, y1, x2, y2 = PLAT.work_area(sw_, sh_)
-        except Exception:                                   # noqa: BLE001
-            x1, y1, x2, y2 = 0, 0, sw_, sh_
-        room = (y2 - y1) - 44
-        if wh > room:
-            cut = min(wh - room, self.scene_h - U.h(MIN_SCENE_H))
-            self.scene_h -= max(0, cut)
-            wh -= max(0, cut)
-        ww = min(ww, (x2 - x1) - U.h(16))
-        self.ww = ww
         U.style_window(self.win, "실시간 배틀 — %s" % (data.get("foeName") or ""),
                        ww, wh)
-        gx = x1 + max(0, ((x2 - x1) - ww) // 2)
-        gy = y1 + max(0, ((y2 - y1) - wh - 30) // 3)
         self.win.geometry("%dx%d+%d+%d" % (ww, wh, gx, gy))
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2, highlightbackground=U.LINE2)
-        self.win.resizable(False, False)
         self.win.protocol("WM_DELETE_WINDOW", self.request_close)
         app.live_battle = self
 
@@ -122,6 +127,7 @@ class LiveBattleWindow(object):
         self._message()
         self._commands()
         self._ball_photos()
+        self.zoom_watch()                    # 이제부터 창을 끌어 크기를 바꾸면 따라간다
 
         events = data.get("events") or []
         if self.played == 0 and events:
@@ -130,7 +136,41 @@ class LiveBattleWindow(object):
             self.sync(data)
             self.show_commands()
         self._poll()
+        self._enter()
         self.focus()
+
+    def _enter(self):
+        """창이 불쑥 뜨지 않게 한다: 비치는 데서 또렷해지고, 검은 띠가 걷히며 장면이 드러난다 (enter_fx)."""
+        from . import enter_fx as EF
+        try:
+            self.win.attributes("-alpha", 0.0)
+        except tk.TclError:
+            pass
+        fx = EF.Blinds(self.cv)
+        t0 = time.monotonic()
+
+        def done():
+            fx.close()
+            try:
+                self.win.attributes("-alpha", 1.0)
+            except tk.TclError:
+                pass
+
+        def step():
+            if not self.alive:
+                return fx.close()
+            t = time.monotonic() - t0
+            k = 1.0 - (t - EF.FADE_S * 0.6) / EF.OPEN_S
+            if k <= 0.0:
+                return done()
+            try:
+                self.win.attributes("-alpha", max(0.0, min(1.0, t / EF.FADE_S)))
+            except tk.TclError:
+                pass
+            fx.draw(0, 0, self.sw, self.sh, k)
+            self.later(16, step)
+        fx.draw(0, 0, self.sw, self.sh, 1.0)
+        step()
 
     # ---------------- 틀 ----------------
     def focus(self):
@@ -150,6 +190,7 @@ class LiveBattleWindow(object):
         return j
 
     def say(self, text):
+        self._said = text or ""              # (창 크기를 바꿔 다시 지을 때 되돌린다)
         try:
             self.msg.configure(text=natural(text or ""))
         except tk.TclError:
@@ -159,10 +200,16 @@ class LiveBattleWindow(object):
     def _scene(self):
         s = U.h
         self.sw, self.sh = self.ww - 4, self.scene_h
-        cv = tk.Canvas(self.win, width=self.sw, height=self.sh, bg="#1b2334",
-                       highlightthickness=0)
-        cv.pack(fill="x")
-        self.cv = cv
+        cv = getattr(self, "cv", None)
+        if cv is None:
+            cv = tk.Canvas(self.win, width=self.sw, height=self.sh, bg="#1b2334",
+                           highlightthickness=0)
+            cv.pack(fill="x")
+            self.cv = cv
+        else:
+            # 창 크기를 바꿨다 - **같은 캔버스를 비우고** 새 크기로 다시 그린다 (battle_zoom)
+            cv.delete("all")
+            cv.configure(width=self.sw, height=self.sh)
         sw, sh = self.sw, self.sh
         cv.create_rectangle(0, int(sh * 0.56), sw, sh, fill="#222b3f", outline="")
         cv.create_line(0, int(sh * 0.56), sw, int(sh * 0.56), fill="#2c3650")
@@ -229,12 +276,13 @@ class LiveBattleWindow(object):
         f = tk.Frame(self.win, bg="#0f141d", height=U.h(MSG_H), highlightthickness=0)
         f.pack(fill="x")
         f.pack_propagate(False)
+        self.msg_frame = f
         tk.Frame(f, bg=U.ACCENT, width=4).pack(side="left", fill="y")
         self.msg = tk.Label(f, text="", bg="#0f141d", fg=U.FG,
                             font=(U.FAMILY, U.pt(12)), anchor="w", justify="left")
         self.msg.pack(side="left", fill="both", expand=True, padx=14)
         U.wrap_to_width(self.msg)
-        self.mega = MegaToggle(f, before=self.msg)       # 시즌 3, 고를 때만 보인다
+        self.mega = MegaToggle(f, before=self.msg, make=U.ghost_button)   # 시즌 3, 고를 때만 보인다
 
     def _commands(self):
         self.cmd = tk.Frame(self.win, bg=U.BG)
@@ -250,19 +298,21 @@ class LiveBattleWindow(object):
         self.turn_lbl = tk.Label(right, text="", bg=U.BG, fg=U.FG_FAINT,
                                  font=U.FONT_XS, anchor="w")
         self.turn_lbl.pack(fill="x")
-        self.switch_btn = U.ghost_button(right, "포켓몬 교체", self.open_switch, height=38)
-        self.switch_btn.pack(fill="x", pady=(8, 0))
+        # (단추와 여백은 조금씩 줄여 뒀다 - 명령 칸을 낮추고도 아래의 기술 설명이 안 눌리게. CMD_H 의 설명)
+        self.switch_btn = U.ghost_button(right, "포켓몬 교체", self.open_switch, height=36)
+        self.switch_btn.pack(fill="x", pady=(6, 0))
         self.forfeit_btn = U.PushButton(right, "기권", self.forfeit, fill=U.DANGER_BG,
                                         fg=U.DANGER, shadow="#1a1013", hover="#3a2028",
-                                        height=34, border=U.DANGER_LINE, font=U.FONT_S)
-        self.forfeit_btn.pack(fill="x", pady=(8, 0))
+                                        height=32, border=U.DANGER_LINE, font=U.FONT_S)
+        self.forfeit_btn.pack(fill="x", pady=(6, 0))
         self.hint = tk.Label(right, text="", bg=U.BG, fg=U.FG_DIM, font=U.FONT_XS,
                              anchor="nw", justify="left")
-        self.hint.pack(fill="both", expand=True, pady=(10, 0))
+        self.hint.pack(fill="both", expand=True, pady=(8, 0))
         U.wrap_to_width(self.hint)
 
     # ---------------- 그림 ----------------
     def set_mon(self, who, mon):
+        self.zoom_use()
         self.shown[who] = dict(mon) if mon else None
         self._paint_box(who)
         self._stop_anim(who)
@@ -471,7 +521,7 @@ class LiveBattleWindow(object):
         def swap():
             self.set_mon(who, mon)
             self._banner(who, "메가진화!")
-        ui_mega.play_in(self, self._center(who), swap, size=MON_H[who] * 0.55)
+        ui_mega.play_in(self, self._center(who), swap, size=Z.px(MON_H[who]) * 0.55)
 
     def _banner(self, who, text):
         s = U.h
@@ -504,8 +554,9 @@ class LiveBattleWindow(object):
             self.fx = None
             self.later(90, self._next)
 
+        self._fx_done = done                  # (창 크기를 바꾸면 이 연출을 끝내고 다음으로 넘긴다)
         try:
-            k = FX_SCALE
+            k = FX_SCALE * Z.K
             (sx, sy), (tx, ty) = self._center(who), self._center(other)
             self.fx = FX.Effect(_FxStage(self, k), self._find_move(ev),
                                 (sx / k, sy / k), (tx / k, ty / k), done, who=who)
@@ -535,6 +586,7 @@ class LiveBattleWindow(object):
     def _next(self):
         if not self.alive:
             return
+        self.zoom_use()
         if not self.queue:
             return self._finish_play()
         ev = self.queue.pop(0)
@@ -661,12 +713,33 @@ class LiveBattleWindow(object):
                 self.shown[who] = dict(mon)
                 self._paint_box(who)
         self._balls()
+        self._paint_turn()
+
+    def _paint_turn(self):
         me = self.view.get("me") or {}
         foe = self.view.get("foe") or {}
         self.turn_lbl.configure(
             text="%d턴  ·  %s  %d : %d" % (self.view.get("turn", 0),
                                            foe.get("name") or "상대",
                                            me.get("left", 0), foe.get("left", 0)))
+
+    def _restore(self):
+        """창 크기를 바꿔 다시 지은 화면을, 들고 있던 것으로 되돌린다 (battle_zoom.Resizable)."""
+        self._ball_photos()
+        for who in ("me", "foe"):
+            self.set_mon(who, self.shown.get(who))
+        self._balls()
+        self._paint_turn()
+        self._paint_timer()
+        switching = self._switching
+        if self._result_painted:
+            self._paint_result()
+        elif self.busy or self._result_shown:
+            self.hide_commands()             # 재생 중이거나 나가는 중이다 - 고를 것이 없다
+        elif switching and self.view.get("canAct") and not self.sent:
+            self.open_switch()
+        else:
+            self.show_commands()
 
     # ---------------- 폴링 ----------------
     def _poll(self):
@@ -749,6 +822,7 @@ class LiveBattleWindow(object):
     # ---------------- 명령 ----------------
     def hide_commands(self):
         self._panel = None
+        self._switching = False
         for w in self.left.winfo_children():
             w.destroy()
         for b in (self.switch_btn, self.forfeit_btn):
@@ -756,6 +830,8 @@ class LiveBattleWindow(object):
         self.mega.show(False)
 
     def show_commands(self):
+        self.zoom_use()
+        self._switching = False
         self._panel = self._panel_key()
         for w in self.left.winfo_children():
             w.destroy()
@@ -852,6 +928,8 @@ class LiveBattleWindow(object):
 
     def open_switch(self, forced=False):
         forced = forced or self.view.get("phase") == "switch"
+        self.zoom_use()
+        self._switching = not forced         # (스스로 연 교체 칸은 창 크기를 바꿔도 그대로 둔다)
         me = self.view.get("me") or {}
         for w in self.left.winfo_children():
             w.destroy()
@@ -959,6 +1037,13 @@ class LiveBattleWindow(object):
         if self._result_shown:
             return
         self._result_shown = True
+        self._paint_result()
+        self._mark_seen()
+
+    def _paint_result(self):
+        """결과 칸을 그린다 (창 크기를 바꿔 다시 지을 때도 부른다 - 한 번만 할 일은 show_result 에)."""
+        self.zoom_use()
+        self._result_painted = True
         self.hide_commands()
         out = self.room.get("outcome") or self.view.get("result")
         title = {"win": "승리!", "lose": "패배...", "draw": "무승부"}.get(out, "끝")
@@ -970,7 +1055,7 @@ class LiveBattleWindow(object):
         inner.pack(fill="both", expand=True, padx=16, pady=10)
         side = tk.Frame(inner, bg=U.BG2)
         side.pack(side="right", fill="y", padx=(12, 0))
-        U.PushButton(side, "닫기", self.close, height=U.h(38)).pack(side="bottom")
+        U.PushButton(side, "닫기", self.close, height=Z.base_h(38)).pack(side="bottom")
         body = tk.Frame(inner, bg=U.BG2)
         body.pack(side="left", fill="both", expand=True)
         tk.Label(body, text=title, bg=U.BG2, fg=color,
@@ -994,7 +1079,6 @@ class LiveBattleWindow(object):
             lab.pack(fill="x", pady=(2, 0))
             U.wrap_to_width(lab)
         self.say(title)
-        self._mark_seen()
 
     def _mark_seen(self):
         if self._seen_sent:
@@ -1016,6 +1100,7 @@ class LiveBattleWindow(object):
         if not self.alive:
             return
         self.alive = False
+        self.zoom_close()
         for e in self.effects + ([self.fx] if self.fx is not None else []):
             try:
                 e.stop()

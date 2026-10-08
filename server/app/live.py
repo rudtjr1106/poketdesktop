@@ -30,6 +30,7 @@ config.LIVE_LEVEL 로 맞춘다.
 """
 import datetime
 import json
+import re
 import random
 
 from common import live_battle as LB
@@ -38,6 +39,21 @@ from . import config, db, deps, pvp, social
 
 # 고른 것을 적다가 상대와 부딪혔을 때 다시 해보는 횟수.
 ACT_TRIES = 5
+
+# 판이 바뀔 때마다(열렸다 · 턴이 돌았다 · 끝났다) 불리는 함수들. 길드 친선전(friendly.py)이 여기에
+# 걸어 두고 구경하는 사람들에게 밀어 준다. 받는 쪽에서 난 오류로 판이 깨지면 안 된다.
+listeners = []
+
+
+def _emit(mid):
+    if not listeners:
+        return
+    row = get(mid)
+    for fn in list(listeners):
+        try:
+            fn(row)
+        except Exception:                                   # noqa: BLE001
+            pass
 
 
 def _now(now=None):
@@ -101,14 +117,21 @@ def expire_old(now=None):
 
 
 # ---------------------------------------------------------------- 초대
+def _same_guild(a, b):
+    """둘이 같은 길드인가 (길드 친선전 - 친구가 아니어도 걸 수 있다)."""
+    ra = db.q1("SELECT guild_id FROM guild_member WHERE user_id=?", (a,))
+    rb = db.q1("SELECT guild_id FROM guild_member WHERE user_id=?", (b,))
+    return bool(ra and rb and ra["guild_id"] == rb["guild_id"])
+
+
 def can_invite(uid, other):
     """지금 저 친구에게 걸 수 있나. 안 되면 까닭."""
     if uid == other:
         return "자기 자신과는 싸울 수 없습니다."
     if not db.q1("SELECT 1 x FROM users WHERE id=?", (other,)):
         return "그런 트레이너가 없습니다."
-    if not social.is_friend(uid, other):
-        return "친구끼리만 실시간 배틀을 할 수 있습니다."
+    if not social.is_friend(uid, other) and not _same_guild(uid, other):
+        return "친구나 같은 길드원끼리만 실시간 배틀을 할 수 있습니다."
     if social.blocked_between(uid, other):
         return "이 트레이너와는 싸울 수 없습니다."
     if not social.is_online(other):
@@ -171,7 +194,31 @@ def accept(uid, mid, now=None):
          mid, row["rev"]))
     if getattr(cur, "rowcount", 1) == 0:
         return get(mid)                      # 사이에 만료됐다
+    _emit(mid)
     return get(mid)
+
+
+def open_direct(a, b, now=None):
+    """초대·수락을 거치지 않고 둘 사이에 바로 판을 연다 (길드 친선전: '상대 구함' 을 누가 받았다).
+
+    친구가 아니어도 된다 - 같은 길드에서 한쪽이 상대를 구했고 다른 쪽이 받았다. 나머지 조건은
+    초대와 같다 (서로 막지 않았고, 둘 다 다른 판이 없고, 둘 다 팀이 있다). 안 되면 ValueError.
+    """
+    expire_old(now)
+    if a == b:
+        raise ValueError("자기 자신과는 싸울 수 없습니다.")
+    if social.blocked_between(a, b):
+        raise ValueError("이 트레이너와는 싸울 수 없습니다.")
+    if my_match(a) or my_match(b):
+        raise ValueError("이미 진행 중인 실시간 배틀이 있습니다.")
+    if not pvp.ranked_team(a) or not pvp.ranked_team(b):
+        raise ValueError("둘 다 데리고 다니는 포켓몬이 있어야 합니다.")
+    cur = db.run(
+        "INSERT INTO live_match (a_id, b_id, a_name, b_name, state, rev,"
+        " events, turn, created_at, updated_at)"
+        " VALUES (?,?,?,?,'invited',0,'[]',0,?,?)",
+        (a, b, _name(a), _name(b), _iso(now), _iso(now)))
+    return accept(b, cur.lastrowid, now)
 
 
 def answer(uid, mid, ok, now=None):
@@ -213,6 +260,8 @@ def _save(row, lb, ev, now=None):
     ok = getattr(cur, "rowcount", 1) != 0
     if ok and lb.over:
         _record(row, lb, now)
+    if ok:
+        _emit(row["id"])
     return ok
 
 
@@ -347,6 +396,67 @@ def public(row, uid, now=None):
             out["outcome"] = ("draw" if row["result"] == "draw"
                               else ("win" if row["result"] == who else "lose"))
     return out
+
+
+SPECTATE_MON = ("species", "num", "name", "level", "hp", "maxhp", "status", "shiny", "tint",
+                "fainted", "mega")
+SPECTATE_EVENT = ("t", "who", "target", "text", "move", "moveType", "cat", "hp", "maxhp", "damage",
+                  "crit", "eff", "slot", "status", "num", "newName", "to", "result")
+_RECALL = re.compile(r"^(?:상대는 )?(.+?)(?:, 돌아와!| 을\(를\) 불러들였다!)$")
+
+
+def _neutral(e, who, names):
+    """배틀의 글은 a 쪽 시점이다 ('가랏!', '상대는 ...', '상대 피카츄 의 ...'). 구경꾼이 읽을 글로 바꾼다."""
+    t, text = e.get("t"), e.get("text") or ""
+    me = names.get(who) or "?"
+    if t == "intro":
+        return "%s 님과 %s 님의 승부!" % (names["a"], names["b"])
+    if t == "switch" and isinstance(e.get("mon"), dict):
+        return "%s: 가랏! %s!" % (me, e["mon"].get("name") or "?")
+    if t == "recall":
+        m = _RECALL.match(text)
+        return "%s: %s, 돌아와!" % (me, m.group(1)) if m else text.replace("상대 ", "")
+    if t == "over":
+        return ""                        # 누가 이겼는지는 화면이 판의 결과를 보고 적는다
+    return text.replace("상대 ", "")
+
+
+def spectate(row):
+    """구경하는 사람에게 줄 판의 겉모습 - **누구 편도 아니다** (a, b 그대로).
+
+    지금 나와 있는 포켓몬과 체력, 남은 마릿수, 방금 일어난 일. 기술 목록·지닌 도구·벤치의
+    포켓몬은 싣지 않는다 (참가자만 아는 것). 판이 아직 안 열렸으면 None.
+    """
+    if not row or not row["data"]:
+        return None
+    lb = _load(row)
+
+    def side(who):
+        p = lb.side(who)
+        m = lb.view_mon(p.mon, False)
+        return {"id": row["%s_id" % who], "name": p.name, "left": len(p.alive_slots()),
+                "size": len(p.team), "mon": dict((k, m.get(k)) for k in SPECTATE_MON)}
+
+    def seat(v):                         # 일은 a 쪽 기준(me/foe)으로 적혀 있다
+        return {"me": "a", "foe": "b"}.get(v, v)
+    events = []
+    names = {"a": lb.side("a").name, "b": lb.side("b").name}
+    for e in json.loads(row["events"] or "[]"):
+        if not isinstance(e, dict):
+            continue
+        one = dict((k, e[k]) for k in SPECTATE_EVENT if k in e)
+        for k in ("who", "target"):
+            if k in one:
+                one[k] = seat(one[k])
+        if isinstance(one.get("text"), str):
+            one["text"] = _neutral(e, one.get("who"), names)
+        if e.get("t") == "switch" and isinstance(e.get("mon"), dict):
+            one["mon"] = dict((k, e["mon"].get(k)) for k in SPECTATE_MON)
+        events.append(one)
+    done = row["state"] == "done"
+    return {"id": row["id"], "rev": row["rev"], "turn": lb.turn, "step": lb.step,
+            "a": side("a"), "b": side("b"), "events": events, "over": bool(lb.over or done),
+            "result": row["result"] if done else None}
 
 
 def me_card(uid, now=None):

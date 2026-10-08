@@ -28,12 +28,17 @@ from common.korean import natural
 
 from . import battle_fx as FX
 from . import effects, sprite_cache, sprites
+from . import battle_zoom as Z
 from . import platform_os as PLAT
-from . import ui_common as U
 from .ui_common import run_async
 from .ui_gym import level_color, shade, trainer_photo
 from . import ui_mega
 from .ui_mega import MegaToggle
+
+# **이 창은 가장자리를 끌어서 크기를 바꾼다** (battle_zoom.Resizable). 창 크기에서 배율이 나오고,
+# U 는 ui_common 그대로인데 h · pt · FONT_* · 단추 높이가 그 배율을 탄다 - 그래서 아래 코드는
+# 평소처럼 U.h(...) 로 적는다. 픽셀로 적어 둔 값(도트 높이처럼 글꼴 배율을 안 타는 것)에는 Z.px 를 건다.
+U = Z.U
 
 # 설계 크기. 글꼴이 커지는 맥에서는 U.h 로 창과 장면이 **같이** 커진다.
 # 장면만 키우고 창을 그대로 두면 오른쪽 이름표가 창 밖으로 잘린다.
@@ -41,11 +46,16 @@ from .ui_mega import MegaToggle
 # 높이는 장면 + 말풍선 + 명령 칸이다. 예전 700(맥에서 840)은 맥북 화면에서
 # 독에 가려 기술 칸 아랫줄이 잘렸다. 기술 칸의 여백을 줄여 전체를 줄였고,
 # 그래도 독을 뺀 화면보다 크면 장면을 줄인다(글자 칸은 그대로).
+#
+# **가장 낮은 장면(MIN_SCENE_H)은 포켓몬이 이름표에 안 가려지는 높이다** (1.10.3). 창을 가장 작게
+# 줄이면 장면이 이 비율이 된다. 220 이었을 때는 내 포켓몬의 머리가 상대 이름표 뒤로, 상대의 발이
+# 내 이름표 뒤로 들어갔다: 상대의 발은 0.50 x 장면 + 8, 내 이름표의 꼭대기는 장면 - 116 →
+# 장면이 248 은 돼야 한다 (내 도트와 상대 이름표는 239). 반올림에 한두 픽셀이 겹치지 않게 조금 더 둔다.
 W = 860
 SCENE_H = 296
 MSG_H = 56
 CMD_H = 212
-MIN_SCENE_H = 220
+MIN_SCENE_H = 256
 STEP_MS = 650
 # 포켓몬 도트 높이(px). 글자가 아니므로 글꼴 배율을 타지 않는다.
 MON_H = {"me": 132, "foe": 108}
@@ -143,7 +153,9 @@ def hp_color(frac):
     return "#ff6b6b"
 
 
-class GymBattleWindow(object):
+class GymBattleWindow(Z.Resizable):
+    ZOOM_KIND = "gym"
+    ZOOM_W, ZOOM_SCENE, ZOOM_MSG, ZOOM_CMD, ZOOM_MIN_SCENE = W, SCENE_H, MSG_H, CMD_H, MIN_SCENE_H
 
     def __init__(self, app, data, on_close=None):
         self.app = app
@@ -168,32 +180,14 @@ class GymBattleWindow(object):
         self.effects = []            # 돌고 있는 연출 전부 (닫을 때 모두 멈춘다)
         self._moves_by_name = None
         t = self.view["trainer"]
+        # 처음 크기: 지난번에 끌어 놓은 크기(없으면 기본 크기). 배율도 여기서 잡힌다.
+        # 독·작업표시줄을 뺀 자리 안에 놓는다 - 기본 크기가 안 들어가면 장면을 줄인다.
+        ww, wh, gx, gy = self.zoom_open()
         self.win = tk.Toplevel(self.root)
-        ww = U.h(W)
-        self.scene_h = U.h(SCENE_H)
-        wh = self.scene_h + U.h(MSG_H) + U.h(CMD_H) + 4
-        sw_, sh_ = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        try:
-            x1, y1, x2, y2 = PLAT.work_area(sw_, sh_)
-        except Exception:                                  # noqa: BLE001
-            x1, y1, x2, y2 = 0, 0, sw_, sh_
-        room = (y2 - y1) - 44                              # 제목 막대와 약간의 여백
-        if wh > room:
-            cut = min(wh - room, self.scene_h - U.h(MIN_SCENE_H))
-            self.scene_h -= max(0, cut)
-            wh -= max(0, cut)
-        # 세로만 줄이고 가로는 안 봤다. 글꼴이 큰 화면에서는 U.h(860) 이
-        # 1032 까지 커져서, 1024 짜리 화면에서는 오른쪽 이름표가 밖으로 나간다.
-        ww = min(ww, (x2 - x1) - U.h(16))
-        self.ww = ww
         U.style_window(self.win, "관장 도전 — %s" % t.get("name", ""), ww, wh)
-        # 독·작업표시줄을 뺀 자리 안에 놓는다 (style_window 는 화면 전체 기준이다)
-        gx = x1 + max(0, ((x2 - x1) - ww) // 2)
-        gy = y1 + max(0, ((y2 - y1) - wh - 30) // 3)
         self.win.geometry("%dx%d+%d+%d" % (ww, wh, gx, gy))
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2, highlightbackground=U.LINE2)
-        self.win.resizable(False, False)
         self.win.protocol("WM_DELETE_WINDOW", self.request_close)
         app.gym_battle = self
 
@@ -201,6 +195,7 @@ class GymBattleWindow(object):
         self._message()
         self._commands()
         self._load_trainer()
+        self.zoom_watch()                    # 이제부터 창을 끌어 크기를 바꾸면 따라간다
 
         events = data.get("events") or []
         if events:
@@ -231,9 +226,15 @@ class GymBattleWindow(object):
     def _scene(self):
         s = U.h
         self.sw, self.sh = self.ww - 4, self.scene_h
-        cv = tk.Canvas(self.win, width=self.sw, height=self.sh, bg="#1b2334", highlightthickness=0)
-        cv.pack(fill="x")
-        self.cv = cv
+        cv = getattr(self, "cv", None)
+        if cv is None:
+            cv = tk.Canvas(self.win, width=self.sw, height=self.sh, bg="#1b2334", highlightthickness=0)
+            cv.pack(fill="x")
+            self.cv = cv
+        else:
+            # 창 크기를 바꿨다 - **같은 캔버스를 비우고** 새 크기로 다시 그린다 (battle_zoom)
+            cv.delete("all")
+            cv.configure(width=self.sw, height=self.sh)
         sw, sh = self.sw, self.sh
         cv.create_rectangle(0, int(sh * 0.56), sw, sh, fill="#222b3f", outline="")
         cv.create_line(0, int(sh * 0.56), sw, int(sh * 0.56), fill="#2c3650")
@@ -299,12 +300,13 @@ class GymBattleWindow(object):
         f = tk.Frame(self.win, bg="#0f141d", height=U.h(MSG_H), highlightthickness=0)
         f.pack(fill="x")
         f.pack_propagate(False)
+        self.msg_frame = f
         tk.Frame(f, bg=U.ACCENT, width=4).pack(side="left", fill="y")
         self.msg = tk.Label(f, text="", bg="#0f141d", fg=U.FG, font=(U.FAMILY, U.pt(12)),
                             anchor="w", justify="left")
         self.msg.pack(side="left", fill="both", expand=True, padx=14)
         U.wrap_to_width(self.msg)
-        self.mega = MegaToggle(f, before=self.msg)       # 시즌 3, 고를 때만 보인다
+        self.mega = MegaToggle(f, before=self.msg, make=U.ghost_button)   # 시즌 3, 고를 때만 보인다
 
     def _commands(self):
         self.cmd = tk.Frame(self.win, bg=U.BG)
@@ -330,6 +332,7 @@ class GymBattleWindow(object):
         U.wrap_to_width(self.hint)
 
     def say(self, text):
+        self._said = text or ""              # (창 크기를 바꿔 다시 지을 때 되돌린다)
         try:
             self.msg.configure(text=natural(text or ""))
         except tk.TclError:
@@ -346,16 +349,27 @@ class GymBattleWindow(object):
     def _load_trainer(self):
         key = self.view["trainer"].get("battleSprite") or self.view["trainer"].get("sprite")
 
+        k = Z.K
+
+        def work():
+            img = trainer_photo(self.app.api, key)
+            if img is not None and k != 1.0:           # 도트라서 뭉개지 않고 늘린다
+                from PIL import Image
+                img = img.resize((max(1, int(round(img.width * k))), max(1, int(round(img.height * k)))),
+                                 Image.NEAREST)
+            return img
+
         def done(img, err):
             if not self.alive or err or img is None:
                 return
             ph = ImageTk.PhotoImage(img)
             self.photos["trainer"] = ph
             self.cv.itemconfigure(self.trainer_item, image=ph)
-        run_async(self.root, lambda: trainer_photo(self.app.api, key), done)
+        run_async(self.root, work, done)
 
     def set_mon(self, who, mon):
         """그 쪽에 이 포켓몬을 세운다. 도트는 뒤에서 받아 온다."""
+        self.zoom_use()
         self.shown[who] = dict(mon) if mon else None
         self._paint_box(who)
         self._stop_anim(who)
@@ -363,7 +377,7 @@ class GymBattleWindow(object):
         if not mon or mon.get("fainted"):
             return
         num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
-        size = MON_H[who]
+        size = Z.px(MON_H[who])
 
         def work():
             path = sprite_cache.ensure(self.app.api, num, shiny)
@@ -487,8 +501,9 @@ class GymBattleWindow(object):
             self.fx = None
             self.later(90, self._next)
 
+        self._fx_done = done                  # (창 크기를 바꾸면 이 연출을 끝내고 다음으로 넘긴다)
         try:
-            k = FX_SCALE
+            k = FX_SCALE * Z.K
             (sx, sy), (tx, ty) = self._center(who), self._center(other)
             self.fx = FX.Effect(_FxStage(self, k), self._find_move(ev), (sx / k, sy / k), (tx / k, ty / k),
                                 done, who=who)
@@ -515,7 +530,7 @@ class GymBattleWindow(object):
         if bb:
             return ((bb[0] + bb[2]) / 2.0, (bb[1] + bb[3]) / 2.0)
         x, y = self.foe_pos if who == "foe" else self.me_pos
-        return (x, y - MON_H[who] / 2.0)
+        return (x, y - Z.px(MON_H[who]) / 2.0)
 
     def lunge(self, who, done):
         """battle_fx 가 접촉기에서 부른다."""
@@ -601,7 +616,7 @@ class GymBattleWindow(object):
         def swap():
             self.set_mon(who, mon)
             self._show_banner(who, "메가진화!")
-        ui_mega.play_in(self, self._center(who), swap, size=MON_H[who] * 0.55)
+        ui_mega.play_in(self, self._center(who), swap, size=Z.px(MON_H[who]) * 0.55)
 
     # ---------------- 재생 ----------------
     def play(self, events, data):
@@ -614,6 +629,7 @@ class GymBattleWindow(object):
     def _next(self):
         if not self.alive:
             return
+        self.zoom_use()
         if not self.queue:
             return self._finish_play()
         ev = self.queue.pop(0)
@@ -740,7 +756,27 @@ class GymBattleWindow(object):
                 self.shown[who] = dict(mon)
                 self._paint_box(who)
         self._balls(view)
+        self._paint_turn()
+
+    def _paint_turn(self):
+        view = self.view
         self.turn_lbl.configure(text="%d턴 · %s" % (view.get("turn", 0), view["trainer"].get("name", "")))
+
+    def _restore(self):
+        """창 크기를 바꿔 다시 지은 화면을, 들고 있던 것으로 되돌린다 (battle_zoom.Resizable)."""
+        self._load_trainer()
+        for who in ("me", "foe"):
+            self.set_mon(who, self.shown.get(who))
+        self._balls(self.view)
+        self._paint_turn()
+        if self.busy:
+            self.hide_commands()             # 재생 중이거나 서버의 답을 기다린다 - 고를 것이 없다
+        elif self.view.get("over"):
+            self._paint_result()
+        elif self.mode == "switch":
+            self.open_switch()
+        else:
+            self.show_commands()
 
     # ---------------- 명령 ----------------
     def hide_commands(self):
@@ -751,6 +787,7 @@ class GymBattleWindow(object):
         self.mega.show(False)
 
     def show_commands(self):
+        self.zoom_use()
         self.mode = "moves"
         for w in self.left.winfo_children():
             w.destroy()
@@ -814,6 +851,7 @@ class GymBattleWindow(object):
     def open_switch(self, forced=False):
         # 쓰러져서 바꿔야 하는 순간에는 어디서 열어도 '돌아가기' 가 없어야 한다
         forced = forced or bool(self.view.get("needSwitch"))
+        self.zoom_use()
         self.mode = "switch"
         for w in self.left.winfo_children():
             w.destroy()
@@ -847,7 +885,7 @@ class GymBattleWindow(object):
         row.pack(fill="x", padx=8, pady=(5, 1))
         # 빈 Label 의 width/height 는 글자 수라서 그림이 오기 전엔 칸이 거대해진다.
         # 크기를 픽셀로 고정한 틀 안에 둔다.
-        slot = tk.Frame(row, bg=bg, width=36, height=36)
+        slot = tk.Frame(row, bg=bg, width=Z.px(36), height=Z.px(36))
         slot.pack(side="left")
         slot.pack_propagate(False)
         thumb = tk.Label(slot, bg=bg, bd=0)
@@ -878,15 +916,17 @@ class GymBattleWindow(object):
                 w.bind("<Button-1>", lambda _e, s=i: self.do_switch(s))
 
     def _party_thumb(self, label, m):
-        key = "p%s/%s" % (m.get("num"), T.skin(m))
+        key = "p%s/%s/%d" % (m.get("num"), T.skin(m), Z.px(32))     # (크기가 바뀌면 다시 만든다)
         if key in self.photos:
             return label.configure(image=self.photos[key])
+
+        size = Z.px(32)
 
         def work():
             path = sprite_cache.ensure(self.app.api, m.get("num"), T.skin(m))
             if not path:
                 return None
-            anim = sprites.load_animation(path, 32, 0.2, 2.0, max_frames=1)
+            anim = sprites.load_animation(path, size, 0.2, 2.0, max_frames=1)
             return sprites.to_rgba(anim.frames[sprites.LEFT][0], anim.key)
 
         def done(img, err):
@@ -956,6 +996,11 @@ class GymBattleWindow(object):
         # 시작해서, 결과를 보는 동안에는 아무 일도 없어 진화 연출이 안 뜨는
         # 것처럼 보였다. 기술 배우기 창은 앱이 이 창이 닫힐 때까지 기다린다.
         self.root.after(600, self._after_flow)
+        self._paint_result()
+
+    def _paint_result(self):
+        """결과 칸을 그린다 (창 크기를 바꿔 다시 지을 때도 부른다 - 한 번만 할 일은 show_result 에)."""
+        self.zoom_use()
         self.hide_commands()
         res = self.view.get("result")
         title = {"won": "승리!", "lost": "패배...", "draw": "무승부", "forfeit": "기권"}.get(res, "끝")
@@ -967,7 +1012,7 @@ class GymBattleWindow(object):
         # 단추는 오른쪽 아래에 **먼저** 붙인다. 줄 아래에 두면 창 높이를 그만큼 더 먹는다.
         side = tk.Frame(inner, bg=U.BG2)
         side.pack(side="right", fill="y", padx=(12, 0))
-        U.PushButton(side, "지도로 돌아가기", self.close, height=U.h(38)).pack(side="bottom")
+        U.PushButton(side, "지도로 돌아가기", self.close, height=Z.base_h(38)).pack(side="bottom")
         body = tk.Frame(inner, bg=U.BG2)
         body.pack(side="left", fill="both", expand=True)
         tk.Label(body, text=title, bg=U.BG2, fg=color, font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
@@ -1035,6 +1080,7 @@ class GymBattleWindow(object):
         if not self.alive:
             return
         self.alive = False
+        self.zoom_close()
         for e in self.effects + ([self.fx] if self.fx is not None else []):
             try:
                 e.stop()

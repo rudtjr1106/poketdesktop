@@ -62,11 +62,25 @@ jobs:
           python client/test_walk_bounds.py
           python client/test_anims.py
 
-      - name: 기술 연출 (919종 끝까지 가는지, 찌꺼기)
+      - name: 기술 연출 (도감의 기술 전부가 끝까지 가는지, 찌꺼기)
         run: python client/test_move_fx.py
 
       - name: 길드 탭의 점·코인 상점 계산
         run: python client/test_guild_badge.py
+
+      # 캐릭터 (1.10.3): 도트를 코드로 그린다. 고를 수 있는 것이 전부 그려지는지, 칸 밖으로 안 나가는지,
+      # 꾸미기 창의 계산(고르기·되돌리기·한 줄에 몇 칸)
+      - name: 캐릭터 도트·꾸미기 창 계산
+        run: |
+          python common/test_avatar_art.py
+          python client/test_avatar.py
+          # 직접 그린 도트의 규격 (96x128, 열두 칸)과 PNG 를 스스로 읽는 일
+          python common/test_avatar_sheet.py
+
+      # 길드 친선전 (1.10.3): 알림·구경 창의 계산, 구경 장면의 계산(볼의 포물선·기다리는 시간),
+      # 경기장에 서는 걷는 도트, 배틀 창이 뜰 때 장면을 덮는 띠
+      - name: 길드 친선전 계산
+        run: python client/test_friendly.py
 
       - name: 휠 한 칸
         run: python client/test_wheel.py
@@ -242,6 +256,10 @@ jobs:
         run: python client/test_raid_ui.py
       - name: 실시간 배틀 화면 (진짜 Tk)
         run: python client/test_live_ui.py
+      # 배틀 창 크기 (1.10.3): 배틀 창을 끌어서 키우고 줄일 때 장면·도트·글자가 함께 따라가는지,
+      # 어느 크기에서도 눌리는 것이 없는지, 판(고르던 칸·재생)이 그대로인지, 바꾼 크기를 기억하는지
+      - name: 배틀 창 크기 (끌어서 바꿔 본다)
+        run: python client/test_battle_zoom.py
       # 도감 업적 (시즌 3). 알림 창·업적 칸·도감 탭 전환·중복 알림 방지.
       - name: 도감 업적 화면 (진짜 Tk)
         run: python client/test_achievements_ui.py
@@ -264,6 +282,16 @@ jobs:
       # 길드 창 (1.10.0): 찾기·만들기, 채팅 폴링, 자리마다 다른 화면, 눌린 위젯
       - name: 길드 창
         run: python client/test_guild_ui.py
+      - name: 캐릭터 만들기 창 (진짜 Tk)
+        run: python client/test_avatar_ui.py
+      - name: 파티 프리셋 줄 (진짜 Tk)
+        run: python client/test_party_ui.py
+      # 긴급 숨기기 (1.10.3): 떠 있는 창을 전부 치웠다 되돌린다. 단축키는 등록과 '눌렸다' 뒤의 길만 본다
+      - name: 긴급 숨기기·단축키 (진짜 Tk)
+        run: python client/test_stealth.py
+      # 길드 친선전 (1.10.3): 길드 창의 친선전 칸, 오른쪽 아래 알림, 구경하는 작은 경기장(볼에서 나오기·기술·교체)
+      - name: 길드 친선전 화면 (진짜 Tk)
+        run: python client/test_friendly_ui.py
       # 1.9.1: 포켓몬을 마우스로 들어서 옮기기 (설정 petDrag, 기본 꺼짐)
       - name: 포켓몬 들어서 옮기기 (진짜 Tk)
         run: python client/test_pet_drag.py
@@ -340,6 +368,10 @@ jobs:
         run: python client/test_raid_ui.py
       - name: 실시간 배틀 화면 (진짜 Tk)
         run: python client/test_live_ui.py
+      # 배틀 창 크기 (1.10.3): 배틀 창을 끌어서 키우고 줄일 때 장면·도트·글자가 함께 따라가는지,
+      # 어느 크기에서도 눌리는 것이 없는지, 판(고르던 칸·재생)이 그대로인지, 바꾼 크기를 기억하는지
+      - name: 배틀 창 크기 (끌어서 바꿔 본다)
+        run: python client/test_battle_zoom.py
       # 도감 업적 (시즌 3). 알림 창·업적 칸·도감 탭 전환·중복 알림 방지.
       - name: 도감 업적 화면 (진짜 Tk)
         run: python client/test_achievements_ui.py
@@ -362,6 +394,16 @@ jobs:
       # 길드 창 (1.10.0): 찾기·만들기, 채팅 폴링, 자리마다 다른 화면, 눌린 위젯
       - name: 길드 창
         run: python client/test_guild_ui.py
+      - name: 캐릭터 만들기 창 (진짜 Tk)
+        run: python client/test_avatar_ui.py
+      - name: 파티 프리셋 줄 (진짜 Tk)
+        run: python client/test_party_ui.py
+      # 긴급 숨기기 (1.10.3): 떠 있는 창을 전부 치웠다 되돌린다. 단축키는 등록과 '눌렸다' 뒤의 길만 본다
+      - name: 긴급 숨기기·단축키 (진짜 Tk)
+        run: python client/test_stealth.py
+      # 길드 친선전 (1.10.3): 길드 창의 친선전 칸, 오른쪽 아래 알림, 구경하는 작은 경기장(볼에서 나오기·기술·교체)
+      - name: 길드 친선전 화면 (진짜 Tk)
+        run: python client/test_friendly_ui.py
       # 1.9.1: 포켓몬을 마우스로 들어서 옮기기 (설정 petDrag, 기본 꺼짐)
       - name: 포켓몬 들어서 옮기기 (진짜 Tk)
         run: python client/test_pet_drag.py
@@ -442,6 +484,12 @@ jobs:
           python test_catch_exp.py
           # 길드 (1.10.0): 만들기·가입·권한·채팅·일일 미션·단계 보상·코인 상점
           python test_guild.py
+          # 캐릭터 (1.10.3): 고른 것만 저장한다, 보내온 것은 믿지 않는다, 마이페이지 카드에 실린다
+          python test_avatar.py
+          # 파티 프리셋 (1.10.3): 번호를 오가도 잃는 것이 없다, 알·꽉 찬 박스·놓아준 포켓몬
+          python test_party.py
+          # 길드 친선전 (1.10.3): 상대 구함·받기·동시 세 판·구경용 모습이 길드원에게 나가는지
+          python test_friendly.py
 
       - name: 서버 띄우기
         env:
@@ -529,6 +577,9 @@ jobs:
           # 길드 웹소켓 (1.10.0): 진짜로 붙어서 새 줄이 밀려오는지, 내보내지면 끊기는지.
           # 길드를 만들 돈만 DB 로 넣는다.
           python server/test_guild_ws.py http://127.0.0.1:8788 /tmp/poket-test.db
+          # 길드 친선전 (1.10.3): 진짜 웹소켓으로 셋이 붙어서 - 상대 구함이 길드원에게 가는지, 받으면
+          # 실시간 배틀이 진짜로 열리고 구경용 모습이 길드원에게 밀려오는지. 길드를 만들 돈만 DB 로 넣는다.
+          python server/test_friendly_ws.py http://127.0.0.1:8788 /tmp/poket-test.db
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

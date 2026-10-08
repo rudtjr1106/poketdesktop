@@ -3,7 +3,10 @@
 
 길드가 없으면 **찾기·만들기**, 있으면 다섯 칸이다:
 
-    채팅      길드원끼리 주고받는 말. 띄워 둔 동안 2초마다 새 줄을 받아 온다
+    채팅      길드원끼리 주고받는 말. 띄워 둔 동안 2초마다 새 줄을 받아 온다.
+              **길드 친선전도 여기서 한다** (1.10.3): `/친선전` 을 치면 상대를 구하는 카드가
+              채팅에 놓이고, 길드원이 그 카드의 [배틀] 을 눌러 받는다. 판이 열리면 같은 카드가
+              [관전] 으로 바뀐다 (무엇을 그릴지는 ui_spectate.chat_card)
     길드원    누가 있고 오늘 얼마나 했나. 프로필 보기, (마스터·부마스터는) 관리
     미션      오늘의 미션과 길드 점수, 단계 보상 받기
     코인 상점 길드 코인으로 사는 곳
@@ -28,14 +31,28 @@ from common.korean import natural
 from . import guild_ws as WS
 from . import item_icons
 from . import ui_common as U
+from . import ui_spectate as SP
 from .ui_common import run_async
 
 W, H = 760, 680
 CHAT_MS = 2000              # 채팅을 물어보는 간격
-CHAT_KEEP = 400             # 화면에 남겨 두는 줄 수
+# 화면에 남겨 두는 줄 수. 넘으면 맨 위부터 걷는다 - 걷힌 줄은 위로 굴리면 다시 받아 온다.
+# (1.10.3 전에는 400 이었고, 걷힌 줄은 다시 볼 길이 없었다.)
+CHAT_KEEP = 3000
+WEEKDAYS = "월화수목금토일"
 CARD = "#161b28"
+PROFILE_AVATAR = 2                  # 프로필 창의 캐릭터 배율 (32 x 2 = 64)
 PROFILE_W, PROFILE_H = 440, 460     # 프로필 창. 높이는 '넘지 않는' 값이다 - 넘치면 안쪽이 굴러간다
 PROFILE_BAR = 16                    # 굴러가는 막대의 몫
+# 채팅에 놓이는 카드(친선전)는 **내용만큼만 넓고 왼쪽에 붙는다** (채팅의 말 줄처럼). 폭은 아래 둘 사이다.
+CHAT_CARD_W = 540           # 상한. 이보다 긴 글은 줄을 바꾼다 (칸이 더 좁으면 칸에 맞춘다)
+CHAT_CARD_MIN = 200         # 칸이 아주 좁을 때의 바닥
+# 바닥: 이 글과 단추가 한 줄에 들어가는 폭 (글꼴 크기를 따라가게 글로 잰다). **가장 긴 닉네임(12자)**
+# 으로 잰다 - 상대를 구하는 카드는 누구 것이든 같은 폭이고, 넉넉해 보인다. (여섯 자로 쟀을 때는
+# 좁아 보였다)
+CHAT_CARD_SAMPLE = "가나다라마바사아자차카타 님이 친선전 상대를 구합니다."
+CHAT_CARD_GAP = 14          # 글과 단추 사이
+FRIENDLY_EVERY = 5          # 폴링으로 돌 때 친선전의 지금 모습을 묻는 간격 (채팅 틱 몇 번에 한 번)
 TABS = (("chat", "채팅"), ("members", "길드원"), ("mission", "미션"),
         ("shop", "코인 상점"), ("guilds", "다른 길드"), ("manage", "관리"))
 SHOP_ICON = 40              # 코인 상점 카드의 도구 그림
@@ -96,6 +113,41 @@ def clock(iso):
         return ""
 
 
+def chat_day(iso):
+    """그 줄이 **내 PC 시각으로** 며칠인가 ('2026-10-06'). 모르면 빈 문자열."""
+    try:
+        return datetime.datetime.fromisoformat(iso).astimezone().strftime("%Y-%m-%d")
+    except (TypeError, ValueError):
+        return ""
+
+
+def day_label(day):
+    """'2026-10-06' -> '10월 6일 화요일'. 모르면 빈 문자열."""
+    try:
+        d = datetime.date.fromisoformat(day)
+        return "%d월 %d일 %s요일" % (d.month, d.day, WEEKDAYS[d.weekday()])
+    except (TypeError, ValueError):
+        return ""
+
+
+def chat_rows(msgs, prev_day=None):
+    """채팅 줄들에 날짜 줄을 끼운다. [("day", 날짜) | ("msg", 줄)] 을 돌려준다.
+
+    채팅을 일주일 치까지 거슬러 볼 수 있어서 (1.10.3) 시각만으로는 언제 한 말인지 모른다.
+    날이 바뀌는 자리마다 날짜 줄이 하나 선다. prev_day 는 바로 앞 줄의 날짜다 - 없으면(None)
+    첫 줄 앞에도 날짜 줄이 선다.
+    """
+    out = []
+    for m in msgs or []:
+        d = chat_day(m.get("at"))
+        if d and d != prev_day:
+            out.append(("day", d))
+        if d:
+            prev_day = d
+        out.append(("msg", m))
+    return out
+
+
 def seen_text(m):
     """길드원 한 줄의 접속 표시."""
     if m.get("online"):
@@ -131,6 +183,11 @@ class GuildWindow(object):
         # 채팅
         self.chat_last = 0
         self.chat_box = None
+        self.fr = None                # 길드 친선전 (ui_spectate.Friendly - 앱의 것을 같이 쓴다)
+        self.chat_cards = {}          # 채팅에 놓인 카드 {줄 번호: {"frame", "inner", "m", "sig", "view", "btn"}}
+        self.chat_hint = None         # 입력 칸 위의 안내 ('/친선전 을 치면 ...')
+        self._card_lo = None          # 카드 폭의 바닥 (글꼴로 한 번 잰다)
+        self._fr_tick = 0
         self.chat_var = None
         self._chat_job = None
         self._chat_busy = False
@@ -564,7 +621,7 @@ class GuildWindow(object):
         self._paint_info()
         bar = tk.Frame(self.body, bg=U.BG)
         bar.pack(fill="x", padx=16, pady=(10, 0))
-        self.seg = U.Segmented(bar, list(TABS), self.tab, self.show_tab)
+        self.seg = U.Segmented(bar, TABS, self.tab, self.show_tab)
         self.seg.frame.pack(side="left")
         self.content = tk.Frame(self.body, bg=U.BG)
         self.content.pack(fill="both", expand=True)
@@ -612,8 +669,38 @@ class GuildWindow(object):
             pass
         self._draw_tab()
 
+    # ---------------- 친선전 (1.10.3) ----------------
+    def friendly(self):
+        """길드 친선전의 지금 모습을 들고 있는 것. 앱의 것을 같이 쓴다 (검사용 앱처럼 없으면 만든다)."""
+        if self.fr is None:
+            fr = getattr(self.app, "friendly", None)
+            if fr is None:
+                from . import ui_spectate
+                fr = ui_spectate.Friendly(self.app)
+                try:
+                    self.app.friendly = fr
+                except Exception:                           # noqa: BLE001
+                    pass
+            self.fr = fr
+            fr.listeners.append(self._friendly_changed)
+        return self.fr
+
+    def _friendly_changed(self):
+        """친선전의 모습이 바뀌었다 (누가 구한다 / 판이 열렸다 / 끝났다 / 내가 구경을 켜고 껐다)."""
+        if not self.alive:
+            return
+        fr = self.fr
+        if fr is not None and fr.error:
+            text, fr.error = fr.error, None
+            self.say(text, U.DANGER)             # 못 받았다 (이미 3판 진행 중, 그사이 다른 사람이 받았다 ...)
+        self._paint_cards()
+        if not self.live and self.chat_visible():
+            self._poll_chat()                    # 폴링으로 돌 때: 방금 놓인 카드를 2초 기다리지 않고 받는다
+
     def _draw_tab(self):
         self._clear(self.content)
+        self.chat_cards = {}
+        self.chat_hint = None
         self.chat_box = None
         self.chat_state = None
         self.chat_ready = False
@@ -642,18 +729,36 @@ class GuildWindow(object):
         box.entry.bind("<Return>", lambda _e: self.send_chat())
         self.chat_entry = box.entry
         self.chat_limit = limit
+        foot = tk.Frame(self.content, bg=U.BG)
+        foot.pack(side="bottom", fill="x", padx=16, pady=(4, 0))
         # 지금 어느 길로 받고 있나. 말이 늦게 오는 것 같을 때 까닭을 알 수 있다.
-        self.chat_state = tk.Label(self.content, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS,
-                                   anchor="e")
-        self.chat_state.pack(side="bottom", fill="x", padx=16, pady=(4, 0))
+        self.chat_state = tk.Label(foot, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="e")
+        self.chat_state.pack(side="right", anchor="n")
+        # 명령은 눈에 안 보인다 - 무엇을 칠 수 있는지 입력 칸 위에 늘 적어 둔다. '/' 를 치면 전부 보여 준다.
+        # (칸이 좁으면 줄을 바꾼다 - 잘리지 않게)
+        self.chat_hint = tk.Label(foot, text=SP.CMD_HINT, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
+                                  justify="left")
+        self.chat_hint.pack(side="left", fill="x", expand=True)
+        U.wrap_to_width(self.chat_hint)
+        self.chat_var.trace_add("write", lambda *_a: self._paint_hint())
         self._paint_state()
 
         wrap = U.framed(self.content, bg=U.INK)
         wrap.pack(fill="both", expand=True, padx=16, pady=(10, 0))
         sb = tk.Scrollbar(wrap, orient="vertical")
+
+        def on_scroll(lo, hi):
+            sb.set(lo, hi)
+            try:
+                if float(lo) <= 0.001:
+                    self._want_older()       # 맨 위까지 굴렸다 - 앞의 줄을 더 받는다 (1.10.3)
+            except (TypeError, ValueError):
+                pass
         t = tk.Text(wrap, bg=U.INK, fg=U.FG, font=U.FONT, wrap="word", relief="flat", bd=0,
                     highlightthickness=0, padx=12, pady=10, state="disabled", cursor="arrow",
-                    yscrollcommand=sb.set, spacing1=2, spacing3=2, height=6)
+                    yscrollcommand=on_scroll, spacing1=2, spacing3=2, height=6, width=1)
+        # (width=1: Text 는 그냥 두면 80자 폭을 바란다 - 칸이 그보다 좁아도 '눌렸다' 가 아니다.
+        #  실제 폭은 틀이 준다)
         sb.configure(command=t.yview)
         sb.pack(side="right", fill="y")
         t.pack(side="left", fill="both", expand=True)
@@ -662,10 +767,25 @@ class GuildWindow(object):
         t.tag_configure("mine", foreground=U.ACCENT, font=U.FONT_B)
         t.tag_configure("body", foreground=U.FG)
         t.tag_configure("system", foreground=U.FG_FAINT, font=U.FONT_S, justify="center")
+        # 날짜 줄과, 맨 처음 줄 위에 서는 안내 ('채팅은 7일 동안 보관됩니다')
+        t.tag_configure("day", foreground=U.FG_DIM, font=U.FONT_XS, justify="center", spacing1=8,
+                        spacing3=4)
+        t.tag_configure("head", foreground=U.FG_FAINT, font=U.FONT_XS, justify="center", spacing3=4)
+        t.tag_configure("card", justify="left", spacing1=5, spacing3=5)       # 카드가 놓이는 줄 (말 줄처럼 왼쪽에)
         t.wheel_div = 40               # 창의 휠 처리(U.install_wheel)가 이 칸을 굴린다
+        t.bind("<Configure>", lambda _e: self._paint_cards(), add="+")       # 칸이 좁아지면 카드도 줄인다
         self.chat_box = t
+        self.chat_cards = {}
+        fr = self.friendly()
+        fr.chat_open = self.chat_visible     # 채팅을 보는 동안에는 화면 구석의 알림을 띄우지 않는다
+        fr.refresh()                         # 어느 카드가 살아 있는지 (지금 누가 구하고, 어느 판이 진행 중인지)
         self.chat_last = 0
-        self.chat_lines = 0
+        self.chat_lines = 0            # 화면에 있는 **말** 줄 수 (날짜 줄·안내 줄은 안 센다)
+        self.chat_rows = []            # 화면의 줄 그대로: ("day", 날짜) | ("head", 글) | ("msg", 줄)
+        self.chat_first = 0            # 화면에 있는 가장 앞 줄의 번호
+        self.chat_more = False         # 그 앞에 받을 줄이 더 있나
+        self.chat_days = 0             # 서버가 채팅을 두는 날 수
+        self._older_busy = False
         self.chat_ready = False
         self._pending = []
         self._poll_chat(first=True)
@@ -683,35 +803,326 @@ class GuildWindow(object):
                 m = dict(m, mine=(m.get("userId") is not None and m.get("userId") == self.my_id))
             fresh.append(m)
         self._append(fresh)
+        if not self.live and any(SP.is_card(m) for m in fresh):
+            self.friendly().refresh()            # 폴링으로 받은 새 카드 - 살아 있는지는 지금 모습을 물어야 안다
         return fresh
 
+    def _segments(self, row):
+        """줄 하나를 (글, 꼬리표) 토막들로. (카드 줄은 화면에는 카드로 놓인다 - _put_row.
+        여기서 주는 글은 그 카드에 적힌 말이다.)"""
+        kind, v = row
+        if kind == "day":
+            return [(day_label(v), ("day",))]
+        if kind == "head":
+            return [(v, ("head",))]
+        if SP.is_card(v):
+            return [("[친선전] %s" % self._card_view(v)["text"], ("card",))]
+        if v.get("system"):
+            return [("— %s —" % v.get("body", ""), ("system",))]
+        return [("%s  " % clock(v.get("at")), ("time",)),
+                ("%s  " % v.get("name", "?"), ("mine" if v.get("mine") else "name",)),
+                (v.get("body", ""), ("body",))]
+
+    def _put_row(self, t, at, row):
+        """줄 하나를 at 자리에 놓는다. 카드 줄은 글 대신 **카드 한 장**(끼워 넣은 창)이다 -
+        그래도 Text 에서는 한 줄이라, 줄을 세서 걷고 붙이는 것(_trim, _prepend)은 그대로 통한다."""
+        if row[0] == "msg" and SP.is_card(row[1]):
+            at = t.index(at)
+            t.window_create(at, window=self._card_widget(t, row[1]))
+            t.tag_add("card", at)
+            return
+        for text, tags in self._segments(row):
+            t.insert(at, text, tags)
+
+    # ---------------- 채팅의 카드: 길드 친선전 (1.10.3) ----------------
+    def _card_span(self):
+        """카드 폭의 (바닥, 상한). 카드는 내용만큼만 넓다 - 이 둘 사이에서."""
+        try:
+            pane = int(self.chat_box.winfo_width())
+        except Exception:                                   # noqa: BLE001
+            pane = 0
+        hi = CHAT_CARD_W if pane <= 1 else max(CHAT_CARD_MIN, min(CHAT_CARD_W, pane - 48))
+        if self._card_lo is None:
+            try:
+                from tkinter import font as tkfont
+                self._card_lo = (tkfont.Font(root=self.root, font=U.FONT_S).measure(CHAT_CARD_SAMPLE)
+                                 + 24 + CHAT_CARD_GAP + 76)          # 안쪽 여백 + 글과 단추 사이 + 단추
+            except Exception:                               # noqa: BLE001
+                self._card_lo = 320
+        return min(self._card_lo, hi), hi
+
+    def _card_view(self, m):
+        """그 카드가 지금 어떻게 보여야 하나 (ui_spectate.chat_card)."""
+        fr = self.friendly()
+        duel = fr.duel.mid if fr.watching() else None
+        return SP.chat_card(m.get("card"), int(m.get("id") or 0), fr.view, self.my_id, duel)
+
+    def _card_widget(self, t, m):
+        line = int(m.get("id") or 0)
+        f = tk.Frame(t, bg=U.LINE2, cursor="arrow")
+        inner = tk.Frame(f, bg=CARD)
+        inner.pack(fill="both", expand=True, padx=1, pady=1)
+        self.chat_cards[line] = {"frame": f, "inner": inner, "m": m, "sig": None, "view": None, "btn": None}
+        self._paint_card(line)
+        return f
+
+    def _paint_card(self, line):
+        """카드 한 장을 지금 모습대로 그린다. **달라졌을 때만** 다시 짓는다."""
+        c = self.chat_cards.get(line)
+        if c is None:
+            return
+        v, (lo, hi) = self._card_view(c["m"]), self._card_span()
+        sig = (v["tag"], v["text"], v["button"], v["act"], v["arg"], lo, hi)
+        if sig == c["sig"]:
+            return
+        inner = c["inner"]
+        try:
+            for ch in inner.winfo_children():
+                ch.destroy()
+            live = v["tone"] in ("seek", "fight")
+            tk.Frame(inner, bg=CARD, width=lo, height=1).pack(anchor="w")    # 바닥 폭을 잡아 주는 살
+            head = tk.Frame(inner, bg=CARD)
+            head.pack(fill="x", padx=12, pady=(6, 0))
+            tk.Label(head, text="길드 친선전", bg=CARD, fg=U.ACCENT if live else U.FG_DIM, font=U.FONT_B,
+                     anchor="w").pack(side="left")
+            if v["tag"]:                         # 진행 중 · 관전 중 · 끝 · 마감 (상대를 구하는 카드에는 없다)
+                tk.Label(head, text=v["tag"], bg=CARD, font=U.FONT_XS, anchor="e",
+                         fg=U.GOOD if v["tone"] == "fight" else U.FG_FAINT).pack(side="right", padx=(CHAT_CARD_GAP, 0))
+            row = tk.Frame(inner, bg=CARD)
+            row.pack(fill="x", padx=12, pady=(4, 9))
+            btn, used = None, 0
+            if v["button"]:
+                press = (lambda a=v["act"], g=v["arg"]: self._card_press(a, g))
+                if v["act"] in ("accept", "watch"):
+                    btn = U.PushButton(row, v["button"], press, height=30, font=U.FONT_B)
+                else:
+                    btn = U.ghost_button(row, v["button"], press, height=30)
+                btn.pack(side="right", padx=(CHAT_CARD_GAP, 0))
+                used = int(btn.holder.cget("width")) + CHAT_CARD_GAP
+            # 글이 길면 카드가 상한까지 넓어지고, 그래도 넘치면 줄을 바꾼다 (글씨를 줄이지 않는다)
+            tk.Label(row, text=v["text"], bg=CARD, fg=U.FG if live else U.FG_DIM, font=U.FONT_S, anchor="w",
+                     justify="left", wraplength=max(80, hi - 24 - used)).pack(side="left")
+            c["sig"], c["view"], c["btn"] = sig, v, btn
+        except tk.TclError:
+            pass
+
+    def _paint_cards(self, only=None):
+        """카드들을(only 를 주면 그 줄만) 지금 모습대로. 맨 아래를 보고 있었으면 그대로 맨 아래를 본다.
+
+        카드는 단추가 생기고 없어지면서 높이가 바뀐다 - 맨 아래에 놓인 카드가 높아지면 그 아래쪽이
+        칸 밖으로 밀려난다. 높이는 **배치가 끝나야** 정해지므로 한 박자 뒤에 맨 아래로 간다.
+        """
+        t = self.chat_box
+        if t is None or not self.chat_cards:
+            return
+        try:
+            at_end = t.yview()[1] >= 0.999
+        except tk.TclError:
+            return
+        for line in ([only] if only is not None else list(self.chat_cards)):
+            self._paint_card(line)
+        if at_end:
+            self._bottom_soon()
+
+    def _bottom_soon(self):
+        """맨 아래로 간다 - **카드의 높이가 정해진 뒤에.**
+
+        카드(끼운 창)는 놓거나 다시 짓는 그 순간에는 높이를 모른다: 안의 것들을 늘어놓고(pack) 그
+        크기가 Text 에 전해지는 것이 다 '한가할 때' 로 미뤄져 있다. 그 자리에서 see("end") 를 부르면
+        납작한 카드를 기준으로 굴러서, 맨 아래 카드의 아래쪽이 칸 밖으로 잘린다. 그래서 한 박자 뒤에,
+        밀린 배치를 다 끝내고 간다.
+        """
+        t = self.chat_box
+        if t is None:
+            return
+
+        def go():
+            try:
+                if self.chat_box is t:
+                    t.update_idletasks()
+                    t.see("end")
+            except tk.TclError:
+                pass
+        try:
+            t.after_idle(go)
+        except tk.TclError:
+            pass
+
+    def _card_press(self, act, arg=None):
+        self.friendly().card_do(act, arg)
+
+    def _card_changed(self, line, card, body=None):
+        """서버가 '그 줄의 카드가 바뀌었다' 고 알렸다 (상대 구함 -> 진행 중 -> 끝)."""
+        if self.chat_box is None:
+            return                               # 다른 칸을 보고 있다 - 채팅 칸을 열 때 새로 받는다
+        rows = [m for kind, m in self.chat_rows if kind == "msg"] + list(self._pending)
+        for m in rows:                           # (아직 못 붙인 줄 - 지난 줄을 받는 중 - 도 고쳐 둔다)
+            if int(m.get("id") or 0) == line:
+                m["card"] = card
+                if body is not None:
+                    m["body"] = body
+        self._paint_cards(only=line)
+
+    def card_texts(self):
+        """화면에 놓인 카드들 {줄 번호: (상태 글, 본문, 단추 글)} (검사용)."""
+        return dict((line, (c["view"]["tag"], c["view"]["text"], c["view"]["button"]))
+                    for line, c in self.chat_cards.items() if c.get("view"))
+
+    def _paint_hint(self):
+        """입력 칸 위의 안내. '/' 로 시작하는 글을 치는 동안에는 쓸 수 있는 명령을 다 보여 준다."""
+        lb = self.chat_hint
+        if lb is None:
+            return
+        try:
+            typing = (self.chat_var.get() or "").lstrip().startswith("/")
+            lb.configure(text=SP.CMD_HELP if typing else SP.CMD_HINT, fg=U.FG_DIM if typing else U.FG_FAINT)
+        except tk.TclError:
+            pass
+
+    def _last_day(self):
+        for kind, v in reversed(self.chat_rows):
+            if kind == "msg":
+                return chat_day(v.get("at")) or None
+        return None
+
     def _append(self, msgs):
+        """새 줄을 아래에 붙인다. 날이 바뀌는 자리에는 날짜 줄이 선다."""
         t = self.chat_box
         if t is None or not msgs:
             return
         try:
             at_end = t.yview()[1] >= 0.999
             t.configure(state="normal")
-            for m in msgs:
-                if self.chat_lines:
+            for row in chat_rows(msgs, self._last_day()):
+                if self.chat_rows:
                     t.insert("end", "\n")
-                if m.get("system"):
-                    t.insert("end", "— %s —" % m.get("body", ""), ("system",))
-                else:
-                    t.insert("end", "%s  " % clock(m.get("at")), ("time",))
-                    t.insert("end", "%s  " % m.get("name", "?"),
-                             ("mine" if m.get("mine") else "name",))
-                    t.insert("end", m.get("body", ""), ("body",))
-                self.chat_lines += 1
-            if self.chat_lines > CHAT_KEEP:              # 오래 띄워 두면 줄이 끝없이 쌓인다
-                cut = self.chat_lines - CHAT_KEEP
-                t.delete("1.0", "%d.0" % (cut + 1))
-                self.chat_lines -= cut
+                self._put_row(t, "end-1c", row)
+                self.chat_rows.append(row)
+                if row[0] == "msg":
+                    self.chat_lines += 1
+                    if not self.chat_first:
+                        self.chat_first = int(row[1].get("id") or 0)
+            if at_end and len(self.chat_rows) > CHAT_KEEP:   # 오래 띄워 두면 줄이 끝없이 쌓인다
+                self._trim(t, len(self.chat_rows) - CHAT_KEEP)
             t.configure(state="disabled")
             if at_end:
                 t.see("end")
+                if any(SP.is_card(m) for m in msgs):
+                    self._bottom_soon()          # 카드는 높이가 늦게 정해진다 - 정해지면 다시 맨 아래로
         except tk.TclError:
             pass
+
+    def _trim(self, t, cut):
+        """맨 위의 cut 줄을 걷는다. 걷힌 줄은 위로 굴리면 다시 받아 온다 (chat_more)."""
+        t.delete("1.0", "%d.0" % (cut + 1))
+        for kind, v in self.chat_rows[:cut]:                         # 걷힌 줄의 카드 (창은 Text 가 같이 지웠다)
+            if kind == "msg":
+                self.chat_cards.pop(int(v.get("id") or 0), None)
+        del self.chat_rows[:cut]
+        while self.chat_rows and self.chat_rows[0][0] != "msg":      # 주인 잃은 날짜 줄
+            t.delete("1.0", "2.0")
+            del self.chat_rows[0]
+        self.chat_lines = sum(1 for r in self.chat_rows if r[0] == "msg")
+        if not self.chat_rows:
+            self.chat_first = 0
+            return
+        top = self.chat_rows[0][1]
+        self.chat_first, self.chat_more = int(top.get("id") or 0), True
+        day = chat_day(top.get("at"))
+        if day:                                               # 맨 윗줄 위에는 늘 날짜가 선다
+            t.insert("1.0", "\n")
+            t.insert("1.0", day_label(day), ("day",))
+            self.chat_rows.insert(0, ("day", day))
+
+    def _prepend(self, msgs, more):
+        """앞의 줄(더 옛 것)을 위에 붙인다. **보던 자리는 그대로 둔다.**
+
+        맨 위에 서 있던 날짜 줄·안내 줄은 걷고 새로 세운다 - 붙이고 나면 거기는 더 이상
+        맨 위가 아니다. 더 받을 것이 없으면(more 가 거짓) 맨 위에 '며칠 동안 보관된다' 를 적는다.
+        """
+        t = self.chat_box
+        if t is None:
+            return
+        try:
+            t.configure(state="normal")
+            while self.chat_rows and self.chat_rows[0][0] != "msg":
+                t.delete("1.0", "2.0")
+                del self.chat_rows[0]
+            block = chat_rows(msgs)
+            old_day = chat_day(self.chat_rows[0][1].get("at")) if self.chat_rows else ""
+            new_day = chat_day(msgs[-1].get("at")) if msgs else None
+            again = bool(old_day) and old_day != new_day     # 원래 맨 윗줄의 날짜 줄을 다시 세운다
+            if again:
+                block.append(("day", old_day))
+            if not more:
+                days = int(self.chat_days or 0)
+                block.insert(0, ("head", "채팅은 %d일 동안 보관됩니다." % days if days
+                                 else "여기가 첫 줄입니다."))
+            t.mark_set("older", "1.0")
+            t.mark_gravity("older", "right")
+            for row in block:
+                self._put_row(t, "older", row)
+                if self.chat_rows or row is not block[-1]:
+                    t.insert("older", "\n")
+            self.chat_rows[0:0] = block
+            self.chat_lines += len(msgs)
+            if msgs:
+                self.chat_first = int(msgs[0].get("id") or 0) or self.chat_first
+            self.chat_more = bool(more)
+            t.configure(state="disabled")
+            if msgs:
+                # 방금까지 맨 위였던 줄(다시 세운 날짜 줄이 있으면 그 줄)이 그대로 맨 위에 온다.
+                # yview(줄) 은 **화면에 그려진 뒤에야** 맞는 자리로 간다 - 방금 넣은 줄들의 높이를
+                # 아직 모를 때 부르면 한두 줄 어긋난다. 그래서 배치를 끝내고 부른다.
+                line = "%d.0" % (len(block) + (0 if again else 1))
+                t.update_idletasks()
+                t.yview(line)
+        except tk.TclError:
+            pass
+
+    def _want_older(self):
+        """맨 위까지 굴렸다. 앞에 줄이 더 있으면 받아 온다 (굴림 도중이라 한 박자 늦춰서)."""
+        if (not self.chat_ready or not self.chat_more or self._older_busy or not self.chat_first
+                or self.chat_box is None):
+            return
+        self._older_busy = True
+        try:
+            self.root.after_idle(self._load_older)
+        except Exception:                                   # noqa: BLE001
+            self._older_busy = False
+
+    def _load_older(self):
+        box, before, api = self.chat_box, self.chat_first, self.app.api
+        if box is None or not self.alive or not before:
+            self._older_busy = False
+            return
+
+        def done(r, err):
+            if not self.alive or self.chat_box is not box:
+                self._older_busy = False
+                return                       # 그사이 칸을 다시 그렸다 - 이 답은 버린다
+            if err:
+                self._older_busy = False
+                return                       # 조용히 넘긴다. 다시 맨 위로 굴리면 또 묻는다
+            r = r or {}
+            msgs = [m for m in (r.get("messages") or []) if 0 < int(m.get("id") or 0) < self.chat_first]
+            try:
+                # **붙이는 동안은 '받는 중' 으로 둔다.** 붙이면서 화면을 한 번 그리는데(_prepend),
+                # 그 순간에는 아직 맨 위를 보고 있어서 '맨 위까지 굴렸다' 가 또 울린다 - 그대로
+                # 두면 한 번 굴렸는데 일주일 치를 줄줄이 다 받아 온다.
+                self._prepend(msgs, bool(r.get("more")) and bool(msgs))
+            finally:
+                self._older_busy = False
+            try:
+                if box.yview()[0] <= 0.001:  # 붙이고도 칸이 다 차지 않았다 - 마저 받는다
+                    self._want_older()
+            except tk.TclError:
+                pass
+        run_async(self.root, lambda: api.guild_chat(before=before), done)
+
+    def chat_bodies(self):
+        """화면에 있는 **말** 줄의 글 (날짜 줄·안내 줄은 뺀다). 검사용."""
+        return ["".join(text for text, _tags in self._segments(r)) for r in self.chat_rows if r[0] == "msg"]
 
     def chat_text(self):
         """채팅 칸에 지금 적힌 글 (검사용)."""
@@ -735,6 +1146,10 @@ class GuildWindow(object):
         # 웹소켓이 붙어 있으면 밀려오는 것만 받는다. 끊겨 있을 때만 묻는다.
         if self.chat_visible() and not self.live:
             self._poll_chat()
+            # 웹소켓이 없으면 친선전 소식도 밀려오지 않는다 - 채팅을 보는 동안 가끔 물어서 카드를 맞춘다
+            self._fr_tick += 1
+            if self._fr_tick % FRIENDLY_EVERY == 0:
+                self.friendly().refresh()
         if self.pane_visible():
             if self._badged:
                 self._badge(False)           # 길드 탭으로 돌아왔다 - 탭의 점은 지운다
@@ -781,6 +1196,12 @@ class GuildWindow(object):
                 return self.load()           # 그사이 길드에서 나왔다 (내보내졌거나 해산)
             self._add_lines(r.get("messages") or [])
             self.chat_last = max(self.chat_last, int(r.get("last") or 0))
+            if first:
+                # 앞에 줄이 더 있나 (옛 서버는 이 값을 안 준다 - 그러면 거슬러 받지 않는다)
+                self.chat_days = int(r.get("days") or 0)
+                self.chat_more = bool(r.get("more"))
+                if not self.chat_more and self.chat_rows and r.get("days"):
+                    self._prepend([], False)                 # 맨 위에 '며칠 동안 보관된다' 를 적는다
             # 이 답을 기다리는 사이에 웹소켓으로 밀려온 줄. 답보다 먼저 붙이면 답에 든
             # 앞 번호의 줄이 '이미 지난 번호' 로 걸러져 사라진다 - 그래서 답 뒤에 붙인다.
             self.chat_ready = True
@@ -792,6 +1213,10 @@ class GuildWindow(object):
             if first:
                 try:
                     box.see("end")
+                    # 줄이 적어 칸이 다 차지 않았으면 맨 위가 곧 보이는 자리다 - 앞의 줄을 마저 받는다
+                    box.update_idletasks()
+                    if box.yview()[0] <= 0.001:
+                        self._want_older()
                 except tk.TclError:
                     pass
             stamp = r.get("stamp")
@@ -805,6 +1230,9 @@ class GuildWindow(object):
         text = " ".join((self.chat_var.get() or "").split())
         if not text:
             return
+        cmd = SP.command(text, (self.data or {}).get("members"), self.my_id)
+        if cmd is not None:
+            return self._run_command(cmd)        # '/친선전' - 말로 보내지 않는다
         if len(text) > self.chat_limit:
             return self.say("한 번에 %d자까지 보낼 수 있습니다." % self.chat_limit, U.DANGER)
         self.chat_var.set("")
@@ -819,6 +1247,26 @@ class GuildWindow(object):
             if not self.live:
                 self._poll_chat()            # 웹소켓이 붙어 있으면 내 말도 밀려온다
         run_async(self.root, lambda: api.guild_say(text), done)
+
+    def _run_command(self, cmd):
+        """채팅에 친 명령 (ui_spectate.command 가 풀어 준 것)."""
+        fr = self.friendly()
+        if cmd[0] == "error":
+            return self.say(cmd[1], U.DANGER)    # 친 글은 그대로 둔다 - 고쳐서 다시 칠 수 있게
+        self.chat_var.set("")
+        if cmd[0] == "seek":
+            if fr.seeking_me():
+                return self.say("이미 상대를 구하고 있습니다. 그만두려면 /친선전 취소", U.FG_DIM)
+            self.say("길드원이 카드의 [배틀] 을 누르면 바로 시작합니다. 3분 동안 아무도 안 받으면 저절로 닫힙니다.")
+            fr.seek(True)
+        elif cmd[0] == "cancel":
+            if not fr.seeking_me():
+                return self.say("상대를 구하고 있지 않습니다.", U.FG_DIM)
+            self.say("")
+            fr.seek(False)
+        elif cmd[0] == "ask":
+            self.say("%s 님에게 친선전을 신청했습니다. 상대가 받으면 시작합니다." % cmd[2], U.GOOD)
+            fr.ask(cmd[1])
 
     # ---------------- 웹소켓 ----------------
     def _ensure_socket(self):
@@ -855,6 +1303,8 @@ class GuildWindow(object):
         if not self.alive:
             return
         t = ev.get("t")
+        if t in ("live", "friendly", "friendly_fight"):
+            return self.friendly().on_event(ev)      # 길드 친선전 (ui_spectate)
         if t == "open":
             self.live = True
             self._paint_state()
@@ -869,6 +1319,8 @@ class GuildWindow(object):
             return self.load()               # 내보내졌거나 해산됐다
         if t == "changed":
             return self._reload_soon()
+        if t == "card":
+            return self._card_changed(int(ev.get("id") or 0), ev.get("card") or {}, ev.get("body"))
         if t == "chat":
             m = ev.get("m") or {}
             if m.get("userId") != self.my_id and not m.get("system"):
@@ -1099,7 +1551,21 @@ class GuildWindow(object):
 
         box = tk.Frame(inner, bg=CARD, highlightthickness=1, highlightbackground=U.ACCENT_SHADOW)
         box.pack(fill="x", padx=pad)
-        top = tk.Frame(box, bg=CARD)
+        # 캐릭터 (1.10.3): 만든 사람이면 이름 왼쪽에 선다. 그만큼 옆의 글이 접히는 폭이 줄어든다.
+        host, head_wrap = box, wrap
+        from . import ui_avatar
+        av = p.get("avatar") if ui_avatar.ENABLED else None      # 캐릭터는 보류 중이라 안 그린다
+        if av:
+            line = tk.Frame(box, bg=CARD)
+            line.pack(fill="x")
+            art = tk.Label(line, bg=CARD, bd=0, padx=0, pady=0)
+            art.pack(side="left", anchor="n", padx=(12, 0), pady=(10, 0))
+            art.image = ui_avatar.portrait(av, PROFILE_AVATAR)    # 직접 그린 도트를 쓰는 사람이면 그 도트
+            art.configure(image=art.image)
+            host = tk.Frame(line, bg=CARD)
+            host.pack(side="left", fill="x", expand=True)
+            head_wrap = wrap - (PROFILE_AVATAR * 32 + 12)
+        top = tk.Frame(host, bg=CARD)
         top.pack(fill="x", padx=14, pady=(12, 2))
         tk.Label(top, text=u.get("name") or "?", bg=CARD, fg=u.get("frameColor") or U.FG,
                  font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left")
@@ -1109,9 +1575,9 @@ class GuildWindow(object):
         text, color = seen_text(g)
         if text:
             tk.Label(top, text=text, bg=CARD, fg=color, font=U.FONT_XS).pack(side="right")
-        for line, fg, font in profile_head(p):
-            tk.Label(box, text=line, bg=CARD, fg=fg, font=font, anchor="w", justify="left",
-                     wraplength=wrap).pack(fill="x", padx=14, pady=(2, 0))
+        for text, fg, font in profile_head(p):
+            tk.Label(host, text=text, bg=CARD, fg=fg, font=font, anchor="w", justify="left",
+                     wraplength=head_wrap).pack(fill="x", padx=14, pady=(2, 0))
         tk.Frame(box, bg=CARD, height=U.h(10)).pack(fill="x")
 
         # 숫자 칸. 마이페이지는 셋씩 놓지만 이 창은 좁아서 둘씩 놓는다 (글자를 줄이지 않는다).
@@ -1192,8 +1658,7 @@ class GuildWindow(object):
         self.bar = tk.Canvas(box, height=U.h(16), bg=CARD, highlightthickness=0, bd=0)
         self.bar.pack(fill="x", padx=14, pady=(0, 4))
         self.bar.bind("<Configure>", lambda _e: self._paint_bar())
-        tk.Label(box, text="길드원이 미션을 하면 점수가 길드에 모입니다. 단계를 넘을 때마다, 오늘 "
-                           "미션을 하나라도 한 길드원이 보상을 받습니다.", bg=CARD, fg=U.FG_FAINT,
+        tk.Label(box, text=mission_note(ms), bg=CARD, fg=U.FG_FAINT,
                  font=U.FONT_XS, anchor="w", justify="left", wraplength=640).pack(
             fill="x", padx=14, pady=(0, 6))
         for t in ms.get("tiers") or []:
@@ -1259,18 +1724,15 @@ class GuildWindow(object):
         tk.Label(row, text=t.get("reward", ""), bg=CARD, fg=U.ACCENT_TEXT if reached else U.FG_DIM,
                  font=U.FONT_S).pack(side="left", padx=(6, 0))
         tier = t["tier"]
-        if t.get("claimed"):
-            tk.Label(row, text="받음", bg=CARD, fg=U.GOOD, font=U.FONT_S).pack(side="right")
-        elif t.get("canClaim"):
-            U.ghost_button(row, "받기", lambda: self.act(lambda: self.app.api.guild_claim(tier),
-                                                        self._after_claim), height=28,
+        kind, text = tier_state(t, ms)
+        if kind == "claim":
+            # 옛 서버(1.10.2 까지)에만 나온다 - 새 서버는 보상을 저절로 넣어 준다
+            U.ghost_button(row, text, lambda: self.act(lambda: self.app.api.guild_claim(tier),
+                                                       self._after_claim), height=28,
                            fill=U.ACCENT_DARK, fg=U.ACCENT).pack(side="right")
-        elif reached:
-            tk.Label(row, text="미션을 하나라도 하면 받을 수 있습니다", bg=CARD, fg=U.FG_FAINT,
-                     font=U.FONT_XS).pack(side="right")
         else:
-            tk.Label(row, text="%d점 남음" % max(0, t["need"] - int(ms.get("guildPoints") or 0)),
-                     bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="right")
+            tk.Label(row, text=text, bg=CARD, fg=U.GOOD if kind == "claimed" else U.FG_FAINT,
+                     font=U.FONT_S if kind == "claimed" else U.FONT_XS).pack(side="right")
 
     def _after_claim(self, _r):
         self.shop = None
@@ -1605,6 +2067,13 @@ class GuildWindow(object):
 
     def close(self):
         self.alive = False
+        if self.fr is not None:
+            try:
+                self.fr.listeners.remove(self._friendly_changed)
+            except ValueError:
+                pass
+            if self.fr.chat_open == self.chat_visible:
+                self.fr.chat_open = None
         self._stop_socket()
         if self._reload_job is not None:
             try:
@@ -1624,6 +2093,32 @@ class GuildWindow(object):
             pass
         if getattr(self.app, "guild_window", None) is self:
             self.app.guild_window = None
+
+
+def mission_note(ms):
+    """미션 칸의 안내 한 줄. 보상이 저절로 들어오는 서버(1.10.3~)인지에 따라 다르다."""
+    if (ms or {}).get("auto"):
+        return ("길드원이 미션을 하면 점수가 길드에 모입니다. 단계를 넘으면, 오늘 미션을 하나라도 한 "
+                "길드원에게 보상이 자동으로 들어옵니다. 받기를 누를 필요가 없습니다.")
+    return ("길드원이 미션을 하면 점수가 길드에 모입니다. 단계를 넘을 때마다, 오늘 미션을 하나라도 한 "
+            "길드원이 보상을 받습니다.")
+
+
+def tier_state(t, ms):
+    """단계 한 줄의 오른쪽에 적을 것. (종류, 글). 종류 = claimed / claim / wait / left.
+
+    보상이 저절로 들어오는 서버에서는 '받기' 가 없다: 넘은 단계는 '받음' 이거나, 아직 오늘 미션을
+    하나도 안 해서 기다리는 중이다 (하나를 끝내는 순간 들어온다).
+    """
+    ms = ms or {}
+    if t.get("claimed"):
+        return "claimed", "받음 (자동)" if ms.get("auto") else "받음"
+    if t.get("canClaim"):
+        return "claim", "받기"
+    if t.get("reached"):
+        return "wait", ("미션을 하나라도 하면 바로 들어옵니다" if ms.get("auto")
+                        else "미션을 하나라도 하면 받을 수 있습니다")
+    return "left", "%d점 남음" % max(0, int(t.get("need") or 0) - int(ms.get("guildPoints") or 0))
 
 
 def profile_head(p):

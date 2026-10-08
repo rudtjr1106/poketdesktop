@@ -14,6 +14,8 @@ from tkinter import ttk
 
 from . import autostart
 from . import config
+from common.korean import natural
+
 from . import ui_common as U
 
 W, H = 460, 690
@@ -159,6 +161,8 @@ class SettingsWindow(object):
         self.grass = tk.BooleanVar(value=bool(s.get("showGrass", True)))
         self.notif = tk.BooleanVar(value=bool(s.get("notifyImportant", True)))
         self.drag = tk.BooleanVar(value=bool(s.get("petDrag", False)))
+        self.fr_note = tk.BooleanVar(value=bool(s.get("friendlyNotify", True)))
+        self.fr_auto = tk.BooleanVar(value=bool(s.get("friendlyAuto", False)))
         # **알림은 셋만 띄운다** - 새 버전, 친구 요청, 게시판 댓글(1.9.0). 게임 안에서
         # 벌어지는 일(잡았다, 레벨이 올랐다)은 이걸 켜도 안 띄운다.
         # 바탕화면에서 눈으로 보이는 것으로 충분하고, 그런 것까지 화면
@@ -183,7 +187,16 @@ class SettingsWindow(object):
                 (self.notif, "새 버전·친구 요청·게시판 댓글 알림", "notifyImportant",
                  "화면에 자국이 안 남는 이 셋만 알립니다. 게시판은 내 글에 댓글이,"
                  " 내 댓글에 답글이 달렸을 때입니다. 잡았다·레벨업 같은 것은"
-                 " 띄우지 않습니다.", self._toggle_plain)):
+                 " 띄우지 않습니다.", self._toggle_plain),
+                # 길드 친선전 (1.10.3). 친선전 자체는 길드 채팅에서 한다 (/친선전) - 여기는
+                # 채팅을 안 보고 있을 때 화면 구석에 알릴지만 정한다 (ui_spectate.Friendly).
+                (self.fr_note, "길드 친선전 알림", "friendlyNotify",
+                 "길드원이 친선전 상대를 구하거나 친선전이 열리면 화면 오른쪽 아래에 "
+                 "잠깐 알립니다. 길드 채팅을 보고 있을 때는 띄우지 않습니다 "
+                 "(채팅에 카드가 놓입니다).", self._toggle_plain),
+                (self.fr_auto, "길드 친선전 바로 관전하기", "friendlyAuto",
+                 "길드 친선전이 열리면 묻지 않고 바탕화면에서 바로 관전합니다.",
+                 self._toggle_plain)):
             c = tk.Checkbutton(
                 box, text=label, variable=var, bg=U.BG, fg=U.FG,
                 selectcolor=U.INK, activebackground=U.BG,
@@ -199,6 +212,8 @@ class SettingsWindow(object):
             U.wrap_to_width(lbl)
         self._area_row(box, s)
         self._catch_row(box, s)
+        self._zoom_row(box, s)
+        self._boss_row(box, s)
         self._autostart_row(box)
 
     def _area_row(self, box, s):
@@ -284,6 +299,104 @@ class SettingsWindow(object):
 
     def _set_catch(self):
         self._set("catchMode", config.catch_mode({"catchMode": self.catch.get()}))
+
+    # ---------------- 긴급 숨기기 단축키 (1.10.3) ----------------
+    def _zoom_row(self, box, s):
+        """배틀 창(관장·레이드·실시간)의 크기. 창을 끌어서 바꾸고(battle_zoom), 여기서는 그것을 알려
+        주고 기본 크기로 되돌린다 - 끌어서 바꿀 수 있다는 것을 모르면 없는 기능이다."""
+        tk.Label(box, text="배틀 창 크기", bg=U.BG, fg=U.FG,
+                 font=U.FONT_S, anchor="w").pack(fill="x", pady=(10, 2))
+        note = tk.Label(box, text="관장·레이드·실시간 배틀 창은 다른 창처럼 가장자리를 끌어서 크기를 "
+                                  "바꿀 수 있습니다. 창을 키우면 장면과 글자가 함께 커지고, 줄이면 "
+                                  "작아집니다. 바꾼 크기는 기억해서 다음 배틀도 그 크기로 뜹니다.",
+                        bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
+                        justify="left", wraplength=W - 60)
+        note.pack(fill="x", pady=(0, 4))
+        U.wrap_to_width(note)
+        row = tk.Frame(box, bg=U.BG)
+        row.pack(fill="x", pady=(0, 6))
+        self.zoom_btn = U.ghost_button(row, "기본 크기로", self._reset_zoom, height=30)
+        self.zoom_btn.pack(side="left")
+        self.zoom_msg = tk.Label(row, text="", bg=U.BG, fg=U.FG_DIM, font=U.FONT_XS, anchor="w")
+        self.zoom_msg.pack(side="left", padx=(10, 0))
+        self._paint_zoom()
+
+    def _paint_zoom(self):
+        kept = bool(self.app.settings.get("battleSize"))
+        try:
+            self.zoom_btn.configure(state="normal" if kept else "disabled")
+            self.zoom_msg.configure(text="" if kept else "지금 기본 크기입니다.")
+        except tk.TclError:
+            pass
+
+    def _reset_zoom(self):
+        from . import battle_zoom as ZOOM
+        ZOOM.forget(self.app)
+        self._paint_zoom()
+        try:
+            self.zoom_msg.configure(text="다음 배틀 창부터 기본 크기로 뜹니다.")
+        except tk.TclError:
+            pass
+
+    def _boss_row(self, box, s):
+        """다른 프로그램을 쓰는 중에도 먹는 단축키 하나 (hotkey.py). **기본은 '쓰지 않음'.**
+
+        아무 조합이나 받지 않고 몇 가지 가운데 고르게 한다 - 등록한 조합은 다른 프로그램에
+        가지 않아서, 흔히 쓰는 조합을 고르면 그 프로그램에서 그 키가 안 먹는다.
+        """
+        from . import hotkey as HOTKEY
+        self.boss = None
+        if not HOTKEY.supported():
+            return
+        tk.Label(box, text="긴급 숨기기 단축키", bg=U.BG, fg=U.FG,
+                 font=U.FONT_S, anchor="w").pack(fill="x", pady=(4, 0))
+        self.boss = tk.StringVar(value=HOTKEY.clean(s.get("bossKey")))
+        self.boss_buttons = {}
+        for value, label in HOTKEY.choices():
+            rb = tk.Radiobutton(
+                box, text=label, value=value, variable=self.boss,
+                bg=U.BG, fg=U.FG, selectcolor=U.INK, activebackground=U.BG,
+                activeforeground=U.FG, font=U.FONT_S, anchor="w",
+                highlightthickness=0, bd=0, command=self._set_boss)
+            rb.pack(fill="x", padx=(22, 0))
+            self.boss_buttons[value] = rb
+        note = tk.Label(box, text="누르면 바탕화면의 포켓몬과 포스크탑 창, 배틀 창이 한 번에 사라지고, "
+                                  "다시 누르면 그대로 돌아옵니다. 다른 프로그램을 쓰는 중에도 먹습니다. "
+                                  "숨긴 동안에도 게임은 그대로 진행됩니다. 단축키 없이도 트레이 메뉴의 "
+                                  "'모두 숨기기' 로 같은 일을 할 수 있습니다.",
+                        bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
+                        justify="left", wraplength=W - 60)
+        note.pack(fill="x", padx=(22, 0))
+        U.wrap_to_width(note)
+        # 등록하지 못했을 때의 까닭 (다른 프로그램이 이미 쓰는 조합 ...). 평소에는 비어 있다.
+        self.boss_msg = tk.Label(box, text=getattr(self.app, "boss_key_error", "") or "", bg=U.BG,
+                                 fg=U.DANGER, font=U.FONT_XS, anchor="w", justify="left",
+                                 wraplength=W - 60)
+        self.boss_msg.pack(fill="x", padx=(22, 0), pady=(0, 6))
+        U.wrap_to_width(self.boss_msg)
+
+    def _set_boss(self):
+        """고른 조합을 등록한다. 못 하면 까닭을 적고 '쓰지 않음' 으로 되돌린다."""
+        want = self.boss.get()
+        ok, why = self.app.apply_boss_key(want)
+        if not ok:
+            # 안 되는 조합을 설정에 남겨 두면 켤 때마다 실패한다. 고르기 전(쓰지 않음)으로 돌린다.
+            self.app.apply_boss_key("")
+            self.boss.set("")
+        try:
+            self.boss_msg.configure(text="" if ok else natural(why))
+        except tk.TclError:
+            pass
+
+    def show_boss(self):
+        """지금 설정대로 표시를 맞춘다 ('기본값으로' 뒤에)."""
+        if self.boss is not None:
+            from . import hotkey as HOTKEY
+            self.boss.set(HOTKEY.clean(self.app.settings.get("bossKey")))
+            try:
+                self.boss_msg.configure(text="")
+            except tk.TclError:
+                pass
 
     def show_grass(self):
         """지금 설정대로 표시를 맞춘다.
@@ -405,6 +518,11 @@ class SettingsWindow(object):
         self.app.set_size(self.app.settings["targetHeight"])
         if self.app.overlay:
             self.app.overlay.apply_alpha()      # 투명도도 그대로(100%)로
+        # 긴급 숨기기 단축키도 기본값(쓰지 않음)이 됐다 - 운영체제에 등록해 둔 것을 푼다
+        fn = getattr(self.app, "apply_boss_key", None)
+        if fn is not None:
+            fn()
+            self.show_boss()
         self._paint_area()          # 직접 그린 영역도 기본값으로 빠졌다
         # 풀숲은 **무조건 다시 맞춘다.** 위에서 설정 값이 이미 기본값으로
         # 바뀌어 있어서, set_show_grass 로 가면 "안 바뀌었다" 며 그냥

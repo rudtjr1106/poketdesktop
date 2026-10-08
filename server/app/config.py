@@ -320,7 +320,9 @@ GUILD_MAX_SUBS = _int("POKET_GUILD_MAX_SUBS", 1)              # 부마스터 수
 GUILD_REJOIN_HOURS = _int("POKET_GUILD_REJOIN_HOURS", 24)
 GUILD_MAX_REQUESTS = _int("POKET_GUILD_MAX_REQUESTS", 3)      # 동시에 넣어 둘 수 있는 가입 신청
 GUILD_CHAT_LEN = _int("POKET_GUILD_CHAT_LEN", 200)            # 채팅 한 줄 글자 수
-GUILD_CHAT_KEEP = _int("POKET_GUILD_CHAT_KEEP", 500)          # 길드마다 남겨 두는 줄 수
+# 길드마다 남겨 두는 줄 수의 **안전 상한**. 채팅은 날짜로(일주일, guild.CHAT_DAYS) 지운다 -
+# 이 값은 도배로 표가 끝없이 자라지 않게 하는 마지막 울타리다 (1.10.3 전에는 500 줄이 곧 보관 기준이었다).
+GUILD_CHAT_KEEP = _int("POKET_GUILD_CHAT_KEEP", 20000)
 GUILD_CHAT_PER_MIN = _int("POKET_GUILD_CHAT_PER_MIN", 20)     # 한 사람이 1분에 보낼 수 있는 줄 수
 # 길드 코인 하나의 값(원). 코인 상점의 값은 '상점 값 / 이 값' 을 올림한 것이다.
 GUILD_COIN_WON = _int("POKET_GUILD_COIN_WON", 250)

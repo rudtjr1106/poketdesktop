@@ -80,6 +80,18 @@ def make_icon_image(size=64):
     return appicon.make(size)
 
 
+def stealth_label(app):
+    """긴급 숨기기 줄의 글자. 숨겨 둔 동안에는 '다시 보이기', 단축키를 골랐으면 옆에 적는다."""
+    try:
+        if app.stealth_on():
+            return "다시 보이기"
+        from . import hotkey
+        key = app.boss_key()
+        return "모두 숨기기  (%s)" % hotkey.label(key) if key else "모두 숨기기"
+    except Exception:                                       # noqa: BLE001
+        return "모두 숨기기"
+
+
 class TrayBase(object):
     """양쪽 트레이가 같이 쓰는 것 — 제목과 메뉴 내용."""
 
@@ -88,7 +100,16 @@ class TrayBase(object):
 
     # ---- tk 스레드로 넘기기 ----
     def call(self, fn, *a):
-        self.app.root.after(0, lambda: fn(*a))
+        app = self.app
+
+        def run():
+            # 숨겨 둔 채로(긴급 숨기기) 메뉴에서 무엇을 고르면 창이 안 보여 고장처럼 보인다.
+            # 숨기기를 푸는 줄이 아니면 먼저 되돌린다.
+            wake = getattr(app, "wake", None)
+            if wake is not None and getattr(fn, "__name__", "") != "toggle_stealth":
+                wake()
+            fn(*a)
+        app.root.after(0, run)
 
     # ---- 알림 ----
     def toast(self, title, message):
@@ -169,6 +190,8 @@ class TrayBase(object):
         return [
             # 이제 창이 하나다. 메뉴는 어느 탭으로 열지만 고른다.
             Item("열기...", lambda: self.call(a.open_box), default=True),
+            # 긴급 숨기기 (1.10.3). 단축키를 안 쓰는 사람도 여기서 한 번에 치울 수 있다.
+            Item(lambda: stealth_label(a), lambda: self.call(a.toggle_stealth)),
             # '바로 가기' 하위 메뉴는 뺐다. 창이 하나로 합쳐진 뒤로는
             # '열기...' 로 들어가서 탭을 고르면 되는데, 메뉴에 같은 것이
             # 일곱 줄 더 있으면 길기만 하다.

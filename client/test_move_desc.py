@@ -134,7 +134,7 @@ def t_분류를_적는다(moves):
         chk("%s 는 %s" % (k, want), MT.cat_name(moves[k]) == want,
             MT.cat_name(moves[k]))
 
-    # 919개 전부가 한국어 한 낱말로 적힌다. 영어가 새어 나오면 안 된다.
+    # 도감의 기술 전부(920개)가 한국어 한 낱말로 적힌다. 영어가 새어 나오면 안 된다.
     bad = [k for k, m in moves.items()
            if MT.cat_name(m) not in ("물리", "특수", "변화")]
     chk("전부 한국어로 적힌다", not bad, bad[:3])

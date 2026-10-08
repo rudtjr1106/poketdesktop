@@ -87,7 +87,7 @@ def main():
     b = mkuser("실시간나")
     stranger = mkuser("남남")
     chk("친구가 아니면 못 건다",
-        "친구끼리만" in (live.can_invite(a, b) or ""), live.can_invite(a, b))
+        "길드원끼리만" in (live.can_invite(a, b) or ""), live.can_invite(a, b))
     befriend(a, b)
     chk("친구면 걸 수 있다", live.can_invite(a, b) is None, live.can_invite(a, b))
     chk("자기 자신은 못 건다", "자기 자신" in (live.can_invite(a, a) or ""))

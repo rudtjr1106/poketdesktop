@@ -21,7 +21,7 @@ import datetime
 
 from fastapi import APIRouter, Depends
 
-from . import achievements, board, db, deps, gym, pvp, season
+from . import achievements, avatar, board, db, deps, gym, pvp, season
 
 router = APIRouter()
 
@@ -122,6 +122,8 @@ def card(uid, dex, now=None):
                    "equipped": deco.get("title")},
         "seasons": _seasons(uid),
         "raid": _raid(uid),
+        # 캐릭터 (1.10.3): 고른 것만 싣는다. 그림은 화면이 같은 코드로 그린다. 안 만들었으면 None
+        "avatar": avatar.public(uid),
     }
 
 

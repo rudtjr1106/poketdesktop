@@ -31,8 +31,8 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
-from . import (achievements, auth, battle_routes, board, board_routes, mega, config, db, deps, eggs, item_routes,  # noqa: E402
-               errors, items, live, live_routes, migrations, mypage, pvp, pvp_routes,
+from . import (achievements, auth, avatar, battle_routes, board, board_routes, mega, config, db, deps, eggs, item_routes,  # noqa: E402
+               errors, friendly, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_ws,
                gym_routes, social_routes, tm_routes, tms, walk)
@@ -48,6 +48,9 @@ app.include_router(raid_routes.router)
 app.include_router(live_routes.router)
 app.include_router(board_routes.router)
 app.include_router(mypage.router)
+app.include_router(avatar.router)
+app.include_router(party.router)
+app.include_router(friendly.router)
 app.include_router(guild_routes.router)
 app.include_router(guild_ws.router)
 
@@ -72,6 +75,15 @@ def _startup():
         threading.Thread(target=_warm_sprites, daemon=True).start()
     db.init()
     migrations.run()
+    # 길드 미션 보상은 저절로 들어온다 (1.10.3). 이 판으로 바뀌기 전에 오늘 이미 넘어 있던
+    # 단계를 한 번 챙긴다 - 그 뒤로는 미션을 끝낼 때마다 guild.note 가 준다. 몇 번을 불러도
+    # 같은 보상은 한 번만 나간다.
+    try:
+        sent = guild.settle_all()
+        if sent:
+            print("[guild] 오늘의 미션 보상 %d건을 보냈습니다" % len(sent))
+    except Exception as e:                                  # noqa: BLE001
+        print("[guild] 미션 보상을 챙기지 못했습니다: %r" % (e,))
     # 게시판의 패치노트 글 (1.9.0). 새 판으로 처음 뜰 때 그 판의 글이 생긴다.
     try:
         made = board.ensure_patch_posts()

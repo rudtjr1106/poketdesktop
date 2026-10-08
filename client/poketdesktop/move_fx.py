@@ -60,7 +60,7 @@ _EXACT_GROUPS = {
     "blades": "airslash aircutter psychocut aquacutter",
     "laser": "hyperbeam solarbeam icebeam aurorabeam signalbeam psybeam chargebeam flashcannon "
              "steelbeam meteorbeam moongeistbeam prismaticlaser eternabeam ficklebeam twinbeam "
-             "photongeyser",
+             "photongeyser nihillight",
     "sparkle": "fairywind silverwind icywind ominouswind",
     "blizzard": "blizzard powdersnow glaciate sheercold",
     "sludge": "sludgebomb sludge sludgewave acidspray venoshock acid gunkshot belch",
