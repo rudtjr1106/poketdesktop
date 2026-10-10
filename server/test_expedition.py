@@ -345,6 +345,40 @@ def main_():
         tms.give(uid2, no)
     chk("  기술머신을 다 모은 사람에게는 안 나온다", all(E.roll(rng, uid2, "ruins", 8, "great")[1] is None for _i in range(60)))
 
+    print("\n=== 안내서의 확률표 ===")
+    # 사이트(docs/guide)에 확률표를 올려 두었다. 규칙을 고치고 안내서를 안 고치면 여기서 걸린다.
+    guide_path = os.path.join(os.path.dirname(HERE), "docs", "guide", "index.html")
+    with open(guide_path, encoding="utf-8") as f:
+        guide = f.read()
+    sec = guide[guide.index('<section id="expedition">'):]
+    sec = sec[:sec.index("</section>")]
+
+    def pct(x):
+        return ("%.3f" % (x * 100.0)).rstrip("0").rstrip(".") + "%"
+    bad = []
+    for h in X.HOURS:
+        for g in X.GRADES:
+            cells = "".join('<td class="n">%s</td>' % pct(dict(X.tier_odds(h, g))[t]) for t in X.TIERS)
+            if "<td>%s</td>%s</tr>" % (X.GRADE_KR[g], cells) not in sec:
+                bad.append((h, g, cells))
+    chk("등급 확률 아홉 줄이 게임의 값 그대로다", not bad, bad[:2])
+    bad = []
+    for place in ("forest", "ruins"):
+        for h in X.HOURS:
+            cells = "".join('<td class="n">%s</td>' % pct(X.tm_chance(h, g, place)) for g in X.GRADES)
+            if "<td>%d시간</td>%s</tr>" % (h, cells) not in sec:
+                bad.append((place, h, cells))
+    chk("기술머신 확률 여섯 줄 (유적은 따로)", not bad, bad[:2])
+    counts = "".join("<tr><td>%d시간</td>%s</tr>" % (h, "".join('<td class="n">%d개</td>' % X.item_count(h, g) for g in X.GRADES))
+                     for h in X.HOURS)
+    chk("가져오는 물건의 수", counts in "".join(ln.strip() for ln in sec.splitlines()), counts)
+    names = [cat[i]["kr"] for p in X.PLACES for t, ids in p["special"].items() for i in ids if t != "common"]
+    chk("특산물이 전부 적혀 있고, 특산물 확률도 같다", all(nm in sec for nm in names) and pct(X.SPECIAL_RATE) + " 확률로 특산물" in sec,
+        [nm for nm in names if nm not in sec])
+    hw = float(sum(w for _i, w in pools["held"]))
+    shares = [pct(round(sum(w for i, w in pools["held"] if cat[i]["rarity"] == r_) / hw, 5)) for r_ in X.HELD_RARITIES]
+    chk("지닌 도구의 내용 비중 (%s)" % " · ".join(shares), all(x in sec for x in shares), shares)
+
     print("\n=== 기록 ===")
     for i in range(E.KEEP_DONE + 8):
         o = E.send(uid, pika, "sea", 2, later(days=2, hours=3 * i))
