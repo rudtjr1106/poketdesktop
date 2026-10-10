@@ -815,13 +815,15 @@ def h_endure(bt, move, who, user, target, tw, ev):
 
 
 def h_guard(bt, move, who, user, target, tw, ev):
+    """패스트가드·와이드가드·트릭가드: 그 턴 동안 우리 진영을 지킨다.
+
+    **연달아 써도 실패하지 않는다** (6세대부터, 1.10.4 - 게시판 #175 "와이드가드가 적용이 안 되는
+    것 같다"). 예전에는 방어처럼 두 번째부터 2/3 확률로 실패했다. 다만 패스트가드·와이드가드는
+    방어류의 연속 횟수를 올린다 - 곧바로 방어를 쓰면 그쪽이 실패하기 쉽다 (원작과 같다).
+    """
     k = key(move)
-    streak = user.cond.get("streak", 0) if k != "CRAFTYSHIELD" else 0
-    if streak and bt.rng.random() >= (1.0 / 3) ** streak:
-        user.cond["streak"] = 0
-        return fail(ev, who)
     if k != "CRAFTYSHIELD":
-        user.cond["streak"] = streak + 1
+        user.cond["streak"] = int(user.cond.get("streak", 0)) + 1
     bt.field.side(who)[k.lower()] = True
     say(ev, who, {"QUICKGUARD": "패스트가드가 %s 진영을 지킨다!", "WIDEGUARD": "와이드가드가 %s 진영을 지킨다!",
                   "CRAFTYSHIELD": "트릭가드가 %s 진영을 지킨다!"}[k] % user.name)

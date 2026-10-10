@@ -1246,7 +1246,10 @@ class Battle(object):
         if side.get("quickguard") and pri > 0 and "protect" in fl:
             ev.append({"t": "msg", "who": tw, "text": "패스트가드가 %s 을(를) 지켰다!" % target.name})
             return True
-        if side.get("wideguard") and move.get("target") in (9, 11) and MC.attacks(move):
+        # 와이드가드: 여럿을 한꺼번에 노리는 기술을 막는다 (지진·파도타기·스톤샤워 ...).
+        # 6세대부터는 그런 변화기(울음소리·째려보기·다크홀)도 막는다 (1.10.4).
+        # **한 마리만 노리는 기술은 안 막는다** - 원작이 그렇다.
+        if side.get("wideguard") and move.get("target") in (9, 11):
             ev.append({"t": "msg", "who": tw, "text": "와이드가드가 %s 을(를) 지켰다!" % target.name})
             return True
         if side.get("craftyshield") and not MC.attacks(move):

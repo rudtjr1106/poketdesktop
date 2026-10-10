@@ -129,6 +129,7 @@ class LiveBattle(object):
         self.result = None              # "a" / "b" / "draw"
         self.reason = None              # ko / forfeit / turns
         self.started = False
+        self.mid = None                 # 턴 도중에 멈춘 자리 (유턴으로 물러나는 중 - _pause 를 보라)
 
     # ---------------- 만들기 ----------------
     def _fighter(self, mon):
@@ -342,9 +343,19 @@ class LiveBattle(object):
                      if out and out["mode"] in ("pass", "shed") else None)
             self._switch(w, int(value), ev, carry=carry, trigger=False)
             fresh.append(self._seat(w))
-        if fresh and not self.over:
+        mid, self.mid = self.mid, None
+        if self.over:
+            return ev
+        if fresh:
             self._entry_abilities(ev, only=fresh, fresh=False)
             self.bt._check_faint(ev)      # 압정에 쓰러질 수 있다
+        if mid:
+            # 유턴·볼트체인지로 **턴 도중에** 물러났다. 남은 차례(상대의 기술)와 턴 끝을 마저 돈다.
+            self._wake(mid)
+            if self._run(mid["order"], mid["moves"], mid["actors"], ev):
+                return ev                 # 또 멈췄다 (상대도 유턴을 썼다)
+            return self._end_turn(ev)
+        if fresh:
             self._settle(ev)
         return ev
 
@@ -398,16 +409,82 @@ class LiveBattle(object):
         me.moved_second = bool(order) and order[0] != "me"
         foe.moved_second = bool(order) and order[0] != "foe"
 
-        acting = {"me": self.a.mon, "foe": self.b.mon}
-        for seat in order:
-            user = self.a.mon if seat == "me" else self.b.mon
-            target = self.b.mon if seat == "me" else self.a.mon
-            if user is not acting[seat]:
+        # 이 턴에 움직일 자리. 턴 도중에 바뀐 포켓몬(끌려 나왔거나 물러난 뒤 나온)은 안 움직인다.
+        actors = {"me": self.a.slot, "foe": self.b.slot}
+        if self._run(order, moves, actors, ev):
+            return ev                     # 교체할 포켓몬을 고르는 동안 턴이 멈췄다
+        return self._end_turn(ev)
+
+    def _run(self, order, moves, actors, ev):
+        """남은 차례를 돈다. **사람이 고를 교체가 걸리면 거기서 멈춘다** (True).
+
+        유턴·볼트체인지·퀵턴·배턴터치·막말내뱉기·순간이동은 쓰자마자 물러나는 기술이다 (1.10.4).
+        예전에는 턴이 다 끝난 뒤에 물었다 - 그래서 물러나려던 포켓몬이 상대의 기술을 그대로 맞고,
+        턴 끝의 독·날씨 피해까지 받고 나서야 바뀌었다. 원작에서는 나온 포켓몬이 대신 맞는다.
+        """
+        order = list(order)
+        while order:
+            seat = order.pop(0)
+            p, q = (self.a, self.b) if seat == "me" else (self.b, self.a)
+            if p.slot != actors[seat]:
                 continue                  # 이번 턴에 끌려 나온 쪽은 안 움직인다
+            user, target = p.mon, q.mon
             if not user.alive() or not target.alive():
                 continue
             self.bt._use(seat, user, target, moves[seat], ev)
+            if self._pause(order, moves, actors, ev):
+                return True
+        return False
 
+    def _pause(self, order, moves, actors, ev):
+        """물러나기로 한 쪽이 있으면 턴을 여기서 멈추고 누구를 낼지 묻는다. 멈췄으면 True.
+
+        상대가 다 쓰러졌으면 안 멈춘다 - 판이 끝난다 (턴 끝 정리가 한다).
+        """
+        if self.over:
+            return False
+        out = []
+        for w in ("a", "b"):
+            p = self.side(w)
+            if not p.pending_out:
+                continue
+            if not (p.mon.alive() and self.valid_switches(w)) or self.side(self.other(w)).wiped():
+                p.pending_out = None
+                continue
+            out.append(w)
+        if not out:
+            return False
+        for w in out:
+            p = self.side(w)
+            p.need_switch = True
+            ev.append({"t": "choose", "who": self._seat(w),
+                       "text": "%s 님이 교체할 포켓몬을 고르고 있다..." % p.name})
+        for w in ("a", "b"):
+            self.side(w).choice = None    # 이 턴의 기술은 mid 가 들고 있다. 이제 고를 것은 교체뿐이다
+        # 저장했다 깨어나도 턴이 이어지게, 이 턴에만 있는 것들을 같이 적어 둔다.
+        me, foe = self.a.mon, self.b.mon
+        self.mid = {"order": list(order), "moves": dict(moves), "actors": dict(actors),
+                    "pending": dict(self.bt.pending or {}), "acted": sorted(self.bt.acted or ()),
+                    "flinched": {"me": bool(me.flinched), "foe": bool(foe.flinched)},
+                    "second": {"me": bool(me.moved_second), "foe": bool(foe.moved_second)},
+                    "hurt": {"me": me.hurt, "foe": foe.hurt}}
+        return True
+
+    def _wake(self, mid):
+        """멈췄던 턴의 사정을 되살린다. 그사이 새로 나온 포켓몬은 이 턴에 아무것도 안 했다."""
+        bt = self.bt
+        bt.pending = dict(mid.get("pending") or {})
+        bt.acted = set(mid.get("acted") or ())
+        for seat, p in (("me", self.a), ("foe", self.b)):
+            if p.slot != (mid.get("actors") or {}).get(seat):
+                bt.pending[seat] = None   # 나온 포켓몬은 이 턴에 기술을 안 쓴다 (기습이 본다)
+                continue
+            p.mon.flinched = bool((mid.get("flinched") or {}).get(seat))
+            p.mon.moved_second = bool((mid.get("second") or {}).get(seat))
+            p.mon.hurt = (mid.get("hurt") or {}).get(seat)
+
+    def _end_turn(self, ev):
+        """턴 끝: 독·날씨 같은 것, 쓰러진 쪽 정리, 턴 수 제한."""
         if self.a.mon.alive() or self.b.mon.alive():
             self.bt._end_of_turn(ev)
         self.bt._check_faint(ev)
@@ -458,7 +535,8 @@ class LiveBattle(object):
         if mode == "drag":
             self._switch(who, self.rng.choice(others), ev, dragged=True)
             return True
-        # 누구를 낼지는 **사람이 고른다.** 이 턴이 끝난 뒤에 묻는다.
+        # 누구를 낼지는 **사람이 고른다.** 그 기술이 끝나자마자 묻는다 (_pause) - 턴은 거기서
+        # 멈췄다가, 고른 포켓몬이 나온 뒤에 이어진다.
         p.pending_out = {"mode": mode, "state": state, "key": key}
         ev.append({"t": "msg", "who": seat,
                    "text": "%s 은(는) 돌아갈 준비를 한다!" % p.mon.name})
@@ -652,6 +730,7 @@ class LiveBattle(object):
                 "a": self._dump_side(self.a), "b": self._dump_side(self.b),
                 "field": self.field.dump(),
                 "keystone": dict(self.keystone), "megaDone": sorted(self.mega_done),
+                "mid": self.mid,
                 "rng": [st[0], list(st[1]), st[2]]}
 
     @classmethod
@@ -677,4 +756,5 @@ class LiveBattle(object):
         self.result = d.get("result")
         self.reason = d.get("reason")
         self.started = bool(d.get("started"))
+        self.mid = d.get("mid")           # 턴 도중에 멈춘 자리 (유턴으로 물러나는 중)
         return self

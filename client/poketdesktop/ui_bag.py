@@ -39,11 +39,6 @@ LIST_W = 292            # 왼쪽 도구 목록 폭
 ITEM_H = U.h(28)        # 도구 한 줄 높이 (글꼴 따라 늘어난다)
 MON_H = U.h(34)         # 포켓몬 한 줄 높이
 THUMB = 22              # 목록에 놓는 도트 높이 (다른 창과 겹치지 않는 값)
-# 목록을 나눠 만드는 크기(U.Chunked). 가방의 줄은 위젯이 8~9개로 무겁고
-# 목록 둘이 같이 자라서, 30줄씩 만들면 묶음 하나에 0.5초씩 멈췄다.
-# 첫 묶음은 첫 화면만큼(도구 스무 줄 남짓, 포켓몬 열몇 줄)이면 된다.
-FIRST_ROWS = 20
-CHUNK_ROWS = 15
 
 EV_STAT_MAX = 252       # 서버 config 와 같은 값 (스탯 하나당)
 EV_TOTAL_MAX = 510      # 서버 config 와 같은 값 (여섯 개 합계)
@@ -245,55 +240,98 @@ def _scroller(parent, bg):
     return cv, inner
 
 
+SEP = "#161a24"          # 줄 사이의 금
+HEAD_H = U.h(26)
+
+
+class HeadRow(object):
+    """도구 목록의 분류 머리줄 ('지닌 도구 · 12종'). 아래에 금 하나."""
+
+    def __init__(self, parent):
+        self.f = tk.Frame(parent, bg=U.LINE)
+        self.body = tk.Frame(self.f, bg=U.INK)
+        self.body.place(x=0, y=0, relwidth=1.0, height=HEAD_H)
+        self.mark = tk.Frame(self.body, bg=U.ACCENT, width=3, height=U.h(11))
+        self.mark.place(x=12, rely=0.5, anchor="w")
+        self.label = tk.Label(self.body, text="", bg=U.INK, fg=U.FG_DIM, font=U.FONT_LABEL)
+        self.label.place(x=21, rely=0.5, anchor="w")
+
+    def bind(self, data):
+        cat, n = data
+        self.mark.configure(bg=CAT_COLOR.get(cat, U.ACCENT))
+        self.label.configure(text="%s · %d종" % (CAT_KR.get(cat, cat), n))
+
+
 class ItemRow(object):
-    """왼쪽 도구 목록 한 줄 — 분류 색점 · 이름 · 개수."""
+    """왼쪽 도구 목록 한 줄 — 그림(없으면 분류 색점) · 이름 · 개수. 아래에 금 하나.
 
-    def __init__(self, parent, item, count, on_pick, selected=False):
-        self.item = item
-        self.on_pick = on_pick
+    **줄 하나가 여러 도구를 돌아가며 보여 준다** (U.VirtualList - 화면에 보이는 만큼만 만든다).
+    무엇을 보여 줄지는 bind 가 정하고, 개수와 고름은 가방 창(win)의 값을 읽는다.
+    """
+
+    def __init__(self, parent, win):
+        self.win = win
+        self.item = None
         self.selected = False
-        self.usable = (item.get("effect") or {}).get("kind") in USABLE
-
-        self.f = tk.Frame(parent, bg=ROW_BG, height=ITEM_H, cursor="hand2")
-        self.f.pack_propagate(False)
-        self.mark = tk.Frame(self.f, bg=ROW_BG, width=3)
+        self.usable = False
+        self.f = tk.Frame(parent, bg=SEP)                # 아래 한 줄이 금으로 남는다
+        self.body = tk.Frame(self.f, bg=ROW_BG, cursor="hand2")
+        self.body.place(x=0, y=0, relwidth=1.0, height=ITEM_H)
+        self.mark = tk.Frame(self.body, bg=ROW_BG, width=3)
         self.mark.place(x=0, y=0, relheight=1.0)
-        # 도구 그림. 아직 못 받았으면 분류 색점으로 대신한다.
-        ph = item_icons.photo(item["id"], 20)
-        if ph is not None:
-            self.dot = tk.Label(self.f, image=ph, bg=ROW_BG, bd=0)
-            self.dot.image = ph
-            self.dot.place(x=8, rely=0.5, anchor="w")
-        else:
-            self.dot = tk.Frame(self.f, bg=CAT_COLOR.get(item.get("cat"), U.BG3),
-                                width=5, height=U.h(5))
-            self.dot.place(x=13, rely=0.5, anchor="w")
-        self.name = tk.Label(self.f, text=item["kr"], bg=ROW_BG,
-                             fg=U.FG if self.usable else U.FG_FAINT,
-                             font=U.FONT_S, anchor="w")
+        # 도구 그림. 아직 못 받았으면 분류 색점으로 대신한다 (bind 가 둘 중 하나를 놓는다).
+        self.icon = tk.Label(self.body, bg=ROW_BG, bd=0)
+        self.dot = tk.Frame(self.body, bg=U.BG3, width=5, height=U.h(5))
+        self.name = tk.Label(self.body, text="", bg=ROW_BG, fg=U.FG, font=U.FONT_S, anchor="w")
         self.name.place(x=32, rely=0.5, anchor="w")
-        self.count = tk.Label(self.f, text="%d개" % count, bg=ROW_BG,
-                              fg=U.FG_DIM if self.usable else U.FG_FAINT,
-                              font=U.FONT_XS, anchor="e")
+        self.count = tk.Label(self.body, text="", bg=ROW_BG, fg=U.FG_DIM, font=U.FONT_XS, anchor="e")
         self.count.place(relx=1.0, x=-12, rely=0.5, anchor="e")
-
-        self.cells = [self.name, self.count, self.dot]
-        for w in [self.f] + self.cells:
-            w.bind("<Button-1>", lambda e: self.on_pick(self.item["id"]))
+        self._art = None                                 # 지금 놓인 것: "icon" | "dot"
+        for w in (self.body, self.icon, self.dot, self.name, self.count):
+            w.bind("<Button-1>", self._click)
             w.bind("<Enter>", self._in)
             w.bind("<Leave>", self._out)
-        if selected:
-            self.set_selected(True)      # 만들 때 칠한다 (나눠 만드는 줄)
 
-    def pack(self, **kw):
-        self.f.pack(fill="x", **kw)
-        return self
+    def bind(self, item):
+        self.item = item
+        self.usable = (item.get("effect") or {}).get("kind") in USABLE
+        ph = item_icons.photo(item["id"], 20)
+        if ph is not None:
+            self.icon.configure(image=ph)
+            self.icon.image = ph
+            if self._art != "icon":
+                self.dot.place_forget()
+                self.icon.place(x=8, rely=0.5, anchor="w")
+                self._art = "icon"
+        else:
+            self.dot.configure(bg=CAT_COLOR.get(item.get("cat"), U.BG3))
+            if self._art != "dot":
+                self.icon.place_forget()
+                self.dot.place(x=13, rely=0.5, anchor="w")
+                self._art = "dot"
+        self.name.configure(text=item["kr"])
+        self.count.configure(text="%d개" % self.win.bag.get(item["id"], 0),
+                             fg=U.FG_DIM if self.usable else U.FG_FAINT)
+        self.selected = (item["id"] == self.win.item_id)
+        self._look()
+
+    def _click(self, _e):
+        if self.item is not None:
+            self.win.pick_item(self.item["id"])
 
     def _paint(self, bg, mark):
-        self.f.configure(bg=bg)
+        self.body.configure(bg=bg)
         self.mark.configure(bg=mark)
-        for w in (self.name, self.count):
+        for w in (self.name, self.count, self.icon):
             w.configure(bg=bg)
+
+    def _look(self):
+        if self.selected:
+            self._paint(SEL_BG, U.ACCENT)
+            self.name.configure(fg=U.ACCENT_TEXT, font=U.FONT_B)
+        else:
+            self._paint(ROW_BG, ROW_BG)
+            self.name.configure(fg=U.FG if self.usable else U.FG_FAINT, font=U.FONT_S)
 
     def _in(self, _e):
         if not self.selected:
@@ -303,107 +341,76 @@ class ItemRow(object):
         if not self.selected:
             self._paint(ROW_BG, ROW_BG)
 
-    def set_selected(self, on):
-        self.selected = on
-        if on:
-            self._paint(SEL_BG, U.ACCENT)
-            self.name.configure(fg=U.ACCENT_TEXT, font=U.FONT_B)
-        else:
-            self._paint(ROW_BG, ROW_BG)
-            self.name.configure(fg=U.FG if self.usable else U.FG_FAINT,
-                                font=U.FONT_S)
-
 
 class MonRow(object):
-    """'누구에게 쓸까?' 목록 한 줄 — 왼쪽에 **실제 도트**를 작게 놓는다.
+    """'누구에게 쓸까?' 목록 한 줄 — 왼쪽에 **실제 도트**를 작게 놓는다. 아래에 금 하나.
 
-    도트 자리는 그림이 오기 전에도 폭이 흔들리지 않게 고정 크기 액자에 넣는다.
+    도트 자리는 그림이 없어도 폭이 흔들리지 않게 고정 크기 액자에 넣는다.
 
-    state=(good, blocked, note, color) 와 selected 를 주면 **만들 때 칠한다.**
-    목록을 나눠 만들기 때문에, 다 만든 뒤 모든 줄을 다시 칠하면 줄 수만큼
-    도로 멈춘다.
+    **줄 하나가 여러 포켓몬을 돌아가며 보여 준다** (U.VirtualList). bind 가 그 포켓몬의 이름·레벨·
+    도트와, 가방 창(win)이 들고 있는 것 - 고른 도구 기준의 상태(_states), 고름(mon_id) - 을 칠한다.
     """
 
-    def __init__(self, parent, mon, on_pick, state=None, selected=False):
-        self.mon = mon
-        self.on_pick = on_pick
+    def __init__(self, parent, win):
+        self.win = win
+        self.mon = None
         self.selected = False
         self.good = False
         self.blocked = False
         self.note_text = ""
         self.photo = None
-        # 아래에서 만든 모습 그대로의 상태. set_state 가 바뀐 것만 칠하려고 쓴다.
-        self._state = (False, False, "", U.FG_FAINT)
-        info = mon.get("info") or {}
-
-        self.f = tk.Frame(parent, bg=ROW_BG, height=MON_H, cursor="hand2")
-        self.f.pack_propagate(False)
-        self.mark = tk.Frame(self.f, bg=ROW_BG, width=3)
+        self.f = tk.Frame(parent, bg=SEP)                # 아래 한 줄이 금으로 남는다
+        self.body = tk.Frame(self.f, bg=ROW_BG, cursor="hand2")
+        self.body.place(x=0, y=0, relwidth=1.0, height=MON_H)
+        self.body.pack_propagate(False)
+        self.mark = tk.Frame(self.body, bg=ROW_BG, width=3)
         self.mark.place(x=0, y=0, relheight=1.0)
 
-        self.frame_art = tk.Frame(self.f, bg=ROW_BG, width=30, height=MON_H)
+        self.frame_art = tk.Frame(self.body, bg=ROW_BG, width=30, height=MON_H)
         self.frame_art.pack_propagate(False)
         self.frame_art.pack(side="left", padx=(9, 0))
         self.art = tk.Label(self.frame_art, bg=ROW_BG)
         self.art.pack(expand=True)
-
-        name = info.get("name", mon.get("species", "?"))
-        if mon.get("shiny"):
-            name = "★ " + name
-        self.name = tk.Label(self.f, text=name, bg=ROW_BG,
-                             fg=U.SHINY if mon.get("shiny") else U.FG,
-                             font=U.FONT_S, anchor="w", width=13)
+        self.name = tk.Label(self.body, text="", bg=ROW_BG, fg=U.FG, font=U.FONT_S, anchor="w", width=13)
         self.name.pack(side="left", padx=(7, 0))
-        self.lv = tk.Label(self.f, text="Lv.%d" % mon.get("level", 0), bg=ROW_BG,
-                           fg=U.FG_DIM, font=U.FONT_XS, anchor="w", width=6)
+        self.lv = tk.Label(self.body, text="", bg=ROW_BG, fg=U.FG_DIM, font=U.FONT_XS, anchor="w", width=6)
         self.lv.pack(side="left")
-        sub = info.get("species", "") if info.get("name") != info.get("species") else ""
-        if mon.get("onDesktop"):
-            sub = (sub + " · 따라다님").strip(" ·")
-        self.sub = tk.Label(self.f, text=sub, bg=ROW_BG, fg=U.FG_FAINT,
-                            font=U.FONT_XS, anchor="w")
+        self.sub = tk.Label(self.body, text="", bg=ROW_BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w")
         self.sub.pack(side="left", padx=(4, 0))
-        self.note = tk.Label(self.f, text="", bg=ROW_BG, fg=U.FG_FAINT,
-                             font=U.FONT_XS, anchor="e")
+        self.note = tk.Label(self.body, text="", bg=ROW_BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="e")
         self.note.pack(side="right", padx=(6, 12))
 
-        self.cells = [self.frame_art, self.art, self.name, self.lv, self.sub,
-                      self.note]
-        for w in [self.f] + self.cells:
-            w.bind("<Button-1>", lambda e: self.on_pick(self.mon["id"]))
+        self.cells = [self.frame_art, self.art, self.name, self.lv, self.sub, self.note]
+        for w in [self.body] + self.cells:
+            w.bind("<Button-1>", self._click)
             w.bind("<Enter>", self._in)
             w.bind("<Leave>", self._out)
 
-        self.selected = bool(selected)
-        if state is not None and tuple(state) != self._state:
-            self.set_state(*state)           # 안에서 다시 칠한다
-        elif self.selected:
-            self.repaint()
-
-    def pack(self, **kw):
-        self.f.pack(fill="x", **kw)
-        return self
-
-    def set_photo(self, photo):
-        """도트를 올린다. 참조를 들고 있지 않으면 그림이 사라진다."""
-        self.photo = photo
-        try:
-            self.art.configure(image=photo)
-        except tk.TclError:
-            pass
-
-    def set_state(self, good, blocked, note, color):
-        # 그대로면 안 칠한다. 도구를 고를 때마다 모든 줄에 부르는데,
-        # 대부분의 줄은 바뀌는 게 없다(진화의 돌이면 거의 다 '해당 없음').
-        if (good, blocked, note, color) == self._state:
-            return
-        self._state = (good, blocked, note, color)
-        self.good = good
-        self.blocked = blocked
-        self.note_text = note
+    def bind(self, mon):
+        self.mon = mon
+        info = mon.get("info") or {}
+        name = info.get("name", mon.get("species", "?"))
+        if mon.get("shiny"):
+            name = "★ " + name
+        self.name.configure(text=name)
+        self.lv.configure(text="Lv.%d" % mon.get("level", 0))
+        sub = info.get("species", "") if info.get("name") != info.get("species") else ""
+        if mon.get("onDesktop"):
+            sub = (sub + " · 따라다님").strip(" ·")
+        self.sub.configure(text=sub)
+        # 도트. 참조를 들고 있지 않으면 그림이 사라진다. 없으면 지난 포켓몬의 것을 걷는다.
+        self.photo = self.win.photos.get(mon["id"])
+        self.art.configure(image=self.photo if self.photo is not None else "")
+        good, blocked, note, color = self.win._states.get(mon["id"]) or (False, False, "", U.FG_FAINT)
+        self.good, self.blocked, self.note_text = good, blocked, note
         self.note.configure(text=note, fg=color)
-        self.f.configure(cursor="" if blocked else "hand2")
+        self.body.configure(cursor="" if blocked else "hand2")
+        self.selected = (mon["id"] == self.win.mon_id)
         self.repaint()
+
+    def _click(self, _e):
+        if self.mon is not None:
+            self.win.pick_mon(self.mon["id"])
 
     def _bg(self):
         if self.selected:
@@ -412,20 +419,20 @@ class MonRow(object):
             return GOOD_BG, U.GOOD
         return ROW_BG, ROW_BG
 
+    def _fill(self, bg):
+        self.body.configure(bg=bg)
+        for w in self.cells:
+            w.configure(bg=bg)
+
     def repaint(self):
         bg, mark = self._bg()
-        self.f.configure(bg=bg)
+        self._fill(bg)
         self.mark.configure(bg=mark)
-        for w in self.cells:
-            try:
-                w.configure(bg=bg)
-            except tk.TclError:
-                pass
         if self.blocked:
             fg = U.FG_FAINT
         elif self.selected:
             fg = U.ACCENT_TEXT
-        elif self.mon.get("shiny"):
+        elif self.mon is not None and self.mon.get("shiny"):
             fg = U.SHINY
         else:
             fg = U.FG
@@ -433,21 +440,11 @@ class MonRow(object):
 
     def _in(self, _e):
         if not self.selected:
-            bg = U.BG2 if not self.good else "#1b2b21"
-            self.f.configure(bg=bg)
-            for w in self.cells:
-                try:
-                    w.configure(bg=bg)
-                except tk.TclError:
-                    pass
+            self._fill(U.BG2 if not self.good else "#1b2b21")
 
     def _out(self, _e):
         if not self.selected:
             self.repaint()
-
-    def set_selected(self, on):
-        self.selected = on
-        self.repaint()
 
 
 # ---------------------------------------------------------------- 가방 창
@@ -486,8 +483,6 @@ class BagWindow(object):
         self.money = 0
         self.mons = []
         self.photos = {}         # {포켓몬id: PhotoImage} — 한 번 만들면 계속 쓴다
-        self.item_rows = {}
-        self.mon_rows = {}
         self.item_id = None
         self.mon_id = None
         self.stat = None         # 병뚜껑으로 단련할 능력
@@ -496,8 +491,6 @@ class BagWindow(object):
         self._wait = None        # 여는 중 표시
         self._states = {}        # {포켓몬id: (good, blocked, note, color)} — 고른 도구 기준
         self._mon_ids = set()
-        self._items_job = None   # 줄을 나눠 만드는 일 (U.Chunked)
-        self._mons_job = None
 
         # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
         self.win = U.panel(parent, root, "포스크탑 — 가방",
@@ -515,8 +508,6 @@ class BagWindow(object):
         self._items_pane(body)
         self._detail_pane(body)
 
-        U.scrollable(self.item_canvas, 60)
-        U.scrollable(self.mon_canvas, 60)
         self.reload()
 
     # ---------------- 머리 ----------------
@@ -558,11 +549,18 @@ class BagWindow(object):
         U.marker_label(head, "가진 도구", bg=U.INK).pack(side="left", padx=12,
                                                      pady=6)
         tk.Frame(wrap, bg=U.LINE, height=U.h(2)).pack(fill="x")
-        self.item_canvas, self.item_inner = _scroller(wrap, U.BG)
-        # 줄은 틀 하나에 담는다. 다시 불러올 때 틀째 숨기고 조금씩 부수려고
-        # (U.retire). 틀은 바탕색이 같아 화면에는 차이가 없다.
-        self.item_list = tk.Frame(self.item_inner, bg=U.BG)
-        self.item_list.pack(fill="x")
+        # **보이는 줄만 만든다** (U.VirtualList). 도구가 300종이어도 위젯은 화면만큼이다 -
+        # 예전에는 줄을 전부 만들어서 열 때와 도구를 쓸 때마다 몇 초씩 끊겼다.
+        self.item_vl = U.VirtualList(wrap, {
+            "head": (HEAD_H + U.h(1), HeadRow),
+            "item": (ITEM_H + U.h(1), lambda p: ItemRow(p, self))}, bg=U.BG)
+        self.item_vl.pack(fill="both", expand=True)
+        self.item_canvas = self.item_vl.canvas
+        self.item_empty = tk.Frame(wrap, bg=U.BG)        # 가방이 비었을 때 목록 대신
+        tk.Label(self.item_empty, text="가방이 비어 있다.", bg=U.BG,
+                 fg=U.FG_DIM, font=U.FONT_S).pack(pady=(34, 4))
+        tk.Label(self.item_empty, text="야생 포켓몬을 잡거나 배틀에서\n도구를 주울 수 있다.",
+                 bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, justify="center").pack()
 
     # ---------------- 오른쪽: 설명과 대상 ----------------
     def _detail_pane(self, parent):
@@ -601,10 +599,13 @@ class BagWindow(object):
 
         frame = U.framed(p, bg=ROW_BG, border=U.LINE)
         frame.pack(fill="both", expand=True)
-        self.mon_canvas, self.mon_inner = _scroller(frame, ROW_BG)
-        self.mon_list = tk.Frame(self.mon_inner, bg=ROW_BG)
-        self.mon_list.pack(fill="both", expand=True)
-        self.mon_note = tk.Label(self.mon_inner, text="", bg=ROW_BG,
+        # 여기도 보이는 줄만 만든다. 포켓몬이 수백 마리면 줄을 다 만든 목록은 굴릴 때마다 끊겼다.
+        self.mon_vl = U.VirtualList(frame, {"mon": (MON_H + U.h(1), lambda p: MonRow(p, self))},
+                                    bg=ROW_BG)
+        self.mon_vl.pack(fill="both", expand=True)
+        self.mon_canvas = self.mon_vl.canvas
+        self._mon_list_on = True                         # 목록이 담겨 있나 (아니면 안내 글이 그 자리에)
+        self.mon_note = tk.Label(frame, text="", bg=ROW_BG,
                                  fg=U.FG_FAINT, font=U.FONT_S, justify="center",
                                  pady=34)
 
@@ -819,105 +820,64 @@ class BagWindow(object):
         return owned
 
     def _fill_items(self):
-        """왼쪽 도구 목록을 새로 만든다.
+        """왼쪽 도구 목록을 새로 채운다: 분류마다 머리줄 하나, 그 아래 가진 도구들.
 
-        **나눠 만든다(U.Chunked).** 첫 화면만큼 먼저 만들고 나머지는 조금씩
-        이어 만든다. 줄은 만들 때 고름까지 칠한다 - self.item_id 가 그 기준이다.
+        줄을 만들지 않는다 - 무엇이 몇 번째 줄인지만 넘긴다 (U.VirtualList). 보던 자리는 그대로다.
         """
-        if self._items_job is not None:
-            self._items_job.cancel()     # 옛 목록의 남은 줄이 뒤에 붙지 않게
-            self._items_job = None
-        old = self.item_list
-        if old.winfo_children():
-            # 옛 줄은 틀째 숨기고 조금씩 부순다. 수백 개를 한 번에 부수면
-            # 그것만으로 0.8초 멈췄다(쓰기·팔기 뒤에 다시 불러올 때).
-            self.item_list = tk.Frame(self.item_inner, bg=U.BG)
-            self.item_list.pack(fill="x", before=old)
-            U.retire(old)
-        box = self.item_list
-        self.item_rows = {}
         owned = self._owned()
         if not owned:
-            tk.Label(box, text="가방이 비어 있다.", bg=U.BG,
-                     fg=U.FG_DIM, font=U.FONT_S).pack(pady=(34, 4))
-            tk.Label(box,
-                     text="야생 포켓몬을 잡거나 배틀에서\n도구를 주울 수 있다.",
-                     bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS,
-                     justify="center").pack()
+            self.item_vl.set([])
+            self.item_vl.holder.pack_forget()
+            self.item_empty.pack(fill="both", expand=True)
             return
+        self.item_empty.pack_forget()
+        self.item_vl.pack(fill="both", expand=True)
         counts = {}
         for x in owned:
             counts[x["cat"]] = counts.get(x["cat"], 0) + 1
-        last = {"cat": None}
-
-        def build(it):
-            if it["cat"] != last["cat"]:
-                cat = last["cat"] = it["cat"]
-                strip = tk.Frame(box, bg=U.INK, height=U.h(26))
-                strip.pack(fill="x")
-                strip.pack_propagate(False)
-                U.marker_label(strip, "%s · %d종" % (CAT_KR.get(cat, cat),
-                                                    counts[cat]),
-                               bg=U.INK,
-                               mark=CAT_COLOR.get(cat, U.ACCENT)).pack(
-                    side="left", padx=12, pady=6)
-                tk.Frame(box, bg=U.LINE, height=U.h(1)).pack(fill="x")
-            self.item_rows[it["id"]] = ItemRow(
-                box, it, self.bag.get(it["id"], 0), self.pick_item,
-                selected=(it["id"] == self.item_id)).pack()
-            tk.Frame(box, bg="#161a24", height=U.h(1)).pack(fill="x")
-
-        self._items_job = U.Chunked(self.win, owned, build,
-                                    first=FIRST_ROWS, size=CHUNK_ROWS)
+        entries, last = [], None
+        for it in owned:
+            if it["cat"] != last:
+                last = it["cat"]
+                entries.append(("head", (last, counts[last])))
+            entries.append(("item", it))
+        self.item_vl.set(entries)
 
     def _fill_mons(self):
-        """'누구에게 쓸까?' 목록을 새로 만든다. 나눠 만든다.
-
-        줄은 만들 때 그 시점의 고른 도구 기준 상태(self._states)와 고름
-        (self.mon_id)으로 칠한다. 첫 화면만큼은 곧이어 pick_item 이 맞춰
-        칠하고, 나중에 만들어지는 줄은 이미 맞춰진 상태로 태어난다.
-        """
-        if self._mons_job is not None:
-            self._mons_job.cancel()
-            self._mons_job = None
-        old = self.mon_list
-        if old.winfo_children():
-            # 도구 목록과 같다 - 틀째 숨기고 조금씩 부순다. 못 쓰는 도구를
-            # 골라 틀이 빠져 있었으면 새 틀도 빠진 채로 둔다(_show_targets 가 담는다).
-            self.mon_list = tk.Frame(self.mon_inner, bg=ROW_BG)
-            if old.winfo_manager() == "pack":
-                self.mon_list.pack(fill="both", expand=True, before=old)
-            U.retire(old)
-        self.mon_rows = {}
+        """'누구에게 쓸까?' 목록을 새로 채운다. 줄은 화면에 걸칠 때 그 시점의 상태로 칠해진다."""
+        self.mon_vl.set([("mon", m) for m in self.mons])
         if not self.mons:
-            tk.Label(self.mon_list, text="가진 포켓몬이 없다.", bg=ROW_BG,
-                     fg=U.FG_FAINT, font=U.FONT_S, pady=30).pack()
+            self._mon_list(False, "가진 포켓몬이 없다.")
+
+    def _mon_list(self, on, note=""):
+        """대상 목록을 보이거나, 그 자리에 안내 글을 놓는다."""
+        if on:
+            self.mon_note.pack_forget()
+            if not self._mon_list_on:
+                self.mon_vl.pack(fill="both", expand=True)
+                self._mon_list_on = True
             return
+        if self._mon_list_on:
+            self.mon_vl.holder.pack_forget()
+            self._mon_list_on = False
+        self.mon_note.configure(text=note)
+        self.mon_note.pack(fill="both", expand=True)
 
-        def build(m):
-            row = MonRow(self.mon_list, m, self.pick_mon,
-                         state=self._states.get(m["id"]),
-                         selected=(m["id"] == self.mon_id)).pack()
-            ph = self.photos.get(m["id"])
-            if ph:
-                row.set_photo(ph)
-            self.mon_rows[m["id"]] = row
-            tk.Frame(self.mon_list, bg="#161a24", height=U.h(1)).pack(fill="x")
+    def shown_items(self):
+        """화면에 걸친 도구 줄들 [(도구 id, 줄)] (검사용)."""
+        return [(row.item["id"], row) for _i, row in self.item_vl.shown() if isinstance(row, ItemRow)]
 
-        self._mons_job = U.Chunked(self.win, self.mons, build,
-                                   first=FIRST_ROWS, size=CHUNK_ROWS)
+    def shown_mons(self):
+        """화면에 걸친 포켓몬 줄들 [(포켓몬 id, 줄)] (검사용)."""
+        return [(row.mon["id"], row) for _i, row in self.mon_vl.shown()]
 
     # ---------------- 고르기 ----------------
     def pick_item(self, item_id):
         prev = self.item_id
         self.item_id = item_id
         self.stat = None
-        # 바뀐 두 줄만 칠한다. 고른 줄은 늘 하나라 나머지는 이미 안 고른
-        # 모습이다. 아직 안 만든 줄은 만들 때 self.item_id 를 보고 칠한다.
-        for i in set((prev, item_id)):
-            r = self.item_rows.get(i)
-            if r is not None:
-                r.set_selected(i == item_id)
+        if prev != item_id:
+            self.item_vl.refresh()           # 보이는 줄만 다시 칠한다 (고름은 줄이 self.item_id 를 본다)
         it = self.current_item()
         if not it:
             self.stat_needed = False
@@ -963,30 +923,20 @@ class BagWindow(object):
         usable = bool(it) and kind in USABLE
         if usable and kind in NO_TARGET:
             # 대상이 없다. 목록 자리에 무엇을 하는 도구인지만 적는다.
-            self.mon_list.pack_forget()
-            self.mon_note.configure(text=natural(item_desc(it)))
-            self.mon_note.pack(fill="both", expand=True)
-            prev, self.mon_id = self.mon_id, None
-            row = self.mon_rows.get(prev)
-            if row is not None:
-                row.set_selected(False)
+            self._mon_list(False, natural(item_desc(it)))
+            self.mon_id = None
             return
         if not usable:
-            self.mon_list.pack_forget()
-            self.mon_note.configure(
-                text=natural(unusable_note(it)) if it else
-                "도구를 고르면 쓸 수 있는 포켓몬을 보여준다.")
-            self.mon_note.pack(fill="both", expand=True)
-            prev, self.mon_id = self.mon_id, None
-            row = self.mon_rows.get(prev)
-            if row is not None:
-                row.set_selected(False)
+            self._mon_list(False, natural(unusable_note(it)) if it else
+                           "도구를 고르면 쓸 수 있는 포켓몬을 보여준다.")
+            self.mon_id = None
             return
-        self.mon_note.pack_forget()
-        self.mon_list.pack(fill="both", expand=True)
+        if not self.mons:
+            return self._mon_list(False, "가진 포켓몬이 없다.")
+        self._mon_list(True)
 
-        # 판정은 **줄이 아니라 데이터로** 한다. 줄은 나눠 만드는 중이라
-        # 아직 없는 줄이 있을 수 있다. 없는 줄은 만들 때 이 상태로 칠해진다.
+        # 판정은 **줄이 아니라 데이터로** 한다. 줄은 화면에 보이는 것만 있다 -
+        # 나머지는 굴러서 화면에 걸칠 때 이 상태로 칠해진다.
         self._states = {}
         first_ok = None
         for m in self.mons:
@@ -994,8 +944,7 @@ class BagWindow(object):
             self._states[m["id"]] = (good, blocked, note, color)
             if not blocked and (first_ok is None or (good and not self._is_good(first_ok))):
                 first_ok = m["id"]
-        for pid, row in self.mon_rows.items():
-            row.set_state(*self._states[pid])
+        self.mon_vl.refresh()
         # 고르고 있던 포켓몬이 이 도구로는 못 쓰는 대상이면 옮겨 준다
         cur = self._states.get(self.mon_id)
         if cur is None or cur[1]:
@@ -1090,11 +1039,8 @@ class BagWindow(object):
             return
         prev = self.mon_id
         self.mon_id = pid if pid in self._mon_ids else None
-        # 바뀐 두 줄만 칠한다 (pick_item 과 같은 까닭).
-        for i in set((prev, self.mon_id)):
-            r = self.mon_rows.get(i)
-            if r is not None:
-                r.set_selected(i == self.mon_id)
+        if prev != self.mon_id:
+            self.mon_vl.refresh()            # 보이는 줄만 다시 칠한다
         self.stat = None
         self._refresh_stats()
         self._refresh_evs()
@@ -1355,9 +1301,6 @@ class BagWindow(object):
     # ---------------- 끝내기 ----------------
     def close(self):
         self.alive = False
-        for job in (self._items_job, self._mons_job):
-            if job is not None:
-                job.cancel()
         if getattr(self.app, "bag_window", None) is self:
             self.app.bag_window = None
         try:

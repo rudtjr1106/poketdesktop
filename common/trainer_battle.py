@@ -171,13 +171,14 @@ class TrainerBattle(object):
         self.over = False
         self.result = None                     # won / lost / draw / forfeit
         self.need_switch = False
+        self.mid = None                 # 턴 도중에 멈춘 자리 (유턴으로 물러나는 중 - _pause 를 보라)
         self.pending_entry = False             # 상대가 내보낸 뒤 특성 발동을 미뤄 둔 상태
         self.foe_switched_last = False
         self.seen = {0}                        # 한 번이라도 나온 상대 자리
         self.started = False
         # 누가 누구를 쓰러뜨렸나. 서버가 경험치를 줄 때 본다 (내 자리가 받는다).
         self.kos = []
-        # 내 포켓몬이 유턴·배턴터치·순간이동으로 물러난다 - 턴이 끝나면 사람이 고른다
+        # 내 포켓몬이 유턴·배턴터치·순간이동으로 물러난다 - 그 기술이 끝나자마자 사람이 고른다 (_pause)
         self.pending_out = None
 
     # ---------------- 만들기 ----------------
@@ -313,7 +314,8 @@ class TrainerBattle(object):
             self._switch("foe", best, ev, carry=carry)
             self.foe_switched_last = True
             return True
-        # 내 포켓몬: 누구를 낼지 사람이 고른다. 이 턴이 끝난 뒤에 묻는다.
+        # 내 포켓몬: 누구를 낼지 사람이 고른다. **그 기술이 끝나자마자 묻는다** (_pause) -
+        # 턴은 거기서 멈췄다가, 고른 포켓몬이 나온 뒤에 이어진다.
         self.pending_out = {"mode": mode, "state": state, "key": key}
         ev.append({"t": "msg", "who": "me", "text": "%s 은(는) 돌아갈 준비를 한다!" % self.me.name})
         return True
@@ -622,10 +624,19 @@ class TrainerBattle(object):
             self.need_switch = False
             out, self.pending_out = self.pending_out, None
             carry = {"mode": out["mode"], "state": out.get("state")} if out and out["mode"] in ("pass", "shed") else None
+            mid, self.mid = self.mid, None
             self._switch("me", value, ev, trigger=not self.pending_entry, fresh=False, carry=carry)
             if self.pending_entry:
                 self.pending_entry = False
                 self._entry_abilities(ev, fresh=False)
+            if mid:
+                # 유턴·볼트체인지로 턴 도중에 물러났다. 남은 차례(상대의 기술)와 턴 끝을 마저 돈다.
+                self._wake(mid)
+                if not self.me.alive():             # 나오자마자 압정에 쓰러졌다
+                    self.bt._check_faint(ev)
+                if self._run(mid["order"], mid["moves"], mid["actors"], ev):
+                    return ev                       # 또 멈췄다 (나온 포켓몬이 위기회피로 물러난다)
+                return self._end_turn(ev)
             if not self.me.alive():                 # 압정에 쓰러졌다
                 self.bt._check_faint(ev)
                 self._settle(ev)
@@ -696,17 +707,73 @@ class TrainerBattle(object):
         me.moved_second = bool(order) and order[0] != "me"
         foe.moved_second = bool(order) and order[0] != "foe"
 
-        acting = {"me": self.me, "foe": self.foe}
-        for who in order:
+        # 이 턴에 움직일 자리. 턴 도중에 바뀐 포켓몬(끌려 나왔거나 물러난 뒤 나온)은 안 움직인다.
+        actors = {"me": self.mi, "foe": self.fi}
+        if self._run(order, {"me": me_move, "foe": foe_move}, actors, ev):
+            return ev                           # 교체할 포켓몬을 고르는 동안 턴이 멈췄다
+        return self._end_turn(ev)
+
+    def _run(self, order, moves, actors, ev):
+        """남은 차례를 돈다. **사람이 고를 교체가 걸리면 거기서 멈춘다** (True).
+
+        유턴·볼트체인지·퀵턴·배턴터치·막말내뱉기·순간이동은 쓰자마자 물러나는 기술이다 (1.10.4).
+        예전에는 턴이 다 끝난 뒤에 물었다 - 그래서 물러나려던 포켓몬이 상대의 기술을 그대로 맞고,
+        턴 끝의 독·날씨 피해까지 받고 나서야 바뀌었다. 원작에서는 나온 포켓몬이 대신 맞는다.
+        """
+        bt = self.bt
+        order = list(order)
+        while order:
+            who = order.pop(0)
             user, target = (self.me, self.foe) if who == "me" else (self.foe, self.me)
-            if user is not acting[who]:
+            if (self.mi if who == "me" else self.fi) != actors[who]:
                 continue                        # 이번 턴에 끌려 나온 포켓몬은 움직이지 않는다
             if not user.alive() or not target.alive():
                 continue
-            bt._use(who, user, target, me_move if who == "me" else foe_move, ev)
+            bt._use(who, user, target, moves[who], ev)
             if not self.foe.alive() and not any(k["foe"] == self.fi for k in self.kos):
                 self.kos.append({"foe": self.fi, "by": self.mi, "turn": self.turn})
+            if self._pause(order, moves, actors, ev):
+                return True
+        return False
 
+    def _pause(self, order, moves, actors, ev):
+        """내 포켓몬이 물러나기로 했으면 턴을 여기서 멈추고 누구를 낼지 묻는다. 멈췄으면 True.
+
+        상대가 다 쓰러졌으면 안 멈춘다 - 판이 끝난다 (턴 끝 정리가 한다).
+        """
+        if not self.pending_out or self.over:
+            return False
+        if not (self.me.alive() and self.valid_switches()):
+            self.pending_out = None
+            return False
+        if not any(f.alive() for f in self.foe_team):
+            self.pending_out = None
+            return False
+        bt = self.bt
+        self.need_switch = True
+        # 저장했다 깨어나도 턴이 이어지게, 이 턴에만 있는 것들을 같이 적어 둔다.
+        self.mid = {"order": list(order), "moves": dict(moves), "actors": dict(actors),
+                    "pending": dict(bt.pending or {}), "acted": sorted(bt.acted or ()),
+                    "flinched": {"me": bool(self.me.flinched), "foe": bool(self.foe.flinched)},
+                    "second": {"me": bool(self.me.moved_second), "foe": bool(self.foe.moved_second)},
+                    "hurt": {"me": self.me.hurt, "foe": self.foe.hurt}}
+        ev.append({"t": "choose", "who": "me", "text": "교체할 포켓몬을 고르세요."})
+        return True
+
+    def _wake(self, mid):
+        """멈췄던 턴의 사정을 되살린다. 새로 나온 내 포켓몬은 이 턴에 아무것도 안 했다."""
+        bt = self.bt
+        bt.pending = dict(mid.get("pending") or {})
+        bt.pending["me"] = None                  # 나온 포켓몬은 이 턴에 기술을 안 쓴다 (기습이 본다)
+        bt.acted = set(mid.get("acted") or ())
+        if self.fi == (mid.get("actors") or {}).get("foe"):
+            self.foe.flinched = bool((mid.get("flinched") or {}).get("foe"))
+            self.foe.moved_second = bool((mid.get("second") or {}).get("foe"))
+            self.foe.hurt = (mid.get("hurt") or {}).get("foe")
+
+    def _end_turn(self, ev):
+        """턴 끝: 독·날씨 같은 것, 쓰러진 쪽 정리, 턴 수 제한."""
+        bt = self.bt
         if self.me.alive() or self.foe.alive():
             bt._end_of_turn(ev)
         bt._check_faint(ev)
@@ -714,6 +781,7 @@ class TrainerBattle(object):
             self.kos.append({"foe": self.fi, "by": self.mi, "turn": self.turn})
         self._settle(ev)
         if self.pending_out and not self.over and not self.need_switch:
+            # 턴 끝의 피해로 물러나게 됐다 (위기회피). 턴은 이미 끝났으니 고르기만 하면 된다.
             if self.me.alive() and self.valid_switches():
                 self.need_switch = True
                 ev.append({"t": "choose", "who": "me", "text": "교체할 포켓몬을 고르세요."})
@@ -858,7 +926,7 @@ class TrainerBattle(object):
             "pendingEntry": self.pending_entry, "foeSwitchedLast": self.foe_switched_last,
             "seen": sorted(self.seen), "started": self.started, "kos": self.kos,
             "rng": [st[0], list(st[1]), st[2]],
-            "field": self.bt.field.dump(), "pendingOut": self.pending_out,
+            "field": self.bt.field.dump(), "pendingOut": self.pending_out, "mid": self.mid,
             "keystone": dict(self.keystone), "megaDone": sorted(self.mega_done),
         }
 
@@ -877,6 +945,7 @@ class TrainerBattle(object):
         self.mega_done = set(d.get("megaDone") or [])
         self._make_duel(FD.Field.load(d.get("field")))
         self.pending_out = d.get("pendingOut")
+        self.mid = d.get("mid")
         self.turn = d["turn"]
         self.bt.turn_no = self.turn
         self.over = d["over"]

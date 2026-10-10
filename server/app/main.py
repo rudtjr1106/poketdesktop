@@ -31,7 +31,7 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
-from . import (achievements, auth, avatar, battle_routes, board, board_routes, mega, config, db, deps, eggs, item_routes,  # noqa: E402
+from . import (achievements, auth, avatar, battle_routes, board, board_routes, mega, config, db, deps, eggs, expedition, item_routes,  # noqa: E402
                errors, friendly, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_ws,
@@ -53,6 +53,7 @@ app.include_router(party.router)
 app.include_router(friendly.router)
 app.include_router(guild_routes.router)
 app.include_router(guild_ws.router)
+app.include_router(expedition.router)
 
 RNG = deps.RNG
 
@@ -1186,6 +1187,9 @@ def me(ctx=Depends(current)):
         "board": board.me_card(uid),
         # 길드 (1.10.1): 남이 쓴 가장 최근 채팅 줄의 번호. 화면이 길드 탭에 점을 찍는다
         "guild": guild.me_card(uid),
+        # 탐험 파견 (1.10.4): 나가 있는 수·돌아온 수·다음 것이 돌아오기까지 남은 초.
+        # 돌아온 것이 있으면 화면이 바탕화면에 보따리를 놓는다.
+        "expedition": expedition.me_card(uid),
         "session": {"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 
@@ -1262,7 +1266,14 @@ def list_pokemon(ctx=Depends(current)):
     assign_boxes(uid)
     # 알은 따로 싣는다. 포켓몬 목록에 섞으면 옛 클라이언트가 알을 포켓몬으로
     # 그리려다 터진다. 새 관리 창이 둘을 합쳐 보여준다.
-    return {"pokemon": [_decorate(m) for m in _mons(uid)],
+    mons = [_decorate(m) for m in _mons(uid)]
+    # 탐험에 나가 있는 포켓몬 (1.10.4). 관리 창이 '탐험 중' 으로 적고, 꺼내기·놓아주기를 막는다.
+    away = expedition.away_ids(uid)
+    if away:
+        for m in mons:
+            if m["id"] in away:
+                m["away"] = True
+    return {"pokemon": mons,
             "eggs": eggs.box_list(uid),
             "boxes": {"size": config.BOX_SIZE, "count": config.BOX_COUNT,
                       "names": _box_names(uid), "used": _box_counts(uid)}}
@@ -1380,6 +1391,8 @@ def _own(uid, pid):
 def set_desktop(pid: int, body: DesktopIn, ctx=Depends(current)):
     uid = ctx["user"]["id"]
     _own(uid, pid)
+    if body.on and expedition.is_away(uid, pid):
+        raise HTTPException(409, "탐험에 나가 있는 포켓몬입니다. 돌아온 뒤에 데리고 다닐 수 있습니다.")
     if body.on:
         # 알도 한 자리를 차지한다 (deps.free_slot). 빈 자리가 없으면 None 이다 -
         # 예전의 next() 는 StopIteration 이 본문 없는 500 으로 나갔다.
@@ -1461,6 +1474,8 @@ def set_nickname(pid: int, body: NicknameIn, ctx=Depends(current)):
 def release(pid: int, ctx=Depends(current)):
     uid = ctx["user"]["id"]
     r = _own(uid, pid)
+    if expedition.is_away(uid, pid):
+        raise HTTPException(409, "탐험에 나가 있는 포켓몬은 놓아줄 수 없습니다. 돌아온 뒤에 해 주세요.")
     name = r["nickname"] or dex().name(r["species"])
     # 지닌 도구는 가방으로 돌려준다. 포켓몬과 같이 사라지면 4000원짜리
     # 구애머리띠가 놓아주기 한 번에 날아간다.
@@ -1484,8 +1499,7 @@ def _held_of(row):
 
 
 def _fighting(uid, pid):
-    return db.q1("SELECT id FROM battle WHERE user_id=? AND state='active'"
-                 " AND mine_id=?", (uid, pid)) is not None
+    return deps.in_battle(uid, pid)         # 끝난 채 남은 줄은 세지 않는다 (1.10.4)
 
 
 @app.post("/api/pokemon/{pid}/hold")
@@ -1615,6 +1629,7 @@ def _sweep(uid):
     gone = db.q("SELECT * FROM wild WHERE user_id=? AND expires_at < ?", (uid, t))
     for r in gone:
         db.run("DELETE FROM wild WHERE id=?", (r["id"],))
+        deps.close_battles_of(uid, r["id"], "fled")
         if r["state"] == "grass":
             _bump(uid, "fled")
             _schedule_next(uid, config.MISS_COOLDOWN)
@@ -1914,6 +1929,9 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
         exp = battle_routes.catch_exp(dex(), uid, mon, None, hour)
     got, where = battle_routes.store_caught(uid, mon)
     db.run("DELETE FROM wild WHERE id=?", (wid,))
+    # 이 야생에 배틀이 걸려 있었으면 같이 닫는다 (1.10.4). 안 닫으면 야생은 볼에 들어갔는데
+    # 배틀 줄만 남아, 내 포켓몬이 계속 '배틀 중' 이라 도구를 못 쓴다 (게시판 #174).
+    deps.close_battles_of(uid, wid, "caught")
     _bump(uid, "caught")
     _schedule_next(uid, _cooldown())
     items.mark_seen(uid, mon["species"], True, auth.now_iso())
@@ -1942,6 +1960,7 @@ def wild_flee(wid: int, ctx=Depends(current)):
     row = db.q1("SELECT * FROM wild WHERE id=? AND user_id=?", (wid, uid))
     if row:
         db.run("DELETE FROM wild WHERE id=?", (wid,))
+        deps.close_battles_of(uid, wid, "fled")
         _bump(uid, "fled")
         _schedule_next(uid, _cooldown() if row["state"] == "revealed"
                        else config.MISS_COOLDOWN)

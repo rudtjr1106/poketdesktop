@@ -28,6 +28,7 @@
 - 박스로 돌아가는 포켓몬은 원래 있던 박스로 간다 (deps.to_box). 꺼내는 일을 **먼저** 한다 -
   박스가 꽉 찬 사람도 자리를 맞바꿀 수 있다.
 - 전설·환상 한 마리 제한은 배틀에 나갈 때 건다 (pvp.split_restricted). 여기서는 안 본다.
+- 탐험에 나가 있는 포켓몬(1.10.4)은 꺼내지 않는다. 그 포켓몬만 빼고 갈아타고, 뺐다고 알린다.
 - 랭크 팀 등록(pvp.set_team)과는 따로다. 등록한 랭크 팀이 있으면 랜덤 배틀은 여전히 그 팀으로 싸운다.
 """
 import datetime
@@ -157,6 +158,13 @@ def use(uid, no):
     row = rows.get(no)
     fresh = row is None or not row["saved"]       # 한 번도 안 쓴 번호: 지금 파티를 들고 간다
     want = live if fresh else _owned(uid, _stored(row))
+    # 탐험에 나가 있는 포켓몬은 못 꺼낸다 (1.10.4). 그 포켓몬만 빼고 갈아탄다 - 까닭은 아래에서 알린다.
+    away = 0
+    if not fresh:
+        from . import expedition
+        out_now = expedition.away_ids(uid)
+        away = len([i for i in want if i in out_now])
+        want = [i for i in want if i not in out_now]
     name = (row["name"] if row is not None else None) or default_name(no)
     if not fresh:
         eggs = deps._egg_slots(uid)
@@ -174,6 +182,8 @@ def use(uid, no):
         message = "파티를 바꿨습니다: [%s]" % name
     else:
         message = "파티를 바꿨습니다: [%s] - 비어 있는 파티입니다." % name
+    if away:
+        message += " (탐험에 나가 있는 %d마리는 빼고 꺼냈습니다.)" % away
     return dict(state(uid), ok=True, changed=not fresh, message=message)
 
 

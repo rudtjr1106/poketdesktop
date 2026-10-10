@@ -28,6 +28,7 @@ from common.korean import natural
 
 from . import battle_fx as FX
 from . import effects, sprite_cache, sprites
+from . import sendout_fx as SO
 from . import battle_zoom as Z
 from . import platform_os as PLAT
 from .ui_common import run_async
@@ -57,6 +58,9 @@ MSG_H = 56
 CMD_H = 212
 MIN_SCENE_H = 256
 STEP_MS = 650
+# 포켓몬이 볼에서 나오고 들어가는 연출(sendout_fx, 1.10.4)을 기다려 주는 시간. 뒤의 것은 숨 고르기다.
+SEND_MS = int(SO.SEND_S * 1000) + 240
+RECALL_MS = int(SO.BACK_S * 1000) + 100
 # 포켓몬 도트 높이(px). 글자가 아니므로 글꼴 배율을 타지 않는다.
 MON_H = {"me": 132, "foe": 108}
 # 도트 폭 상한 (받침 폭쯤, 장면 좌표라 U.h 를 탄다). 높이만 맞추면 옆으로 긴 도트가
@@ -179,6 +183,7 @@ class GymBattleWindow(Z.Resizable):
         self.fx = None
         self.effects = []            # 돌고 있는 연출 전부 (닫을 때 모두 멈춘다)
         self._moves_by_name = None
+        self.sendout = SO.SendOut(self)   # 몬스터볼에서 나오고 들어가는 연출 (1.10.4 - 실시간 배틀과 같은 것)
         t = self.view["trainer"]
         # 처음 크기: 지난번에 끌어 놓은 크기(없으면 기본 크기). 배율도 여기서 잡힌다.
         # 독·작업표시줄을 뺀 자리 안에 놓는다 - 기본 크기가 안 들어가면 장면을 줄인다.
@@ -347,6 +352,10 @@ class GymBattleWindow(Z.Resizable):
             return
         j = self.root.after(ms, lambda: self.alive and fn())
         self.jobs.append(j)
+        if len(self.jobs) > 600:
+            # 닫을 때 거두려고 적어 두는 목록이다. 연출이 16ms 마다 예약을 걸어서 긴 판에서는 수만 개가
+            # 쌓였다. 오래된 것은 이미 불렸다 - 혹시 남은 것이 닫은 뒤에 불려도 alive 가 막는다.
+            del self.jobs[:300]
         return j
 
     # ---------------- 그림 ----------------
@@ -371,14 +380,21 @@ class GymBattleWindow(Z.Resizable):
             self.cv.itemconfigure(self.trainer_item, image=ph)
         run_async(self.root, work, done)
 
-    def set_mon(self, who, mon):
-        """그 쪽에 이 포켓몬을 세운다. 도트는 뒤에서 받아 온다."""
+    def set_mon(self, who, mon, entry=False):
+        """그 쪽에 이 포켓몬을 세운다. 도트는 뒤에서 받아 온다.
+
+        entry = 볼에서 나오는 중이다 (sendout.throw 를 먼저 불렀다) - 도트가 오면 볼에서 커져 나온 뒤에
+        움직이기 시작한다. 아니면 도트가 오는 대로 바로 선다.
+        """
         self.zoom_use()
         self.shown[who] = dict(mon) if mon else None
         self._paint_box(who)
         self._stop_anim(who)
+        if not entry:
+            self.sendout.cancel(who)
         self.cv.itemconfigure(self.sprite[who], image="")
         if not mon or mon.get("fainted"):
+            self.sendout.forget(who)
             return
         num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
         size = Z.px(MON_H[who])
@@ -398,11 +414,23 @@ class GymBattleWindow(Z.Resizable):
                 return
             # 쇼다운 도트는 왼쪽을 본다. 내 쪽은 뒤집어 상대를 보게 한다.
             frames = anim.frames[sprites.LEFT if who == "me" else sprites.RIGHT]
-            photos = [ImageTk.PhotoImage(sprites.to_rgba(f, anim.key)) for f in frames]
+            first = sprites.to_rgba(frames[0], anim.key)
+            photos = [ImageTk.PhotoImage(first)] + [ImageTk.PhotoImage(sprites.to_rgba(f, anim.key))
+                                                    for f in frames[1:]]
             self.anims[who] = (photos, list(anim.durations) or [100])
-            self._tick(who, 0)
+            # 볼에서 나오는 중이면 다 커진 뒤에 움직이기 시작한다 (sendout 이 부른다)
+            if not self.sendout.arrive(who, first, lambda: self._tick(who, 0)):
+                self._tick(who, 0)
 
         run_async(self.root, work, done)
+
+    def sendout_hand(self, who):
+        """볼이 날아오는 곳 (sendout_fx). **상대의 볼은 관장의 손에서 나온다** - 관장이 장면 오른쪽에
+        서 있다. 내 쪽은 정해 주지 않는다 (화면 왼쪽 아래 밖에서 날아온다)."""
+        if who != "foe":
+            return None
+        s = U.h
+        return (self.sw - s(92), self.foe_pos[1] - s(44))
 
     def _stop_anim(self, who):
         j = self.anim_jobs.get(who)
@@ -573,6 +601,7 @@ class GymBattleWindow(Z.Resizable):
                 return
             if i >= 8:
                 self._stop_anim(who)
+                self.sendout.forget(who)             # 쓰러졌다 - 불러들일 그림도 없다
                 self.cv.itemconfigure(item, image="")
                 self.cv.move(item, 0, -U.h(4) * 8)
                 return
@@ -654,13 +683,21 @@ class GymBattleWindow(Z.Resizable):
             self.say(text)
             return STEP_MS * 3 + 400
         if t == "switch":
-            self.set_mon(who, ev.get("mon"))
             self.say(text)
+            mon = ev.get("mon")
+            if who in ("me", "foe") and mon and not mon.get("fainted"):
+                # **몬스터볼에서 나온다** (1.10.4): 볼이 날아와 열리고, 흰 빛이 커져 포켓몬이 된다
+                self.sendout.throw(who)
+                self.set_mon(who, mon, entry=True)
+                return SEND_MS
+            self.set_mon(who, mon)
             return STEP_MS
         if t == "recall":
-            self._stop_anim(who)
-            self.cv.itemconfigure(self.sprite[who], image="")
             self.say(text)
+            if who in ("me", "foe"):
+                self._stop_anim(who)
+                self.sendout.recall(who)             # 흰 빛으로 줄어들어 붉은 줄기로 돌아간다
+                return RECALL_MS
             return 420
         if t == "mega":
             self._mega(ev)
@@ -862,7 +899,10 @@ class GymBattleWindow(Z.Resizable):
         side = self.view["me"]
         head = tk.Frame(self.left, bg=U.BG)
         head.pack(fill="x")
-        tk.Label(head, text="누구로 바꿀까?" if not forced else "다음 포켓몬을 고르세요",
+        # 유턴·볼트체인지로 물러나는 중이면(나와 있는 포켓몬이 멀쩡하다) '교체할' 이라고 묻는다
+        cur = (side.get("team") or [{}])[side.get("slot") or 0] if side.get("team") else {}
+        ask = "교체할 포켓몬을 고르세요" if (cur.get("hp") or 0) > 0 else "다음 포켓몬을 고르세요"
+        tk.Label(head, text="누구로 바꿀까?" if not forced else ask,
                  bg=U.BG, fg=U.FG, font=U.FONT_B).pack(side="left")
         if not forced:
             U.ghost_button(head, "돌아가기", self.show_commands, height=28).pack(side="right")
@@ -877,7 +917,7 @@ class GymBattleWindow(Z.Resizable):
         self.mega.show(False)
         self.hint.configure(text="쓰러진 포켓몬과 지금 나와 있는 포켓몬은 고를 수 없습니다.")
         if forced:
-            self.say("다음 포켓몬을 고르세요.")
+            self.say(ask + ".")
 
     def _party_cell(self, grid, i, m, active):
         ok = not m.get("fainted") and not active
@@ -1094,6 +1134,7 @@ class GymBattleWindow(Z.Resizable):
         self.fx = None
         for who in ("me", "foe"):
             self._stop_anim(who)
+        self.sendout.close()                 # 볼 연출이 쥔 그림을 여기서(Tk 스레드에서) 놓는다
         for j in self.jobs:
             try:
                 self.root.after_cancel(j)

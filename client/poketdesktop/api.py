@@ -214,6 +214,25 @@ class Api(object):
     def party_rename(self, no, name):
         return self._call("POST", "/api/party/%d/name" % int(no), {"name": name})
 
+    # 탐험 파견 (1.10.4). 박스의 포켓몬을 몇 시간 보내 두면 도구를 가져온다.
+    def expedition(self):
+        """나가 있는 것들 (남은 초·돌아왔는지)과 칸 수."""
+        return self._call("GET", "/api/expedition")
+
+    def expedition_send(self, pid, place, hours):
+        return self._call("POST", "/api/expedition/send",
+                          {"pokemon": int(pid), "place": place, "hours": int(hours)})
+
+    def expedition_claim(self, eid=None):
+        """돌아온 보따리를 받는다. eid 가 없으면 돌아온 것 전부 (바탕화면의 보따리)."""
+        if eid is None:
+            return self._call("POST", "/api/expedition/claim", {})
+        return self._call("POST", "/api/expedition/%d/claim" % int(eid), {})
+
+    def expedition_recall(self, eid):
+        """불러들인다. 빈손으로 돌아온다."""
+        return self._call("POST", "/api/expedition/%d/recall" % int(eid), {})
+
     def set_order(self, ids):
         """데리고 다니는 순서. 화면에 보이는 차례대로 넘긴다 (음수는 알)."""
         return self._call("POST", "/api/pokemon/order",

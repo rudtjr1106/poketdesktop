@@ -72,8 +72,7 @@ def _mon(uid, pid):
 
 
 def _in_battle(uid, pid):
-    return db.q1("SELECT id FROM battle WHERE user_id=? AND state='active'"
-                 " AND mine_id=?", (uid, pid)) is not None
+    return deps.in_battle(uid, pid)         # 끝난 채 남은 줄은 세지 않는다 (1.10.4)
 
 
 def _wallet(uid):

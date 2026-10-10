@@ -43,6 +43,12 @@ BOX_SIZE = 30
 # 첫 묶음은 첫 화면만큼(창 높이에 스무 줄 남짓)이면 된다.
 FIRST_ROWS = 20
 CHUNK_ROWS = 15
+# **숨긴 줄을 이만큼까지만 들고 있는다** (1.10.4). 박스를 넘기면 지난 박스의 줄은 숨겨만 두는데
+# (돌아올 때 다시 안 만들려고), 끝없이 들고 있으면 박스를 다 넘겨 본 사람은 가진 포켓몬 전부의 줄이
+# 쌓인다 - 400마리에 위젯 5,200개, 그 창을 닫는 데만 0.7초가 걸렸다. 두 박스치면 방금 본 박스로는
+# 바로 돌아간다. 넘친 것은 숨긴 지 오래된 것부터, 조금씩 끊어서 치운다 (KEEP_CHUNK).
+ROW_KEEP = 2 * BOX_SIZE
+KEEP_CHUNK = 12
 # 상세 칸 도트의 높이, 그리고 만들어 둔 것을 몇 마리까지 들고 있을지.
 # 방금 본 포켓몬을 다시 고르면 다시 풀지 않고 그대로 쓴다.
 ART_H = 92
@@ -82,7 +88,7 @@ def _row_sig(mon):
     return (mon.get("num"), mon.get("species"), info.get("name"),
             bool(mon.get("shiny")), mon.get("gender"), mon.get("level"),
             info.get("nature"), info.get("ivPercent"),
-            bool(mon.get("onDesktop")))
+            bool(mon.get("onDesktop")), bool(mon.get("away")))
 
 
 # 알 (1.4.1). 목록의 타입 칸과 상세 칸에 적는다.
@@ -292,8 +298,10 @@ class Row(object):
             bst = box_filter.bst_of(mon, dex)
             self._bst_text = ("%d" % bst, U.GOOD if bst >= 600 else (U.FG if self.party else dim))
             self.iv_cell = self._cell(self._iv_text[0], COLS[5], self._iv_text[1], U.FONT_XS)
-        self._cell("따라다님" if self.party else "박스", COLS[6],
-                   U.GOOD if self.party else U.FG_FAINT, U.FONT_XS)
+        # 탐험에 나가 있는 포켓몬 (1.10.4): 박스에 있지만 데리고 다닐 수 없다
+        away = bool(mon.get("away")) and not self.party
+        self._cell("따라다님" if self.party else ("탐험 중" if away else "박스"), COLS[6],
+                   U.GOOD if self.party else (U.INFO if away else U.FG_FAINT), U.FONT_XS)
 
         pid = self.mon["id"]
         press = self.dnd.get("press")
@@ -391,7 +399,7 @@ class BoxWindow(object):
         self.root = root
         self.app = app
         self.mons = []
-        self.rows = {}           # {id: Row} — 받은 목록으로 만들어 둔 줄 전부 (숨긴 줄 포함)
+        self.rows = {}           # {id: Row} — 만들어 둔 줄 (보이는 줄 + 숨겨 둔 줄. 숨긴 것은 ROW_KEEP 까지)
         self._shown = {"party": [], "box": []}   # 지금 담긴 줄 id, 화면 순서대로
         self._by_id = {}         # {id: 포켓몬} — 받은 목록
         self.box_no = 0          # 지금 보고 있는 PC 박스
@@ -404,6 +412,8 @@ class BoxWindow(object):
         self.party = None        # 서버가 준 파티 프리셋 (active/presets ...). 옛 서버면 None
         self._party_busy = False # 갈아타는 중 (답이 오기 전에 또 누르지 못하게)
         self._rows_job = None    # 줄을 나눠 만들고 담는 일 (U.Chunked)
+        self._prune_job = None   # 넘치게 쌓인 숨긴 줄을 나눠 치우는 일 (ROW_KEEP)
+        self._hide_seq = 0       # 줄을 숨긴 차례 (오래된 것부터 치우려고 센다)
         self._sep_on = False     # 'PC 박스' 머리가 담겨 있나
         self._wait = None        # 불러오는 중 표시
         self.sel = None
@@ -1437,14 +1447,14 @@ class BoxWindow(object):
             order = self._shown[sec]
             stay = set(want[sec])
             for pid in [p for p in order if p not in stay]:
-                self.rows[pid].forget()
+                self._hide_row(pid)
                 order.remove(pid)
             # 다시 불러왔더니 앞뒤가 바뀌었다(파티를 끌어서 바꿨다). 끼워
             # 넣기로는 못 고치니 그 칸의 줄을 다 빼고 새 순서로 다시 담는다.
             packed = set(order)
             if order != [p for p in want[sec] if p in packed]:
                 for pid in order:
-                    self.rows[pid].forget()
+                    self._hide_row(pid)
                 del order[:]
 
         if box_all:
@@ -1479,7 +1489,8 @@ class BoxWindow(object):
                 prev = pid
         wanted = set(want["party"]) | set(want["box"])
         self._rows_job = U.Chunked(self.win, plan, self._place_row,
-                                   first=FIRST_ROWS, size=CHUNK_ROWS)
+                                   first=FIRST_ROWS, size=CHUNK_ROWS,
+                                   on_done=lambda: self._prune_rows(wanted))
 
         # 행이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게
         # 여기서 다시 맞춘다.
@@ -1531,6 +1542,25 @@ class BoxWindow(object):
             row.pack()
         order.insert(0, pid)
 
+    def _hide_row(self, pid):
+        """줄을 목록에서 뺀다 (부수지는 않는다 - 다시 보일 때 담기만 한다)."""
+        row = self.rows[pid]
+        row.forget()
+        self._hide_seq += 1
+        row.hidden_at = self._hide_seq
+
+    def _prune_rows(self, wanted):
+        """숨긴 줄이 ROW_KEEP 보다 많으면 오래된 것부터 치운다 (조금씩 끊어서 - 넘기는 순간에 멈추지 않게).
+
+        보이는 줄을 다 담은 뒤에 부른다. 치우는 도중에 목록이 다시 바뀌면 _stop_rows 가 남은 일을 버린다.
+        """
+        hidden = [pid for pid in self.rows if pid not in wanted]
+        over = len(hidden) - ROW_KEEP
+        if over <= 0:
+            return
+        hidden.sort(key=lambda pid: getattr(self.rows[pid], "hidden_at", 0))
+        self._prune_job = U.Chunked(self.win, hidden[:over], self._drop_row, first=0, size=KEEP_CHUNK)
+
     def _drop_row(self, pid):
         row = self.rows.pop(pid, None)
         if row is None:
@@ -1543,9 +1573,11 @@ class BoxWindow(object):
     def _stop_rows(self):
         """남은 줄 일을 버린다. 새로 맞추기 전에 반드시 부른다 - 안 그러면
         옛 계획의 줄이 새 목록 사이에 끼어든다."""
-        if self._rows_job is not None:
-            self._rows_job.cancel()
-            self._rows_job = None
+        for name in ("_rows_job", "_prune_job"):
+            job = getattr(self, name)
+            if job is not None:
+                job.cancel()
+                setattr(self, name, None)
 
     def _ensure_built(self, pid):
         """아직 안 만든 줄을 고르면 남은 줄을 지금 다 만든다.
@@ -1725,6 +1757,10 @@ class BoxWindow(object):
             if m.get("isEgg"):
                 # 알에는 별명을 못 짓고 놓아줄 수도 없다.
                 self.btn_nick.configure(state="disabled")
+                self.btn_release.configure(state="disabled")
+            elif m.get("away") and not m.get("onDesktop"):
+                # 탐험에 나가 있다 (1.10.4). 돌아올 때까지 꺼낼 수도 놓아줄 수도 없다 - 단추가 까닭을 말한다.
+                self.btn_party.configure(text="탐험 중", state="disabled")
                 self.btn_release.configure(state="disabled")
             # 색 고르기는 이로치만
             self.btn_tint.configure(
@@ -2318,6 +2354,8 @@ class BoxWindow(object):
         if not m:
             return
         on = not m.get("onDesktop")
+        if on and m.get("away"):
+            return self.say("탐험에 나가 있습니다. 돌아온 뒤에 데리고 다닐 수 있습니다.", U.INFO)
         self.say("적용하는 중...")
         if m.get("isEgg"):
             msg = ("알을 데리고 다닙니다. 이제부터 자랍니다." if on
@@ -2353,6 +2391,8 @@ class BoxWindow(object):
         m = self.current()
         if not m or m.get("isEgg"):
             return
+        if m.get("away"):
+            return self.say("탐험에 나가 있는 포켓몬은 놓아줄 수 없습니다.", U.INFO)
         if not confirm_release(self.win, self.app, m):
             return
         name = m["info"]["name"]

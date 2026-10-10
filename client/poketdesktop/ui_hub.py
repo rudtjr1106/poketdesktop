@@ -19,6 +19,7 @@ from .ui_bag_tabs import BagTabs
 from .ui_board import BoardWindow
 from .ui_box import BoxWindow
 from .ui_dex import DexWindow
+from .ui_expedition import ExpeditionWindow
 from .ui_friends import FriendsWindow
 from .ui_guild import GuildWindow
 from .ui_gym import GymWindow
@@ -34,6 +35,8 @@ TABS = [
     # 가방 안에서 [도구 | 기술머신] 으로 나뉜다 (1.8.0 - 기술머신 탭을 합쳤다)
     ("bag", "가방", BagTabs, True),
     ("shop", "상점", ShopWindow, True),
+    # 탐험 파견 (1.10.4): 박스의 포켓몬을 몇 시간 보내 두면 도구를 가져온다. 상점 오른쪽 (사용자 결정)
+    ("expedition", "탐험", ExpeditionWindow, False),
     ("dex", "도감", DexWindow, False),
     ("friends", "친구", FriendsWindow, False),
     ("guild", "길드", GuildWindow, False),            # 1.10.0

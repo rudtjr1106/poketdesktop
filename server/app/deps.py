@@ -4,6 +4,7 @@
 main.py 에 두면 battle_routes 가 main 을 import 하고 main 이 다시
 battle_routes 를 import 하는 순환이 생겨서 따로 뺐다.
 """
+import datetime
 import json
 import random
 
@@ -23,6 +24,41 @@ def dex():
     if _DEX is None:
         _DEX = P.Pokedex.load(config.POKEDEX_PATH)
     return _DEX
+
+
+# ---------------------------------------------------------------- 야생 배틀이 살아 있나
+def in_battle(uid, pid):
+    """이 포켓몬이 **지금** 야생 배틀을 하고 있나 (도구 쓰기·지닌 도구 바꾸기를 막을 때 본다).
+
+    **줄이 남아 있기만 한 배틀은 세지 않는다** (1.10.4, 게시판 #174 "퀵볼로 잡으면 전투 중
+    판정이 유지된다"). 예전에는 state='active' 인 줄만 봤는데, 그 줄이 끝난 판인 채로 남는 길이
+    둘 있었다:
+
+      * 배틀이 걸린 야생을 **배틀 밖의 볼 던지기**(/api/wild/{id}/catch)로 잡았다 - 야생 줄만
+        지워지고 배틀 줄은 active 로 남았다. 다음 야생 배틀을 걸 때까지 내 포켓몬은 '배틀 중'.
+      * 제한 시간(BATTLE_TTL)이 지났다 - 누가 그 배틀을 다시 열어 봐야만 줄이 닫혔다.
+
+    둘 다 여기서 닫는다 (야생이 없거나 시간이 지난 판은 이어 갈 길이 없다).
+    """
+    row = db.q1("SELECT b.id, b.expires_at, w.id AS wid FROM battle b"
+                " LEFT JOIN wild w ON w.id = b.wild_id"
+                " WHERE b.user_id=? AND b.state='active' AND b.mine_id=?"
+                " ORDER BY b.id DESC LIMIT 1", (uid, pid))
+    if not row:
+        return False
+    exp = auth.parse_iso(row["expires_at"])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if row["wid"] is None or (exp and exp < now):
+        db.run("UPDATE battle SET state='done', result='fled' WHERE id=? AND state='active'",
+               (row["id"],))
+        return False
+    return True
+
+
+def close_battles_of(uid, wild_id, result):
+    """야생 줄이 없어질 때 거기 걸려 있던 배틀도 닫는다 (result: caught / fled)."""
+    db.run("UPDATE battle SET state='done', result=? WHERE user_id=? AND wild_id=? AND state='active'",
+           (result, uid, wild_id))
 
 
 def current(request: Request, authorization: str = Header(default="")):

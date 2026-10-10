@@ -196,6 +196,55 @@ def t_방어(dex):
     chk("대타가 있으면 또 못 만든다", "실패" in texts(ev), texts(ev))
 
 
+def t_와이드가드(dex):
+    """게시판 #175 "와이드 가드가 적용이 안 되는 것 같음" (1.10.4)."""
+    print("-- 와이드가드·패스트가드")
+    fails = blocked = 0
+    for s in range(40):
+        bt, me, foe = fight(dex, mon(dex, "MACHAMP", 50, ["WIDEGUARD"]), mon(dex, "GARCHOMP", 50, ["EARTHQUAKE"]),
+                            rng=random.Random(s))
+        for _turn in range(4):                      # 네 턴을 내리 쓴다
+            bt.begin_turn()
+            fails += "실패" in texts(use(bt, "me", "WIDEGUARD"))
+            hp = me.hp
+            ev = use(bt, "foe", "EARTHQUAKE")
+            blocked += (me.hp == hp and "와이드가드가" in texts(ev))
+    chk("**와이드가드는 연달아 써도 실패하지 않는다** (160번 중 실패 %d)" % fails, fails == 0, fails)
+    chk("  그 턴의 광역기를 매번 막는다 (지진, %d/160)" % blocked, blocked == 160, blocked)
+    bt, me, foe = fight(dex, mon(dex, "MACHAMP", 50, ["WIDEGUARD", "PROTECT"]),
+                        mon(dex, "GARCHOMP", 50, ["EARTHQUAKE", "ROCKSLIDE", "DRAGONCLAW", "GROWL", "SCREECH"]))
+    use(bt, "me", "WIDEGUARD")
+    hp = me.hp
+    ev = use(bt, "foe", "ROCKSLIDE")
+    chk("상대 전체를 노리는 기술도 막는다 (스톤샤워)", me.hp == hp and "와이드가드가" in texts(ev), texts(ev))
+    ev = use(bt, "foe", "GROWL")
+    chk("**여럿을 노리는 변화기도 막는다** (울음소리)", me.stages["atk"] == 0 and "와이드가드가" in texts(ev), (me.stages, texts(ev)))
+    ev = use(bt, "foe", "SCREECH")
+    chk("한 마리만 노리는 변화기는 안 막는다 (싫은소리)", me.stages["def"] == -2, me.stages)
+    ev = use(bt, "foe", "DRAGONCLAW")
+    chk("한 마리만 노리는 공격은 안 막는다 (드래곤클로 - 원작과 같다)", me.hp < hp and "와이드가드가" not in texts(ev), texts(ev))
+    bt.begin_turn()
+    hp = me.hp
+    use(bt, "foe", "EARTHQUAKE")
+    chk("다음 턴에는 풀려 있다", me.hp < hp)
+    fails = 0
+    for s in range(40):
+        bt2, a, b = fight(dex, mon(dex, "MACHAMP", 50, ["WIDEGUARD", "PROTECT"]), mon(dex, "SNORLAX", 50, ["TACKLE"]),
+                          rng=random.Random(s))
+        use(bt2, "me", "WIDEGUARD")
+        bt2.begin_turn()
+        fails += "실패" in texts(use(bt2, "me", "PROTECT"))
+    chk("와이드가드 바로 다음의 방어는 실패하기 쉽다 (연속 횟수는 오른다, %d/40)" % fails, 18 <= fails <= 36, fails)
+    fails = 0
+    for s in range(30):
+        bt3, a, b = fight(dex, mon(dex, "MACHAMP", 50, ["QUICKGUARD"]), mon(dex, "SNORLAX", 50, ["QUICKATTACK"]),
+                          rng=random.Random(s))
+        for _turn in range(3):
+            bt3.begin_turn()
+            fails += "실패" in texts(use(bt3, "me", "QUICKGUARD"))
+    chk("패스트가드도 연달아 써도 실패하지 않는다", fails == 0, fails)
+
+
 def t_제한(dex):
     print("-- 도발·사슬묶기·트집·앙코르·봉인·회복봉인")
     bt, me, foe = fight(dex, mon(dex, "GENGAR", 50, ["TAUNT", "DISABLE", "TORMENT", "ENCORE", "IMPRISON", "HEALBLOCK"]),
@@ -726,11 +775,11 @@ def t_압정과_교체(dex):
     tb.bt._use("foe", tb.foe, tb.me, "BATONPASS", ev)
     chk("배턴터치: 다음 포켓몬이 랭크·기충전을 받는다", tb.fi == 1 and tb.foe.stages["atk"] == 4 and tb.foe.cond.get("focus"),
         (tb.fi, tb.foe.stages, texts(ev)))
-    # 내 유턴: 턴이 끝나면 고른다
+    # 내 유턴: 쓰자마자 고른다 (1.10.4 - 자세한 것은 test_pivot.py)
     party = [mon(dex, "SCIZOR", 50, ["UTURN"]), mon(dex, "SNORLAX", 50, ["TACKLE"])]
     tb = gym(dex, 50, [mon(dex, "BLISSEY", 50, ["SOFTBOILED"])], party)
     ev = tb.act("move", "UTURN")
-    chk("유턴(내 포켓몬): 턴 끝에 교체할 포켓몬을 묻는다", tb.need_switch and tb.me.alive() and "고르세요" in texts(ev), texts(ev))
+    chk("유턴(내 포켓몬): 교체할 포켓몬을 묻는다", tb.need_switch and tb.me.alive() and "고르세요" in texts(ev), texts(ev))
     back = TB.TrainerBattle.load(dex, json.loads(json.dumps(tb.dump())))
     ev = back.act("switch", 1)
     chk("저장했다 되살려도 이어서 교체된다", back.mi == 1 and not back.need_switch, texts(ev))
@@ -830,7 +879,7 @@ def t_무작위(dex):
 
 def main():
     dex = load_dex()
-    for fn in (t_빠진것, t_혼란, t_방어, t_제한, t_시간차, t_헤롱헤롱과_잠김, t_특성과_타입, t_능력, t_회복,
+    for fn in (t_빠진것, t_혼란, t_방어, t_와이드가드, t_제한, t_시간차, t_헤롱헤롱과_잠김, t_특성과_타입, t_능력, t_회복,
                t_상대를_회복, t_길동무와_튕기기, t_부르기, t_도구, t_날씨, t_필드와_방, t_진영, t_압정과_교체, t_싱글에서_실패,
                t_저장, t_AI, t_무작위):
         fn(dex)

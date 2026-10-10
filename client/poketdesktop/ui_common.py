@@ -9,6 +9,7 @@ tkinter 가 그대로 그릴 수 있는 것만 쓰기 위해서다.
     라벨        왼쪽에 금색 3px 막대
     강조        몬스터볼 빨강은 머리띠와 위험한 동작에만
 """
+import bisect
 import queue
 import sys
 import threading
@@ -874,6 +875,199 @@ class ScrollFit(object):
 def scroll_fitter(cv, inner, wid=None, bind=True):
     """ScrollFit 을 만들어 돌려준다. 쓰는 법은 ScrollFit 을 보라."""
     return ScrollFit(cv, inner, wid, bind)
+
+
+class VirtualList(object):
+    """줄이 수백~수천이어도 **화면에 보이는 만큼만** 위젯을 두는 목록.
+
+    ## 왜
+
+    줄마다 Frame 하나에 Label 을 대여섯 개씩 얹으면 포켓몬 400마리의 가방은 위젯이 5,600개다.
+    만드는 데 2초(끊어서 만들어도 그동안 바탕화면의 도트까지 같이 끊긴다), 굴릴 때마다 그 위젯을
+    전부 옮기느라 한 번에 40ms, 그리고 도구를 하나 쓸 때마다 전부 부수고 다시 만드느라 3초였다.
+    윈도우는 위젯 하나하나가 창이라 더 느리다.
+
+    여기서는 화면에 걸친 줄(+ 위아래 몇 줄)만 만들어 두고, 굴리면 **화면 밖으로 나간 줄을 들어온
+    자리에 다시 쓴다.** 목록이 몇 줄이든 위젯은 서른 개 남짓이다. 여는 것도, 굴리는 것도, 목록을
+    통째로 갈아 끼우는 것도 줄 수와 상관없다.
+
+    ## 쓰는 법
+
+        vl = U.VirtualList(parent, {"item": (30, make_item), "head": (26, make_head)}, bg=U.BG)
+        vl.pack(fill="both", expand=True)
+        vl.set([("head", "지닌 도구"), ("item", {...}), ("item", {...}), ...])
+
+    kinds 는 {종류: (줄 높이 px, make)}. 종류마다 높이는 하나다 (줄 사이의 금도 그 높이에 넣는다).
+    make(parent) 는 줄 하나를 만들어 돌려준다. 그 줄은
+
+        .f             바깥 틀 (tk.Frame)
+        .bind(data)    이 줄에 그 자료를 보여 준다. **다른 자료로 몇 번이고 다시 불린다** -
+                       지난 자료의 흔적(색, 그림, 고름)이 남지 않게 다 다시 칠해야 한다.
+
+    를 갖춘다. 고름처럼 줄 밖에서 정해지는 것은 bind 가 읽어 가게 하고(창의 값을 본다),
+    바뀌면 refresh() 를 부른다 - 보이는 줄만 다시 칠하므로 싸다.
+
+        vl.set(entries, keep=True)   목록을 통째로 바꾼다. keep 이면 보던 자리 그대로
+        vl.refresh()                 보이는 줄을 다시 칠한다
+        vl.see(i)                    i 번째 줄이 보이게 굴린다
+        vl.index(pred)               pred(종류, 자료) 가 참인 첫 줄의 번호 (없으면 None)
+        vl.shown()                   지금 화면에 걸친 [(번호, 줄)] - 위에서부터
+        vl.canvas                    굴러가는 캔버스 (휠은 걸어 뒀다 - install_wheel 이 찾는다)
+        vl.holder                    통째로 숨기거나 다시 담을 때 쓰는 바깥 틀
+    """
+    MARGIN = 3                  # 화면 위아래로 이만큼 더 만들어 둔다 (굴리는 순간 빈칸이 안 보이게)
+
+    def __init__(self, parent, kinds, bg=BG, wheel=60):
+        self.kinds = kinds
+        self.entries = []
+        self.tops = [0]         # 줄마다의 위쪽 y. 끝에 전체 높이가 하나 더 있다
+        self.live = {}          # {번호: (종류, 줄, 캔버스 창 번호)} - 지금 만들어 둔 줄
+        self.free = {}          # {종류: [(줄, 창 번호)]} - 화면 밖으로 나가 쉬는 줄
+        self.made = 0           # 지금까지 만든 줄 위젯 수 (목록이 몇 줄이든 화면만큼이다)
+        self._w = 1
+        self.holder = tk.Frame(parent, bg=bg)
+        self.canvas = cv = tk.Canvas(self.holder, bg=bg, highlightthickness=0, bd=0)
+        self.bar = ttk.Scrollbar(self.holder, orient="vertical", command=self._drag)
+        cv.configure(yscrollcommand=self._scrolled)
+        self.bar.pack(side="right", fill="y")
+        cv.pack(side="left", fill="both", expand=True)
+        cv.bind("<Configure>", self._resized, add="+")
+        scrollable(cv, wheel, after=self.sync)
+
+    def pack(self, **kw):
+        self.holder.pack(**kw)
+        return self
+
+    # ---- 목록
+    def set(self, entries, keep=True):
+        self.entries = list(entries)
+        tops, y = [], 0
+        for kind, _data in self.entries:
+            tops.append(y)
+            y += self.kinds[kind][0]
+        tops.append(y)
+        self.tops = tops
+        for i in list(self.live):
+            self._release(i)
+        self._region()
+        if not keep:
+            try:
+                self.canvas.yview_moveto(0)
+            except tk.TclError:
+                pass
+        self.sync()
+
+    def refresh(self):
+        for i, (_kind, row, _wid) in list(self.live.items()):
+            row.bind(self.entries[i][1])
+
+    def index(self, pred):
+        for i, (kind, data) in enumerate(self.entries):
+            if pred(kind, data):
+                return i
+        return None
+
+    def see(self, i):
+        if i is None or not (0 <= i < len(self.entries)):
+            return
+        cv = self.canvas
+        try:
+            top, h = cv.canvasy(0), cv.winfo_height()
+            total = max(self.tops[-1], h, 1)
+            y0, y1 = self.tops[i], self.tops[i + 1]
+            if y0 < top:
+                cv.yview_moveto(y0 / float(total))
+            elif y1 > top + h:
+                cv.yview_moveto((y1 - h) / float(total))
+        except tk.TclError:
+            return
+        self.sync()
+
+    def shown(self):
+        cv = self.canvas
+        try:
+            top, h = cv.canvasy(0), cv.winfo_height()
+        except tk.TclError:
+            return []
+        return [(i, self.live[i][1]) for i in sorted(self.live)
+                if self.tops[i + 1] > top and self.tops[i] < top + h]
+
+    # ---- 굴러갈 때
+    def _drag(self, *a):
+        self.canvas.yview(*a)
+        self.sync()
+
+    def _scrolled(self, lo, hi):
+        self.bar.set(lo, hi)
+        self.sync()
+
+    def _resized(self, e):
+        if e.width != self._w:
+            self._w = e.width
+            for rows in ([v[1:] for v in self.live.values()], [x for xs in self.free.values() for x in xs]):
+                for _row, wid in rows:
+                    try:
+                        self.canvas.itemconfigure(wid, width=e.width)
+                    except tk.TclError:
+                        pass
+        self._region()
+        self.sync()
+
+    def _region(self):
+        """굴릴 범위. 내용이 화면보다 짧으면 굴릴 것이 없어야 한다 (맨 위로 되돌린다)."""
+        cv = self.canvas
+        try:
+            h = cv.winfo_height()
+            total = self.tops[-1]
+            cv.configure(scrollregion=(0, 0, max(1, self._w), max(total, h)))
+            if total <= h:
+                cv.yview_moveto(0)
+        except tk.TclError:
+            pass
+
+    def sync(self):
+        """화면에 걸친 줄(+ 위아래 몇 줄)에만 위젯을 둔다. 나간 줄은 쉬게 하고 들어온 줄에 다시 쓴다."""
+        cv = self.canvas
+        try:
+            top, h = cv.canvasy(0), cv.winfo_height()
+        except tk.TclError:
+            return
+        n = len(self.entries)
+        lo = max(0, bisect.bisect_right(self.tops, top) - 1 - self.MARGIN)
+        hi = min(n, bisect.bisect_left(self.tops, top + max(h, 1)) + self.MARGIN)
+        for i in [i for i in self.live if not (lo <= i < hi)]:
+            self._release(i)
+        for i in range(lo, hi):
+            if i not in self.live:
+                self._acquire(i)
+
+    def _acquire(self, i):
+        kind, data = self.entries[i]
+        height, make = self.kinds[kind]
+        cv = self.canvas
+        pool = self.free.get(kind)
+        try:
+            if pool:
+                row, wid = pool.pop()
+                cv.coords(wid, 0, self.tops[i])
+                cv.itemconfigure(wid, state="normal")
+            else:
+                row = make(cv)
+                wid = cv.create_window(0, self.tops[i], window=row.f, anchor="nw",
+                                       width=max(1, self._w), height=height)
+                self.made += 1
+            row.bind(data)
+        except tk.TclError:
+            return
+        self.live[i] = (kind, row, wid)
+
+    def _release(self, i):
+        kind, row, wid = self.live.pop(i)
+        try:
+            self.canvas.itemconfigure(wid, state="hidden")
+        except tk.TclError:
+            return
+        self.free.setdefault(kind, []).append((row, wid))
 
 
 class Chunked(object):

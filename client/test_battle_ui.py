@@ -898,6 +898,94 @@ def t_상대_이름표는_두_줄이다():
         and ring.cv.lowered == [(2, 1)] and ring.plates == [2, 1], (kw, ring.cv.rects))
 
 
+# ---------------------------------------------------------------- 배틀 밖의 볼이 배틀로 간다 (1.10.4)
+class 가짜던지는배틀(object):
+    closed = False
+    holding = False
+
+    def __init__(self):
+        self.던진것 = []
+        self.메뉴 = []
+
+    def _do_throw(self, ball=None):
+        self.던진것.append(ball)
+
+    def throw_ball(self, e=None):
+        self.메뉴.append(e)
+
+
+class 가짜뿌리(object):
+    def __init__(self):
+        self.예약 = {}
+        self.n = 0
+
+    def after(self, ms, fn):
+        self.n += 1
+        self.예약[self.n] = fn
+        return self.n
+
+    def after_cancel(self, j):
+        self.예약.pop(j, None)
+
+
+class 가짜야생조종(object):
+    """WildController 에서 throw_ball 이 보는 것만."""
+
+    def __init__(self, battle):
+        self.app = type("앱", (), {})()
+        self.app.battle = battle
+        self.app.root = 가짜뿌리()
+        self.app.balls = 5
+        self.app.settings = {}
+        self.throwing = False
+        self.pet = object()
+        self.wild_id = 7
+        self.서버로 = []
+        self.메뉴 = []
+
+    def ball_menu(self, e):
+        self.메뉴.append(e)
+
+
+def t_배틀이_걸려_있으면_배틀_안에서_던진다():
+    """볼 메뉴를 연 뒤에 배틀이 시작되면, 고른 볼이 배틀 밖의 길(/wild/catch)로 나갔다.
+
+    야생은 잡혔는데 서버의 배틀은 안 끝나서 '배틀 중' 판정이 남았다 (게시판 #174).
+    """
+    from poketdesktop import wild_ui as W
+    배틀 = 가짜던지는배틀()
+    ctl = 가짜야생조종(배틀)
+    W.WildController.throw_ball(ctl, "QUICKBALL")
+    chk("배틀이 있으면 그 볼을 배틀에 넘긴다", 배틀.던진것 == ["QUICKBALL"] and not ctl.throwing, (배틀.던진것, ctl.throwing))
+    배틀.closed = True
+    ctl2 = 가짜야생조종(배틀)
+    ctl2.throwing = True                       # 서버를 부르기 전에 멈추게 (여기서는 길만 본다)
+    W.WildController.throw_ball(ctl2, "QUICKBALL")
+    chk("끝난 배틀에는 안 넘긴다", 배틀.던진것 == ["QUICKBALL"], 배틀.던진것)
+
+
+def t_볼_메뉴를_열면_예약해_둔_배틀을_취소한다():
+    """왼쪽 클릭은 조금 기다렸다가 배틀을 건다 (두 번 클릭을 기다린다). 그 사이에 오른쪽 클릭으로
+    볼 메뉴를 열면 메뉴 밑에서 배틀이 시작됐다."""
+    from poketdesktop import wild_ui as W
+    ctl = 가짜야생조종(None)
+    pet = W.WildPet.__new__(W.WildPet)
+    pet.ctl = ctl
+    pet._battle_job = ctl.app.root.after(300, lambda: None)
+    W.WildPet.on_menu(pet, "e")
+    chk("예약이 지워졌다", pet._battle_job is None and not ctl.app.root.예약, ctl.app.root.예약)
+    chk("  볼 메뉴는 그대로 뜬다", ctl.메뉴 == ["e"], ctl.메뉴)
+    배틀 = 가짜던지는배틀()
+    ctl.app.battle = 배틀
+    W.WildPet.on_menu(pet, "e2")
+    chk("  배틀 중이면 배틀의 볼 메뉴가 뜬다", 배틀.메뉴 == ["e2"] and ctl.메뉴 == ["e"], (배틀.메뉴, ctl.메뉴))
+    pet2 = W.WildPet.__new__(W.WildPet)
+    pet2.mon = {"shiny": False, "info": {"species": "꼬부기", "level": 5}}
+    chk("표식에 '야생' 이라고 적지 않는다", W.WildPet.badge_text(pet2) == "꼬부기 Lv.5", W.WildPet.badge_text(pet2))
+    pet2.mon["shiny"] = True
+    chk("  색이 다른 개체는 별을 붙인다", W.WildPet.badge_text(pet2) == "★ 꼬부기 Lv.5", W.WildPet.badge_text(pet2))
+
+
 def main():
     for fn in (t_체력을_그대로_반영한다, t_교체하면_새_포켓몬_체력으로_바뀐다,
                t_숨은_도트의_체력바는_안_그린다, t_맞는_순간_그_쪽만_준다,
@@ -909,7 +997,8 @@ def main():
                t_턴마다_잡기_설정을_보낸다, t_멈추라고_하면_10초_기다렸다가_끝까지_싸운다,
                t_왼쪽_클릭하면_바로_싸운다, t_볼_메뉴가_열린_동안은_싸우지_않는다,
                t_바쁠_때_던진_볼은_턴이_끝나고_던진다, t_멈춘_채_던졌다가_놓치면_10초를_새로_센다,
-               t_잡으면_끝낸다, t_상대_이름표는_두_줄이다):
+               t_잡으면_끝낸다, t_상대_이름표는_두_줄이다,
+               t_배틀이_걸려_있으면_배틀_안에서_던진다, t_볼_메뉴를_열면_예약해_둔_배틀을_취소한다):
         print("-- %s" % fn.__name__[2:])
         fn()
     print()

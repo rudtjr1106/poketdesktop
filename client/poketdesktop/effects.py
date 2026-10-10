@@ -438,3 +438,82 @@ def _fade_out(im, w, h, key):
         for x in range(w):
             if row[x & 3] < level:
                 px[x, y] = key
+
+
+# ---------------------------------------------------------------- 탐험에서 돌아온 보따리 (1.10.4)
+BUNDLE_CLOTH = (52, 148, 110)        # 보자기
+BUNDLE_DARK = (30, 96, 74)
+BUNDLE_LIGHT = (104, 196, 152)
+BUNDLE_LINE = (20, 46, 40)
+BUNDLE_SWIRL = (214, 240, 222)       # 당초무늬
+BUNDLE_SHADOW = (22, 30, 40)
+BUNDLE_SPARK = (255, 232, 140)
+
+
+def bundle_frames(size=44, frames=8, key=(255, 0, 255)):
+    """탐험에서 돌아온 포켓몬이 놓고 간 보따리. 살짝 들썩이고, 가끔 반짝인다.
+
+    풀숲(grass_frames)처럼 배경을 투명색으로 채워 그대로 창에 올린다. (그림들, 폭, 높이)
+    크게 그려서 줄인다 - 작은 그림을 바로 그리면 매듭의 곡선이 계단진다.
+    """
+    from .sprites import flatten_rgba, premultiply
+    ss = 4
+    w, h = int(size * 1.1), size
+    W, H = w * ss, h * ss
+    out = []
+    for i in range(frames):
+        ph = math.sin(i / float(frames) * 2 * math.pi)
+        im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        line = max(ss, int(H * 0.03))
+        base = H * 0.93
+        # 들썩임: 위아래로 조금 눌렸다 펴진다 (바닥은 그대로)
+        tall = H * (0.60 + 0.025 * ph)
+        wide = W * (0.37 - 0.010 * ph)
+        cx = W * 0.5
+        top = base - tall
+        d.ellipse((cx - wide * 0.9, base - H * 0.05, cx + wide * 0.9, base + H * 0.05), fill=BUNDLE_SHADOW + (150,))
+        # 매듭의 두 귀: 묶고 남은 보자기 끝이 양옆으로 벌어져 있다 (몸통 뒤에서 솟는다)
+        sway = W * 0.015 * ph
+        kx, ky = cx, top + H * 0.07
+        for sign in (-1, 1):
+            tip = (kx + sign * W * 0.27 + sway, ky - H * 0.17)
+            ear = [(kx + sign * W * 0.02, ky + H * 0.03),
+                   (kx + sign * W * 0.10, ky - H * 0.10),
+                   (tip[0] - sign * W * 0.04, tip[1] - H * 0.03),
+                   tip,
+                   (tip[0] - sign * W * 0.01, tip[1] + H * 0.07),
+                   (kx + sign * W * 0.13, ky + H * 0.04)]
+            d.polygon(ear, fill=BUNDLE_LIGHT if sign < 0 else BUNDLE_CLOTH)
+            d.line(ear + [ear[0]], fill=BUNDLE_LINE, width=line, joint="curve")
+        # 몸통
+        box = (cx - wide, top, cx + wide, base)
+        d.ellipse(box, fill=BUNDLE_CLOTH, outline=BUNDLE_LINE, width=line)
+        # 아래쪽 그늘과 위쪽 빛
+        d.chord((box[0] + line, top + tall * 0.40, box[2] - line, base - line), 10, 170, fill=BUNDLE_DARK)
+        d.ellipse((cx - wide * 0.66, top + tall * 0.16, cx - wide * 0.26, top + tall * 0.36), fill=BUNDLE_LIGHT)
+        # 매듭에서 내려오는 주름 둘
+        for sign in (-1, 1):
+            d.arc((kx + sign * wide * 0.10 - wide * 0.55, ky - tall * 0.05, kx + sign * wide * 0.10 + wide * 0.55,
+                   ky + tall * 0.75), 250 if sign < 0 else 255, 285 if sign < 0 else 290, fill=BUNDLE_DARK,
+                  width=max(ss, line // 2))
+        # 당초무늬 (소용돌이 셋)
+        sw = max(ss, int(H * 0.024))
+        for (fx, fy, r) in ((0.08, 0.58, 0.19), (-0.48, 0.68, 0.14), (0.54, 0.72, 0.12)):
+            x, y, rr = cx + wide * fx, top + tall * fy, wide * r
+            d.arc((x - rr, y - rr, x + rr, y + rr), 20, 320, fill=BUNDLE_SWIRL, width=sw)
+            d.arc((x - rr * 0.45, y - rr * 0.45, x + rr * 0.45, y + rr * 0.45), 200, 520, fill=BUNDLE_SWIRL, width=sw)
+        # 매듭
+        k = W * 0.075
+        d.ellipse((kx - k, ky - k * 0.75, kx + k, ky + k * 0.95), fill=BUNDLE_LIGHT, outline=BUNDLE_LINE, width=line)
+        # 반짝임: 한 바퀴에 한 번, 오른쪽 위에서
+        t = (i % frames) / float(frames)
+        if 0.05 <= t <= 0.45:
+            g = math.sin((t - 0.05) / 0.40 * math.pi)
+            sx, sy, r = cx + wide * 0.95, top + H * 0.02, H * 0.11 * g
+            d.polygon([(sx, sy - r), (sx + r * 0.28, sy - r * 0.28), (sx + r, sy), (sx + r * 0.28, sy + r * 0.28),
+                       (sx, sy + r), (sx - r * 0.28, sy + r * 0.28), (sx - r, sy), (sx - r * 0.28, sy - r * 0.28)],
+                      fill=BUNDLE_SPARK)
+        im = premultiply(im).resize((w, h), Image.LANCZOS)
+        out.append(flatten_rgba(im, key))
+    return out, w, h

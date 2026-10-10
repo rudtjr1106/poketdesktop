@@ -239,6 +239,77 @@ def make_gif(path):
     return path
 
 
+def hidden_rows_are_capped(root, dex):
+    """박스를 넘기면 지난 박스의 줄은 숨겨만 둔다. **끝없이 쌓이지는 않는다** (1.10.4).
+
+    박스를 다 넘겨 본 사람은 가진 포켓몬 전부의 줄이 쌓였다 - 400마리면 위젯 5,200개, 그 창을
+    닫는 데만 0.7초. 숨긴 줄은 두 박스치(ROW_KEEP)까지만 들고, 넘친 것은 오래된 것부터 치운다.
+    """
+    print()
+    print("-- 숨긴 줄은 두 박스치까지만")
+    n = ui_box.BOX_SIZE
+    party = [mon(dex, 1 + i, 5000 + i, on=True) for i in range(3)]
+    box = [mon(dex, 10 + (i % 140), 6000 + i) for i in range(n * 7)]         # 박스 일곱 개
+    for i, m in enumerate(box):
+        m["box"] = i // n
+    app = FakeApp(root, dex, party + box)
+    win = ui_box.BoxWindow(root, app)
+    try:
+        settle_rows(root, win)
+        party_ids = [m["id"] for m in party]
+        box_ids = [m["id"] for m in box]
+
+        def rest():
+            settle_rows(root, win)
+            wait_for(root, lambda: not (win._prune_job is not None and win._prune_job.pending))
+            settle(root)
+
+        def hidden():
+            vis = set(shown(win))
+            return [p for p in win.rows if p not in vis]
+        chk("처음에는 보이는 줄만 있다 (파티 3 + 첫 박스 %d)" % n, len(win.rows) == 3 + n and not hidden(), len(win.rows))
+        for no in range(1, 7):
+            win.goto_box(no)
+            rest()
+        chk("박스 일곱 개를 다 넘겨도 숨긴 줄은 %d줄을 넘지 않는다 (가진 것은 %d마리)" % (ui_box.ROW_KEEP, len(box)),
+            len(hidden()) == ui_box.ROW_KEEP and len(win.rows) == 3 + n + ui_box.ROW_KEEP, (len(hidden()), len(win.rows)))
+        chk("  남긴 것은 방금 본 두 박스다 (오래된 것부터 치운다)",
+            sorted(hidden()) == sorted(page_ids(box_ids, 4) + page_ids(box_ids, 5)), sorted(hidden())[:4])
+        chk("  치운 줄의 위젯은 남지 않는다", len(win.inner.winfo_children()) == 2 * len(win.rows) + 3,
+            (len(win.inner.winfo_children()), len(win.rows)))
+        chk("  지금 보는 박스는 그대로 순서대로 있다", layout(win) == full_layout(party_ids, page_ids(box_ids, 6)), layout(win)[:10])
+        keep = dict((p, win.rows[p]) for p in page_ids(box_ids, 5))
+        win.goto_box(5)
+        rest()
+        chk("방금 본 박스로 돌아가면 그 줄을 그대로 쓴다 (새로 안 만든다)",
+            all(win.rows[p] is r for p, r in keep.items()) and layout(win) == full_layout(party_ids, page_ids(box_ids, 5)))
+        win.goto_box(0)
+        rest()
+        chk("치운 박스로 돌아가면 다시 만들어 제대로 보인다", layout(win) == full_layout(party_ids, page_ids(box_ids, 0))
+            and win.rows[box_ids[0]].name_cell.cget("text") == box[0]["info"]["name"]
+            and len(hidden()) <= ui_box.ROW_KEEP, (layout(win)[:8], len(hidden())))
+        far = box_ids[n * 3 + 7]
+        win.select(far)                              # 치워진 박스의 포켓몬을 고른다 (도트를 두 번 눌러 열 때)
+        rest()
+        chk("치워진 박스의 포켓몬을 골라도 그 박스가 열리고 골라진다", win.box_no == 3 and win.sel == far and picked(win) == [far]
+            and far in shown(win), (win.box_no, win.sel, picked(win)))
+        win.f_query.set(box[n * 6 + 3]["info"]["name"][:2])    # 찾기: 박스를 넘어 모은다
+        rest()
+        found = shown(win)[3:]
+        chk("찾기는 치워진 박스의 것도 찾는다 (%d마리)" % len(found), len(found) >= 1
+            and all(p in win._by_id for p in found) and box_ids[n * 6 + 3] in found, found[:5])
+        win.f_query.set("")
+        rest()
+        chk("  풀면 보던 박스로 돌아오고, 숨긴 줄은 여전히 %d줄 안쪽이다" % ui_box.ROW_KEEP,
+            layout(win) == full_layout(party_ids, page_ids(box_ids, 3)) and len(hidden()) <= ui_box.ROW_KEEP,
+            (layout(win)[:8], len(hidden())))
+    finally:
+        try:
+            win.close()
+        except Exception:                                   # noqa: BLE001
+            pass
+
+
 def hyper_and_evs(root, dex):
     """병뚜껑과 노력치가 상세 칸에 **보이는가.**
 
@@ -497,6 +568,7 @@ def main():
         pass
 
     many(root, dex)
+    hidden_rows_are_capped(root, dex)
     hyper_and_evs(root, dex)
     sort_by_bst(root, dex)
 
@@ -999,8 +1071,10 @@ def _many(root, dex, app, win, party, box, big):
     first_box = [m["id"] for m in new[3:] if int(m.get("box") or 0) == 0]
     chk("첫 박스가 순서대로, 머리까지",
         layout(win) == full_layout(new_party, first_box), layout(win)[:12])
-    chk("그대로인 줄은 같은 줄을 쓴다",
-        all(win.rows[p] is before[p] for p in box_ids if p not in (gone, renamed)))
+    # (숨겨 둔 줄은 두 박스치까지만 들고 있는다 - ROW_KEEP. 남아 있는 줄을 본다.)
+    same = [p for p in box_ids if p in win.rows and p in before and p not in (gone, renamed)]
+    chk("그대로인 줄은 같은 줄을 쓴다 (%d줄)" % len(same),
+        len(same) >= ui_box.BOX_SIZE and all(win.rows[p] is before[p] for p in same), len(same))
     chk("바뀐 줄은 새로 만든다 (새 별명)", win.rows[renamed] is not before[renamed]
         and "새별명" in win.rows[renamed].name_cell.cget("text"))
     chk("놓아준 줄은 없어진다", gone not in win.rows)

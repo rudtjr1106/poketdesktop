@@ -32,6 +32,7 @@ from common.korean import natural
 
 from . import battle_fx as FX
 from . import effects, sprite_cache, sprites
+from . import sendout_fx as SO
 from . import battle_zoom as Z
 from . import platform_os as PLAT
 from .ui_common import run_async
@@ -64,6 +65,9 @@ CMD_H = 248
 MIN_SCENE_H = 261
 STEP_MS = 600
 POLL_MS = 1500
+# 포켓몬이 볼에서 나오고 들어가는 연출(sendout_fx)을 기다려 주는 시간. 뒤의 것은 숨 고르기다.
+SEND_MS = int(SO.SEND_S * 1000) + 240
+RECALL_MS = int(SO.BACK_S * 1000) + 100
 MON_H = {"me": 128, "foe": 108}
 MON_W = {"me": 340, "foe": 280}
 
@@ -111,6 +115,7 @@ class LiveBattleWindow(Z.Resizable):
         self._result_painted = False  # 결과 칸을 그려 뒀나 (기권하고 나갈 때는 안 그린다)
         self._switching = False       # 스스로 교체 칸을 열어 뒀나
         self._pending = None
+        self.sendout = SO.SendOut(self)   # 몬스터볼에서 나오고 들어가는 연출 (1.10.4)
 
         # 처음 크기: 지난번에 끌어 놓은 크기(없으면 기본 크기). 배율도 여기서 잡힌다.
         ww, wh, gx, gy = self.zoom_open()
@@ -130,37 +135,69 @@ class LiveBattleWindow(Z.Resizable):
         self.zoom_watch()                    # 이제부터 창을 끌어 크기를 바꾸면 따라간다
 
         events = data.get("events") or []
-        if self.played == 0 and events:
-            self.play(events, data)
+        fresh = self.played == 0 and bool(events)
+        if fresh:
+            # 새 판이다. **띠가 걷히기 시작할 때** 첫 장면(포켓몬이 볼에서 나온다)을 튼다 -
+            # 닫힌 띠 뒤에서 먼저 틀면 못 본다.
+            self.busy = True
+            self.hide_commands()
+            self._pending = data
         else:
             self.sync(data)
             self.show_commands()
         self._poll()
-        self._enter()
+        self._enter(versus=fresh, then=(lambda: self.play(events, data)) if fresh else None)
         self.focus()
 
-    def _enter(self):
-        """창이 불쑥 뜨지 않게 한다: 비치는 데서 또렷해지고, 검은 띠가 걷히며 장면이 드러난다 (enter_fx)."""
+    def _enter(self, versus=False, then=None):
+        """창이 불쑥 뜨지 않게 한다: 비치는 데서 또렷해지고, 검은 띠가 걷히며 장면이 드러난다 (enter_fx).
+
+        versus = 새 판을 여는 것이다 (1.10.4). 닫힌 띠 위에 **'나 VS 상대'** 를 한 박자 띄운 뒤에 걷는다 -
+        예전에는 0.5초 만에 지나가서 배틀에 들어간다는 느낌이 없었다. 이미 하던 판을 다시 여는 것이면
+        이름은 안 띄우고 띠만 걷는다. then() 은 띠가 걷히기 시작할 때 부른다 (첫 장면을 튼다).
+        """
         from . import enter_fx as EF
         try:
             self.win.attributes("-alpha", 0.0)
         except tk.TclError:
             pass
         fx = EF.Blinds(self.cv)
+        vs = None
+        if versus:
+            me = (self.view.get("me") or {}).get("name") or "나"
+            foe = (self.view.get("foe") or {}).get("name") or self.room.get("foeName") or "상대"
+            vs = EF.Versus(self.cv, me, foe, U.FAMILY, U.pt(15), U.pt(30))
+        hold = EF.HOLD_S if versus else 0.0
+        t_open = EF.FADE_S * 0.6 + hold               # 이때부터 띠가 걷힌다
         t0 = time.monotonic()
+        state = {"started": then is None}
+        # 들어가는 연출이 어떻게 흘렀나 (검사가 본다): 이름이 제자리에 선 채로 닫혀 있었나, 첫 장면을 언제 틀었나
+        self._vs = vs
+        self.intro = {"names": False, "start": None, "open": t_open}
+
+        def start():
+            if not state["started"]:
+                state["started"] = True
+                self.intro["start"] = time.monotonic() - t0
+                then()
 
         def done():
             fx.close()
+            if vs is not None:
+                vs.close()
+            self._vs = None
             try:
                 self.win.attributes("-alpha", 1.0)
             except tk.TclError:
                 pass
+            start()
 
         def step():
             if not self.alive:
-                return fx.close()
+                fx.close()
+                return vs.close() if vs is not None else None
             t = time.monotonic() - t0
-            k = 1.0 - (t - EF.FADE_S * 0.6) / EF.OPEN_S
+            k = 1.0 - (t - t_open) / EF.OPEN_S
             if k <= 0.0:
                 return done()
             try:
@@ -168,6 +205,12 @@ class LiveBattleWindow(Z.Resizable):
             except tk.TclError:
                 pass
             fx.draw(0, 0, self.sw, self.sh, k)
+            if vs is not None:
+                vs.draw(self.sw, self.sh, t - EF.FADE_S * 0.4, min(1.0, k))
+                if k >= 1.0 and t - EF.FADE_S * 0.4 >= EF.SLIDE_S:
+                    self.intro["names"] = True    # 이름이 다 들어와 선 모습을 그렸다 (띠는 아직 닫혀 있다)
+            if t >= t_open:
+                start()
             self.later(16, step)
         fx.draw(0, 0, self.sw, self.sh, 1.0)
         step()
@@ -187,6 +230,10 @@ class LiveBattleWindow(Z.Resizable):
             return None
         j = self.root.after(ms, lambda: self.alive and fn())
         self.jobs.append(j)
+        if len(self.jobs) > 600:
+            # 닫을 때 거두려고 적어 두는 목록이다. 연출이 16ms 마다 예약을 걸어서 긴 판에서는 수만 개가
+            # 쌓였다. 오래된 것은 이미 불렸다 - 혹시 남은 것이 닫은 뒤에 불려도 alive 가 막는다.
+            del self.jobs[:300]
         return j
 
     def say(self, text):
@@ -315,16 +362,21 @@ class LiveBattleWindow(Z.Resizable):
         U.wrap_to_width(self.hint)
 
     # ---------------- 그림 ----------------
-    def set_mon(self, who, mon):
+    def set_mon(self, who, mon, entry=False):
+        """그쪽에 이 포켓몬을 세운다. entry = 볼에서 나오는 중이다 (sendout.throw 를 먼저 불렀다) -
+        그림이 오면 볼에서 커져 나온 뒤에 움직이기 시작한다. 아니면 그림이 오는 대로 바로 선다."""
         self.zoom_use()
         self.shown[who] = dict(mon) if mon else None
         self._paint_box(who)
         self._stop_anim(who)
+        if not entry:
+            self.sendout.cancel(who)
         try:
             self.cv.itemconfigure(self.sprite[who], image="")
         except tk.TclError:
             return
         if not mon or mon.get("fainted"):
+            self.sendout.forget(who)
             return
         num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
         size = U.h(MON_H[who])
@@ -343,9 +395,13 @@ class LiveBattleWindow(Z.Resizable):
             if cur.get("num") != num:
                 return
             frames = anim.frames[sprites.LEFT if who == "me" else sprites.RIGHT]
-            photos = [ImageTk.PhotoImage(sprites.to_rgba(f, anim.key)) for f in frames]
+            first = sprites.to_rgba(frames[0], anim.key)
+            photos = [ImageTk.PhotoImage(first)] + [ImageTk.PhotoImage(sprites.to_rgba(f, anim.key))
+                                                    for f in frames[1:]]
             self.anims[who] = (photos, list(anim.durations) or [100])
-            self._tick(who, 0)
+            # 볼에서 나오는 중이면 다 커진 뒤에 움직이기 시작한다 (sendout 이 부른다)
+            if not self.sendout.arrive(who, first, lambda: self._tick(who, 0)):
+                self._tick(who, 0)
         run_async(self.root, work, done)
 
     def _stop_anim(self, who):
@@ -490,6 +546,7 @@ class LiveBattleWindow(Z.Resizable):
                 return
             if i >= 8:
                 self._stop_anim(who)
+                self.sendout.forget(who)             # 쓰러졌다 - 불러들일 그림도 없다
                 try:
                     self.cv.itemconfigure(item, image="")
                     self.cv.move(item, 0, -U.h(4) * 8)
@@ -606,16 +663,21 @@ class LiveBattleWindow(Z.Resizable):
             self.say(text)
             return STEP_MS + 200
         if t == "switch":
-            self.set_mon(who, ev.get("mon"))
             self.say(text)
+            mon = ev.get("mon")
+            if who in ("me", "foe") and mon and not mon.get("fainted"):
+                # **몬스터볼에서 나온다** (1.10.4): 볼이 날아와 열리고, 흰 빛이 커져 포켓몬이 된다
+                self.sendout.throw(who)
+                self.set_mon(who, mon, entry=True)
+                return SEND_MS
+            self.set_mon(who, mon)
             return STEP_MS
         if t == "recall":
-            self._stop_anim(who)
-            try:
-                self.cv.itemconfigure(self.sprite[who], image="")
-            except tk.TclError:
-                pass
             self.say(text)
+            if who in ("me", "foe"):
+                self._stop_anim(who)
+                self.sendout.recall(who)             # 흰 빛으로 줄어들어 붉은 줄기로 돌아간다
+                return RECALL_MS
             return 420
         if t == "mega":
             self._mega(ev)
@@ -939,7 +1001,11 @@ class LiveBattleWindow(Z.Resizable):
             w.destroy()
         head = tk.Frame(self.left, bg=U.BG)
         head.pack(fill="x")
-        tk.Label(head, text="다음 포켓몬을 고르세요" if forced else "누구로 바꿀까?",
+        # 유턴·볼트체인지로 물러나는 중이면(나와 있는 포켓몬이 멀쩡하다) '교체할' 이라고 묻는다
+        team = me.get("team") or []
+        cur = team[me.get("slot") or 0] if team else {}
+        ask = "교체할 포켓몬을 고르세요" if (cur.get("hp") or 0) > 0 else "다음 포켓몬을 고르세요"
+        tk.Label(head, text=ask if forced else "누구로 바꿀까?",
                  bg=U.BG, fg=U.FG, font=U.FONT_B).pack(side="left")
         if not forced:
             U.ghost_button(head, "돌아가기", self.show_commands, height=28).pack(side="right")
@@ -1114,6 +1180,7 @@ class LiveBattleWindow(Z.Resizable):
         self.fx = None
         for who in ("me", "foe"):
             self._stop_anim(who)
+        self.sendout.close()                 # 볼 연출이 쥔 그림을 여기서(Tk 스레드에서) 놓는다
         for j in self.jobs:
             try:
                 self.root.after_cancel(j)

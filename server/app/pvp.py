@@ -301,6 +301,9 @@ def set_team(uid, ids):
                     % marks, (uid,) + tuple(clean))
         if len(rows) != len(clean):
             raise ValueError("내 포켓몬만 넣을 수 있습니다.")
+        from . import expedition                 # 탐험에 나가 있으면 배틀에 못 나간다 (1.10.4)
+        if expedition.away_ids(uid) & set(clean):
+            raise ValueError("탐험에 나가 있는 포켓몬은 랭크 팀에 넣을 수 없습니다.")
         names = restricted_species()
         if sum(1 for r in rows if r["species"] in names) > RESTRICTED_MAX:
             raise ValueError("랭크 팀에는 전설·환상 포켓몬을 %d마리까지 넣을 수 있습니다."

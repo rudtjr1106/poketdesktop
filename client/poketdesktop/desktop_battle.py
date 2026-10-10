@@ -130,7 +130,7 @@ class DesktopBattle(object):
         self.mine.battling = True
         self.foe.battling = True
         self.saved_home = (self.mine.x, self.mine.y)
-        # 야생 쪽은 '야생 OO Lv.5' 이름표가 도트 바로 위에 붙어 있어서
+        # 야생 쪽은 'OO Lv.5' 표식이 도트 바로 위에 붙어 있어서
         # 체력바를 그 위로 올려야 겹치지 않는다.
         self.bars = ((HpBar(self.layer), HpBar(self.layer, lift=18))
                      if self.layer else None)

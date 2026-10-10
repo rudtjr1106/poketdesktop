@@ -89,6 +89,7 @@ class App(object):
         self.overlay = None
         self.tray = None
         self.wild = None
+        self.expedition = None     # 탐험 파견의 바탕화면 쪽 (돌아온 보따리, 1.10.4)
         self._syncing = False
         self.hub = None            # 탭 창 하나
         self.box_window = None
@@ -416,6 +417,9 @@ class App(object):
             self.refresh_tray()     # 로그인 전 메뉴를 제대로 된 것으로 바꾼다
         if self.wild is None:
             self.wild = WildController(self)
+        if self.expedition is None:
+            from . import expedition_ui
+            self.expedition = expedition_ui.Desk(self)
         self._watch_right_click()
         # 다시 로그인했으면 알림 기록을 비운다. 다른 계정의 요청을
         # "이미 알렸다" 고 여기면 새 계정의 첫 요청을 놓친다.
@@ -686,6 +690,9 @@ class App(object):
                 self.user_id = (me.get("user") or {}).get("id", self.user_id)
                 # 길드 채팅 (1.10.1): 안 읽은 줄이 있으면 길드 탭에 점
                 self.note_guild(me.get("guild"))
+                # 탐험 파견 (1.10.4): 돌아온 것이 있으면 바탕화면에 보따리를 놓는다
+                if self.expedition is not None and "expedition" in me:
+                    self.expedition.note(me.get("expedition"))
                 # 레이드 안내(announce_raid)는 1.10.0 에서 끊었다 - 레이드 탭을 뺐으므로
                 # 빛기둥·결과 알림이 없는 탭을 가리키면 안 된다 (ui_hub.TABS 를 보라).
                 # 실시간 배틀. 걸려온 초대·싸우던 판·안 본 결과가 있으면
@@ -733,6 +740,8 @@ class App(object):
         self.close_arena()
         if self.wild:
             self.wild.stop()
+        if self.expedition:
+            self.expedition.clear()
         if self.overlay:
             self.overlay.clear()
         self.close_windows()
@@ -766,6 +775,8 @@ class App(object):
             self._paint_notice()
             self._guild_dot = None
             self._paint_guild()
+            if self.expedition is not None:
+                self.expedition._badge()       # 돌아온 보따리가 있으면 탐험 탭에 점
         self.hub.show(key)
         return self.hub.panes.get(key)
 
@@ -1248,6 +1259,10 @@ class App(object):
 
     def open_gym(self):
         self.gym_window = self._tab("gym")
+
+    def open_expedition(self):
+        """탐험 탭 (1.10.4)."""
+        self._tab("expedition")
 
     def open_raid(self):
         self.raid_window = self._tab("raid")
@@ -2544,6 +2559,8 @@ class App(object):
         self.close_arena()
         if self.wild:
             self.wild.stop()
+        if self.expedition:
+            self.expedition.clear()
         if self.overlay:
             self.overlay.clear()
         self.close_windows()
@@ -2608,6 +2625,8 @@ class App(object):
         self.close_windows()
         if self.wild:
             self.wild.stop()
+        if self.expedition:
+            self.expedition.clear()
         if self.overlay:
             self.overlay.stop()
             self.overlay.clear()

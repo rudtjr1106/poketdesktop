@@ -672,6 +672,25 @@ CREATE TABLE IF NOT EXISTS party_preset (
     updated_at  TEXT,
     PRIMARY KEY (user_id, no)
 );
+-- 탐험 파견 (1.10.4). 박스의 포켓몬을 몇 시간 보내 두면 도구를 가져온다 (server/app/expedition.py).
+-- state: out = 나가 있다 (**돌아왔어도 보따리를 받기 전까지는 out 이다** - 그동안 그 포켓몬은 못 꺼낸다)
+--        done = 보따리를 받았다 · recalled = 불러들였다 (빈손).
+-- grade·score 는 보낼 때 정해진 성공도. loot 는 받을 때 굴려서 적는다 (기록용).
+CREATE TABLE IF NOT EXISTS expedition (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pokemon_id  INTEGER NOT NULL,
+    place       TEXT NOT NULL,
+    hours       INTEGER NOT NULL,
+    grade       TEXT NOT NULL,
+    score       INTEGER NOT NULL DEFAULT 0,
+    started_at  TEXT NOT NULL,
+    ends_at     TEXT NOT NULL,
+    state       TEXT NOT NULL DEFAULT 'out',
+    loot        TEXT,
+    claimed_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_expedition_user ON expedition(user_id, state);
 -- 캐릭터 (1.10.3). 마이페이지에서 만든다. **그림이 아니라 고른 것(spec)을 적는다** -
 -- 그림은 common/avatar_art 가 그때그때 그린다 (서버도 화면도 같은 코드).
 -- image 는 **직접 그린 도트** (걷기 시트 PNG 의 base64, common/avatar_sheet). 화면이 올리는 길은

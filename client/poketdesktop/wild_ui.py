@@ -110,23 +110,25 @@ class WildPet(Pet):
     def make_nameplate(self):
         """야생에는 이름표를 안 붙인다. **표식이 이미 그 자리에 있다.**
 
-        표식('야생 꼬부기 Lv.5')이 도트 바로 위 같은 줄에 뜬다. 이름표까지
+        표식('꼬부기 Lv.5')이 도트 바로 위 같은 줄에 뜬다. 이름표까지
         붙이면 두 글자가 거의 통째로 포개져서 둘 다 못 읽었고, 볼에 넣으면
         표식만 숨고 이름표는 허공에 남았다 (hide_wild_sprite).
         """
         return
 
-    def make_badge(self):
+    def badge_text(self):
+        """표식의 글. **'야생' 이라고 적지 않는다** (1.10.4) - 빨간 바탕과 깜빡임이 이미 야생이라는
+        뜻이고, 그 두 글자만큼 표식이 길어져 옆의 것을 가렸다. 색이 다른 개체는 별과 금빛 바탕."""
         info = self.mon.get("info", {})
-        shiny = self.mon.get("shiny")
-        text = "★ 야생" if shiny else "야생"
-        bg = "#d6a828" if shiny else "#e24e4e"
+        return "%s%s Lv.%s" % ("★ " if self.mon.get("shiny") else "",
+                               info.get("species", "?"), info.get("level", "?"))
+
+    def make_badge(self):
+        bg = "#d6a828" if self.mon.get("shiny") else "#e24e4e"
         w = tk.Toplevel(self.ov.root)
         w.overrideredirect(True)
         w.configure(bg=bg)
-        tk.Label(w, text="%s  %s Lv.%s" % (text, info.get("species", "?"),
-                                           info.get("level", "?")),
-                 bg=bg, fg="#ffffff", font=U.FONT_XS,
+        tk.Label(w, text=self.badge_text(), bg=bg, fg="#ffffff", font=U.FONT_XS,
                  padx=6, pady=1).pack()
         PLAT.raise_above(w)
         self.badge_win = w
@@ -229,6 +231,9 @@ class WildPet(Pet):
             self.ctl.start_battle()
 
     def on_menu(self, e):
+        # **왼쪽 클릭이 예약해 둔 배틀 열기를 먼저 취소한다** (1.10.4). 안 그러면 볼 메뉴가 떠 있는
+        # 밑에서 배틀이 시작되고, 메뉴에서 고른 볼은 배틀 밖의 길로 나간다 (throw_ball 을 보라).
+        self._cancel_battle_job()
         # 배틀 중이면 배틀 쪽으로 넘긴다 (체력이 깎여 있어 잘 잡힌다).
         # 이벤트를 같이 넘겨야 거기서도 볼 고르는 메뉴가 뜬다.
         if self.ctl.app.battle:
@@ -848,6 +853,13 @@ class WildController(object):
         return got or self.last_ball()
 
     def throw_ball(self, ball=None):
+        # **배틀이 걸려 있으면 배틀 안에서 던진다** (1.10.4, 게시판 #174 '퀵볼로 잡으면 전투 중
+        # 판정이 유지된다'). 볼 메뉴를 연 뒤에 배틀이 시작됐을 때, 메뉴에서 고른 볼이 이 길
+        # (배틀 밖의 /wild/catch)로 나갔다 - 야생은 잡혔는데 서버의 배틀은 안 끝나서 내 포켓몬이
+        # 계속 '배틀 중' 으로 남았고, 화면의 배틀은 사라진 상대와 싸우다 멈췄다.
+        battle = self.app.battle
+        if battle is not None and not getattr(battle, "closed", False):
+            return battle._do_throw(ball)
         if self.throwing or not self.pet or not self.wild_id:
             return
         ball = ball or self.last_ball()
