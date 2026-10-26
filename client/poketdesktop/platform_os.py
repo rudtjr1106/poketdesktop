@@ -71,6 +71,8 @@ mouse_buttons_down = _M.mouse_buttons_down
 missing_requirement = getattr(_M, "missing_requirement", lambda: None)
 font_candidates = _M.font_candidates
 pil_font_files = _M.pil_font_files
+# 화면 테마의 글꼴을 이 프로그램 안에서만 등록한다 (tk.Tk() 전에).
+register_font = getattr(_M, "register_font", lambda path: False)
 already_running_hint = _M.already_running_hint
 
 # 맥에만 있는 것. 없는 데서는 아무 일도 안 하게 해 둔다.

@@ -12,6 +12,7 @@
 """
 import tkinter as tk
 
+from . import skins
 from . import ui_common as U
 from .ui_bag import BagWindow
 from .ui_tms import TmWindow
@@ -20,7 +21,9 @@ KINDS = [("items", "도구"), ("tms", "기술머신")]
 CLASSES = {"items": BagWindow, "tms": TmWindow}
 
 
+@skins.skinnable
 class BagTabs(object):
+    CLASSES = CLASSES             # 화면 테마가 칸 클래스를 바꿔 끼운다 (skins/<열쇠>/bag_tabs.py)
 
     def __init__(self, root, app, parent=None):
         self.root = root
@@ -54,10 +57,10 @@ class BagTabs(object):
             seg.badge("tms", on)
 
     def show(self, key):
-        if key not in CLASSES or key == self.current:
+        if key not in self.CLASSES or key == self.current:
             return self.panes.get(key)
         if key not in self.panes:
-            pane = CLASSES[key](self.root, self.app, self.holders[key],
+            pane = self.CLASSES[key](self.root, self.app, self.holders[key],
                                 switch=self._switch_for(key))
             pane.win.pack(fill="both", expand=True)
             self.panes[key] = pane

@@ -165,15 +165,22 @@ class TkWin(object):
 
 
 class FakeHub(Hub):
-    """허브 흉내. 탭이 바뀔 때 하는 일(_on_tab)은 HubWindow 의 진짜 것."""
+    """허브 흉내. 위 탭(묶음)이 바뀔 때 하는 일(_on_tab → _open)은 HubWindow 의 진짜 것."""
     _on_tab = ui_hub.HubWindow._on_tab
-    _key_at = ui_hub.HubWindow._key_at
+    _group_at = ui_hub.HubWindow._group_at
+    _open = ui_hub.HubWindow._open
+    _shown = staticmethod(ui_hub.HubWindow._shown)
 
     def __init__(self, app):
         Hub.__init__(self)
         self.app, self.nb, self.root = app, Nb(), TkWin()
-        self.order = [t[0] for t in ui_hub.TABS]
+        self.groups = [g[0] for g in ui_hub.GROUPS]
+        self.last = dict((g[0], g[2][0]) for g in ui_hub.GROUPS)
+        self.current = None
         self.built = []
+
+    def _swap(self, key):
+        pass
 
     def _build(self, key):
         self.built.append(key)
@@ -361,7 +368,9 @@ def main():
     walker.hub.panes["guild"] = pane
     walker.note_guild({"id": 1, "chat": 110})
     chk("(준비) 길드 탭을 보는 동안에는 점이 없다", walker.hub.badges[-1] == ("guild", False))
-    pane.visible = False                     # 다른 탭을 눌렀다
+    walker.hub.current = walker.hub.last["community"] = "guild"     # 커뮤니티 묶음의 길드 탭을 보던 중
+    pane.visible = False                     # 다른 묶음('포켓몬')을 눌렀다
+    walker.hub.nb.at = walker.hub.groups.index("pokemon")
     walker.hub._on_tab()
     for _ms, fn in walker.hub.root.jobs:
         fn()
@@ -369,7 +378,10 @@ def main():
         walker.hub.badges[-1] == ("guild", True) and walker.hub.built, walker.hub.badges)
     pane.visible = True
     walker.hub.root.jobs = []
+    walker.hub.nb.at = walker.hub.groups.index("community")         # 커뮤니티로 돌아오면 마지막에 본 길드 탭
     walker.hub._on_tab()
+    chk("  위 탭을 누르면 그 묶음에서 마지막에 본 탭(길드)이 뜬다", walker.hub.current == "guild"
+        and walker.hub.built[-1] == "guild", walker.hub.built)
     for _ms, fn in walker.hub.root.jobs:
         fn()
     chk("길드 탭으로 돌아오면 점이 바로 꺼진다", walker.hub.badges[-1] == ("guild", False))

@@ -20,7 +20,7 @@ import tkinter as tk
 from common import tint as T
 from common.korean import natural
 
-from . import item_icons, sprite_cache, sprites
+from . import item_icons, skins, sprite_cache, sprites
 from . import platform_os as PLAT
 from . import ui_common as U
 from .overlay import Pet
@@ -197,12 +197,55 @@ def fetch_icons(api, eggs):
 
 
 # ---------------------------------------------------------------- 부화 알림
-def announce_hatch(parent, app, egg, on_close=None):
-    """알에서 태어난 포켓몬을 보여준다."""
-    from . import ui_box
+def hatch_facts(egg):
+    """부화 알림에 적을 것: (포켓몬 이름, 포켓몬 자료, 덧붙임 줄들). 화면(기본 · 테마)이 같이 쓴다.
+
+    덧붙임은 [(글, 뜻)] - 뜻은 'level' · 'shiny' · 'party'. 기본 화면은 ' · ' 로 이어 한 줄로 적는다.
+    """
     mon = egg.get("pokemon") or {}
     info = mon.get("info") or {}
     name = info.get("name") or info.get("species") or "포켓몬"
+    bits = [("Lv.%d" % int(mon.get("level") or 0), "level")] if mon else []
+    if mon.get("shiny"):
+        bits.append(("★ 색이 다른 개체", "shiny"))
+    if mon:
+        bits.append(("데리고 다닙니다" if mon.get("onDesktop")
+                     else "파티가 꽉 차서 박스에 넣었습니다", "party"))
+    return name, mon, bits
+
+
+def hatch_photo(app, mon, height, on_photo, parent):
+    """태어난 포켓몬의 도트를 받아(작업 스레드) 그림으로 만들어 on_photo(PhotoImage) 에 준다.
+
+    on_photo 를 받은 쪽이 그림을 창에 붙여 둔다 - 지역 변수에만 두면 그림이 지워져 빈칸이 된다
+    (tk 가 PhotoImage 를 붙들지 않는다). 안 받아졌거나 틀렸으면 아무것도 안 한다.
+    """
+    num = mon.get("num")
+    if not num:
+        return
+
+    def work():
+        return sprite_cache.ensure(app.api, num, T.skin(mon))
+
+    def done(path, err):
+        if err or not path:
+            return
+        try:
+            from PIL import ImageTk
+            a = sprites.load_animation(path, height, 1.0, 3.0, max_frames=1)
+            ph = ImageTk.PhotoImage(sprites.to_rgba(a.frames[sprites.RIGHT][0],
+                                                    a.key))
+            on_photo(ph)
+        except Exception:                                  # noqa: BLE001
+            pass
+    U.run_async(parent, work, done)
+
+
+@skins.skinnable_fn("announce")
+def announce_hatch(parent, app, egg, on_close=None):
+    """알에서 태어난 포켓몬을 보여준다."""
+    from . import ui_box
+    name, mon, bits = hatch_facts(egg)
     win, f = ui_box._shell(parent, "알이 부화했다", 400, U.h(360))
     color = EGG_COLOR.get(egg.get("kind"), U.ACCENT)
 
@@ -232,34 +275,14 @@ def announce_hatch(parent, app, egg, on_close=None):
     art.pack(expand=True)
     tk.Label(f, text=natural("%s이(가) 태어났다!" % name), bg=U.BG, fg=U.FG,
              font=U.FONT_H).pack()
-    bits = ["Lv.%d" % int(mon.get("level") or 0)] if mon else []
-    if mon.get("shiny"):
-        bits.append("★ 색이 다른 개체")
-    if mon:
-        bits.append("데리고 다닙니다" if mon.get("onDesktop")
-                    else "파티가 꽉 차서 박스에 넣었습니다")
-    tk.Label(f, text="  ·  ".join(bits), bg=U.BG,
+    tk.Label(f, text="  ·  ".join(t for t, _k in bits), bg=U.BG,
              fg=U.SHINY if mon.get("shiny") else U.FG_FAINT,
              font=U.FONT_XS).pack(pady=(4, 0))
 
-    num = mon.get("num")
-    if num:
-        def work():
-            return sprite_cache.ensure(app.api, num, T.skin(mon))
-
-        def done(path, err):
-            if err or not path:
-                return
-            try:
-                from PIL import ImageTk
-                a = sprites.load_animation(path, 88, 1.0, 3.0, max_frames=1)
-                ph = ImageTk.PhotoImage(sprites.to_rgba(a.frames[sprites.RIGHT][0],
-                                                        a.key))
-                # 창에 붙여 둔다. 지역 변수에만 두면 이 함수가 끝나는 순간
-                # 그림이 지워져 빈칸이 된다 (tk 가 PhotoImage 를 붙들지 않는다).
-                art.image = ph
-                art.configure(image=ph)
-            except Exception:                              # noqa: BLE001
-                pass
-        U.run_async(parent, work, done)
+    def show(ph):
+        # 창에 붙여 둔다. 지역 변수에만 두면 이 함수가 끝나는 순간
+        # 그림이 지워져 빈칸이 된다 (tk 가 PhotoImage 를 붙들지 않는다).
+        art.image = ph
+        art.configure(image=ph)
+    hatch_photo(app, mon, 88, show, parent)
     return win

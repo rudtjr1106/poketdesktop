@@ -14,6 +14,7 @@ import time
 import tkinter as tk
 
 from . import platform_os as PLAT
+from . import skins
 from . import ui_common as U
 
 # 이만큼 지나면 "자고 있어서 그렇다" 고 알려준다.
@@ -26,6 +27,7 @@ LEARN_SLOW = ("인터넷이 느려서 조금 걸리고 있습니다.\n"
               "끝날 때까지 기다려 주세요.  (%d초)")
 
 
+@skins.skinnable
 class Overlay(object):
     """창 위에 덮는 기다림 표시."""
 
@@ -39,6 +41,11 @@ class Overlay(object):
         self.spin = 0
         self.done = False
 
+        self._build(parent, text)
+        self._tick()
+
+    def _build(self, parent, text):
+        """덮는 판을 짓는다 (테마가 바꾼다). self.box 는 close() 가 지운다."""
         self.box = tk.Frame(parent, bg=U.BG)
         self.box.place(relx=0, rely=0, relwidth=1, relheight=1)
         mid = tk.Frame(self.box, bg=U.BG)
@@ -53,13 +60,9 @@ class Overlay(object):
         self.note = tk.Label(mid, text="", bg=U.BG, fg=U.FG_FAINT,
                              font=U.FONT_XS, justify="center")
         self.note.pack(pady=(4, 0))
-        self._tick()
 
-    def _tick(self):
-        if self.done:
-            return
-        # 몬스터볼이 구른다. 도는 것이 있어야 멈춘 게 아니라는 걸 안다.
-        self.spin = (self.spin + 11) % 360
+    def _paint(self):
+        """몬스터볼이 구른다. 도는 것이 있어야 멈춘 게 아니라는 걸 안다 (self.spin 은 _tick 이 올린다)."""
         c = self.cv
         c.delete("all")
         r = 20
@@ -71,11 +74,20 @@ class Overlay(object):
         c.create_oval(x - 7, y - 7, x + 7, y + 7, fill="#f4f6fb",
                       outline=U.INK, width=3)
 
+    def _set_note(self, text):
+        self.note.configure(text=text)
+
+    def _tick(self):
+        if self.done:
+            return
+        self.spin = (self.spin + 11) % 360
+        self._paint()
+
         waited = time.time() - self.t0
         if waited >= SLOW_AFTER:
-            self.note.configure(
-                text=(self.slow or "서버가 자고 있어서 깨우는 중입니다.\n"
-                                   "처음 한 번은 1분쯤 걸릴 수 있습니다.  (%d초)")
+            self._set_note(
+                (self.slow or "서버가 자고 있어서 깨우는 중입니다.\n"
+                              "처음 한 번은 1분쯤 걸릴 수 있습니다.  (%d초)")
                 % int(waited))
         try:
             self.job = self.parent.after(45, self._tick)
@@ -104,6 +116,7 @@ class Overlay(object):
             pass
 
 
+@skins.skinnable
 class Popup(object):
     """덮을 창이 없을 때 쓰는 기다림 표시.
 
@@ -121,8 +134,7 @@ class Popup(object):
         self.win = tk.Toplevel(root)
         U.style_window(self.win, text, self.W, self.H)
         U.apply_theme(self.win)
-        self.win.configure(bg=U.BG, highlightthickness=2,
-                           highlightbackground=U.LINE2)
+        self._frame()
         self.win.resizable(False, False)
         self.win.protocol("WM_DELETE_WINDOW", lambda: None)
         self.body = Overlay(self.win, text, slow=slow)
@@ -131,6 +143,11 @@ class Popup(object):
             self.win.lift()
         except Exception:                                   # noqa: BLE001
             pass
+
+    def _frame(self):
+        """창 틀의 바탕 · 테두리 (테마가 바꾼다)."""
+        self.win.configure(bg=U.BG, highlightthickness=2,
+                           highlightbackground=U.LINE2)
 
     def say(self, text):
         self.body.say(text)

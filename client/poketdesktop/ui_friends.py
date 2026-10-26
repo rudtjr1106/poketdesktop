@@ -15,6 +15,7 @@ import tkinter as tk
 
 from common.korean import ago
 
+from . import skins
 from . import ui_common as U
 from . import ui_loading
 from .ui_common import run_async
@@ -32,6 +33,7 @@ FIRST_ROWS = 10
 CHUNK_ROWS = 4
 
 
+@skins.skinnable
 class FriendsWindow(object):
 
     def __init__(self, app, parent=None):
@@ -202,16 +204,14 @@ class FriendsWindow(object):
                 return self.say(getattr(err, "message", str(err)), U.DANGER)
             self.say((r or {}).get("message") or ok_msg or "됐습니다.")
             self.q.set("")
-            for w in self.found.winfo_children():
-                w.destroy()
+            self._paint_found(None)
             self.reload()
         run_async(self.root, fn, done)
 
     # ---------------- 찾기 결과 ----------------
     def do_search(self):
         name = self.q.get().strip()
-        for w in self.found.winfo_children():
-            w.destroy()
+        self._paint_found(None)
         if not name:
             return
 
@@ -219,12 +219,37 @@ class FriendsWindow(object):
             if err:
                 return self.say(getattr(err, "message", str(err)), U.DANGER)
             if not r.get("found"):
-                return self._note(self.found, "그런 닉네임의 트레이너가 없습니다.")
-            self._search_card(r)
+                return self._paint_found(("note", "그런 닉네임의 트레이너가 없습니다."))
+            self._paint_found(("card", r))
         run_async(self.root, lambda: self.app.api.friend_search(name), done)
 
-    def _search_card(self, r):
+    def _paint_found(self, what):
+        """찾기 결과 (테마마다 그리는 곳). None = 지운다, ("note", 글) · ("card", 찾은 사람)."""
+        for w in self.found.winfo_children():
+            w.destroy()
+        if what is None:
+            return
+        kind, x = what
+        if kind == "note":
+            self._note(self.found, x)
+        else:
+            self._search_card(x)
+
+    def _search_actions(self, r):
+        """찾은 사람 줄의 오른쪽: [("button", 글, 할 일, 모양) | ("label", 글, 색)] (오른쪽부터)."""
         rel = r.get("relation")
+        uid = r["id"]
+        if rel == "none":
+            return [("button", "친구 신청", lambda: self.act(lambda: self.app.api.friend_request(r["name"])), "ghost")]
+        if rel == "incoming":
+            return [("button", "수락", lambda: self.act(lambda: self.app.api.friend_accept(uid)), "ghost")]
+        return [("label", {"self": "나 자신입니다",
+                           "friend": "이미 친구입니다",
+                           "outgoing": "신청을 보내 두었습니다",
+                           "rejected": "거절된 신청이 있습니다",
+                           "blocked": "신청할 수 없습니다"}.get(rel, ""), U.FG_FAINT)]
+
+    def _search_card(self, r):
         card = U.framed(self.found, bg=U.BG3)
         card.pack(fill="x")
         row = tk.Frame(card, bg=U.BG3)
@@ -235,25 +260,11 @@ class FriendsWindow(object):
         if r.get("ranked"):
             tk.Label(row, text="%d점" % r.get("rating", 0), bg=U.BG3,
                      fg=U.ACCENT, font=U.FONT_S).pack(side="left")
-
-        uid = r["id"]
-        if rel == "none":
-            U.ghost_button(row, "친구 신청",
-                           lambda: self.act(
-                               lambda: self.app.api.friend_request(r["name"])),
-                           height=30).pack(side="right")
-        elif rel == "incoming":
-            U.ghost_button(row, "수락",
-                           lambda: self.act(
-                               lambda: self.app.api.friend_accept(uid)),
-                           height=30).pack(side="right")
-        else:
-            tk.Label(row, text={"self": "나 자신입니다",
-                                "friend": "이미 친구입니다",
-                                "outgoing": "신청을 보내 두었습니다",
-                                "rejected": "거절된 신청이 있습니다",
-                                "blocked": "신청할 수 없습니다"}.get(rel, ""),
-                     bg=U.BG3, fg=U.FG_FAINT, font=U.FONT_S).pack(side="right")
+        for it in self._search_actions(r):
+            if it[0] == "button":
+                U.ghost_button(row, it[1], it[2], height=30).pack(side="right")
+            else:
+                tk.Label(row, text=it[1], bg=U.BG3, fg=it[2], font=U.FONT_S).pack(side="right")
 
     # ---------------- 그리기 ----------------
     def draw(self):
@@ -267,6 +278,23 @@ class FriendsWindow(object):
         # 곧 보이는 화면이다 - 아래를 보던 채로 두면 아직 안 만든 자리가
         # 빈 채로 먼저 보인다. 다 만들면 보던 자리로 돌려놓는다 (_back_to).
         self.cv.yview_moveto(0)
+        count, items = self._list_data()
+        self.count.configure(text=count)
+        # 그릴 차례를 순서대로 늘어놓고 나눠 만든다. 순서는 예전과 같다 -
+        # 받은 신청이 맨 위라 첫 묶음에 든다.
+        rows = {"title": lambda x: self._title(*x), "note": lambda x: self._note(self.list, x),
+                "request": self._request_row, "friend": self._friend_row,
+                "pending": self._pending_row, "blocked": self._blocked_row}
+        steps = [(rows[kind], (x,)) for kind, x in items]
+        self._job = U.Chunked(self.win, steps, lambda s: s[0](*s[1]),
+                              first=FIRST_ROWS, size=CHUNK_ROWS,
+                              on_done=lambda: self._back_to(keep))
+        # 목록이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게.
+        self.fit.schedule()
+
+    def _list_data(self):
+        """(머리의 '3 / 30명 · 접속 중 1명', [(종류, 자료)]) - 종류는 title · note · request · friend · pending · blocked.
+        title 의 자료는 (글, 색) 이다 (색이 없으면 기본)."""
         d = self.data or {}
         fr = d.get("friends") or []
         inc = d.get("incoming") or []
@@ -274,33 +302,21 @@ class FriendsWindow(object):
         blk = d.get("blocked") or []
         on = sum(1 for f in fr if f.get("online"))
         lim = (d.get("limits") or {}).get("maxFriends", 30)
-        self.count.configure(text="%d / %d명  ·  접속 중 %d명"
-                                  % (len(fr), lim, on))
-
-        # 그릴 차례를 순서대로 늘어놓고 나눠 만든다. 순서는 예전과 같다 -
-        # 받은 신청이 맨 위라 첫 묶음에 든다.
-        steps = []
+        items = []
         if inc:
-            steps.append((self._title, ("받은 신청 %d" % len(inc), U.ACCENT)))
-            steps += [(self._request_row, (x,)) for x in inc]
-
-        steps.append((self._title, ("친구 %d" % len(fr),)))
+            items.append(("title", ("받은 신청 %d" % len(inc), U.ACCENT)))
+            items += [("request", x) for x in inc]
+        items.append(("title", ("친구 %d" % len(fr),)))
         if not fr:
-            steps.append((self._note, (
-                self.list, "아직 친구가 없습니다. 위에서 닉네임으로 찾아보세요.")))
-        steps += [(self._friend_row, (f,)) for f in fr]
-
+            items.append(("note", "아직 친구가 없습니다. 위에서 닉네임으로 찾아보세요."))
+        items += [("friend", f) for f in fr]
         if out:
-            steps.append((self._title, ("보낸 신청 %d" % len(out), U.FG_DIM)))
-            steps += [(self._pending_row, (x,)) for x in out]
+            items.append(("title", ("보낸 신청 %d" % len(out), U.FG_DIM)))
+            items += [("pending", x) for x in out]
         if blk:
-            steps.append((self._title, ("차단 %d" % len(blk), U.FG_FAINT)))
-            steps += [(self._blocked_row, (x,)) for x in blk]
-        self._job = U.Chunked(self.win, steps, lambda s: s[0](*s[1]),
-                              first=FIRST_ROWS, size=CHUNK_ROWS,
-                              on_done=lambda: self._back_to(keep))
-        # 목록이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게.
-        self.fit.schedule()
+            items.append(("title", ("차단 %d" % len(blk), U.FG_FAINT)))
+            items += [("blocked", x) for x in blk]
+        return "%d / %d명  ·  접속 중 %d명" % (len(fr), lim, on), items
 
     def _scroll_top(self):
         try:
@@ -363,6 +379,37 @@ class FriendsWindow(object):
         row.pack(fill="x", padx=12, pady=9)
         return row
 
+    def _friend_actions(self, f):
+        """친구 줄의 오른쪽: [("button", 글, 할 일, 모양) | ("label", 글, 색, 작은 글인가)] (오른쪽부터).
+        모양: ghost(보통) · red(배틀) · accent(놀러 가기 · 실시간)."""
+        uid = f["id"]
+        out = [("button", "삭제", lambda: self.act(lambda: self.app.api.friend_remove(uid), "친구를 삭제했습니다."),
+                "ghost"),
+               ("button", "차단", lambda: self.act(lambda: self.app.api.friend_block(uid)), "ghost"),
+               # 접속해 있지 않아도 걸린다 - 그 사람의 지금 파티를 가져와 싸운다.
+               ("button", "배틀", lambda: self.app.pvp_challenge(uid), "red")]
+        # 걸어 둔 초대가 이 친구에게 간 것이면, 단추 대신 **기다리는 중**을
+        # 띄운다. 알림 한 줄은 금방 사라져서 신청이 갔는지 알 수가 없었다.
+        pend = getattr(self.app, "live_pending", None) or {}
+        if pend and pend.get("foeId") == uid:
+            out.append(("button", "취소", lambda: self.app.live_cancel(self.draw), "ghost"))
+            out.append(("label", "수락을 기다리는 중...", U.ACCENT, False))
+            return out
+        # 친구 집에 놀러 가기 (1.11.0): 앱이 켜져 있고 다른 친구와 연결돼 있지 않은 친구에게만.
+        visit = getattr(self.app, "visit", None)
+        if visit is not None and visit.active and visit.partner_id() == uid:
+            # 지금 이 친구와 연결돼 있다 - 채팅 창이 없으니 끝내는 단추를 여기에도 둔다 (도트 우클릭에도 있다)
+            out.append(("button", "돌아오기" if visit.guest else "돌려보내기", lambda: self.end_visit(), "ghost"))
+        elif f.get("visitable") and visit is not None and not visit.active:
+            out.append(("button", "놀러 가기", lambda: self.open_visit(f), "accent"))
+        elif f.get("visitBusy"):
+            out.append(("label", "친구와 노는 중", U.FG_FAINT, True))
+        # 실시간 배틀은 **둘 다 켜 있어야** 한다. 접속 중인 친구에게만 띄운다 -
+        # 꺼져 있는 친구 옆에 눌러도 거절당할 단추를 두지 않는다.
+        if f.get("online"):
+            out.append(("button", "실시간", lambda: self.app.live_invite(uid, f.get("name")), "accent"))
+        return out
+
     def _friend_row(self, f):
         row = self._card()
         self._dot(row, f.get("online"))
@@ -391,47 +438,13 @@ class FriendsWindow(object):
         if w or l:
             tk.Label(row, text="%d승 %d패" % (w, l), bg=U.BG3, fg=U.FG_FAINT,
                      font=U.FONT_XS).pack(side="left", padx=(8, 0))
-        uid = f["id"]
-        U.ghost_button(row, "삭제",
-                       lambda: self.act(
-                           lambda: self.app.api.friend_remove(uid),
-                           "친구를 삭제했습니다."), height=28).pack(side="right")
-        U.ghost_button(row, "차단",
-                       lambda: self.act(
-                           lambda: self.app.api.friend_block(uid)),
-                       height=28).pack(side="right", padx=(0, 6))
-        # 접속해 있지 않아도 걸린다 - 그 사람의 지금 파티를 가져와 싸운다.
-        U.ghost_button(row, "배틀", lambda: self.app.pvp_challenge(uid),
-                       height=28, fill=U.RED).pack(side="right", padx=(0, 6))
-        # 걸어 둔 초대가 이 친구에게 간 것이면, 단추 대신 **기다리는 중**을
-        # 띄운다. 알림 한 줄은 금방 사라져서 신청이 갔는지 알 수가 없었다.
-        pend = getattr(self.app, "live_pending", None) or {}
-        if pend and pend.get("foeId") == uid:
-            U.ghost_button(row, "취소",
-                           lambda: self.app.live_cancel(self.draw),
-                           height=28).pack(side="right", padx=(0, 6))
-            tk.Label(row, text="수락을 기다리는 중...", bg=U.BG3, fg=U.ACCENT,
-                     font=U.FONT_S).pack(side="right", padx=(0, 8))
-            return
-        # 친구 집에 놀러 가기 (1.11.0): 앱이 켜져 있고 다른 친구와 연결돼 있지 않은 친구에게만.
-        visit = getattr(self.app, "visit", None)
-        if visit is not None and visit.active and visit.partner_id() == uid:
-            # 지금 이 친구와 연결돼 있다 - 채팅 창이 없으니 끝내는 단추를 여기에도 둔다 (도트 우클릭에도 있다)
-            U.ghost_button(row, "돌아오기" if visit.guest else "돌려보내기", lambda: self.end_visit(),
-                           height=28).pack(side="right", padx=(0, 6))
-        elif f.get("visitable") and visit is not None and not visit.active:
-            U.ghost_button(row, "놀러 가기", lambda: self.open_visit(f),
-                           height=28, fill=U.ACCENT_DARK, fg=U.ACCENT).pack(side="right", padx=(0, 6))
-        elif f.get("visitBusy"):
-            tk.Label(row, text="친구와 노는 중", bg=U.BG3, fg=U.FG_FAINT,
-                     font=U.FONT_XS).pack(side="right", padx=(0, 8))
-        # 실시간 배틀은 **둘 다 켜 있어야** 한다. 접속 중인 친구에게만 띄운다 -
-        # 꺼져 있는 친구 옆에 눌러도 거절당할 단추를 두지 않는다.
-        if f.get("online"):
-            U.ghost_button(row, "실시간",
-                           lambda: self.app.live_invite(uid, f.get("name")),
-                           height=28, fill=U.ACCENT_DARK,
-                           fg=U.ACCENT).pack(side="right", padx=(0, 6))
+        for i, it in enumerate(self._friend_actions(f)):
+            if it[0] == "button":
+                kw = {"red": {"fill": U.RED}, "accent": {"fill": U.ACCENT_DARK, "fg": U.ACCENT}}.get(it[3], {})
+                U.ghost_button(row, it[1], it[2], height=28, **kw).pack(side="right", padx=(0, 6) if i else 0)
+            else:
+                tk.Label(row, text=it[1], bg=U.BG3, fg=it[2],
+                         font=U.FONT_XS if it[3] else U.FONT_S).pack(side="right", padx=(0, 8))
 
     def end_visit(self):
         visit = getattr(self.app, "visit", None)
@@ -448,21 +461,31 @@ class FriendsWindow(object):
         from .ui_visit import SendDialog
         self.visit_dialog = SendDialog(self.app, {"id": f["id"], "name": f.get("name")})
 
+    def _request_actions(self, x):
+        """받은 신청 줄의 단추 (오른쪽부터): [(글, 할 일)]."""
+        uid = x["id"]
+        return [("거절", lambda: self.act(lambda: self.app.api.friend_remove(uid), "신청을 거절했습니다.")),
+                ("수락", lambda: self.act(lambda: self.app.api.friend_accept(uid)))]
+
+    def _pending_actions(self, x):
+        uid = x["id"]
+        return [("취소", lambda: self.act(lambda: self.app.api.friend_remove(uid), "신청을 취소했습니다."))]
+
+    def _blocked_actions(self, x):
+        uid = x["id"]
+        return [("차단 해제", lambda: self.act(lambda: self.app.api.friend_unblock(uid), "차단을 풀었습니다."))]
+
+    def _buttons(self, row, actions):
+        for i, (text, fn) in enumerate(actions):
+            U.ghost_button(row, text, fn, height=28).pack(side="right", padx=(0, 6) if i else 0)
+
     def _request_row(self, x):
         row = self._card()
         tk.Label(row, text=x["name"], bg=U.BG3, fg=U.FG,
                  font=U.FONT_B).pack(side="left")
         tk.Label(row, text="님이 친구 신청을 보냈습니다", bg=U.BG3,
                  fg=U.FG_DIM, font=U.FONT_S).pack(side="left", padx=(6, 0))
-        uid = x["id"]
-        U.ghost_button(row, "거절",
-                       lambda: self.act(
-                           lambda: self.app.api.friend_remove(uid),
-                           "신청을 거절했습니다."), height=28).pack(side="right")
-        U.ghost_button(row, "수락",
-                       lambda: self.act(
-                           lambda: self.app.api.friend_accept(uid)),
-                       height=28).pack(side="right", padx=(0, 6))
+        self._buttons(row, self._request_actions(x))
 
     def _pending_row(self, x):
         row = self._card()
@@ -470,21 +493,13 @@ class FriendsWindow(object):
                  font=U.FONT_S).pack(side="left")
         tk.Label(row, text="답을 기다리는 중", bg=U.BG3, fg=U.FG_FAINT,
                  font=U.FONT_XS).pack(side="left", padx=(6, 0))
-        uid = x["id"]
-        U.ghost_button(row, "취소",
-                       lambda: self.act(
-                           lambda: self.app.api.friend_remove(uid),
-                           "신청을 취소했습니다."), height=28).pack(side="right")
+        self._buttons(row, self._pending_actions(x))
 
     def _blocked_row(self, x):
         row = self._card()
         tk.Label(row, text=x["name"], bg=U.BG3, fg=U.FG_FAINT,
                  font=U.FONT_S).pack(side="left")
-        uid = x["id"]
-        U.ghost_button(row, "차단 해제",
-                       lambda: self.act(
-                           lambda: self.app.api.friend_unblock(uid),
-                           "차단을 풀었습니다."), height=28).pack(side="right")
+        self._buttons(row, self._blocked_actions(x))
 
     # ---------------- 끝 ----------------
     def focus(self):

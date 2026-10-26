@@ -133,6 +133,11 @@ def build(onedir=False):
         # 길드 채팅의 웹소켓 (websocket-client). try 안에서 불러서 못 찾을 수 있어 적어 둔다 -
         # 빠지면 오류 없이 채팅이 2초 폴링으로만 돈다 (눈에 안 띄는 고장).
         "--hidden-import", "websocket",
+        # 화면 테마 (skins/). 테마마다 화면 파일을 이름으로 불러서(importlib) PyInstaller 가 못 본다 -
+        # 통째로 넣는다. 테마의 글꼴 파일도 같이 (skins.font_dir 이 poketdesktop/fonts 를 본다).
+        "--collect-submodules", "poketdesktop.skins",
+        "--add-data", os.path.join(ROOT, "client", "poketdesktop", "fonts") + os.pathsep
+        + os.path.join("poketdesktop", "fonts"),
         # 안 쓰는 무거운 것들은 뺀다
         "--exclude-module", "numpy",
         "--exclude-module", "scipy",

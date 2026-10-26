@@ -14,6 +14,7 @@ from tkinter import ttk
 
 from . import autostart
 from . import config
+from . import skins
 from common.korean import natural
 
 from . import ui_common as U
@@ -58,6 +59,7 @@ class Row(object):
         self.on_change(v)
 
 
+@skins.skinnable
 class SettingsWindow(object):
 
     def __init__(self, app, parent=None, header=True):
@@ -75,7 +77,10 @@ class SettingsWindow(object):
         if not U.is_embedded(self.win):
             # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
             U.install_wheel(self.win)
+        self._build(s, header)
 
+    # 화면 테마(skins/)는 _build 만 갈아 끼운다 - 값을 바꾸는 일(_set · _toggle · _set_catch …)은 이 창의 것을 쓴다.
+    def _build(self, s, header):
         if header:
             head = tk.Frame(self.win, bg=U.BG2, height=U.h(56))
             head.pack(fill="x")
@@ -107,6 +112,7 @@ class SettingsWindow(object):
         U.scrollable(self.cv, 60)
         p.configure(padx=20, pady=4)
 
+        self._skin_box(p, s)
         Row(p, "포켓몬 크기", "도트를 이 높이에 맞춰 통일합니다.",
             24, 120, s["targetHeight"], "%.0f px",
             lambda v: self._set_size(int(v)), step=4)
@@ -153,6 +159,80 @@ class SettingsWindow(object):
             self.cv.configure(
                 scrollregion=(0, 0, self.cv.winfo_width(),
                               max(h, need[3])))
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    # ---------------------------------------------------------------- 화면 테마
+    def _skin_box(self, p, s):
+        """화면 테마 (리소스팩, skins/). 고르면 저장하고, 지금 것과 다르면 '다시 켜서 적용' 을 띄운다.
+
+        고를 것이 기본 하나뿐이면(다 그린 테마가 아직 없으면) 칸을 안 그린다.
+        """
+        self.skin_rows = {}
+        items = skins.choices()
+        if len(items) < 2:
+            return
+        box = tk.Frame(p, bg=U.BG)
+        box.pack(fill="x", pady=(12, 0))
+        tk.Label(box, text="화면 테마", bg=U.BG, fg=U.FG, font=U.FONT_B,
+                 anchor="w").pack(fill="x")
+        tk.Label(box, text="창과 배틀 화면을 그 세대 게임처럼 그립니다. 바꾸면 프로그램을 다시 켜서 적용합니다.",
+                 bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left",
+                 wraplength=W - 60).pack(fill="x")
+        grid = tk.Frame(box, bg=U.BG)
+        grid.pack(fill="x", pady=(6, 0))
+        self.skin_pick = s.get("skin") if skins.usable(s.get("skin")) else skins.DEFAULT
+        for i, sk in enumerate(items):
+            cell = tk.Frame(grid, bg=U.BG2, highlightthickness=2, highlightbackground=U.LINE,
+                            cursor="hand2")
+            cell.grid(row=i // 2, column=i % 2, sticky="nsew", padx=(0 if i % 2 == 0 else 4, 0), pady=(0, 4))
+            name = tk.Label(cell, text=sk.name, bg=U.BG2, fg=U.FG, font=U.FONT_B, anchor="w",
+                            cursor="hand2")
+            name.pack(fill="x", padx=10, pady=(6, 0))
+            era = tk.Label(cell, text=sk.era, bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS, anchor="w",
+                           cursor="hand2")
+            era.pack(fill="x", padx=10, pady=(0, 6))
+            for w in (cell, name, era):
+                w.bind("<Button-1>", lambda _e, k=sk.key: self._pick_skin(k))
+            self.skin_rows[sk.key] = (cell, name, era)
+        grid.columnconfigure(0, weight=1, uniform="skin")
+        grid.columnconfigure(1, weight=1, uniform="skin")
+        self.skin_apply = tk.Frame(box, bg=U.BG)
+        self.skin_apply_note = tk.Label(self.skin_apply, text="", bg=U.BG, fg=U.ACCENT_TEXT,
+                                        font=U.FONT_S, anchor="w")
+        self.skin_apply_note.pack(side="left")
+        U.PushButton(self.skin_apply, "다시 켜서 적용", self._restart_for_skin,
+                     height=30, font=U.FONT_S).pack(side="right")
+        self._paint_skin()
+
+    def _pick_skin(self, key):
+        if key == self.skin_pick:
+            return
+        self.skin_pick = key
+        self._set("skin", key)
+        self._paint_skin()
+
+    def _paint_skin(self):
+        for key, (cell, name, era) in self.skin_rows.items():
+            on = key == self.skin_pick
+            bg = U.ACCENT_SOFT if on else U.BG2
+            cell.configure(bg=bg, highlightbackground=U.ACCENT if on else U.LINE)
+            name.configure(bg=bg, fg=U.ACCENT if on else U.FG)
+            era.configure(bg=bg)
+        if self.skin_pick != skins.active():
+            self.skin_apply_note.configure(
+                text="'%s' 테마는 다시 켜면 적용됩니다." % skins.BY_KEY[self.skin_pick].name)
+            self.skin_apply.pack(fill="x", pady=(4, 0))
+        else:
+            self.skin_apply.pack_forget()
+
+    def _restart_for_skin(self):
+        if not self.app.restart():
+            self.status_say("다시 켜지 못했습니다. 프로그램을 직접 껐다 켜 주세요.")
+
+    def status_say(self, text):
+        try:
+            U.set_status(self.status, text, U.DANGER)
         except Exception:                                   # noqa: BLE001
             pass
 
@@ -509,7 +589,10 @@ class SettingsWindow(object):
                 for k in ("server", "lastBall", "autostart",
                           "lastRunVersion", "updateSkipped",
                           # 어디까지 읽었는지도 기록이다 (지우면 '새 글' 표시가 다시 뜬다)
-                          "noticeSeen", "patchSeen")
+                          "noticeSeen", "patchSeen",
+                          # 화면 테마는 다시 켜야 바뀐다 - 여기서 조용히 기본으로 돌리면 다음에
+                          # 켤 때 영문도 모르게 테마가 바뀐다
+                          "skin")
                 if k in self.app.settings}
         self.app.settings.clear()
         self.app.settings.update(dict(config.DEFAULTS))

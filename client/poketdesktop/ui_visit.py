@@ -20,7 +20,7 @@ from PIL import ImageTk
 from common import tint as T
 from common.korean import natural
 
-from . import item_icons, sprite_cache, sprites
+from . import item_icons, skins, sprite_cache, sprites
 from . import ui_bag
 from . import ui_common as U
 from .ui_common import run_async
@@ -50,8 +50,16 @@ class PickRow(ui_bag.ItemRow):
         self._look()
 
 
+@skins.skinnable
 class ItemPicker(object):
-    """들고 갈 도구 (carry) · 보따리에 쌀 도구 (drop) 고르는 창."""
+    """들고 갈 도구 (carry) · 보따리에 쌀 도구 (drop) 고르는 창.
+
+    고르기 · 한도 · 서버 호출은 여기 그대로 두고, 화면 테마는 **짓는 고리(_build)와 칠하는 고리**
+    (_show_limit · _set_go · _paint_status · _show_who · _set_thumb · _set_entries · _refresh_list ·
+    _set_empty_text · _show_empty · _paint_picked) 만 덮어쓴다.
+    """
+    WIN_SIZE = (W, H)             # 테마가 크기를 바꾸려면 이 둘을 덮는다
+    WIN_MIN = (640, 460)
 
     def __init__(self, app, mode, friend=None):
         self.app, self.mode = app, mode
@@ -68,16 +76,53 @@ class ItemPicker(object):
         self.picked_rows = {}         # {도구: (줄, 개수 글)}
         carry = self.carry = (mode == "carry")
         self.win = U.panel(None, self.root, "포스크탑 — 놀러 가기" if carry else "포스크탑 — 여기에 두기",
-                           W, H, 640, 460, self.close)
+                           self.WIN_SIZE[0], self.WIN_SIZE[1], self.WIN_MIN[0], self.WIN_MIN[1], self.close)
         self.win.configure(bg=U.BG, highlightthickness=2, highlightbackground=U.LINE2)
         U.install_wheel(self.win)
+        self._build()
+        self.load()
+
+    # ---------------- 짓기 (테마마다 짓는 곳) ----------------
+    def _build(self):
+        """창 안의 것들. 테마는 이것을 통째로 덮는다 - self.limit · go_btn · status · who · who_sub ·
+        picked_note 에 해당하는 자리를 두고 아래 칠하는 고리(_show_limit …)를 받아야 한다."""
         self._header()
         self._bottom()
         body = tk.Frame(self.win, bg=U.BG)
         body.pack(fill="both", expand=True)
         self._list_pane(body)
         self._picked_pane(body)
-        self.load()
+
+    # ---------------- 칠하는 고리 (테마가 덮는 곳) ----------------
+    def _show_limit(self, text, fg=None):
+        """머리의 한도 칸 ('볼 2/5 · 지닌 도구 0/1' · '받을 수 있음')."""
+        if fg is None:
+            self.limit.configure(text=text)
+        else:
+            self.limit.configure(text=text, fg=fg)
+
+    def _set_go(self, enabled):
+        self.go_btn.configure(state="normal" if enabled else "disabled")
+
+    def _paint_status(self, text, color, fg):
+        U.set_status(self.status, text, color, fg)
+
+    def _show_who(self, title, sub):
+        self.who.configure(text=title)
+        self.who_sub.configure(text=sub)
+
+    def _set_thumb(self, img):
+        self.keep["thumb"] = ImageTk.PhotoImage(img)
+        self.thumb.configure(image=self.keep["thumb"])
+
+    def _set_entries(self, entries):
+        self.vl.set(entries)
+
+    def _refresh_list(self):
+        self.vl.refresh()
+
+    def _set_empty_text(self, text):
+        self.empty_text.configure(text=text)
 
     # ---------------- 머리 ----------------
     def _header(self):
@@ -95,8 +140,7 @@ class ItemPicker(object):
             pass
         tk.Label(inner, text="놀러 가기" if self.carry else "여기에 두기", bg=U.BG2, fg=U.FG,
                  font=(U.FAMILY_BLACK, U.pt(15))).pack(side="left", padx=(10, 10))
-        who = self.friend.get("name") or ((self.app.visit.v or {}).get("partner") if self.app.visit else "")
-        tk.Label(inner, text=("%s 님의 집으로" if self.carry else "%s 님의 집에") % (who or "친구"),
+        tk.Label(inner, text=self._whose_home(),
                  bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_S).pack(side="left")
         purse = tk.Frame(inner, bg=U.INK, highlightthickness=2, highlightbackground=U.LINE)
         purse.pack(side="right")
@@ -105,6 +149,20 @@ class ItemPicker(object):
         self.limit = tk.Label(purse, text="", bg=U.INK, fg=U.ACCENT, font=U.FONT_B)
         self.limit.pack(side="left", padx=(0, 10))
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+
+    def _whose_home(self):
+        """머리의 '○○ 님의 집으로' (놀러 갈 때) · '○○ 님의 집에' (둘 때)."""
+        who = self.friend.get("name") or ((self.app.visit.v or {}).get("partner") if self.app.visit else "")
+        return ("%s 님의 집으로" if self.carry else "%s 님의 집에") % (who or "친구")
+
+    def _how_text(self):
+        """오른쪽 아래 안내글."""
+        if self.carry:
+            return ("들고 갈 수 있는 것은 볼과 지닌 도구 중 귀함까지 (볼 5개 · 지닌 도구 1개). 들고 간 도구는 "
+                    "보여 주기만 한다. 친구 집에서 내 포켓몬을 우클릭해 '여기에 두기' 를 하면 보따리에 싸서 친구에게 "
+                    "줄 수 있다 (친구는 하루 한 번 받는다). 안 준 것은 그대로 내 가방에 남는다.")
+        return ("두는 순간 내 가방에서 빠진다. 친구가 보따리를 누르면 친구 가방으로 들어가고, 안 받은 채 "
+                "끝나면 돌려받는다. 보따리를 받는 것은 하루 한 번이다.")
 
     # ---------------- 왼쪽: 고를 수 있는 것 (가방의 목록) ----------------
     def _list_pane(self, parent):
@@ -157,14 +215,7 @@ class ItemPicker(object):
         self.picked.pack(fill="both", expand=True)
         self.picked_note = tk.Label(self.picked, text="", bg=ui_bag.ROW_BG, fg=U.FG_FAINT, font=U.FONT_S,
                                     justify="center", pady=30)
-        if self.carry:
-            how = ("들고 갈 수 있는 것은 볼과 지닌 도구 중 귀함까지 (볼 5개 · 지닌 도구 1개). 들고 간 도구는 "
-                   "보여 주기만 한다. 친구 집에서 내 포켓몬을 우클릭해 '여기에 두기' 를 하면 보따리에 싸서 친구에게 "
-                   "줄 수 있다 (친구는 하루 한 번 받는다). 안 준 것은 그대로 내 가방에 남는다.")
-        else:
-            how = ("두는 순간 내 가방에서 빠진다. 친구가 보따리를 누르면 친구 가방으로 들어가고, 안 받은 채 "
-                   "끝나면 돌려받는다. 보따리를 받는 것은 하루 한 번이다.")
-        self.how = tk.Label(p, text=how, bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left")
+        self.how = tk.Label(p, text=self._how_text(), bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left")
         self.how.pack(fill="x", pady=(10, 0))
         U.wrap_to_width(self.how)
 
@@ -186,7 +237,7 @@ class ItemPicker(object):
     # ---------------- 거들기 ----------------
     def say(self, text, color=U.GOOD, fg=None):
         try:
-            U.set_status(self.status, natural(text or ""), color, fg)
+            self._paint_status(natural(text or ""), color, fg)
         except tk.TclError:
             pass
 
@@ -244,7 +295,7 @@ class ItemPicker(object):
             if not self.alive:
                 return
             if err:
-                self.empty_text.configure(text="불러오지 못했다.\n%s" % getattr(err, "message", err))
+                self._set_empty_text("불러오지 못했다.\n%s" % getattr(err, "message", err))
                 self._show_empty(True)
                 return
             shop, st, have, thumb = r
@@ -264,8 +315,7 @@ class ItemPicker(object):
                                            if i.get("cat") in ui_bag.CAT_ORDER else 99, i.get("kr") or ""))
             if thumb is not None:
                 try:
-                    self.keep["thumb"] = ImageTk.PhotoImage(thumb)
-                    self.thumb.configure(image=self.keep["thumb"])
+                    self._set_thumb(thumb)
                 except Exception:                           # noqa: BLE001
                     pass
             self._fill()
@@ -282,9 +332,9 @@ class ItemPicker(object):
 
     def _fill(self):
         if not self.items:
-            self.empty_text.configure(text="들고 갈 수 있는 도구가 없다.\n(볼 · 지닌 도구 중 귀함까지)\n도구 없이도 놀러 "
-                                           "갈 수 있다." if self.carry
-                                      else "들고 온 도구가 없다.\n다음에 놀러 갈 때 들고 와서 둘 수 있다.")
+            self._set_empty_text("들고 갈 수 있는 도구가 없다.\n(볼 · 지닌 도구 중 귀함까지)\n도구 없이도 놀러 "
+                                 "갈 수 있다." if self.carry
+                                 else "들고 온 도구가 없다.\n다음에 놀러 갈 때 들고 와서 둘 수 있다.")
             self._show_empty(True)
             return
         self._show_empty(False)
@@ -296,7 +346,7 @@ class ItemPicker(object):
                 last = it.get("cat")
                 entries.append(("head", (last, counts[last])))
             entries.append(("item", it))
-        self.vl.set(entries)
+        self._set_entries(entries)
 
     # ---------------- 고르기 ----------------
     def pick_item(self, iid):
@@ -343,19 +393,19 @@ class ItemPicker(object):
         if not self.alive:
             return
         try:
-            self.vl.refresh()
+            self._refresh_list()
         except tk.TclError:
             pass
         self._paint_who()
         self._paint_picked()
         if self.carry:
-            self.limit.configure(text="볼 %d/%d · 지닌 도구 %d/%d" % (
+            self._show_limit("볼 %d/%d · 지닌 도구 %d/%d" % (
                 self.cat_total("ball"), self.ball_max(), self.cat_total("held"), self.held_max()))
-            self.go_btn.configure(state="normal")
+            self._set_go(True)
         else:
             give = self.can_give()
-            self.limit.configure(text="받을 수 있음" if give else "이미 받음", fg=U.ACCENT if give else U.DANGER)
-            self.go_btn.configure(state="normal" if (give and self.total() > 0) else "disabled")
+            self._show_limit("받을 수 있음" if give else "이미 받음", U.ACCENT if give else U.DANGER)
+            self._set_go(give and self.total() > 0)
             if not give:
                 self.say(self._no_give_text(), U.DANGER, U.DANGER)
 
@@ -368,13 +418,13 @@ class ItemPicker(object):
         if self.carry:
             lead = vis.my_lead_pet() if vis is not None else None
             info = ((lead.mon or {}).get("info") or {}) if lead is not None else {}
-            self.who.configure(text=("%s  Lv.%s" % (info.get("name"), info.get("level", "?")))
-                               if info.get("name") else "파티 맨 앞 포켓몬")
-            self.who_sub.configure(text="이(가) 친구 바탕화면으로 놀러 간다. 화면 오른쪽에서 걸어 들어가 오른쪽 "
-                                        "아래에 선다.")
+            self._show_who(("%s  Lv.%s" % (info.get("name"), info.get("level", "?")))
+                           if info.get("name") else "파티 맨 앞 포켓몬",
+                           "이(가) 친구 바탕화면으로 놀러 간다. 화면 오른쪽에서 걸어 들어가 오른쪽 "
+                           "아래에 선다.")
         else:
-            self.who.configure(text="보따리 %d개" % self.total() if self.total() else "보따리")
-            self.who_sub.configure(text="내 포켓몬 옆에 보따리를 둔다. 친구가 누르면 받는다.")
+            self._show_who("보따리 %d개" % self.total() if self.total() else "보따리",
+                           "내 포켓몬 옆에 보따리를 둔다. 친구가 누르면 받는다.")
 
     def _paint_picked(self):
         for iid in list(self.picked_rows):
@@ -428,14 +478,14 @@ class ItemPicker(object):
         vis = getattr(self.app, "visit", None)
         if vis is None:
             return
-        self.go_btn.configure(state="disabled")
+        self._set_go(False)
         self.say("가는 중...", U.FG_FAINT)
 
         def done(r, err):
             if not self.alive:
                 return
             if err:
-                self.go_btn.configure(state="normal")
+                self._set_go(True)
                 return self.say(getattr(err, "message", None) or str(err), U.DANGER, U.DANGER)
             self.close()
         vis.go(self.friend["id"], self.items_out(), done)
@@ -444,7 +494,7 @@ class ItemPicker(object):
         items = self.items_out()
         if not items:
             return
-        self.go_btn.configure(state="disabled")
+        self._set_go(False)
         self.say("보따리를 싸는 중...", U.FG_FAINT)
         api = self.app.api
 

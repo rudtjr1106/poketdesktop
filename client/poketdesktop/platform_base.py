@@ -387,6 +387,15 @@ def pil_font_files(bold=False):
     return ()
 
 
+def register_font(path):
+    """글꼴 파일 하나를 **이 프로그램 안에서만** 쓸 수 있게 등록한다 (화면 테마의 글꼴).
+
+    컴퓨터에 깔지 않는다 - 프로그램이 끝나면 운영체제가 잊는다. 됐으면 True.
+    tk.Tk() 를 만들기 **전에** 불러야 Tk 의 글꼴 목록에 들어간다.
+    """
+    return False
+
+
 def already_running_hint():
     """이미 돌고 있다고 알릴 때, 어디를 보라고 할 것인가."""
     return "이미 떠 있는 창을 찾아보세요."

@@ -16,6 +16,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 
 from . import sprite_cache
+from . import skins
 from . import ui_common as U
 from . import ui_loading
 from .ui_common import run_async
@@ -54,6 +55,7 @@ def query_hit(sp, query):
     return False
 
 
+@skins.skinnable
 class DexWindow(object):
 
     def __init__(self, app, parent=None):
@@ -84,16 +86,20 @@ class DexWindow(object):
             # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
             U.install_wheel(self.win)
 
+        self.ach = None             # 처음 누를 때 만든다
+        self.titles = None          # 칭호 목록 (1.8.1). 이것도 처음 누를 때
+        self._ach_label = None
+        self._build()
+        self.reload()
+
+    # 화면 테마(skins/)는 _build 와 칠하는 자리(draw · _redraw_cells · visible_nums · _show_panel)만 갈아 끼운다.
+    def _build(self):
         self._header()
         # 격자와 업적 칸을 번갈아 보여주려고 격자 쪽을 한 틀에 담는다.
         self.dex_body = tk.Frame(self.win, bg=U.BG)
         self.dex_body.pack(fill="both", expand=True)
         self._filters()
         self._grid()
-        self.ach = None             # 처음 누를 때 만든다
-        self.titles = None          # 칭호 목록 (1.8.1). 이것도 처음 누를 때
-        self._ach_label = None
-        self.reload()
 
     # ---------------- 머리 ----------------
     def _header(self):

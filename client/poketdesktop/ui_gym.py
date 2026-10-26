@@ -48,7 +48,7 @@ import tkinter.font as tkfont
 
 from PIL import Image, ImageDraw, ImageTk
 
-from . import config, sprite_cache, sprites
+from . import config, skins, sprite_cache, sprites
 from . import ui_common as U
 from .ui_common import run_async
 
@@ -249,7 +249,13 @@ class TrainerRow(object):
             self.win.hover_row(self.data[0]["region"], False)
 
 
+@skins.skinnable
 class GymWindow(object):
+    # 지도의 색 (테마가 바꾼다). 글꼴은 _map_family · _map_bold · _map_xs.
+    MAP = {"bg": "#0f141d", "legend_bg": "#0f141d", "hint_bg": "#0f141d",
+           "sido": "#2a3246", "edge": "#0b0e14", "hot": "#ffffff",
+           "label": "#f2f4fb", "label_sub": "#c9cfdf", "ink": "#10131b", "island": "#4a5475",
+           "legend": None, "legend_dim": None, "link": None, "hint_line": "#2c3650"}
 
     def __init__(self, root, app, parent=None):
         self.root = root
@@ -281,6 +287,10 @@ class GymWindow(object):
         self.boss = {}               # 악당 출현 (시즌 4): 서버 개요의 "boss" 칸
         self.boss_win = None
 
+        self.MAP = dict(self.MAP)
+        for k, v in (("legend", U.FG_DIM), ("legend_dim", U.FG_FAINT), ("link", U.ACCENT)):
+            if self.MAP.get(k) is None:
+                self.MAP[k] = v
         self.win = U.panel(parent, root, "포스크탑 — 관장", W, H, 900, 600, self.close)
         self.win.configure(bg=U.BG, highlightthickness=2, highlightbackground=U.LINE2)
         if not U.is_embedded(self.win):
@@ -294,6 +304,18 @@ class GymWindow(object):
         self.reload()
 
     # ---------------- 틀 ----------------
+    def _map_family(self):
+        return U.FAMILY
+
+    def _map_bold(self):
+        return "bold"
+
+    def _map_xs(self):
+        return U.FONT_XS
+
+    def _map_backdrop(self):
+        """지도 캔버스의 바탕 (redraw 가 다 지운 뒤 맨 먼저). 기본은 캔버스 바탕색 그대로."""
+
     def _header(self):
         h = tk.Frame(self.win, bg=U.BG2, height=U.h(62))
         h.pack(fill="x")
@@ -320,10 +342,10 @@ class GymWindow(object):
         self._status(holder)
         # 범례는 **지도와 다른 캔버스**에 둔다. 한 캔버스에 두면 키운 지도나 마우스를
         # 올려 위로 올린 도형이 범례를 덮었다.
-        self.legend_cv = tk.Canvas(holder, bg="#0f141d", highlightthickness=0, height=U.h(50))
+        self.legend_cv = tk.Canvas(holder, bg=self.MAP["legend_bg"], highlightthickness=0, height=U.h(50))
         self.legend_cv.pack(side="bottom", fill="x")
         tk.Frame(holder, bg=U.LINE, height=1).pack(side="bottom", fill="x")
-        self.cv = tk.Canvas(holder, bg="#0f141d", highlightthickness=0)
+        self.cv = tk.Canvas(holder, bg=self.MAP["bg"], highlightthickness=0)
         self.cv.pack(fill="both", expand=True)
         self.cv.bind("<Configure>", self._on_resize)
         # 시·도 안에서는 휠로 키우고 끌어서 옮긴다. 경기·인천의 구는 작아서
@@ -705,6 +727,7 @@ class GymWindow(object):
         cv = self.cv
         cv.delete("all")
         self.items = {}
+        self._map_backdrop()
         if self.sido is None:
             self._draw_nation()
         else:
@@ -724,14 +747,13 @@ class GymWindow(object):
         order = sorted(self.map["sido"], key=lambda sd: -sd.get("area", 0))
         for sd in order:
             won, total, lo, hi = stats.get(sd["code"], (0, 0, 0, 0))
-            frac = won / float(total or 1)
-            fill = shade(CLEAR, 0.35 + 0.65 * frac) if won else "#2a3246"
+            fill = self._sido_fill(won, total)
             if sd["code"] == self.boss_sido():
                 fill = BOSS_FILL                 # 악당이 차지한 곳은 검다 (시즌 4)
             tag = "s%s" % sd["code"]
             for ring in sd["rings"]:
                 cv.create_polygon([c for p in ring for c in tf(p)], fill=fill,
-                                  outline=BOSS_LINE if fill == BOSS_FILL else "#0b0e14",
+                                  outline=BOSS_LINE if fill == BOSS_FILL else self.MAP["edge"],
                                   width=2 if fill == BOSS_FILL else 1, tags=(tag, "region", "map"))
             self.items[tag] = ("sido", sd["code"])
             cv.tag_bind(tag, "<Enter>", lambda _e, c=sd["code"]: self._hover_sido(c, True))
@@ -740,8 +762,8 @@ class GymWindow(object):
         # 이름표는 도형을 다 그린 뒤에. **좁은 곳부터** 자리를 잡는다 - 서울·세종은
         # 옮길 데가 없지만 경기·충남은 넓어서 비켜 앉을 수 있다. 가운데가 이미
         # 잡혀 있으면 자기 땅 안에서 위·아래·옆으로 옮겨 보고, 끝내 안 되면 뺀다.
-        f1 = tkfont.Font(root=cv, family=U.FAMILY, size=U.pt(9), weight="bold")
-        f2 = tkfont.Font(root=cv, family=U.FAMILY, size=U.pt(8))
+        f1 = tkfont.Font(root=cv, family=self._map_family(), size=U.pt(9), weight=self._map_bold())
+        f2 = tkfont.Font(root=cv, family=self._map_family(), size=U.pt(8))
         self._label_fonts = (f1, f2)
         taken = []
         for sd in reversed(order):
@@ -767,13 +789,18 @@ class GymWindow(object):
                 continue
             cx = (box[0] + box[2]) / 2.0
             taken.append(box)
-            t1 = cv.create_text(cx, box[1] + f1.metrics("linespace") / 2.0, text=label, fill="#f2f4fb",
+            t1 = cv.create_text(cx, box[1] + f1.metrics("linespace") / 2.0, text=label, fill=self.MAP["label"],
                                 font=f1, tags=("label", "map"))
-            t2 = cv.create_text(cx, box[3] - f2.metrics("linespace") / 2.0, text=sub, fill="#c9cfdf",
+            t2 = cv.create_text(cx, box[3] - f2.metrics("linespace") / 2.0, text=sub, fill=self.MAP["label_sub"],
                                 font=f2, tags=("label", "map"))
             for t in (t1, t2):
                 cv.tag_bind(t, "<ButtonRelease-1>", lambda _e, c=sd["code"]: self._click_sido(c))
                 cv.tag_bind(t, "<Enter>", lambda _e, c=sd["code"]: self._hover_sido(c, True))
+
+    def _sido_fill(self, won, total):
+        """전국 지도의 시·도 빛깔: 이긴 곳이 많을수록 진한 금색 (테마가 바꾼다)."""
+        frac = won / float(total or 1)
+        return shade(CLEAR, 0.35 + 0.65 * frac) if won else self.MAP["sido"]
 
     def _sido_stats(self):
         out = {}
@@ -803,7 +830,7 @@ class GymWindow(object):
         for b in boxes:
             # 멀리 떨어진 섬은 가까이 당겨 그렸다. 원래 자리가 아니라는 표시.
             (x0, y0), (x1, y1) = tf((b[0], b[1])), tf((b[2], b[3]))
-            cv.create_rectangle(x0, y0, x1, y1, outline="#4a5475", dash=(4, 3), tags=("map",))
+            cv.create_rectangle(x0, y0, x1, y1, outline=self.MAP["island"], dash=(4, 3), tags=("map",))
         for d in regs:
             t = self.by_region.get(d["code"]) or {}
             lv = t.get("level", 20)
@@ -812,19 +839,19 @@ class GymWindow(object):
             sel = d["code"] == self.selected
             for ring in flat[d["code"]]:
                 cv.create_polygon(ring, fill=fill,
-                                  outline=CLEAR if t.get("cleared") else "#0b0e14",
+                                  outline=CLEAR if t.get("cleared") else self.MAP["edge"],
                                   width=3 if t.get("cleared") else 1, tags=(tag, "region", "map"))
             self.items[tag] = ("sgg", d["code"])
             cv.tag_bind(tag, "<Enter>", lambda _e, c=d["code"]: self._hover_sgg(c, True))
             cv.tag_bind(tag, "<Leave>", lambda _e, c=d["code"]: self._hover_sgg(c, False))
             cv.tag_bind(tag, "<ButtonRelease-1>", lambda _e, c=d["code"]: self._click_region(c))
             if sel:
-                cv.itemconfigure(tag, outline="#ffffff", width=3)
+                cv.itemconfigure(tag, outline=self.MAP["hot"], width=3)
         if self.selected:
             cv.tag_raise("g%s" % self.selected)
             self._restack("g%s" % self.selected)
-        f_name = tkfont.Font(root=cv, family=U.FAMILY, size=U.pt(8), weight="bold")
-        f_lv = tkfont.Font(root=cv, family=U.FAMILY, size=U.pt(7))
+        f_name = tkfont.Font(root=cv, family=self._map_family(), size=U.pt(8), weight=self._map_bold())
+        f_lv = tkfont.Font(root=cv, family=self._map_family(), size=U.pt(7))
         for d in regs:
             t = self.by_region.get(d["code"]) or {}
             sx, sy = shifts.get((d["code"], ring_of(d, d["center"])), (0, 0))
@@ -851,15 +878,15 @@ class GymWindow(object):
                 # 오늘 보상을 받은 곳은 초록, 이겼지만 오늘은 아직인 곳은 금색
                 items.append(cv.create_oval(cx - r, oy - r, cx + r, oy + r,
                                             fill=TODAY if t.get("today") else CLEAR,
-                                            outline="#10131b", tags=("label", "map")))
-                items.append(cv.create_text(cx, oy, text="✓", fill="#10131b",
-                                            font=(U.FAMILY, U.pt(8), "bold"), tags=("label", "map")))
+                                            outline=self.MAP["ink"], tags=("label", "map")))
+                items.append(cv.create_text(cx, oy, text="✓", fill=self.MAP["ink"],
+                                            font=(self._map_family(), U.pt(8), self._map_bold()), tags=("label", "map")))
                 top += ck
             if shown:
-                items.append(cv.create_text(cx, top + nh / 2.0, text=shown[0], fill="#10131b",
+                items.append(cv.create_text(cx, top + nh / 2.0, text=shown[0], fill=self.MAP["ink"],
                                             font=f_name, tags=("label", "map")))
             if len(shown) > 1:
-                items.append(cv.create_text(cx, top + nh + lh / 2.0, text=shown[1], fill="#10131b",
+                items.append(cv.create_text(cx, top + nh + lh / 2.0, text=shown[1], fill=self.MAP["ink"],
                                             font=f_lv, tags=("label", "map")))
             for x in items:
                 cv.tag_bind(x, "<ButtonRelease-1>", lambda _e, c=d["code"]: self._click_region(c))
@@ -870,15 +897,15 @@ class GymWindow(object):
         cv.delete("all")
         x0, y0 = U.h(16), U.h(18)
         if self.sido is None:
-            cv.create_text(x0, y0, anchor="w", fill=U.FG_DIM, font=U.FONT_XS,
+            cv.create_text(x0, y0, anchor="w", fill=self.MAP["legend"], font=self._map_xs(),
                            text="시·도를 누르면 그 안의 시·군·구로 들어갑니다   (금색 = 이긴 곳이 많을수록 진하게)")
             self._zoom_hint()
             return
-        t0 = cv.create_text(x0, y0, anchor="w", fill=U.FG_DIM, font=U.FONT_XS, text="트레이너 레벨")
+        t0 = cv.create_text(x0, y0, anchor="w", fill=self.MAP["legend"], font=self._map_xs(), text="트레이너 레벨")
         bx = cv.bbox(t0)[2] + U.h(10)
         # 표식 둘(이긴 곳 · 오늘 완료)이 설 자리를 먼저 잰다. 색 띠는 남는 폭만큼만 쓴다 -
         # 허브를 가장 좁게 줄이면 띠를 14px 칸으로 그릴 자리가 없다.
-        f = tkfont.Font(root=cv, font=U.FONT_XS)
+        f = tkfont.Font(root=cv, font=self._map_xs())
         r, gap = U.h(8), U.h(16)
         marks = [(CLEAR, "이긴 곳"), (TODAY, "오늘 완료")]
         need = sum(2 * r + U.h(6) + f.measure(text) for _c, text in marks) + gap * len(marks)
@@ -890,12 +917,12 @@ class GymWindow(object):
         for lv in (20, 60, 100):
             i = (lv - 20) // 5
             cv.create_text(bx + i * cell + cell // 2, y0 + U.h(16), text=str(lv),
-                           fill=U.FG_FAINT, font=U.FONT_XS)
+                           fill=self.MAP["legend_dim"], font=self._map_xs())
         ex = bx + 17 * cell + gap
         for color, text in marks:
-            cv.create_oval(ex, y0 - r, ex + 2 * r, y0 + r, fill=color, outline="#10131b", tags=("mark",))
-            cv.create_text(ex + r, y0, text="✓", fill="#10131b", font=(U.FAMILY, U.pt(8), "bold"))
-            tid = cv.create_text(ex + 2 * r + U.h(6), y0, anchor="w", fill=U.FG_DIM, font=U.FONT_XS,
+            cv.create_oval(ex, y0 - r, ex + 2 * r, y0 + r, fill=color, outline=self.MAP["ink"], tags=("mark",))
+            cv.create_text(ex + r, y0, text="✓", fill=self.MAP["ink"], font=(self._map_family(), U.pt(8), self._map_bold()))
+            tid = cv.create_text(ex + 2 * r + U.h(6), y0, anchor="w", fill=self.MAP["legend"], font=self._map_xs(),
                                  text=text, tags=("marktext",))
             ex = cv.bbox(tid)[2] + gap
         self._zoom_hint()
@@ -906,19 +933,19 @@ class GymWindow(object):
         x, y = cv.winfo_width() - U.h(12), U.h(16)
         cv.delete("hint")
         if self.zoom <= 1.0:
-            t0 = cv.create_text(x, y, anchor="e", fill=U.FG_FAINT, font=U.FONT_XS, text="휠로 확대", tags=("hint",))
+            t0 = cv.create_text(x, y, anchor="e", fill=self.MAP["legend_dim"], font=self._map_xs(), text="휠로 확대", tags=("hint",))
             x0, y0, _, y1 = cv.bbox(t0)
-            bg = cv.create_rectangle(x0 - U.h(6), y0 - U.h(3), x + U.h(4), y1 + U.h(3), fill="#0f141d",
+            bg = cv.create_rectangle(x0 - U.h(6), y0 - U.h(3), x + U.h(4), y1 + U.h(3), fill=self.MAP["hint_bg"],
                                      outline="", tags=("hint",))
             cv.tag_lower(bg, t0)
             return
-        rid = cv.create_text(x, y, anchor="e", fill=U.ACCENT, font=U.FONT_XS, text="원래 크기",
+        rid = cv.create_text(x, y, anchor="e", fill=self.MAP["link"], font=self._map_xs(), text="원래 크기",
                              tags=("reset", "hint"))
-        tid = cv.create_text(cv.bbox(rid)[0] - U.h(10), y, anchor="e", fill=U.FG_DIM, font=U.FONT_XS,
+        tid = cv.create_text(cv.bbox(rid)[0] - U.h(10), y, anchor="e", fill=self.MAP["legend"], font=self._map_xs(),
                              text="×%.1f · 끌어서 옮기기" % self.zoom, tags=("hint",))
         x0, y0, _, y1 = cv.bbox(tid)
-        bg = cv.create_rectangle(x0 - U.h(8), y0 - U.h(4), x + U.h(6), y1 + U.h(4), fill="#0f141d",
-                                 outline="#2c3650", tags=("hint",))
+        bg = cv.create_rectangle(x0 - U.h(8), y0 - U.h(4), x + U.h(6), y1 + U.h(4), fill=self.MAP["hint_bg"],
+                                 outline=self.MAP["hint_line"], tags=("hint",))
         cv.tag_lower(bg, rid)
         cv.tag_bind(rid, "<Button-1>", lambda _e: (self._reset_view(), self.redraw()))
         cv.tag_bind(rid, "<Enter>", lambda _e: cv.configure(cursor="hand2"))
@@ -929,8 +956,8 @@ class GymWindow(object):
         tag = "s%s" % code
         evil = code == self.boss_sido()
         try:
-            off = (BOSS_LINE, 2) if evil else ("#0b0e14", 1)
-            self.cv.itemconfigure(tag, outline="#ffffff" if on else off[0], width=2 if on else off[1])
+            off = (BOSS_LINE, 2) if evil else (self.MAP["edge"], 1)
+            self.cv.itemconfigure(tag, outline=self.MAP["hot"] if on else off[0], width=2 if on else off[1])
             if on:
                 self.cv.tag_raise(tag)
                 self._restack(tag)
@@ -954,11 +981,11 @@ class GymWindow(object):
         sel = code == self.selected
         try:
             if on:
-                self.cv.itemconfigure(tag, outline="#ffffff", width=3)
+                self.cv.itemconfigure(tag, outline=self.MAP["hot"], width=3)
                 self.cv.tag_raise(tag)
                 self._restack(tag)
             else:
-                self.cv.itemconfigure(tag, outline="#ffffff" if sel else (CLEAR if t.get("cleared") else "#0b0e14"),
+                self.cv.itemconfigure(tag, outline=self.MAP["hot"] if sel else (CLEAR if t.get("cleared") else self.MAP["edge"]),
                                       width=3 if (sel or t.get("cleared")) else 1)
         except tk.TclError:
             return
@@ -1016,24 +1043,33 @@ class GymWindow(object):
         """목록을 지금 화면(전국 / 시·도)과 거르기에 맞춰 채운다."""
         if not self.data or not self.map:
             return
+        rows, key, note, empty = self._list_data()
+        self._paint_list(rows, keep and key == self._list_key, note, empty)
+        self._list_key = key
+
+    def _list_data(self):
+        """(줄 [(트레이너, 지역 이름)], 목록 열쇠, '12곳' 같은 쪽지, 비었을 때의 말 (줄이 있으면 None))."""
         if self.sido is None:
             names = {d["code"]: "%s %s" % (short_sido(d.get("sidonm", "")), sgg_name(d["name"]))
                      for d in self.map["sgg"]}
         else:
             names = {d["code"]: sgg_name(d["name"]) for d in self.map["sgg"] if d["sido"] == self.sido}
         rows = list_rows(self.data["regions"], names, self.which)
-        key = (self.sido, self.which)
-        self.vl.set([("t", r) for r in rows], keep=keep and key == self._list_key)
-        self._list_key = key
         total = sum(1 for t in self.data["regions"] if t.get("region") in names)
-        self.list_note.configure(text="%d곳" % len(rows) if self.which == "all"
-                                 else "%d / %d곳" % (len(rows), total))
+        note = "%d곳" % len(rows) if self.which == "all" else "%d / %d곳" % (len(rows), total)
+        empty = None if rows else {"new": "이곳은 모두 이겼습니다.",
+                                   "left": "오늘 남은 곳이 없습니다.\n(이긴 곳을 다시 이기면 하루 한 번 상금이 나옵니다)"
+                                   }.get(self.which, "트레이너가 없습니다.")
+        return rows, (self.sido, self.which), note, empty
+
+    def _paint_list(self, rows, keep, note, empty):
+        """트레이너 목록 (테마마다 그리는 곳). keep = 보던 자리 그대로."""
+        self.vl.set([("t", r) for r in rows], keep=keep)
+        self.list_note.configure(text=note)
         if rows:
             self.list_empty.place_forget()
         else:
-            self.list_empty.configure(text={"new": "이곳은 모두 이겼습니다.",
-                                            "left": "오늘 남은 곳이 없습니다.\n(이긴 곳을 다시 이기면 하루 한 번 상금이 나옵니다)"
-                                            }.get(self.which, "트레이너가 없습니다."))
+            self.list_empty.configure(text=empty)
             self.list_empty.place(relx=0.5, rely=0.3, anchor="center")
 
     def _restack(self, raised):
@@ -1115,36 +1151,51 @@ class GymWindow(object):
         """고른 곳이 없을 때 오른쪽: 요약과 그 안의 트레이너 목록."""
         self._clear_card()
         self._show("list")
-        for w in self.head.winfo_children():
-            w.destroy()
-        if not self.data:
-            return
+        self._paint_summary(self._summary_data() if self.data else None)
+
+    def _summary_data(self):
+        """요약에 무엇을 보일지: 경로 · 제목 · 설명 · 세 칸 · 시·도 바로 가기를 보일지."""
         nation = self.sido is None
         if nation:
-            self._crumbs([("대한민국", None)])
-            tk.Label(self.head, text="대한민국", bg=U.BG2, fg=U.FG,
-                     font=(U.FAMILY_BLACK, U.pt(16))).pack(anchor="w", pady=(6, 2))
-            tk.Label(self.head, text="시·군·구 256곳마다 트레이너가 기다립니다.",
-                     bg=U.BG2, fg=U.FG_DIM, font=U.FONT_S, justify="left").pack(anchor="w")
+            crumbs = [("대한민국", None)]
+            title, desc = "대한민국", "시·군·구 256곳마다 트레이너가 기다립니다."
             regions = self.data["regions"]
         else:
             name = self.sido_names.get(self.sido, "")
-            self._crumbs([("대한민국", self.to_nation), (short_sido(name), None)])
-            title = tk.Label(self.head, text=name, bg=U.BG2, fg=U.FG,
-                             font=(U.FAMILY_BLACK, U.pt(16)), justify="left", anchor="w")
-            title.pack(fill="x", pady=(6, 2))
-            U.wrap_to_width(title)
+            crumbs = [("대한민국", self.to_nation), (short_sido(name), None)]
+            title, desc = name, None
             codes = {d["code"] for d in self.map["sgg"] if d["sido"] == self.sido}
             regions = [r for r in self.data["regions"] if r["region"] in codes]
         won = sum(1 for r in regions if r["cleared"])
         today = sum(1 for r in regions if r.get("today"))
+        stats = (("이긴 곳", "%d / %d" % (won, len(regions)), U.FG),
+                 ("오늘 완료", "%d곳" % today, TODAY if today else U.FG_DIM),
+                 ("레벨", "%d ~ %d" % (min(r["level"] for r in regions), max(r["level"] for r in regions)), U.FG))
+        return {"nation": nation, "crumbs": crumbs, "title": title, "desc": desc, "stats": stats,
+                "sido": nation and self.nation_view == "sido"}
+
+    def _paint_summary(self, d):
+        """요약 (테마마다 그리는 곳). d 가 None 이면 아직 불러오는 중이다."""
+        for w in self.head.winfo_children():
+            w.destroy()
+        if d is None:
+            return
+        nation = d["nation"]
+        self._crumbs(d["crumbs"])
+        if nation:
+            tk.Label(self.head, text=d["title"], bg=U.BG2, fg=U.FG,
+                     font=(U.FAMILY_BLACK, U.pt(16))).pack(anchor="w", pady=(6, 2))
+            tk.Label(self.head, text=d["desc"],
+                     bg=U.BG2, fg=U.FG_DIM, font=U.FONT_S, justify="left").pack(anchor="w")
+        else:
+            title = tk.Label(self.head, text=d["title"], bg=U.BG2, fg=U.FG,
+                             font=(U.FAMILY_BLACK, U.pt(16)), justify="left", anchor="w")
+            title.pack(fill="x", pady=(6, 2))
+            U.wrap_to_width(title)
         # 세 칸을 한 줄에 둔다 (세로로 쌓으면 그만큼 목록이 짧아진다)
         box = U.framed(self.head, bg=U.BG3, border=U.LINE)
         box.pack(fill="x", pady=(10, 0))
-        for i, (k, v, color) in enumerate((
-                ("이긴 곳", "%d / %d" % (won, len(regions)), U.FG),
-                ("오늘 완료", "%d곳" % today, TODAY if today else U.FG_DIM),
-                ("레벨", "%d ~ %d" % (min(r["level"] for r in regions), max(r["level"] for r in regions)), U.FG))):
+        for i, (k, v, color) in enumerate(d["stats"]):
             cell = tk.Frame(box, bg=U.BG3)
             cell.grid(row=0, column=i, sticky="nsew", padx=(10 if not i else 4, 4), pady=7)
             tk.Label(cell, text=k, bg=U.BG3, fg=U.FG_DIM, font=U.FONT_XS, bd=0, pady=0).pack(anchor="w")
@@ -1157,7 +1208,7 @@ class GymWindow(object):
             row.pack(fill="x", pady=(12, 0))
             U.Segmented(row, [("sido", "시·도"), ("trainer", "트레이너")], self.nation_view,
                         self.set_nation_view).frame.pack(side="left")
-        if nation and self.nation_view == "sido":
+        if d["sido"]:
             self.list_box.pack_forget()
             self._sido_buttons()
             return
@@ -1170,25 +1221,30 @@ class GymWindow(object):
         U.marker_label(self.head, "시·도 바로 가기", bg=U.BG2).pack(anchor="w", pady=(14, 6))
         grid = tk.Frame(self.head, bg=U.BG2)
         grid.pack(fill="x")
-        stats = self._sido_stats()
-        order = sorted(self.map["sido"], key=lambda sd: sd["code"])
-        for i, sd in enumerate(order):
-            won, total, _lo, _hi = stats.get(sd["code"], (0, 0, 0, 0))
-            done = total and won == total
+        for i, (code, label, won, total, done) in enumerate(self._sido_cells()):
             bg = shade(CLEAR, 0.45) if done else U.BG3
             cell = tk.Frame(grid, bg=bg, cursor="hand2", highlightthickness=1, highlightbackground=U.LINE)
             cell.grid(row=i // 4, column=i % 4, sticky="nsew", padx=2, pady=2)
-            name = tk.Label(cell, text=short_sido(sd["name"]), bg=bg, fg=U.FG, font=U.FONT_S, cursor="hand2")
+            name = tk.Label(cell, text=label, bg=bg, fg=U.FG, font=U.FONT_S, cursor="hand2")
             name.pack(pady=(3, 0))
             cnt = tk.Label(cell, text="%d/%d" % (won, total), bg=bg, fg=U.FG_DIM if not done else U.FG,
                            font=U.FONT_XS, cursor="hand2")
             cnt.pack(pady=(0, 3))
             for w in (cell, name, cnt):
-                w.bind("<Button-1>", lambda _e, c=sd["code"]: self.enter_sido(c))
+                w.bind("<Button-1>", lambda _e, c=code: self.enter_sido(c))
                 w.bind("<Enter>", lambda _e, ws=(cell, name, cnt): [x.configure(bg=U.BG4) for x in ws])
                 w.bind("<Leave>", lambda _e, ws=(cell, name, cnt), b=bg: [x.configure(bg=b) for x in ws])
         for c in range(4):
             grid.grid_columnconfigure(c, weight=1, uniform="sido")
+
+    def _sido_cells(self):
+        """시·도 바로 가기 열여섯 칸: [(코드, 짧은 이름, 이긴 곳, 전체, 다 이겼나)] (코드 순)."""
+        stats = self._sido_stats()
+        out = []
+        for sd in sorted(self.map["sido"], key=lambda sd: sd["code"]):
+            won, total, _lo, _hi = stats.get(sd["code"], (0, 0, 0, 0))
+            out.append((sd["code"], short_sido(sd["name"]), won, total, bool(total and won == total)))
+        return out
 
     def jump(self, code):
         d = next((x for x in self.map["sgg"] if x["code"] == code), None)
@@ -1223,8 +1279,7 @@ class GymWindow(object):
                      back=lambda s=d.get("sido"): self.back_to_list(s))
         self._clear_card()
         self._show("card")
-        tk.Label(self.card, text="트레이너를 불러오는 중...", bg=U.BG2, fg=U.FG_DIM,
-                 font=U.FONT_S).pack(anchor="w", pady=10)
+        self._card_loading()
 
         def work():
             t = self.app.api.gym_trainer(code)
@@ -1247,7 +1302,43 @@ class GymWindow(object):
 
         run_async(self.root, work, done)
 
+    def _card_loading(self):
+        """카드 자리의 '불러오는 중' (테마마다 그리는 곳)."""
+        tk.Label(self.card, text="트레이너를 불러오는 중...", bg=U.BG2, fg=U.FG_DIM,
+                 font=U.FONT_S).pack(anchor="w", pady=10)
+
+    def _card_data(self, code, t):
+        """트레이너 카드에 무엇을 보일지 (글은 다 여기서 정한다)."""
+        st_key = region_state(t)
+        act = (self.data or {}).get("active")
+        if act and act["region"] == code:
+            label = "승부 이어하기"
+        elif act:
+            label = "다른 승부가 진행 중"
+        else:
+            label = "도전하기"
+        other = None
+        if act and act["region"] != code:
+            other = "%s 과(와)의 승부를 먼저 끝내세요." % self.by_region.get(act["region"], {}).get("name", "")
+        return {
+            "role": t["role"], "name": t["name"], "level": t["level"], "state": st_key,
+            "type": ("%s 타입을 주로 쓴다" % t["typeKr"]) if t.get("typeKr") else None,
+            # 이긴 기록과 상금
+            "record": ("✓ 이긴 곳 · %d번 이김%s" % (t["wins"], (" · 최소 %d턴" % t["bestTurns"]) if t.get("bestTurns") else "")
+                       if t["cleared"] else "아직 이기지 못했다"),
+            "cleared": bool(t["cleared"]),
+            "prize": {"new": "처음 이기면 상금 %s원", "left": "오늘 다시 이기면 %s원 (하루 한 번)",
+                      "done": "오늘 상금을 받았다 · 내일 다시 %s원"}[st_key] % format(t["prize"], ","),
+            "why": t.get("why") or None,
+            "team": t["team"],
+            "button": label, "can": other is None, "other": other,
+        }
+
     def _trainer_card(self, code, t, img, thumbs):
+        self._paint_card(code, self._card_data(code, t), img, thumbs)
+
+    def _paint_card(self, code, d, img, thumbs):
+        """트레이너 카드 (테마마다 그리는 곳)."""
         self._clear_card()
         top = tk.Frame(self.card, bg=U.BG2)
         top.pack(fill="x", pady=(4, 0))
@@ -1257,14 +1348,14 @@ class GymWindow(object):
             tk.Label(top, image=ph, bg=U.BG2).pack(side="left")
         info = tk.Frame(top, bg=U.BG2)
         info.pack(side="left", fill="both", expand=True, padx=(10, 0))
-        tk.Label(info, text=t["role"], bg=U.BG2, fg=U.FG_DIM, font=U.FONT_S, anchor="w").pack(anchor="w")
-        tk.Label(info, text=t["name"], bg=U.BG2, fg=U.FG, font=(U.FAMILY_BLACK, U.pt(17)),
+        tk.Label(info, text=d["role"], bg=U.BG2, fg=U.FG_DIM, font=U.FONT_S, anchor="w").pack(anchor="w")
+        tk.Label(info, text=d["name"], bg=U.BG2, fg=U.FG, font=(U.FAMILY_BLACK, U.pt(17)),
                  anchor="w").pack(anchor="w")
         chips = tk.Frame(info, bg=U.BG2)
         chips.pack(anchor="w", pady=(4, 0))
-        tk.Label(chips, text=" Lv.%d " % t["level"], bg=level_color(t["level"]), fg="#10131b",
+        tk.Label(chips, text=" Lv.%d " % d["level"], bg=level_color(d["level"]), fg="#10131b",
                  font=U.FONT_B).pack(side="left")
-        st_key = region_state(t)
+        st_key = d["state"]
         if st_key != "new":
             # 오늘 보상을 받았나 (1.10.5). 받았으면 초록으로 채우고, 남았으면 금색 테두리만.
             text, color = STATE_TEXT[st_key]
@@ -1272,24 +1363,20 @@ class GymWindow(object):
             tk.Label(chips, text=" %s " % text, bg=TODAY if done else U.BG2, fg="#10131b" if done else color,
                      font=U.FONT_B, highlightthickness=0 if done else 1,
                      highlightbackground=U.ACCENT).pack(side="left", padx=(6, 0))
-        if t.get("typeKr"):
-            tk.Label(info, text="%s 타입을 주로 쓴다" % t["typeKr"], bg=U.BG2, fg=U.FG_FAINT,
+        if d["type"]:
+            tk.Label(info, text=d["type"], bg=U.BG2, fg=U.FG_FAINT,
                      font=U.FONT_XS).pack(anchor="w", pady=(4, 0))
         # 이긴 기록과 상금은 도트 옆 빈칸에 둔다. 아래에 두 줄을 더 쌓으면
         # 창 높이 700 에서 에이스 줄이 굴려야 보이는 자리로 밀려났다.
-        state = ("✓ 이긴 곳 · %d번 이김%s" % (t["wins"], (" · 최소 %d턴" % t["bestTurns"]) if t.get("bestTurns") else "")
-                 if t["cleared"] else "아직 이기지 못했다")
-        st = tk.Label(info, text=state, bg=U.BG2, fg=U.GOOD if t["cleared"] else U.FG_DIM,
+        st = tk.Label(info, text=d["record"], bg=U.BG2, fg=U.GOOD if d["cleared"] else U.FG_DIM,
                       font=U.FONT_S, anchor="w", justify="left")
         st.pack(fill="x", pady=(8, 0))
         U.wrap_to_width(st)
-        prize = {"new": "처음 이기면 상금 %s원", "left": "오늘 다시 이기면 %s원 (하루 한 번)",
-                 "done": "오늘 상금을 받았다 · 내일 다시 %s원"}[st_key] % format(t["prize"], ",")
-        pz = tk.Label(info, text=prize, bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left")
+        pz = tk.Label(info, text=d["prize"], bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left")
         pz.pack(fill="x")
         U.wrap_to_width(pz)
-        if t.get("why"):
-            why = tk.Label(self.card, text=t["why"], bg=U.BG2, fg=U.ACCENT, font=U.FONT_S,
+        if d["why"]:
+            why = tk.Label(self.card, text=d["why"], bg=U.BG2, fg=U.ACCENT, font=U.FONT_S,
                            justify="left", anchor="w")
             why.pack(fill="x", pady=(6, 0))
             U.wrap_to_width(why)
@@ -1297,11 +1384,11 @@ class GymWindow(object):
         U.marker_label(self.card, "데리고 있는 포켓몬", bg=U.BG2).pack(anchor="w", pady=(10, 3))
         team = tk.Frame(self.card, bg=U.BG2)
         team.pack(fill="x")
-        for i, m in enumerate(t["team"]):
+        for i, m in enumerate(d["team"]):
             # 그림(28px)이 들어가는 줄이라 글꼴 배율만 따르면 윈도우(배율 1.0)에서 30px 로
             # 모자란다. 그림 높이보다 작아지지 않게 한다.
             row_h = max(U.h(30), 32)
-            row = tk.Frame(team, bg=U.BG3 if i == len(t["team"]) - 1 else U.BG2, height=row_h)
+            row = tk.Frame(team, bg=U.BG3 if i == len(d["team"]) - 1 else U.BG2, height=row_h)
             row.pack(fill="x", pady=1)
             row.pack_propagate(False)
             bg = row["bg"]
@@ -1315,27 +1402,19 @@ class GymWindow(object):
                 tk.Label(slot, image=ph, bg=bg, bd=0, highlightthickness=0).pack(expand=True)
             tk.Label(row, text=m["kr"] or m["species"], bg=bg, fg=U.FG, font=U.FONT_B,
                      anchor="w").pack(side="left", padx=(6, 0))
-            if i == len(t["team"]) - 1:
+            if i == len(d["team"]) - 1:
                 tk.Label(row, text="에이스", bg=bg, fg=U.ACCENT, font=U.FONT_XS).pack(side="left", padx=6)
             tk.Label(row, text="Lv.%d" % m["level"], bg=bg, fg=U.FG_DIM, font=U.FONT_S).pack(side="right", padx=8)
             tk.Label(row, text="/".join(m.get("types") or []), bg=bg, fg=U.FG_FAINT,
                      font=U.FONT_XS).pack(side="right")
 
-        act = (self.data or {}).get("active")
         btn_row = tk.Frame(self.action, bg=U.BG2)
         btn_row.pack(fill="x", pady=(6, 0))
-        if act and act["region"] == code:
-            label = "승부 이어하기"
-        elif act:
-            label = "다른 승부가 진행 중"
-        else:
-            label = "도전하기"
-        self.go_btn = U.PushButton(btn_row, label, lambda: self.challenge(code), height=40)
+        self.go_btn = U.PushButton(btn_row, d["button"], lambda: self.challenge(code), height=40)
         self.go_btn.pack(fill="x")
-        if act and act["region"] != code:
+        if not d["can"]:
             self.go_btn.configure(state="disabled")
-            other = self.by_region.get(act["region"], {})
-            tk.Label(btn_row, text="%s 과(와)의 승부를 먼저 끝내세요." % other.get("name", ""),
+            tk.Label(btn_row, text=d["other"],
                      bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS).pack(anchor="w", pady=(4, 0))
 
     # ---------------- 도전 ----------------

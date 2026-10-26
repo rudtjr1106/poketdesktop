@@ -27,6 +27,7 @@ from common import tint as T
 from common.korean import natural
 
 from . import box_filter, item_icons, sprite_cache, sprites
+from . import skins
 from . import ui_common as U
 from . import ui_loading
 from .ui_bond import BondPanel
@@ -434,6 +435,7 @@ class Row(object):
                 font=U.FONT_S)
 
 
+@skins.skinnable
 class BoxWindow(object):
     def __init__(self, root, app, parent=None):
         self.root = root
@@ -489,6 +491,12 @@ class BoxWindow(object):
             # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
             U.install_wheel(self.win)
 
+        self._build()
+        self.reload()
+
+    # 화면 테마(skins/)는 _build 와 칠하는 자리(_show · _paint_* · show_detail …)만 갈아 끼운다.
+    # 서버 호출 · 판정(박스 넘기기, 거르기, 줄 세우기, 여러 마리 고르기, 맞바꾸기)은 이 창의 것을 쓴다.
+    def _build(self):
         self._header()
         self._bottom()
 
@@ -496,8 +504,6 @@ class BoxWindow(object):
         body.pack(fill="both", expand=True)
         self._list(body)
         self._detail(body)
-
-        self.reload()
 
     @property
     def sort_bst(self):
@@ -1640,28 +1646,9 @@ class BoxWindow(object):
         거르기를 바꿔도 남은 일만 버리고 거기서부터 다시 맞추면 된다.
         """
         self._stop_rows()
-        # 거름망은 박스에만. 데리고 다니는 여섯은 늘 그대로 보인다.
-        party, box = box_filter.apply_box(self.mons, self.app.dex, self.f_type,
-                                          self.f_query.get())
-        box_all = len(self.mons) - len(party)
-        filtered = bool(self.f_type or self.f_query.get().strip())
-        if self.sort:
-            box = box_filter.sort_by(box, self.app.dex, self.sort)
-        # **한 박스만 그린다.** 줄 하나에 위젯이 열서너 개라 수백 마리를 다
-        # 만들면 창이 느려진다. 거르기가 걸려 있으면 박스를 넘어 다 뒤진다.
-        if self._searching():
-            page_box = box
-        elif self.sort:
-            # 줄 세워 보기: 박스를 넘어 전부를 줄 세우되, 한 번에 한 박스 크기만큼만 그린다.
-            size = self.box_size()
-            self.rank_page = max(0, min(self.rank_page, self.rank_pages(len(box)) - 1))
-            page_box = box[self.rank_page * size:(self.rank_page + 1) * size]
-        else:
-            page_box = [m for m in box if int(m.get("box") or 0) == self.box_no]
-        self._paint_page(len(box))
+        party, box, page_box, box_all, filtered = self._view_lists()
         want = {"party": [m["id"] for m in party],
                 "box": [m["id"] for m in page_box]}
-        self._page_ids = list(want["box"])
 
         for sec in ("party", "box"):
             order = self._shown[sec]
@@ -1715,21 +1702,48 @@ class BoxWindow(object):
         # 행이 줄었을 수 있다. 스크롤 위치가 남아 빈 화면이 보이지 않게
         # 여기서 다시 맞춘다.
         self.fit_scroll()
-        n_egg = sum(1 for m in self.mons if m.get("isEgg"))
-        party_egg = sum(1 for m in party if m.get("isEgg"))
-        if n_egg:
-            self.count.configure(
-                text="보유 %d마리 · 알 %d개  ·  데리고 다니는 중 %d마리 + 알 %d개"
-                     % (len(self.mons) - n_egg, n_egg, len(party) - party_egg,
-                        party_egg))
-        else:
-            self.count.configure(text="보유 %d마리  ·  데리고 다니는 중 %d마리"
-                                      % (len(self.mons), len(party)))
+        self.count.configure(text=self.count_text(party))
         shown = want["party"] + want["box"]
         if keep and keep in wanted:
             self.select(keep)
         elif shown:
             self.select(shown[0])
+
+    def _view_lists(self):
+        """지금 보일 것: (파티, 거름망에 맞는 박스 전부, 이 쪽에 보일 박스 것, 박스 전체 마릿수, 거르는 중인가).
+
+        박스 이름표도 여기서 칠하고(_paint_page), 이 쪽의 순서(_page_ids - 여러 마리 고르기의 Shift)도 적는다.
+        """
+        # 거름망은 박스에만. 데리고 다니는 여섯은 늘 그대로 보인다.
+        party, box = box_filter.apply_box(self.mons, self.app.dex, self.f_type,
+                                          self.f_query.get())
+        box_all = len(self.mons) - len(party)
+        filtered = bool(self.f_type or self.f_query.get().strip())
+        if self.sort:
+            box = box_filter.sort_by(box, self.app.dex, self.sort)
+        # **한 박스만 그린다.** 줄 하나에 위젯이 열서너 개라 수백 마리를 다
+        # 만들면 창이 느려진다. 거르기가 걸려 있으면 박스를 넘어 다 뒤진다.
+        if self._searching():
+            page_box = box
+        elif self.sort:
+            # 줄 세워 보기: 박스를 넘어 전부를 줄 세우되, 한 번에 한 박스 크기만큼만 그린다.
+            size = self.box_size()
+            self.rank_page = max(0, min(self.rank_page, self.rank_pages(len(box)) - 1))
+            page_box = box[self.rank_page * size:(self.rank_page + 1) * size]
+        else:
+            page_box = [m for m in box if int(m.get("box") or 0) == self.box_no]
+        self._paint_page(len(box))
+        self._page_ids = [m["id"] for m in page_box]
+        return party, box, page_box, box_all, filtered
+
+    def count_text(self, party):
+        """머리줄의 '보유 N마리 · 데리고 다니는 중 n마리'."""
+        n_egg = sum(1 for m in self.mons if m.get("isEgg"))
+        party_egg = sum(1 for m in party if m.get("isEgg"))
+        if n_egg:
+            return ("보유 %d마리 · 알 %d개  ·  데리고 다니는 중 %d마리 + 알 %d개"
+                    % (len(self.mons) - n_egg, n_egg, len(party) - party_egg, party_egg))
+        return "보유 %d마리  ·  데리고 다니는 중 %d마리" % (len(self.mons), len(party))
 
     def _place_row(self, item):
         """할 일 하나 - 줄이 없으면 만들고, 칸이 있으면 제자리에 담는다."""
@@ -2728,11 +2742,15 @@ class BoxWindow(object):
 
 
 # ---------------------------------------------------------------- 대화상자
+@skins.skinnable
 class HeldPicker(object):
     """가방에서 지니게 할 도구를 고르는 창.
 
     상점 목록(/api/shop)을 받는다 - 거기에 이름·설명·지닐 수 있는지가 다
     들어 있고 가방 개수도 같이 온다. 가진 것 중 지닐 수 있는 것만 보여준다.
+
+    고르는 규칙 · 서버 호출은 여기 것을 그대로 쓴다. 테마는 짓는 고리(_build ·
+    _paint_note · _paint_rows · _row)만 바꾼다.
     """
 
     def __init__(self, box, mon):
@@ -2740,21 +2758,30 @@ class HeldPicker(object):
         self.app = box.app
         self.root = box.root
         self.mon = mon
-        self.win = U.panel(None, self.root, "도구 지니게 하기", 460, 560,
-                           380, 400, self.close)
-        self.win.configure(bg=U.BG, highlightthickness=2,
-                           highlightbackground=U.LINE2)
-        U.install_wheel(self.win)
         self.photos = []
         # 이 포켓몬의 진화 도구. 지니게 하면 가방에서 빠지는데, 서버는 가방에
         # 있는 것만 진화에 쓴다. 본가 버릇대로 롱스톤에게 금속코트를 지니게
         # 하면 조용히 진화를 못 하게 된다 - 그 줄에 미리 한 줄 적는다(_row).
         self.evo_items = evo_items(self.app.dex, mon)
+        self._build()
+        U.install_wheel(self.win)
+
+        # **기다리는 동안 빈 창을 보여주지 않는다.** 가방을 서버에서 받아야
+        # 목록이 채워지는데, 그동안 아무 표시가 없어서 '안 열렸나' 싶었다.
+        self._wait = ui_loading.Overlay(self.win, "가방을 보는 중")
+        U.run_async(self.root, self.app.api.shop, self._loaded)
+
+    def _build(self):
+        """창을 짓는다 (테마가 바꾼다). self.win 과 안내 글 · 줄 자리를 만든다."""
+        self.win = U.panel(None, self.root, "도구 지니게 하기", 460, 560,
+                           380, 400, self.close)
+        self.win.configure(bg=U.BG, highlightthickness=2,
+                           highlightbackground=U.LINE2)
 
         head = tk.Frame(self.win, bg=U.BG2, height=U.h(56))
         head.pack(fill="x")
         head.pack_propagate(False)
-        tk.Label(head, text="%s에게 지니게 할 도구" % mon["info"].get("name", ""),
+        tk.Label(head, text="%s에게 지니게 할 도구" % self.mon["info"].get("name", ""),
                  bg=U.BG2, fg=U.FG, font=U.FONT_B).pack(side="left", padx=16,
                                                         pady=16)
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
@@ -2779,11 +2806,6 @@ class HeldPicker(object):
             self._wid, width=e.width))
         U.scrollable(self.cv, 60)
 
-        # **기다리는 동안 빈 창을 보여주지 않는다.** 가방을 서버에서 받아야
-        # 목록이 채워지는데, 그동안 아무 표시가 없어서 '안 열렸나' 싶었다.
-        self._wait = ui_loading.Overlay(self.win, "가방을 보는 중")
-        U.run_async(self.root, self.app.api.shop, self._loaded)
-
     def _close_wait(self):
         w = getattr(self, "_wait", None)
         if w:
@@ -2793,8 +2815,7 @@ class HeldPicker(object):
     def _loaded(self, r, err):
         self._close_wait()
         if err:
-            return self.note.configure(text=getattr(err, "message", str(err)),
-                                       fg=U.DANGER)
+            return self._paint_note(getattr(err, "message", str(err)), U.DANGER)
         bag = (r or {}).get("bag") or {}
         rows = [it for it in (r or {}).get("items", [])
                 if it.get("holdable") and bag.get(it["id"], 0) > 0]
@@ -2804,14 +2825,25 @@ class HeldPicker(object):
         rows = [it for it in rows if it.get("cat") != "megastone"
                 or (mega_fits(dex, it, self.mon) and self.mon.get("bonded") is not False)]
         if not rows:
-            self.note.configure(text="지닐 수 있는 도구가 가방에 없습니다. "
-                                     "상점의 '지닌 도구' 칸에서 살 수 있습니다.")
-            return
+            self._paint_note("지닐 수 있는 도구가 가방에 없습니다. "
+                             "상점의 '지닌 도구' 칸에서 살 수 있습니다.")
+            return self._paint_rows([], bag)
         cur = self.mon.get("heldKr")
-        self.note.configure(text=("지금은 %s을(를) 지니고 있습니다. 바꾸면 그건 "
-                                  "가방으로 돌아갑니다." % cur) if cur
-                            else "하나를 고르면 바로 지닙니다.")
+        self._paint_note(("지금은 %s을(를) 지니고 있습니다. 바꾸면 그건 "
+                          "가방으로 돌아갑니다." % cur) if cur
+                         else "하나를 고르면 바로 지닙니다.")
         rows.sort(key=lambda it: (it.get("cat") != "held", it.get("kr", "")))
+        self._paint_rows(rows, bag)
+
+    def _paint_note(self, text, fg=None):
+        """안내 글 (테마가 바꾼다). fg 를 안 주면 빛깔은 그대로 둔다."""
+        if fg is None:
+            self.note.configure(text=text)
+        else:
+            self.note.configure(text=text, fg=fg)
+
+    def _paint_rows(self, rows, bag):
+        """고를 도구들을 줄로 짓는다 (테마가 바꾼다). rows 가 비면 지닐 것이 없다."""
         for it in rows:
             self._row(it, bag.get(it["id"], 0))
 
@@ -2863,15 +2895,14 @@ class HeldPicker(object):
 
     def pick(self, it):
         pid = self.mon["id"]
-        self.note.configure(text="%s을(를) 지니게 하는 중..." % it["kr"])
+        self._paint_note("%s을(를) 지니게 하는 중..." % it["kr"])
         done = self.box._after("%s에게 %s을(를) 지니게 했습니다."
                                % (self.mon["info"].get("name", ""), it["kr"]))
 
         def finish(r, err):
             self._close_wait()
             if err:
-                return self.note.configure(
-                    text=getattr(err, "message", str(err)), fg=U.DANGER)
+                return self._paint_note(getattr(err, "message", str(err)), U.DANGER)
             self.close()
             done(r, None)
         # 누르고 나서 서버가 답할 때까지 아무 일도 안 일어나 보였다.
@@ -2885,6 +2916,7 @@ class HeldPicker(object):
             pass
 
 
+@skins.skinnable_fn("dialogs")
 def _shell(parent, title, w, h, danger=False):
     win = tk.Toplevel(parent)
     U.style_window(win, title, w, h)
@@ -2892,14 +2924,7 @@ def _shell(parent, title, w, h, danger=False):
     win.configure(highlightthickness=2,
                   highlightbackground=U.DANGER_LINE if danger else U.LINE2)
     win.resizable(False, False)
-    bar = tk.Frame(win, bg=U.DANGER_BG if danger else U.BG2, height=U.h(34))
-    bar.pack(fill="x")
-    bar.pack_propagate(False)
-    tk.Frame(bar, bg=U.DANGER if danger else U.ACCENT, width=3,
-             height=U.h(13)).pack(side="left", padx=(12, 8))
-    tk.Label(bar, text=title, bg=U.DANGER_BG if danger else U.BG2,
-             fg="#ffb3b3" if danger else U.FG, font=U.FONT_B).pack(side="left")
-    tk.Frame(win, bg=U.DANGER_LINE if danger else U.LINE2, height=U.h(2)).pack(fill="x")
+    U.dialog_bar(win, title, danger)
     body = tk.Frame(win, bg=U.BG)
     body.pack(fill="both", expand=True, padx=18, pady=16)
     win.shell_w, win.shell_h = w, h
@@ -2945,6 +2970,7 @@ def scroll_body(body):
     return inner, cv
 
 
+@skins.skinnable_fn("dialogs")
 def ask_text(parent, title, message, hint="", initial=""):
     win, f = _shell(parent, title, 380, 216)
     out = {}
@@ -2973,6 +2999,7 @@ def ask_text(parent, title, message, hint="", initial=""):
     return out.get("v")
 
 
+@skins.skinnable_fn("dialogs")
 def ask_choice(parent, title, message, options):
     """여럿 중 하나를 고른다 (1.13: 로토무카탈로그·운석의 모습). 고른 열쇠, 취소면 None.
 
@@ -3008,6 +3035,7 @@ def ask_choice(parent, title, message, options):
     return out.get("v")
 
 
+@skins.skinnable_fn("dialogs")
 def confirm(parent, title, message, danger=True, ok_text="확인"):
     """예/아니오 확인.
 

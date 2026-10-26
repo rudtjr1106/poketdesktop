@@ -14,6 +14,7 @@
 import tkinter as tk
 import tkinter.font as tkfont
 
+from . import skins
 from . import ui_common as U
 
 SEA = "#0f141d"
@@ -50,6 +51,7 @@ def _edge_key(a, b):
     return (p, q) if p <= q else (q, p)
 
 
+@skins.skinnable
 class WarMap(object):
     """parent 안에 지도를 그린다. on_pick(칸) 은 칸을 눌렀을 때, on_hover(칸 또는 None) 는 올렸을 때."""
 
@@ -172,6 +174,7 @@ class WarMap(object):
         except tk.TclError:
             return
         self.items, self.runs, self._look, self._line_look = {}, [], {}, {}
+        self._backdrop()
         if not self.geo or not self._order or not self._box or not self.cells:
             return
         self._size = (cv.winfo_width(), cv.winfo_height())
@@ -190,6 +193,15 @@ class WarMap(object):
         self._labels(tf)
         self._marks()
 
+    def _backdrop(self):
+        """지도 뒤의 바탕 (테마가 바다 무늬 같은 것을 그린다 - 'bg' 꼬리표, 확대해도 그대로). 기본은 캔버스 빛깔뿐."""
+
+    def _label(self, px, py, text, color):
+        """부채꼴 바깥의 길드 이름 한 개 (테마마다 글씨 모양)."""
+        self.cv.create_text(px + 1, py + 1, text=text, fill=LINE, font=self.label_font, tags=("map", "label"))
+        self.cv.create_text(px, py, text=text, fill=lighten(color, 0.55), font=self.label_font,
+                            tags=("map", "label"))
+
     def _labels(self, tf):
         """부채꼴 바깥에 그 땅의 처음 주인 길드 이름 (서버 ring_geo 의 labels). 길드가 많으면 줄여 적는다."""
         labels = (self.geo or {}).get("labels") or []
@@ -199,10 +211,7 @@ class WarMap(object):
             if len(text) > cut:
                 text = text[:cut - 1] + "…"
             px, py = tf((lb["x"], lb["y"]))
-            color = self.colors.get(lb.get("guildId"), "#ffffff")
-            self.cv.create_text(px + 1, py + 1, text=text, fill=LINE, font=self.label_font, tags=("map", "label"))
-            self.cv.create_text(px, py, text=text, fill=lighten(color, 0.55), font=self.label_font,
-                                tags=("map", "label"))
+            self._label(px, py, text, self.colors.get(lb.get("guildId"), "#ffffff"))
 
     def _borders(self, tf):
         """칸 사이의 경계와 바닷가를 선으로. 고리를 따라가며 같은 경계가 이어지는 동안 한 줄로 묶는다."""

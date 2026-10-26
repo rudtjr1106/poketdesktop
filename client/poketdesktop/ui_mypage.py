@@ -23,6 +23,7 @@ from tkinter import ttk
 
 from common.korean import ago, natural
 
+from . import skins
 from . import ui_common as U
 from .ui_common import run_async
 from .ui_settings import SettingsWindow
@@ -144,6 +145,7 @@ class Flow(object):
             return 0
 
 
+@skins.skinnable
 class MyPageWindow(object):
 
     def __init__(self, app, parent=None):
@@ -166,6 +168,11 @@ class MyPageWindow(object):
         if not U.is_embedded(self.win):
             U.install_wheel(self.win)
 
+        self._build()
+        self.load()
+
+    # 화면 테마(skins/)는 _build 와 칠하는 자리(_fill · _fill_tab · show_page · show_settings · say)만 갈아 끼운다.
+    def _build(self):
         self._header()
         self.status = U.status_line(self.win, "")
         self.status.pack(side="bottom", fill="x", padx=16, pady=(6, 12))
@@ -173,7 +180,6 @@ class MyPageWindow(object):
         self.page.pack(fill="both", expand=True)
         self.set_box = tk.Frame(self.win, bg=U.BG)        # 설정 화면이 들어갈 칸
         self._build_scroll()
-        self.load()
 
     # ---------------- 머리 ----------------
     def _header(self):

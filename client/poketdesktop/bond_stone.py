@@ -27,6 +27,7 @@ import tkinter as tk
 from common.korean import natural
 
 from . import platform_os as PLAT
+from . import skins
 from . import ui_common as U
 from .ui_common import run_async
 
@@ -36,8 +37,13 @@ PULSE_MS = 650
 TEXT = {"ready": "✦ 빛나는 돌", "claim": "✦ 메가스톤 고르기"}
 
 
+@skins.skinnable
 class StoneBadge(object):
-    """포켓몬 한 마리 머리 위의 표식. Pet.place 가 움직일 때마다 옮긴다."""
+    """포켓몬 한 마리 머리 위의 표식. Pet.place 가 움직일 때마다 옮긴다.
+
+    모습은 `_build`(창 안에 표식을 짓는다)와 `_paint`(반짝임 한 칸을 칠한다) 두 고리다 - 화면 테마가
+    이 둘만 덮는다. 자리 잡기 · 숨기기 · 누르기 · 반짝이는 시계는 모두 여기 것을 쓴다.
+    """
 
     def __init__(self, pet, kind, on_click):
         self.pet = pet
@@ -49,16 +55,26 @@ class StoneBadge(object):
         self._job = None
         w = tk.Toplevel(self.ov.root)
         w.overrideredirect(True)
-        w.configure(bg=FILL)
-        self.label = tk.Label(w, text=TEXT.get(kind, TEXT["ready"]), bg=FILL, fg="#ffffff",
-                              font=U.FONT_XS, padx=7, pady=1, cursor="hand2")
-        self.label.pack()
-        self.label.bind("<ButtonRelease-1>", self._click)
+        self._build(w)
         PLAT.raise_above(w)
         self.win = w
         self.shown = True
         self.place()
         self._pulse()
+
+    def _build(self, w):
+        """창 w 안에 표식을 짓는다. 눌리는 위젯을 self.label 에 두고 <ButtonRelease-1> 을 _click 에 건다."""
+        w.configure(bg=FILL)
+        self.label = tk.Label(w, text=TEXT.get(self.kind, TEXT["ready"]), bg=FILL, fg="#ffffff",
+                              font=U.FONT_XS, padx=7, pady=1, cursor="hand2")
+        self.label.pack()
+        self.label.bind("<ButtonRelease-1>", self._click)
+
+    def _paint(self, lit):
+        """반짝임 한 칸: lit 이면 밝게. 투명도는 맥에서 클릭 통과와 부딪히므로 색을 바꾼다."""
+        c = FILL_LIT if lit else FILL
+        self.win.configure(bg=c)
+        self.label.configure(bg=c)
 
     def _click(self, _e=None):
         if self.on_click:
@@ -104,12 +120,10 @@ class StoneBadge(object):
             pass
 
     def _pulse(self):
-        """반짝인다. 투명도는 맥에서 클릭 통과와 부딪히므로 색을 바꾼다."""
+        """반짝인다."""
         try:
             self.lit = not self.lit
-            c = FILL_LIT if self.lit else FILL
-            self.win.configure(bg=c)
-            self.label.configure(bg=c)
+            self._paint(self.lit)
         except Exception:                                   # noqa: BLE001
             return
         self._job = self.ov.root.after(PULSE_MS, self._pulse)
@@ -205,6 +219,26 @@ class BondStones(object):
                 pass
 
 
+def got_texts(got):
+    """스톤 알림의 글: (창 제목, 머리말, [한 줄씩], 맨 아래 안내). 화면(기본 · 테마)이 같이 쓴다.
+
+    스톤 없이 유대만 마친 것(bondOnly - 그 종의 스톤은 이미 있다, 10/22)은 이제 메가진화할 수 있다고 알린다.
+    """
+    only = all(g.get("bondOnly") for g in got)
+    lines = [natural("%s 와(과)의 유대 미션을 마쳐 이제 메가진화할 수 있습니다." % (g.get("name") or "포켓몬")
+                     if g.get("bondOnly") else
+                     "%s 와(과)의 유대 미션을 마쳐 %s 을(를) 받았습니다."
+                     % (g.get("name") or "포켓몬", g.get("stoneKr") or g.get("stone") or "메가스톤"))
+             for g in got]
+    note = ("포켓몬 관리에서 메가스톤을 지니게 하고, 배틀에서 '메가진화' 를 켜면 한 판에 "
+            "한 번 메가진화합니다." if only else
+            "가방에 넣어 두었습니다. 포켓몬 관리에서 지니게 하고, 배틀에서 "
+            "'메가진화' 를 켜면 한 판에 한 번 메가진화합니다.")
+    return ("메가진화" if only else "메가스톤",
+            "유대 미션을 마쳤습니다!" if only else "메가스톤을 받았습니다!", lines, note)
+
+
+@skins.skinnable_fn("announce")
 def announce_got(parent, got):
     """저절로 받은 메가스톤을 알린다. 여럿이면 한 창에.
 
@@ -213,30 +247,23 @@ def announce_got(parent, got):
     if not got:
         return
     from . import ui_box
-    only = all(g.get("bondOnly") for g in got)
-    win, f = ui_box._shell(parent, "메가진화" if only else "메가스톤", 440, U.h(250))
-    tk.Label(f, text="유대 미션을 마쳤습니다!" if only else "메가스톤을 받았습니다!", bg=U.BG, fg=U.ACCENT_TEXT,
+    title, head, lines, note_text = got_texts(got)
+    win, f = ui_box._shell(parent, title, 440, U.h(250))
+    tk.Label(f, text=head, bg=U.BG, fg=U.ACCENT_TEXT,
              font=(U.FAMILY_BLACK, U.pt(17))).pack(anchor="w")
     box = tk.Frame(f, bg="#161b28", highlightthickness=2, highlightbackground=U.LINE)
     box.pack(fill="x", pady=(12, 0))
     inner = tk.Frame(box, bg="#161b28")
     inner.pack(fill="x", padx=14, pady=10)
-    for g in got:
+    for line in lines:
         row = tk.Frame(inner, bg="#161b28")
         row.pack(fill="x", pady=2)
         tk.Label(row, text="✦", bg="#161b28", fg=FILL_LIT, font=U.FONT_B).pack(side="left", anchor="n")
-        text = ("%s 와(과)의 유대 미션을 마쳐 이제 메가진화할 수 있습니다." % (g.get("name") or "포켓몬")
-                if g.get("bondOnly") else
-                "%s 와(과)의 유대 미션을 마쳐 %s 을(를) 받았습니다."
-                % (g.get("name") or "포켓몬", g.get("stoneKr") or g.get("stone") or "메가스톤"))
-        lb = tk.Label(row, text=natural(text),
+        lb = tk.Label(row, text=line,
                       bg="#161b28", fg=U.FG, font=U.FONT_S, anchor="w", justify="left",
                       wraplength=340)
         lb.pack(side="left", fill="x", expand=True, padx=(6, 0))
-    note = tk.Label(f, text=("포켓몬 관리에서 메가스톤을 지니게 하고, 배틀에서 '메가진화' 를 켜면 한 판에 "
-                             "한 번 메가진화합니다." if only else
-                             "가방에 넣어 두었습니다. 포켓몬 관리에서 지니게 하고, 배틀에서 "
-                             "'메가진화' 를 켜면 한 판에 한 번 메가진화합니다."),
+    note = tk.Label(f, text=note_text,
                     bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, anchor="w", justify="left",
                     wraplength=390)
     note.pack(fill="x", pady=(10, 0))

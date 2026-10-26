@@ -30,6 +30,7 @@ from common.korean import natural
 
 from . import guild_ws as WS
 from . import item_icons
+from . import skins
 from . import ui_common as U
 from . import ui_spectate as SP
 from .ui_common import run_async
@@ -168,6 +169,7 @@ def seen_text(m):
     return "%d일 전" % (ago // 86400), U.FG_FAINT
 
 
+@skins.skinnable
 class GuildWindow(object):
 
     def __init__(self, app, parent=None):
@@ -335,46 +337,54 @@ class GuildWindow(object):
         self._draw_guild()
 
     # ================================================================ 길드가 없을 때
-    def _draw_none(self):
+    def _none_data(self):
+        """길드가 없을 때 위의 판: 설명 · 기다릴 말(없으면 None) · 남은 코인 말(없으면 None) ·
+        [(넣어 둔 신청 글, 취소할 일)] · 만들 수 있나."""
         d = self.data or {}
+        cost = int(d.get("createCost") or 0)
+        wait = int(d.get("cooldown") or 0)
+        text = ("길드에 들어가면 길드원끼리 채팅하고, 일일 미션을 함께 모아 몬스터볼과 "
+                "길드 코인을 받습니다. 길드를 만들려면 %s원이 듭니다 (정원 %d명)."
+                % (format(cost, ","), int(d.get("max") or 0)))
+        wait_text = ("길드를 나온 지 얼마 안 됐습니다. %s 뒤에 다시 가입하거나 만들 수 있습니다." % span(wait)
+                     if wait > 0 else None)
+        coin_text = ("길드 코인이 %d개 남아 있습니다. 길드가 없어도 쓸 수 있습니다." % int(d["coin"])
+                     if int(d.get("coin") or 0) > 0 else None)
+        pending = [("%s 길드에 가입 신청을 넣어 두었습니다. 승인을 기다리는 중입니다." % p["name"],
+                    (lambda gid=p["guildId"]: self.act(lambda: self.app.api.guild_cancel(gid))))
+                   for p in d.get("pending") or []]
+        return {"text": text, "wait": wait_text, "coin": coin_text, "pending": pending, "can": wait <= 0}
+
+    def _draw_none(self):
+        n = self._none_data()
         top = U.framed(self.body, bg=CARD)
         top.pack(fill="x", padx=16, pady=(14, 0))
         row = tk.Frame(top, bg=CARD)
         row.pack(fill="x", padx=14, pady=12)
-        cost = int(d.get("createCost") or 0)
-        wait = int(d.get("cooldown") or 0)
         self.b_create = U.PushButton(row, "길드 만들기", self.create_dialog, height=34,
                                      font=U.FONT_B)
         self.b_create.pack(side="right", padx=(12, 0))
-        if wait > 0:
+        if not n["can"]:
             self.b_create.configure(state="disabled")
-        text = ("길드에 들어가면 길드원끼리 채팅하고, 일일 미션을 함께 모아 몬스터볼과 "
-                "길드 코인을 받습니다. 길드를 만들려면 %s원이 듭니다 (정원 %d명)."
-                % (format(cost, ","), int(d.get("max") or 0)))
-        lb = tk.Label(row, text=text, bg=CARD, fg=U.FG_DIM, font=U.FONT_S, anchor="w",
+        lb = tk.Label(row, text=n["text"], bg=CARD, fg=U.FG_DIM, font=U.FONT_S, anchor="w",
                       justify="left")
         lb.pack(side="left", fill="x", expand=True)
         U.wrap_to_width(lb)
-        if wait > 0:
-            tk.Label(top, text="길드를 나온 지 얼마 안 됐습니다. %s 뒤에 다시 가입하거나 만들 수 "
-                               "있습니다." % span(wait), bg=CARD, fg=U.DANGER, font=U.FONT_XS,
+        if n["wait"]:
+            tk.Label(top, text=n["wait"], bg=CARD, fg=U.DANGER, font=U.FONT_XS,
                      anchor="w").pack(fill="x", padx=14, pady=(0, 10))
-        if int(d.get("coin") or 0) > 0:
+        if n["coin"]:
             r2 = tk.Frame(top, bg=CARD)
             r2.pack(fill="x", padx=14, pady=(0, 10))
-            tk.Label(r2, text="길드 코인이 %d개 남아 있습니다. 길드가 없어도 쓸 수 있습니다."
-                              % int(d["coin"]), bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS,
+            tk.Label(r2, text=n["coin"], bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS,
                      anchor="w").pack(side="left")
             U.ghost_button(r2, "코인 상점", self.open_coinshop, height=28).pack(side="right")
-        for p in d.get("pending") or []:
+        for text, cancel in n["pending"]:
             r3 = tk.Frame(top, bg=CARD)
             r3.pack(fill="x", padx=14, pady=(0, 10))
-            tk.Label(r3, text="%s 길드에 가입 신청을 넣어 두었습니다. 승인을 기다리는 중입니다."
-                              % p["name"], bg=CARD, fg=U.ACCENT_TEXT, font=U.FONT_XS,
+            tk.Label(r3, text=text, bg=CARD, fg=U.ACCENT_TEXT, font=U.FONT_XS,
                      anchor="w").pack(side="left")
-            U.ghost_button(r3, "신청 취소",
-                           lambda gid=p["guildId"]: self.act(lambda: self.app.api.guild_cancel(gid)),
-                           height=28).pack(side="right")
+            U.ghost_button(r3, "신청 취소", cancel, height=28).pack(side="right")
 
         self._finder(self.body)
 
@@ -488,30 +498,38 @@ class GuildWindow(object):
                  font=U.FONT_XS).pack(side="left", padx=(10, 0))
         tk.Label(row, text="누적 %s점" % format(int(g.get("points") or 0), ","), bg=U.BG3,
                  fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left", padx=(10, 0))
-        gid = g["id"]
-        mine = ((self.data or {}).get("guild") or {}).get("id")
-        if mine is not None:
-            # 길드에 든 채로 둘러보는 중이다 (1.10.1). 가입은 지금 길드를 나온 뒤에야 된다.
-            if gid == mine:
-                U.chip(row, "내 길드", U.ACCENT, fg=U.ACCENT_DARK, padx=7).pack(side="right")
-        elif g.get("requested"):
-            U.ghost_button(row, "신청 취소",
-                           lambda: self.act(lambda: self.app.api.guild_cancel(gid)),
-                           height=28).pack(side="right")
-        elif g.get("full"):
-            tk.Label(row, text="가득 참", bg=U.BG3, fg=U.FG_FAINT, font=U.FONT_S).pack(side="right")
-        else:
-            label = "가입" if g.get("joinMode") == "open" else "가입 신청"
-            b = U.ghost_button(row, label, lambda: self.join(g), height=28,
+        act = self._guild_action(g, wait)
+        if act[0] == "mine":
+            U.chip(row, act[1], U.ACCENT, fg=U.ACCENT_DARK, padx=7).pack(side="right")
+        elif act[0] == "cancel":
+            U.ghost_button(row, act[1], act[2], height=28).pack(side="right")
+        elif act[0] == "full":
+            tk.Label(row, text=act[1], bg=U.BG3, fg=U.FG_FAINT, font=U.FONT_S).pack(side="right")
+        elif act[0] == "join":
+            b = U.ghost_button(row, act[1], act[2], height=28,
                                fill=U.ACCENT_DARK, fg=U.ACCENT)
             b.pack(side="right")
-            if wait > 0:
+            if not act[3]:
                 b.configure(state="disabled")
         lb = tk.Label(c, text=g.get("intro") or "소개가 없습니다.", bg=U.BG3,
                       fg=U.FG_DIM if g.get("intro") else U.FG_FAINT, font=U.FONT_XS,
                       anchor="w", justify="left")
         lb.pack(fill="x", padx=12, pady=(0, 9))
         U.wrap_to_width(lb)
+
+    def _guild_action(self, g, wait):
+        """길드 카드 오른쪽에 둘 것: ("mine", 글) · ("cancel", 글, 할 일) · ("full", 글) ·
+        ("join", 글, 할 일, 누를 수 있나) · ("none",)."""
+        gid = g["id"]
+        mine = ((self.data or {}).get("guild") or {}).get("id")
+        if mine is not None:
+            # 길드에 든 채로 둘러보는 중이다 (1.10.1). 가입은 지금 길드를 나온 뒤에야 된다.
+            return ("mine", "내 길드") if gid == mine else ("none",)
+        if g.get("requested"):
+            return ("cancel", "신청 취소", lambda: self.act(lambda: self.app.api.guild_cancel(gid)))
+        if g.get("full"):
+            return ("full", "가득 참")
+        return ("join", "가입" if g.get("joinMode") == "open" else "가입 신청", lambda: self.join(g), wait <= 0)
 
     def join(self, g):
         from .ui_box import ask_text, confirm
@@ -738,7 +756,36 @@ class GuildWindow(object):
     # ---------------- 채팅 ----------------
     def _tab_chat(self):
         d = self.data or {}
-        limit = int((d.get("limits") or {}).get("chat") or 200)
+        self.chat_limit = int((d.get("limits") or {}).get("chat") or 200)
+        self._build_chat()
+        self.chat_var.trace_add("write", lambda *_a: self._paint_hint())
+        self._paint_state()
+        self.chat_cards = {}
+        fr = self.friendly()
+        fr.chat_open = self.chat_visible     # 채팅을 보는 동안에는 화면 구석의 알림을 띄우지 않는다
+        fr.refresh()                         # 어느 카드가 살아 있는지 (지금 누가 구하고, 어느 판이 진행 중인지)
+        self.chat_last = 0
+        self.chat_lines = 0            # 화면에 있는 **말** 줄 수 (날짜 줄·안내 줄은 안 센다)
+        self.chat_rows = []            # 화면의 줄 그대로: ("day", 날짜) | ("head", 글) | ("msg", 줄)
+        self.chat_first = 0            # 화면에 있는 가장 앞 줄의 번호
+        self.chat_more = False         # 그 앞에 받을 줄이 더 있나
+        self.chat_days = 0             # 서버가 채팅을 두는 날 수
+        self._older_busy = False
+        self.chat_ready = False
+        self._pending = []
+        self._poll_chat(first=True)
+
+    def _on_chat_scroll(self, lo):
+        """채팅 칸이 굴렀다 - 맨 위까지 왔으면 앞의 줄을 더 받는다 (1.10.3)."""
+        try:
+            if float(lo) <= 0.001:
+                self._want_older()
+        except (TypeError, ValueError):
+            pass
+
+    def _build_chat(self):
+        """채팅 칸의 위젯 (테마마다 짓는 곳): 보내는 줄 · 안내 · 상태 · 글 칸(Text) 과 태그.
+        self.chat_var · chat_entry · chat_hint · chat_state · chat_box 를 둔다."""
         send = tk.Frame(self.content, bg=U.BG)
         send.pack(side="bottom", fill="x", padx=16, pady=(8, 0))
         self.chat_var = tk.StringVar()
@@ -747,7 +794,6 @@ class GuildWindow(object):
         box.pack(side="left", fill="x", expand=True, padx=(0, 8))
         box.entry.bind("<Return>", lambda _e: self.send_chat())
         self.chat_entry = box.entry
-        self.chat_limit = limit
         foot = tk.Frame(self.content, bg=U.BG)
         foot.pack(side="bottom", fill="x", padx=16, pady=(4, 0))
         # 지금 어느 길로 받고 있나. 말이 늦게 오는 것 같을 때 까닭을 알 수 있다.
@@ -759,8 +805,6 @@ class GuildWindow(object):
                                   justify="left")
         self.chat_hint.pack(side="left", fill="x", expand=True)
         U.wrap_to_width(self.chat_hint)
-        self.chat_var.trace_add("write", lambda *_a: self._paint_hint())
-        self._paint_state()
 
         wrap = U.framed(self.content, bg=U.INK)
         wrap.pack(fill="both", expand=True, padx=16, pady=(10, 0))
@@ -768,11 +812,7 @@ class GuildWindow(object):
 
         def on_scroll(lo, hi):
             sb.set(lo, hi)
-            try:
-                if float(lo) <= 0.001:
-                    self._want_older()       # 맨 위까지 굴렸다 - 앞의 줄을 더 받는다 (1.10.3)
-            except (TypeError, ValueError):
-                pass
+            self._on_chat_scroll(lo)
         t = tk.Text(wrap, bg=U.INK, fg=U.FG, font=U.FONT, wrap="word", relief="flat", bd=0,
                     highlightthickness=0, padx=12, pady=10, state="disabled", cursor="arrow",
                     yscrollcommand=on_scroll, spacing1=2, spacing3=2, height=6, width=1)
@@ -794,20 +834,6 @@ class GuildWindow(object):
         t.wheel_div = 40               # 창의 휠 처리(U.install_wheel)가 이 칸을 굴린다
         t.bind("<Configure>", lambda _e: self._paint_cards(), add="+")       # 칸이 좁아지면 카드도 줄인다
         self.chat_box = t
-        self.chat_cards = {}
-        fr = self.friendly()
-        fr.chat_open = self.chat_visible     # 채팅을 보는 동안에는 화면 구석의 알림을 띄우지 않는다
-        fr.refresh()                         # 어느 카드가 살아 있는지 (지금 누가 구하고, 어느 판이 진행 중인지)
-        self.chat_last = 0
-        self.chat_lines = 0            # 화면에 있는 **말** 줄 수 (날짜 줄·안내 줄은 안 센다)
-        self.chat_rows = []            # 화면의 줄 그대로: ("day", 날짜) | ("head", 글) | ("msg", 줄)
-        self.chat_first = 0            # 화면에 있는 가장 앞 줄의 번호
-        self.chat_more = False         # 그 앞에 받을 줄이 더 있나
-        self.chat_days = 0             # 서버가 채팅을 두는 날 수
-        self._older_busy = False
-        self.chat_ready = False
-        self._pending = []
-        self._poll_chat(first=True)
 
     def _add_lines(self, msgs):
         """새 줄을 붙인다. **이미 붙인 번호는 건너뛴다** - 웹소켓으로 온 줄과 폴링으로 온 줄이
@@ -1984,8 +2010,7 @@ class GuildWindow(object):
             self.seg_mode = U.Segmented(row, [("open", "자유 가입"), ("approve", "승인 필요")],
                                         g.get("joinMode") or "open", self.set_mode)
             self.seg_mode.frame.pack(side="left")
-            tk.Label(row, text="자유 가입은 누구나 바로 들어오고, 승인 필요는 마스터나 부마스터가 "
-                               "받아 줘야 들어옵니다.", bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS,
+            tk.Label(row, text=self.MODE_NOTE, bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS,
                      anchor="w", justify="left", wraplength=420).pack(side="left", padx=(12, 0))
 
         self._section(inner, "길드 나가기")
@@ -1993,14 +2018,8 @@ class GuildWindow(object):
         box.pack(fill="x")
         row = tk.Frame(box, bg=CARD)
         row.pack(fill="x", padx=14, pady=10)
-        hours = int(d.get("rejoinHours") or 24)
-        if can.get("master") and int(g.get("members") or 0) > 1:
-            text = ("길드 마스터는 그냥 나갈 수 없습니다. 길드원 칸에서 마스터를 넘기거나, 아래에서 "
-                    "길드를 해산해 주세요.")
-        else:
-            text = "나가면 %d시간 동안 다른 길드에 들어가거나 새로 만들 수 없습니다. 길드 코인은 남습니다." % hours
-            if can.get("master"):
-                text = "혼자 남은 마스터가 나가면 길드가 없어집니다. " + text
+        text, can_leave, _can_disband = self._leave_data()
+        if can_leave:
             self.b_leave = U.danger_button(row, "길드 나가기", self.leave, height=32)
             self.b_leave.pack(side="right", padx=(12, 0))
         lb = tk.Label(row, text=text, bg=CARD, fg=U.FG_DIM, font=U.FONT_S, anchor="w",
@@ -2013,13 +2032,29 @@ class GuildWindow(object):
             row.pack(fill="x", padx=14, pady=10)
             self.b_disband = U.danger_button(row, "길드 해산", self.disband, height=32)
             self.b_disband.pack(side="right", padx=(12, 0))
-            lb = tk.Label(row, text="길드와 채팅, 오늘의 미션 점수가 모두 사라집니다. 되돌릴 수 없습니다. "
-                                    "만들 때 낸 돈은 돌아오지 않습니다.", bg=CARD, fg=U.FG_DIM,
+            lb = tk.Label(row, text=self.DISBAND_NOTE, bg=CARD, fg=U.FG_DIM,
                           font=U.FONT_S, anchor="w", justify="left")
             lb.pack(side="left", fill="x", expand=True)
             U.wrap_to_width(lb)
         tk.Frame(inner, bg=U.BG, height=U.h(12)).pack(fill="x")
         fit.fit_now()
+
+    DISBAND_NOTE = "길드와 채팅, 오늘의 미션 점수가 모두 사라집니다. 되돌릴 수 없습니다. 만들 때 낸 돈은 돌아오지 않습니다."
+    MODE_NOTE = "자유 가입은 누구나 바로 들어오고, 승인 필요는 마스터나 부마스터가 받아 줘야 들어옵니다."
+
+    def _leave_data(self):
+        """길드 나가기 칸: (설명, 나가기 단추를 둘까, 해산 단추를 둘까)."""
+        d = self.data or {}
+        g = d.get("guild") or {}
+        can = d.get("can") or {}
+        hours = int(d.get("rejoinHours") or 24)
+        if can.get("master") and int(g.get("members") or 0) > 1:
+            return ("길드 마스터는 그냥 나갈 수 없습니다. 길드원 칸에서 마스터를 넘기거나, 아래에서 "
+                    "길드를 해산해 주세요.", False, True)
+        text = "나가면 %d시간 동안 다른 길드에 들어가거나 새로 만들 수 없습니다. 길드 코인은 남습니다." % hours
+        if can.get("master"):
+            text = "혼자 남은 마스터가 나가면 길드가 없어집니다. " + text
+        return text, True, bool(can.get("master"))
 
     def _section(self, parent, title, note=""):
         head = tk.Frame(parent, bg=U.BG)

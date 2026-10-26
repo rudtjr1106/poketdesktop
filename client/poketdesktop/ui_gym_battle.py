@@ -27,7 +27,7 @@ from common import tint as T
 from common.korean import natural
 
 from . import battle_fx as FX
-from . import effects, sprite_cache, sprites
+from . import effects, skins, sprite_cache, sprites
 from . import sendout_fx as SO
 from . import battle_zoom as Z
 from . import platform_os as PLAT
@@ -159,6 +159,7 @@ def hp_color(frac):
     return "#ff6b6b"
 
 
+@skins.skinnable
 class GymBattleWindow(Z.Resizable):
     ZOOM_KIND = "gym"
     ZOOM_W, ZOOM_SCENE, ZOOM_MSG, ZOOM_CMD, ZOOM_MIN_SCENE = W, SCENE_H, MSG_H, CMD_H, MIN_SCENE_H
@@ -868,12 +869,16 @@ class GymBattleWindow(Z.Resizable):
 
     # ---------------- 명령 ----------------
     def hide_commands(self):
+        self._clear_commands()
+        self.mega.show(False)
+        self.gim.hide()
+
+    def _clear_commands(self):
+        """명령 칸을 비우고 교체 · 기권을 못 누르게 한다 (테마마다 그리는 곳)."""
         for w in self.left.winfo_children():
             w.destroy()
         for b in (self.switch_btn, self.forfeit_btn):
             b.configure(state="disabled")
-        self.mega.show(False)
-        self.gim.hide()
 
     def _gim_changed(self):
         """Z기술 단추를 켜고 껐다 - 기술을 고르는 중이면 칸을 다시 그린다."""
@@ -883,26 +888,31 @@ class GymBattleWindow(Z.Resizable):
     def show_commands(self):
         self.zoom_use()
         self.mode = "moves"
-        for w in self.left.winfo_children():
-            w.destroy()
         side = self.view["me"]
         mon = side["team"][side["slot"]]
-        grid = tk.Frame(self.left, bg=U.BG)
-        grid.pack(fill="both", expand=True)
         moves = mon.get("moves") or []
         self.mega.show(self.view.get("canMega"))
         self.gim.show(self.view.get("gimmick"))
-        for i, m in enumerate(moves[:4] if len(moves) <= 4 else moves[-1:]):
-            self._move_cell(grid, i, self.gim.decorate(m))
+        shown = [self.gim.decorate(m) for m in (moves[:4] if len(moves) <= 4 else moves[-1:])]
+        can_switch = any(not x.get("fainted") for i, x in enumerate(side["team"]) if i != side["slot"])
+        self._paint_moves(shown, can_switch)
+        self.say("%s 은(는) 무엇을 할까?" % mon.get("name", ""))
+
+    def _paint_moves(self, moves, can_switch):
+        """기술 칸 넷과 교체 · 기권 단추를 그린다 (테마마다 그리는 곳). moves 는 Z기술까지 입힌 것."""
+        for w in self.left.winfo_children():
+            w.destroy()
+        grid = tk.Frame(self.left, bg=U.BG)
+        grid.pack(fill="both", expand=True)
+        for i, m in enumerate(moves):
+            self._move_cell(grid, i, m)
         for c in (0, 1):
             grid.grid_columnconfigure(c, weight=1, uniform="mv")
         for r in (0, 1):
             grid.grid_rowconfigure(r, weight=1, uniform="mvr")
-        can_switch = any(not x.get("fainted") for i, x in enumerate(side["team"]) if i != side["slot"])
         self.switch_btn.configure(state="normal" if can_switch else "disabled")
         self.forfeit_btn.configure(state="normal")
         self.hint.configure(text="기술에 마우스를 올리면 설명이 나옵니다.")
-        self.say("%s 은(는) 무엇을 할까?" % mon.get("name", ""))
 
     def _move_cell(self, grid, i, m):
         col = U.TYPE_COLOR.get(m.get("type"), U.BG3)
@@ -948,14 +958,22 @@ class GymBattleWindow(Z.Resizable):
         forced = forced or bool(self.view.get("needSwitch"))
         self.zoom_use()
         self.mode = "switch"
-        for w in self.left.winfo_children():
-            w.destroy()
         side = self.view["me"]
-        head = tk.Frame(self.left, bg=U.BG)
-        head.pack(fill="x")
         # 유턴·볼트체인지로 물러나는 중이면(나와 있는 포켓몬이 멀쩡하다) '교체할' 이라고 묻는다
         cur = (side.get("team") or [{}])[side.get("slot") or 0] if side.get("team") else {}
         ask = "교체할 포켓몬을 고르세요" if (cur.get("hp") or 0) > 0 else "다음 포켓몬을 고르세요"
+        self.mega.show(False)
+        self.gim.hide()
+        self._paint_switch(side, forced, ask)
+        if forced:
+            self.say(ask + ".")
+
+    def _paint_switch(self, side, forced, ask):
+        """교체 칸을 그린다 (테마마다 그리는 곳). 쓰러졌으면(forced) 돌아가기가 없다."""
+        for w in self.left.winfo_children():
+            w.destroy()
+        head = tk.Frame(self.left, bg=U.BG)
+        head.pack(fill="x")
         tk.Label(head, text="누구로 바꿀까?" if not forced else ask,
                  bg=U.BG, fg=U.FG, font=U.FONT_B).pack(side="left")
         if not forced:
@@ -968,11 +986,7 @@ class GymBattleWindow(Z.Resizable):
             grid.grid_columnconfigure(c, weight=1, uniform="pt")
         self.switch_btn.configure(state="disabled")
         self.forfeit_btn.configure(state="normal")
-        self.mega.show(False)
-        self.gim.hide()
         self.hint.configure(text="쓰러진 포켓몬과 지금 나와 있는 포켓몬은 고를 수 없습니다.")
-        if forced:
-            self.say(ask + ".")
 
     def _party_cell(self, grid, i, m, active):
         ok = not m.get("fainted") and not active
@@ -1108,18 +1122,6 @@ class GymBattleWindow(Z.Resizable):
         self.hide_commands()
         res = self.view.get("result")
         title = {"won": "승리!", "lost": "패배...", "draw": "무승부", "forfeit": "기권"}.get(res, "끝")
-        color = {"won": U.ACCENT, "lost": U.DANGER}.get(res, U.FG)
-        panel = tk.Frame(self.left, bg=U.BG2, highlightthickness=2, highlightbackground=color)
-        panel.pack(fill="both", expand=True)
-        inner = tk.Frame(panel, bg=U.BG2)
-        inner.pack(fill="both", expand=True, padx=16, pady=10)
-        # 단추는 오른쪽 아래에 **먼저** 붙인다. 줄 아래에 두면 창 높이를 그만큼 더 먹는다.
-        side = tk.Frame(inner, bg=U.BG2)
-        side.pack(side="right", fill="y", padx=(12, 0))
-        U.PushButton(side, "지도로 돌아가기", self.close, height=Z.base_h(38)).pack(side="bottom")
-        body = tk.Frame(inner, bg=U.BG2)
-        body.pack(side="left", fill="both", expand=True)
-        tk.Label(body, text=title, bg=U.BG2, fg=color, font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
         t = self.view["trainer"]
         lines = []
         if res == "won" and (self.reward or {}).get("lines") is not None:
@@ -1146,11 +1148,27 @@ class GymBattleWindow(Z.Resizable):
                 ups[e.get("name")] = e.get("level")
         if ups:
             lines.append("레벨 업: " + ", ".join("%s Lv.%d" % (k, v) for k, v in ups.items()))
+        self._paint_result_panel(res, title, [natural(ln) for ln in lines])
+        self.say(title)
+
+    def _paint_result_panel(self, res, title, lines):
+        """결과 칸 (테마마다 그리는 곳): 제목 · 줄 · '지도로 돌아가기'."""
+        color = {"won": U.ACCENT, "lost": U.DANGER}.get(res, U.FG)
+        panel = tk.Frame(self.left, bg=U.BG2, highlightthickness=2, highlightbackground=color)
+        panel.pack(fill="both", expand=True)
+        inner = tk.Frame(panel, bg=U.BG2)
+        inner.pack(fill="both", expand=True, padx=16, pady=10)
+        # 단추는 오른쪽 아래에 **먼저** 붙인다. 줄 아래에 두면 창 높이를 그만큼 더 먹는다.
+        side = tk.Frame(inner, bg=U.BG2)
+        side.pack(side="right", fill="y", padx=(12, 0))
+        U.PushButton(side, "지도로 돌아가기", self.close, height=Z.base_h(38)).pack(side="bottom")
+        body = tk.Frame(inner, bg=U.BG2)
+        body.pack(side="left", fill="both", expand=True)
+        tk.Label(body, text=title, bg=U.BG2, fg=color, font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
         for ln in lines:
-            lab = tk.Label(body, text=natural(ln), bg=U.BG2, fg=U.FG, font=U.FONT_S, anchor="w", justify="left")
+            lab = tk.Label(body, text=ln, bg=U.BG2, fg=U.FG, font=U.FONT_S, anchor="w", justify="left")
             lab.pack(fill="x", pady=(2, 0))
             U.wrap_to_width(lab)
-        self.say(title)
 
     def request_close(self):
         if self.alive and not self.view.get("over"):

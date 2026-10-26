@@ -6,6 +6,10 @@
 
 회원가입에서는 1~9세대 어태커 27마리 중 하나를 고른다.
 카드에 뜨는 그림은 **실제 도트**다(서버에서 받아 캐시한 움직이는 GIF).
+
+화면 테마는 짓는 고리만 덮어쓴다 - 창의 틀(_build) · 로그인 칸(_build_login) · 회원가입 칸(_build_signup) ·
+서버 칸 보이기(_paint_server) · 세대 단추 칠하기(_paint_gens) · 카드(StarterCard._build) · 비밀번호 칸(PinEntry._cell).
+서버에 묻는 일 · 입력 검사 · 오류 문구는 여기 그대로다.
 """
 import tkinter as tk
 
@@ -14,7 +18,7 @@ from PIL import ImageTk
 from common.korean import fmt as kfmt
 from common.version import VERSION
 
-from . import config, sprite_cache, sprites
+from . import config, skins, sprite_cache, sprites
 from . import ui_common as U
 from .api import Api
 
@@ -22,6 +26,7 @@ CHECK_DELAY = 420          # 타이핑이 멈추고 이만큼 뒤에 닉네임�
 CARD_W, CARD_H = 116, 114
 
 
+@skins.skinnable
 class PinEntry(object):
     """숫자 4칸짜리 비밀번호 입력.
 
@@ -35,23 +40,28 @@ class PinEntry(object):
         self.boxes = []
         self.entries = []
         for i in range(digits):
-            box = tk.Frame(self.frame, bg=U.INK, highlightthickness=2,
-                           highlightbackground=U.LINE, highlightcolor=U.ACCENT,
-                           width=42, height=U.h(44), bd=0)
-            box.pack_propagate(False)
-            box.pack(side="left", padx=(0, 7))
-            e = tk.Entry(box, bg=U.INK, fg=U.FG, insertbackground=U.ACCENT,
-                         relief="flat", bd=0, justify="center",
-                         font=(U.FAMILY, U.pt(16), "bold"), highlightthickness=0,
-                         show="●", width=2)
-            e.pack(expand=True)
+            box, e = self._cell(i)
             e.bind("<KeyRelease>", lambda ev, k=i: self._typed(ev, k))
-            e.bind("<FocusIn>",
-                   lambda ev, b=box: b.configure(highlightbackground=U.ACCENT))
-            e.bind("<FocusOut>",
-                   lambda ev, b=box: b.configure(highlightbackground=U.LINE))
             self.boxes.append(box)
             self.entries.append(e)
+
+    def _cell(self, i):
+        """칸 하나를 짓는다 - (테두리 틀, 입력칸). 고른 칸은 테두리가 금색이 된다."""
+        box = tk.Frame(self.frame, bg=U.INK, highlightthickness=2,
+                       highlightbackground=U.LINE, highlightcolor=U.ACCENT,
+                       width=42, height=U.h(44), bd=0)
+        box.pack_propagate(False)
+        box.pack(side="left", padx=(0, 7))
+        e = tk.Entry(box, bg=U.INK, fg=U.FG, insertbackground=U.ACCENT,
+                     relief="flat", bd=0, justify="center",
+                     font=(U.FAMILY, U.pt(16), "bold"), highlightthickness=0,
+                     show="●", width=2)
+        e.pack(expand=True)
+        e.bind("<FocusIn>",
+               lambda ev, b=box: b.configure(highlightbackground=U.ACCENT))
+        e.bind("<FocusOut>",
+               lambda ev, b=box: b.configure(highlightbackground=U.LINE))
+        return box, e
 
     def pack(self, **kw):
         self.frame.pack(**kw)
@@ -86,6 +96,7 @@ class PinEntry(object):
             pass
 
 
+@skins.skinnable
 class StarterCard(object):
     """스타팅 포켓몬 카드 한 장. 실제 도트가 제자리에서 움직인다."""
 
@@ -95,6 +106,11 @@ class StarterCard(object):
         self.photos = []
         self.durations = [140]
         self.i = 0
+        self._build(parent)
+
+    def _build(self, parent):
+        """카드를 짓는다. 도트는 self.art.configure(image=) 로 붙는다 (set_frames · step)."""
+        mon = self.mon
         base = "#101623"
 
         self.box = tk.Frame(parent, bg=base, highlightthickness=2,
@@ -153,6 +169,7 @@ class StarterCard(object):
             self.tag.place_forget()
 
 
+@skins.skinnable
 class LoginWindow(object):
     """결과는 self.result 에 담긴다. 취소하면 None."""
 
@@ -171,12 +188,27 @@ class LoginWindow(object):
         self._check_job = None
         self._anim_job = None
 
-        self.win = tk.Toplevel(root)
+        # 서버 주소는 평소에 보일 필요가 없다. 어디에 붙는지만 작게 알려주고,
+        # 눌렀을 때만 고칠 수 있게 접어 둔다. (개발할 때 로컬 서버를 가리키거나,
+        # 나중에 서버를 옮겼을 때만 쓴다)
+        self.server = tk.StringVar(value=settings.get("server", ""))
+        self.server_open = False
+
+        self._build()
+        self.server.trace_add("write", lambda *_a: self._server_changed())
+        self.win.protocol("WM_DELETE_WINDOW", self.cancel)
+
+        self.show_login()
+        self.win.bind("<Return>", lambda e: self._enter())
+
+    def _build(self):
+        """창의 틀을 짓는다 - self.win, 서버 줄(server_bar · server_label · server_box),
+        탭(tab_login · tab_signup), 칸(panel), 상태 줄(status)."""
+        self.win = tk.Toplevel(self.root)
         U.style_window(self.win, "포스크탑", 460, 748)
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.protocol("WM_DELETE_WINDOW", self.cancel)
         self.win.resizable(False, False)
 
         U.ball_header(self.win, 460, 96, "포스크탑",
@@ -189,12 +221,6 @@ class LoginWindow(object):
         body = tk.Frame(self.win, bg=U.BG)
         body.pack(fill="both", expand=True, padx=20, pady=(15, 0))
 
-        # 서버 주소는 평소에 보일 필요가 없다. 어디에 붙는지만 작게 알려주고,
-        # 눌렀을 때만 고칠 수 있게 접어 둔다. (개발할 때 로컬 서버를 가리키거나,
-        # 나중에 서버를 옮겼을 때만 쓴다)
-        self.server = tk.StringVar(value=settings.get("server", ""))
-        self.server_open = False
-
         self.server_bar = tk.Frame(body, bg=U.BG)
         self.server_bar.pack(fill="x", pady=(0, 2))
         self.server_label = tk.Label(
@@ -205,7 +231,6 @@ class LoginWindow(object):
 
         self.server_box = tk.Frame(body, bg=U.BG)
         U.entry(self.server_box, self.server).pack(fill="x", pady=(4, 0))
-        self.server.trace_add("write", lambda *_a: self._server_changed())
 
         tabs = tk.Frame(body, bg=U.BG)
         tabs.pack(fill="x", pady=(11, 0))
@@ -220,9 +245,6 @@ class LoginWindow(object):
         self.status = U.status_line(body, "", U.LINE)
         self.status.pack(fill="x", pady=(13, 13))
 
-        self.show_login()
-        self.win.bind("<Return>", lambda e: self._enter())
-
     # ---------------- 탭 ----------------
     def _server_text(self):
         """접속할 곳을 짧게. 주소 전체는 길어서 호스트만 보여준다."""
@@ -235,6 +257,10 @@ class LoginWindow(object):
 
     def _toggle_server(self):
         self.server_open = not self.server_open
+        self._paint_server()
+
+    def _paint_server(self):
+        """서버 주소 칸을 펴거나 접는다 (server_open 을 따른다)."""
         if self.server_open:
             self.server_box.pack(fill="x", after=self.server_bar)
         else:
@@ -277,11 +303,17 @@ class LoginWindow(object):
     def show_login(self):
         self.clear_panel()
         self.paint_tabs()
+        self.li_name = tk.StringVar(value=config.load_session().get("username", ""))
+        box = self._build_login()
+        self.win.after(80, lambda: box.entry.focus_set())
+
+    def _build_login(self):
+        """로그인 칸을 짓는다 - 닉네임 칸(li_name), 비밀번호(li_pin), 로그인 단추, 회원가입 링크.
+        닉네임 칸(.entry 가 있는 것)을 돌려준다."""
         p = tk.Frame(self.panel, bg=U.BG2)
         p.pack(fill="both", expand=True, padx=18, pady=18)
 
         U.marker_label(p, "닉네임", bg=U.BG2).pack(anchor="w", pady=(0, 5))
-        self.li_name = tk.StringVar(value=config.load_session().get("username", ""))
         box = U.entry(p, self.li_name)
         box.pack(fill="x")
 
@@ -300,12 +332,26 @@ class LoginWindow(object):
                         font=U.FONT_B, cursor="hand2")
         link.pack(side="left", padx=(6, 0))
         link.bind("<Button-1>", lambda e: self.switch("signup"))
-        self.win.after(80, lambda: box.entry.focus_set())
+        return box
 
     # ---------------- 회원가입 ----------------
     def show_signup(self):
         self.clear_panel()
         self.paint_tabs()
+        self.rg_name = tk.StringVar()
+        self.rg_name.trace_add("write", lambda *a: self.schedule_check())
+        self._build_signup()
+
+        if self.gens:
+            self.build_genbar()
+            self.show_gen(self.gen)
+        else:
+            self.load_starters()
+        self.win.after(80, lambda: self.name_box.entry.focus_set())
+
+    def _build_signup(self):
+        """회원가입 칸을 짓는다 - 닉네임 칸(name_box · name_hint), 비밀번호(rg_pin),
+        세대 단추 자리(genbar), 카드 자리(cardbar), 가입 단추(btn_signup)."""
         p = tk.Frame(self.panel, bg=U.BG2)
         p.pack(fill="both", expand=True, padx=16, pady=(13, 12))
 
@@ -316,8 +362,6 @@ class LoginWindow(object):
                                   font=U.FONT_XS)
         self.name_hint.pack(side="right")
 
-        self.rg_name = tk.StringVar()
-        self.rg_name.trace_add("write", lambda *a: self.schedule_check())
         self.name_box = U.entry(p, self.rg_name)
         self.name_box.pack(fill="x", pady=(5, 0))
 
@@ -341,13 +385,6 @@ class LoginWindow(object):
         self.btn_signup = U.PushButton(p, "포켓몬을 골라 주세요", self.do_register,
                                        height=42)
         self.btn_signup.pack(fill="x", side="bottom", pady=(12, 0))
-
-        if self.gens:
-            self.build_genbar()
-            self.show_gen(self.gen)
-        else:
-            self.load_starters()
-        self.win.after(80, lambda: self.name_box.entry.focus_set())
 
     # ---------------- 닉네임 중복 확인 ----------------
     def schedule_check(self):
@@ -472,12 +509,7 @@ class LoginWindow(object):
 
     def show_gen(self, n):
         self.gen = n
-        for k, b in self.genbtns.items():
-            on = (k == n)
-            b.configure(bg=U.ACCENT if on else U.BG3,
-                        fg=U.ACCENT_DARK if on else U.FG_DIM,
-                        font=U.FONT_B if on else U.FONT_XS,
-                        highlightbackground=U.INK if on else U.BG2)
+        self._paint_gens()
         row = next((g for g in self.gens if g["gen"] == n), None)
         if not row:
             return
@@ -491,6 +523,15 @@ class LoginWindow(object):
         if row["pokemon"]:
             self.pick(row["pokemon"][0]["internal"])
         self.load_art(row["pokemon"])
+
+    def _paint_gens(self):
+        """세대 단추를 칠한다 - 지금 세대(self.gen)가 금색."""
+        for k, b in self.genbtns.items():
+            on = (k == self.gen)
+            b.configure(bg=U.ACCENT if on else U.BG3,
+                        fg=U.ACCENT_DARK if on else U.FG_DIM,
+                        font=U.FONT_B if on else U.FONT_XS,
+                        highlightbackground=U.INK if on else U.BG2)
 
     def pick(self, internal):
         self.picked = internal
@@ -626,8 +667,9 @@ class LoginWindow(object):
         return self.result
 
 
+@skins.skinnable_fn("login")
 def ask_password(root, title, message):
-    """회원탈퇴처럼 비밀번호를 한 번 더 확인해야 할 때."""
+    """회원탈퇴처럼 비밀번호를 한 번 더 확인해야 할 때. 확인하면 숫자 네 자리, 닫으면 None."""
     win = tk.Toplevel(root)
     U.style_window(win, title, 360, 220)
     U.apply_theme(win)
@@ -635,12 +677,7 @@ def ask_password(root, title, message):
     win.resizable(False, False)
     out = {}
 
-    bar = tk.Frame(win, bg=U.BG2, height=U.h(34))
-    bar.pack(fill="x")
-    bar.pack_propagate(False)
-    tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(13)).pack(side="left", padx=(12, 8))
-    tk.Label(bar, text=title, bg=U.BG2, fg=U.FG, font=U.FONT_B).pack(side="left")
-    tk.Frame(win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+    U.dialog_bar(win, title)
 
     f = tk.Frame(win, bg=U.BG)
     f.pack(fill="both", expand=True, padx=18, pady=16)

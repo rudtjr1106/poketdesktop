@@ -23,6 +23,7 @@ import tkinter as tk
 from common.korean import natural
 
 from . import item_icons
+from . import skins
 from . import ui_common as U
 from . import ui_loading
 from .ui_bag import _scroller
@@ -51,6 +52,7 @@ def sellable(items, bag):
     return out
 
 
+@skins.skinnable
 class SellMany(object):
     """고른 것을 (도구, 개수) 목록으로 돌려준다. 그만두면 None."""
 
@@ -68,15 +70,15 @@ class SellMany(object):
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
         self.parent = parent
+        self._build()
+        self.win.protocol("WM_DELETE_WINDOW", self._cancel)
+        self._paint()
 
-        bar = tk.Frame(self.win, bg=U.BG2, height=U.h(34))
-        bar.pack(fill="x")
-        bar.pack_propagate(False)
-        tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(13)).pack(side="left",
-                                                                 padx=(12, 8))
-        tk.Label(bar, text="여러 개 팔기", bg=U.BG2, fg=U.FG,
-                 font=U.FONT_B).pack(side="left")
-        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+    # ---------------- 그리기 ----------------
+    def _build(self):
+        """창 안의 것들 (테마마다 짓는 곳): 안내 · 고르기 단추 · 줄들 · 합계 · 팔기 단추.
+        self.ok_btn · total · hint · rows 를 둔다 (rows[도구] = (틀, 개수 칸, 있는 수, 값))."""
+        U.dialog_bar(self.win, "여러 개 팔기")
 
         f = tk.Frame(self.win, bg=U.BG)
         f.pack(fill="both", expand=True, padx=16, pady=(12, 12))
@@ -113,10 +115,7 @@ class SellMany(object):
             tk.Label(self.box, text="팔 수 있는 물건이 없습니다.",
                      bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S).pack(anchor="w",
                                                                  pady=10)
-        self.win.protocol("WM_DELETE_WINDOW", self._cancel)
-        self._paint()
 
-    # ---------------- 그리기 ----------------
     def _row(self, it, have, price):
         f = tk.Frame(self.box, bg=U.BG2, height=U.h(ROW_H),
                      highlightthickness=1, highlightbackground=U.LINE)

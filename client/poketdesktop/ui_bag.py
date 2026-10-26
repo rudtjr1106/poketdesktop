@@ -33,6 +33,7 @@ from common.korean import natural
 from . import sprite_cache, sprites
 from . import ui_box
 from . import item_icons
+from . import skins
 from . import ui_common as U
 from . import ui_loading
 from . import ui_monfind
@@ -538,6 +539,7 @@ def bag_title(inner, switch=None):
         switch(inner).pack(side="left", padx=(0, 12))
 
 
+@skins.skinnable
 class BagWindow(object):
     def __init__(self, root, app, parent=None, switch=None):
         self.root = root
@@ -571,14 +573,19 @@ class BagWindow(object):
             # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
             U.install_wheel(self.win)
 
+        self._build()
+        self.reload()
+
+    # ---------------- 그리기 ----------------
+    # 화면 테마(skins/)는 이 아래 _build 와 _paint_* · _show_* · _repaint_* 만 갈아 끼운다 - 서버 호출과
+    # 판정(어느 도구를 누구에게 쓸 수 있나, 단추를 켤까)은 이 창의 것을 그대로 쓴다.
+    def _build(self):
         self._header()
         self._bottom()
         body = tk.Frame(self.win, bg=U.BG)
         body.pack(fill="both", expand=True)
         self._items_pane(body)
         self._detail_pane(body)
-
-        self.reload()
 
     # ---------------- 머리 ----------------
     def _header(self):
@@ -779,6 +786,50 @@ class BagWindow(object):
         self.status = U.status_line(inner, "", bg=U.INK)
         self.status.pack(side="left", fill="x", expand=True, pady=11)
 
+    # ---------------- 칠하기 (화면 테마가 갈아 끼운다) ----------------
+    def _paint_money(self, kinds, total):
+        self.money_label.configure(text="{:,}원".format(self.money))
+        self.count_label.configure(text="%d종 · 모두 %d개" % (kinds, total))
+
+    def _paint_sort(self):
+        self.item_seg.set(self.item_sort)
+
+    def _show_mons(self, keep):
+        self.mon_vl.set([("mon", m) for m in self._view], keep=keep)
+
+    def _repaint_items(self):
+        self.item_vl.refresh()
+
+    def _repaint_mons(self):
+        self.mon_vl.refresh()
+
+    def _paint_item(self, it):
+        """오른쪽 위 - 고른 도구의 이름 · 분류 · 개수 · 설명, 그리고 능력 칸 · 노력치 칸을 열고 닫는다."""
+        if not it:
+            self.i_name.configure(text="도구를 고르세요")
+            self.i_cat.configure(text="", bg=U.BG2)
+            self.i_count.configure(text="")
+            self.i_desc.configure(text="왼쪽에서 도구를 고르면 여기에 설명이 뜬다.")
+            self.t_hint.configure(text="")
+            self.statbox.pack_forget()
+            self.evbox.pack_forget()
+            return
+        kind = (it.get("effect") or {}).get("kind")
+        self.i_name.configure(text=it["kr"])
+        self.i_cat.configure(text=CAT_KR.get(it["cat"], it["cat"]),
+                             bg=CAT_COLOR.get(it["cat"], U.BG3), fg="#14141a")
+        self.i_count.configure(text="%d개" % self.bag.get(it["id"], 0))
+        self.i_desc.configure(text=natural(item_desc(it)))
+        self.t_hint.configure(text=target_hint(it))
+        if self.stat_needed:
+            self.statbox.pack(fill="x", pady=(11, 0), after=self.i_desc)
+        else:
+            self.statbox.pack_forget()
+        if kind == "ev":
+            self.evbox.pack(fill="x", pady=(11, 0))
+        else:
+            self.evbox.pack_forget()
+
     # ---------------- 거들기 ----------------
     def say(self, text, color=U.GOOD, fg=None):
         try:
@@ -863,10 +914,9 @@ class BagWindow(object):
             except Exception:                           # noqa: BLE001
                 pass
 
-        self.money_label.configure(text="{:,}원".format(self.money))
         kinds = sum(1 for v in self.bag.values() if v > 0)
         total = sum(v for v in self.bag.values() if v > 0)
-        self.count_label.configure(text="%d종 · 모두 %d개" % (kinds, total))
+        self._paint_money(kinds, total)
 
         # 고를 도구를 먼저 정해 둔다. 줄을 만들면서 고른 줄을 바로 칠한다.
         keep_item = self.item_id
@@ -919,23 +969,33 @@ class BagWindow(object):
         줄을 만들지 않는다 - 무엇이 몇 번째 줄인지만 넘긴다 (U.VirtualList). 보던 자리는 그대로다.
         """
         owned = self._owned()
-        self.item_nomatch.pack_forget()
         if not owned:
+            return self._show_item_entries("empty")
+        entries = self._item_entries(owned)
+        if not entries:
+            # 찾는 말에 맞는 도구가 없다
+            return self._show_item_entries(
+                "nomatch", note=natural("'%s' 에 맞는 도구가 없다." % self.item_q.get().strip()))
+        self._show_item_entries("list", entries, keep=keep)
+
+    def _show_item_entries(self, state, entries=(), keep=True, note=""):
+        """도구 목록 자리: state 가 "list" 면 entries 를 담고, "empty"(가방이 비었다) ·
+        "nomatch"(찾는 말에 맞는 것이 없다 - note) 면 목록 대신 안내를 놓는다."""
+        self.item_nomatch.pack_forget()
+        if state == "empty":
             self.item_vl.set([])
             self.item_vl.holder.pack_forget()
             self.item_empty.pack(fill="both", expand=True)
             return
         self.item_empty.pack_forget()
-        entries = self._item_entries(owned)
-        if not entries:
-            # 찾는 말에 맞는 도구가 없다
+        if state == "nomatch":
             self.item_vl.set([])
             self.item_vl.holder.pack_forget()
-            self.item_nomatch.configure(text=natural("'%s' 에 맞는 도구가 없다." % self.item_q.get().strip()))
+            self.item_nomatch.configure(text=note)
             self.item_nomatch.pack(fill="x", pady=(34, 0))
             return
         self.item_vl.pack(fill="both", expand=True)
-        self.item_vl.set(entries, keep=keep)
+        self.item_vl.set(list(entries), keep=keep)
 
     def _item_entries(self, owned):
         """목록에 담을 줄: 분류마다 머리줄 하나와 그 아래 도구들 - 찾는 말로 거르고 고른 순서로 (1.13.4).
@@ -978,7 +1038,7 @@ class BagWindow(object):
     def set_item_sort(self, key):
         """줄 세우기 단추를 눌렀다. 고른 도구는 그대로, 목록은 맨 위부터."""
         self.item_sort = key if key in dict(ITEM_SORTS) else "name"
-        self.item_seg.set(self.item_sort)
+        self._paint_sort()
         self._items_changed()
         self.say("도구를 %s순으로 봅니다." % dict(ITEM_SORTS)[self.item_sort]
                  + (" 지닌 도구는 하는 일마다 묶었습니다." if self.item_sort == "kind" else ""), U.INFO, U.FG_DIM)
@@ -995,7 +1055,7 @@ class BagWindow(object):
         보이는 것은 찾는 말로 거르고 고른 순서로 줄 세운 것이다 (self.find, 1.13.1).
         """
         self._view = self.find.view(self.mons, getattr(self.app, "dex", None))
-        self.mon_vl.set([("mon", m) for m in self._view], keep=keep)
+        self._show_mons(keep)
         if not self.mons:
             self._mon_list(False, "가진 포켓몬이 없다.")
 
@@ -1038,40 +1098,20 @@ class BagWindow(object):
         self.item_id = item_id
         self.stat = None
         if prev != item_id:
-            self.item_vl.refresh()           # 보이는 줄만 다시 칠한다 (고름은 줄이 self.item_id 를 본다)
+            self._repaint_items()            # 보이는 줄만 다시 칠한다 (고름은 줄이 self.item_id 를 본다)
         it = self.current_item()
         if not it:
             self.stat_needed = False
-            self.i_name.configure(text="도구를 고르세요")
-            self.i_cat.configure(text="", bg=U.BG2)
-            self.i_count.configure(text="")
-            self.i_desc.configure(text="왼쪽에서 도구를 고르면 여기에 설명이 뜬다.")
-            self.t_hint.configure(text="")
-            self.statbox.pack_forget()
-            self.evbox.pack_forget()
+            self._paint_item(None)
             self._show_targets(None)
             return self._refresh_button()
 
         eff = it.get("effect") or {}
         kind = eff.get("kind")
-        self.i_name.configure(text=it["kr"])
-        self.i_cat.configure(text=CAT_KR.get(it["cat"], it["cat"]),
-                             bg=CAT_COLOR.get(it["cat"], U.BG3), fg="#14141a")
-        self.i_count.configure(text="%d개" % self.bag.get(it["id"], 0))
-        self.i_desc.configure(text=natural(item_desc(it)))
-        self.t_hint.configure(text=target_hint(it))
-
         # 병뚜껑처럼 능력을 골라야 하는 것만 능력 칸을 연다.
         # 금색병뚜껑(count 6)은 서버가 알아서 여섯 개를 다 단련한다.
         self.stat_needed = (kind == "iv" and int(eff.get("count", 1)) < 6)
-        if self.stat_needed:
-            self.statbox.pack(fill="x", pady=(11, 0), after=self.i_desc)
-        else:
-            self.statbox.pack_forget()
-        if kind == "ev":
-            self.evbox.pack(fill="x", pady=(11, 0))
-        else:
-            self.evbox.pack_forget()
+        self._paint_item(it)
 
         self._show_targets(it)
         self._refresh_stats()
@@ -1111,7 +1151,7 @@ class BagWindow(object):
             if not self._states[m["id"]][1] and (
                     first_ok is None or (self._is_good(m["id"]) and not self._is_good(first_ok))):
                 first_ok = m["id"]
-        self.mon_vl.refresh()
+        self._repaint_mons()
         # 고르고 있던 포켓몬이 이 도구로는 못 쓰는 대상이거나 찾기에 가려졌으면 옮겨 준다
         cur = self._states.get(self.mon_id)
         if cur is None or cur[1] or not any(m["id"] == self.mon_id for m in self._view):
@@ -1236,7 +1276,7 @@ class BagWindow(object):
         prev = self.mon_id
         self.mon_id = pid if pid in self._mon_ids else None
         if prev != self.mon_id:
-            self.mon_vl.refresh()            # 보이는 줄만 다시 칠한다
+            self._repaint_mons()             # 보이는 줄만 다시 칠한다
         self.stat = None
         self._refresh_stats()
         self._refresh_evs()
@@ -1264,25 +1304,30 @@ class BagWindow(object):
         ivs = info.get("ivs") or {}
         hyper = info.get("hyper") or {}
         if not mon:
-            self.stat_hint.configure(text="먼저 포켓몬을 고르세요")
+            hint = "먼저 포켓몬을 고르세요"
         elif int(mon.get("level", 0)) < HYPER_MIN_LEVEL:
-            self.stat_hint.configure(text="Lv.%d 부터 단련할 수 있다"
-                                          % HYPER_MIN_LEVEL)
+            hint = "Lv.%d 부터 단련할 수 있다" % HYPER_MIN_LEVEL
         else:
-            self.stat_hint.configure(text="회색은 이미 최고치")
+            hint = "회색은 이미 최고치"
+        cells = []                            # (능력, 글, "off" | "done" | "on" | "free")
         for key, label in STAT_ROWS:
-            lb = self.stat_chips[key]
             if not mon:
-                lb.configure(text=label, bg=U.BG2, fg="#5a6076",
-                             highlightbackground=U.LINE, cursor="")
+                cells.append((key, label, "off"))
                 continue
             iv = int(ivs.get(key, 0))
             done = hyper.get(key) or iv >= P.IV_MAX
             text = "%s %d" % (label, P.IV_MAX if done else iv)
-            if done:
+            cells.append((key, text, "done" if done else "on" if self.stat == key else "free"))
+        self._paint_stats(hint, cells)
+
+    def _paint_stats(self, hint, cells):
+        self.stat_hint.configure(text=hint)
+        for key, text, state in cells:
+            lb = self.stat_chips[key]
+            if state in ("off", "done"):
                 lb.configure(text=text, bg=U.BG2, fg="#5a6076",
                              highlightbackground=U.LINE, cursor="")
-            elif self.stat == key:
+            elif state == "on":
                 lb.configure(text=text, bg=U.ACCENT, fg=U.ACCENT_DARK,
                              highlightbackground=U.INK, cursor="hand2")
             else:
@@ -1298,25 +1343,33 @@ class BagWindow(object):
         evs = info.get("evs") or {}
         total = int(info.get("evTotal", 0))
         want = (it.get("effect") or {}).get("stat")
+        rows = []                             # (능력, 이름, 값 - 포켓몬을 안 골랐으면 None, 이 도구의 능력인가)
         for key, label in STAT_ROWS:
+            rows.append((key, label, int(evs.get(key, 0)) if mon else None, key == want))
+        if mon:
+            total_text = "합계 %d / %d" % (total, EV_TOTAL_MAX)
+            total_full = total >= EV_TOTAL_MAX
+        else:
+            total_text, total_full = "포켓몬을 고르세요", None
+        self._paint_evs(rows, total_text, total_full)
+
+    def _paint_evs(self, rows, total_text, total_full):
+        """total_full: 합계가 꽉 찼나 (True/False), 포켓몬을 안 골랐으면 None."""
+        for key, label, v, on in rows:
             name, cv, val = self.ev_bars[key]
-            v = int(evs.get(key, 0)) if mon else 0
-            on = (key == want)
             name.configure(fg=U.ACCENT_TEXT if on else U.FG_DIM)
-            val.configure(text=str(v) if mon else "-",
+            val.configure(text=str(v) if v is not None else "-",
                           fg=U.ACCENT if on else U.FG_DIM)
             cv.delete("all")
-            w = int(118 * min(v, EV_STAT_MAX) / float(EV_STAT_MAX))
+            w = int(118 * min(v or 0, EV_STAT_MAX) / float(EV_STAT_MAX))
             if w:
                 cv.create_rectangle(0, 0, w, 7,
                                     fill=U.ACCENT if on else "#4a5878",
                                     outline="")
-        if mon:
-            self.ev_total.configure(
-                text="합계 %d / %d" % (total, EV_TOTAL_MAX),
-                fg=U.DANGER if total >= EV_TOTAL_MAX else U.FG_DIM)
+        if total_full is None:
+            self.ev_total.configure(text=total_text, fg=U.FG_FAINT)
         else:
-            self.ev_total.configure(text="포켓몬을 고르세요", fg=U.FG_FAINT)
+            self.ev_total.configure(text=total_text, fg=U.DANGER if total_full else U.FG_DIM)
 
     def _refresh_button(self):
         it = self.current_item()
@@ -1325,20 +1378,20 @@ class BagWindow(object):
         usable = bool(it) and kind in USABLE
         free = usable and kind in NO_TARGET          # 대상을 안 고르는 도구
         ok = bool(usable and (free or (mon and (not self.stat_needed or self.stat))))
-        self.use_btn.configure(state="normal" if ok else "disabled")
-        if it and usable and (mon or free):
-            self.use_btn.configure(text="%s 쓰기" % it["kr"])
-        else:
-            self.use_btn.configure(text="쓰기")
+        use_text = "%s 쓰기" % it["kr"] if (it and usable and (mon or free)) else "쓰기"
 
         # 팔기는 포켓몬을 안 골라도 된다. 값이 붙어 있고 실제로 갖고
         # 있으면 팔 수 있다. 몬스터볼은 게임이 안 돌아가므로 뺀다.
         have = int(self.bag.get((it or {}).get("id"), 0)) if it else 0
         price = int((it or {}).get("sell") or 0)
         can_sell = bool(it) and price > 0 and have > 0 and it["id"] != "POKEBALL"
-        self.sell_btn.configure(state="normal" if can_sell else "disabled")
-        self.sell_btn.configure(
-            text="%d원에 팔기" % price if can_sell else "팔기")
+        self._paint_buttons(ok, use_text, can_sell, "%d원에 팔기" % price if can_sell else "팔기")
+
+    def _paint_buttons(self, use_ok, use_text, sell_ok, sell_text):
+        self.use_btn.configure(state="normal" if use_ok else "disabled")
+        self.use_btn.configure(text=use_text)
+        self.sell_btn.configure(state="normal" if sell_ok else "disabled")
+        self.sell_btn.configure(text=sell_text)
 
     # ---------------- 팔기 ----------------
     def do_sell(self):
@@ -1628,6 +1681,39 @@ def gift_line(g):
     return "%s ×%d" % (g.get("name") or "?", n)
 
 
+def gift_notes(gifts):
+    """선물 알림의 글 셋: (제목, 메시지, 맨 아래 안내). 화면(기본 · 테마)이 같이 쓴다.
+
+    제목과 메시지는 운영자가 적은 것이다. 첫 선물의 것을 쓴다 - 한 번에 여러 개를 보낼 때는 보통 같은
+    이유로 보낸다. 안내는 선물 종류에 따라 다르다 (가방 · 알 · 칭호/명패).
+    """
+    head = gifts[0].get("title") or ""
+    msg = gifts[0].get("message") or ""
+    # 칭호·명패는 가방이 아니라 마이페이지에서 단다 (시즌 보상, 1.12.0 까지는 랭킹 탭)
+    kinds = set(g.get("kind") for g in gifts)
+    bits = []
+    if kinds & {"item", "money", "balls"}:
+        bits.append("가방에 넣어 두었습니다.")
+    if "egg" in kinds:
+        # 1.4.1 부터 알도 파티 한 자리를 차지한다. 꽉 차 있으면 박스로 간다.
+        bits.append("알은 데리고 다니는 동안 게임을 켜 둔 시간만큼 자라서 부화합니다. "
+                    "자리가 없으면 박스에 들어가니 포켓몬 관리에서 데리고 다니세요.")
+    if kinds & {"title", "frame"}:
+        bits.append("칭호·명패는 마이페이지에서 바꿀 수 있습니다.")
+    return head, msg, " ".join(bits) or "가방에 넣어 두었습니다."
+
+
+def gift_icon_id(g):
+    """선물 한 줄에 그릴 도구 그림의 id (없으면 None - 돈 · 칭호처럼 그림이 없는 줄)."""
+    if g.get("kind") == "item" and g.get("item"):
+        return g["item"]
+    if g.get("kind") == "egg" and g.get("item"):
+        from . import eggs_ui
+        return eggs_ui.EGG_ITEM.get(g["item"])
+    return None
+
+
+@skins.skinnable_fn("announce")
 def announce_gifts(parent, app, gifts):
     """운영자가 보낸 선물이 도착했다고 알린다.
 
@@ -1651,10 +1737,7 @@ def announce_gifts(parent, app, gifts):
 
     tk.Label(f, text="선물이 도착했습니다", bg=U.BG, fg=U.ACCENT_TEXT,
              font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
-    # 제목과 메시지는 운영자가 적은 것이다. 첫 선물의 것을 쓴다 -
-    # 한 번에 여러 개를 보낼 때는 보통 같은 이유로 보낸다.
-    head = gifts[0].get("title") or ""
-    msg = gifts[0].get("message") or ""
+    head, msg, footer = gift_notes(gifts)
     if head:
         tk.Label(f, text=head, bg=U.BG, fg=U.FG, font=U.FONT_H,
                  wraplength=360, justify="left").pack(anchor="w", pady=(6, 0))
@@ -1680,31 +1763,15 @@ def announce_gifts(parent, app, gifts):
         slot.pack_propagate(False)
         icon = tk.Label(slot, bg=PANEL)
         icon.pack(expand=True)
-        if g.get("kind") == "item" and g.get("item"):
-            _gift_icon(parent, app, icon, g["item"], keep, i)
-        elif g.get("kind") == "egg" and g.get("item"):
-            from . import eggs_ui
-            egg_item = eggs_ui.EGG_ITEM.get(g["item"])
-            if egg_item:
-                _gift_icon(parent, app, icon, egg_item, keep, i)
+        icon_id = gift_icon_id(g)
+        if icon_id:
+            _gift_icon(parent, app, icon, icon_id, keep, i)
         tk.Label(row, text=gift_line(g), bg=PANEL, fg=U.FG, font=U.FONT_B,
                  anchor="w").pack(side="left")
     if n > 8:
         tk.Label(inner, text="그 밖 %d개" % (n - 8), bg=PANEL,
                  fg=U.FG_FAINT, font=U.FONT_XS).pack(anchor="w", pady=(4, 0))
 
-    # 칭호·명패는 가방이 아니라 마이페이지에서 단다 (시즌 보상, 1.12.0 까지는 랭킹 탭)
-    kinds = set(g.get("kind") for g in gifts)
-    bits = []
-    if kinds & {"item", "money", "balls"}:
-        bits.append("가방에 넣어 두었습니다.")
-    if "egg" in kinds:
-        # 1.4.1 부터 알도 파티 한 자리를 차지한다. 꽉 차 있으면 박스로 간다.
-        bits.append("알은 데리고 다니는 동안 게임을 켜 둔 시간만큼 자라서 부화합니다. "
-                    "자리가 없으면 박스에 들어가니 포켓몬 관리에서 데리고 다니세요.")
-    if kinds & {"title", "frame"}:
-        bits.append("칭호·명패는 마이페이지에서 바꿀 수 있습니다.")
-    footer = " ".join(bits) or "가방에 넣어 두었습니다."
     tk.Label(f, text=footer, bg=U.BG, fg=U.FG_DIM,
              font=U.FONT_S, wraplength=360,
              justify="left").pack(anchor="w", pady=(10, 0))
@@ -1750,6 +1817,47 @@ def ask_new_learns(app, mon, r):
     return True
 
 
+def evolve_lines(info):
+    """진화 알림의 글 둘: (진화했다는 말, 배운 기술 줄 또는 ''). 화면(기본 · 테마)이 같이 쓴다.
+
+    '(으)로' 는 natural() 이 못 고치는 표기다. '로(으로)' 로 적어야 앞말의 받침을 보고 '로 / 으로' 가
+    제대로 골라진다. 진화하면서 배우는 기술이 있으면 같이 적고, 자리가 없어 못 배운 것도 적는다 -
+    잠시 뒤에 무엇을 잊을지 묻는 창이 뜬다.
+    """
+    head = natural("%s은(는) %s로(으로) 진화했다!" % (info.get("fromKr", "?"), info.get("toKr", "?")))
+    learned = info.get("learned") or []
+    pending = info.get("pending") or []
+    line = ""
+    if learned or pending:
+        bits = []
+        if learned:
+            bits.append("%s 을(를) 배웠다!" % ", ".join(learned))
+        if pending:
+            bits.append("%s 을(를) 배우려 한다." % ", ".join(pending))
+        line = natural("  ".join(bits))
+    return head, line
+
+
+def evolve_images(app, info, height=72):
+    """작업 스레드에서. 진화 전 · 후의 도트 (PIL 그림 또는 None) 둘."""
+    out = []
+    for num in (info.get("fromNum"), info.get("toNum")):
+        path = sprite_cache.ensure(app.api, num, False)
+        img = None
+        if path:
+            try:
+                anim = sprites.load_animation(path, target_height=height,
+                                              min_scale=0.2, max_scale=3.0,
+                                              max_frames=1)
+                img = sprites.to_rgba(anim.frames[sprites.RIGHT][0],
+                                      anim.key)
+            except Exception:                           # noqa: BLE001
+                img = None
+        out.append(img)
+    return out
+
+
+@skins.skinnable_fn("announce")
 def announce_evolve(parent, app, info):
     """진화했다고 크게 알린다.
 
@@ -1762,24 +1870,11 @@ def announce_evolve(parent, app, info):
 
     tk.Label(f, text="축하합니다!", bg=U.BG, fg=U.ACCENT_TEXT,
              font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
-    # '(으)로' 는 natural() 이 못 고치는 표기다. '로(으로)' 로 적어야
-    # 앞말의 받침을 보고 '로 / 으로' 가 제대로 골라진다.
-    tk.Label(f, text=natural("%s은(는) %s로(으로) 진화했다!"
-                             % (info.get("fromKr", "?"), info.get("toKr", "?"))),
-             bg=U.BG, fg=U.FG, font=U.FONT_H, wraplength=360,
+    head, learn_line = evolve_lines(info)
+    tk.Label(f, text=head, bg=U.BG, fg=U.FG, font=U.FONT_H, wraplength=360,
              justify="left").pack(anchor="w", pady=(6, 0))
-    # 진화하면서 배우는 기술이 있으면 같이 적는다. 자리가 없어 못 배운
-    # 것도 적는다 - 잠시 뒤에 무엇을 잊을지 묻는 창이 뜬다.
-    learned = info.get("learned") or []
-    pending = info.get("pending") or []
-    if learned or pending:
-        bits = []
-        if learned:
-            bits.append("%s 을(를) 배웠다!" % ", ".join(learned))
-        if pending:
-            bits.append("%s 을(를) 배우려 한다." % ", ".join(pending))
-        line = "  ".join(bits)
-        tk.Label(f, text=natural(line), bg=U.BG, fg=U.ACCENT_TEXT,
+    if learn_line:
+        tk.Label(f, text=learn_line, bg=U.BG, fg=U.ACCENT_TEXT,
                  font=U.FONT_S, wraplength=360,
                  justify="left").pack(anchor="w", pady=(2, 0))
 
@@ -1794,21 +1889,7 @@ def announce_evolve(parent, app, info):
     after.pack(side="left", expand=True)
 
     def work():
-        out = []
-        for num in (info.get("fromNum"), info.get("toNum")):
-            path = sprite_cache.ensure(app.api, num, False)
-            img = None
-            if path:
-                try:
-                    anim = sprites.load_animation(path, target_height=72,
-                                                  min_scale=0.2, max_scale=3.0,
-                                                  max_frames=1)
-                    img = sprites.to_rgba(anim.frames[sprites.RIGHT][0],
-                                          anim.key)
-                except Exception:                       # noqa: BLE001
-                    img = None
-            out.append(img)
-        return out
+        return evolve_images(app, info)
 
     def done(imgs, err):
         if err or not imgs:

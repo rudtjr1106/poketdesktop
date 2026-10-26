@@ -19,9 +19,9 @@
 """
 import tkinter as tk
 
-from common import movetext as MT
 from common.korean import natural
 
+from . import skins
 from . import ui_common as U
 from .ui_learn import MIN_H, SCREEN_PAD, W, ForgetAsk
 
@@ -56,6 +56,7 @@ def tag_text(entry):
     return "%s · 무료" % when if entry.get("free") else when
 
 
+@skins.skinnable
 class RememberAsk(ForgetAsk):
     """떠올릴 기술 하나를 고르게 한다. result 는 기술 내부 이름, 안 고르면 None."""
 
@@ -77,14 +78,7 @@ class RememberAsk(ForgetAsk):
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
 
-        bar = tk.Frame(self.win, bg=U.BG2, height=U.h(34))
-        bar.pack(fill="x")
-        bar.pack_propagate(False)
-        tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(13)).pack(side="left",
-                                                            padx=(12, 8))
-        tk.Label(bar, text="기술 떠올리기", bg=U.BG2, fg=U.FG,
-                 font=U.FONT_B).pack(side="left")
-        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+        U.dialog_bar(self.win, "기술 떠올리기")
 
         f = tk.Frame(self.win, bg=U.BG)
         f.pack(fill="both", expand=True, padx=18, pady=(14, 14))
@@ -141,41 +135,8 @@ class RememberAsk(ForgetAsk):
     # ---------------- 그리기 ----------------
     def _entry_row(self, parent, entry):
         mv = entry["move"]
-        md = self._md(mv)
-        f = tk.Frame(parent, bg=U.BG2, highlightthickness=1,
-                     highlightbackground=U.LINE)
-        f.pack(fill="x", pady=2)
-        inner = tk.Frame(f, bg=U.BG2)
-        inner.pack(fill="x", padx=10, pady=7)
-
-        head = tk.Frame(inner, bg=U.BG2)
-        head.pack(fill="x")
-        name = tk.Label(head, text=entry.get("kr") or self._kr(mv), bg=U.BG2,
-                        fg=U.FG, font=U.FONT_B, anchor="w")
-        name.pack(side="left")
-        cat = tk.Label(head, text=MT.cat_name(md), bg=U.BG2,
-                       fg=MT.cat_color(md), font=U.FONT_XS, anchor="w")
-        cat.pack(side="left", padx=(8, 0))
-        tag = tk.Label(head, text=tag_text(entry), bg=U.BG2,
-                       fg=U.GOOD if entry.get("free") else U.FG_FAINT,
-                       font=U.FONT_XS, anchor="e")
-        tag.pack(side="right")
-
-        bits = [self._type_kr(md)] + MT.stat_bits(md, with_cat=False)
-        stat = tk.Label(inner, text=MT.SEP.join(b for b in bits if b),
-                        bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w")
-        stat.pack(fill="x", pady=(2, 0))
-
-        desc = tk.Label(inner, text=MT.desc(md), bg=U.BG2, fg=U.FG_DIM,
-                        font=U.FONT_XS, anchor="w", justify="left")
-        desc.pack(fill="x", pady=(3, 0))
-        U.wrap_to_width(desc)
-
-        parts = (f, inner, head, name, cat, tag, stat, desc)
-        self.rows[mv] = (f, parts, name, cat, md)
-        for w in parts:
-            w.bind("<Button-1>", lambda _e, m=mv: self._pick(m))
-        return f
+        return self._plate(parent, mv, entry.get("kr") or self._kr(mv), tag_text(entry),
+                           U.GOOD if entry.get("free") else U.FG_FAINT)
 
     def _short(self, entry):
         """이 기술을 떠올리는 데 모자란 돈. 공짜거나 넉넉하면 0."""

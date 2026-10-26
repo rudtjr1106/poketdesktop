@@ -15,6 +15,7 @@ from . import api as apimod                    # noqa: E402
 from . import autostart                     # noqa: E402
 from . import config, single, sprite_cache, ui_loading, updater, walk_cache  # noqa: E402
 from . import watchdog                         # noqa: E402
+from . import skins                            # noqa: E402
 from . import platform_os as PLAT              # noqa: E402
 from . import ui_common as U                   # noqa: E402
 from .overlay import Overlay, look_num         # noqa: E402
@@ -33,7 +34,7 @@ from .ui_friends import FriendsWindow          # noqa: E402
 from .ui_settings import SettingsWindow        # noqa: E402
 from .arena import Arena                       # noqa: E402
 from .ui_shop import ShopWindow                # noqa: E402
-from .ui_hub import HubWindow                  # noqa: E402
+from . import ui_hub                           # noqa: E402
 from .ui_common import apply_theme, run_async  # noqa: E402
 from .ui_login import LoginWindow, ask_password  # noqa: E402
 from .ui_update import NewVersionAsk, UpdateWindow  # noqa: E402
@@ -188,6 +189,8 @@ class App(object):
 
         # tk.Tk() 보다 **먼저** 해야 하는 것이 있다 (맥의 창 복구 대화상자).
         PLAT.before_tk()
+        # 화면 테마의 글꼴도 tk.Tk() 전에 등록해야 Tk 이 본다 (기본 테마는 아무것도 안 한다).
+        skins.register_fonts()
         self.root = tk.Tk()
         self.root.withdraw()
         # Dock/작업표시줄에는 안 뜨고 트레이 아이콘만 남는다.
@@ -800,7 +803,7 @@ class App(object):
         # (platform_mac.keep_focus) 여기서 직접 불러야 한다.
         PLAT.activate()
         if not self.hub:
-            self.hub = HubWindow(self)
+            self.hub = ui_hub.make(self)        # 화면 테마가 허브를 따로 그리면 그것으로
             self._paint_notice()
             self._guild_dot = None
             self._paint_guild()
@@ -2853,8 +2856,35 @@ class App(object):
             self.root.after(1500, self.quit)
         run_async(self.root, lambda: self.api.delete_account(pw), done)
 
+    # ---------------------------------------------------------------- 다시 켜기
+    def restart(self):
+        """이 프로그램을 끄고 다시 켠다 (화면 테마를 바꿨을 때).
+
+        새로 켜지는 쪽은 RELAUNCH 표시를 달고 나가서, 이쪽이 다 꺼질 때까지 잠깐 기다린다
+        (main - 한 번만 실행 잠금). 못 띄웠으면 끄지 않는다 - 꺼지기만 하고 안 켜지는 것이 제일 나쁘다.
+        """
+        try:
+            cmd, cwd = _self_command([RELAUNCH])
+            kw = {"cwd": cwd, "close_fds": True}
+            if os.name == "nt":
+                import subprocess
+                kw["creationflags"] = (getattr(subprocess, "DETACHED_PROCESS", 0)
+                                       | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+            else:
+                import subprocess
+                kw["start_new_session"] = True
+                kw["stdout"] = kw["stderr"] = subprocess.DEVNULL
+            subprocess.Popen(cmd, **kw)
+        except Exception as e:                              # noqa: BLE001
+            config.log("다시 켜기 실패: %s" % e)
+            return False
+        config.log("다시 켭니다: %s" % " ".join(cmd))
+        self.quit(hard=True)
+        return True
+
     # ---------------------------------------------------------------- 종료
-    def quit(self):
+    def quit(self, hard=False):
+        """끈다. hard = 다시 켜는 중 (restart) - 정리할 것만 정리하고 Tk 를 부수지 않은 채 프로세스를 바로 끝낸다."""
         if self._quitting:
             return
         self._quitting = True
@@ -2883,6 +2913,12 @@ class App(object):
             self.battle.close()
         if self.tray:
             self.tray.stop()
+        if hard:
+            # 화면 테마를 바꿔 다시 켤 때 (2026-10-26): 새 프로세스는 이미 떴다. 여기서 Tk 를 부수거나 파이썬이 마무리를
+            # 하는 사이에 Tcl 메모리 오류('alloc: invalid block')로 죽은 적이 있어서 (맥이면 '예기치 않게 종료' 창),
+            # 잠금만 풀고 바로 끝낸다. 남은 것은 운영체제가 치운다.
+            single.release()
+            os._exit(0)
         try:
             self.root.quit()
             self.root.destroy()
@@ -2894,6 +2930,27 @@ class App(object):
         # 멈추면 알아채고 강제 종료를 묻는다 (1.13.3) - 맥은 Dock 에 안 떠서 '강제 종료' 창에 안 나온다
         watchdog.start(self.root, self)
         self.root.mainloop()
+
+
+# 스스로 다시 켤 때 다는 표시 (App.restart). 이게 있으면 앞의 것이 꺼질 때까지 기다린다.
+RELAUNCH = "--relaunch"
+RELAUNCH_WAIT = 20.0        # 초. 앞의 것이 정리하는 데 이보다 오래 걸린 적은 없다
+
+
+def _self_command(extra):
+    """이 프로그램을 다시 띄우는 명령과 그 자리. (명령, cwd)"""
+    if getattr(sys, "frozen", False):
+        if sys.platform == "darwin":
+            app = updater.app_bundle()
+            if app:
+                # 번들 안의 실행 파일을 바로 부르면 Dock · 권한이 번들로 안 묶인다
+                return ["/usr/bin/open", "-n", app, "--args"] + list(extra), os.path.dirname(app)
+        exe = sys.executable
+        return [exe] + list(extra), os.path.dirname(exe)
+    script = os.path.abspath(sys.argv[0])
+    if os.path.basename(script) == "__main__.py":
+        return [sys.executable, "-m", "poketdesktop"] + list(extra), os.getcwd()
+    return [sys.executable, script] + list(extra), os.path.dirname(script)
 
 
 def main():
@@ -2909,6 +2966,16 @@ def main():
     # 트레이 아이콘이 '숨겨진 아이콘' 안에 들어가 있어서, 이미 켜져
     # 있는 걸 못 보고 다시 누르기가 아주 쉽다.
     _lock, running = single.acquire(config.data_dir())
+    if running and RELAUNCH in sys.argv:
+        # 스스로 다시 켠 것이다 (화면 테마). 앞의 것이 아직 정리 중이다 - 꺼질 때까지 기다린다.
+        import time
+        until = time.time() + RELAUNCH_WAIT
+        while running and time.time() < until:
+            # 윈도우는 '이미 있다' 고 할 때도 그 뮤텍스의 손잡이를 준다. 쥔 채로 기다리면 앞의 것이
+            # 꺼져도 뮤텍스가 안 사라져서 영영 '이미 있다' 가 된다 - 놓고 다시 묻는다.
+            single.release()
+            time.sleep(0.25)
+            _lock, running = single.acquire(config.data_dir())
     if running:
         config.log("이미 실행 중이라 새로 켜지 않습니다")
         single.tell_user()

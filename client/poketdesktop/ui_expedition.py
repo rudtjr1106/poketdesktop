@@ -42,7 +42,7 @@ from common import expedition as X
 from common import tint as T
 from common.korean import natural
 
-from . import config, sprite_cache, sprites
+from . import config, skins, sprite_cache, sprites
 from . import ui_common as U
 from . import ui_loading
 from .ui_common import run_async
@@ -214,6 +214,7 @@ def grow_text(g):
     return "탐험 Lv.%d" % lv + (" ● %d점" % free if free else "")
 
 
+@skins.skinnable
 class ExpeditionWindow(object):
 
     def __init__(self, app, parent=None):
@@ -237,6 +238,7 @@ class ExpeditionWindow(object):
         self.growth = {}             # {포켓몬 id(글자): 탐험 성장·쉬는 시간} - 서버가 준 것 (1.10.5)
         self._rest_job = None        # 쉬는 시간이 줄어드는 것을 가끔 다시 칠한다
         self.grow_dialog = None
+        self._cands = []             # '누구를' 목록에 선 것 [(포켓몬, 점수, 성공도)]
 
         self.win = U.panel(parent, self.root, "포스크탑 — 탐험", 1020, 664, 980, 600, self.close)
         self.win.configure(bg=U.BG, highlightthickness=2, highlightbackground=U.LINE2)
@@ -315,14 +317,27 @@ class ExpeditionWindow(object):
         """그 탐험의 지금 남은 초 (받은 뒤 흐른 시간을 뺀다)."""
         return max(0, int(o.get("left") or 0) - int(time.monotonic() - self._t0))
 
-    def _paint_slots(self):
+    def _slots_data(self):
+        """탐험 칸 셋: ([(탐험 또는 None, 돌아왔나)], '2 / 3 칸 사용 중 · 돌아옴 1')."""
         out = (self.state or {}).get("out") or []
+        rows, ready = [], 0
+        for i in range(X.SLOTS):
+            o = out[i] if i < len(out) else None
+            done = o is not None and self.left_of(o) <= 0 and bool(o.get("ready"))
+            ready += done
+            rows.append((o, done))
+        return rows, "%d / %d 칸 사용 중" % (len(out), X.SLOTS) + (" · 돌아옴 %d" % ready if ready else "")
+
+    def _paint_slots(self):
+        rows, note = self._slots_data()
         self.live = []
-        ready = 0
-        for i, card in enumerate(self.cards):
+        self._paint_slot_cards(rows, note)
+
+    def _paint_slot_cards(self, rows, note):
+        """탐험 칸 셋 (테마마다 그리는 곳). 남은 시간을 1초마다 고칠 것은 self.live 에 (탐험, ...) 로 넣는다."""
+        for card, (o, done) in zip(self.cards, rows):
             for w in card.winfo_children():
                 w.destroy()
-            o = out[i] if i < len(out) else None
             if o is None:
                 card.configure(highlightbackground=U.LINE)
                 mid = tk.Frame(card, bg=PANEL)
@@ -330,12 +345,9 @@ class ExpeditionWindow(object):
                 tk.Label(mid, text="빈 칸", bg=PANEL, fg=U.FG_DIM, font=U.FONT_B).pack()
                 tk.Label(mid, text="오른쪽에서 골라 보내세요", bg=PANEL, fg=U.FG_FAINT, font=U.FONT_XS).pack(pady=(3, 0))
                 continue
-            done = self.left_of(o) <= 0 and bool(o.get("ready"))
-            ready += done
             card.configure(highlightbackground=U.ACCENT if done else U.LINE)
             self._slot_card(card, o, done)
-        n = len(out)
-        self.slot_note.configure(text="%d / %d 칸 사용 중" % (n, X.SLOTS) + (" · 돌아옴 %d" % ready if ready else ""))
+        self.slot_note.configure(text=note)
 
     def _slot_card(self, card, o, done):
         mon = o.get("pokemon") or {}
@@ -381,12 +393,18 @@ class ExpeditionWindow(object):
         self.live.append((o, left_lbl, fill))
         self._paint_live(o, left_lbl, fill)
 
-    def _paint_live(self, o, label, fill):
+    def live_of(self, o):
+        """나가 있는 탐험의 지금: ('3시간 12분 남음', 지난 몫 0~1)."""
         left = self.left_of(o)
         total = max(1, int(o.get("total") or 1))
+        return (("%s 남음" % X.hours_text(left)) if left > 0 else "돌아오는 중..."), \
+            max(0.0, min(1.0, 1.0 - left / float(total)))
+
+    def _paint_live(self, o, label, fill):
+        text, frac = self.live_of(o)
         try:
-            label.configure(text=("%s 남음" % X.hours_text(left)) if left > 0 else "돌아오는 중...")
-            fill.place_configure(relwidth=max(0.0, min(1.0, 1.0 - left / float(total))))
+            label.configure(text=text)
+            fill.place_configure(relwidth=frac)
         except tk.TclError:
             pass
 
@@ -509,9 +527,13 @@ class ExpeditionWindow(object):
 
     def _paint_hours(self):
         self.hours_seg.set(self.hours)
+        self.hours_note.configure(text=self.hours_text())
+
+    def hours_text(self):
+        """고른 시간에 가져올 물건 수."""
         row = X.ITEMS.get(self.hours) or (0, 0, 0)
-        self.hours_note.configure(text="물건 %d ~ %d개를 가져옵니다 (성공도에 따라)" % (row[0], row[-1])
-                                  if row[0] != row[-1] else "물건 %d개를 가져옵니다" % row[0])
+        return ("물건 %d ~ %d개를 가져옵니다 (성공도에 따라)" % (row[0], row[-1])
+                if row[0] != row[-1] else "물건 %d개를 가져옵니다" % row[0])
 
     def set_place(self, place_id):
         if place_id == self.place or X.place(place_id) is None:
@@ -554,23 +576,32 @@ class ExpeditionWindow(object):
         # 쉬는 시간은 지금 남은 값으로 (받은 뒤 흐른 만큼 뺀다) - 다 쉰 포켓몬이 위로 올라온다
         now = dict((k, dict(g, rest=self.rest_left(k))) for k, g in self.growth.items())
         rows = candidates(self.mons, self.app.dex, self.place, now)
+        self._cands = rows
         ids = [m["id"] for m, _p, _g in rows]
         if self.pick not in ids:
             self.pick = ids[0] if ids else None
-        self.vl.set([("mon", r) for r in rows], keep=keep)
         ready = sum(1 for m, _p, _g in rows if self.mon_state(m) == "ok")
         resting = sum(1 for m, _p, _g in rows if self.mon_state(m) == "rest")
-        self.pick_note.configure(text=("보낼 수 있는 %d마리 · 잘할 차례로" % ready
-                                       + (" · 쉬는 중 %d" % resting if resting else "")) if rows else "")
+        note = ("보낼 수 있는 %d마리 · 잘할 차례로" % ready
+                + (" · 쉬는 중 %d" % resting if resting else "")) if rows else ""
+        empty = None
+        if not rows:
+            have = any(not m.get("isEgg") for m in self.mons)
+            empty = ("박스에 있는 포켓몬만 보낼 수 있습니다.\n포켓몬 탭에서 박스에 넣어 주세요." if have
+                     else "보낼 포켓몬이 없습니다.")
+        self._paint_pick_list(rows, keep, note, empty)
+        self._paint_summary()
+        self._arm_rest()
+
+    def _paint_pick_list(self, rows, keep, note, empty):
+        """'누구를' 목록 (테마마다 그리는 곳). empty = 비었을 때의 말 (있으면 None)."""
+        self.vl.set([("mon", r) for r in rows], keep=keep)
+        self.pick_note.configure(text=note)
         if rows:
             self.empty.place_forget()
         else:
-            have = any(not m.get("isEgg") for m in self.mons)
-            self.empty.configure(text="박스에 있는 포켓몬만 보낼 수 있습니다.\n포켓몬 탭에서 박스에 넣어 주세요." if have
-                                 else "보낼 포켓몬이 없습니다.")
+            self.empty.configure(text=empty)
             self.empty.place(relx=0.5, rely=0.4, anchor="center")
-        self._paint_summary()
-        self._arm_rest()
 
     def _arm_rest(self):
         """쉬는 포켓몬이 있으면 가끔 다시 칠한다 (남은 시간이 줄고, 다 쉬면 위로 올라온다)."""
@@ -597,7 +628,7 @@ class ExpeditionWindow(object):
         self._paint_summary()
 
     def _picked(self):
-        for kind, data in self.vl.entries:
+        for data in self._cands:
             if data[0]["id"] == self.pick:
                 return data
         return None
@@ -606,28 +637,32 @@ class ExpeditionWindow(object):
         return max(0, X.SLOTS - len((self.state or {}).get("out") or []))
 
     def _paint_summary(self):
+        grow_text, grow_on, text, color, can_send = self._summary_data()
+        self._show_summary(grow_text, grow_on, text, color, can_send)
+
+    def _show_summary(self, grow_text, grow_on, text, color, can_send):
+        """아래 줄 (테마마다 그리는 곳): 성장 단추 · 요약 글 · 보내기 단추."""
+        self.grow_btn.configure(text=grow_text, state="normal" if grow_on else "disabled")
+        self.summary.configure(text=text, fg=color)
+        self.send_btn.configure(state="normal" if can_send else "disabled")
+
+    def _summary_data(self):
+        """(성장 단추 글, 성장을 열 수 있나, 요약 글, 글 색, 보낼 수 있나)."""
         data = self._picked()
         p = X.place(self.place) or {}
         g = self.growth_of(data[0]["id"]) if data is not None else {}
-        self.grow_btn.configure(text="성장 ●" if g.get("free") else "성장",
-                                state="normal" if data is not None else "disabled")
+        grow = ("성장 ●" if g.get("free") else "성장", data is not None)
         if self.state is not None and self.free() <= 0:
-            self.summary.configure(text="탐험 칸이 꽉 찼습니다.\n돌아온 보따리를 받으면 칸이 빕니다.", fg=U.FG_FAINT)
-            self.send_btn.configure(state="disabled")
-            return
+            return grow + ("탐험 칸이 꽉 찼습니다.\n돌아온 보따리를 받으면 칸이 빕니다.", U.FG_FAINT, False)
         if data is None:
-            self.summary.configure(text="보낼 포켓몬을 고르세요.", fg=U.FG_FAINT)
-            self.send_btn.configure(state="disabled")
-            return
+            return grow + ("보낼 포켓몬을 고르세요.", U.FG_FAINT, False)
         mon, _pts, grade = data
         name = (mon.get("info") or {}).get("name") or "?"
         st = self.mon_state(mon)
         if st != "ok":
             why = ("쉬는 중입니다.\n%s 뒤에 다시 나갈 수 있습니다." % X.hours_text(self.rest_left(mon["id"])) if st == "rest"
                    else "데리고 다니는 중입니다.\n박스에 넣으면 보낼 수 있습니다.")
-            self.summary.configure(text="%s — %s" % (name, why), fg=U.FG_FAINT)
-            self.send_btn.configure(state="disabled")
-            return
+            return grow + ("%s — %s" % (name, why), U.FG_FAINT, False)
         stats = g.get("stats") or {}
         took = X.duration(self.hours, stats.get("speed", 0))
         n = X.item_count(self.hours, grade)
@@ -637,12 +672,9 @@ class ExpeditionWindow(object):
             extra.append("물건 하나 더 %d%%" % round(100 * X.haul_chance(stats["haul"])))
         if stats.get("charm"):
             extra.append("포켓몬을 데려올 확률 %d%%" % round(100 * X.charm_chance(stats["charm"])))
-        self.summary.configure(
-            text="%s Lv.%s → %s · %s\n예상 %s · 물건 %d개%s"
-                 % (name, mon.get("level", "?"), p.get("kr", ""), X.time_text(took), X.GRADE_KR.get(grade, ""), n,
-                    "\n" + " · ".join(extra) if extra else ""),
-            fg=U.FG)
-        self.send_btn.configure(state="disabled" if self.busy else "normal")
+        return grow + ("%s Lv.%s → %s · %s\n예상 %s · 물건 %d개%s"
+                       % (name, mon.get("level", "?"), p.get("kr", ""), X.time_text(took), X.GRADE_KR.get(grade, ""), n,
+                          "\n" + " · ".join(extra) if extra else ""), U.FG, not self.busy)
 
     def open_grow(self):
         data = self._picked()

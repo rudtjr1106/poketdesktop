@@ -17,6 +17,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from . import platform_os as PLAT
+from . import skins
 
 # ---------------------------------------------------------------- 색
 INK = "#0d1017"          # 가장 어두운 바닥 (입력칸, 액자 안)
@@ -612,6 +613,22 @@ def window_icon(win):
 
 # 창 위쪽 제목 표시줄과 아래 여유. 작업 영역에서 이만큼은 빼고 잡는다.
 CHROME_H = 44
+
+
+@skins.skinnable_fn("dialogs")
+def dialog_bar(win, title, danger=False):
+    """작은 창 맨 위의 머리띠: 왼쪽 노란(위험하면 빨간) 막대와 제목, 그 아래 선. 띠(Frame)를 돌려준다.
+
+    작은 창마다 똑같이 짓던 것을 한 군데로 모았다 - 화면 테마가 이것 하나로 작은 창들의 머리를 바꾼다.
+    """
+    bar = tk.Frame(win, bg=DANGER_BG if danger else BG2, height=h(34))
+    bar.pack(fill="x")
+    bar.pack_propagate(False)
+    tk.Frame(bar, bg=DANGER if danger else ACCENT, width=3, height=h(13)).pack(side="left", padx=(12, 8))
+    tk.Label(bar, text=title, bg=DANGER_BG if danger else BG2, fg="#ffb3b3" if danger else FG,
+             font=FONT_B).pack(side="left")
+    tk.Frame(win, bg=DANGER_LINE if danger else LINE2, height=h(2)).pack(fill="x")
+    return bar
 
 
 def style_window(win, title, w=None, h=None):
@@ -1465,6 +1482,8 @@ def apply_theme(root):
           # 그대로 두면 고른 탭이 좁고 낮아져 누를 때마다 줄이 흔들린다.
           # 전부 같은 값으로 못 박는다.
           padding=[("selected", [12, 7])])
+    from . import skins
+    skins.theme(root, s)             # 고른 화면 테마가 위젯의 빛깔을 바꾼다 (기본 테마는 아무것도 안 한다)
     return s
 
 
@@ -1597,6 +1616,7 @@ def gender_color(g):
 
 
 # ---------------------------------------------------------------- 뜨는 메뉴
+@skins.skinnable
 class PopupMenu(object):
     """tkinter 로 직접 그리는 메뉴.
 
@@ -1615,6 +1635,9 @@ class PopupMenu(object):
          {"text": "버전 1.0.8", "enabled": False},
          {"text": "바로 가기", "header": True},
          {"text": "가방", "command": fn, "indent": 1}]
+
+    닫히는 규칙(바깥 누르기 · Esc · 감시 고리)과 놓는 자리는 여기 것을 그대로 쓴다. 테마는 창 안을
+    짓는 고리(_paint · _row)와 줄 높이(_line_height · _rows_height)만 바꾼다.
     """
 
     W = 250
@@ -1642,14 +1665,40 @@ class PopupMenu(object):
         밖으로 나가 누를 수가 없다. 글자를 줄이지 않고 단을 늘린다.
         """
         try:
-            from tkinter import font as tkfont
-            line = tkfont.Font(root=self.root, font=FONT).metrics("linespace") + 5
+            line = self._line_height()
             _x1, sy1, _x2, sy2 = screen_at(self.root, x, y)
             room = max(line * 4, (sy2 - sy1) - 60)
         except Exception:                                   # noqa: BLE001
             return 1
-        need = sum(h(9) if r is None else line for r in rows) + 12
+        need = self._rows_height(rows, line)
         return max(1, -(-int(need) // int(room)))
+
+    def _line_height(self):
+        """보통 줄 하나의 높이 (몇 단으로 놓을지 셀 때 - 테마가 바꾼다)."""
+        from tkinter import font as tkfont
+        return tkfont.Font(root=self.root, font=FONT).metrics("linespace") + 5
+
+    def _rows_height(self, rows, line):
+        """줄들을 한 단에 놓았을 때의 높이 (구분선 · 위아래 여백까지)."""
+        return sum(h(9) if r is None else line for r in rows) + 12
+
+    def _split(self, rows):
+        """단마다 나눈 줄들. 한 단이면 [rows]."""
+        cols = max(1, min(getattr(self, "cols", 1), len(rows) or 1))
+        if cols <= 1:
+            return [rows]
+        per = -(-len(rows) // cols)
+        return [rows[i:i + per] for i in range(0, len(rows), per)]
+
+    @staticmethod
+    def _can_pick(row):
+        """누를 수 있는 줄인가 - 꺼 두지 않았고 할 일이 있다."""
+        return bool(row.get("enabled", True) and row.get("command") is not None)
+
+    def _choose(self, fn):
+        """줄을 골랐다. 메뉴를 먼저 닫는다 - 창이 메뉴 뒤로 들어가면 안 보인다."""
+        self.close()
+        fn()
 
     def _build(self, rows):
         cat = tk.Toplevel(self.root)
@@ -1669,17 +1718,18 @@ class PopupMenu(object):
 
         win = tk.Toplevel(self.root)
         win.overrideredirect(True)
-        win.configure(bg=BG2, highlightthickness=1, highlightbackground=LINE2)
         win.bind("<Escape>", lambda e: self.close())
         self.win = win
+        self._paint(win, rows)
 
+    def _paint(self, win, rows):
+        """메뉴 창 안을 짓는다 (테마가 바꾼다). 단이 여럿이면 self.width 를 그만큼 늘린다."""
+        win.configure(bg=BG2, highlightthickness=1, highlightbackground=LINE2)
         body = tk.Frame(win, bg=BG2)
         body.pack(fill="both", expand=True, padx=1, pady=6)
-        cols = max(1, min(getattr(self, "cols", 1), len(rows) or 1))
-        if cols > 1:
+        groups = self._split(rows)
+        if len(groups) > 1:
             # 단마다 같은 폭. 창 폭은 _place 가 width 로 못박으므로 여기서 늘린다.
-            per = -(-len(rows) // cols)
-            groups = [rows[i:i + per] for i in range(0, len(rows), per)]
             self.width = self.width * len(groups)
             holders = []
             for i, _g in enumerate(groups):
@@ -1688,7 +1738,7 @@ class PopupMenu(object):
                 col.grid(row=0, column=i, sticky="new")
                 holders.append(col)
         else:
-            groups, holders = [rows], [body]
+            holders = [body]
         for group, holder in zip(groups, holders):
             for row in group:
                 if row is None:
@@ -1705,7 +1755,7 @@ class PopupMenu(object):
                      width=1).pack(fill="x", padx=10 + indent * 12,
                                    pady=(4, 0))
             return
-        enabled = row.get("enabled", True) and row.get("command") is not None
+        enabled = self._can_pick(row)
         checked = row.get("checked")
         mark = "" if checked is None else ("✓ " if checked else "    ")
         lab = tk.Label(body, text=mark + text, bg=BG2, anchor="w",
@@ -1725,13 +1775,7 @@ class PopupMenu(object):
             lab.configure(cursor="hand2")
         lab.bind("<Enter>", lambda e, w=lab: w.configure(bg=BG4))
         lab.bind("<Leave>", lambda e, w=lab: w.configure(bg=BG2))
-
-        def click(_e, fn=row["command"]):
-            # 메뉴를 먼저 닫는다. 창이 메뉴 뒤로 들어가면 안 보인다.
-            self.close()
-            fn()
-
-        lab.bind("<Button-1>", click)
+        lab.bind("<Button-1>", lambda _e, fn=row["command"]: self._choose(fn))
 
     def _place(self, x, y, anchor):
         win = self.win

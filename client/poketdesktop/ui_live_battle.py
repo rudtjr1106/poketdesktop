@@ -31,7 +31,7 @@ from common import tint as T
 from common.korean import natural
 
 from . import battle_fx as FX
-from . import effects, sprite_cache, sprites
+from . import effects, skins, sprite_cache, sprites
 from . import sendout_fx as SO
 from . import battle_zoom as Z
 from . import platform_os as PLAT
@@ -84,6 +84,7 @@ def step_of(m):
     return int((m or {}).get("step") or (m or {}).get("turn") or 0)
 
 
+@skins.skinnable
 class LiveBattleWindow(Z.Resizable):
     ZOOM_KIND = "live"
     ZOOM_W, ZOOM_SCENE, ZOOM_MSG, ZOOM_CMD, ZOOM_MIN_SCENE = W, SCENE_H, MSG_H, CMD_H, MIN_SCENE_H
@@ -437,17 +438,21 @@ class LiveBattleWindow(Z.Resizable):
         self.anim_jobs[who] = self.root.after(
             max(40, int(d or 100)), lambda: self._tick(who, i + 1))
 
-    def _paint_box(self, who, hp=None):
-        it = self.box[who]
-        mon = self.shown.get(who)
+    def who_tag(self, who):
+        """이름표 맨 위의 '나' / '상대 이름 · 고름' (상대가 이번 턴을 골랐나)."""
         side = (self.view.get(who) or {})
-        cv = self.cv
         tag = "나" if who == "me" else (side.get("name") or "상대")
         if who == "foe" and side.get("chosen"):
             tag += "  ·  고름"
         elif who == "foe" and side.get("needSwitch"):
             tag += "  ·  고르는 중"
-        cv.itemconfigure(it["who"], text=tag)
+        return tag
+
+    def _paint_box(self, who, hp=None):
+        it = self.box[who]
+        mon = self.shown.get(who)
+        cv = self.cv
+        cv.itemconfigure(it["who"], text=self.who_tag(who))
         if not mon:
             for k in ("name", "lv", "status"):
                 cv.itemconfigure(it[k], text="")
@@ -924,12 +929,15 @@ class LiveBattleWindow(Z.Resizable):
 
     def _paint_timer(self):
         left = max(0, int(self._deadline - time.time())) if self._deadline else 0
+        if self.busy or self._result_shown:
+            self._paint_timer_text("", False)
+        else:
+            self._paint_timer_text("%d초" % left, left <= 5)
+
+    def _paint_timer_text(self, text, danger):
+        """남은 시간 (테마마다 그리는 곳). danger = 5초 이하."""
         try:
-            if self.busy or self._result_shown:
-                self.timer.configure(text="")
-            else:
-                self.timer.configure(text="%d초" % left,
-                                     fg=U.DANGER if left <= 5 else U.ACCENT)
+            self.timer.configure(text=text, fg=U.DANGER if danger else U.ACCENT)
         except tk.TclError:
             pass
 
@@ -937,12 +945,16 @@ class LiveBattleWindow(Z.Resizable):
     def hide_commands(self):
         self._panel = None
         self._switching = False
+        self._clear_commands()
+        self.mega.show(False)
+        self.gim.hide()
+
+    def _clear_commands(self):
+        """명령 칸을 비우고 교체 · 기권을 못 누르게 한다 (테마마다 그리는 곳)."""
         for w in self.left.winfo_children():
             w.destroy()
         for b in (self.switch_btn, self.forfeit_btn):
             b.configure(state="disabled")
-        self.mega.show(False)
-        self.gim.hide()
 
     def _gim_changed(self):
         """Z기술 단추를 켜고 껐다 - 기술을 고르는 중이면 칸을 다시 그린다."""
@@ -953,57 +965,67 @@ class LiveBattleWindow(Z.Resizable):
         self.zoom_use()
         self._switching = False
         self._panel = self._panel_key()
-        for w in self.left.winfo_children():
-            w.destroy()
         # 남은 시간은 폴링이 1.5초마다 다시 적는데, 연출이 끝난 직후에는
         # 그 사이 비어 있다. 고를 수 있게 된 순간 바로 적는다.
         self._paint_timer()
         me = self.view.get("me") or {}
         foe = self.view.get("foe") or {}
-        self.forfeit_btn.configure(state="normal")
         # 폴링이 명령 칸을 다시 그려도 켜 둔 메가는 그대로다 (이미 보이면 안 건드린다)
         self.mega.show(self.view.get("canMega") and not (self.sent or me.get("chosen")))
         self.gim.show(None if (self.sent or me.get("chosen")) else self.view.get("gimmick"))
         if not self.view.get("canAct"):
-            self.switch_btn.configure(state="disabled")
             why = ("%s 님이 다음 포켓몬을 고르고 있습니다."
                    % (foe.get("name") or "상대")) if self.view.get("phase") == "switch" \
                 else "상대를 기다리는 중입니다."
-            tk.Label(self.left, text=why, bg=U.BG, fg=U.ACCENT,
-                     font=U.FONT_H).pack(anchor="w", pady=(16, 4))
+            self._paint_wait(why, None)
             self.say(why)
             return
         if self.sent or me.get("chosen"):
             self.sent = True
-            self.switch_btn.configure(state="disabled")
-            box = tk.Frame(self.left, bg=U.BG)
-            box.pack(fill="both", expand=True)
-            tk.Label(box, text="%s 님을 기다리는 중..." % (foe.get("name") or "상대"),
-                     bg=U.BG, fg=U.ACCENT, font=U.FONT_H).pack(anchor="w", pady=(16, 4))
-            lab = tk.Label(box, bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, anchor="w",
-                           justify="left",
-                           text="둘 다 고르면 그 턴이 한꺼번에 진행됩니다. 상대가 "
-                                "시간을 넘기면 서버가 대신 골라 줍니다.")
-            lab.pack(fill="x")
-            U.wrap_to_width(lab)
+            self._paint_wait("%s 님을 기다리는 중..." % (foe.get("name") or "상대"),
+                             "둘 다 고르면 그 턴이 한꺼번에 진행됩니다. 상대가 "
+                             "시간을 넘기면 서버가 대신 골라 줍니다.")
             self.say("상대를 기다리는 중...")
             return
         if self.view.get("phase") == "switch":
             return self.open_switch(forced=True)
+        moves = [self.gim.decorate(m) for m in (me.get("moves") or [])[:4]]
+        self._paint_moves(moves, bool(me.get("switches")))
+        team = me.get("team") or []
+        mon = team[me.get("slot", 0)] if team else {}
+        self.say("%s 은(는) 무엇을 할까?" % (mon.get("name") or ""))
+
+    def _paint_wait(self, title, note):
+        """고를 것이 없다 - 상대를 기다린다 (테마마다 그리는 곳). note 는 아랫줄 (없으면 None)."""
+        for w in self.left.winfo_children():
+            w.destroy()
+        self.forfeit_btn.configure(state="normal")
+        self.switch_btn.configure(state="disabled")
+        box = tk.Frame(self.left, bg=U.BG)
+        box.pack(fill="both", expand=True)
+        tk.Label(box, text=title, bg=U.BG, fg=U.ACCENT,
+                 font=U.FONT_H).pack(anchor="w", pady=(16, 4))
+        if note:
+            lab = tk.Label(box, bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, anchor="w",
+                           justify="left", text=note)
+            lab.pack(fill="x")
+            U.wrap_to_width(lab)
+
+    def _paint_moves(self, moves, can_switch):
+        """기술 칸 넷과 교체 · 기권 단추 (테마마다 그리는 곳). moves 는 Z기술까지 입힌 것."""
+        for w in self.left.winfo_children():
+            w.destroy()
+        self.forfeit_btn.configure(state="normal")
         grid = tk.Frame(self.left, bg=U.BG)
         grid.pack(fill="both", expand=True)
-        for i, m in enumerate((me.get("moves") or [])[:4]):
-            self._move_cell(grid, i, self.gim.decorate(m))
+        for i, m in enumerate(moves):
+            self._move_cell(grid, i, m)
         for c in (0, 1):
             grid.grid_columnconfigure(c, weight=1, uniform="mv")
         for r in (0, 1):
             grid.grid_rowconfigure(r, weight=1, uniform="mvr")
-        self.switch_btn.configure(
-            state="normal" if me.get("switches") else "disabled")
+        self.switch_btn.configure(state="normal" if can_switch else "disabled")
         self.hint.configure(text="기술에 마우스를 올리면 설명이 나옵니다.")
-        team = me.get("team") or []
-        mon = team[me.get("slot", 0)] if team else {}
-        self.say("%s 은(는) 무엇을 할까?" % (mon.get("name") or ""))
 
     def _move_cell(self, grid, i, m):
         col = U.TYPE_COLOR.get(m.get("type"), U.BG3)
@@ -1052,14 +1074,20 @@ class LiveBattleWindow(Z.Resizable):
         self.zoom_use()
         self._switching = not forced         # (스스로 연 교체 칸은 창 크기를 바꿔도 그대로 둔다)
         me = self.view.get("me") or {}
-        for w in self.left.winfo_children():
-            w.destroy()
-        head = tk.Frame(self.left, bg=U.BG)
-        head.pack(fill="x")
         # 유턴·볼트체인지로 물러나는 중이면(나와 있는 포켓몬이 멀쩡하다) '교체할' 이라고 묻는다
         team = me.get("team") or []
         cur = team[me.get("slot") or 0] if team else {}
         ask = "교체할 포켓몬을 고르세요" if (cur.get("hp") or 0) > 0 else "다음 포켓몬을 고르세요"
+        self.mega.show(False)
+        self.gim.hide()
+        self._paint_switch(me, forced, ask)
+
+    def _paint_switch(self, me, forced, ask):
+        """교체 칸 (테마마다 그리는 곳). 고를 수 있는 것은 me["switches"] 에 든 자리뿐이다."""
+        for w in self.left.winfo_children():
+            w.destroy()
+        head = tk.Frame(self.left, bg=U.BG)
+        head.pack(fill="x")
         tk.Label(head, text=ask if forced else "누구로 바꿀까?",
                  bg=U.BG, fg=U.FG, font=U.FONT_B).pack(side="left")
         if not forced:
@@ -1072,8 +1100,6 @@ class LiveBattleWindow(Z.Resizable):
         for c in (0, 1, 2):
             grid.grid_columnconfigure(c, weight=1, uniform="pt")
         self.switch_btn.configure(state="disabled")
-        self.mega.show(False)
-        self.gim.hide()
         self.hint.configure(text="쓰러진 포켓몬과 지금 나와 있는 포켓몬은 고를 수 없습니다.")
 
     def _party_cell(self, grid, i, m, active, ok):
@@ -1175,19 +1201,6 @@ class LiveBattleWindow(Z.Resizable):
         self.hide_commands()
         out = self.room.get("outcome") or self.view.get("result")
         title = {"win": "승리!", "lose": "패배...", "draw": "무승부"}.get(out, "끝")
-        color = {"win": U.ACCENT, "lose": U.DANGER}.get(out, U.FG)
-        panel = tk.Frame(self.left, bg=U.BG2, highlightthickness=2,
-                         highlightbackground=color)
-        panel.pack(fill="both", expand=True)
-        inner = tk.Frame(panel, bg=U.BG2)
-        inner.pack(fill="both", expand=True, padx=16, pady=10)
-        side = tk.Frame(inner, bg=U.BG2)
-        side.pack(side="right", fill="y", padx=(12, 0))
-        U.PushButton(side, "닫기", self.close, height=Z.base_h(38)).pack(side="bottom")
-        body = tk.Frame(inner, bg=U.BG2)
-        body.pack(side="left", fill="both", expand=True)
-        tk.Label(body, text=title, bg=U.BG2, fg=color,
-                 font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
         foe = (self.view.get("foe") or {}).get("name") or "상대"
         reason = self.room.get("reason") or self.view.get("reason")
         lines = []
@@ -1201,12 +1214,29 @@ class LiveBattleWindow(Z.Resizable):
         fo = self.view.get("foe") or {}
         lines.append("남은 포켓몬 %d : %d" % (me.get("left", 0), fo.get("left", 0)))
         lines.append("전적에 남습니다. 상금과 랭크 점수는 움직이지 않습니다.")
+        self._paint_result_panel(out, title, [natural(ln) for ln in lines])
+        self.say(title)
+
+    def _paint_result_panel(self, out, title, lines):
+        """결과 칸 (테마마다 그리는 곳): 제목 · 줄 · '닫기'. out = win / lose / draw."""
+        color = {"win": U.ACCENT, "lose": U.DANGER}.get(out, U.FG)
+        panel = tk.Frame(self.left, bg=U.BG2, highlightthickness=2,
+                         highlightbackground=color)
+        panel.pack(fill="both", expand=True)
+        inner = tk.Frame(panel, bg=U.BG2)
+        inner.pack(fill="both", expand=True, padx=16, pady=10)
+        side = tk.Frame(inner, bg=U.BG2)
+        side.pack(side="right", fill="y", padx=(12, 0))
+        U.PushButton(side, "닫기", self.close, height=Z.base_h(38)).pack(side="bottom")
+        body = tk.Frame(inner, bg=U.BG2)
+        body.pack(side="left", fill="both", expand=True)
+        tk.Label(body, text=title, bg=U.BG2, fg=color,
+                 font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
         for ln in lines:
-            lab = tk.Label(body, text=natural(ln), bg=U.BG2, fg=U.FG, font=U.FONT_S,
+            lab = tk.Label(body, text=ln, bg=U.BG2, fg=U.FG, font=U.FONT_S,
                            anchor="w", justify="left")
             lab.pack(fill="x", pady=(2, 0))
             U.wrap_to_width(lab)
-        self.say(title)
 
     def _mark_seen(self):
         if self._seen_sent:

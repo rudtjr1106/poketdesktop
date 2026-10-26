@@ -35,6 +35,7 @@ from common import tint as T
 from common.korean import natural
 
 from . import sprite_cache, sprites
+from . import skins
 from . import ui_common as U
 from . import ui_loading
 from . import ui_monfind
@@ -67,6 +68,7 @@ TYPE_KR = {
 CAT_KR = MT.CAT_KR
 
 
+@skins.skinnable
 class TmWindow(object):
 
     def __init__(self, root, app, parent=None, switch=None):
@@ -108,6 +110,11 @@ class TmWindow(object):
         if not U.is_embedded(self.win):
             U.install_wheel(self.win)
 
+        self._build()
+        self.reload()
+
+    # 화면 테마(skins/)는 _build 와 칠하는 자리(_paint_* · _show_* · _mons_* · _mark* · say)만 갈아 끼운다.
+    def _build(self):
         self._header()
         self._bottom()
         body = tk.Frame(self.win, bg=U.BG)
@@ -117,7 +124,6 @@ class TmWindow(object):
 
         U.scrollable(self.list_canvas, 60)
         U.scrollable(self.mon_canvas, 60)
-        self.reload()
 
     # ---------------- 머리 ----------------
     def _header(self):
@@ -248,9 +254,7 @@ class TmWindow(object):
             self.tms = data.get("tms") or []
             self.fresh = set(t["no"] for t in self.tms
                              if t.get("have") and t.get("new")) - self._seen_here
-            self.count_lbl.configure(
-                text="%d / %d 개" % (data.get("haveCount", 0),
-                                     data.get("total", 0)))
+            self._paint_count(data.get("haveCount", 0), data.get("total", 0))
             self._paint_list()
             self._paint_fresh()
             self._paint_detail()
@@ -270,6 +274,9 @@ class TmWindow(object):
                     w.close()
 
         U.run_async(self.root, work, done)
+
+    def _paint_count(self, have, total):
+        self.count_lbl.configure(text="%d / %d 개" % (have, total))
 
     def _toggle_filter(self):
         self.only_have = not self.only_have
@@ -606,27 +613,41 @@ class TmWindow(object):
         if self._mon_job is not None:
             self._mon_job.cancel()
             self._mon_job = None
-        for w in self.mon_inner.winfo_children():
-            w.destroy()
-        self.mon_rows = {}
+        self._clear_mons()
         self._learners = None
         self._mon_none = None
         t = self._cur()
+        self._paint_move(t)
+        if t:
+            self._fill_mons(t)
+
+    def move_lines(self, t):
+        """(제목, 타입·분류·위력… 한 줄, 설명) - 고른 기술머신이 없으면 None."""
         if not t:
-            self.title_lbl.configure(text="기술머신을 고르세요")
-            self.sub_lbl.configure(text="")
-            self.desc_lbl.configure(text="")
-            return
-        self.title_lbl.configure(text=t["label"])
+            return None
         md = self._move(t)
         bits = [TYPE_KR.get(t["type"], t["type"]),
                 CAT_KR.get(t["cat"], t["cat"])]
         # 위력·명중·PP 는 도감에서 온다. 없으면 타입과 분류만 적는다.
         bits += MT.stat_bits(md, with_cat=False) if md else []
-        self.sub_lbl.configure(text=MT.SEP.join(b for b in bits if b))
-        self.desc_lbl.configure(text=MT.desc(md) if md else "")
+        return t["label"], MT.SEP.join(b for b in bits if b), (MT.desc(md) if md else "")
 
-        self._fill_mons(t)
+    def _clear_mons(self):
+        for w in self.mon_inner.winfo_children():
+            w.destroy()
+        self.mon_rows = {}
+
+    def _paint_move(self, t):
+        got = self.move_lines(t)
+        if not got:
+            self.title_lbl.configure(text="기술머신을 고르세요")
+            self.sub_lbl.configure(text="")
+            self.desc_lbl.configure(text="")
+            return
+        title, sub, desc = got
+        self.title_lbl.configure(text=title)
+        self.sub_lbl.configure(text=sub)
+        self.desc_lbl.configure(text=desc)
 
     def _fill_mons(self, t):
         """이 기술머신을 배울 수 있는 내 포켓몬을 채운다.
@@ -636,9 +657,7 @@ class TmWindow(object):
         """
         gen = self._mon_gen
         # 묻는 동안 칸이 비어 있으면 '배울 포켓몬이 없다' 로 읽힌다.
-        wait = tk.Label(self.mon_inner, text="불러오는 중...", bg=U.BG2,
-                        fg=U.FG_FAINT, font=U.FONT_S)
-        wait.pack(anchor="w", padx=8, pady=12)
+        self._mons_note("불러오는 중...")
 
         def work():
             return self.app.api.tm_learners(t["no"])
@@ -646,24 +665,31 @@ class TmWindow(object):
         def done(r, err):
             if not self.alive or gen != self._mon_gen or self._cur() is not t:
                 return
-            try:
-                wait.destroy()
-            except tk.TclError:
-                pass
+            self._mons_note(None)
             if err:
                 return self.say("포켓몬을 불러오지 못했습니다. %s" % err, U.RED)
             rows = (r or {}).get("learners") or []
             self._learners = rows
             if not rows:
-                tk.Label(self.mon_inner,
-                         text="이 기술머신을 배울 수 있는 포켓몬이 없습니다.",
-                         bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_S).pack(
-                             anchor="w", padx=8, pady=12)
-                return
+                return self._mons_note("이 기술머신을 배울 수 있는 포켓몬이 없습니다.")
             self._thumbs(rows, t, gen)
             self._arrange_mons()
 
         U.run_async(self.root, work, done)
+
+    def _mons_note(self, text):
+        """오른쪽 목록 자리의 안내 글 ('불러오는 중...' · '없습니다'). None 이면 걷는다."""
+        old = getattr(self, "_mons_wait", None)
+        if old is not None:
+            try:
+                old.destroy()
+            except tk.TclError:
+                pass
+            self._mons_wait = None
+        if text:
+            self._mons_wait = tk.Label(self.mon_inner, text=text, bg=U.BG2,
+                                       fg=U.FG_FAINT, font=U.FONT_S)
+            self._mons_wait.pack(anchor="w", padx=8, pady=12)
 
     def _arrange_mons(self):
         """오른쪽 줄을 찾는 말·고른 순서대로 담는다 (self.find, 1.13.1).
@@ -678,14 +704,18 @@ class TmWindow(object):
         if self._mon_job is not None:
             self._mon_job.cancel()           # 옛 순서의 남은 줄이 뒤에 붙지 않게
             self._mon_job = None
+        view = self.find.view(self._learners, getattr(self.app, "dex", None))
+        if self.mon_id is not None and not any(m["id"] == self.mon_id for m in view):
+            self.pick_mon(None)
+        self._show_mons(view)
+
+    def _show_mons(self, view):
+        """오른쪽 목록을 view(찾는 말 · 순서를 거친 배울 포켓몬) 대로 담는다."""
         for got in self.mon_rows.values():
             got[0].pack_forget()
         if self._mon_none is not None:
             self._mon_none.destroy()
             self._mon_none = None
-        view = self.find.view(self._learners, getattr(self.app, "dex", None))
-        if self.mon_id is not None and not any(m["id"] == self.mon_id for m in view):
-            self.pick_mon(None)
         try:
             self.mon_canvas.yview_moveto(0)
         except tk.TclError:
@@ -780,20 +810,27 @@ class TmWindow(object):
             # 만든 그림은 남겨 두고(다음에 그대로 쓴다) 줄에는 안 붙인다.
             if gen != self._mon_gen or self._cur() is not t:
                 return
-            for m in learners:
-                got = self.mon_rows.get(m["id"])
-                ph = self.photos.get((m.get("num"), T.skin(m)))
-                if got is None or ph is None:
-                    continue          # 아직 안 만든 줄은 만들 때 붙는다
-                try:
-                    got[1].configure(image=ph)
-                except tk.TclError:
-                    pass
+            self._thumbs_ready(learners)
 
         U.run_async(self.root, work, done)
 
+    def _thumbs_ready(self, learners):
+        """도트가 다 만들어졌다 - 이미 만든 줄에 붙인다."""
+        for m in learners:
+            got = self.mon_rows.get(m["id"])
+            ph = self.photos.get((m.get("num"), T.skin(m)))
+            if got is None or ph is None:
+                continue          # 아직 안 만든 줄은 만들 때 붙는다
+            try:
+                got[1].configure(image=ph)
+            except tk.TclError:
+                pass
+
     def pick_mon(self, pid):
         prev, self.mon_id = self.mon_id, pid
+        self._mark_mons(prev, pid)
+
+    def _mark_mons(self, prev, pid):
         # 바뀐 두 줄만 칠한다.
         for i in set((prev, pid)):
             got = self.mon_rows.get(i)
@@ -813,9 +850,9 @@ class TmWindow(object):
             return self.say("기술머신을 먼저 고르세요.")
         if not self.mon_id:
             return self.say("가르칠 포켓몬을 고르세요.")
-        got = self.mon_rows.get(self.mon_id)
-        moves = list(got[4]) if got else []
-        name = got[2].cget("text").split(" Lv.")[0] if got else "포켓몬"
+        got = next((m for m in (self._learners or []) if m.get("id") == self.mon_id), None)
+        moves = list(got.get("moves") or []) if got else []
+        name = got.get("name", "?") if got else "포켓몬"
 
         forget = ""
         if len(moves) >= 4:

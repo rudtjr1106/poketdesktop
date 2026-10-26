@@ -28,6 +28,7 @@
 import tkinter as tk
 from tkinter import ttk
 
+from . import skins
 from . import ui_common as U
 from . import ui_war_map as WM
 from .ui_common import run_async
@@ -109,6 +110,7 @@ def log_mark(x):
     return ("방어", True) if x.get("good") else ("졌음", False)
 
 
+@skins.skinnable
 class WarTab(object):
     """gw 는 길드 창(GuildWindow). parent 는 그 탭의 빈 칸."""
 

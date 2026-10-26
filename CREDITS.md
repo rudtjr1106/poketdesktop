@@ -64,6 +64,21 @@ GBA 풍 4방향 도트이고, 그 프로젝트에 기여한 팬들이 그린 것
 트레이너 스프라이트. `server/data/trainer_sprites/` 에 있다.
 의정부시의 이스터에그 트레이너와 지우의 도트는 개발자가 따로 준비한 그림이다.
 
+## 화면 테마의 글꼴
+화면 테마(설정 → 화면 테마)에서 쓰는 글꼴. `client/poketdesktop/fonts/` 에 있고,
+그 테마를 골랐을 때만 이 프로그램 안에서 등록해 쓴다 (컴퓨터에 깔지 않는다).
+
+- [갈무리 Galmuri](https://github.com/quiple/galmuri) (Galmuri11) — 이민서 (quiple).
+  금·은 · 에메랄드 · 디아루가·펄기아 · 플라티나 · 블랙·화이트 테마의 픽셀 글꼴.
+- [Pretendard](https://github.com/orioncactus/pretendard) 1.3.9 (Bold · Black) — 길형진. 소드·실드 테마.
+
+**라이선스: 둘 다 [SIL Open Font License 1.1](https://openfontlicense.org)** —
+`fonts/OFL.txt` 를 같이 둔다. Pretendard 는 배포된 원본 OTF 그대로다('Pretendard' 가 예약 글꼴 이름이라
+고친 파일은 그 이름을 못 쓴다). 갈무리는 웹 글꼴(WOFF2)을 TTF 로 풀었다 - 예약 이름이 없고 글자 모양은 그대로다.
+
+화면 테마의 탭 · 메뉴 아이콘(몬스터볼 · 보물주머니 · 타운맵 · 친구수첩 …)은 위 '도구 그림' 과 같은
+PokeAPI/sprites 의 도구 그림 17개를 코드 안에 넣어 쓴다 (`skins/dp/poke_icons.py`).
+
 ## 포켓몬
 포켓몬과 관련된 이름·그림의 저작권은 닌텐도 / Game Freak / 포켓몬 컴퍼니에 있다.
 이 프로젝트는 팬이 만든 비상업 프로젝트다.

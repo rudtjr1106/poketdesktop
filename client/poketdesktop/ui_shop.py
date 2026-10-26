@@ -25,6 +25,7 @@ from tkinter import ttk
 from common.korean import natural
 
 from . import item_icons
+from . import skins
 from . import ui_common as U
 from . import ui_loading
 
@@ -298,6 +299,7 @@ class Row(object):
 
 
 # ---------------------------------------------------------------- 창
+@skins.skinnable
 class ShopWindow(object):
     def __init__(self, root, app, parent=None):
         self.root = root
@@ -322,6 +324,11 @@ class ShopWindow(object):
             # 탭으로 들어갈 때는 허브가 이미 걸어 두었다.
             U.install_wheel(self.win)
 
+        self._build()
+        self.reload()
+
+    # 화면 테마(skins/)는 _build 와 칠하는 자리(_show_items · _repaint_rows · _paint_* · show_detail …)만 갈아 끼운다.
+    def _build(self):
         self._header()
         self._bottom()
 
@@ -330,8 +337,6 @@ class ShopWindow(object):
         self._cats(body)
         self._detail(body)      # 오른쪽을 먼저 잡아야 가운데가 남은 폭을 다 먹는다
         self._list(body)
-
-        self.reload()
 
     # ---------------- 머리 ----------------
     def _header(self):
@@ -637,8 +642,8 @@ class ShopWindow(object):
             self.bag = data.get("bag") or {}
             self.money = int(data.get("money") or 0)
             self.sell_rate = float(data.get("sellRate") or 0.5)
-            self.sub.configure(text="파는 값은 사는 값의 %d%%  ·  도구 %d종"
-                                    % (round(self.sell_rate * 100), len(self.items)))
+            self._paint_sub("파는 값은 사는 값의 %d%%  ·  도구 %d종"
+                            % (round(self.sell_rate * 100), len(self.items)))
             self._paint_money()
             self._paint_cat_counts()
             self.render(keep=True)
@@ -673,20 +678,30 @@ class ShopWindow(object):
         q = (self.q.get() or "").strip().lower()
         shown = [it for it in self.items if self._match(it, q)]
         wanted = set(it["id"] for it in shown)
-        if shown:
-            self._nomatch.place_forget()
-        else:
-            self._nomatch.place(relx=0.5, y=40, anchor="n")
         # 고름을 먼저 정한다 - 줄은 칠해질 때 self.sel 을 본다
         if self.sel not in wanted:
             self.sel = shown[0]["id"] if shown else None
             self.qty = 1
-        self.vl.set([("item", it) for it in shown], keep=keep)
-        self.found.configure(text="%d개" % len(shown))
+        self._show_items(shown, keep)
         if self.sel is not None:
             self.show_detail()
         else:
             self._clear_detail()
+
+    def _paint_sub(self, text):
+        self.sub.configure(text=text)
+
+    def _show_items(self, shown, keep):
+        """목록 자리: 분류 · 검색어에 맞는 도구들 (없으면 '찾는 도구가 없습니다')."""
+        if shown:
+            self._nomatch.place_forget()
+        else:
+            self._nomatch.place(relx=0.5, y=40, anchor="n")
+        self.vl.set([("item", it) for it in shown], keep=keep)
+        self.found.configure(text="%d개" % len(shown))
+
+    def _repaint_rows(self):
+        self.vl.refresh()
 
     def shown_rows(self):
         """화면에 걸친 줄들 [(도구 id, 줄)] (검사용)."""
@@ -699,7 +714,7 @@ class ShopWindow(object):
         changed = (iid != self.sel)
         self.sel = iid
         if changed:
-            self.vl.refresh()           # 보이는 줄만 다시 칠한다 (고름은 줄이 self.sel 을 본다)
+            self._repaint_rows()        # 보이는 줄만 다시 칠한다 (고름은 줄이 self.sel 을 본다)
         if changed and not keep_qty:
             self.qty = 1          # 다른 물건으로 옮겼는데 99개가 남아 있으면 위험하다
         self.show_detail()
@@ -805,7 +820,7 @@ class ShopWindow(object):
 
         보이는 줄만 다시 칠한다 - 나머지는 화면에 걸칠 때 그때의 개수로 칠해진다.
         """
-        self.vl.refresh()
+        self._repaint_rows()
         self.show_detail()
 
     # ---------------- 개수 ----------------

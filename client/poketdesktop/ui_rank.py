@@ -19,6 +19,7 @@
 import datetime
 import tkinter as tk
 
+from . import skins
 from . import ui_common as U
 from . import ui_loading
 from . import ui_season as S
@@ -86,6 +87,7 @@ def today_text(fight):
     return "오늘 %d판 가능" % left
 
 
+@skins.skinnable
 class RankWindow(object):
 
     def __init__(self, app, parent=None):
@@ -235,16 +237,13 @@ class RankWindow(object):
         if self._job is not None:
             self._job.cancel()      # 옛 목록의 남은 카드가 새 목록 뒤에 붙지 않게
             self._job = None
-        for w in self.list.winfo_children():
-            w.destroy()
-        # 카드는 위에서부터 나눠 만든다. 맨 위로 올려 둬야 먼저 만든 묶음이
-        # 곧 보이는 화면이다 - 아래를 보던 채로 두면 아직 안 만든 자리가
-        # 빈 채로 먼저 보인다. 다 만들면 보던 자리로 돌려놓는다 (_back_to).
-        self.cv.yview_moveto(0)
         if self.mode == "records":
-            return self._draw_records(keep)
+            return self._paint_records(self._records_head(), self._shown_records(), keep)
+        self._paint_rank(self._rank_head(), keep)
 
-        self.title.configure(text="랭킹  ·  시즌 %d" % self.season)
+    # ---- 무엇을 보일지 (글은 다 여기서 정한다 - 테마는 그리기만 한다)
+    def _rank_head(self):
+        """(제목, 머리줄의 작은 글)."""
         me = self.me
         bits = []
         if me.get("ranked"):
@@ -261,54 +260,16 @@ class RankWindow(object):
             bits.append(today_text(fight))
         if self.rules.get("endsAt"):
             bits.append("%s까지" % _date_kr(self.rules["endsAt"]))
-        self.sub.configure(text="  ·  ".join(bits))
+        return "랭킹  ·  시즌 %d" % self.season, "  ·  ".join(bits)
 
-        self._me_card()
-        self._rules_card()
+    def _empty_text(self):
+        return "아직 순위표가 비어 있습니다.\n랜덤 배틀 %d판을 치르면 이름이 올라갑니다." % self.placement
 
-        if not self.rows:
-            tk.Label(self.list,
-                     text="아직 순위표가 비어 있습니다.\n"
-                          "랜덤 배틀 %d판을 치르면 이름이 올라갑니다."
-                          % self.placement,
-                     bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S,
-                     justify="center").pack(pady=36)
-            self._hall()
-            return self.fit.schedule()
-
-        def finished():
-            self._hall()
-            self.fit.schedule()
-            self._back_to(keep)
-
-        self._job = U.Chunked(self.win, self.rows, self._card,
-                              first=FIRST_ROWS, size=CHUNK_ROWS,
-                              on_done=finished)
-        self.fit.schedule()
-
-    def _me_card(self):
-        """내 티어와 다음 티어까지. 표 맨 위에 둔다 - 제일 먼저 궁금한 것이다."""
+    def _me_data(self):
+        """내 티어와 다음 티어까지. 옛 서버(RP 없음)면 None."""
         me = self.me
         if "rp" not in me:
-            return          # 옛 서버. RP 가 없으면 그리지 않는다
-        box = tk.Frame(self.list, bg=U.BG2, highlightthickness=2,
-                       highlightbackground=me.get("frameColor") or U.LINE2)
-        box.pack(fill="x", pady=(0, 8))
-        inner = tk.Frame(box, bg=U.BG2)
-        inner.pack(fill="x", padx=14, pady=10)
-        top = tk.Frame(inner, bg=U.BG2)
-        top.pack(fill="x")
-        chip = S.tier_chip(top, me.get("tier"), me.get("tierKr"), big=True)
-        if chip:
-            chip.pack(side="left")
-        tk.Label(top, text="%s RP" % format(int(me.get("rp") or 0), ","),
-                 bg=U.BG2, fg=U.FG, font=(U.FAMILY_BLACK, U.pt(14))).pack(
-            side="left", padx=(10, 0))
-        if me.get("title"):
-            tk.Label(top, text=me["title"], bg=U.BG2,
-                     fg=me.get("frameColor") or U.ACCENT_TEXT,
-                     font=U.FONT_S).pack(side="right")
-
+            return None
         lines = []
         if me.get("nextTierKr"):
             lines.append("%s까지 %d RP" % (me["nextTierKr"], me.get("rpToNext", 0)))
@@ -329,44 +290,25 @@ class RankWindow(object):
         if me.get("sameDropped"):
             lines.append("같은 포켓몬은 %d마리까지라 %d마리는 빠지고 싸움"
                          % (me.get("sameSpeciesMax") or 1, me["sameDropped"]))
-        tk.Label(inner, text="  ·  ".join(lines), bg=U.BG2, fg=U.FG_DIM,
-                 font=U.FONT_XS, anchor="w", justify="left",
-                 wraplength=W - 90).pack(fill="x", pady=(6, 0))
-        short = rank_short_text(me, self.rules)
-        if short:
-            # 랭크전 조건 (시즌 4): 못 채우면 랜덤 배틀을 못 건다 - 누르기 전에 보이게
-            tk.Label(inner, text=short, bg=U.BG2, fg=U.DANGER, font=U.FONT_XS, anchor="w",
-                     justify="left", wraplength=W - 90).pack(fill="x", pady=(4, 0))
+        return {"tier": me.get("tier"), "tierKr": me.get("tierKr"),
+                "rp": "%s RP" % format(int(me.get("rp") or 0), ","),
+                "title": me.get("title"), "color": me.get("frameColor"),
+                "lines": "  ·  ".join(lines),
+                # 랭크전 조건 (시즌 4): 못 채우면 랜덤 배틀을 못 건다 - 누르기 전에 보이게
+                "short": rank_short_text(me, self.rules)}
 
-    def _rules_card(self):
-        """규칙과 이번 시즌 보상. 서버가 보낸 숫자 그대로 적는다."""
+    RULES_NOTE = ("점수는 내가 건 랜덤 배틀만 오르내립니다. "
+                  "걸려온 판과 친구 배틀은 점수에 들어가지 않습니다.")
+
+    def _rules_data(self):
+        """규칙과 이번 시즌 보상. 서버가 보낸 숫자 그대로 적는다. 규칙이 없으면(옛 서버) None."""
         r = self.rules
         if not r:
-            note = tk.Label(
-                self.list,
-                text=("점수는 내가 건 랜덤 배틀만 오르내립니다. "
-                      "걸려온 판과 친구 배틀은 점수에 들어가지 않습니다."),
-                bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
-                justify="left", wraplength=W - 80)
-            note.pack(fill="x", pady=(0, 8))
-            return
-        box = tk.Frame(self.list, bg=CARD_BG, highlightthickness=1,
-                       highlightbackground=U.LINE)
-        box.pack(fill="x", pady=(0, 10))
-        inner = tk.Frame(box, bg=CARD_BG)
-        inner.pack(fill="x", padx=14, pady=10)
-
-        row = tk.Frame(inner, bg=CARD_BG)
-        row.pack(fill="x")
+            return None
+        tiers = []
         for t in r.get("tiers") or []:
-            chip = S.tier_chip(row, t.get("tier"), t.get("tierKr"))
-            if not chip:
-                continue
-            chip.pack(side="left", padx=(0, 4))
             need = ("%d" % t["rp"]) if "rp" in t else ("%d명" % t.get("seats", 0))
-            tk.Label(row, text=need, bg=CARD_BG, fg=U.FG_FAINT,
-                     font=U.FONT_XS).pack(side="left", padx=(0, 10))
-
+            tiers.append((t.get("tier"), t.get("tierKr"), need))
         rp = r.get("rp") or {}
         text = []
         if rp.get("win") and rp.get("lose"):
@@ -393,64 +335,31 @@ class RankWindow(object):
             # 10/22: 같은 종도 한 마리 (server/app/pvp.SAME_SPECIES_MAX) - 전설 제한과 같은 곳에 건다
             text.append("같은 포켓몬은 한 팀에 %d마리까지 (랭크·친구·관장·레이드·길드전)" % r["sameSpeciesMax"])
         text.append("내가 건 랜덤 배틀만 점수에 들어갑니다")
-        tk.Label(inner, text="\n".join(text), bg=CARD_BG, fg=U.FG_DIM,
-                 font=U.FONT_XS, anchor="w", justify="left",
-                 wraplength=W - 90).pack(fill="x", pady=(8, 0))
+        rewards = []
+        for rw in r.get("rewards") or []:
+            bits = [rw["egg"]] if rw.get("egg") else []
+            if rw.get("title"):
+                bits.append("칭호 '%s'" % rw["title"])
+            if rw.get("frame"):
+                bits.append(rw["frame"])
+            if rw.get("shiny"):
+                bits.append("이로치사탕 %d개" % rw["shiny"])
+            # 도구와 도구가 아닌 보상 (시즌 4 부터: 기술머신 뽑기권 · 관장 등록)
+            for it in rw.get("items") or []:
+                n = int(it.get("count") or 1)
+                bits.append(it.get("kr", "?") if n == 1 else "%s %d개" % (it.get("kr", "?"), n))
+            bits.extend(rw.get("perks") or [])
+            rewards.append((rw.get("tier"), rw.get("tierKr"), " · ".join(bits), rw.get("frameColor")))
+        return {"tiers": tiers, "text": "\n".join(text), "rewards": rewards,
+                "rewards_title": "시즌 보상 (도달한 최고 티어 · 사천왕과 챔피언은 끝날 때 자리)"}
 
-        rewards = r.get("rewards") or []
-        if rewards:
-            tk.Label(inner, text="시즌 보상 (도달한 최고 티어 · 사천왕과 챔피언은 끝날 때 자리)",
-                     bg=CARD_BG, fg=U.FG, font=U.FONT_B, anchor="w").pack(
-                fill="x", pady=(10, 2))
-            grid = tk.Frame(inner, bg=CARD_BG)
-            grid.pack(fill="x")
-            for i, rw in enumerate(rewards):
-                chip = S.tier_chip(grid, rw.get("tier"), rw.get("tierKr"))
-                if chip:
-                    chip.grid(row=i, column=0, sticky="w", pady=1)
-                bits = [rw["egg"]] if rw.get("egg") else []
-                if rw.get("title"):
-                    bits.append("칭호 '%s'" % rw["title"])
-                if rw.get("frame"):
-                    bits.append(rw["frame"])
-                if rw.get("shiny"):
-                    bits.append("이로치사탕 %d개" % rw["shiny"])
-                # 도구와 도구가 아닌 보상 (시즌 4 부터: 기술머신 뽑기권 · 관장 등록)
-                for it in rw.get("items") or []:
-                    n = int(it.get("count") or 1)
-                    bits.append(it.get("kr", "?") if n == 1 else "%s %d개" % (it.get("kr", "?"), n))
-                bits.extend(rw.get("perks") or [])
-                # 챔피언 줄은 길어서 한 줄에 다 안 들어간다 - 글씨를 줄이지 않고 줄을 바꾼다.
-                # 폭은 카드 안쪽에서 티어 칸(가장 긴 '마스터볼')만큼 뺀 것.
-                tk.Label(grid, text=" · ".join(bits), bg=CARD_BG,
-                         fg=rw.get("frameColor") or U.FG_DIM,
-                         font=U.FONT_XS, anchor="w", justify="left",
-                         wraplength=W - 90 - U.h(110)).grid(
-                    row=i, column=1, sticky="w", padx=(8, 0))
-
-    def _hall(self):
-        """지난 시즌 명예의 전당."""
+    def _hall_data(self):
+        """지난 시즌 명예의 전당: (제목, [(등수, 이름, 칭호, 점수 글)]). 없으면 None."""
         rows = (self.hall or {}).get("rows") or []
         if not rows:
-            return
-        tk.Label(self.list, text="시즌 %d 명예의 전당" % self.hall.get("season", 0),
-                 bg=U.BG, fg=U.FG, font=U.FONT_H, anchor="w").pack(
-            fill="x", pady=(14, 4))
-        box = tk.Frame(self.list, bg=CARD_BG, highlightthickness=1,
-                       highlightbackground=U.LINE)
-        box.pack(fill="x", pady=(0, 10))
+            return None
+        out = []
         for r in rows:
-            line = tk.Frame(box, bg=CARD_BG)
-            line.pack(fill="x", padx=12, pady=3)
-            rank = r.get("rank", 0)
-            tk.Label(line, text="%d" % rank, bg=CARD_BG,
-                     fg=MEDAL.get(rank, U.FG_DIM), width=3, anchor="e",
-                     font=U.FONT_B).pack(side="left")
-            tk.Label(line, text=r.get("name", "?"), bg=CARD_BG, fg=U.FG,
-                     font=U.FONT_B).pack(side="left", padx=(10, 0))
-            if r.get("title"):
-                tk.Label(line, text=r["title"], bg=CARD_BG, fg=U.ACCENT_TEXT,
-                         font=U.FONT_XS).pack(side="left", padx=(8, 0))
             if r.get("tierKr"):
                 # 시즌 2 부터: 끝날 때의 티어(챔피언·사천왕은 자리)와 RP
                 score = "%s · %d RP · %d승 %d패" % (
@@ -458,6 +367,189 @@ class RankWindow(object):
             else:
                 score = "%d점 · %d승 %d패" % (
                     r.get("rating", 0), r.get("wins", 0), r.get("losses", 0))
+            out.append((r.get("rank", 0), r.get("name", "?"), r.get("title"), score))
+        return "시즌 %d 명예의 전당" % self.hall.get("season", 0), out
+
+    def _row_data(self, r):
+        """순위표의 한 줄."""
+        streak = r.get("streak", 0)
+        bits = ["%d전 %d승 %d패" % (r.get("games", 0), r.get("wins", 0),
+                                  r.get("losses", 0))]
+        if r.get("draws"):
+            bits.append("%d무" % r["draws"])
+        if streak >= 2:
+            bits.append("%d연승" % streak)
+        elif streak <= -2:
+            bits.append("%d연패" % abs(streak))
+        # 옛 서버는 rp 가 없다. 그때는 점수를 그대로.
+        score = "%s RP" % format(int(r.get("rp") or 0), ",") if "rp" in r else "%d" % r.get("rating", 0)
+        return {"mine": bool(r.get("me")), "rank": r.get("rank", 0), "tier": r.get("tier"),
+                "tierKr": r.get("tierKr"), "name": r.get("name", "?"), "color": r.get("frameColor"),
+                "title": r.get("title"), "bits": "  ·  ".join(bits), "score": score}
+
+    def _records_head(self):
+        s = self.rec_summary
+        bits = ["랜덤 배틀 %d전 %d승 %d패" % (s.get("games", 0), s.get("wins", 0), s.get("losses", 0))]
+        if s.get("draws"):
+            bits[0] += " %d무" % s["draws"]
+        fw, fl = s.get("friendWins", 0), s.get("friendLosses", 0)
+        if fw or fl:
+            bits.append("친구 배틀 %d승 %d패" % (fw, fl))
+        bits.append("최근 %d판" % RECORD_LIMIT)
+        return "대전 기록", "  ·  ".join(bits)
+
+    REC_NOTE = ("공격한 판은 내가 건 대전, 공격받은 판은 나를 상대로 걸려온 대전입니다. "
+                "점수와 상금은 내가 건 랜덤 배틀에만 붙습니다.")
+
+    def _record_data(self, r):
+        """대전 기록의 한 줄. watch = 다시 볼 수 있으면 대전 번호."""
+        attack = r.get("started", True)
+        bits = [KIND.get(r.get("kind"), r.get("kind") or ""), when_text(r.get("at")),
+                "%d턴" % (r.get("turns") or 0),
+                "남은 %d : %d" % (r.get("myLeft") or 0, r.get("foeLeft") or 0)]
+        if r.get("rpDelta"):
+            bits.append("RP %+d" % r["rpDelta"])
+        if r.get("reward"):
+            bits.append("%s원" % format(r["reward"], ","))
+        if not attack:
+            bits.append("점수·승패에 안 들어감")
+        # 다시 보기: 로그가 남아 있는 판만 (옛 서버는 canReplay 가 없다 - 그때는 띄운다)
+        watch = r.get("matchId") if (r.get("matchId") and r.get("canReplay", True)) else None
+        return {"attack": attack, "result": r.get("result"), "foe": r.get("foe") or "?",
+                "lead": self._lead_text(r), "bits": "  ·  ".join(b for b in bits if b), "watch": watch}
+
+    # ---- 그리기 (테마마다 그리는 곳)
+    def _paint_rank(self, head, keep):
+        for w in self.list.winfo_children():
+            w.destroy()
+        # 카드는 위에서부터 나눠 만든다. 맨 위로 올려 둬야 먼저 만든 묶음이
+        # 곧 보이는 화면이다 - 아래를 보던 채로 두면 아직 안 만든 자리가
+        # 빈 채로 먼저 보인다. 다 만들면 보던 자리로 돌려놓는다 (_back_to).
+        self.cv.yview_moveto(0)
+        self.title.configure(text=head[0])
+        self.sub.configure(text=head[1])
+
+        self._me_card()
+        self._rules_card()
+
+        if not self.rows:
+            tk.Label(self.list, text=self._empty_text(),
+                     bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S,
+                     justify="center").pack(pady=36)
+            self._hall()
+            return self.fit.schedule()
+
+        def finished():
+            self._hall()
+            self.fit.schedule()
+            self._back_to(keep)
+
+        self._job = U.Chunked(self.win, self.rows, self._card,
+                              first=FIRST_ROWS, size=CHUNK_ROWS,
+                              on_done=finished)
+        self.fit.schedule()
+
+    def _me_card(self):
+        """내 티어와 다음 티어까지. 표 맨 위에 둔다 - 제일 먼저 궁금한 것이다."""
+        d = self._me_data()
+        if d is None:
+            return          # 옛 서버. RP 가 없으면 그리지 않는다
+        box = tk.Frame(self.list, bg=U.BG2, highlightthickness=2,
+                       highlightbackground=d["color"] or U.LINE2)
+        box.pack(fill="x", pady=(0, 8))
+        inner = tk.Frame(box, bg=U.BG2)
+        inner.pack(fill="x", padx=14, pady=10)
+        top = tk.Frame(inner, bg=U.BG2)
+        top.pack(fill="x")
+        chip = S.tier_chip(top, d["tier"], d["tierKr"], big=True)
+        if chip:
+            chip.pack(side="left")
+        tk.Label(top, text=d["rp"],
+                 bg=U.BG2, fg=U.FG, font=(U.FAMILY_BLACK, U.pt(14))).pack(
+            side="left", padx=(10, 0))
+        if d["title"]:
+            tk.Label(top, text=d["title"], bg=U.BG2,
+                     fg=d["color"] or U.ACCENT_TEXT,
+                     font=U.FONT_S).pack(side="right")
+        tk.Label(inner, text=d["lines"], bg=U.BG2, fg=U.FG_DIM,
+                 font=U.FONT_XS, anchor="w", justify="left",
+                 wraplength=W - 90).pack(fill="x", pady=(6, 0))
+        if d["short"]:
+            tk.Label(inner, text=d["short"], bg=U.BG2, fg=U.DANGER, font=U.FONT_XS, anchor="w",
+                     justify="left", wraplength=W - 90).pack(fill="x", pady=(4, 0))
+
+    def _rules_card(self):
+        """규칙과 이번 시즌 보상."""
+        d = self._rules_data()
+        if d is None:
+            note = tk.Label(
+                self.list,
+                text=self.RULES_NOTE,
+                bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
+                justify="left", wraplength=W - 80)
+            note.pack(fill="x", pady=(0, 8))
+            return
+        box = tk.Frame(self.list, bg=CARD_BG, highlightthickness=1,
+                       highlightbackground=U.LINE)
+        box.pack(fill="x", pady=(0, 10))
+        inner = tk.Frame(box, bg=CARD_BG)
+        inner.pack(fill="x", padx=14, pady=10)
+
+        row = tk.Frame(inner, bg=CARD_BG)
+        row.pack(fill="x")
+        for tier, tier_kr, need in d["tiers"]:
+            chip = S.tier_chip(row, tier, tier_kr)
+            if not chip:
+                continue
+            chip.pack(side="left", padx=(0, 4))
+            tk.Label(row, text=need, bg=CARD_BG, fg=U.FG_FAINT,
+                     font=U.FONT_XS).pack(side="left", padx=(0, 10))
+
+        tk.Label(inner, text=d["text"], bg=CARD_BG, fg=U.FG_DIM,
+                 font=U.FONT_XS, anchor="w", justify="left",
+                 wraplength=W - 90).pack(fill="x", pady=(8, 0))
+
+        if d["rewards"]:
+            tk.Label(inner, text=d["rewards_title"],
+                     bg=CARD_BG, fg=U.FG, font=U.FONT_B, anchor="w").pack(
+                fill="x", pady=(10, 2))
+            grid = tk.Frame(inner, bg=CARD_BG)
+            grid.pack(fill="x")
+            for i, (tier, tier_kr, text, color) in enumerate(d["rewards"]):
+                chip = S.tier_chip(grid, tier, tier_kr)
+                if chip:
+                    chip.grid(row=i, column=0, sticky="w", pady=1)
+                # 챔피언 줄은 길어서 한 줄에 다 안 들어간다 - 글씨를 줄이지 않고 줄을 바꾼다.
+                # 폭은 카드 안쪽에서 티어 칸(가장 긴 '마스터볼')만큼 뺀 것.
+                tk.Label(grid, text=text, bg=CARD_BG,
+                         fg=color or U.FG_DIM,
+                         font=U.FONT_XS, anchor="w", justify="left",
+                         wraplength=W - 90 - U.h(110)).grid(
+                    row=i, column=1, sticky="w", padx=(8, 0))
+
+    def _hall(self):
+        """지난 시즌 명예의 전당."""
+        d = self._hall_data()
+        if d is None:
+            return
+        title, rows = d
+        tk.Label(self.list, text=title,
+                 bg=U.BG, fg=U.FG, font=U.FONT_H, anchor="w").pack(
+            fill="x", pady=(14, 4))
+        box = tk.Frame(self.list, bg=CARD_BG, highlightthickness=1,
+                       highlightbackground=U.LINE)
+        box.pack(fill="x", pady=(0, 10))
+        for rank, name, title_, score in rows:
+            line = tk.Frame(box, bg=CARD_BG)
+            line.pack(fill="x", padx=12, pady=3)
+            tk.Label(line, text="%d" % rank, bg=CARD_BG,
+                     fg=MEDAL.get(rank, U.FG_DIM), width=3, anchor="e",
+                     font=U.FONT_B).pack(side="left")
+            tk.Label(line, text=name, bg=CARD_BG, fg=U.FG,
+                     font=U.FONT_B).pack(side="left", padx=(10, 0))
+            if title_:
+                tk.Label(line, text=title_, bg=CARD_BG, fg=U.ACCENT_TEXT,
+                         font=U.FONT_XS).pack(side="left", padx=(8, 0))
             tk.Label(line, text=score, bg=CARD_BG, fg=U.FG_FAINT,
                      font=U.FONT_XS).pack(side="right")
 
@@ -483,11 +575,12 @@ class RankWindow(object):
             pass
 
     def _card(self, r):
-        mine = bool(r.get("me"))
-        rank = r.get("rank", 0)
+        d = self._row_data(r)
+        mine = d["mine"]
+        rank = d["rank"]
         # 내 줄은 금색 테두리로 찾기 쉽게. 목록이 길어지면 자기 줄을
         # 눈으로 뒤지게 된다. 명패를 단 사람은 그 색 테두리.
-        edge = U.ACCENT if mine else (r.get("frameColor") or U.LINE)
+        edge = U.ACCENT if mine else (d["color"] or U.LINE)
         box = tk.Frame(self.list, bg=U.BG2 if mine else CARD_BG,
                        highlightthickness=2, highlightbackground=edge)
         box.pack(fill="x", pady=(0, 7))
@@ -503,38 +596,24 @@ class RankWindow(object):
         left.pack(side="left", fill="x", expand=True, padx=(12, 0))
         top = tk.Frame(left, bg=box["bg"])
         top.pack(fill="x")
-        chip = S.tier_chip(top, r.get("tier"), r.get("tierKr"))
+        chip = S.tier_chip(top, d["tier"], d["tierKr"])
         if chip:
             chip.pack(side="left", padx=(0, 8))
-        tk.Label(top, text=r.get("name", "?"), bg=box["bg"],
-                 fg=S.name_color(r, U.ACCENT if mine else U.FG),
+        tk.Label(top, text=d["name"], bg=box["bg"],
+                 fg=d["color"] or (U.ACCENT if mine else U.FG),
                  font=U.FONT_B).pack(side="left")
         if mine:
             tk.Label(top, text="나", bg=U.ACCENT, fg="#14141a",
                      font=U.FONT_XS, padx=5).pack(side="left", padx=(8, 0))
-        if r.get("title"):
-            tk.Label(top, text=r["title"], bg=box["bg"],
-                     fg=r.get("frameColor") or U.ACCENT_TEXT,
+        if d["title"]:
+            tk.Label(top, text=d["title"], bg=box["bg"],
+                     fg=d["color"] or U.ACCENT_TEXT,
                      font=U.FONT_XS).pack(side="left", padx=(8, 0))
 
-        streak = r.get("streak", 0)
-        bits = ["%d전 %d승 %d패" % (r.get("games", 0), r.get("wins", 0),
-                                  r.get("losses", 0))]
-        if r.get("draws"):
-            bits.append("%d무" % r["draws"])
-        if streak >= 2:
-            bits.append("%d연승" % streak)
-        elif streak <= -2:
-            bits.append("%d연패" % abs(streak))
-        tk.Label(left, text="  ·  ".join(bits), bg=box["bg"], fg=U.FG_FAINT,
+        tk.Label(left, text=d["bits"], bg=box["bg"], fg=U.FG_FAINT,
                  font=U.FONT_XS).pack(anchor="w", pady=(4, 0))
 
-        # 옛 서버는 rp 가 없다. 그때는 점수를 그대로.
-        if "rp" in r:
-            text = "%s RP" % format(int(r.get("rp") or 0), ",")
-        else:
-            text = "%d" % r.get("rating", 0)
-        tk.Label(inner, text=text, bg=box["bg"], fg=U.FG,
+        tk.Label(inner, text=d["score"], bg=box["bg"], fg=U.FG,
                  font=U.FONT_NUM).pack(side="right")
 
     # ---------------- 대전 기록 (1.12.1) ----------------
@@ -554,28 +633,21 @@ class RankWindow(object):
             return [r for r in self.records if not r.get("started", True)]
         return list(self.records)
 
-    def _draw_records(self, keep):
-        self.title.configure(text="대전 기록")
-        s = self.rec_summary
-        bits = ["랜덤 배틀 %d전 %d승 %d패" % (s.get("games", 0), s.get("wins", 0), s.get("losses", 0))]
-        if s.get("draws"):
-            bits[0] += " %d무" % s["draws"]
-        fw, fl = s.get("friendWins", 0), s.get("friendLosses", 0)
-        if fw or fl:
-            bits.append("친구 배틀 %d승 %d패" % (fw, fl))
-        bits.append("최근 %d판" % RECORD_LIMIT)
-        self.sub.configure(text="  ·  ".join(bits))
+    def _paint_records(self, head, rows, keep):
+        for w in self.list.winfo_children():
+            w.destroy()
+        self.cv.yview_moveto(0)
+        self.title.configure(text=head[0])
+        self.sub.configure(text=head[1])
 
         bar = tk.Frame(self.list, bg=U.BG)
         bar.pack(fill="x", pady=(0, 8))
         self.rec_seg = U.Segmented(bar, REC_FILTERS, self.rec_filter, self._pick_filter)
         self.rec_seg.pack(side="left")
-        tk.Label(self.list, text="공격한 판은 내가 건 대전, 공격받은 판은 나를 상대로 걸려온 대전입니다. "
-                                 "점수와 상금은 내가 건 랜덤 배틀에만 붙습니다.",
+        tk.Label(self.list, text=self.REC_NOTE,
                  bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left",
                  wraplength=W - 80).pack(fill="x", pady=(0, 8))
 
-        rows = self._shown_records()
         if not rows:
             tk.Label(self.list, text=REC_EMPTY.get(self.rec_filter, REC_EMPTY["all"]),
                      bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S, justify="center").pack(pady=36)
@@ -599,7 +671,8 @@ class RankWindow(object):
         return "%s vs %s" % (a, b) if a and b else ""
 
     def _record_card(self, r):
-        attack = r.get("started", True)
+        d = self._record_data(r)
+        attack = d["attack"]
         box = tk.Frame(self.list, bg=CARD_BG, highlightthickness=2,
                        highlightbackground=U.LINE)
         box.pack(fill="x", pady=(0, 7))
@@ -610,34 +683,23 @@ class RankWindow(object):
         left.pack(side="left", fill="x", expand=True)
         top = tk.Frame(left, bg=CARD_BG)
         top.pack(fill="x")
-        mark, color = RESULT.get(r.get("result"), ("?", U.FG_DIM))
+        mark, color = RESULT.get(d["result"], ("?", U.FG_DIM))
         tk.Label(top, text=mark, bg=color, fg="#14141a",
                  font=(U.FAMILY_BLACK, U.pt(11)), width=3).pack(side="left")
         U.chip(top, "공격" if attack else "방어", U.ACCENT if attack else U.INFO,
                font=U.FONT_XS, padx=6).pack(side="left", padx=(8, 0))
-        tk.Label(top, text=r.get("foe") or "?", bg=CARD_BG, fg=U.FG,
+        tk.Label(top, text=d["foe"], bg=CARD_BG, fg=U.FG,
                  font=U.FONT_B).pack(side="left", padx=(9, 0))
-        lead = self._lead_text(r)
-        if lead:
-            tk.Label(top, text=lead, bg=CARD_BG, fg=U.FG_DIM,
+        if d["lead"]:
+            tk.Label(top, text=d["lead"], bg=CARD_BG, fg=U.FG_DIM,
                      font=U.FONT_XS).pack(side="left", padx=(10, 0))
 
-        bits = [KIND.get(r.get("kind"), r.get("kind") or ""), when_text(r.get("at")),
-                "%d턴" % (r.get("turns") or 0),
-                "남은 %d : %d" % (r.get("myLeft") or 0, r.get("foeLeft") or 0)]
-        if r.get("rpDelta"):
-            bits.append("RP %+d" % r["rpDelta"])
-        if r.get("reward"):
-            bits.append("%s원" % format(r["reward"], ","))
-        if not attack:
-            bits.append("점수·승패에 안 들어감")
-        tk.Label(left, text="  ·  ".join(b for b in bits if b), bg=CARD_BG,
+        tk.Label(left, text=d["bits"], bg=CARD_BG,
                  fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left",
                  wraplength=W - 260).pack(anchor="w", fill="x", pady=(4, 0))
 
-        # 다시 보기: 로그가 남아 있는 판만 (옛 서버는 canReplay 가 없다 - 그때는 띄운다)
-        if r.get("matchId") and r.get("canReplay", True):
-            U.ghost_button(inner, "다시 보기", lambda m=r["matchId"]: self._watch(m),
+        if d["watch"]:
+            U.ghost_button(inner, "다시 보기", lambda m=d["watch"]: self._watch(m),
                            height=30).pack(side="right")
 
     def _watch(self, mid):

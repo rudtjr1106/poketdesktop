@@ -15,6 +15,7 @@ import tkinter as tk
 
 from PIL import ImageTk
 
+from . import skins
 from . import ui_common as U
 from .ui_common import run_async
 
@@ -55,6 +56,7 @@ def action_of(card):
     return "", False, ""
 
 
+@skins.skinnable
 class BossWindow(object):
     """gw 는 관장 창(GymWindow). 승부가 끝나면 이 창과 지도를 같이 다시 받는다."""
 

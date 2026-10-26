@@ -216,17 +216,55 @@ def main():
     chk("도구 칸이 다시 보인다", tabs.holders["items"].winfo_ismapped()
         and not tabs.holders["tms"].winfo_ismapped())
 
+    print("\n=== 탭 묶음 (2026-10-25) ===")
+    chk("위 탭은 묶음 여섯 개", [g[1] for g in ui_hub.GROUPS] == ["포켓몬", "가방", "상점", "모험", "커뮤니티", "마이페이지"]
+        and [hub.nb.tab(i, "text").strip() for i in range(hub.nb.index("end"))]
+        == [g[1] for g in ui_hub.GROUPS], [hub.nb.tab(i, "text") for i in range(hub.nb.index("end"))])
+    chk("  탭 열쇠는 모두 묶음 하나에 든다", sorted(ui_hub.GROUP_OF) == sorted(keys)
+        and sum(len(g[2]) for g in ui_hub.GROUPS) == len(keys), ui_hub.GROUP_OF)
+    chk("  가방 · 상점은 따로 (하위 탭 줄 없음)", ui_hub.GROUP_TABS["bag"] == ["bag"]
+        and ui_hub.GROUP_TABS["shop"] == ["shop"] and "bag" not in hub.cells and "shop" not in hub.cells)
+    chk("지금 탭은 가방", hub.current == "bag" and hub.nb.index("current") == hub.groups.index("bag"), hub.current)
+    hub.show("box")
+    settle(root, 0.3)
+    box = hub.panes.get("box")
+    chk("show('box') 는 '포켓몬' 묶음의 '포켓몬' 하위 탭으로", hub.current == "box" and box is not None
+        and hub.nb.index("current") == 0 and hub.frames["box"].winfo_ismapped()
+        and not hub.frames["dex"].winfo_manager(), (hub.current, hub.nb.index("current")))
+    cell, lab, line = hub.cells["box"]
+    chk("  하위 탭 줄: 고른 것은 금색 글씨 + 금색 밑줄, 나머지는 흐린 글씨",
+        lab.cget("fg") == U.ACCENT and line.cget("bg") == U.ACCENT
+        and hub.cells["dex"][1].cget("fg") == U.FG_DIM and hub.cells["dex"][2].cget("bg") == U.BG)
+    import tkinter.font as tkfont
+    got_f = tkfont.Font(root=root, font=lab.cget("font")).actual()
+    want_f = tkfont.Font(root=root, font=U.FONT).actual()
+    chk("  하위 탭 글꼴은 위 탭 글꼴 그대로", got_f == want_f, (got_f, want_f))
+    chk("  가방 탭은 안 보인다 (다른 묶음)", not hub.frames["bag"].winfo_viewable())
+    shown = []
+    box.on_shown = lambda: shown.append(1)
+    hub.show("bag")
+    settle(root, 0.2)
+    hub.nb.select(0)                                  # 위 탭 '포켓몬' 을 누른 것
+    settle(root, 0.3)
+    chk("위 탭을 누르면 그 묶음에서 마지막에 본 탭이 다시 뜬다 (on_shown 한 번)", hub.current == "box"
+        and shown == [1] and hub.panes.get("box") is box, (hub.current, shown))
+    hub.show("bag")
+    settle(root, 0.2)
+
     print("\n=== 새 공지 점 ===")
-    idx = hub.order.index("board")
+    idx = hub.groups.index("community")
     plain = tab_width(hub.nb, idx)
-    hub.nb.tab(idx, text="  게시판 ●  ")                    # 1.10.x 의 점 (글자) - 견주려고 잠깐
+    hub.nb.tab(idx, text="  커뮤니티 ●  ")                  # 1.10.x 의 점 (글자) - 견주려고 잠깐
     settle(root, 0.1)
     old = tab_width(hub.nb, idx)
+    hub.nb.tab(idx, text="  커뮤니티  ")
+    cell = hub.cells["board"][0]
+    cell_w = cell.winfo_reqwidth()
     hub.set_badge("board", True)
     settle(root, 0.1)
     new = tab_width(hub.nb, idx)
-    chk("게시판 탭에 점 (그림 - 글자는 그대로)", bool(hub.nb.tab(idx, "image"))
-        and hub.nb.tab(idx, "text").strip() == "게시판", (hub.nb.tab(idx, "text"), hub.nb.tab(idx, "image")))
+    chk("게시판에 점을 켜면 '커뮤니티' 위 탭에 점 (그림 - 글자는 그대로)", bool(hub.nb.tab(idx, "image"))
+        and hub.nb.tab(idx, "text").strip() == "커뮤니티", (hub.nb.tab(idx, "text"), hub.nb.tab(idx, "image")))
     chk("  점을 달아도 탭이 옛 글자 점보다 넓어지지 않는다", plain < new <= old, (plain, new, old))
     img = str(hub.nb.tab(idx, "image")[0])
     chk("  그림은 탭 글줄 높이 그대로 (글자와 한 줄에 앉는다)",
@@ -234,10 +272,21 @@ def main():
     spec = [str(x) for x in hub.nb.tab(idx, "image")]
     chk("  고른 탭·마우스를 올린 탭은 글자색을 따라 다른 점", spec[1::2] == ["selected", "active"]
         and len(set(spec[0::2])) == 3, spec)
+    lab = hub.cells["board"][1]
+    chk("  '게시판' 하위 탭에도 점 (칸 폭은 그대로)", bool(str(lab.cget("image")))
+        and lab.cget("text") == "게시판" and abs(cell.winfo_reqwidth() - cell_w) <= 1, (cell.winfo_reqwidth(), cell_w))
+    chk("  다른 하위 탭에는 점이 없다", not str(hub.cells["guild"][1].cget("image")))
+    hub.set_badge("guild", True)
     hub.set_badge("board", False)
     settle(root, 0.1)
-    chk("끄면 사라진다", not hub.nb.tab(idx, "image") and hub.nb.tab(idx, "text") == "  게시판  "
-        and tab_width(hub.nb, idx) == plain, (hub.nb.tab(idx, "text"), tab_width(hub.nb, idx), plain))
+    chk("묶음 안에 하나라도 켜져 있으면 위 탭 점은 남는다", bool(hub.nb.tab(idx, "image"))
+        and not str(lab.cget("image")) and bool(str(hub.cells["guild"][1].cget("image"))))
+    hub.set_badge("guild", False)
+    settle(root, 0.1)
+    chk("끄면 사라진다", not hub.nb.tab(idx, "image") and hub.nb.tab(idx, "text") == "  커뮤니티  "
+        and tab_width(hub.nb, idx) == plain and not hub.badges, (hub.nb.tab(idx, "text"), tab_width(hub.nb, idx), plain))
+    hub.set_badge("nope", True)
+    chk("  모르는 열쇠는 그냥 넘긴다", not hub.badges)
 
     hub.close()
     settle(root, 0.3)

@@ -18,7 +18,7 @@ import tkinter as tk
 from common import expedition as X
 from common.korean import natural
 
-from . import config, effects
+from . import config, effects, skins
 from . import platform_os as PLAT
 from .fx_layer import screen_origin
 from . import ui_common as U
@@ -368,6 +368,22 @@ def _mon_thumb(win, app, label, mon, keep, tag, size=30):
     run_async(win, work, done)
 
 
+def loot_summary(lines, claimed):
+    """창 머리에 적을 한 줄: '물건 N개를 가져왔습니다.' (+ ' 포켓몬 M마리를 데려왔습니다.'). 화면(기본 · 테마)이 같이 쓴다."""
+    total = sum(n for _h, _g, _k, rows in lines for _i, _t, n, _tier in rows)
+    friends = sum(1 for g in claimed if isinstance((g or {}).get("friend"), dict))
+    return "물건 %d개를 가져왔습니다." % total + (" 포켓몬 %d마리를 데려왔습니다." % friends if friends else "")
+
+
+def loot_max_height(win):
+    """받은 것 창의 높이 한계: 화면 높이의 2/3. 넘으면 창을 키우지 않고 안쪽이 굴러간다."""
+    try:
+        return int(win.winfo_screenheight() * 0.66)
+    except tk.TclError:
+        return None
+
+
+@skins.skinnable_fn("announce")
 def show_loot(parent, app, claimed):
     """탐험에서 가져온 것을 보여 준다. 창은 내용만큼만 크고, 길면 안쪽이 굴러간다."""
     from . import ui_bag, ui_box
@@ -376,11 +392,9 @@ def show_loot(parent, app, claimed):
         return
     keep = {}
     win, f = ui_box._shell(parent, "탐험", LOOT_W, U.h(260))
-    total = sum(n for _h, _g, _k, rows in lines for _i, _t, n, _tier in rows)
-    friends = sum(1 for g in claimed if isinstance((g or {}).get("friend"), dict))
     tk.Label(f, text="탐험에서 돌아왔습니다", bg=U.BG, fg=U.ACCENT_TEXT,
              font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
-    tk.Label(f, text="물건 %d개를 가져왔습니다." % total + (" 포켓몬 %d마리를 데려왔습니다." % friends if friends else ""),
+    tk.Label(f, text=loot_summary(lines, claimed),
              bg=U.BG, fg=U.FG_DIM, font=U.FONT_S).pack(anchor="w", pady=(4, 0))
 
     # **바닥 줄(확인 단추)을 먼저 잡는다.** 굴러가는 칸을 먼저 담으면 그 칸이 높이를 다 먹어서,
@@ -457,10 +471,6 @@ def show_loot(parent, app, claimed):
 
     win.keep = keep
     # 내용만큼만 키운다. 화면 높이의 2/3 를 넘으면 안쪽이 굴러간다.
-    try:
-        hi = int(win.winfo_screenheight() * 0.66)
-    except tk.TclError:
-        hi = None
-    ui_box.fit(win, hi=hi, scroll=(cv, inner))
+    ui_box.fit(win, hi=loot_max_height(win), scroll=(cv, inner))
     win.grab_set()
     parent.wait_window(win)

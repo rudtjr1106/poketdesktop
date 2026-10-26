@@ -13,12 +13,14 @@ from common.version import VERSION
 
 from . import config
 from . import platform_os as PLAT
+from . import skins
 from . import ui_common as U
 from . import updater
 
 W, H = 420, 300
 
 
+@skins.skinnable
 class UpdateWindow(object):
     """받는 동안 뜨는 창. show() 가 끝나면 결과를 돌려준다.
 
@@ -39,13 +41,17 @@ class UpdateWindow(object):
         self.win = tk.Toplevel(root)
         U.style_window(self.win, "포스크탑 업데이트", W, H)
         U.apply_theme(self.win)
-        self.win.configure(bg=U.BG, highlightthickness=2,
-                           highlightbackground=U.LINE2)
+        self._frame()
         self.win.resizable(False, False)
         self.win.protocol("WM_DELETE_WINDOW", self.on_skip)
 
         self._head()
         self._body()
+
+    def _frame(self):
+        """창 틀의 바탕 · 테두리 (테마가 바꾼다)."""
+        self.win.configure(bg=U.BG, highlightthickness=2,
+                           highlightbackground=U.LINE2)
 
     # ---------------- 머리: 굴러가는 몬스터볼 ----------------
     def _head(self):
@@ -270,6 +276,7 @@ def highlights(notes_md, limit=6):
     return out
 
 
+@skins.skinnable
 class NewVersionAsk(object):
     """켜 둔 동안 새 버전을 찾았을 때 물어보는 창.
 
@@ -289,36 +296,52 @@ class NewVersionAsk(object):
         self.win = tk.Toplevel(root)
         U.style_window(self.win, "포스크탑 — 새 버전", ASK_W, ASK_H)
         U.apply_theme(self.win)
-        self.win.configure(bg=U.BG, highlightthickness=2,
-                           highlightbackground=U.LINE2)
+        self._frame()
         self.win.resizable(False, False)
         self.win.protocol("WM_DELETE_WINDOW", self.on_later)
+        sub, bits = self._facts()
+        self._build(sub, bits)
+        self._fit()
 
+    def _frame(self):
+        """창 틀의 바탕 · 테두리 (테마가 바꾼다)."""
+        self.win.configure(bg=U.BG, highlightthickness=2,
+                           highlightbackground=U.LINE2)
+
+    def _facts(self):
+        """창에 적을 것: (버전 · 크기 한 줄, 바뀐 것 줄들). 짓는 모양과 무관한 자료."""
+        info = self.info
+        sub = "v%s  →  v%s" % (VERSION, info["version"])
+        size = info.get("size") or 0
+        if size:
+            sub += "   ·   %.1f MB" % (size / 1048576.0)
+        bits = []
+        for line in highlights(info.get("notes"))[:3]:
+            # **길면 자른다.** 릴리스 본문의 한 항목은 서너 줄까지
+            # 가는데, 그걸 그대로 담으면 창이 화면을 넘긴다. 자세한
+            # 것은 받은 뒤 '새로운 기능' 창에서 읽는다.
+            if len(line) > 96:
+                line = line[:95].rstrip() + "..."
+            bits.append(line)
+        return sub, bits
+
+    def _build(self, sub, bits):
+        """창 안을 짓는다 (테마가 바꾼다). 단추는 on_now / on_later 를 부른다."""
         head = tk.Frame(self.win, bg=U.RED, height=U.h(76))
         head.pack(fill="x")
         head.pack_propagate(False)
         tk.Label(head, text="새 버전이 나왔습니다", bg=U.RED, fg="#ffffff",
                  font=(U.FAMILY_BLACK, U.pt(15)), anchor="w").pack(
                      fill="x", padx=20, pady=(16, 0))
-        sub = "v%s  →  v%s" % (VERSION, info["version"])
-        size = info.get("size") or 0
-        if size:
-            sub += "   ·   %.1f MB" % (size / 1048576.0)
         tk.Label(head, text=sub, bg=U.RED, fg="#ffd9d6", font=U.FONT_S,
                  anchor="w").pack(fill="x", padx=20)
 
         p = tk.Frame(self.win, bg=U.BG)
         p.pack(fill="both", expand=True, padx=20, pady=(14, 0))
-        bits = highlights(info.get("notes"))
         if bits:
             tk.Label(p, text="바뀐 것", bg=U.BG, fg=U.FG_DIM, font=U.FONT_B,
                      anchor="w").pack(fill="x")
-            for line in bits[:3]:
-                # **길면 자른다.** 릴리스 본문의 한 항목은 서너 줄까지
-                # 가는데, 그걸 그대로 담으면 창이 화면을 넘긴다. 자세한
-                # 것은 받은 뒤 '새로운 기능' 창에서 읽는다.
-                if len(line) > 96:
-                    line = line[:95].rstrip() + "..."
+            for line in bits:
                 tk.Label(p, text="· " + line, bg=U.BG, fg=U.FG,
                          font=U.FONT_S, anchor="w", justify="left",
                          wraplength=ASK_W - 56).pack(fill="x", pady=(4, 0))
@@ -335,7 +358,6 @@ class NewVersionAsk(object):
         U.PushButton(row, "지금 받기", self.on_now, height=36).pack(side="right")
         U.ghost_button(row, "나중에", self.on_later, height=36).pack(
             side="right", padx=(0, 8))
-        self._fit()
 
     def _fit(self):
         """내용에 맞춰 창 높이를 정한다.

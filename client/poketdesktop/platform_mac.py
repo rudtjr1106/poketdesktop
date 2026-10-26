@@ -1141,6 +1141,33 @@ def pil_font_files(bold=False):
     return files
 
 
+def register_font(path):
+    """CTFontManagerRegisterFontsForURL(프로세스 범위) - 이 프로그램만 보는 글꼴로 등록한다.
+
+    pyobjc 의 CoreText 묶음은 따로 깔아야 해서 ctypes 로 바로 부른다.
+    """
+    try:
+        cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+        ct = ctypes.CDLL("/System/Library/Frameworks/CoreText.framework/CoreText")
+        cf.CFURLCreateFromFileSystemRepresentation.argtypes = [
+            ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_bool]
+        cf.CFURLCreateFromFileSystemRepresentation.restype = ctypes.c_void_p
+        cf.CFRelease.argtypes = [ctypes.c_void_p]
+        ct.CTFontManagerRegisterFontsForURL.argtypes = [
+            ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p]
+        ct.CTFontManagerRegisterFontsForURL.restype = ctypes.c_bool
+        raw = os.fsencode(path)
+        url = cf.CFURLCreateFromFileSystemRepresentation(None, raw, len(raw), False)
+        if not url:
+            return False
+        try:
+            return bool(ct.CTFontManagerRegisterFontsForURL(url, 1, None))   # 1 = kCTFontManagerScopeProcess
+        finally:
+            cf.CFRelease(url)
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 def already_running_hint():
     return ("화면 위쪽 메뉴 막대에서\n"
             "몬스터볼 아이콘을 찾아보세요.")

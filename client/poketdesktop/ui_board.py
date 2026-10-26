@@ -44,6 +44,7 @@ from tkinter import ttk
 
 from common.korean import ago, natural
 
+from . import skins
 from . import ui_common as U
 from .ui_common import run_async
 
@@ -105,6 +106,7 @@ def open_url(url):
         return False
 
 
+@skins.skinnable
 class BoardWindow(object):
 
     def __init__(self, app, parent=None):
@@ -228,6 +230,17 @@ class BoardWindow(object):
         self.reply_to = None
         self.edit_id = None
         self.write_btn.configure(state="normal")
+        self._build_list()
+        if self.data and self.data.get("kind") == self.kind \
+                and self.data.get("page") == self.page \
+                and (self.data.get("q") or "") == self.q:
+            self._fill_list(self.data)          # 보던 것을 먼저 그리고 새로 받는다
+        else:
+            self._list_loading()
+        self.load_list(gen)
+
+    def _build_list(self):
+        """목록 화면의 틀 (테마마다 그리는 곳): 종류 탭 · 쪽 넘기기 · 찾기 줄 · 굴러가는 칸."""
         bar = tk.Frame(self.body, bg=U.BG)
         bar.pack(fill="x", padx=16, pady=(12, 8))
         self.seg = U.Segmented(bar, KINDS, self.kind, self.pick_kind)
@@ -244,14 +257,10 @@ class BoardWindow(object):
         wrap = tk.Frame(self.body, bg=U.BG)
         wrap.pack(fill="both", expand=True, padx=16)
         self.list = self._scroll_area(wrap)
-        if self.data and self.data.get("kind") == self.kind \
-                and self.data.get("page") == self.page \
-                and (self.data.get("q") or "") == self.q:
-            self._fill_list(self.data)          # 보던 것을 먼저 그리고 새로 받는다
-        else:
-            tk.Label(self.list, text="불러오는 중...", bg=U.BG, fg=U.FG_FAINT,
-                     font=U.FONT_S).pack(pady=30)
-        self.load_list(gen)
+
+    def _list_loading(self):
+        tk.Label(self.list, text="불러오는 중...", bg=U.BG, fg=U.FG_FAINT,
+                 font=U.FONT_S).pack(pady=30)
 
     # ---------------- 찾기 ----------------
     def _search_row(self):
@@ -350,29 +359,17 @@ class BoardWindow(object):
     def _fill_list(self, d):
         self.can_notice = bool(d.get("canNotice"))
         self.limits.update(d.get("limits") or {})
-        for w in self.list.winfo_children():
-            w.destroy()
         pinned, posts = d.get("pinned") or [], d.get("posts") or []
-        for p in pinned:
-            self._row(p, pinned=True)
-        for p in posts:
-            self._row(p)
         q = d.get("q") or ""
+        empty = None
         if not pinned and not posts:
-            empty = ("'%s' 이(가) 들어간 글이 없습니다." % q) if q else (
+            empty = natural(("'%s' 이(가) 들어간 글이 없습니다." % q) if q else (
                 "아직 패치노트가 없습니다." if d.get("kind") == "patch"
-                else "아직 글이 없습니다. 첫 글을 써 보세요.")
-            tk.Label(self.list, text=natural(empty),
-                     bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S).pack(pady=40)
+                else "아직 글이 없습니다. 첫 글을 써 보세요."))
         pages = d.get("pages") or 1
-        self.page_lbl.configure(text="%d / %d" % (d.get("page") or 1, pages))
-        self.prev_btn.configure(state="normal" if self.page > 1 else "disabled")
-        self.next_btn.configure(state="normal" if self.page < pages else "disabled")
-        self.count.configure(text=("찾은 글 %d개" if q else "글 %d개") % (d.get("total") or 0))
-        try:
-            self.cv.yview_moveto(0.0)
-        except tk.TclError:
-            pass
+        self._paint_list(pinned, posts, empty, "%d / %d" % (d.get("page") or 1, pages),
+                         self.page > 1, self.page < pages,
+                         ("찾은 글 %d개" if q else "글 %d개") % (d.get("total") or 0))
         self.say("")
         # 공지를 봤다 - 탭과 트레이의 '새 공지' 표시를 끈다
         seen = [p["id"] for p in pinned] + [p["id"] for p in posts
@@ -391,6 +388,26 @@ class BoardWindow(object):
                 mark(max(patches))
             except Exception:                               # noqa: BLE001
                 pass
+
+    def _paint_list(self, pinned, posts, empty, page_text, can_prev, can_next, count):
+        """목록 (테마마다 그리는 곳). empty = 비었을 때의 말 (글이 있으면 None)."""
+        for w in self.list.winfo_children():
+            w.destroy()
+        for p in pinned:
+            self._row(p, pinned=True)
+        for p in posts:
+            self._row(p)
+        if empty:
+            tk.Label(self.list, text=empty,
+                     bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S).pack(pady=40)
+        self.page_lbl.configure(text=page_text)
+        self.prev_btn.configure(state="normal" if can_prev else "disabled")
+        self.next_btn.configure(state="normal" if can_next else "disabled")
+        self.count.configure(text=count)
+        try:
+            self.cv.yview_moveto(0.0)
+        except tk.TclError:
+            pass
 
     def _row(self, p, pinned=False):
         bg = PIN_BG if pinned else ROW_BG
@@ -434,8 +451,7 @@ class BoardWindow(object):
         gen = self._clear("post")
         self.reply_to = None
         self.write_btn.configure(state="normal")
-        tk.Label(self.body, text="불러오는 중...", bg=U.BG, fg=U.FG_FAINT,
-                 font=U.FONT_S).pack(pady=30)
+        self._post_loading()
         api = self.app.api
 
         def done(r, err):
@@ -446,6 +462,10 @@ class BoardWindow(object):
                 return self.show_list()
             self._show_post(r, bottom)
         run_async(self.root, lambda: api.board_post(pid), done)
+
+    def _post_loading(self):
+        tk.Label(self.body, text="불러오는 중...", bg=U.BG, fg=U.FG_FAINT,
+                 font=U.FONT_S).pack(pady=30)
 
     def _show_post(self, p, bottom=False, keep=None):
         """글과 댓글을 그린다. keep 은 입력칸에 남길 글 (실패했을 때)."""
@@ -752,6 +772,32 @@ class BoardWindow(object):
         self.edit_id = post["id"] if post else None
         self.write_btn.configure(state="disabled")
         self.count.configure(text="")
+        self.kind_var = self._write_kind(post)
+        self._paint_write(post)
+        self._count_post()
+        self.say("")
+        try:
+            (self.text if post else self.title_entry.winfo_children()[0]).focus_set()
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    def _write_kind(self, post):
+        """쓰는 글의 처음 종류. 고칠 때는 그 글의 종류 그대로다."""
+        if post:
+            return post.get("kind") or "free"
+        if self.kind == "notice" and self.can_notice:
+            return "notice"
+        if self.kind == "qna":
+            return "qna"                    # Q&A 를 보다가 쓰면 Q&A 로
+        return "free"
+
+    def _write_kinds(self):
+        """새 글의 종류 칸: ([(열쇠, 이름)], 옆에 붙는 말). 공지는 운영자에게만."""
+        kinds = WRITE_KINDS + ([("notice", "공지")] if self.can_notice else [])
+        return kinds, ("공지는 운영자만 쓸 수 있습니다." if self.can_notice else "질문은 Q&A 에 올려 주세요.")
+
+    def _paint_write(self, post):
+        """쓰기 화면 (테마마다 그리는 곳)."""
         back = (lambda: self.open_post(post["id"])) if post else self.show_list
         bar = tk.Frame(self.body, bg=U.BG)
         bar.pack(fill="x", padx=16, pady=(12, 4))
@@ -770,24 +816,16 @@ class BoardWindow(object):
 
         form = tk.Frame(self.body, bg=U.BG)
         form.pack(fill="both", expand=True, padx=16)
-        self.kind_var = "free"
-        if post:
-            self.kind_var = post.get("kind") or "free"
-        elif self.kind == "notice" and self.can_notice:
-            self.kind_var = "notice"
-        elif self.kind == "qna":
-            self.kind_var = "qna"           # Q&A 를 보다가 쓰면 Q&A 로
         if not post:
             # 종류는 쓸 때만 고른다 (고칠 때는 못 바꾼다).
-            kinds = WRITE_KINDS + ([("notice", "공지")] if self.can_notice else [])
+            kinds, note = self._write_kinds()
             row = tk.Frame(form, bg=U.BG)
             row.pack(fill="x", pady=(8, 0))
             tk.Label(row, text="종류", bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,
                      width=5, anchor="w").pack(side="left")
             self.kind_seg = U.Segmented(row, kinds, self.kind_var, self._pick_post_kind)
             self.kind_seg.pack(side="left")
-            tk.Label(row, text=("공지는 운영자만 쓸 수 있습니다." if self.can_notice
-                                else "질문은 Q&A 에 올려 주세요."),
+            tk.Label(row, text=note,
                      bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left", padx=(10, 0))
         row = tk.Frame(form, bg=U.BG)
         row.pack(fill="x", pady=(10, 0))
@@ -816,12 +854,6 @@ class BoardWindow(object):
         if post:
             self.text.insert("1.0", post.get("body") or "")
         self.text.bind("<KeyRelease>", lambda _e: self._count_post())
-        self._count_post()
-        self.say("")
-        try:
-            (self.text if post else self.title_entry.winfo_children()[0]).focus_set()
-        except Exception:                                   # noqa: BLE001
-            pass
 
     def _pick_post_kind(self, kind):
         self.kind_var = kind

@@ -26,7 +26,7 @@ from PIL import ImageTk
 from common import tint as T
 from common.korean import natural
 
-from . import sprite_cache, sprite_tint, sprites
+from . import skins, sprite_cache, sprite_tint, sprites
 from . import ui_common as U
 
 THUMB = 56                  # 미리보기 도트가 들어갈 칸 (px, U.h 로 늘린다)
@@ -65,6 +65,10 @@ def previews(api, num, box):
     return out
 
 
+NOTE = "고른 색은 내 화면뿐 아니라 친구와 대전 상대의 화면에도 그대로 보입니다."
+
+
+@skins.skinnable
 class TintPicker(object):
 
     def __init__(self, app, mon, parent=None, on_done=None):
@@ -75,6 +79,7 @@ class TintPicker(object):
         self.alive = True
         self.cells = {}             # tint 값 -> 칸(Frame)
         self.photos = {}
+        self.imgs = {}              # tint 값 -> RGBA 그림 (테마가 키워 쓸 수 있게)
         self.current = T.clean(mon.get("tint")) if mon.get("shiny") else None
         self.picked = self.current
         info = mon.get("info") or {}
@@ -83,8 +88,6 @@ class TintPicker(object):
         # 창 폭은 칸 여덟 개에 맞춘다. 높이는 다 담은 뒤에 잰다 - 글꼴 배율마다
         # 줄 높이가 달라서 숫자로 박아 두면 어느 한쪽에서 단추가 눌린다.
         box = U.h(THUMB)
-        cell_w = box + 12 + 4                   # 안쪽 여백 12 + 테두리 2x2
-        width = 8 * cell_w + 7 * GAP + PAD * 2 + 8
 
         self.win = tk.Toplevel(parent or self.root)
         self.win.withdraw()
@@ -93,20 +96,31 @@ class TintPicker(object):
         self.win.configure(bg=U.BG, highlightthickness=2, highlightbackground=U.LINE2)
         self.win.protocol("WM_DELETE_WINDOW", self.close)
 
-        bar = tk.Frame(self.win, bg=U.BG2, height=U.h(34))
-        bar.pack(fill="x")
-        bar.pack_propagate(False)
-        tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(13)).pack(side="left", padx=(12, 8))
-        tk.Label(bar, text="색 고르기", bg=U.BG2, fg=U.FG, font=U.FONT_B).pack(side="left")
-        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+        U.dialog_bar(self.win, "색 고르기")
+        width = self._build(box)
+        self._paint()
 
+        # 다 담았다. 필요한 높이를 재서 그만큼만 잡는다.
+        self.win.update_idletasks()
+        U.style_window(self.win, "포스크탑 — 색 고르기", width,
+                       self.win.winfo_reqheight() + 4)
+        self.win.deiconify()
+
+        api, num = app.api, mon.get("num")
+        U.run_async(self.root, lambda: previews(api, num, box), self._loaded)
+
+    # ---------------- 짓는 고리 (화면 테마가 덮는다) ----------------
+    def _build(self, box):
+        """창 안을 짓는다. 만들어 둬야 할 것: head · note · ok_btn · status · cells{값: (칸, 그림)}. 창 폭을 돌려준다."""
+        cell_w = box + 12 + 4                   # 안쪽 여백 12 + 테두리 2x2
+        width = 8 * cell_w + 7 * GAP + PAD * 2 + 8
         f = tk.Frame(self.win, bg=U.BG)
         f.pack(fill="both", expand=True, padx=PAD, pady=(14, 14))
         self.head = tk.Label(f, text=natural("★ %s 의 색을 고릅니다" % self.name),
                              bg=U.BG, fg=U.SHINY, font=U.FONT_B, justify="left", anchor="w")
         self.head.pack(fill="x")
         self.note = tk.Label(
-            f, text="고른 색은 내 화면뿐 아니라 친구와 대전 상대의 화면에도 그대로 보입니다.",
+            f, text=NOTE,
             bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, justify="left", anchor="w",
             wraplength=width - PAD * 2 - 8)
         self.note.pack(fill="x", pady=(4, 0))
@@ -144,24 +158,33 @@ class TintPicker(object):
             # 첫 칸이 무엇인지만 글로 알려 준다 (나머지는 그 색조를 돌린 것)
             tk.Label(self.grid, text="맨 앞이 %s, 나머지는 그 색조를 돌린 것" % name,
                      bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w").pack(fill="x", pady=(3, 0))
-        self._paint()
+        return width
 
-        # 다 담았다. 필요한 높이를 재서 그만큼만 잡는다.
-        self.win.update_idletasks()
-        U.style_window(self.win, "포스크탑 — 색 고르기", width,
-                       self.win.winfo_reqheight() + 4)
-        self.win.deiconify()
+    def _set_art(self, v, ph):
+        """그 칸에 미리보기 그림을 건다 (창이 이미 닫혔으면 TclError)."""
+        self.cells[v][1].configure(image=ph)
 
-        api, num = app.api, mon.get("num")
-        U.run_async(self.root, lambda: previews(api, num, box), self._loaded)
+    def _paint_cell(self, v, on, current):
+        """칸 하나의 고른 표시 (on = 지금 골라 둔 것, current = 서버에 적힌 지금 색)."""
+        self.cells[v][0].configure(highlightbackground=U.ACCENT if on else
+                                   (U.LINE2 if current else U.BG2))
+
+    def _set_ready(self, ready):
+        """'이 색으로' 를 누를 수 있는가."""
+        self.ok_btn.configure(state="normal" if ready else "disabled")
+
+    def _say(self, text, bad=False):
+        """창 아래의 상태 글 (bad 면 잘못된 일)."""
+        self.status.configure(text=text, fg=U.DANGER if bad else U.FG_FAINT)
 
     # ---------------- 그리기 ----------------
     def _loaded(self, imgs, err):
         if not self.alive:
             return
         if err or not imgs:
-            self.status.configure(text="도트를 받지 못했습니다.", fg=U.DANGER)
+            self._say("도트를 받지 못했습니다.", True)
             return
+        self.imgs = imgs
         for v, im in imgs.items():
             got = self.cells.get(v)
             if got is None:
@@ -169,29 +192,25 @@ class TintPicker(object):
             ph = ImageTk.PhotoImage(im)
             self.photos[v] = ph
             try:
-                got[1].configure(image=ph)
+                self._set_art(v, ph)
             except tk.TclError:
                 return
-        self.status.configure(text="")
+        self._say("")
         self._paint()
 
     def _paint(self):
-        for v, (cell, _art) in self.cells.items():
-            on = (v == self.picked)
+        for v in self.cells:
             try:
-                cell.configure(highlightbackground=U.ACCENT if on else
-                               (U.LINE2 if v == self.current else U.BG2))
+                self._paint_cell(v, v == self.picked, v == self.current)
             except tk.TclError:
                 return
-        ready = bool(self.photos)
-        self.ok_btn.configure(
-            state="normal" if ready and self.picked != self.current else "disabled")
+        self._set_ready(bool(self.photos) and self.picked != self.current)
 
     def pick(self, v):
         if v not in self.cells or v not in self.photos:
             return
         self.picked = v
-        self.status.configure(text="", fg=U.FG_FAINT)
+        self._say("")
         self._paint()
 
     # ---------------- 보내기 ----------------
@@ -199,8 +218,8 @@ class TintPicker(object):
         if self.picked == self.current:
             return
         v = self.picked
-        self.ok_btn.configure(state="disabled")
-        self.status.configure(text="바꾸는 중...", fg=U.FG_FAINT)
+        self._set_ready(False)
+        self._say("바꾸는 중...")
         pid = self.mon["id"]
         U.run_async(self.root, lambda: self.app.api.set_tint(pid, v),
                     lambda r, err: self._applied(v, r, err))
@@ -209,7 +228,7 @@ class TintPicker(object):
         if not self.alive:
             return
         if err:
-            self.status.configure(text=natural(getattr(err, "message", str(err))), fg=U.DANGER)
+            self._say(natural(getattr(err, "message", str(err))), True)
             self._paint()
             return
         self.current = v

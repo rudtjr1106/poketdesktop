@@ -316,6 +316,19 @@ def pil_font_files(bold=False):
     return ("malgunbd.ttf", "malgun.ttf") if bold else ("malgun.ttf",)
 
 
+def register_font(path):
+    """AddFontResourceEx(FR_PRIVATE) - 이 프로세스만 보는 글꼴로 등록한다 (설치하지 않는다)."""
+    from ctypes import wintypes
+    FR_PRIVATE = 0x10
+    try:
+        gdi = ctypes.windll.gdi32
+        gdi.AddFontResourceExW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.LPVOID]
+        gdi.AddFontResourceExW.restype = ctypes.c_int
+        return gdi.AddFontResourceExW(path, FR_PRIVATE, None) > 0
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 def already_running_hint():
     """이미 돌고 있다고 알릴 때, 어디를 보라고 할 것인가."""
     return ("작업표시줄 오른쪽 끝의 '숨겨진 아이콘 표시'(^) 를 눌러\n"

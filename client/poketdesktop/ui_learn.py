@@ -38,6 +38,7 @@ from common import movetext as MT
 from common.korean import natural
 
 from . import platform_os as PLAT
+from . import skins
 from . import ui_common as U
 
 W = 460
@@ -52,6 +53,7 @@ MIN_H = U.h(300)
 SCREEN_PAD = U.h(40)
 
 
+@skins.skinnable
 class ForgetAsk(object):
     """지금 아는 기술 넷 + 새 기술을 늘어놓고 하나를 고르게 한다.
 
@@ -79,14 +81,7 @@ class ForgetAsk(object):
         # (내 맥은 받아 줘서 안 드러났다).
         self.parent = parent
 
-        bar = tk.Frame(self.win, bg=U.BG2, height=U.h(34))
-        bar.pack(fill="x")
-        bar.pack_propagate(False)
-        tk.Frame(bar, bg=U.ACCENT, width=3, height=U.h(13)).pack(side="left",
-                                                            padx=(12, 8))
-        tk.Label(bar, text="기술 배우기", bg=U.BG2, fg=U.FG,
-                 font=U.FONT_B).pack(side="left")
-        tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+        U.dialog_bar(self.win, "기술 배우기")
 
         f = tk.Frame(self.win, bg=U.BG)
         f.pack(fill="both", expand=True, padx=18, pady=(14, 14))
@@ -155,6 +150,10 @@ class ForgetAsk(object):
         return str(t)
 
     def _row(self, parent, mv, is_new):
+        return self._plate(parent, mv, self._kr(mv), "새 기술" if is_new else "", U.ACCENT)
+
+    def _plate(self, parent, mv, title, tag_text, tag_color):
+        """기술 한 줄: 이름 · 분류 · 꼬리표 / 타입 · 위력 ... / 설명. 누르면 고른다 (테마가 모양을 바꾼다)."""
         md = self._md(mv)
         f = tk.Frame(parent, bg=U.BG2, highlightthickness=1,
                      highlightbackground=U.LINE)
@@ -164,15 +163,15 @@ class ForgetAsk(object):
 
         head = tk.Frame(inner, bg=U.BG2)
         head.pack(fill="x")
-        name = tk.Label(head, text=self._kr(mv), bg=U.BG2, fg=U.FG,
+        name = tk.Label(head, text=title, bg=U.BG2, fg=U.FG,
                         font=U.FONT_B, anchor="w")
         name.pack(side="left")
         # 분류는 색을 따로 준다. 다섯 줄을 훑을 때 글자만으로는 안 띈다.
         cat = tk.Label(head, text=MT.cat_name(md), bg=U.BG2,
                        fg=MT.cat_color(md), font=U.FONT_XS, anchor="w")
         cat.pack(side="left", padx=(8, 0))
-        tag = tk.Label(head, text="새 기술" if is_new else "",
-                       bg=U.BG2, fg=U.ACCENT, font=U.FONT_XS, anchor="e")
+        tag = tk.Label(head, text=tag_text,
+                       bg=U.BG2, fg=tag_color, font=U.FONT_XS, anchor="e")
         tag.pack(side="right")
 
         bits = [self._type_kr(md)] + MT.stat_bits(md, with_cat=False)
@@ -193,6 +192,10 @@ class ForgetAsk(object):
 
     def _pick(self, mv):
         self.picked = mv
+        self._paint_pick(mv)
+
+    def _paint_pick(self, mv):
+        """고른 줄을 밝힌다 (테마가 바꾼다)."""
         for m, (f, parts, name, cat, md) in self.rows.items():
             on = (m == mv)
             bg = U.ACCENT_SOFT if on else U.BG2

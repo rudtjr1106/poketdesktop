@@ -17,6 +17,7 @@ from tkinter import ttk
 
 from common.korean import natural
 
+from . import skins
 from . import ui_common as U
 from .ui_common import run_async
 
@@ -35,6 +36,39 @@ def reward_text(a):
     return ""
 
 
+def announce_lines(items):
+    """알림 창에 적을 것: (머리말, 줄들, 그 밖 N개, 아래 안내). 테마마다 그리는 것만 다르다."""
+    n = len(items)
+    head = ("지금까지의 기록으로 업적 %d개를 달성했습니다" % n if n >= BULK
+            else "업적 달성!")
+    bits = []
+    if any(a.get("title") for a in items):
+        bits.append("칭호는 마이페이지에서 달 수 있습니다.")
+    if any(a.get("balls") for a in items):
+        bits.append("몬스터볼은 가방에 넣어 두었습니다.")
+    bits.append("모든 업적은 도감 탭의 '업적' 에서 봅니다.")
+    return head, items[:MAX_LINES], max(0, n - MAX_LINES), " ".join(bits)
+
+
+def unlock_text(d):
+    """업적 칸 오른쪽 위 글: 열린 해금."""
+    ul = d.get("unlocks") or {}
+    opened = [name for key, name in (("unlock_7", "울트라홀"),
+                                      ("unlock_9", "패러독스")) if ul.get(key)]
+    return (("열림: " + " · ".join(opened)) if opened
+            else "해금 업적을 달성하면 새 포켓몬이 나타납니다")
+
+
+def group_rows(items):
+    """갈래 차례대로 [(갈래, [줄들])]."""
+    groups = []
+    for a in items:
+        if a["group"] not in groups:
+            groups.append(a["group"])
+    return [(g, [a for a in items if a["group"] == g]) for g in groups]
+
+
+@skins.skinnable_fn("achievements")
 def announce(parent, app, items):
     """업적 달성 창. 여럿이면 한 창에 모은다."""
     if not items:
@@ -44,8 +78,7 @@ def announce(parent, app, items):
     height = U.h(230) + min(n, MAX_LINES) * U.h(40)
     win, f = ui_box._shell(parent, "업적", 440, height)
 
-    head = ("지금까지의 기록으로 업적 %d개를 달성했습니다" % n if n >= BULK
-            else "업적 달성!")
+    head, shown, more, note = announce_lines(items)
     tk.Label(f, text=head, bg=U.BG, fg=U.ACCENT_TEXT, wraplength=390,
              justify="left", font=(U.FAMILY_BLACK, U.pt(17))).pack(anchor="w")
 
@@ -53,7 +86,7 @@ def announce(parent, app, items):
     box.pack(fill="x", pady=(12, 0))
     inner = tk.Frame(box, bg=PANEL)
     inner.pack(fill="x", padx=14, pady=10)
-    for a in items[:MAX_LINES]:
+    for a in shown:
         row = tk.Frame(inner, bg=PANEL)
         row.pack(fill="x", pady=2)
         tk.Label(row, text="★", bg=PANEL, fg=U.ACCENT, font=U.FONT_B).pack(side="left")
@@ -63,17 +96,11 @@ def announce(parent, app, items):
         if rw:
             tk.Label(row, text=rw, bg=PANEL, fg=U.FG_DIM,
                      font=U.FONT_XS).pack(side="right")
-    if n > MAX_LINES:
-        tk.Label(inner, text="그 밖 %d개" % (n - MAX_LINES), bg=PANEL,
+    if more:
+        tk.Label(inner, text="그 밖 %d개" % more, bg=PANEL,
                  fg=U.FG_FAINT, font=U.FONT_XS).pack(anchor="w", pady=(4, 0))
 
-    bits = []
-    if any(a.get("title") for a in items):
-        bits.append("칭호는 마이페이지에서 달 수 있습니다.")
-    if any(a.get("balls") for a in items):
-        bits.append("몬스터볼은 가방에 넣어 두었습니다.")
-    bits.append("모든 업적은 도감 탭의 '업적' 에서 봅니다.")
-    tk.Label(f, text=" ".join(bits), bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,
+    tk.Label(f, text=note, bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,
              wraplength=390, justify="left").pack(anchor="w", pady=(10, 0))
 
     row = tk.Frame(f, bg=U.BG)
@@ -93,8 +120,13 @@ def announce(parent, app, items):
     parent.wait_window(win)
 
 
+@skins.skinnable
 class AchievementPanel(object):
-    """도감 탭 안의 업적 칸. 격자 자리에 들어간다."""
+    """도감 탭 안의 업적 칸. 격자 자리에 들어간다.
+
+    받기 · 갈래 묶기 · 수 세기는 여기 그대로 두고, 화면 테마는 **짓는 고리(_build)와 칠하는 고리**
+    (_set_summary · _set_unlock · _paint_groups) 만 덮어쓴다. 칭호 목록(TitlePanel)도 같은 고리를 쓴다.
+    """
 
     def __init__(self, parent, app, on_count=None):
         self.app = app
@@ -103,6 +135,11 @@ class AchievementPanel(object):
         self.alive = True
         self.data = None
         self.f = tk.Frame(parent, bg=U.BG)
+        self._build()
+
+    # ---------------- 짓기 · 칠하는 고리 (테마가 덮는 곳) ----------------
+    def _build(self):
+        """칸 안의 것들. 테마는 self.f 안에 제 모양을 짓는다."""
         top = tk.Frame(self.f, bg=U.BG)
         top.pack(fill="x", padx=14, pady=(10, 4))
         self.summary = tk.Label(top, text="불러오는 중...", bg=U.BG, fg=U.FG,
@@ -123,53 +160,57 @@ class AchievementPanel(object):
         self.fit = U.scroll_fitter(self.cv, self.body, wid)
         U.scrollable(self.cv, 60)
 
+    def _set_summary(self, text, fg):
+        """머리줄 왼쪽 글 ('달성 3 / 40' · 오류 글)."""
+        self.summary.configure(text=text, fg=fg)
+
+    def _set_unlock(self, text):
+        self.unlock.configure(text=text)
+
+    def _paint_groups(self, groups, row_fn):
+        """갈래마다 머리 + 줄들. groups = [(갈래, [줄 자료], 이룬 수)]."""
+        for w in self.body.winfo_children():
+            w.destroy()
+        for g, rows, n_done in groups:
+            head = tk.Frame(self.body, bg=U.BG)
+            head.pack(fill="x", pady=(10, 4))
+            U.marker_label(head, "%s  %d/%d" % (g, n_done, len(rows)),
+                           bg=U.BG).pack(side="left")
+            for a in rows:
+                row_fn(a)
+        self.fit.schedule()
+
     def pack(self, **kw):
         self.f.pack(**kw)
 
     def pack_forget(self):
         self.f.pack_forget()
 
+    def _fetch(self):
+        """서버에서 받는 것 (작업 스레드에서 부른다)."""
+        return self.app.api.achievements()
+
     def reload(self):
         def done(r, err):
             if not self.alive:
                 return
             if err:
-                self.summary.configure(text=getattr(err, "message", str(err)),
-                                       fg=U.DANGER)
+                self._set_summary(getattr(err, "message", str(err)), U.DANGER)
                 return
             self.data = r or {}
             self.draw()
-        run_async(self.root, lambda: self.app.api.achievements(), done)
+        run_async(self.root, self._fetch, done)
 
     def draw(self):
-        for w in self.body.winfo_children():
-            w.destroy()
         d = self.data or {}
         items = d.get("achievements") or []
         done, total = d.get("done", 0), d.get("total", len(items))
-        self.summary.configure(text="달성 %d / %d" % (done, total), fg=U.FG)
+        self._set_summary("달성 %d / %d" % (done, total), U.FG)
         if self.on_count:
             self.on_count(done, total)
-        ul = d.get("unlocks") or {}
-        opened = [name for key, name in (("unlock_7", "울트라홀"),
-                                          ("unlock_9", "패러독스")) if ul.get(key)]
-        self.unlock.configure(
-            text=("열림: " + " · ".join(opened)) if opened
-            else "해금 업적을 달성하면 새 포켓몬이 나타납니다")
-        groups = []
-        for a in items:
-            if a["group"] not in groups:
-                groups.append(a["group"])
-        for g in groups:
-            rows = [a for a in items if a["group"] == g]
-            n_done = sum(1 for a in rows if a.get("gotAt"))
-            head = tk.Frame(self.body, bg=U.BG)
-            head.pack(fill="x", pady=(10, 4))
-            U.marker_label(head, "%s  %d/%d" % (g, n_done, len(rows)),
-                           bg=U.BG).pack(side="left")
-            for a in rows:
-                self._row(a)
-        self.fit.schedule()
+        self._set_unlock(unlock_text(d))
+        self._paint_groups([(g, rows, sum(1 for a in rows if a.get("gotAt")))
+                            for g, rows in group_rows(items)], self._row)
 
     def _row(self, a):
         got = bool(a.get("gotAt"))
@@ -222,6 +263,7 @@ class AchievementPanel(object):
 
 
 # ---------------------------------------------------------------- 칭호 목록 (1.8.1)
+@skins.skinnable
 class TitlePanel(AchievementPanel):
     """도감 탭 안의 칭호 목록 — 칭호마다 **어떻게 얻는지**를 적는다.
 
@@ -230,39 +272,16 @@ class TitlePanel(AchievementPanel):
     틀(굴리는 칸·진행 막대)은 업적 칸과 같다.
     """
 
-    def reload(self):
-        def done(r, err):
-            if not self.alive:
-                return
-            if err:
-                self.summary.configure(text=getattr(err, "message", str(err)),
-                                       fg=U.DANGER)
-                return
-            self.data = r or {}
-            self.draw()
-        run_async(self.root, lambda: self.app.api.titles(), done)
+    def _fetch(self):
+        return self.app.api.titles()
 
     def draw(self):
-        for w in self.body.winfo_children():
-            w.destroy()
         d = self.data or {}
         items = d.get("titles") or []
-        self.summary.configure(text="가진 칭호 %d / %d" % (d.get("owned", 0),
-                                                       d.get("total", len(items))), fg=U.FG)
-        self.unlock.configure(text="칭호는 마이페이지의 '칭호·명패 바꾸기' 에서 답니다")
-        groups = []
-        for c in items:
-            if c["group"] not in groups:
-                groups.append(c["group"])
-        for g in groups:
-            rows = [c for c in items if c["group"] == g]
-            head = tk.Frame(self.body, bg=U.BG)
-            head.pack(fill="x", pady=(10, 4))
-            U.marker_label(head, "%s  %d/%d" % (g, sum(1 for c in rows if c.get("owned")),
-                                                len(rows)), bg=U.BG).pack(side="left")
-            for c in rows:
-                self._row(c)
-        self.fit.schedule()
+        self._set_summary("가진 칭호 %d / %d" % (d.get("owned", 0), d.get("total", len(items))), U.FG)
+        self._set_unlock("칭호는 마이페이지의 '칭호·명패 바꾸기' 에서 답니다")
+        self._paint_groups([(g, rows, sum(1 for c in rows if c.get("owned")))
+                            for g, rows in group_rows(items)], self._row)
 
     def _row(self, c):
         got = bool(c.get("owned"))
