@@ -673,6 +673,22 @@ def main():
     last = fr.duel
     fr.close()
     chk("앱이 치우면 구경도 끝난다", fr.duel is None and fr.card is None and not last.alive)
+
+    print("\n=== 자리를 잡기 전에 없앤 도트 창 ===")
+    import _tkinter
+    from PIL import Image
+    settle(root, 0.1)
+    for moved in (False, True):
+        sp = F.Sprite(root, (254, 1, 254), (40, 48))      # 화면 밖(-4000)에서 태어난다
+        sp.show(sp.load([Image.new("RGBA", (40, 48), (240, 200, 60, 255))])[0])
+        if moved:
+            sp.move(400, 400)                             # (옮기라고만 하고 아직 안 옮겨졌다)
+        sp.destroy()                                      # 사건을 한 번도 처리하지 않은 채 없앤다
+        n, t0 = 0, time.time()
+        while n < 3000 and root.tk.dooneevent(_tkinter.DONT_WAIT) and time.time() - t0 < 3:
+            n += 1
+        chk("%s 없애도 Tk 가 다시 그리기를 끝없이 되풀이하지 않는다 (맥 Tk 8.6.17 - 예전에는 여기서 멈췄다)"
+            % ("옮기라고 한 직후에" if moved else "한 번도 옮기기 전에"), n < 3000, n)
     root.destroy()
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0

@@ -144,11 +144,20 @@ class _FxStage(object):
 
     def __init__(self, win, k):
         self.win = win
+        self.k = k
         self.cv = _ScaledCanvas(win.cv, k)
         self.root = win.root
+        self.hiding = getattr(win, "hiding", None)      # 숨는 기술 (battle_fx.Hiding, 2.0)
 
     def lunge(self, who, done):
         self.win.lunge(who, done)
+
+    def fx_shift(self, key, dx, dy):
+        self.win.fx_shift(key, dx * self.k, dy * self.k)
+
+    def fx_box(self, key):
+        bb = self.win.fx_box(key)
+        return tuple(v / self.k for v in bb) if bb else None
 
 
 def hp_color(frac):
@@ -187,6 +196,7 @@ class GymBattleWindow(Z.Resizable):
 
         self.fx = None
         self.effects = []            # 돌고 있는 연출 전부 (닫을 때 모두 멈춘다)
+        self.hiding = FX.Hiding(self._sprite_show)     # 공중날기·구멍파기 ... 로 숨은 쪽 (2.0)
         self._moves_by_name = None
         self.sendout = SO.SendOut(self)   # 몬스터볼에서 나오고 들어가는 연출 (1.10.4 - 실시간 배틀과 같은 것)
         t = self.view["trainer"]
@@ -414,6 +424,7 @@ class GymBattleWindow(Z.Resizable):
         if not entry:
             self.sendout.cancel(who)
         self.cv.itemconfigure(self.sprite[who], image="")
+        self.hiding.apply(who)                          # 숨어 있으면 다시 그려도 숨긴 채로 (2.0)
         if not mon or mon.get("fainted"):
             self.sendout.forget(who)
             return
@@ -590,6 +601,22 @@ class GymBattleWindow(Z.Resizable):
         self._lunge(who)
         self.later(190, done)
 
+    # 숨는 기술 (2.0, battle_fx.Hiding · vanish_fx)
+    def _sprite_show(self, who, on):
+        self.cv.itemconfigure(self.sprite[who], state="normal" if on else "hidden")
+
+    def fx_shift(self, who, dx, dy):
+        self.cv.move(self.sprite[who], dx, dy)
+
+    def fx_box(self, who):
+        """도트의 테두리. 숨겨 둔 도트는 bbox 가 비므로 그림 크기로 잰다 (도트는 아래 가운데에 붙어 있다)."""
+        a = self.anims.get(who)
+        xy = self.cv.coords(self.sprite[who])
+        if not a or len(xy) < 2:
+            return None
+        w, h = a[0][0].width(), a[0][0].height()
+        return (xy[0] - w / 2.0, xy[1] - h, xy[0] + w / 2.0, xy[1])
+
     def _shake(self, who, n=6):
         item = self.sprite[who]
         offs = [6, -6, 5, -5, 3, -3, 0][:n] + [0]
@@ -725,6 +752,8 @@ class GymBattleWindow(Z.Resizable):
         if t == "switch":
             self.say(text)
             mon = ev.get("mon")
+            if who in ("me", "foe"):
+                self.hiding.forget(who)
             if who in ("me", "foe") and mon and not mon.get("fainted"):
                 # **몬스터볼에서 나온다** (1.10.4): 볼이 날아와 열리고, 흰 빛이 커져 포켓몬이 된다
                 self.sendout.throw(who)
@@ -735,6 +764,7 @@ class GymBattleWindow(Z.Resizable):
         if t == "recall":
             self.say(text)
             if who in ("me", "foe"):
+                self.hiding.forget(who)
                 self._stop_anim(who)
                 self.sendout.recall(who)             # 흰 빛으로 줄어들어 붉은 줄기로 돌아간다
                 return RECALL_MS
@@ -799,6 +829,7 @@ class GymBattleWindow(Z.Resizable):
             return STEP_MS
         if t == "faint":
             if who in ("me", "foe"):
+                self.hiding.forget(who)          # 숨은 채 쓰러졌으면 나타나서 쓰러진다
                 self._faint(who)
                 mon = self.shown.get(who)
                 if mon is not None:
@@ -808,6 +839,7 @@ class GymBattleWindow(Z.Resizable):
             self.say(text)
             return STEP_MS + 150
         if t == "over":
+            self.hiding.forget_all()             # 숨은 채 끝났다 - 보이게 (2.0)
             self.say(text)
             return STEP_MS
         if text:
@@ -1110,6 +1142,7 @@ class GymBattleWindow(Z.Resizable):
 
     # ---------------- 끝 ----------------
     def show_result(self):
+        self.hiding.forget_all()             # 숨은 채 끝났으면 결과 화면에서는 보이게 (2.0)
         # **결과가 뜨는 순간 진화 연출을 시작한다.** 전에는 창을 닫아야
         # 시작해서, 결과를 보는 동안에는 아무 일도 없어 진화 연출이 안 뜨는
         # 것처럼 보였다. 기술 배우기 창은 앱이 이 창이 닫힐 때까지 기다린다.

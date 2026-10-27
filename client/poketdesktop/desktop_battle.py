@@ -100,6 +100,7 @@ class DesktopBattle(object):
         self.fx = None
         self.texts = []
         self.layer = None
+        self.hiding = FX.Hiding(self._pet_show)     # 공중날기·구멍파기 ... 로 숨은 쪽 (2.0)
         self.mine = None        # 내 도트 (Pet)
         self.foe = None         # 야생 도트 (WildPet)
         self.bars = None        # 체력바 (내 것, 상대 것)
@@ -381,6 +382,8 @@ class DesktopBattle(object):
                                 .replace(" 상태가 되었다!", ""), "#ff9d55")
         if t == "faint":
             side = self.mine if who == "me" else self.foe
+            if getattr(self, "hiding", None):
+                self.hiding.forget(who)      # 숨은 채 쓰러졌으면 나타나서 쓰러진다
             if side:
                 return self.faint(side, done)
         if t == "immune":
@@ -723,6 +726,8 @@ class DesktopBattle(object):
         b = r.get("battle")
         if b:
             self.b = b
+        if getattr(self, "hiding", None) and self.hiding.hidden("foe"):
+            self.hiding.apply("foe")         # 놓친 볼이 도로 띄웠다(show_wild_sprite) - 아직 하늘·땅속이다
         self.app.notify(r.get("message") or "놓쳤다!")
         self.play(r.get("events") or [], r or {})
 
@@ -785,6 +790,40 @@ class DesktopBattle(object):
             pet.place()
             self.after(22, lambda: go(i + 1))
         go(1)
+
+    # 숨는 기술 (2.0, battle_fx.Hiding · vanish_fx). 도트가 저마다 창이라 창을 숨기고 옮긴다 -
+    # 숨은 동안 맞아서 흔들려도(번개 · 지진) 창이 숨어 있으니 안 보인다.
+    def _pet(self, who):
+        return self.mine if who == "me" else self.foe if who == "foe" else None
+
+    def _pet_show(self, who, on):
+        pet = self._pet(who)
+        if pet is None:
+            return
+        # 야생 표식(이름 Lv)도 같이 - 몸만 숨으면 표식이 빈 자리에 떠 있다 (쓰러질 때와 같다)
+        wins = [pet.win] + [w for w in (getattr(pet, "badge_win", None),) if w]
+        if on:
+            for w in wins:
+                PLAT.show_again(w)
+            if self.layer:
+                self.layer.raise_above()     # 다시 뜬 도트 창 위로 연출 · 체력바가 오게
+        else:
+            for w in wins:
+                w.withdraw()
+
+    def fx_shift(self, who, dx, dy):
+        pet = self._pet(who)
+        if pet is not None:
+            pet.x += dx
+            pet.y += dy
+            pet.place()
+
+    def fx_box(self, who):
+        pet = self._pet(who)
+        if pet is None or not self.layer:
+            return None
+        x0, y0 = self.layer.to_local(pet.x, pet.y)
+        return (x0, y0, x0 + pet.fw, y0 + pet.fh)
 
     def shake(self, pet, done):
         """맞았다. 몸이 흔들리는 동안 맞는 동작을 돌린다.
@@ -870,6 +909,11 @@ class DesktopBattle(object):
             return
         self.closed = True
         self.clear_bars()
+        if self.fx:
+            self.fx.stop()                   # 옮겨 둔 도트를 제자리로 (숨는 기술)
+            self.fx = None
+        if getattr(self, "hiding", None):
+            self.hiding.forget_all()         # 숨은 채 끝났으면 도로 보이게
         evolves = getattr(self, "pending_evolve", None) or []
         if evolves:
             self.root.after(400, lambda: play_evolutions(self.app, evolves))

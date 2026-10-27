@@ -415,7 +415,8 @@ SPECTATE_EVENT = ("t", "who", "target", "text", "move", "moveType", "cat", "hp",
                   "crit", "eff", "slot", "status", "num", "newName", "to", "result",
                   "base", "z",                                # Z기술 (시즌 4)
                   "transform",                                # 변신한 모습 번호 (1.12.1)
-                  "look", "label")                            # 배틀 중 폼의 도트 번호·이름, 원시회귀 (1.13)
+                  "look", "label",                            # 배틀 중 폼의 도트 번호·이름, 원시회귀 (1.13)
+                  "charge", "carry", "stay")                  # 두 턴 기술의 첫 턴 - 숨는·모으는 연출 (2.0)
 _RECALL = re.compile(r"^(?:상대는 )?(.+?)(?:, 돌아와!| 을\(를\) 불러들였다!)$")
 
 

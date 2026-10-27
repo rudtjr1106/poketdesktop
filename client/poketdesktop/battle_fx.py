@@ -355,10 +355,99 @@ def fang_rows(tx, ty, gap=0):
     return upper, lower
 
 
-class Effect(object):
-    """캔버스 위에서 도는 연출 하나. root.after 로 스스로 굴러간다."""
+# ---------------------------------------------------------------- 숨는 기술 (2.0)
+OTHER = {"me": "foe", "foe": "me", "a": "b", "b": "a"}
 
-    def __init__(self, stage, move, src, dst, on_done, who="me", ev=None):
+
+class Hiding(object):
+    """숨는 기술로 지금 모습을 감춘 포켓몬 - 공중날기·뛰어오르다·프리폴·구멍파기·다이빙·고스트다이브·섀도다이브.
+
+    서버가 두 턴 기술의 **첫 턴** 기술 사건에 charge 를 단다: 숨는 자리('fly' 'dig' 'dive' 'vanish'),
+    숨지 않고 모으기만 하면 'power' (솔라빔·로켓박치기 ...). 프리폴은 carry 도 단다 - 상대를 데리고 올라간다.
+    그 턴에는 공격 연출 대신 숨는 연출을 틀고(vanish_fx), 숨은 포켓몬은 **그 쪽이 다음 기술을 쓸 때** 다시
+    나타난다. 둘째 턴에 마비 등으로 못 움직이면 엔진도 숨긴 채로 두므로 화면도 그대로 둔다.
+
+    배틀 화면마다 하나 둔다. 키는 그 화면이 포켓몬을 가리키는 것 그대로다 ("me"/"foe", 구경은 "a"/"b",
+    레이드는 자리). show(key, on) 은 화면이 준다 - 그 도트를 바로 보이거나 감춘다. 바뀔 때만 부른다 -
+    바탕화면 도트는 다시 보일 때 창을 다시 띄우므로(PLAT.show_again) 괜히 부르면 안 된다.
+
+    화면이 할 일: 새 포켓몬이 나오거나(교체·불러들임) 쓰러지면 forget, 도트를 다시 그렸으면(창 크기·폼)
+    apply, 판이 끝나면 forget_all.
+    """
+
+    def __init__(self, show):
+        self.show = show
+        self.kind = {}            # key -> 숨은 자리
+        self.held = {}            # 프리폴: 데려간 쪽 key -> 끌려간 쪽 key
+        self.vis = {}             # key -> 마지막으로 건 보임 (모르면 보이는 것)
+
+    def hidden(self, key):
+        return self.kind.get(key)
+
+    def hide(self, key, kind):
+        self.kind[key] = kind
+        self.set(key, False)
+
+    def come_out(self, key):
+        """다시 나온다 - 기록만 지운다 (보이게 하는 것은 연출이 한다). 데려간 상대도 같이 나온다.
+
+        나오는 쪽들을 [(key, 숨었던 자리)] 로 돌려준다.
+        """
+        out = []
+        kind = self.kind.pop(key, None)
+        if kind:
+            out.append((key, kind))
+        carried = self.held.pop(key, None)
+        if carried is not None and self.kind.get(carried):
+            out.append((carried, self.kind.pop(carried)))
+        return out
+
+    def forget(self, key):
+        """새 포켓몬이 나오거나 쓰러졌다 - 숨김을 풀고 바로 보이게 한다. 그 쪽이 데려간 상대도 놓인다."""
+        keys = [key]
+        if key in self.held:
+            keys.append(self.held.pop(key))
+        for k, v in list(self.held.items()):
+            if v == key:
+                self.held.pop(k)
+        for k in keys:
+            if self.kind.pop(k, None):
+                self.set(k, True)
+
+    def forget_all(self):
+        for k in list(self.kind):
+            self.forget(k)
+        self.held = {}
+
+    def apply(self, key):
+        """도트를 다시 그렸다 (창 크기를 바꿨다·폼이 바뀌었다) - 숨김을 다시 건다."""
+        self.set(key, not self.kind.get(key), force=True)
+
+    def sync(self, key):
+        """숨김 기록대로 보이거나 감춘다 (연출이 끝날 때)."""
+        self.set(key, not self.kind.get(key))
+
+    def set(self, key, on, force=False):
+        if not force and self.vis.get(key, True) == on:
+            return
+        self.vis[key] = on
+        try:
+            self.show(key, on)
+        except Exception:                                   # noqa: BLE001
+            if DEBUG:
+                raise
+
+
+class Effect(object):
+    """캔버스 위에서 도는 연출 하나. root.after 로 스스로 굴러간다.
+
+    숨는 기술 (2.0): 무대(stage)에 hiding(Hiding)이 있으면 숨는·다시 나오는 연출을 튼다 (vanish_fx).
+    도트를 움직이려면 무대에 fx_shift(key, dx, dy) 가, 몸 크기를 알려면 fx_box(key) 가 있어야 한다 -
+    없으면 감추고 보이기만 한다. 이 연출이 옮긴 도트는 끝날 때(멈출 때도) 제자리로 돌려놓는다.
+    keys = (쓰는 쪽, 맞는 쪽) 을 무대가 부르는 이름. 안 주면 who 와 그 맞은편이다.
+    """
+
+    def __init__(self, stage, move, src, dst, on_done, who="me", ev=None, keys=None):
         self.st = stage
         self.who = who
         self.cv = stage.cv
@@ -382,6 +471,51 @@ class Effect(object):
         self.eff = float(hit.get("eff") or 1.0)
         self.zmove = bool(ev.get("z"))
         self.label = ev.get("move") or self.move.get("kr") or ""
+        self.charge = ev.get("charge")              # 두 턴 기술의 첫 턴 (Hiding)
+        self.carry = bool(ev.get("carry"))          # 프리폴 - 상대도 데리고 간다
+        self.stay = bool(ev.get("stay"))            # 숨은 채로 따라 쓴 기술 (춤추기 ...) - 숨은 채 둔다
+        self.keys = tuple(keys) if keys else (who, OTHER.get(who, "foe"))
+        self.hiding = getattr(stage, "hiding", None)
+        self.moved = {}                             # key -> [dx, dy] 이 연출이 옮겨 둔 도트
+        self.touched = set()                        # 이 연출이 보이고 감춘 도트
+
+    # ---- 도트 (숨는 기술) ----
+    def body_move(self, key, dx, dy):
+        fn = getattr(self.st, "fx_shift", None)
+        if fn is None or (not dx and not dy):
+            return
+        try:
+            fn(key, dx, dy)
+        except Exception:                                   # noqa: BLE001
+            if DEBUG:
+                raise
+            return
+        m = self.moved.setdefault(key, [0.0, 0.0])
+        m[0] += dx
+        m[1] += dy
+
+    def body_home(self, key):
+        m = self.moved.pop(key, None)
+        if m:
+            fn = getattr(self.st, "fx_shift", None)
+            try:
+                fn(key, -m[0], -m[1])
+            except Exception:                               # noqa: BLE001
+                if DEBUG:
+                    raise
+
+    def body_show(self, key, on):
+        if self.hiding is not None:
+            self.touched.add(key)
+            self.hiding.set(key, on)
+
+    def body_box(self, key):
+        """그 도트의 테두리 (x0, y0, x1, y1). 모르면 None."""
+        fn = getattr(self.st, "fx_box", None)
+        try:
+            return fn(key) if fn else None
+        except Exception:                                   # noqa: BLE001
+            return None
 
     # ---- 도구 ----
     def after(self, ms, fn):
@@ -412,6 +546,12 @@ class Effect(object):
                 pass
         self.jobs = []
         self.clear()
+        # 숨는 기술: 옮긴 도트를 제자리로, 보임은 숨김 기록대로 (도중에 멈춰도 어긋난 채로 남지 않게)
+        for key in list(self.moved):
+            self.body_home(key)
+        if self.hiding is not None:
+            for key in self.touched:
+                self.hiding.sync(key)
         if self.on_done:
             self.on_done()
 
@@ -421,6 +561,18 @@ class Effect(object):
 
     # ---- 시작 ----
     def play(self):
+        # 숨는 기술 (2.0): 첫 턴이면 공격 대신 숨는·모으는 연출, 숨어 있던 쪽이면 다시 나온 뒤에 공격
+        from . import vanish_fx
+        if vanish_fx.takes(self):
+            try:
+                return vanish_fx.play(self, self._play_move)
+            except Exception:
+                if DEBUG:
+                    raise
+                return self.finish()
+        return self._play_move()
+
+    def _play_move(self):
         # **쏘는 자세(Shoot/Charge)는 안 넣는다.** 동작마다 칸 크기가
         # 달라서 창이 커졌다 작아지는데, 이 연출은 도트 좌표를 잡아 두고
         # 그리는 것이라 그 사이에 그림이 튄다. 기술 이펙트만으로도

@@ -113,6 +113,7 @@ class LiveBattleWindow(Z.Resizable):
         self.shown = {"me": None, "foe": None}
         self.effects = []
         self.fx = None
+        self.hiding = FX.Hiding(self._sprite_show)     # 공중날기·구멍파기 ... 로 숨은 쪽 (2.0)
         self._moves_by_name = None
         self._deadline = 0.0
         self._seen_sent = False
@@ -383,6 +384,7 @@ class LiveBattleWindow(Z.Resizable):
             self.sendout.cancel(who)
         try:
             self.cv.itemconfigure(self.sprite[who], image="")
+            self.hiding.apply(who)                      # 숨어 있으면 다시 그려도 숨긴 채로 (2.0)
         except tk.TclError:
             return
         if not mon or mon.get("fainted"):
@@ -522,6 +524,22 @@ class LiveBattleWindow(Z.Resizable):
     def lunge(self, who, done):
         self._lunge(who)
         self.later(190, done)
+
+    # 숨는 기술 (2.0, battle_fx.Hiding · vanish_fx) - 관장 배틀 창과 같다
+    def _sprite_show(self, who, on):
+        self.cv.itemconfigure(self.sprite[who], state="normal" if on else "hidden")
+
+    def fx_shift(self, who, dx, dy):
+        self.cv.move(self.sprite[who], dx, dy)
+
+    def fx_box(self, who):
+        """도트의 테두리. 숨겨 둔 도트는 bbox 가 비므로 그림 크기로 잰다 (도트는 아래 가운데에 붙어 있다)."""
+        a = self.anims.get(who)
+        xy = self.cv.coords(self.sprite[who])
+        if not a or len(xy) < 2:
+            return None
+        w, h = a[0][0].width(), a[0][0].height()
+        return (xy[0] - w / 2.0, xy[1] - h, xy[0] + w / 2.0, xy[1])
 
     def _lunge(self, who):
         item = self.sprite[who]
@@ -698,6 +716,8 @@ class LiveBattleWindow(Z.Resizable):
         if t == "switch":
             self.say(text)
             mon = ev.get("mon")
+            if who in ("me", "foe"):
+                self.hiding.forget(who)
             if who in ("me", "foe") and mon and not mon.get("fainted"):
                 # **몬스터볼에서 나온다** (1.10.4): 볼이 날아와 열리고, 흰 빛이 커져 포켓몬이 된다
                 self.sendout.throw(who)
@@ -708,6 +728,7 @@ class LiveBattleWindow(Z.Resizable):
         if t == "recall":
             self.say(text)
             if who in ("me", "foe"):
+                self.hiding.forget(who)
                 self._stop_anim(who)
                 self.sendout.recall(who)             # 흰 빛으로 줄어들어 붉은 줄기로 돌아간다
                 return RECALL_MS
@@ -773,6 +794,7 @@ class LiveBattleWindow(Z.Resizable):
             return STEP_MS
         if t == "faint":
             if who in ("me", "foe"):
+                self.hiding.forget(who)          # 숨은 채 쓰러졌으면 나타나서 쓰러진다
                 self._faint(who)
                 mon = self.shown.get(who)
                 if mon is not None:
@@ -782,6 +804,7 @@ class LiveBattleWindow(Z.Resizable):
             self.say(text)
             return STEP_MS + 150
         if t == "over":
+            self.hiding.forget_all()             # 숨은 채 끝났다 - 보이게 (2.0)
             self.say(text)
             return STEP_MS + 200
         if text:
@@ -1188,6 +1211,7 @@ class LiveBattleWindow(Z.Resizable):
 
     # ---------------- 끝 ----------------
     def show_result(self):
+        self.hiding.forget_all()             # 숨은 채 끝났으면 결과 화면에서는 보이게 (2.0)
         if self._result_shown:
             return
         self._result_shown = True

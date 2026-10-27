@@ -131,6 +131,7 @@ class Arena(object):
         self.bars = {}
         self.texts = []
         self.fx = None
+        self.hiding = FX.Hiding(self._pet_show)     # 공중날기·구멍파기 ... 로 숨은 쪽 (2.0)
         self.foes = []                # ArenaPet 6마리
         self.mine = []                # 내 Pet 6마리 (이미 화면에 있는 것)
         # 명단이 바탕화면 도트와 다를 때 새로 세운 내 쪽 도트, 그동안 숨긴
@@ -631,6 +632,8 @@ class Arena(object):
             self.float_over(src, "Z기술!", "#ffd23c")
         if t == "faint":
             side = self.active.get(who)
+            if getattr(self, "hiding", None):
+                self.hiding.forget(who)      # 숨은 채 쓰러졌으면 나타나서 쓰러진다
             if side:
                 return self._faint(side, done)
         return self.after(max(60, int(self.gap * 0.7)), done)
@@ -670,6 +673,8 @@ class Arena(object):
             if left[0] <= 0:
                 self.after(int(GREET_MS * 0.6), done)
         for side, i in need:
+            if getattr(self, "hiding", None):
+                self.hiding.forget(side)        # 숨은 채 물러나면 나타나서 물러난다 (2.0)
             # 살아 있는데 바뀌는 경우(상성 교체)에는 먼저 자기 자리로
             # 물러난다. 쓰러졌으면 _step_out 이 알아서 아무것도 안 한다.
             self._step_out(side)
@@ -685,9 +690,38 @@ class Arena(object):
         sides = ("me", "foe") if ev.get("side") == "both" else (ev.get("side"),)
         for side in sides:
             if side in ("me", "foe"):
+                if getattr(self, "hiding", None):
+                    self.hiding.forget(side)    # (턴 제한으로 같이 끝났다 - 숨은 채면 링을 비우기 전에 보이게)
                 self.down[side].add(self.slot[side])
                 self.active[side] = None
         return self.after(int(ROUND_GAP * self.scale), done)
+
+    # ---------------- 숨는 기술 (2.0, battle_fx.Hiding · vanish_fx) ----------------
+    # 링에 선 도트 창을 숨기고 옮긴다. 키는 "me"/"foe" - 라운드가 바뀌면 _on_round 가 forget 한다.
+    def _pet_show(self, side, on):
+        pet = self.active.get(side)
+        if pet is None:
+            return
+        if on:
+            PLAT.show_again(pet.win)
+            if self.layer:
+                self.layer.raise_above()     # 다시 뜬 도트 창 위로 연출 · 체력바가 오게
+        else:
+            pet.win.withdraw()
+
+    def fx_shift(self, side, dx, dy):
+        pet = self.active.get(side)
+        if pet is not None:
+            pet.x += dx
+            pet.y += dy
+            pet.place()
+
+    def fx_box(self, side):
+        pet = self.active.get(side)
+        if pet is None:
+            return None
+        x0, y0 = self.to_local(pet.x, pet.y)
+        return (x0, y0, x0 + pet.fw, y0 + pet.fh)
 
     # ---------------- 작은 연출 ----------------
     def _shake(self, pet, done):
@@ -818,6 +852,16 @@ class Arena(object):
         if self.closed:
             return
         self.closed = True
+        if getattr(self, "fx", None) is not None:
+            try:
+                self.fx.stop()                  # 옮겨 둔 도트를 제자리로 (숨는 기술)
+            except Exception:                   # noqa: BLE001
+                pass
+            self.fx = None
+        # 숨긴 도트: 내 쪽은 아래에서 전부 다시 띄우고, 상대는 없앤다 - 기록만 비운다
+        if getattr(self, "hiding", None):
+            self.hiding.kind.clear()
+            self.hiding.held.clear()
         if getattr(self, "bar_job", None):
             try:
                 self.root.after_cancel(self.bar_job)

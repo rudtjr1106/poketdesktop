@@ -1207,6 +1207,47 @@ def _showdown():
 
 
 # ---------------------------------------------------------------- 위력·데미지가 계산으로 정해지는 기술
+def t_charge_events():
+    """두 턴 기술의 첫 턴 사건에 charge 가 붙는다 - 화면이 공격 대신 숨는·모으는 연출을 튼다 (2.0)."""
+    print("-- 두 턴 기술: 첫 턴 사건에 숨는 자리가 붙는다")
+
+    def moves(ev):
+        return [e for e in ev if e.get("t") == "move"]
+
+    for k, hide in (("FLY", "fly"), ("BOUNCE", "fly"), ("DIG", "dig"), ("DIVE", "dive"),
+                    ("PHANTOMFORCE", "vanish"), ("SHADOWFORCE", "vanish"), ("SOLARBEAM", "power"),
+                    ("SKULLBASH", "power")):
+        bt, me, foe = fight(mon("MEW", 50, [k]), mon("SNORLAX", 80, ["SPLASH"]))
+        _sure(bt)
+        first = moves(use(bt, "me", k))
+        second = moves(use(bt, "me", k))
+        chk("%s: 첫 턴은 charge=%s, 둘째 턴은 안 붙는다" % (DEX.move(k)["kr"], hide),
+            len(first) == 1 and first[0].get("charge") == hide and not first[0].get("carry")
+            and len(second) == 1 and "charge" not in second[0], (first, second))
+    bt, me, foe = fight(mon("BRAVIARY", 50, ["SKYDROP"]), mon("MACHAMP", 50, ["TACKLE"]))
+    _sure(bt)
+    first = moves(use(bt, "me", "SKYDROP"))
+    chk("프리폴: 상대를 데리고 간다 (carry)", first and first[0].get("charge") == "fly" and first[0].get("carry"), first)
+    bt, me, foe = fight(mon("MEW", 50, ["SOLARBEAM"]), mon("SNORLAX", 80, ["SPLASH"]))
+    _sure(bt)
+    bt.field.weather = "sun"
+    ev = moves(use(bt, "me", "SOLARBEAM"))
+    chk("햇빛이면 솔라빔이 한 턴에 나간다 - charge 없이", len(ev) == 1 and "charge" not in ev[0], ev)
+    bt, me, foe = fight(mon("MEW", 50, ["FLY"], held="POWERHERB"), mon("SNORLAX", 80, ["SPLASH"]))
+    _sure(bt)
+    ev = moves(use(bt, "me", "FLY"))
+    chk("파워허브면 공중날기도 한 턴에 - charge 없이", len(ev) == 1 and "charge" not in ev[0], ev)
+    bt, me, foe = fight(mon("ORICORIO", 50, ["FLY"], ability="DANCER"), mon("SNORLAX", 80, ["SWORDSDANCE"]))
+    _sure(bt)
+    use(bt, "me", "FLY")
+    ev = moves(use(bt, "foe", "SWORDSDANCE"))
+    mine = [e for e in ev if e.get("who") == "me"]
+    chk("숨은 채로 춤을 따라 추면 stay - 화면이 다시 나오게 하지 않는다 (엔진도 숨긴 채다)",
+        len(mine) == 1 and mine[0].get("stay") and me.cond.get("invuln") == "fly", (ev, me.cond.get("invuln")))
+    ev = moves(use(bt, "me", "FLY"))
+    chk("  둘째 턴의 공중날기에는 stay 가 안 붙는다", len(ev) == 1 and "stay" not in ev[0], ev)
+
+
 def _eng_power(k, user, target):
     """엔진이 데미지 식에 넣는 위력 (battle._damage 와 같은 길)."""
     m2 = SM.resolve(MC.resolve(DEX.move(k), user, target), user, target)
@@ -1455,6 +1496,7 @@ def main():
     t_showdown()
     t_formulas()
     t_coverage()
+    t_charge_events()
     print("")
     print("=" * 54)
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))

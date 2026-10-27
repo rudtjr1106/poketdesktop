@@ -304,6 +304,17 @@ class Sprite(object):
                 pass
 
     def destroy(self):
+        # **화면 밖에 있는 채로 없애지 않는다.** 맥 Tk 8.6.17 은 화면 밖(-4000)에서 한 번도 안 그려진 창을
+        # 없애면 다시 그리기를 끝없이 되풀이한다 - 그 뒤로 update() 가 안 돌아오고(test_friendly_ui 가
+        # 멈췄다) 앱이면 CPU 를 계속 쓴다. 자리를 잡기 전에 없애는 일(나오자마자 건너뛰기·그만 보기)이
+        # 그렇다. 빈 그림을 걸고 화면 안으로 옮겨(투명하고 클릭이 지나간다 - 안 보인다) 옮긴 것을 마친 뒤에 없앤다.
+        try:
+            self.view.show(self.blank)
+            if self.at is None:
+                self.win.geometry("+0+0")
+            self.win.update_idletasks()
+        except Exception:                                   # noqa: BLE001
+            pass
         try:
             self.view.destroy()
         except Exception:                                   # noqa: BLE001
@@ -414,9 +425,16 @@ class _Stage(object):
         self.scene = scene
         self.cv = scene.pane.cv
         self.root = scene.pane.root
+        self.hiding = scene.hiding                  # 숨는 기술 (battle_fx.Hiding, 2.0)
 
     def lunge(self, who, done):
         self.scene.lunge(who, done)
+
+    def fx_shift(self, s, dx, dy):
+        self.scene.fx_shift(s, dx, dy)
+
+    def fx_box(self, s):
+        return self.scene.fx_box(s)
 
 
 class _Tween(object):
@@ -442,6 +460,8 @@ class _Side(object):
         self.hp = 0.0                 # 막대에 그려진 체력 (줄어드는 중이면 그 사이 값)
         self.maxhp = 1
         self.off = (0.0, 0.0)         # 제자리에서 비켜 있는 만큼 (달려들기·흔들리기·가라앉기)
+        self.lift = (0.0, 0.0)        # 숨는 기술 연출이 옮겨 둔 만큼 (vanish_fx, 2.0)
+        self.gone = False             # 숨는 기술로 숨었다 - 도트를 안 건다
         self.left, self.size = 0, 0   # 남은 마릿수, 데려온 마릿수
         self.ball = None              # 날아오는 볼 (도트 창)
         self.balls = ()               # 그 창에 걸 그림 (닫힌 볼, 열린 볼)
@@ -472,6 +492,8 @@ class FightScene(object):
         self.beam_ends = None
         self.rays = []
         self.sides = dict((s, _Side()) for s in SIDES)
+        from . import battle_fx as FX
+        self.hiding = FX.Hiding(self._side_show)    # 공중날기·구멍파기 ... 로 숨은 쪽 (2.0)
         self.spot = dict(pane.spot)
         ground = self.spot["a"][1]
         # 볼이 날아 들어오는 자리: 저마다 바깥쪽 위에서
@@ -546,6 +568,7 @@ class FightScene(object):
                 pass
             self.fx = None
         self._clear_fx_bits()
+        self.hiding.forget_all()            # 건너뛴 일 사이에 나왔을지 모른다 - 보이게 둔다
         for s in SIDES:
             self.sides[s].busy = False
             self.sides[s].off = (0.0, 0.0)
@@ -571,22 +594,28 @@ class FightScene(object):
         self.synced = True
 
     # ---------------- 한쪽의 포켓몬 ----------------
-    def _enter(self, s, mon):
-        """그 포켓몬으로 바꿔 들 준비: 앞 포켓몬의 창을 치우고 새 그림을 받는다."""
+    def _enter(self, s, mon, keep=False):
+        """그 포켓몬으로 바꿔 들 준비: 앞 포켓몬의 창을 치우고 새 그림을 받는다.
+
+        keep = 같은 포켓몬이 모습만 바뀐다 (메가진화·폼) - 숨는 기술로 숨어 있으면 숨긴 채로 둔다 (2.0).
+        """
         side = self.sides[s]
+        if not keep:
+            self.hiding.forget(s)
         if side.sprite is not None:
             side.sprite.destroy()
         side.sprite, side.idle, side.grow, side.look = None, [], [], None
         side.mon, side.art, side.off = dict(mon), None, (0.0, 0.0)
+        side.lift, side.gone = (0.0, 0.0), bool(keep and self.hiding.hidden(s))
         side.hp, side.maxhp = float(mon.get("hp") or 0), max(1, int(mon.get("maxhp") or 1))
         side.frame, side.next_frame = 0, 0.0
         load_art(self.pane, mon, s, lambda art, m=mon: self._got_art(s, m, art))
 
-    def _stand(self, s, mon, now):
+    def _stand(self, s, mon, now, keep=False):
         """볼 없이 바로 세운다 (뒤늦게 들어왔을 때, 놓친 교체를 맞출 때)."""
         side = self.sides[s]
         side.out, side.busy = True, False
-        self._enter(s, mon)
+        self._enter(s, mon, keep)
         side.look = ("idle", 0)
 
     def _got_art(self, s, mon, art):
@@ -610,6 +639,8 @@ class FightScene(object):
 
     def _hide(self, s):
         side = self.sides[s]
+        self.hiding.forget(s)
+        side.lift, side.gone = (0.0, 0.0), False
         side.out, side.busy, side.look, side.off = False, False, None, (0.0, 0.0)
         side.mon, side.art = None, None
         if side.sprite is not None:
@@ -645,6 +676,7 @@ class FightScene(object):
             self._send_out(who, ev["mon"], now)
             self.say(text, None)
         elif t == "recall" and who in SIDES:
+            self.hiding.forget(who)
             self._recall(who, now)
             self.say(text, None)
         elif t == "mega" and who in SIDES and self.sides[who].mon:
@@ -687,6 +719,7 @@ class FightScene(object):
                 self._bar_to(who, ev["hp"], now)
             self.say(short_text(text), who if who in SIDES else None)
         elif t == "faint" and who in SIDES:
+            self.hiding.forget(who)          # 숨은 채 쓰러졌으면 나타나서 쓰러진다
             self._faint(who, now)
             self.say("쓰러졌다!", who, "#ff9d9d")
         elif text:
@@ -806,7 +839,7 @@ class FightScene(object):
         side.busy = True
 
         def swap():
-            self._stand(s, mon, now)
+            self._stand(s, mon, now, keep=True)     # 같은 포켓몬 - 숨어 있으면 숨긴 채로
         self.tweens.append(_Tween(now, 0.45, lambda _t: None, swap))
 
     def _faint(self, s, now):
@@ -837,6 +870,28 @@ class FightScene(object):
         def move(t):
             side.hp = lerp(start, to, t)
         self.tweens.append(_Tween(now, 0.4, move))
+
+    # 숨는 기술 (2.0, battle_fx.Hiding · vanish_fx). 도트 창은 틱마다 _place 가 놓으므로 값만 바꾸고 바로 놓는다.
+    def _side_show(self, s, on):
+        side = self.sides.get(s)
+        if side is not None:
+            side.gone = not on
+            self._place()
+
+    def fx_shift(self, s, dx, dy):
+        side = self.sides.get(s)
+        if side is not None:
+            side.lift = (side.lift[0] + dx, side.lift[1] + dy)
+            self._place()
+
+    def fx_box(self, s):
+        """도트의 테두리 (레이어 자리). 서는 자리(spot)가 발 가운데다."""
+        if s not in self.sides or not self.sides[s].art:
+            return None
+        w, h = (self.sides[s].art or {}).get("size") or (MON_W, MON_H)
+        x, y = self.spot[s]
+        x0, y0 = self.pane.loc(x - w / 2.0, y - h)
+        return (x0, y0, x0 + w, y0 + h)
 
     def lunge(self, s, done):
         """기술 연출이 부른다: 몸이 앞으로 움찔했다 돌아온다."""
@@ -930,10 +985,10 @@ class FightScene(object):
             x, y = self.spot[s]
             sp = side.sprite
             if sp is not None:
-                sp.move(x + side.off[0], y + side.off[1])
+                sp.move(x + side.off[0] + side.lift[0], y + side.off[1] + side.lift[1])
                 kind = side.look
                 handle = None
-                if kind is not None:
+                if kind is not None and not side.gone:
                     pool = side.idle if kind[0] == "idle" else side.grow
                     handle = pool[min(kind[1], len(pool) - 1)] if pool else None
                 sp.show(handle)

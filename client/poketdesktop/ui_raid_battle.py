@@ -96,6 +96,7 @@ class RaidBattleWindow(Z.Resizable):
         self.shown = {}             # 지금 그려 둔 것 (연출용)
         self.effects = []
         self.fx = None
+        self.hiding = FX.Hiding(self._sprite_show)     # 공중날기·구멍파기 ... 로 숨은 자리 (2.0)
         self._fx_actor = None
         self._moves_by_name = None
         self._poll_job = None
@@ -291,6 +292,7 @@ class RaidBattleWindow(Z.Resizable):
         self._stop_anim(key)
         try:
             self.cv.itemconfigure(self.sprite[key], image="")
+            self.hiding.apply(key)                      # 숨어 있으면 다시 그려도 숨긴 채로 (2.0)
         except (KeyError, tk.TclError):
             return
         if not mon or mon.get("fainted"):
@@ -457,6 +459,26 @@ class RaidBattleWindow(Z.Resizable):
         self._lunge(self._fx_actor if who != "foe" else BOSS)
         self.later(190, done)
 
+    # 숨는 기술 (2.0, battle_fx.Hiding · vanish_fx). 키는 자리(번호 · BOSS)다.
+    def _sprite_show(self, key, on):
+        item = self.sprite.get(key)
+        if item is not None:
+            self.cv.itemconfigure(item, state="normal" if on else "hidden")
+
+    def fx_shift(self, key, dx, dy):
+        item = self.sprite.get(key)
+        if item is not None:
+            self.cv.move(item, dx, dy)
+
+    def fx_box(self, key):
+        """도트의 테두리. 숨겨 둔 도트는 bbox 가 비므로 그림 크기로 잰다 (도트는 아래 가운데에 붙어 있다)."""
+        a, item = self.anims.get(key), self.sprite.get(key)
+        xy = self.cv.coords(item) if item is not None else ()
+        if not a or len(xy) < 2:
+            return None
+        w, h = a[0][0].width(), a[0][0].height()
+        return (xy[0] - w / 2.0, xy[1] - h, xy[0] + w / 2.0, xy[1])
+
     def _lunge(self, key):
         item = self.sprite.get(key)
         if item is None:
@@ -551,7 +573,7 @@ class RaidBattleWindow(Z.Resizable):
             (sx, sy), (tx, ty) = self._center(src), self._center(dst)
             self.fx = FX.Effect(_FxStage(self, k), self._find_move(ev),
                                 (sx / k, sy / k), (tx / k, ty / k), done,
-                                who="me" if src != BOSS else "foe", ev=ev)
+                                who="me" if src != BOSS else "foe", ev=ev, keys=(src, dst))
             self.effects = [e for e in self.effects if not e.dead] + [self.fx]
             self.later(2400, done)
             self.fx.play()
@@ -596,11 +618,13 @@ class RaidBattleWindow(Z.Resizable):
             return STEP_MS + 300
         if t == "switch":
             if key is not None:
+                self.hiding.forget(key)
                 self.set_mon(key, ev.get("mon"), boss=(key == BOSS))
             self.say(text)
             return 360
         if t == "recall":
             if key is not None:
+                self.hiding.forget(key)
                 self._stop_anim(key)
                 try:
                     self.cv.itemconfigure(self.sprite[key], image="")
@@ -724,6 +748,7 @@ class RaidBattleWindow(Z.Resizable):
             return STEP_MS
         if t == "faint":
             if key is not None:
+                self.hiding.forget(key)          # 숨은 채 쓰러졌으면 나타나서 쓰러진다
                 self._faint(key)
                 mon = self.shown.get(key)
                 if mon is not None:
@@ -733,8 +758,11 @@ class RaidBattleWindow(Z.Resizable):
             self.say(text)
             return STEP_MS + 120
         if t in ("leave", "over"):
+            if key is not None:
+                self.hiding.forget(key)
             self.say(text)
             if t == "over":
+                self.hiding.forget_all()         # 숨은 채 끝났다 - 보이게 (2.0)
                 self._flash(text or "", U.GOOD if ev.get("result") == "won" else U.DANGER)
                 return STEP_MS + 400
             return STEP_MS
@@ -1103,6 +1131,7 @@ class RaidBattleWindow(Z.Resizable):
 
     # ---------------- 끝 ----------------
     def show_result(self):
+        self.hiding.forget_all()             # 숨은 채 끝났으면 결과 화면에서는 보이게 (2.0)
         if self._result_shown:
             return
         self._result_shown = True

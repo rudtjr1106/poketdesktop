@@ -1714,6 +1714,8 @@ class Battle(object):
                    "text": "%s 의 %s!" % (user.name, shown or self.move_name(key))}
             if shown:
                 mev["z"] = True               # 화면이 Z기술 연출을 붙인다
+            if called and user.cond.get("invuln"):
+                mev["stay"] = True            # 숨은 채로 따라 썼다 (춤추기 ...) - 화면이 다시 나오게 하지 않는다 (2.0)
             ev.append(mev)
         if key != STRUGGLE and not bounced:
             user.cond["lastMove"] = key
@@ -2106,10 +2108,15 @@ class Battle(object):
         user.cond["charge2"] = {"move": k}
         if hide:
             user.cond["invuln"] = hide
-        ev.append({"t": "move", "who": who, "name": user.name,
-                   "move": self.move_name(key), "moveType": shown_type(move, user),
-                   "cat": move.get("cat"),
-                   "text": "%s 의 %s!" % (user.name, self.move_name(key))})
+        # charge (2.0): 화면이 이 턴에는 공격 연출 대신 숨는(hide)·모으는('power') 연출을 튼다.
+        # 숨은 포켓몬은 그 쪽이 다음 기술을 쓸 때 다시 나타난다. 프리폴은 상대도 데리고 간다(carry).
+        mev = {"t": "move", "who": who, "name": user.name,
+               "move": self.move_name(key), "moveType": shown_type(move, user),
+               "cat": move.get("cat"), "charge": hide or "power",
+               "text": "%s 의 %s!" % (user.name, self.move_name(key))}
+        if k == "SKYDROP":
+            mev["carry"] = True
+        ev.append(mev)
         ev.append({"t": "msg", "who": who, "text": text % user.name})
         if stat:
             self._change_stat(user, stat, 1, ev, who, source=user)
