@@ -215,6 +215,7 @@ class SettingsWindow(object):
         self._area_row(box, s)
         self._catch_row(box, s)
         self._zoom_row(box, s)
+        self._font_row(box, s)
         self._boss_row(box, s)
         self._autostart_row(box)
 
@@ -337,6 +338,127 @@ class SettingsWindow(object):
         self._paint_zoom()
         try:
             self.zoom_msg.configure(text="다음 배틀 창부터 기본 크기로 뜹니다.")
+        except tk.TclError:
+            pass
+
+    # ---------------- 글꼴 ----------------
+    FONT_AUTO = "자동 (권장)"
+    FONT_MISSING = " (설치 안 됨)"
+    FONT_SAMPLE = "가나다라 ABC 123 피카츄 Lv.50"
+
+    def _font_row(self, box, s):
+        """전체 글꼴. 고르면 바로 저장하고 전역 글꼴(U.FONT_*)을 다시 정한다.
+
+        **새로 여는 창부터 바뀐다.** 위젯 천 곳 가까이가 만들 때 글꼴을 복사해 가서,
+        떠 있는 창까지 바꾸려면 그것을 전부 명명 글꼴로 바꿔야 한다. 그만한 값은
+        아니라고 보고 설명에 그렇게 적는다.
+        """
+        tk.Label(box, text="글꼴", bg=U.BG, fg=U.FG, font=U.FONT_B,
+                 anchor="w").pack(fill="x", pady=(10, 2))
+        self._combo_style()
+        saved = config.font_family(s)
+        have = U.font_choices(self.root)
+        values = [self.FONT_AUTO]
+        # 다른 PC 에서 옮겨 온 설정이면 그 글꼴이 여기 없다. 목록에서 빠뜨리면 콤보가
+        # 빈칸으로 보이고, '자동' 으로 보여 주면 저장값과 화면이 어긋난다. 꼬리표를 달아
+        # 보여 주기만 하고 저장값은 건드리지 않는다 - 그 PC 로 돌아가면 다시 그 글꼴이다.
+        self._font_missing = None
+        if saved and saved not in have:
+            self._font_missing = saved + self.FONT_MISSING
+            values.append(self._font_missing)
+        values += have
+        self.font_var = tk.StringVar(
+            value=(self._font_missing or saved) if saved else self.FONT_AUTO)
+        self.font_combo = ttk.Combobox(
+            box, textvariable=self.font_var, values=values, state="readonly",
+            height=15, style="Font.TCombobox", font=U.FONT_S)
+        self.font_combo.pack(fill="x", pady=(0, 6))
+        self.font_combo.bind("<<ComboboxSelected>>", self._pick_font)
+        # 읽기 전용 콤보는 휠을 굴리면 값이 바뀐다 (Tk 의 기본 동작). 설정 창을 굴리다가
+        # 콤보 위를 지나는 것만으로 글꼴이 바뀌어 저장되면 안 된다 - 창을 굴리는 것으로 돌린다.
+        for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+            self.font_combo.bind(seq, self._wheel_page)
+        self.font_preview = tk.Label(
+            box, text=self.FONT_SAMPLE, bg=U.INK, fg=U.FG, anchor="w",
+            justify="left", padx=10, pady=6, font=(U.FAMILY, U.BASE_PT + 2))
+        self.font_preview.pack(fill="x", pady=(0, 4))
+        # 본문보다 두 단계 큰 글자라 단독 창(460) 폭에서는 끝이 잘렸다. 잘리느니 접는다.
+        U.wrap_to_width(self.font_preview)
+        note = tk.Label(box, text="새로 여는 창부터 바뀝니다. 지금 떠 있는 창까지 바꾸려면 "
+                                  "프로그램을 다시 켜 주세요. 한글이 없는 글꼴을 고르면 한글은 "
+                                  "다른 글꼴로 대신 보일 수 있습니다. 바탕화면 배틀 연출의 글자는 "
+                                  "바뀌지 않습니다.",
+                        bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
+                        justify="left", wraplength=W - 60)
+        note.pack(fill="x", pady=(0, 6))
+        U.wrap_to_width(note)
+
+    def _combo_style(self):
+        """콤보를 어두운 바탕에 맞춘다. clam 기본은 흰 칸에 회색 단추라 이 창에서만 튄다.
+
+        테마 함수(U.apply_theme)는 다른 창도 같이 쓰므로 거기는 두고 이 창에서 따로 정한다.
+        펼친 목록(Listbox)은 ttk 스타일이 안 먹어서 옵션 DB 로 칠한다.
+        """
+        try:
+            st = ttk.Style(self.root)
+            st.configure("Font.TCombobox", fieldbackground=U.INK, background=U.BG3,
+                         foreground=U.FG, arrowcolor=U.FG_DIM, bordercolor=U.LINE,
+                         lightcolor=U.INK, darkcolor=U.INK, padding=6,
+                         selectbackground=U.INK, selectforeground=U.FG)
+            st.map("Font.TCombobox",
+                   fieldbackground=[("readonly", U.INK)],
+                   foreground=[("readonly", U.FG)],
+                   selectbackground=[("readonly", U.INK)],
+                   selectforeground=[("readonly", U.FG)],
+                   background=[("active", U.BG4), ("", U.BG3)],
+                   arrowcolor=[("active", U.ACCENT), ("", U.FG_DIM)])
+            for k, v in (("background", U.INK), ("foreground", U.FG),
+                         ("selectBackground", U.ACCENT_SOFT),
+                         ("selectForeground", U.ACCENT_TEXT), ("font", U.FONT_S)):
+                self.root.option_add("*TCombobox*Listbox." + k, v)
+        except tk.TclError:
+            pass
+
+    def _wheel_page(self, e):
+        """콤보 위에서 굴린 휠을 설정 창 스크롤로 보낸다 (U.install_wheel 과 같은 셈)."""
+        if getattr(e, "num", None) in (4, 5):
+            n = -1 if e.num == 4 else 1
+        else:
+            n = U.wheel_units(e.delta, 60)
+        try:
+            lo, hi = self.cv.yview()
+            if (hi - lo) < 0.999:
+                self.cv.yview_scroll(n, "units")
+        except tk.TclError:
+            pass
+        return "break"
+
+    def _pick_font(self, _e=None):
+        label = self.font_var.get()
+        if label == self.FONT_AUTO:
+            want = ""
+        elif self._font_missing and label == self._font_missing:
+            want = label[:-len(self.FONT_MISSING)]
+        else:
+            want = label
+        self._set("fontFamily", want)
+        got = U.apply_font_family(self.root, want)
+        self._paint_font_preview()
+        if want and got != want:
+            # 상태줄은 한 줄이라 길면 잘린다 - 고른 이름은 콤보에 이미 보인다.
+            U.set_status(self.status, "이 PC 에 없는 글꼴이라 자동으로 둡니다.", U.DANGER)
+        else:
+            U.set_status(self.status, "새로 여는 창부터 이 글꼴로 그립니다.")
+        try:
+            self.font_combo.selection_clear()
+        except tk.TclError:
+            pass
+
+    def _paint_font_preview(self):
+        """실제로 쓰게 된 글꼴(U.FAMILY)로 그린다. 고른 이름이 이 PC 에 없으면 Tk 은 말없이
+        다른 글꼴로 바꿔 그려서, 고른 이름으로 그리면 미리보기가 거짓말을 한다."""
+        try:
+            self.font_preview.configure(font=(U.FAMILY, U.BASE_PT + 2))
         except tk.TclError:
             pass
 
@@ -526,6 +648,17 @@ class SettingsWindow(object):
             fn()
             self.show_boss()
         self._paint_area()          # 직접 그린 영역도 기본값으로 빠졌다
+        # 글꼴도 자동("")이 됐다. 저장만 하면 이번 실행 동안은 고른 글꼴이 그대로 남는다 -
+        # 전역 글꼴도 되돌려야 다음에 여는 창이 자동 글꼴이다.
+        # root 가 없는 자리(창 없이 reset 만 빌려 쓰는 검사)에서는 건너뛴다.
+        root = getattr(self, "root", None)
+        if root is not None:
+            U.apply_font_family(root, "")
+            try:
+                self.font_var.set(self.FONT_AUTO)
+                self._paint_font_preview()
+            except (AttributeError, tk.TclError):
+                pass
         # 풀숲은 **무조건 다시 맞춘다.** 위에서 설정 값이 이미 기본값으로
         # 바뀌어 있어서, set_show_grass 로 가면 "안 바뀌었다" 며 그냥
         # 돌아온다. 그러면 껐던 사람은 되돌렸는데도 풀숲이 안 돋는다.
