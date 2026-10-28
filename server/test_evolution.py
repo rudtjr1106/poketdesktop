@@ -13,6 +13,7 @@
 
 서버를 띄우지 않는다. DB 와 모듈만 직접 쓴다.
 """
+import json
 import os
 import sys
 import tempfile
@@ -320,6 +321,62 @@ def main():
     same = set((evolution.check_level(d, dict(bare("WURMPLE"), level=7, id=5), h) or {}).get("to")
                for h in (3, 12, 20))
     chk("  같은 개체는 언제 올려도 같은 쪽", len(same) == 1, same)
+    import datetime
+    chk("앱이 시각을 안 보내면 한국 시각으로 본다 (컨테이너는 UTC)",
+        evolution._hour() == datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).hour)
+
+    print()
+    print("=== Lv.100 친밀도 진화: 이상한사탕이 안 써질 때 까닭을 말한다 (게시판 #351 리오르) ===")
+    uid5 = mkuser("evo_riolu")
+    me5 = {"user": {"id": uid5}}
+    rio = mkmon(uid5, "RIOLU")
+    db.run("UPDATE pokemon SET level=100, happiness=70 WHERE id=?", (rio,))
+    items.bag_add(uid5, "RARECANDY", 3)
+
+    def candy(hour):
+        try:
+            return R.use(R.UseIn(item="RARECANDY", pokemon=rio, hour=hour), me5), None
+        except HTTPException as e:
+            return None, e.detail
+    _r, msg = candy(12)
+    chk("친밀도가 모자라면 400 에 '친밀도 160 이상 (지금 70 ...)' 과 걸리는 시간",
+        msg and "친밀도 160 이상 (지금 70" in msg and "시간쯤" in msg and "루카리오" in msg, msg)
+    db.run("UPDATE pokemon SET happiness=176 WHERE id=?", (rio,))
+    _r, msg = candy(22)
+    chk("친밀도는 됐는데 밤이면 '낮(6~18시) - 지금은 아닙니다'",
+        msg and "낮(6~18시) - 지금은 아닙니다" in msg and "됐습니다" in msg, msg)
+    chk("  안 써졌으니 사탕은 그대로", items.bag_count(uid5, "RARECANDY") == 3)
+    r, msg = candy(12)
+    chk("낮에 쓰면 루카리오로 진화한다", r and (r.get("evolve") or {}).get("to") == "LUCARIO"
+        and species_of(rio) == "LUCARIO", msg or r)
+    chk("진화할 길이 없는 종은 예전 그대로 '이미 최고 레벨입니다.' 만",
+        evolution.why_not(d, dict(bare("LUCARIO"), level=100)) is None)
+
+    print()
+    print("=== 루나아라 변경권 (게시판 #370 보상) ===")
+    t = items.get("LUNALATICKET")
+    chk("도구가 있다 - 상점에 안 뜨고 드랍도 안 된다", t and t.get("buyable") is False
+        and not any(i == "LUNALATICKET" for i, _w in items.data()["dropTable"]), t)
+    uid6 = mkuser("evo_ticket")
+    me6 = {"user": {"id": uid6}}
+    sol = mkmon(uid6, "SOLGALEO", held="SOLGANIUMZ")
+    db.run("UPDATE pokemon SET level=60, happiness=123, ability='FULLMETALBODY', moves=? WHERE id=?",
+           (json.dumps(["SUNSTEELSTRIKE", "TACKLE"]), sol))
+    other = mkmon(uid6, "PIKACHU")
+    items.bag_add(uid6, "LUNALATICKET", 1)
+    code = status_of(lambda: R.use(R.UseIn(item="LUNALATICKET", pokemon=other, hour=12), me6))
+    chk("솔가레오가 아니면 400, 표는 그대로", code == 400 and items.bag_count(uid6, "LUNALATICKET") == 1, code)
+    r = R.use(R.UseIn(item="LUNALATICKET", pokemon=sol, hour=12), me6)
+    row = db.q1("SELECT * FROM pokemon WHERE id=?", (sol,))
+    chk("루나아라로 바뀐다", row["species"] == "LUNALA" and (r.get("evolve") or {}).get("to") == "LUNALA", r)
+    chk("  레벨 · 친밀도는 그대로", row["level"] == 60 and row["happiness"] == 123, dict(row))
+    chk("  특성은 같은 자리 (풀메탈바디 -> 스펙터가드)", row["ability"] == "SHADOWSHIELD", row["ability"])
+    chk("  메테오드라이브 -> 섀도레이 (다른 기술은 그대로)",
+        json.loads(row["moves"]) == ["MOONGEISTBEAM", "TACKLE"], row["moves"])
+    chk("  솔가레오Z -> 루나아라Z", row["held"] == "LUNALIUMZ", row["held"])
+    chk("  표는 하나 쓴다", items.bag_count(uid6, "LUNALATICKET") == 0)
+    chk("  도감에 루나아라가 오른다", db.q1("SELECT caught FROM seen WHERE user_id=? AND species='LUNALA'",
+                                    (uid6,)) is not None)
 
     print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))

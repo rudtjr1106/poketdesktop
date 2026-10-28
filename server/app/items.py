@@ -613,8 +613,9 @@ def ball_options(uid, dex, wild, balls, mine=None, turn=0, hour=None):
 
 
 def _server_hour():
+    # 컨테이너는 UTC 다. 앱이 시각을 안 보냈을 때 한국 시각으로 본다 (evolution._hour 와 같다).
     import datetime
-    return datetime.datetime.now().hour
+    return datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).hour
 
 
 def _uses_stone(dex, species, stone_id):

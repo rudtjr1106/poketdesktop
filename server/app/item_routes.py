@@ -479,7 +479,9 @@ def _use_level(uid, it, eff, mon, dex, hour):
     if mon["level"] >= P.LEVEL_MAX:
         b = evolution.check_level(dex, mon, hour)
         if not b:
-            raise HTTPException(400, "이미 최고 레벨입니다.")
+            why = evolution.why_not(dex, mon, hour)
+            raise HTTPException(400, korean.natural("이미 최고 레벨입니다." + (
+                " %s. 조건이 맞을 때 쓰면 진화합니다." % why if why else "")))
         before = mon["species"]
         got = evolution.apply(uid, mon, b, dex, _now())
         info = evolution.public(dex, before, b["to"], got.get("learned") or [],
@@ -501,7 +503,34 @@ def _use_level(uid, it, eff, mon, dex, hour):
     return out
 
 
+def _use_swap(uid, it, eff, mon, dex):
+    """변경권 - 정해진 종을 짝이 되는 종으로 바꾼다 (루나아라 변경권, 게시판 #370).
+
+    코스모움이 밤에도 솔가레오로만 진화하던 버그의 보상. 진화와 같은 길(evolution.apply)로 바꾼다 -
+    레벨 · 개체값 · 성격 · 친밀도는 그대로, 경험치는 새 곡선, 특성은 같은 자리, 도감에 올림.
+    **도감의 진화표에는 안 넣는다.** 솔가레오가 '진화 전' 이 되면 진화의휘석이 붙는 등 다른 데가 틀어진다.
+    전용기와 전용 Z크리스탈은 짝으로 갈아 준다 (메테오드라이브를 든 루나아라가 생기지 않게).
+    """
+    if mon["species"] not in (eff.get("from") or []):
+        raise HTTPException(400, "%s은(는) %s에게 쓸 수 없습니다." % (it["kr"], _name(mon, dex)))
+    sw = eff.get("moves") or {}
+    mon = dict(mon, moves=[sw.get(m, m) for m in mon.get("moves") or []],
+               pending=[sw.get(m, m) for m in mon.get("pending") or []])
+    before, name = mon["species"], _name(mon, dex)
+    got = evolution.apply(uid, mon, {"to": eff["swap"]}, dex, _now())
+    held = (eff.get("held") or {}).get(mon.get("held") or "")
+    if held:
+        db.run("UPDATE pokemon SET held=? WHERE id=? AND user_id=?", (held, mon["id"], uid))
+    info = evolution.public(dex, before, eff["swap"], got.get("learned") or [],
+                            got.get("pendingIds") or [])
+    return {"ok": True, "evolve": info,
+            "message": "%s은(는) %s(으)로 바뀌었다!" % (name, info["toKr"])}
+
+
 def _use_stone(uid, it, mon, dex, hour):
+    eff = it.get("effect") or {}
+    if eff.get("swap"):
+        return _use_swap(uid, it, eff, mon, dex)
     b = evolution.check_item(dex, mon, it["id"], hour)
     if not b:
         name = mon.get("nickname") or dex.name(mon["species"])

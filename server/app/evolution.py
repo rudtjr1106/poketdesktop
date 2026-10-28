@@ -23,8 +23,13 @@ from common import pokelogic as P
 from . import db, items
 
 
+KST = datetime.timezone(datetime.timedelta(hours=9))
+
+
 def _hour(hour=None):
-    return datetime.datetime.now().hour if hour is None else int(hour)
+    # 앱이 시각을 안 보낸 길(탐험 · 레이드 경험치 같은 것)은 서버 시계를 본다. 그게 그냥 now() 였는데
+    # 컨테이너는 UTC 라 한국과 9시간 어긋났다 - 밤 11시가 낮(14시)으로 읽혔다 (게시판 #370 을 보다 찾음).
+    return datetime.datetime.now(KST).hour if hour is None else int(hour)
 
 
 def _time_ok(want, hour=None):
@@ -138,6 +143,42 @@ def check_level(dex, mon, hour=None):
             if mon.get("happiness", 0) >= b.get("happiness", 999) \
                     and _cond_ok(b, dex, mon, hour):
                 return b
+    return None
+
+
+TIME_KR = {"day": "낮(6~18시)", "night": "밤(18~6시)", "dusk": "해 질 녘(17~19시)"}
+
+
+def why_not(dex, mon, hour=None):
+    """레벨업 · 친밀도 진화가 지금 왜 안 되는지 한 줄. 그런 진화가 아예 없으면 None.
+
+    Lv.100 에게 이상한사탕을 쓰면 진화 판정만 한다(item_routes._use_level). 안 되면 예전에는
+    '이미 최고 레벨입니다' 뿐이라, 친밀도가 모자란지 밤이라 안 되는지 알 길이 없었다
+    (Lv.100 리오르 - 친밀도 160 + 낮, 게시판 #351).
+    """
+    if mon.get("noEvolve"):
+        return "변함없는돌로 진화를 막아 두었습니다."
+    from . import walk
+    for b in branches(dex, mon):
+        mode = b.get("mode")
+        if mode not in ("level", "friend"):
+            continue
+        need = []
+        if mode == "level" and mon["level"] < b.get("level", 999):
+            need.append("Lv.%d" % b["level"])
+        if mode == "friend":
+            have, want = int(mon.get("happiness", 0)), int(b.get("happiness", 999))
+            if have < want:
+                hrs = walk.hours_to(have, want, bool(mon.get("luxury")), mon.get("held") == "SOOTHEBELL")
+                need.append("친밀도 %d 이상 (지금 %d - 데리고 다니면 %d시간쯤 걸립니다)"
+                            % (want, have, max(1, int(round(hrs)))))
+            else:
+                need.append("친밀도 %d 이상 (지금 %d - 됐습니다)" % (want, have))
+        if b.get("time"):
+            ok = _time_ok(b["time"], hour)
+            need.append(TIME_KR.get(b["time"], b["time"]) + ("" if ok else " - 지금은 아닙니다"))
+        to = (dex.get(b["to"]) or {}).get("kr", b["to"])
+        return "%s(으)로 진화하려면: %s" % (to, " · ".join(need))
     return None
 
 

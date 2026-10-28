@@ -136,6 +136,20 @@ EXTRA = [
                 " 포켓몬을 고르지 않아도 된다.",
         "effect": {"kind": "tmticket"},
     },
+    # 보상 (2026-10-29, 게시판 #370). 코스모움이 밤에도 솔가레오로만 진화하던 버그 - 밤에 진화시킨 사람에게
+    # 선물함으로 준다. 상점·드랍에 없다. 쓰는 법은 진화의 돌과 같지만(앱이 대상을 밝게 칠한다) 도감의 진화표가
+    # 아니라 effect 의 swap 으로 바꾼다 (item_routes._use_swap).
+    {
+        "id": "LUNALATICKET", "ident": "lunala-ticket",
+        "kr": "루나아라 변경권", "en": "Lunala Ticket",
+        "cat": "misc", "cost": 0, "sell": 0, "buyable": False,
+        "desc": "솔가레오에게 쓰면 루나아라로 바뀌는 표. 레벨 · 개체값 · 성격 · 친밀도는 그대로이고,"
+                " 메테오드라이브는 섀도레이로, 솔가레오Z는 루나아라Z로 바뀐다.",
+        "evolves": ["솔가레오"],
+        "effect": {"kind": "stone", "swap": "LUNALA", "from": ["SOLGALEO"],
+                   "moves": {"SUNSTEELSTRIKE": "MOONGEISTBEAM"},
+                   "held": {"SOLGANIUMZ": "LUNALIUMZ"}},
+    },
     {
         "id": "RANKTICKETTMTYPE", "ident": "rank-ticket-tm-type",
         "kr": "타입 확정 기술머신 뽑기권", "en": "Typed TM Ticket",

@@ -4783,6 +4783,33 @@
    "sell": 4000,
    "weight": 0
   },
+  "LUNALATICKET": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "desc": "솔가레오에게 쓰면 루나아라로 바뀌는 표. 레벨 · 개체값 · 성격 · 친밀도는 그대로이고, 메테오드라이브는 섀도레이로, 솔가레오Z는 루나아라Z로 바뀐다.",
+   "effect": {
+    "from": [
+     "SOLGALEO"
+    ],
+    "held": {
+     "SOLGANIUMZ": "LUNALIUMZ"
+    },
+    "kind": "stone",
+    "moves": {
+     "SUNSTEELSTRIKE": "MOONGEISTBEAM"
+    },
+    "swap": "LUNALA"
+   },
+   "en": "Lunala Ticket",
+   "evolves": [
+    "솔가레오"
+   ],
+   "id": "LUNALATICKET",
+   "ident": "lunala-ticket",
+   "kr": "루나아라 변경권",
+   "sell": 0
+  },
   "LUNALIUMZ": {
    "cat": "zcrystal",
    "chance": 0,
