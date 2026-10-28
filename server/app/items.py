@@ -74,6 +74,9 @@ def public_list():
             "cat": it["cat"], "cost": it["cost"], "sell": it["sell"],
             "buyable": it.get("buyable", True) and it["cost"] > 0,
             "rarity": it.get("rarity"),
+            # 운영자가 만든 도구(본가에 없음). 가방·박스는 이 목록에서 도구 정보를
+            # 얻으니 서버에서 빼지 못한다 - 앱 상점이 이 표시로 거른다.
+            "custom": bool(it.get("custom")),
             "effect": it["effect"],
             "evolves": it.get("evolves", []),
             # 볼은 종류마다 쓸모가 다른데 설명이 전부 같았다.

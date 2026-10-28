@@ -382,7 +382,8 @@ def profile(uid, other):
     if rel in ("self", "friend"):
         out["lastSeen"] = seen
         out["lastSeenAgo"] = _ago(seen)
+        # 연습판(하루 20판 뒤, 점수 없음)은 뺀다 - 밤에 연습판 서른 판을 지면 최근 전적이 패로 덮인다
         out["recent"] = [r["result"] for r in db.q(
-            "SELECT result FROM battle_record WHERE user_id=?"
+            "SELECT result FROM battle_record WHERE user_id=? AND practice=0"
             " ORDER BY id DESC LIMIT 10", (other,))]
     return out

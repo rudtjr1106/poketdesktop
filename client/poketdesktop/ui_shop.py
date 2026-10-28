@@ -637,8 +637,11 @@ class ShopWindow(object):
             data = data or {}
             # 메가스톤(92종)은 유대 미션으로만 받고 사고팔 수 없다. 상점에 두면
             # '안 판다' 줄이 92개 쏟아진다 - 가방에서만 보인다 (시즌 3).
+            # 운영자가 만든 도구(디아루가 알 뽑기권 등, 서버 custom 표시)도 같다 -
+            # 선물·보상으로만 받는 것이라 '안 판다' 줄로 미리 보이면 안 된다.
+            # (옛 서버는 custom 을 안 보낸다 -> 그대로 보인다)
             self.items = [it for it in (data.get("items") or [])
-                          if it.get("cat") != "megastone"]
+                          if it.get("cat") != "megastone" and not it.get("custom")]
             self.bag = data.get("bag") or {}
             self.money = int(data.get("money") or 0)
             self.sell_rate = float(data.get("sellRate") or 0.5)

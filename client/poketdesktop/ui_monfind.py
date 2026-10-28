@@ -23,20 +23,28 @@ from . import ui_common as U
 
 class FindBar(object):
 
-    def __init__(self, parent, bg, on_change):
+    def __init__(self, parent, bg, on_change, stacked=False):
+        """stacked = [기본|가나다순|레벨순] 을 찾기 줄 아래 오른쪽 줄로 내린다. 가방·기술머신처럼 넓은 칸은
+        한 줄이면 되지만, 탐험 탭의 '누구를' 단은 좁아서(가장 좁게 줄이면 340px 남짓) 한 줄에 안 든다."""
         self.on_change = on_change
         self.sort = ""
         self.frame = tk.Frame(parent, bg=bg)
-        tk.Label(self.frame, text="포켓몬 찾기", bg=bg, fg=U.FG_DIM,
+        top = tk.Frame(self.frame, bg=bg) if stacked else self.frame
+        if stacked:
+            top.pack(fill="x")
+        tk.Label(top, text="포켓몬 찾기", bg=bg, fg=U.FG_DIM,
                  font=U.FONT_XS).pack(side="left")
         self.q = tk.StringVar()
-        self.box = U.entry(self.frame, self.q, width=12)
+        self.box = U.entry(top, self.q, width=12)
         self.box.pack(side="left", padx=(8, 0))
         # 찾는 말이 있을 때만 '몇 마리' 를 적는다.
-        self.count = tk.Label(self.frame, text="", bg=bg, fg=U.FG_FAINT,
+        self.count = tk.Label(top, text="", bg=bg, fg=U.FG_FAINT,
                               font=U.FONT_XS)
         self.count.pack(side="left", padx=(10, 0))
-        self.seg = U.Segmented(self.frame, box_filter.PICK_SORTS, "", self.pick_sort)
+        row = tk.Frame(self.frame, bg=bg) if stacked else self.frame
+        if stacked:
+            row.pack(fill="x", pady=(6, 0))
+        self.seg = U.Segmented(row, box_filter.PICK_SORTS, "", self.pick_sort)
         self.seg.pack(side="right")
         self.q.trace_add("write", lambda *_a: self._changed())
 

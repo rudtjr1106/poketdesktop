@@ -210,6 +210,28 @@ class FakeApi(object):
             by[i]["box"] = int(no)
         return len(coming)
 
+    def release_many(self, ids):
+        """서버 /api/pokemon/release-many 와 같은 모양: 한 마리씩 따로 보고, 막힌 것은 까닭과 함께.
+        busy 에 든 번호는 '배틀 중' 으로 막는다 (그사이 다른 곳에서 배틀을 걸었다고 친다)."""
+        ids = [int(i) for i in ids]
+        self.calls.append(("release", list(ids)))
+        busy = getattr(self, "busy", set())
+        done, failed = [], []
+        for i in ids:
+            m = next((x for x in self.mons if x["id"] == i), None)
+            if m is None:
+                failed.append({"id": i, "reason": "그런 포켓몬이 없습니다."})
+            elif i in busy:
+                failed.append({"id": i, "name": m["info"]["name"],
+                               "reason": "배틀 중인 포켓몬은 놓아줄 수 없습니다. 배틀이 끝난 뒤에 해 주세요."})
+            else:
+                self.mons.remove(m)
+                done.append({"id": i, "name": m["info"]["name"]})
+        msg = "%d마리를 보내주었습니다." % len(done) if done else "한 마리도 놓아주지 못했습니다."
+        if failed:
+            msg += (" %d마리는 못 보냈습니다." if done else " (%d마리 모두 막혔습니다)") % len(failed)
+        return {"ok": True, "released": done, "failed": failed, "heldToBag": [], "message": msg}
+
     def set_box_name(self, no, name):
         self.calls.append(("boxname", no, name))
         if name:

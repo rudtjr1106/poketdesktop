@@ -299,15 +299,26 @@ def main():
         ("입장 중에 cleanup", 2.2, lambda ar: ar.cleanup()),
         ("cleanup 을 두 번", 3.0, lambda ar: (ar.cleanup(), ar.cleanup())),
         ("재생 중 예외가 나도", 3.0, lambda ar: _boom(ar)),
+        # 사용자가 × 를 누르거나 Esc 를 친다 (그만 보기). 단추의 마우스 이벤트를 진짜로 보낸다.
+        ("× 를 눌러 그만 보기", 3.0, lambda ar: ar.stop_plate.x.event_generate("<Button-1>")),
+        ("소집 중에 ×", 0.6, lambda ar: ar.stop_plate.x.event_generate("<Button-1>")),
+        ("Esc 로 그만 보기", 3.0, lambda ar: ar.stop_plate.win.event_generate("<Escape>")),
+        ("× 를 두 번", 3.0, lambda ar: (ar.stop_plate.stop(), ar.stop())),
     ]
     for name, when, kill in cases:
         ov = desktop(root, dex, NUMS)
         want = len(ov.pets)
         app = FakeApp(root, dex)
         app.overlay = ov
-        ar = A.Arena(app, make_match(dex, rng, NUMS))
+        done_calls = []
+        ar = A.Arena(app, make_match(dex, rng, NUMS), on_done=lambda: done_calls.append(1))
         ar.start()
         run_until(root, when)
+        plate = ar.stop_plate
+        if "×" in name or "Esc" in name:
+            if plate is not None:
+                plate.win.focus_force()
+                root.update()
         try:
             kill(ar)
         except Exception as e:                              # noqa: BLE001
@@ -322,6 +333,9 @@ def main():
         chk("%s → 다시 걸어다닌다" % name,
             all(not p.battling for p in ov.pets.values()))
         chk("%s → 예약된 일이 안 남는다" % name, not ar.jobs, len(ar.jobs))
+        chk("%s → 그만 보기 판이 없다" % name,
+            ar.stop_plate is None and (plate is None or not plate.win.winfo_exists()))
+        chk("%s → 끝났다고 한 번만 알린다" % name, done_calls == [1], done_calls)
         ov.clear()
 
     print("\n=== 한 마리씩만 있을 때 ===")

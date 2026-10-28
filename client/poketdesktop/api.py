@@ -2,6 +2,7 @@
 """서버와 주고받는 부분. 실패하면 ApiError 로 통일해서 던진다."""
 import json
 import os
+import re
 
 import requests
 
@@ -276,6 +277,76 @@ class Api(object):
     def release(self, pid):
         return self._call("DELETE", "/api/pokemon/%d" % pid)
 
+    # 서버가 한 번에 받는 수 (ReleaseManyIn 의 max_length). 그 넘게 고르면 나눠 보낸다.
+    RELEASE_CHUNK = 200
+
+    def release_many(self, ids):
+        """여러 마리를 한 번에 놓아준다. {"released": [{id, name}], "failed": [{id, name, reason}], ...}.
+
+        서버는 한 마리씩 따로 판다 - 막힌 것만 failed 에 까닭과 함께 온다.
+        서버는 한 번에 200마리까지라 **그 넘게는 200마리씩 나눠 보내고 결과를 하나로 합친다** (박스 화면의
+        '이 화면 전부' 로 찾은 것을 다 고르면 넘을 수 있다).
+        **옛 서버에는 이 길이 없다** (404·405). 그때는 한 마리씩 release 로 보내고 같은 모양으로 돌려준다
+        (move_boxes 와 같다: 새 서버의 404 는 "그런 포켓몬이 없습니다" 라 그건 그대로 올린다).
+        """
+        ids = [int(i) for i in ids]
+        step = self.RELEASE_CHUNK
+        parts = []
+        for k in range(0, max(len(ids), 1), step):
+            chunk = ids[k:k + step]
+            try:
+                parts.append(self._call("POST", "/api/pokemon/release-many", {"ids": chunk}))
+            except ApiError as e:
+                if e.status != 405 and not (e.status == 404 and "없습니다" not in (e.message or "")):
+                    raise
+                # 옛 서버: 첫 덩어리에서 알게 된다. 남은 것 전부를 한 마리씩
+                parts.append(self._release_one_by_one(ids[k:]))
+                break
+        if len(parts) == 1:
+            return parts[0]
+        done, failed, bag = [], [], []
+        for r in parts:
+            done += r.get("released") or []
+            failed += r.get("failed") or []
+            bag += r.get("heldToBag") or []
+        return {"ok": True, "released": done, "failed": failed, "heldToBag": bag,
+                "message": self._release_msg(len(done), len(failed), len(bag))}
+
+    @staticmethod
+    def _release_msg(n_done, n_failed, n_bag, bag_note=""):
+        """여러 마리 놓아주기 알림 글. 서버(main.release_many)와 같은 말 - 나눠 보내거나 옛 서버여도 같게."""
+        msg = "%d마리를 보내주었습니다." % n_done if n_done else "한 마리도 놓아주지 못했습니다."
+        if bag_note:
+            msg += " " + bag_note
+        elif n_bag:
+            msg += " 지니고 있던 도구 %d개는 가방에 넣었습니다." % n_bag
+        if n_failed:
+            # 다 막혔으면 '한 마리도 …' 뒤에 몇 마리가 막혔는지만 (못 보낸 수 = 고른 수)
+            msg += (" %d마리는 못 보냈습니다." if n_done else " (%d마리 모두 막혔습니다)") % n_failed
+        return msg
+
+    def _release_one_by_one(self, ids):
+        """옛 서버용: 한 마리씩 release. 한 마리 길의 알림 글에서 '가방에 넣었습니다' 를 건져 도구 이야기도 살린다
+        (옛 서버는 도구 이름을 따로 주지 않는다 - 글에서 이름을 뽑는다)."""
+        done, failed, bag = [], [], []
+        for i in ids:
+            try:
+                r = self.release(i) or {}
+            except ApiError as e:
+                if e.status in (0, 401):     # 연결이 끊기거나 로그인이 풀리면 더 보내 봐야 다 막힌다
+                    raise
+                failed.append({"id": i, "reason": e.message or "놓아주지 못했습니다."})
+                continue
+            done.append({"id": i})
+            m = re.search(r"지니고 있던 (.+?)은\(는\) 가방에 넣었습니다", r.get("message") or "")
+            if m:
+                bag.append(m.group(1))
+        note = ""
+        if bag:
+            note = "지니고 있던 %s은(는) 가방에 넣었습니다." % ", ".join(bag)
+        return {"ok": True, "released": done, "failed": failed, "heldToBag": bag,
+                "message": self._release_msg(len(done), len(failed), len(bag), note)}
+
     # 지닌 도구. 가방의 도구 하나를 이 포켓몬에게 들린다 / 벗겨 가방에 넣는다.
     def hold(self, pid, item):
         return self._call("POST", "/api/pokemon/%d/hold" % pid, {"item": item})
@@ -518,8 +589,11 @@ class Api(object):
         return self._call("POST", "/api/pvp/match/%d/seen" % mid, {})
 
     def pvp_random(self):
-        """아무나 골라 붙는다. 상대는 접속해 있지 않아도 된다."""
-        return self._call("POST", "/api/pvp/random", {})
+        """아무나 골라 붙는다. 상대는 접속해 있지 않아도 된다.
+
+        practice=1 = 이 앱은 연습판(하루 20판 뒤, 점수 없음)을 안다. 서버는 이 표시가 있을 때만 20판 뒤에도
+        받는다 - 없는 옛 앱은 예전처럼 막힌다. 랭킹 단추·트레이 모두 여기 하나로 건다 (app.pvp_random)."""
+        return self._call("POST", "/api/pvp/random", {"practice": 1})
 
     def pvp_challenge(self, uid):
         """친구를 지목해서 붙는다. 수락을 기다리지 않는다."""

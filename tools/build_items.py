@@ -89,11 +89,14 @@ NO_BUY = {"master-ball", "gold-bottle-cap"}
 # **rarity 를 주지 않는다.** 드랍표는 rarity 가 있는 것만 담으므로,
 # 없으면 자연히 안 떨어진다. 운영자가 선물로만 주는 물건이다.
 #
-# cost 0 · buyable false 라 상점에도 안 뜬다. 이벤트 전에 목록에서
-# 들키면 재미가 없다 - 마스터볼이 "안 판다" 로 되어 있는 것과 같다.
+# cost 0 · buyable false 지만 그것만으로는 상점에서 안 숨겨진다 - 서버 목록
+# (items.public_list)은 가방·박스도 쓰므로 거르지 않고 '안 판다' 줄로 그대로 나간다.
+# 그래서 "custom": True 를 달아 보낸다. 앱 상점(ui_shop)이 이 표시로 목록에서
+# 뺀다 (가방에는 그대로). 이벤트 전에 상점에서 들키면 재미가 없다.
 EXTRA = [
     {
         "id": "FLOWERBALL", "ident": "flower-ball",
+        "custom": True,
         "kr": "플라워볼", "en": "Flower Ball",
         "cat": "ball", "cost": 0, "sell": 0, "buyable": False,
         # **설명에 종 이름을 쓰지 않는다.** 가방에서 미리 읽힌다.
@@ -104,6 +107,7 @@ EXTRA = [
     # 랭크 시즌 보상 (1.4.0). 상점·드랍에 없다 - 순위로만 받는다.
     {
         "id": "SHINYCANDY", "ident": "shiny-candy",
+        "custom": True,
         "kr": "이로치사탕", "en": "Shiny Candy",
         "cat": "misc", "cost": 0, "sell": 0, "buyable": False,
         "desc": "먹이면 몸 색이 바뀌어 이로치가 되는 신비한 사탕."
@@ -116,6 +120,7 @@ EXTRA = [
     # 준다. 상점·드랍에 없다.
     {
         "id": "RAIDTICKETDIALGA", "ident": "raid-ticket-dialga",
+        "custom": True,
         "kr": "디아루가 알 뽑기권", "en": "Dialga Egg Ticket",
         "cat": "misc", "cost": 0, "sell": 0, "buyable": False,
         "desc": "레이드에서 아깝게 놓친 디아루가 알을 한 번 더 노려 보는 표."
@@ -130,6 +135,7 @@ EXTRA = [
     # 나오면 표만 날아간 것과 같다). 다 모았으면 쓸 수 없고 표는 남는다.
     {
         "id": "RANKTICKETTM", "ident": "rank-ticket-tm",
+        "custom": True,
         "kr": "랜덤 기술머신 뽑기권", "en": "TM Ticket",
         "cat": "misc", "cost": 0, "sell": 0, "buyable": False,
         "desc": "아직 없는 기술머신 가운데 하나가 무작위로 나오는 표."
@@ -138,6 +144,7 @@ EXTRA = [
     },
     {
         "id": "RANKTICKETTMTYPE", "ident": "rank-ticket-tm-type",
+        "custom": True,
         "kr": "타입 확정 기술머신 뽑기권", "en": "Typed TM Ticket",
         "cat": "misc", "cost": 0, "sell": 0, "buyable": False,
         "desc": "쓸 때 타입을 고르면, 그 타입 기술머신 가운데 아직 없는 것 하나가"

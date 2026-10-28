@@ -436,7 +436,9 @@ CREATE TABLE IF NOT EXISTS pvp_match (
     b_reward    INTEGER NOT NULL DEFAULT 0,
     a_seen      INTEGER NOT NULL DEFAULT 0,
     b_seen      INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT NOT NULL
+    created_at  TEXT NOT NULL,
+    -- 연습판 (하루 20판 뒤의 랜덤 배틀). 이 로그는 봤든 안 봤든 이틀이면 치운다 (pvp.prune)
+    practice    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_pvp_match_a ON pvp_match(a_id, id);
 CREATE INDEX IF NOT EXISTS idx_pvp_match_b ON pvp_match(b_id, id);
@@ -470,7 +472,9 @@ CREATE TABLE IF NOT EXISTS battle_record (
     ended_at    TEXT NOT NULL,
     -- 시즌 2 부터 보이는 점수는 RP 다. rating/delta 는 숨은 점수(MMR).
     rp          INTEGER NOT NULL DEFAULT 0,
-    rp_delta    INTEGER NOT NULL DEFAULT 0
+    rp_delta    INTEGER NOT NULL DEFAULT 0,
+    -- 연습판 (하루 20판 뒤의 랜덤 배틀). 점수·승패에 안 들어가고 상금만 조금 붙은 판 (pvp._settle)
+    practice    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_record_user ON battle_record(user_id, id DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_record_once ON battle_record(match_id, user_id);
@@ -1119,6 +1123,12 @@ MIGRATIONS = [
     ("guild_chat", "card", "ALTER TABLE guild_chat ADD COLUMN card TEXT NOT NULL DEFAULT ''"),
     # 1.11.0: 새 기술머신 표시. 옛 행은 1 = 이미 본 것 - 올리자마자 가진 것 전부에 점이 뜨면 안 된다
     ("tm_owned", "seen", "ALTER TABLE tm_owned ADD COLUMN seen INTEGER NOT NULL DEFAULT 1"),
+    # 연습판 (하루 20판 뒤의 랜덤 배틀). 옛 행은 0 = 점수판 - 그때는 20판에서 막혔다
+    ("battle_record", "practice",
+     "ALTER TABLE battle_record ADD COLUMN practice INTEGER NOT NULL DEFAULT 0"),
+    # 연습판 대전 로그 표시 - 점수판 로그(14일)보다 빨리(2일) 치우려고. 옛 행은 0 = 점수판
+    ("pvp_match", "practice",
+     "ALTER TABLE pvp_match ADD COLUMN practice INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

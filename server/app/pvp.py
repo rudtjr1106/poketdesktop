@@ -39,6 +39,11 @@ REWARD = {"win": 500, "draw": 0, "lose": 0}
 # 돈이 무한히 나온다. 아래 하루 상한과 같이 쓴다.
 FRIEND_RATE = 0.5
 
+# 하루 20판(DAILY_BATTLES)을 넘긴 랜덤 배틀 = **연습판**의 상금 (사용자 결정: 점수판 500원의 1/5).
+# 점수는 하나도 안 움직이고 돈만 조금 준다. 아래 하루 상한(DAILY_CAP)은 점수판과 **같이** 센다 -
+# 연습판을 몇 판 더 친다고 하루 벌이가 6000원을 넘지 않는다.
+PRACTICE_REWARD = {"win": 100, "draw": 0, "lose": 0}
+
 # 하루에 배틀로 받을 수 있는 돈의 상한.
 # 도구를 되팔면 한 번에 838원쯤 되고 몬스터볼이 200원이다. 6000원이면
 # 하루치 벌이로 넉넉하되, 계속 돌린다고 끝없이 불어나지는 않는다.
@@ -66,6 +71,10 @@ PAIR_COOLDOWN_MIN = 30      # 같은 사람에게 다시 걸기까지
 # **친구 배틀은 안 센다.** 친구에게 한 판 걸었다고 랭크 한 판이 줄면, 친구와
 # 놀려면 랭크를 포기해야 한다. 같은 상대에게는 30분에 한 번만 걸 수 있어서
 # (PAIR_COOLDOWN_MIN) 둘이서 계속 붙어 점수를 몰아주는 것은 그대로 막힌다.
+#
+# **20판을 넘기면 막지 않고 연습판으로 친다** (사용자 결정). 하루 상한을 둔 까닭은 자는 사람의
+# 점수를 몇 번이고 깎는 것이었는데, 연습판은 양쪽 다 점수(RP·숨은 점수·연승·배치·판수·하루 첫 승)가
+# 하나도 안 움직이므로 그 걱정이 없다. 쿨타임(같은 상대 30분 · 랜덤 쿨타임)과 상대 고르기는 그대로다.
 DAILY_BATTLES = 20
 
 # 랜덤 배틀에서 상대를 고를 때만 쓰는 값들.
@@ -117,6 +126,10 @@ FRESH_WINDOW_MIN = 60 * 24
 # 다 본 대전 로그를 며칠이나 들고 있을지. 로그는 보고 나면 값이 없어지는
 # 자료인데 한 판에 수십 KB 라 Turso 용량을 제일 먼저 먹는다.
 KEEP_DAYS = 14
+# 연습판(하루 20판 뒤) 로그는 봤든 안 봤든 이만큼 지나면 치운다. 점수가 안 걸린 판이라 다시 볼 값이 적은데,
+# 20판 뒤로는 상한 없이 쌓이므로 점수판처럼 14일(그것도 양쪽이 다 본 것만) 들고 있으면 용량을 먹는다.
+# 전적(battle_record) 줄은 남는다 - 화면은 canReplay 로 '다시 보기' 만 끈다.
+PRACTICE_KEEP_DAYS = 2
 
 
 def _now():
@@ -170,14 +183,14 @@ def _score(result):
 
 
 # ---------------------------------------------------------------- 상금
-def _reward_for(uid, row, kind, result):
+def _reward_for(uid, row, kind, result, practice=False):
     """이 판으로 받을 돈. 하루 상한에 걸리면 깎아서 준다.
 
     상한을 쓰는 이유는 친구끼리 서로 져 주며 돈을 찍어내는 걸 막기
     위해서다. 어느 방식으로 벌든 하루 총액이 같은 문에 걸리므로,
-    나중에 배틀 종류가 늘어도 여기만 보면 된다.
+    나중에 배틀 종류가 늘어도 여기만 보면 된다. 연습판도 같은 문이다.
     """
-    want = REWARD[result]
+    want = (PRACTICE_REWARD if practice else REWARD)[result]
     if kind == "friend":
         want = int(want * FRIEND_RATE)
     today = _today()
@@ -398,16 +411,23 @@ def _name(uid):
     return r["username"] if r else "?"
 
 
-def run_match(a_uid, b_uid, kind="random", seed=None):
+def run_match(a_uid, b_uid, kind="random", seed=None, practice=None):
     """두 사람을 붙이고 결과를 남긴다. 부르는 순간 판이 끝난다.
 
-    돌려주는 것: {"matchId", "winner"(user_id 또는 None), "turns",
+    돌려주는 것: {"matchId", "winner"(user_id 또는 None), "turns", "practice",
                   "a": {...}, "b": {...}}
-    양쪽의 dict 에는 result / reward / rating / delta / rp / rpDelta 가 들어 있다.
+    양쪽의 dict 에는 result / reward / rating / delta / rp / rpDelta / practice 가 들어 있다.
 
     랜덤 배틀은 랭크 팀으로, 레벨 상한을 걸고 싸운다. 친구 배틀은 지금까지처럼
     바탕화면 파티를 원래 레벨 그대로 쓴다 - 키운 보람은 거기서 보여 준다.
+
+    practice 를 안 주면 **거는 쪽(a)이 오늘 20판을 다 썼는지**로 정한다 (랜덤 배틀만).
+    판은 점수판과 똑같이 싸운다 - 다른 것은 뒤처리(_settle)뿐이다. 응답 모양도 같아서
+    (점수 변화가 0 일 뿐) practice 를 모르는 옛 앱 화면도 그대로 돈다.
     """
+    if practice is None:
+        practice = kind == "random" and is_practice(a_uid)
+    practice = bool(practice) and kind == "random"
     dex = deps.dex()
     if kind == "random":
         a_mons, b_mons = capped(ranked_team(a_uid)), capped(ranked_team(b_uid))
@@ -437,15 +457,16 @@ def run_match(a_uid, b_uid, kind="random", seed=None):
 
     # a 가 건 쪽이다(run_match 를 부르는 자리에서 늘 그렇게 넘긴다).
     # b 는 걸려온 쪽이라 상금이 없다 - 계산도 하지 않는다.
-    pay_a, day, used_a = _reward_for(a_uid, row_a, kind, res_a)
+    pay_a, day, used_a = _reward_for(a_uid, row_a, kind, res_a, practice)
     pay_b, used_b = 0, 0
 
     mid = db.run(
         "INSERT INTO pvp_match (kind, a_id, b_id, a_name, b_name, winner,"
-        " turns, seed, engine, log, a_reward, b_reward, created_at)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " turns, seed, engine, log, a_reward, b_reward, created_at, practice)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (kind, a_uid, b_uid, a_name, b_name, winner_id, out["turns"], seed,
-         VERSION, pack(out["events"]), pay_a, pay_b, _iso())).lastrowid
+         VERSION, pack(out["events"]), pay_a, pay_b, _iso(),
+         1 if practice else 0)).lastrowid
 
     left_a = _left(out["events"], "me", len(a_mons))
     left_b = _left(out["events"], "foe", len(b_mons))
@@ -456,14 +477,14 @@ def run_match(a_uid, b_uid, kind="random", seed=None):
 
     fin_a = _settle(a_uid, row_a, b_uid, b_name, kind, res_a, pay_a, day,
                     used_a, out["turns"], left_a, left_b, lead_a, lead_b,
-                    mid, row_b["rating"], power_ratio=ratio_a)
+                    mid, row_b["rating"], power_ratio=ratio_a, practice=practice)
     fin_b = _settle(b_uid, row_b, a_uid, a_name, kind, res_b, pay_b, day,
                     used_b, out["turns"], left_b, left_a, lead_b, lead_a,
                     mid, row_a["rating"], started=False,
-                    power_ratio=1.0 / ratio_a)
+                    power_ratio=1.0 / ratio_a, practice=practice)
 
     return {"matchId": mid, "winner": winner_id, "turns": out["turns"],
-            "kind": kind, "seed": seed, "a": fin_a, "b": fin_b}
+            "kind": kind, "seed": seed, "practice": practice, "a": fin_a, "b": fin_b}
 
 
 def _left(events, side, total):
@@ -481,11 +502,15 @@ def power_ratio(mine, theirs):
 
 def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
             turns, my_left, foe_left, lead, foe_lead, mid, foe_rating,
-            started=True, power_ratio=1.0):
+            started=True, power_ratio=1.0, practice=False):
     """한 사람 몫의 뒤처리 — 돈, 전적, 점수.
 
     started 는 **내가 걸었는가**다. 걸려온 쪽은 전적에 남기기만 하고
     점수도 승패도 돈도 건드리지 않는다.
+
+    practice 는 **연습판**(하루 20판 뒤의 랜덤 배틀)이다. 건 쪽도 걸려온 쪽처럼
+    점수·승패·판수·연승·하루 첫 승을 하나도 안 건드리고, 돈(하루 상한 안)만 받는다.
+    전적에는 '연습' 으로 남긴다.
 
     상대는 접속해 있지 않아도 붙는다(자는 사람의 파티를 가져와 돌린다).
     그래서 걸려온 판까지 점수에 넣으면, 자는 동안 남이 몇 번을 걸었느냐로
@@ -508,7 +533,7 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
     notes = []
     today = _today()
     first_win = False
-    counts = started and kind == "random"
+    counts = started and kind == "random" and not practice
     if counts:
         # 숨은 점수도 RP 와 **같은 기대치**(숨은 점수 + 전력비)로 움직인다. 숨은
         # 점수만 전력을 모른 채 오르내리면, 전력이 센 사람의 숨은 점수에 전력이
@@ -526,22 +551,28 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
 
     db.run("INSERT INTO battle_record (user_id, foe_id, foe_name, kind,"
            " result, rating, delta, reward, turns, my_left, foe_left,"
-           " lead, foe_lead, match_id, started, ended_at, rp, rp_delta)"
-           " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+           " lead, foe_lead, match_id, started, ended_at, rp, rp_delta, practice)"
+           " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
            (uid, foe_id, foe_name, kind, result, rating, delta, pay, turns,
             my_left, foe_left, lead, foe_lead, mid, 1 if started else 0,
-            _iso(), rp, rp_delta))
+            _iso(), rp, rp_delta, 1 if practice else 0))
 
     if not started:
         # 걸려온 판은 여기서 끝. 점수·승패·하루 상한 어느 것도 안 건드린다.
         return {"userId": uid, "result": result, "reward": 0,
                 "rating": rating, "delta": 0, "rp": rp, "rpDelta": 0,
-                "started": False, "myLeft": my_left, "foeLeft": foe_left}
+                "started": False, "practice": practice,
+                "myLeft": my_left, "foeLeft": foe_left}
 
     won = 1 if result == "win" else 0
     lost = 1 if result == "lose" else 0
     drew = 1 if result == "draw" else 0
-    if kind == "random":
+    if practice:
+        # 연습판: 하루 상금만 센다 (점수판과 같은 상한). 판수·승패·연승·RP·하루 첫 승은 그대로,
+        # 길드 미션('랜덤 배틀 하기')도 안 센다 - 20판이면 이미 다 찼고, 점수 없는 판은 점수 없는 판이다.
+        db.run("UPDATE rank_stat SET earned_day=?, earned=?, updated_at=? WHERE user_id=?",
+               (day, used + pay, _iso(), uid))
+    elif kind == "random":
         from . import guild                 # 길드 일일 미션 (1.10.0): 내가 건 랜덤 배틀만 센다
         guild.note_safe(uid, "rank")
         games = row["games"] + 1
@@ -563,9 +594,10 @@ def _settle(uid, row, foe_id, foe_name, kind, result, pay, day, used,
 
     out = {"userId": uid, "result": result, "reward": pay,
            "rating": rating, "delta": delta, "rp": rp, "rpDelta": rp_delta,
-           "rpNotes": notes, "started": True,
+           "rpNotes": notes, "started": True, "practice": practice,
            "myLeft": my_left, "foeLeft": foe_left}
-    if counts:
+    if kind == "random":
+        # 연습판도 지금 티어를 싣는다 (안 바뀐 그대로) - 랜덤 배틀 응답 모양을 옛 앱이 보던 그대로 둔다
         out.update(season.tier_public(season.tier_of(rp)))
     return out
 
@@ -619,18 +651,27 @@ def _all_teams():
     return dict((uid, restrict(mons)[0]) for uid, mons in teams.items())
 
 
-def _last_met(uid, minutes):
-    """그 시간 안에 붙은 상대 -> 마지막으로 붙은 시각."""
+def _last_met(uid, minutes, practice=True):
+    """그 시간 안에 붙은 상대 -> 마지막으로 붙은 시각.
+
+    practice=False 면 연습판(하루 20판 뒤) 줄은 안 본다. 상대 고르기의 '오래 안 만난 사람부터'
+    (3시간 건너뛰기 · 하루 감점)는 점수판끼리의 일이다 - 밤에 연습판으로 여러 명을 만났다고
+    다음 날 아침 점수판에서 RP 가 가까운 사람들을 건너뛰면 안 된다.
+    """
     cut = _iso(_now() - datetime.timedelta(minutes=minutes))
     rows = db.q("SELECT foe_id, MAX(ended_at) last FROM battle_record"
                 " WHERE user_id=? AND ended_at > ? AND foe_id IS NOT NULL"
+                + ("" if practice else " AND practice=0") +
                 " GROUP BY foe_id", (uid, cut))
     return dict((r["foe_id"], r["last"]) for r in rows)
 
 
-def _recent_foes(uid, minutes=PAIR_COOLDOWN_MIN):
-    """최근에 붙은 사람들. 연달아 같은 사람을 때리지 않게."""
-    return set(_last_met(uid, minutes))
+def _recent_foes(uid, minutes=PAIR_COOLDOWN_MIN, practice=True):
+    """최근에 붙은 사람들. 연달아 같은 사람을 때리지 않게.
+
+    같은 상대 30분 쿨타임(기본값)은 **연습판도 센다** - 점수가 없어도 한 사람을 몰아 치지 못하게.
+    """
+    return set(_last_met(uid, minutes, practice))
 
 
 def _blocked_ids(uid):
@@ -666,7 +707,10 @@ def find_opponent(uid, rng=None):
     mine = teams.get(uid)
     if not mine or not rank_ready(mine)[0]:
         return None
-    skip = _recent_foes(uid, RANDOM_REPEAT_MIN) | _blocked_ids(uid)
+    # 3시간 건너뛰기는 점수판만 본다 (_last_met). 그래도 30분 안에 만난 사람은 연습판이라도 뺀다 -
+    # 안 빼면 골라 놓고 can_fight 의 같은 상대 쿨타임에 걸려 '30분에 한 번' 으로 끝난다.
+    skip = (_recent_foes(uid, RANDOM_REPEAT_MIN, practice=False) | _recent_foes(uid)
+            | _blocked_ids(uid))
     skip.add(uid)
 
     my_power = team_power(mine) or 1.0
@@ -749,7 +793,7 @@ def _pick_fresh(uid, cands, rng, ratings=None, my_mmr=BASE_RATING, points=None, 
     """
     ratings = ratings or {}
     points = points or {}
-    met = _last_met(uid, FRESH_WINDOW_MIN)
+    met = _last_met(uid, FRESH_WINDOW_MIN, practice=False)     # 하루 감점도 점수판만 (_last_met)
 
     def rp_cost(c):
         return abs(points.get(c[1], 0) - my_rp) + (MET_PENALTY if c[1] in met else 0)
@@ -813,10 +857,14 @@ def rank_short(uid):
     return why
 
 
-def can_start(uid, kind="random"):
+def can_start(uid, kind="random", practice_ok=False):
     """내 쪽 조건만. 상대를 고르기 전에 먼저 본다.
 
     상대까지 골라 놓고 막히면, 애먼 사람의 쿨다운만 태우게 된다.
+
+    practice_ok = 거는 앱이 연습판을 안다고 알렸나 (POST /api/pvp/random 의 practice=1).
+    **안 알린 옛 앱은 20판에서 예전처럼 막는다.** 옛 앱은 연습판을 모르니 막지 않으면 21판째도
+    점수판인 줄 알고 걸고, 화면에는 'RP +0' 만 남는다 - 왜 점수가 안 오르는지 알 길이 없다.
     """
     team = ranked_team(uid) if kind == "random" else _party(uid)
     if not team:
@@ -825,10 +873,9 @@ def can_start(uid, kind="random"):
         why = rank_short(uid)
         if why:
             return why
-        # 하루 상한과 쿨타임은 **랜덤 배틀에만** 건다 (DAILY_BATTLES 의 설명).
-        row = _rating_row(uid)
-        used = row["fought"] if row["fought_day"] == _today() else 0
-        if used >= DAILY_BATTLES:
+        # 하루 상한과 쿨타임은 **랜덤 배틀에만** 건다. 새 앱(practice_ok)은 20판을 넘겨도 막지 않는다 -
+        # 그 뒤는 연습판이다 (DAILY_BATTLES 의 설명, run_match 가 is_practice 로 가른다).
+        if not practice_ok and is_practice(uid):
             return "오늘은 랜덤 배틀을 %d판까지 걸 수 있습니다. 내일 다시 해주세요." % DAILY_BATTLES
         left = random_cooldown_left(uid)
         if left:
@@ -836,11 +883,11 @@ def can_start(uid, kind="random"):
     return None
 
 
-def can_fight(uid, other, kind="friend"):
-    """지금 저 사람에게 걸 수 있는가. 안 되면 이유를 돌려준다."""
+def can_fight(uid, other, kind="friend", practice_ok=False):
+    """지금 저 사람에게 걸 수 있는가. 안 되면 이유를 돌려준다. practice_ok 는 can_start 의 것."""
     if uid == other:
         return "자기 자신과는 싸울 수 없습니다."
-    why = can_start(uid, kind)
+    why = can_start(uid, kind, practice_ok)
     if why:
         return why
     if not db.q1("SELECT 1 x FROM users WHERE id=?", (other,)):
@@ -873,6 +920,12 @@ def note_fight(uid, kind="random"):
            (today, used + 1, uid))
 
 
+def is_practice(uid):
+    """지금 랜덤 배틀을 걸면 연습판인가 = 오늘(한국 날짜) 20판을 다 썼나. **읽기만 한다** (fight_left 와 같은 까닭)."""
+    r = db.q1("SELECT fought, fought_day FROM rank_stat WHERE user_id=?", (uid,))
+    return bool(r) and r["fought_day"] == _today() and (r["fought"] or 0) >= DAILY_BATTLES
+
+
 def fight_left(uid):
     """오늘 랜덤 배틀을 몇 판 더 걸 수 있나 (1.13, /api/me 에 실어 트레이 메뉴가 쓴다).
 
@@ -881,16 +934,21 @@ def fight_left(uid):
     """
     r = db.q1("SELECT fought, fought_day FROM rank_stat WHERE user_id=?", (uid,))
     used = r["fought"] if r and r["fought_day"] == _today() else 0
-    return {"left": max(0, DAILY_BATTLES - used), "dailyBattles": DAILY_BATTLES}
+    # practice = 다 썼으니 다음 판은 연습판 (새 앱이 '연습판 (점수 없음)' 으로 적는다). 옛 서버에는 이 칸이
+    # 없다 - 앱은 칸이 없으면 예전처럼 '오늘은 다 함' 으로 적는다.
+    return {"left": max(0, DAILY_BATTLES - used), "dailyBattles": DAILY_BATTLES,
+            "practice": used >= DAILY_BATTLES}
 
 
 def fight_status(uid):
     row = _rating_row(uid)
     today = _today()
     used = row["fought"] if row["fought_day"] == today else 0
-    # foughtToday/left 는 **랜덤 배틀** 기준이다 (친구 배틀은 상한이 없다).
+    # foughtToday/left 는 **랜덤 배틀** 기준이다 (친구 배틀은 상한이 없다). foughtToday 는 연습판까지
+    # 센 오늘 건 판 수라 20 을 넘을 수 있다 - left 는 0 아래로 안 내려간다.
     return {"foughtToday": used, "dailyBattles": DAILY_BATTLES,
             "left": max(0, DAILY_BATTLES - used),
+            "practice": used >= DAILY_BATTLES, "practiceReward": PRACTICE_REWARD["win"],
             "randomCooldownSec": int(config.RANDOM_COOLDOWN_SEC),
             "randomCooldownLeft": random_cooldown_left(uid)}
 
@@ -956,7 +1014,7 @@ def match_view(uid, mid):
             foe["guild"] = g
     except Exception:                                       # noqa: BLE001
         pass
-    rec = db.q1("SELECT rp_delta, rp FROM battle_record WHERE match_id=?"
+    rec = db.q1("SELECT rp_delta, rp, practice FROM battle_record WHERE match_id=?"
                 " AND user_id=?", (mid, uid))
     return {
         "id": m["id"], "kind": m["kind"], "result": result,
@@ -969,6 +1027,8 @@ def match_view(uid, mid):
         "levelCap": season.LEVEL_CAP if m["kind"] == "random" else None,
         "rpDelta": rec["rp_delta"] if rec else 0,
         "rp": rec["rp"] if rec else None,
+        # 연습판 (하루 20판 뒤): 결과 화면이 '연습판 · 점수 변화 없음' 을 적는다
+        "practice": bool(rec["practice"]) if rec else False,
     }
 
 
@@ -1020,6 +1080,8 @@ def records(uid, limit=30):
                     # 내가 건 판인가. 걸려온 판은 점수·승패·돈에 안 들어가서
                     # 화면에서도 그렇게 보여야 한다.
                     "started": bool(r["started"]),
+                    # 연습판 (하루 20판 뒤의 랜덤 배틀) - 점수에 안 들어간 판
+                    "practice": bool(r["practice"]),
                     "rating": None if hide else r["rating"],
                     "delta": 0 if hide else r["delta"],
                     "rp": r["rp"], "rpDelta": r["rp_delta"],
@@ -1125,11 +1187,16 @@ def ranking(limit=50, uid=None):
     return out
 
 
-def prune(days=KEEP_DAYS):
-    """오래된 대전 로그를 치운다. 전적(battle_record)은 그대로 남는다."""
+def prune(days=KEEP_DAYS, practice_days=PRACTICE_KEEP_DAYS):
+    """오래된 대전 로그를 치운다. 전적(battle_record)은 그대로 남는다.
+
+    연습판 로그는 봤든 안 봤든 practice_days 가 지나면 치운다 (PRACTICE_KEEP_DAYS).
+    """
     cut = _iso(_now() - datetime.timedelta(days=days))
     db.run("DELETE FROM pvp_match WHERE created_at < ?"
            " AND a_seen=1 AND b_seen=1", (cut,))
+    db.run("DELETE FROM pvp_match WHERE practice=1 AND created_at < ?",
+           (_iso(_now() - datetime.timedelta(days=practice_days)),))
     # 주인 없는 판도 같이 치운다.
     #
     # db.run 은 끊기면 다시 해보는데(Turso 가 가끔 끊긴다) INSERT 는

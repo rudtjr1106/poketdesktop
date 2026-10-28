@@ -610,6 +610,25 @@ def expedition(root, dex):
     finally:
         ui_box.confirm = real
     chk("불러들이기 → 칸이 빈다", sum(1 for x, _d in w._slot_rows if x) == 1)
+    # 찾기 · 줄 세우기 (1.13.5) - 기본 탭과 같은 말. 입력칸은 진짜 위젯, 탭은 판이 그린다.
+    w.find.pick_sort("level")
+    TBL.settle(root, 0.3)
+    lvs = [r[1][0]["level"] for r in w.vl.rows]
+    chk("찾기: 레벨순 (높은 것부터)", len(lvs) >= 10 and lvs == sorted(lvs, reverse=True), lvs[:5])
+    one = w.vl.rows[0][1][0]
+    w.find.q.set(str(one["num"]))
+    TBL.settle(root, 0.3)
+    chk("  도감 번호로 찾는다 (고른 포켓몬이 가려지면 보이는 것 중에서 다시 고른다)",
+        bool(w.vl.rows) and one["id"] in [r[1][0]["id"] for r in w.vl.rows]
+        and len(w.vl.rows) < len(lvs) and w.pick in [r[1][0]["id"] for r in w.vl.rows], (len(w.vl.rows), w.pick))
+    w.find.q.set("없는포켓몬")
+    TBL.settle(root, 0.3)
+    chk("  하나도 안 맞으면 안내 · 아무도 안 고르고 보내기가 잠긴다", not w.vl.rows and "없는포켓몬" in (w._empty or "")
+        and w.pick is None and w._summary_data()[4] is False, (w._empty, w.pick))
+    w.find.q.set("")
+    w.find.pick_sort("")
+    TBL.settle(root, 0.3)
+    chk("  지우면 다 돌아온다", len(w.vl.rows) >= 10 and not w._empty and w.pick is not None, (len(w.vl.rows), w.pick))
     w.close()
 
 

@@ -88,6 +88,9 @@ def random_label(app):
     left = getattr(app, "fight_left", None)
     if left is None:
         return "랜덤 배틀"
+    if left <= 0 and getattr(app, "fight_practice", None):
+        # 새 서버는 20판 뒤에도 받는다 - 점수 없는 연습판으로 (옛 서버는 practice 칸이 없어 아래 글 그대로)
+        return "랜덤 배틀  (연습판 · 점수 없음)"
     if left <= 0:
         return "랜덤 배틀  (오늘은 다 함)"
     return "랜덤 배틀  (%d판 남음)" % left

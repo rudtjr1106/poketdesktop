@@ -22,12 +22,13 @@ from PIL import ImageTk
 from common import expedition as X
 from common import tint as T
 
-from ... import sprite_cache, sprites
+from ... import box_filter, sprite_cache, sprites
 from ... import ui_common as U
 from ... import ui_expedition as E
 from ...ui_common import run_async
 from . import CUR, INK, INK2, LINE, PANEL, SEL, WHITE, WIN_BG, font, tone
 from . import kit as K
+from .scene import Find
 
 BODY, BODY_HI, BODY_LO = "#3a3f48", "#4a505a", "#23262d"
 LCD, LCD_HI, LCD_INK, LCD_DIM = "#a8c890", "#b8d6a0", "#24301c", "#41522f"
@@ -144,6 +145,8 @@ class ExpeditionWindow(E.ExpeditionWindow):
     def _send(self, body):
         s = U.h
         cv = self.cv
+        # 찾기·줄 세우기 (기본 탭과 같은 말). 칸은 진짜 입력칸이고 줄 세우기 탭은 판이 그린다.
+        self.find = Find(self, cv, self._find_changed)
         self.vl = K.VList(cv, WHITE, self._draw_row)
         self.vl.on_click = lambda data, *_a: self.pick_mon(data[0]["id"])
         self.send_btn = K.CButton(cv, "보내기", self.do_send, "red", font(12))
@@ -334,8 +337,34 @@ class ExpeditionWindow(E.ExpeditionWindow):
         self.grow_btn.layout(rx - bw - s(8) - gw, by1, rx - bw - s(8), by2)
         K.text(cv, lx, (fy1 + h) // 2, text, font(10), fill=tone(color) if color else INK, anchor="w", width=tw,
                tags=T_)
+        # 찾기 줄: 포켓몬 찾기 [입력칸] N마리  [기본|가나다순|레벨순]. 한 줄에 안 들면 탭이 아래 줄로 내려간다.
+        fy, fh = s(34), s(26)
+        cv.create_text(lx, fy + fh // 2, text="포켓몬 찾기", fill=INK2, font=font(9), anchor="w", tags=T_)
+        label_w = K.tkfont_of(cv, font(9)).measure("포켓몬 찾기")
+        ex = lx + label_w + s(10)
+        sorts = [(k or "base", lb) for k, lb in box_filter.PICK_SORTS]
+        f10 = K.tkfont_of(cv, font(10))
+        tabs_w = sum(f10.measure(lb) + 2 * s(10) for _k, lb in sorts)
+        cnt_w = s(52) if self.find.count else 0
+        if rx - tabs_w - s(8) - cnt_w - ex >= s(90):
+            K.tabs(cv, rx, fy, fh, sorts, self.find.sort or "base", "msrt_", align="right", tags=T_)
+            tx = rx - tabs_w
+            ly1 = fy + fh + s(8)
+        else:
+            K.tabs(cv, rx, fy + fh + s(4), fh, sorts, self.find.sort or "base", "msrt_", align="right",
+                          tags=T_)
+            tx = rx
+            ly1 = fy + 2 * fh + s(12)
+        for k, _lb in sorts:
+            cv.tag_bind("msrt_" + k, "<Button-1>", lambda _e, v=k: self.find.pick_sort("" if v == "base" else v))
+        cv.tag_bind("msrt_", "<Enter>", lambda _e: cv.configure(cursor="hand2"))
+        cv.tag_bind("msrt_", "<Leave>", lambda _e: cv.configure(cursor=""))
+        self._place("mfind", self.find.box, ex, fy, max(s(60), tx - ex - s(8) - cnt_w), fh)
+        if self.find.count:
+            cv.create_text(tx - s(8), fy + fh // 2, text=self.find.count, fill=INK2, font=font(9), anchor="e",
+                           tags=T_)
         # 흰 목록
-        ly1, ly2 = s(34), fy1 - s(8)
+        ly2 = fy1 - s(8)
         K.panel(cv, lx, ly1, rx, ly2, tags=T_)
         if self._empty:
             i = self._wins.get("vl")

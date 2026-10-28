@@ -47,6 +47,7 @@ from common.korean import natural
 from . import config, skins, sprite_cache, sprites
 from . import ui_common as U
 from . import ui_loading
+from . import ui_monfind
 from .ui_common import run_async
 
 LEFT_W = 300                 # 탐험 칸
@@ -332,7 +333,7 @@ class ExpeditionWindow(object):
         self.growth = {}             # {포켓몬 id(글자): 탐험 성장·쉬는 시간} - 서버가 준 것 (1.10.5)
         self._rest_job = None        # 쉬는 시간이 줄어드는 것을 가끔 다시 칠한다
         self.grow_dialog = None
-        self._cands = []             # '누구를' 목록에 선 것 [(포켓몬, 점수, 성공도)]
+        self._cands = []             # '누구를' 목록에 선 것 [(포켓몬, 점수, 성공도)] - 찾기에 가려진 것은 없다
 
         self.win = U.panel(parent, self.root, "포스크탑 — 탐험", 1020, 664, 980, 600, self.close)
         self.win.configure(bg=U.BG, highlightthickness=2, highlightbackground=U.LINE2)
@@ -645,6 +646,9 @@ class ExpeditionWindow(object):
         tk.Frame(right, bg=U.LINE, height=U.h(1)).pack(fill="x", padx=14)
         wrap = tk.Frame(right, bg=U.BG)
         wrap.pack(fill="both", expand=True, padx=14, pady=(0, 8))
+        # 찾기·줄 세우기 - 가방·기술머신과 같은 칸(이 단은 좁아 두 줄). 곳·시간을 바꿔도 찾는 말과 순서는 그대로다.
+        self.find = ui_monfind.FindBar(wrap, U.BG, self._find_changed, stacked=True)
+        self.find.frame.pack(fill="x", pady=(8, 6))
         self.vl = U.VirtualList(wrap, {"mon": (ROW_H, lambda p: PickRow(p, self))}, bg=U.BG)
         self.vl.pack(fill="both", expand=True)
         self.empty = tk.Label(wrap, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S, justify="center")
@@ -712,23 +716,40 @@ class ExpeditionWindow(object):
     def _fill(self, keep=True):
         # 쉬는 시간은 지금 남은 값으로 (받은 뒤 흐른 만큼 뺀다) - 다 쉰 포켓몬이 위로 올라온다
         now = dict((k, dict(g, rest=self.rest_left(k))) for k, g in self.growth.items())
-        rows = candidates(self.mons, self.app.dex, self.place, now)
+        all_rows = candidates(self.mons, self.app.dex, self.place, now)
+        # 찾는 말로 거르고 고른 순서로 줄 세운다 (기본 = 잘할 차례 그대로). 몇 마리인지 적는 말은 가리기 전 기준이다.
+        rows = self._find_rows(all_rows)
         self._cands = rows
-        ids = [m["id"] for m, _p, _g in rows]
-        if self.pick not in ids:
-            self.pick = ids[0] if ids else None
-        ready = sum(1 for m, _p, _g in rows if self.mon_state(m) == "ok")
-        resting = sum(1 for m, _p, _g in rows if self.mon_state(m) == "rest")
+        if self.pick not in [m["id"] for m, _p, _g in rows]:
+            # 고른 포켓몬이 가려졌다 - 보이는 것 중에서 다시 고른다 (보낼 수 있는 것이 먼저, 가방과 같은 규칙).
+            # 안 보이는 포켓몬을 보내 버리지 않게, 하나도 안 보이면 아무도 안 고른다.
+            ok = [m["id"] for m, _p, _g in rows if self.mon_state(m) == "ok"]
+            self.pick = ok[0] if ok else (rows[0][0]["id"] if rows else None)
+        ready = sum(1 for m, _p, _g in all_rows if self.mon_state(m) == "ok")
+        resting = sum(1 for m, _p, _g in all_rows if self.mon_state(m) == "rest")
         note = ("보낼 수 있는 %d마리 · 잘할 차례로" % ready
-                + (" · 쉬는 중 %d" % resting if resting else "")) if rows else ""
+                + (" · 쉬는 중 %d" % resting if resting else "")) if all_rows else ""
         empty = None
-        if not rows:
+        if not all_rows:
             have = any(not m.get("isEgg") for m in self.mons)
             empty = ("박스에 있는 포켓몬만 보낼 수 있습니다.\n포켓몬 탭에서 박스에 넣어 주세요." if have
                      else "보낼 포켓몬이 없습니다.")
+        elif not rows:
+            empty = self.find.empty_note()
         self._paint_pick_list(rows, keep, note, empty)
         self._paint_summary()
         self._arm_rest()
+
+    def _find_rows(self, rows):
+        """rows [(포켓몬, 점수, 성공도)] 를 찾는 말로 거르고 고른 순서로 줄 세운 것 (받은 목록은 그대로)."""
+        by_id = dict((r[0]["id"], r) for r in rows)
+        view = self.find.view([r[0] for r in rows], self.app.dex)
+        return [by_id[m["id"]] for m in view]
+
+    def _find_changed(self):
+        """찾는 말·순서가 바뀌었다. 목록을 맨 위부터 다시 담고, 고른 포켓몬이 가려졌으면 다시 고른다."""
+        if self.alive:
+            self._fill(keep=False)
 
     def _paint_pick_list(self, rows, keep, note, empty):
         """'누구를' 목록 (테마마다 그리는 곳). empty = 비었을 때의 말 (있으면 None)."""

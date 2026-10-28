@@ -122,6 +122,8 @@ class App(object):
         self.friend_unseen = 0
         # 오늘 랜덤 배틀을 몇 판 더 걸 수 있나 (1.13, 트레이의 '랜덤 배틀 (N판 남음)'). 모르면 None.
         self.fight_left = None
+        # 그다음 판이 연습판(하루 20판 뒤, 점수 없음)인가. None = 옛 서버라 모름 (그때는 20판에서 정말 막힌다).
+        self.fight_practice = None
         # 게시판 (1.8.0): 서버가 알려 준 가장 최근 공지 번호. 마지막으로 본
         # 번호(settings.noticeSeen)보다 크면 탭과 트레이에 표시한다.
         self.board_notice = 0
@@ -445,6 +447,7 @@ class App(object):
         self._friend_first = True
         self.friend_unseen = 0
         self.fight_left = None
+        self.fight_practice = None
         self.sync()
         # 첫 동기화가 실패하거나(서버가 깨는 중이라 느릴 수 있다) 도트를
         # 아직 못 받았으면 바탕화면이 비어 보인다. 잠시 뒤 한 번 더 맞춘다.
@@ -720,6 +723,7 @@ class App(object):
                 # 오늘 남은 랜덤 배틀 (1.13): 트레이 메뉴에 적는다. 옛 서버는 안 실어 준다 (그러면 숫자 없이).
                 if "fight" in me:
                     self.fight_left = (me.get("fight") or {}).get("left")
+                    self.fight_practice = (me.get("fight") or {}).get("practice")
                 # 탐험 파견 (1.10.4): 돌아온 것이 있으면 바탕화면에 보따리를 놓는다
                 if self.expedition is not None and "expedition" in me:
                     self.expedition.note(me.get("expedition"))
@@ -1580,6 +1584,9 @@ class App(object):
             # 서버는 붙이는 순간 한 판을 센다. 트레이의 남은 판 수를 다음 동기화까지 기다리지 않고 바로 줄인다.
             if self.fight_left:
                 self.fight_left -= 1
+                # 방금 20판째였다 - 새 서버면(practice 칸이 있었으면) 다음 판부터 연습판
+                if self.fight_left == 0 and self.fight_practice is False:
+                    self.fight_practice = True
             if on_found:
                 on_found(r)
         self._pvp(lambda: self.api.pvp_random(), on_done, found)
@@ -1811,6 +1818,8 @@ class App(object):
             bits.append("RP %+d" % mine["rpDelta"])
         elif mine.get("delta") and "rp" not in mine:
             bits.append("%+d점" % mine["delta"])
+        if mine.get("practice"):
+            bits.append("연습판 · 점수 변화 없음")
         if mine.get("myLeft") is not None:
             bits.append("%d대 %d 남음"
                         % (mine.get("myLeft", 0), mine.get("foeLeft", 0)))
@@ -2056,7 +2065,8 @@ class App(object):
         self._drop_pillar()
         for name in ("box_window", "shop_window", "bag_window",
                      "friends_win", "dex_window", "settings_win",
-                     "raid_window", "board_window", "mypage_window"):
+                     "raid_window", "board_window", "mypage_window",
+                     "catch_pick_window"):
             w = getattr(self, name, None)
             if w:
                 try:

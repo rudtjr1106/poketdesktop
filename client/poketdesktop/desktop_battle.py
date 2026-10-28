@@ -17,6 +17,8 @@
     - 잡기 모드면 서버가 체력을 남기고 싸우다가 멈추라고(hold) 한다.
       10초 동안 '지금 던지세요' 를 띄우고 기다린다. 왼쪽 클릭하거나 10초가
       지나면 그 판은 끝까지 싸운다(finish). 던졌다가 놓치면 다시 10초.
+    - '고른 포켓몬만'(pick) 은 서버가 모른다. 앱이 야생의 종을 보고 always / off 로 바꿔 보낸다
+      (config.catch_for - 폼은 원래 종으로, 색이 다른 포켓몬은 늘 멈춘다).
 
 기술 버튼은 없다. 무슨 기술을 쓸지는 서버가 알아서 고른다.
 도트 위에 작은 체력바만 띄우고, 나머지는 도트의 움직임과 이펙트,
@@ -117,6 +119,7 @@ class DesktopBattle(object):
         self.finish = False        # 멈췄다가 다시 싸우기로 했다 -> 이 판은 끝까지
         self.pending_ball = None   # 바쁠 때 던진 볼 ("" 은 마지막에 쓴 볼)
         self.playing = False       # 받은 이벤트를 그리는 중
+        self.sent_catch = None     # 마지막 턴에 서버로 실제 보낸 잡기 모드 (pick 은 always/off 로 바뀌어 간다)
         self.stalled = False       # 멈춘 동안 다음 턴을 건너뛰었다
 
         self.setup(intro)
@@ -326,7 +329,9 @@ class DesktopBattle(object):
             return
         self.stalled = False
         self.busy = True
-        catch = config.catch_mode(self.app.settings)
+        catch = config.catch_for(self.app.settings, (self.b or {}).get("foe"),
+                                 getattr(self.app, "dex", None))
+        self.sent_catch = catch
         finish = self.finish
 
         def done(r, err):
@@ -555,6 +560,10 @@ class DesktopBattle(object):
         note = text + ". 볼은 그대로다."
         if config.catch_mode(self.app.settings) == "new":
             note += " 이미 잡은 포켓몬은 끝까지 싸운다 - 설정의 '야생 배틀에서 잡기 좋게 싸우기' 를 '항상' 으로 하면 멈춘다."
+        elif config.catch_mode(self.app.settings) == "pick" and getattr(self, "sent_catch", None) == "off":
+            # 이 판에 실제로 off 를 보냈을 때만 (고르지 않은 종이고 이로치도 아니다). 고른 종이거나 이로치라
+            # always 를 보냈는데도 쓰러졌다면 '고르지 않아서' 가 아니다.
+            note += " 고르지 않은 포켓몬은 끝까지 싸운다 - 설정의 '야생 배틀에서 잡기 좋게 싸우기' 에서 고를 수 있다."
         self.app.notify(note)
         pid = ((self.b or {}).get("me") or {}).get("id")
         show = getattr(self.app, "float_over_pet", None)

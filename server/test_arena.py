@@ -202,6 +202,8 @@ def main():
         print("\n=== 하루 상한 ===")
         # c 로 계속 걸어 본다. 쿨다운 때문에 상대가 곧 동나므로,
         # 상한과 '상대 없음' 중 무엇에 걸리든 무한히는 안 된다.
+        # 본문이 {} 라서 **옛 앱처럼** 건다 - 연습판(practice=1)을 안 알렸으니 서버는 20판에서 예전처럼 막는다
+        # (pvp.can_start 의 practice_ok). 연습판 쪽은 server/test_pvp.py 의 '연습판' 이 본다.
         codes = []
         for _ in range(25):
             s, r = call("POST", "/api/pvp/random", {}, ct)

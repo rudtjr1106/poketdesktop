@@ -232,11 +232,16 @@ def main():
                    (cap, sp, '["TACKLE"]', slot))
         db.run("UPDATE rank_stat SET fought_day='2026-10-03', fought=? WHERE user_id=?",
                (pvp.DAILY_BATTLES, cap))
+        # 20판 뒤에도 새 앱(practice_ok)은 걸 수 있다 - 연습판(점수 없음)이 된다. 표시 없는 옛 앱은 예전처럼 막힌다.
+        # 날짜가 바뀌는 때는 그 연습판(옛 앱이면 막힘)이 풀리는 때로 본다.
         why = pvp.can_start(cap, "random")
-        chk("  한국 09:00 - 아직 오늘 스무 판을 다 썼다", bool(why) and "20" in why, why)
+        chk("  한국 09:00 - 아직 오늘 스무 판을 다 썼다 (옛 앱은 막힘)", bool(why) and "20" in why, why)
+        chk("  (새 앱이면 다음 판은 연습판)", pvp.is_practice(cap)
+            and pvp.can_start(cap, "random", practice_ok=True) is None,
+            (pvp.is_practice(cap), pvp.can_start(cap, "random", practice_ok=True)))
         pvp._now = lambda: datetime.datetime(2026, 10, 3, 15, 0, 1, tzinfo=utc)
-        chk("  한국 자정이 지나면 다시 걸 수 있다", pvp.can_start(cap, "random") is None,
-            pvp.can_start(cap, "random"))
+        chk("  한국 자정이 지나면 다시 점수판", not pvp.is_practice(cap)
+            and pvp.can_start(cap, "random") is None, pvp.can_start(cap, "random"))
     finally:
         pvp._now = real
 

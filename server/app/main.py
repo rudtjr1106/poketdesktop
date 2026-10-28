@@ -1543,19 +1543,133 @@ def release(pid: int, ctx=Depends(current)):
     uid = ctx["user"]["id"]
     r = _own(uid, pid)
     if expedition.is_away(uid, pid):
-        raise HTTPException(409, "탐험에 나가 있는 포켓몬은 놓아줄 수 없습니다. 돌아온 뒤에 해 주세요.")
+        raise HTTPException(409, _AWAY_RELEASE)
+    # 여러 마리 길과 같은 제한 - 한쪽 길로만 배틀 중인 애를 놓을 수 있으면 막은 뜻이 없다
+    # (배틀 줄이 주인 없는 포켓몬을 가리키게 된다).
+    if _fighting(uid, pid):
+        raise HTTPException(409, _BATTLE_RELEASE)
+    gone = _release_row(uid, r)
+    if gone is None:                         # 그사이 다른 요청(두 번 누르기 등)이 먼저 놓아줬다
+        raise HTTPException(404, "그런 포켓몬이 없습니다.")
+    name, held = gone
+    msg = "%s 을(를) 보내주었습니다." % name
+    if held:
+        msg += " 지니고 있던 %s은(는) 가방에 넣었습니다." % items.name_of(held)
+    return {"ok": True, "message": msg}
+
+
+_AWAY_RELEASE = "탐험에 나가 있는 포켓몬은 놓아줄 수 없습니다. 돌아온 뒤에 해 주세요."
+_BATTLE_RELEASE = "배틀 중인 포켓몬은 놓아줄 수 없습니다. 배틀이 끝난 뒤에 해 주세요."
+
+
+def _release_row(uid, r):
+    """포켓몬 한 줄을 놓아준다 (막을지는 부른 쪽이 먼저 본다). (이름, 지니던 도구) 를 돌려준다.
+    그사이 이미 없어졌으면(같은 요청이 두 번 왔다) None.
+
+    한 마리 놓아주기와 여러 마리 놓아주기가 같이 쓴다 - 한쪽에만 뒷정리가 늘면 다른 쪽으로 놓아준
+    포켓몬의 도구·성장 기록이 남거나 사라진다.
+
+    **지우기를 먼저 하고, 정말 지웠을 때만 도구를 돌려준다.** 예전 차례(도구 먼저 → 지우기)는 같은 놓아주기가
+    겹쳐 오면 둘 다 SELECT 로 포켓몬을 보고 둘 다 가방에 도구를 넣었다 - 구애머리띠가 하나 더 생긴다.
+    DELETE 의 rowcount 는 한 요청에만 1 이 나온다.
+    """
+    pid = int(r["id"])
     name = r["nickname"] or dex().name(r["species"])
+    cur = db.run("DELETE FROM pokemon WHERE id=? AND user_id=?", (pid, uid))
+    if getattr(cur, "rowcount", 1) != 1:
+        return None
     # 지닌 도구는 가방으로 돌려준다. 포켓몬과 같이 사라지면 4000원짜리
     # 구애머리띠가 놓아주기 한 번에 날아간다.
     held = r["held"] if "held" in r.keys() else None
     if held:
         items.bag_add(uid, held, 1)
-    db.run("DELETE FROM pokemon WHERE id=?", (pid,))
     expedition.forget(uid, pid)              # 탐험 성장 기록 (1.10.5)
-    msg = "%s 을(를) 보내주었습니다." % name
-    if held:
-        msg += " 지니고 있던 %s은(는) 가방에 넣었습니다." % items.name_of(held)
-    return {"ok": True, "message": msg}
+    return name, held
+
+
+class ReleaseManyIn(BaseModel):
+    ids: list = Field(default_factory=list, max_length=200)
+
+
+@app.post("/api/pokemon/release-many")
+def release_many(body: ReleaseManyIn, ctx=Depends(current)):
+    """박스에서 고른 포켓몬 여러 마리를 한 번에 놓아준다.
+
+    **한 마리씩 따로 판다** - 박스 옮기기(다 옮기거나 하나도 안 옮기기)와 다르다. 놓아주기는 자리를
+    다투지 않으니 하나가 막혔다고 나머지까지 되돌릴 까닭이 없고, 못 놓은 것은 까닭과 함께 돌려준다:
+
+      * 남의 것 · 없는 번호   - "그런 포켓몬이 없습니다." (한 마리 길의 404 와 같은 말)
+      * 탐험에 나가 있다       - 한 마리 길과 같은 409 의 말
+      * 지금 야생 배틀에 나가 있다 - 한 마리 길에는 없는 제한이다. 여러 마리는 박스 화면에서 한꺼번에
+        고르는 것이라 배틀 중인 애가 모르고 섞이기 쉽다 (배틀 줄이 주인 없는 포켓몬을 가리키게 된다).
+    """
+    uid = ctx["user"]["id"]
+    ids = []
+    for x in body.ids:
+        x = _release_id(x)
+        if x is None:
+            raise HTTPException(400, "놓아줄 포켓몬을 알 수 없습니다.")
+        if x > 0 and x not in ids:
+            ids.append(x)
+    if not ids:
+        raise HTTPException(400, "놓아줄 포켓몬을 골라 주세요.")
+    done, failed, bag = [], [], []
+    for pid in ids:
+        # 한 마리가 터져도(DB 잠김 등) 나머지는 계속 본다 - 이미 놓아준 것을 '실패' 로 덮어 쓰지 않게.
+        # 터진 것은 놓아줬는지 모르니 까닭을 '다시 해 주세요' 로 둔다 (다시 하면 없어졌으면 '없다' 가 온다).
+        try:
+            one = _release_one(uid, pid)
+        except Exception as e:                              # noqa: BLE001
+            sys.stderr.write("[여러 마리 놓아주기] %s 실패: %s: %s\n" % (pid, type(e).__name__, str(e)[:160]))
+            one = ("failed", {"id": pid, "reason": "잠시 문제가 있어 놓아주지 못했습니다. 잠시 뒤 다시 해 주세요."})
+        kind, row = one
+        if kind == "failed":
+            failed.append(row)
+            continue
+        done.append({"id": pid, "name": row["name"]})
+        if row["held"]:
+            bag.append(items.name_of(row["held"]))
+    msg = "%d마리를 보내주었습니다." % len(done) if done else "한 마리도 놓아주지 못했습니다."
+    if bag:
+        msg += " 지니고 있던 도구 %d개는 가방에 넣었습니다." % len(bag)
+    if failed:
+        # 앱의 Api._release_msg 와 같은 말 (나눠 보내거나 옛 서버로 한 마리씩 보내도 글이 같게)
+        msg += (" %d마리는 못 보냈습니다." if done else " (%d마리 모두 막혔습니다)") % len(failed)
+    return {"ok": True, "released": done, "failed": failed, "heldToBag": bag, "message": msg}
+
+
+def _release_id(x):
+    """여러 마리 놓아주기의 번호 하나를 정수로. 못 믿을 것은 None (400 이 된다).
+
+    int() 에 그냥 넣으면 True 가 1번, 3.7 이 3번 포켓몬이 된다 - 남의 실수로 엉뚱한 포켓몬이 놓아지지 않게
+    bool 은 거절하고, 실수는 3.0 처럼 정수 값일 때만 받는다. 글자는 '12' 같은 숫자 글자만.
+    """
+    if isinstance(x, bool):
+        return None
+    if isinstance(x, int):
+        return x
+    if isinstance(x, float):
+        return int(x) if x.is_integer() else None
+    if isinstance(x, str) and x.strip().lstrip("-").isdigit():
+        return int(x.strip())
+    return None
+
+
+def _release_one(uid, pid):
+    """여러 마리 놓아주기의 한 마리. ("done", {name, held}) 또는 ("failed", {id, name?, reason})."""
+    r = db.q1("SELECT * FROM pokemon WHERE id=? AND user_id=?", (pid, uid))
+    if r is None:
+        return "failed", {"id": pid, "reason": "그런 포켓몬이 없습니다."}
+    if expedition.is_away(uid, pid):
+        why = _AWAY_RELEASE
+    elif _fighting(uid, pid):
+        why = _BATTLE_RELEASE
+    else:
+        gone = _release_row(uid, r)
+        if gone is None:                     # 그사이 다른 요청이 먼저 놓아줬다
+            return "failed", {"id": pid, "reason": "그런 포켓몬이 없습니다."}
+        return "done", {"name": gone[0], "held": gone[1]}
+    return "failed", {"id": pid, "name": r["nickname"] or dex().name(r["species"]), "reason": why}
 
 
 # ---------------------------------------------------------------- 지닌 도구

@@ -46,6 +46,11 @@ class _Cfg(object):
         return self.kw.get(key, "")
 
 
+def _is_act(key):
+    """아래 설명 창의 단추 열쇠인가 ("act:글자"). 줄의 단추는 (줄 번호, 글자) 다."""
+    return isinstance(key, str) and key.startswith("act:")
+
+
 class SettingsWindow(ST.SettingsWindow):
 
     def _build(self, s, header):
@@ -77,6 +82,7 @@ class SettingsWindow(ST.SettingsWindow):
         self.zoom_msg = _Cfg(lambda **kw: self._soon())
         self.boss_msg = _Cfg(lambda **kw: self._soon())
         self.boot_note = _Cfg(lambda **kw: self._soon())
+        self.catch_pick_note = _Cfg(lambda **kw: self._soon())    # 고른 포켓몬 몇 종 (_paint_catch_pick)
         # 값 (기본 창의 이름 그대로 - 바꾸는 함수들이 이것을 읽는다)
         self.names = tk.BooleanVar(value=bool(s.get("showNames")))
         self.grass = tk.BooleanVar(value=bool(s.get("showGrass", True)))
@@ -156,9 +162,13 @@ class SettingsWindow(ST.SettingsWindow):
             self._flag(label, note, var, key, how)
         self.rows.append({"kind": "choice", "label": "야생 배틀에서 잡기",
                           "note": "체력을 조금 남기고 멈춰서 볼을 던질 틈을 줍니다. 10초 안에 안 던지거나 야생 포켓몬을 "
-                                  "왼쪽 클릭하면 끝까지 싸웁니다. 색이 다른 포켓몬은 잡은 적이 있어도 이렇게 합니다.",
+                                  "왼쪽 클릭하면 끝까지 싸웁니다. 색이 다른 포켓몬은 잡은 적이 있거나 고르지 않았어도 "
+                                  "이렇게 합니다.",
                           "choices": list(self.CATCH_CHOICES), "get": lambda: self.catch.get(),
-                          "put": lambda v: (self.catch.set(v), self._set_catch())})
+                          "put": lambda v: (self.catch.set(v), self._set_catch()),
+                          # '고른 포켓몬만' 의 고르는 창 (ui_catch_pick) - 다른 것을 골라도 미리 골라 둘 수 있게 늘 둔다
+                          "value": lambda: self._catch_pick_text(),
+                          "action": ("고르기…", self._open_catch_pick, lambda: True)})
         btns = [("화면에 그리기", self._pick_area), ("기본 자리로", self._clear_area)]
         get = getattr(self.app, "screen_choices", None)
         for name, rect in (list(get()) if get else []):
@@ -187,7 +197,7 @@ class SettingsWindow(ST.SettingsWindow):
                           "value_note": lambda: self.boot_note.cget("text"),
                           "disabled": not autostart.supported()})
         self.rows.append({"kind": "buttons", "label": "기본값으로", "note": "모든 설정을 처음 값으로 되돌립니다. 자동 시작 · "
-                          "화면 테마 · 글자 크기 · 읽은 글 기록은 그대로 둡니다.", "buttons": [("되돌리기", self.reset)]})
+                          "화면 테마 · 글자 크기 · 읽은 글 기록 · 잡기에서 고른 포켓몬은 그대로 둡니다.", "buttons": [("되돌리기", self.reset)]})
 
     # ---------------- 기본 창이 부르는 자리 ----------------
     def _say(self, text, color=None):
@@ -398,22 +408,25 @@ class SettingsWindow(ST.SettingsWindow):
                 _a, tid = K.text(cv, x1 + U.h(14), ty, t, font(10), fill=tone(c) if c else INK, width=tw)
                 bb = cv.bbox(tid)
                 ty = (bb[3] if bb else ty + U.h(16)) + U.h(4)
+            # 단추는 글자(act[0])마다 하나다 - 예전에는 하나를 같이 써서, 처음 만든 줄의 글자·할 일이 다른 줄에도
+            # 남았다 ('다시 켜서 적용' 자리에 '고르기…' 를 달면서 나눴다).
+            want = "act:" + act[0] if act_on else None
+            for k in [k for k in self.btns if _is_act(k) and k != want]:
+                self.btns[k].hide()
             if act_on:
-                b = self.btns.get("act")
+                b = self.btns.get(want)
                 if b is None:
-                    b = self.btns["act"] = K.CButton(cv, act[0], act[1], "blue", font(10))
+                    b = self.btns[want] = K.CButton(cv, act[0], act[1], "blue", font(10))
                 w = b.want_width(U.h(22))
                 b.layout(x2 - U.h(12) - w, y + (bh - U.h(36)) // 2, x2 - U.h(12), y + (bh + U.h(36)) // 2)
-            elif "act" in self.btns:
-                self.btns["act"].hide()
             y += bh + U.h(4)
         # 상태 한 줄 (바꾼 결과)
         text, color = self._msg
         if text:
             K.text(cv, x1 + 4, y, text, font(10), fill=tone(color) if color else INK2, width=x2 - x1 - 8)
-        b = self.btns.get("act")
-        if b is not None and b.box:
-            b.draw()
+        for k, b in self.btns.items():
+            if _is_act(k) and b.box:
+                b.draw()
 
     def _bar_set(self, r, x, a, b):
         k = max(0.0, min(1.0, (x - a) / float((b - a) or 1)))

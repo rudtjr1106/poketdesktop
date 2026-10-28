@@ -101,6 +101,9 @@ jobs:
 
       - name: 풀숲 끄기·알림·패치노트
         run: python client/test_new_settings.py
+      # 잡기 모드 '고른 포켓몬만': 고른 종·이로치·폼을 보고 서버에 always/off 로 바꿔 보내는지
+      - name: 잡기 - 고른 포켓몬만
+        run: python client/test_catch_pick.py
       - name: 지닌 도구 (엔진)
         run: python common/test_held.py
       # 1.13: 그동안 없던 지닌 도구 110종 + 폼체인지 (지니면·써서·배틀 중·원시회귀)
@@ -251,10 +254,18 @@ jobs:
         run: python client/test_autostart.py
       - name: 설정 창·트레이 (창을 실제로 만든다)
         run: python client/smoke_autostart.py
+      # 잡기 모드 '고른 포켓몬만' 의 고르는 창 (1025종 - 보이는 줄만) · 설정 줄. DP 는 설정 창이 달라서 따로 본다.
+      - name: 잡기 - 고르는 창 (진짜 Tk)
+        run: python client/test_catch_pick_ui.py
+      - name: 잡기 - 고르는 창 (DP 테마)
+        env:
+          POKET_SKIN: dp
+        run: python client/test_catch_pick_ui.py
       - name: 테두리 없는 창이 제자리에 뜨는가
         run: |
           python client/smoke_window.py
           python client/test_popup_close.py
+          python client/test_arena_close.py    # 대전 다시 보기 × · Esc 로 끄기 (창·예약이 안 남는가)
           python client/test_gift_dialog.py
           python client/test_learn_dialog.py
           python client/test_learn_pending.py
@@ -289,6 +300,9 @@ jobs:
       # 포켓몬 관리 창의 '탐험 중'.
       - name: 탐험 파견 화면 (진짜 Tk)
         run: python client/test_expedition_ui.py
+      # 탐험 탭 '누구를' 목록 찾기 · 가나다순 · 레벨순 (가방과 같은 FindBar)
+      - name: 탐험 포켓몬 찾기 (진짜 Tk)
+        run: python client/test_expedition_find.py
       # 도감 업적 (시즌 3). 알림 창·업적 칸·도감 탭 전환·중복 알림 방지.
       - name: 도감 업적 화면 (진짜 Tk)
         run: python client/test_achievements_ui.py
@@ -363,6 +377,7 @@ jobs:
       - name: 랭크 시즌 화면
         run: |
           python client/smoke_season.py
+          python client/test_practice_ui.py   # 하루 20판 뒤 연습판: 단추·머리줄·대전 기록·트레이 (옛 서버면 예전 글)
           python client/smoke_eggs.py
           python client/test_walk_shiny.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
@@ -370,6 +385,9 @@ jobs:
       # 머리글로 줄 세우기(도감 번호·이름·레벨) · 여러 마리 한꺼번에 옮기기 (1.10.6)
       - name: 포켓몬 관리 창의 줄 세우기·여러 마리 옮기기 (진짜 Tk)
         run: python client/test_box_multi.py
+      # 여러 마리 골라 한 번에 놓아주기: 확인 창(몇 마리·이름·숨은 특성·이로치 경고) · 옛 서버면 한 마리씩
+      - name: 포켓몬 관리 창의 여러 마리 놓아주기 (진짜 Tk)
+        run: python client/test_box_release_many.py
       # 시즌 4 (1.12.0): 배틀 창의 Z기술 단추, 악당 출현(검은 지도·악당 창), 길드전 칸
       - name: Z기술 단추 (진짜 Tk)
         run: python client/test_gimmick_ui.py
@@ -417,6 +435,7 @@ jobs:
         run: |
           python client/smoke_window.py
           python client/test_popup_close.py
+          python client/test_arena_close.py    # 대전 다시 보기 × · Esc 로 끄기 (창·예약이 안 남는가)
           python client/test_gift_dialog.py
           python client/test_learn_dialog.py
           python client/test_learn_pending.py
@@ -446,6 +465,9 @@ jobs:
       # 포켓몬 관리 창의 '탐험 중'.
       - name: 탐험 파견 화면 (진짜 Tk)
         run: python client/test_expedition_ui.py
+      # 탐험 탭 '누구를' 목록 찾기 · 가나다순 · 레벨순 (가방과 같은 FindBar)
+      - name: 탐험 포켓몬 찾기 (진짜 Tk)
+        run: python client/test_expedition_find.py
       # 도감 업적 (시즌 3). 알림 창·업적 칸·도감 탭 전환·중복 알림 방지.
       - name: 도감 업적 화면 (진짜 Tk)
         run: python client/test_achievements_ui.py
@@ -518,6 +540,7 @@ jobs:
       - name: 랭크 시즌 화면
         run: |
           python client/smoke_season.py
+          python client/test_practice_ui.py   # 하루 20판 뒤 연습판: 단추·머리줄·대전 기록·트레이 (옛 서버면 예전 글)
           python client/smoke_eggs.py
           python client/test_walk_shiny.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
@@ -525,6 +548,9 @@ jobs:
       # 머리글로 줄 세우기(도감 번호·이름·레벨) · 여러 마리 한꺼번에 옮기기 (1.10.6)
       - name: 포켓몬 관리 창의 줄 세우기·여러 마리 옮기기 (진짜 Tk)
         run: python client/test_box_multi.py
+      # 여러 마리 골라 한 번에 놓아주기: 확인 창(몇 마리·이름·숨은 특성·이로치 경고) · 옛 서버면 한 마리씩
+      - name: 포켓몬 관리 창의 여러 마리 놓아주기 (진짜 Tk)
+        run: python client/test_box_release_many.py
       # 시즌 4 (1.12.0): 배틀 창의 Z기술 단추, 악당 출현(검은 지도·악당 창), 길드전 칸
       - name: Z기술 단추 (진짜 Tk)
         run: python client/test_gimmick_ui.py
@@ -580,6 +606,8 @@ jobs:
           python test_raid.py
           python test_live.py
           python test_boxes.py
+          # 여러 마리 놓아주기: 한 마리씩 따로 보고 막힌 것(탐험·배틀 중·남의 것)은 까닭과 함께
+          python test_release_many.py
           python test_achievements.py
           python test_mega.py
           python test_legend_limit.py
@@ -678,7 +706,7 @@ jobs:
           # 도커에서는 둘이 /app 아래 나란히 놓여서 문제가 없었다.
           export PYTHONPATH="${{ github.workspace }}"
           cd server
-          python test_pvp.py
+          python test_pvp.py            # + 연습판 (하루 20판 뒤): 양쪽 점수 그대로 · 이기면 100원 · 하루 상한 같이 · 쿨타임 그대로
           python test_walk.py
 
       - name: HTTP 로 두드리는 검사

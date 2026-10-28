@@ -3152,6 +3152,7 @@
    "buyable": false,
    "cat": "ball",
    "cost": 0,
+   "custom": true,
    "desc": "등에 꽃이 핀 포켓몬을 위해 만들어진 볼. 그 포켓몬은 반드시 잡을 수 있다.",
    "effect": {
     "cond": "event_target",
@@ -6493,6 +6494,7 @@
    "buyable": false,
    "cat": "misc",
    "cost": 0,
+   "custom": true,
    "desc": "레이드에서 아깝게 놓친 디아루가 알을 한 번 더 노려 보는 표. 쓰면 70% 확률로 알을 받는다. 포켓몬을 고르지 않아도 된다.",
    "effect": {
     "chance": 0.7,
@@ -6510,6 +6512,7 @@
    "buyable": false,
    "cat": "misc",
    "cost": 0,
+   "custom": true,
    "desc": "아직 없는 기술머신 가운데 하나가 무작위로 나오는 표. 포켓몬을 고르지 않아도 된다.",
    "effect": {
     "kind": "tmticket"
@@ -6524,6 +6527,7 @@
    "buyable": false,
    "cat": "misc",
    "cost": 0,
+   "custom": true,
    "desc": "쓸 때 타입을 고르면, 그 타입 기술머신 가운데 아직 없는 것 하나가 무작위로 나오는 표. 포켓몬을 고르지 않아도 된다.",
    "effect": {
     "kind": "tmticket",
@@ -7272,6 +7276,7 @@
    "buyable": false,
    "cat": "misc",
    "cost": 0,
+   "custom": true,
    "desc": "먹이면 몸 색이 바뀌어 이로치가 되는 신비한 사탕. 겉모습만 바뀌고 능력은 그대로다.",
    "effect": {
     "kind": "shiny"

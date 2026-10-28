@@ -516,14 +516,19 @@ def main():
     root.update()
 
     # ------------------------------------------------------------ 상점
-    print("\n=== 상점: 도구 %d종 ===" % len([i for i in items if i["cat"] != "megastone"]))
+    print("\n=== 상점: 도구 %d종 ===" % len([i for i in items if i["cat"] != "megastone" and not i.get("custom")]))
     api = Api(mons, items)
     app = App(root, api, dex)
     s = ui_shop.ShopWindow(root, app)
     s.win.winfo_toplevel().deiconify()
     wait(root, lambda: bool(s.items) and s._wait is None and s.vl.shown())
     settle(root, 0.3)
-    sold = [i for i in items if i["cat"] != "megastone"]
+    # 메가스톤과 운영자가 만든 도구(custom)는 상점에 안 뜬다 - 가방에서만 보인다
+    sold = [i for i in items if i["cat"] != "megastone" and not i.get("custom")]
+    mine = [i["id"] for i in items if i.get("custom")]
+    chk("**운영자가 만든 도구(%d종)는 상점 목록에 없고, 가방에는 있다**" % len(mine),
+        len(mine) >= 5 and not set(mine) & set(i["id"] for i in s.items)
+        and set(mine) <= set(i["id"] for i in api.shop()["items"]), mine)
     n_w = widgets(s.win)
     chk("**위젯이 줄 수만큼 늘지 않는다**: %d줄에 위젯 %d개 (예전에는 2,000개)" % (len(s.vl.entries), n_w), n_w < 500
         and len(s.vl.entries) == len(sold) and s.vl.made <= 30, (n_w, s.vl.made))

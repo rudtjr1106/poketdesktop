@@ -100,9 +100,14 @@ DEFAULTS = {
     #   new     아직 안 잡은 종과 색이 다른 포켓몬만 (기본)
     #   always  언제나
     #   off     늘 끝까지 싸운다 (예전과 같다)
+    #   pick    고른 종(catchPick)과 색이 다른 포켓몬만
     # 체력을 조금 남기고 멈춰서 10초 동안 볼을 던질 틈을 준다. 자동으로
     # 싸우다 보면 오른쪽 클릭하기 전에 쓰러뜨려 버리던 것을 막는다.
     "catchMode": "new",
+    # 'pick' 일 때 멈출 종 - 도감의 내부 이름(internal) 목록. 폼(로토무 히트 …)은 원래 종으로 맞춘다.
+    # **이 목록을 제자리에서 고치지 말 것** - 기본값으로 돌릴 때 DEFAULTS 의 이 리스트를 그대로 같이 쓴다.
+    # 늘 새 리스트로 갈아 끼운다 (ui_catch_pick).
+    "catchPick": [],
     # 마지막에 던진 볼. 두 번 누르면 이걸로 바로 던진다.
     # 게임 상태가 아니라 취향이라 서버에 두지 않는다.
     "lastBall": "POKEBALL",
@@ -169,7 +174,7 @@ DEFAULTS = {
 }
 
 
-CATCH_MODES = ("new", "always", "off")
+CATCH_MODES = ("new", "always", "off", "pick")
 
 
 # 가장 흐린 값. 투명도 99% 까지 올릴 수 있다 (사용자 요청). 0 은 안 된다 -
@@ -190,6 +195,50 @@ def catch_mode(settings):
     """설정의 잡기 모드. 모르는 값이면 기본(new)."""
     v = (settings or {}).get("catchMode")
     return v if v in CATCH_MODES else DEFAULTS["catchMode"]
+
+
+def catch_pick(settings):
+    """'고른 포켓몬만' 에서 고른 종 (내부 이름 집합). 리스트가 아니거나 글이 아닌 것은 버린다."""
+    v = (settings or {}).get("catchPick")
+    if not isinstance(v, (list, tuple)):
+        return frozenset()
+    return frozenset(x.strip().upper() for x in v if isinstance(x, str) and x.strip())
+
+
+def base_species(species, dex=None):
+    """폼·메가의 내부 이름을 원래 종으로 (ROTOM_HEAT -> ROTOM). 원래 종이면 그대로.
+
+    도감(common.pokelogic.Pokedex)이 있으면 그 자료(formOf · megaOf)를 믿는다. 없으면(도감을 아직 못 받았다)
+    밑줄 앞을 본다 - 도감 1025종의 내부 이름에는 밑줄이 없고, 폼·메가만 '종_폼' 꼴이다.
+    """
+    sp = (species or "").strip().upper()
+    by = getattr(dex, "by_internal", None) or {}
+    m = by.get(sp)
+    if m:
+        return (m.get("formOf") or m.get("megaOf") or sp).upper()
+    return sp.split("_", 1)[0] if sp else ""
+
+
+def catch_for(settings, foe, dex=None):
+    """이 야생과 싸울 때 서버에 보낼 잡기 모드 (new/always/off).
+
+    'pick' 은 **앱이 정해서 always / off 로 바꿔 보낸다** - 서버는 그 모드대로 멈출 뿐이라, 옛 서버도
+    그대로 알아듣는다. 색이 다른 포켓몬은 고르지 않은 종이어도 멈춘다 ('new' 와 같은 규칙 - 놓치면 아깝다).
+    foe 는 배틀의 야생 쪽 (/api/battle 의 battle.foe: species · shiny). 종을 모르면 끝까지 싸운다.
+    """
+    mode = catch_mode(settings)
+    if mode != "pick":
+        return mode
+    foe = foe or {}
+    if foe.get("shiny"):
+        return "always"
+    sp = foe.get("species")
+    if not isinstance(sp, str) or not sp.strip():
+        return "off"
+    picked = catch_pick(settings)
+    if sp.strip().upper() in picked or base_species(sp, dex) in picked:
+        return "always"
+    return "off"
 
 
 def load_settings():

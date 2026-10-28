@@ -19,37 +19,44 @@ from . import config, db, deps, pvp, season, social
 router = APIRouter()
 
 
-def _fight(uid, other, kind):
+def _fight(uid, other, kind, practice_ok=False):
     """실제로 붙인다. 규칙 확인 -> 계산 -> 횟수 기록."""
-    why = pvp.can_fight(uid, other, kind)
+    why = pvp.can_fight(uid, other, kind, practice_ok)
     if why:
         raise HTTPException(409, why)
     out = pvp.run_match(uid, other, kind=kind)
-    pvp.note_fight(uid, kind)          # 랜덤 배틀만 하루 상한을 쓴다
+    pvp.note_fight(uid, kind)          # 랜덤 배틀만 하루 판수를 센다 (20판 뒤는 연습판 - run_match 가 가른다)
     # 내 쪽은 지금 봤으니 안 본 것으로 세지 않는다. 상대는 다음에 켤 때
     # 알림으로 받는다.
     pvp.mark_seen(uid, out["matchId"])
     return out
 
 
+class RandomIn(BaseModel):
+    # 1 = 이 앱은 연습판(하루 20판 뒤, 점수 없음)을 안다. 옛 앱은 빈 본문({})을 보내서 0 -
+    # 그때는 20판에서 예전처럼 막는다 (pvp.can_start 의 practice_ok).
+    practice: int = 0
+
+
 @router.post("/api/pvp/random")
-def random_battle(ctx=Depends(deps.current)):
+def random_battle(body: Optional[RandomIn] = None, ctx=Depends(deps.current)):
     """아무나 하나 골라 붙는다. 상대는 접속해 있지 않아도 된다.
 
     레벨대가 비슷한 사람부터 찾고, 없으면 넓혀 간다. 친구 몇 명이 하는
     서버라 '상대가 없습니다' 만 뜨는 것보다는 조금 기울어도 붙는 게 낫다.
     """
     uid = ctx["user"]["id"]
+    practice_ok = bool(body and body.practice)
     # 내 쪽 조건을 먼저 본다. 상대까지 골라 놓고 막히면 애먼 사람의
     # 쿨다운만 태우게 된다.
-    why = pvp.can_start(uid, "random")
+    why = pvp.can_start(uid, "random", practice_ok)
     if why:
         raise HTTPException(409, why)
     other = pvp.find_opponent(uid)
     if other is None:
         raise HTTPException(
             404, "지금 붙을 상대가 없습니다. 조금 뒤에 다시 해주세요.")
-    return _fight(uid, other, "random")
+    return _fight(uid, other, "random", practice_ok)
 
 
 @router.post("/api/pvp/challenge/{other}")
@@ -125,7 +132,9 @@ def ranking(limit: int = 50, ctx=Depends(deps.current)):
             "me": me, "season": pvp.SEASON,
             "placement": pvp.PLACEMENT,
             "rules": dict(season.rules_public(),
-                          restrictedMax=pvp.RESTRICTED_MAX, sameSpeciesMax=pvp.SAME_SPECIES_MAX),
+                          restrictedMax=pvp.RESTRICTED_MAX, sameSpeciesMax=pvp.SAME_SPECIES_MAX,
+                          # 하루 20판 뒤의 연습판 (점수 없음, 이기면 100원). 옛 앱은 모르는 칸이라 안 그린다
+                          practice={"after": pvp.DAILY_BATTLES, "win": pvp.PRACTICE_REWARD["win"]}),
             # 지난 시즌 명예의 전당. 시즌 1 은 티어가 없던 시즌이라 순위만 있다.
             "hall": {"season": pvp.SEASON - 1,
                      "rows": season.hall(pvp.SEASON - 1)}}

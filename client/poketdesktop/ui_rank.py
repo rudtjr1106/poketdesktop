@@ -79,9 +79,14 @@ def rank_short_text(me, rules):
 
 
 def today_text(fight):
-    """머리줄에 적을 '오늘 몇 판 가능'. 하루 상한(랜덤 배틀 20판) 기준이다."""
+    """머리줄에 적을 '오늘 몇 판 가능'. 하루 상한(랜덤 배틀 20판) 기준이다.
+
+    20판을 다 쓰면 새 서버는 막지 않고 연습판(점수 없음)으로 받는다 - fight.practice 가 그것이다.
+    옛 서버에는 그 칸이 없고 정말로 막히므로 예전 글 그대로 둔다."""
     left = max(0, int(fight.get("left") or 0))
     cap = int(fight.get("dailyBattles") or 0)
+    if fight.get("practice"):
+        return ("오늘 %d판 끝 · 이제 연습판 (점수 없음)" % cap) if cap else "이제 연습판 (점수 없음)"
     if not left:
         return "오늘은 다 했습니다 (%d판)" % cap if cap else "오늘은 다 했습니다"
     return "오늘 %d판 가능" % left
@@ -141,8 +146,8 @@ class RankWindow(object):
         self.mode_btn.pack(side="right", padx=(0, 8), pady=15)
         U.ghost_button(inner, "랭크 팀", self._team,
                        height=32).pack(side="right", padx=(0, 8), pady=15)
-        U.ghost_button(inner, "랜덤 배틀", self._random,
-                       height=32).pack(side="right", padx=(0, 8), pady=15)
+        self.random_btn = U.ghost_button(inner, self._random_text(), self._random, height=32)
+        self.random_btn.pack(side="right", padx=(0, 8), pady=15)
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     def _body(self):
@@ -237,9 +242,24 @@ class RankWindow(object):
         if self._job is not None:
             self._job.cancel()      # 옛 목록의 남은 카드가 새 목록 뒤에 붙지 않게
             self._job = None
+        self._sync_random_btn()
         if self.mode == "records":
             return self._paint_records(self._records_head(), self._shown_records(), keep)
         self._paint_rank(self._rank_head(), keep)
+
+    def _random_text(self):
+        """랜덤 배틀 단추의 글. 오늘 20판을 다 썼으면 연습판이라고 (새 서버만 fight.practice 를 싣는다)."""
+        fight = (getattr(self, "me", None) or {}).get("fight") or {}
+        return "연습판 (점수 없음)" if fight.get("practice") else "랜덤 배틀"
+
+    def _sync_random_btn(self):
+        """단추 글을 지금 자료에 맞춘다. 테마 단추(DP 의 CButton)도 같은 configure 를 받는다 - 폭은 그리면서 다시 잰다."""
+        btn = getattr(self, "random_btn", None)
+        if btn is not None:
+            try:
+                btn.configure(text=self._random_text())
+            except tk.TclError:
+                pass
 
     # ---- 무엇을 보일지 (글은 다 여기서 정한다 - 테마는 그리기만 한다)
     def _rank_head(self):
@@ -334,6 +354,11 @@ class RankWindow(object):
         if r.get("sameSpeciesMax"):
             # 10/22: 같은 종도 한 마리 (server/app/pvp.SAME_SPECIES_MAX) - 전설 제한과 같은 곳에 건다
             text.append("같은 포켓몬은 한 팀에 %d마리까지 (랭크·친구·관장·레이드·길드전)" % r["sameSpeciesMax"])
+        pr = r.get("practice") or {}
+        if pr.get("after"):
+            # 하루 20판 뒤의 랜덤 배틀 (새 서버만 싣는다)
+            text.append("하루 %d판 뒤의 랜덤 배틀은 연습판 - 점수 변화 없음, 이기면 %s원"
+                        % (pr["after"], format(int(pr.get("win") or 0), ",")))
         text.append("내가 건 랜덤 배틀만 점수에 들어갑니다")
         rewards = []
         for rw in r.get("rewards") or []:
@@ -411,7 +436,9 @@ class RankWindow(object):
             bits.append("RP %+d" % r["rpDelta"])
         if r.get("reward"):
             bits.append("%s원" % format(r["reward"], ","))
-        if not attack:
+        if r.get("practice"):
+            bits.append("연습판 · 점수 변화 없음")      # 하루 20판 뒤의 랜덤 배틀 (걸려온 쪽에도 같이 적힌다)
+        elif not attack:
             bits.append("점수·승패에 안 들어감")
         # 다시 보기: 로그가 남아 있는 판만 (옛 서버는 canReplay 가 없다 - 그때는 띄운다)
         watch = r.get("matchId") if (r.get("matchId") and r.get("canReplay", True)) else None
@@ -716,7 +743,8 @@ class RankWindow(object):
     def _found(self, r):
         """상대를 찾았다 - 이제 바탕화면에서 재생한다. 점수는 재생이 끝나야 바뀐다 (1.12.1)."""
         try:
-            self.say("대전 중... 끝나면 점수가 반영됩니다", U.FG_FAINT)
+            self.say("연습판 대전 중... 점수는 그대로입니다" if (r or {}).get("practice")
+                     else "대전 중... 끝나면 점수가 반영됩니다", U.FG_FAINT)
         except Exception:                                   # noqa: BLE001
             pass                                            # 그사이 창을 닫았다
 

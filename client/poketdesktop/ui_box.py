@@ -458,6 +458,9 @@ class BoxWindow(object):
         self.multi = False
         self.checked = set()
         self._last_check = None  # 방금 고른 줄 (Shift 로 사이를 한꺼번에 고를 때의 한쪽 끝)
+        # 여러 마리 놓아주기 요청이 도는 중. 그동안 고르기 단추를 잠가 같은 요청이 두 번 나가지 않게 한다
+        # (서버가 겹친 놓아주기를 막긴 하지만, 두 번째 답이 '없습니다' 로 와서 바닥 글이 헷갈린다).
+        self._releasing = False
         self._page_ids = []      # 지금 박스 칸에 보일 줄 (순서대로, 아직 안 만든 것도)
         self.boxes = {}          # 서버가 준 박스 정보 (size/count/names/used)
         self.party = None        # 서버가 준 파티 프리셋 (active/presets ...). 옛 서버면 None
@@ -1008,6 +1011,13 @@ class BoxWindow(object):
         self.bar_multi = multi = tk.Frame(inner, bg=U.INK)
         self.btn_multi_move = U.PushButton(multi, "옮기기 (0마리)", self.move_checked, height=34)
         self.btn_multi_move.pack(side="left", pady=10)
+        # 고른 것을 한 번에 놓아준다. 평소의 '놓아주기' 와 같은 붉은 단추 - 되돌릴 수 없다.
+        self.btn_multi_release = U.PushButton(multi, "놓아주기 (0마리)", self.release_checked,
+                                              fill=U.DANGER_BG, fg=U.DANGER,
+                                              shadow="#1a1013", hover="#3a2028",
+                                              height=34, border=U.DANGER_LINE,
+                                              font=U.FONT_S)
+        self.btn_multi_release.pack(side="left", padx=(8, 0), pady=10)
         self.btn_multi_all = U.ghost_button(multi, "이 화면 전부", self.check_all_shown, height=34)
         self.btn_multi_all.pack(side="left", padx=8, pady=10)
         self.btn_multi_clear = U.ghost_button(multi, "고르기 풀기", self.clear_checks, height=34)
@@ -1088,6 +1098,12 @@ class BoxWindow(object):
             self.party = got[2] if len(got) > 2 else None
             self._paint_party()
             self.mons = mons or []
+            if self.checked:
+                # 고름에서 서버에 더는 없는 것을 뺀다 - 놓아주기가 오류로 끝났어도 일부는 놓아졌을 수 있다
+                have = set(int(m.get("id") or 0) for m in self.mons)
+                self.checked = set(i for i in self.checked if i in have)
+                if self.multi:
+                    self._paint_multi()
             self._refresh_filter_bar()
             # 다시 불러온 까닭(떠올리기 결과 같은 것)이 있으면 지우지 않고 남긴다.
             note, self._note = getattr(self, "_note", None), None
@@ -1429,12 +1445,12 @@ class BoxWindow(object):
     def move_box(self):
         """고른 포켓몬을 다른 박스로. 어디로 보낼지 물어본다.
 
-        맨 위 줄은 '여러 마리 한꺼번에 옮기기' 다 (1.10.6) - 누르면 고르기가 켜진다.
+        맨 위 줄은 '여러 마리 골라 옮기기 · 놓아주기' 다 (1.10.6) - 누르면 고르기가 켜진다.
         """
         m = self.current()
         if not m:
             return
-        rows = [{"text": "여러 마리 한꺼번에 옮기기…", "checked": False, "command": self.enter_multi}]
+        rows = [{"text": "여러 마리 골라 옮기기 · 놓아주기…", "checked": False, "command": self.enter_multi}]
         if m.get("isEgg"):
             self.say("알은 박스를 옮길 수 없습니다.", U.DANGER)
             return self._menu(self.btn_move, rows)
@@ -1469,7 +1485,10 @@ class BoxWindow(object):
     # ---------------- 여러 마리 고르기 (1.10.6) ----------------
     @staticmethod
     def _can_check(m):
-        """여러 마리 옮기기에 넣을 수 있나: 박스에 있는 포켓몬만 (알과 데리고 다니는 것은 안 된다)."""
+        """여러 마리 고르기에 넣을 수 있나: 박스에 있는 포켓몬만 (알과 데리고 다니는 것은 안 된다).
+
+        놓아주기도 같은 고름을 쓴다 - 데리고 다니는 애는 한 마리씩 놓아준다 (바탕화면이 한꺼번에 비지 않게).
+        """
         return bool(m) and not m.get("isEgg") and not m.get("onDesktop") and int(m.get("id") or 0) > 0
 
     def enter_multi(self):
@@ -1480,7 +1499,7 @@ class BoxWindow(object):
         self.bar_normal.pack_forget()
         self.bar_multi.pack(side="left", fill="y", before=self.status)
         self._paint_multi()
-        self.say("옮길 포켓몬을 눌러 고르세요. Shift 를 누른 채 누르면 사이의 것까지 고릅니다.", U.FG_DIM)
+        self.say("옮기거나 놓아줄 포켓몬을 눌러 고르세요. Shift 를 누른 채 누르면 사이의 것까지 고릅니다.", U.FG_DIM)
 
     def exit_multi(self):
         if not self.multi:
@@ -1502,14 +1521,19 @@ class BoxWindow(object):
 
     def _paint_multi(self):
         n = len(self.checked)
-        self.btn_multi_move.configure(text="옮기기 (%d마리)" % n, state="normal" if n else "disabled")
-        self.btn_multi_clear.configure(state="normal" if n else "disabled")
+        # 놓아주는 동안은 고른 것을 바꾸는 단추를 다 잠근다 (답이 오면 done 이 다시 칠한다)
+        on = "normal" if n and not self._releasing else "disabled"
+        self.btn_multi_move.configure(text="옮기기 (%d마리)" % n, state=on)
+        self.btn_multi_release.configure(text="놓아주기 (%d마리)" % n, state=on)
+        self.btn_multi_clear.configure(state=on)
+        self.btn_multi_all.configure(state="disabled" if self._releasing else "normal")
+        self.btn_multi_done.configure(state="disabled" if self._releasing else "normal")
 
     def toggle_check(self, pid, shift=False):
         """여러 마리 고르기에서 줄을 눌렀다. shift 면 방금 고른 줄부터 이 줄까지를 한꺼번에 고른다."""
         m = self._by_id.get(pid)
         if not self._can_check(m):
-            return self.say("알과 데리고 다니는 포켓몬은 한꺼번에 옮길 수 없습니다 (박스의 포켓몬만 고릅니다).",
+            return self.say("알과 데리고 다니는 포켓몬은 여러 마리 고르기에 넣을 수 없습니다 (박스의 포켓몬만 고릅니다).",
                             U.DANGER)
         order = self._page_ids
         if shift and self._last_check in order and pid in order:
@@ -1525,7 +1549,7 @@ class BoxWindow(object):
         self._sync_checks()
         self._paint_multi()
         self.say("%d마리를 골랐습니다. 박스를 넘기거나 찾아서 더 고를 수 있습니다." % len(self.checked)
-                 if self.checked else "옮길 포켓몬을 눌러 고르세요.", U.FG_DIM)
+                 if self.checked else "옮기거나 놓아줄 포켓몬을 눌러 고르세요.", U.FG_DIM)
 
     def check_all_shown(self):
         """지금 박스 칸에 보이는 것을 전부 고른다 (한 박스, 또는 찾은 것 전부)."""
@@ -1586,6 +1610,64 @@ class BoxWindow(object):
             self._paint_multi()
             self._note = ("%d마리를 %s 로 옮겼습니다." % (len(ids), self.box_name(no)), U.GOOD)
             self.reload()
+        U.run_async(self.root, work, done)
+
+    def release_checked(self):
+        """고른 것들을 한 번에 놓아준다: 확인 창 한 번 → 서버 한 번.
+
+        탐험에 나가 있는 것은 처음부터 빼고 확인 창에 그렇게 적는다 (서버도 막는다 - 그사이 보냈을 수 있다).
+        서버가 막은 것(탐험·배틀 중, 그사이 없어짐)은 고름에 남겨 두고 까닭을 바닥에 적는다.
+        """
+        if self._releasing:                  # 앞 요청의 답을 기다리는 중 (단추는 잠겨 있다 - 그래도 한 번 더 막는다)
+            return
+        mons = [self._by_id[i] for i in self._page_order(self.checked) if self._can_check(self._by_id.get(i))]
+        if not mons:
+            return self.say("놓아줄 포켓몬을 먼저 골라 주세요.", U.DANGER)
+        away = [m for m in mons if m.get("away")]
+        go = [m for m in mons if not m.get("away")]
+        if not go:
+            return self.say("고른 포켓몬이 모두 탐험에 나가 있어 놓아줄 수 없습니다.", U.INFO)
+        if not confirm_release_many(self.win, go, away):
+            return
+        self._do_release_many([m["id"] for m in go])
+
+    def _page_order(self, ids):
+        """고른 번호들을 화면에 보이는 순서로 (확인 창의 이름 목록이 박스에서 본 차례대로 나오게)."""
+        ids = set(ids)
+        order = [i for i in self._page_ids if i in ids]
+        return order + sorted(ids - set(order))
+
+    def _do_release_many(self, ids):
+        ids = list(ids)
+        self._releasing = True
+        self._paint_multi()
+        self.say("놓아주는 중...")
+
+        def work():
+            return self.app.api.release_many(ids)
+
+        def done(r, err):
+            self._releasing = False
+            if err:
+                # 오류로 끝나도 일부는 놓아졌을 수 있다 (200마리씩 나눠 보내다 중간에 끊겼다, 답만 못 받았다).
+                # 그래서 여기서 끝내지 않고 목록·바탕화면을 서버에 맞춘다 - 고름에서 사라진 것은 reload 가 뺀다.
+                gone = set()
+                self._note = (getattr(err, "message", str(err)), U.DANGER)
+            else:
+                gone = set(int(x.get("id")) for x in (r.get("released") or []))
+                failed = r.get("failed") or []
+                msg = r.get("message") or "%d마리를 보내주었습니다." % len(gone)
+                if failed:
+                    why = failed[0].get("reason") or ""
+                    msg = "%s %s" % (msg, why) if why and why not in msg else msg
+                self._note = (msg, U.INFO if failed else U.GOOD)
+            # 놓아준 것만 고름에서 뺀다. 막힌 것은 남겨 두어 무엇이 남았는지 보이게.
+            self.checked = set(i for i in self.checked if i not in gone)
+            self._last_check = None
+            self._sync_checks()
+            self._paint_multi()
+            self.reload()
+            self.app.request_sync()
         U.run_async(self.root, work, done)
 
     def _menu(self, btn, rows, below=False):
@@ -3165,6 +3247,82 @@ def confirm_release(parent, app, mon):
     U.ghost_button(brow, "취소", win.destroy, height=34).pack(side="right",
                                                             padx=(0, 8))
     grow(win)
+    win.grab_set()
+    parent.wait_window(win)
+    return out["v"]
+
+
+def release_many_text(mons, away=()):
+    """여러 마리 놓아주기 확인 창에 적을 것: (머리말, [(이름 줄, 표시)], [경고]).
+
+    **한 마리 확인 창의 경고를 빠뜨리지 않는다** - 숨은 특성(10/22 사용자). 거기에 여러 마리라서 섞여
+    들어가기 쉬운 것들도 한데 모아 적는다: 이로치, 지닌 도구(가방으로 돌아간다), 탐험 중이라 빠지는 것.
+    창을 띄우지 않고도 검사할 수 있게 따로 둔다.
+    """
+    rows, hidden, shiny, held = [], [], [], []
+    for m in mons:
+        info = m.get("info", {})
+        name = info.get("name", "?")
+        marks = []
+        if info.get("hiddenAbility") or m.get("hiddenAbility"):
+            ab = info.get("ability")
+            hidden.append("%s(%s)" % (name, ab) if ab else name)
+            marks.append("숨은 특성")
+        if m.get("shiny"):
+            shiny.append(name)
+            marks.append("이로치")
+        if m.get("held"):
+            held.append(m.get("heldKr") or m["held"])
+            marks.append("도구")
+        rows.append(("%s  Lv.%d" % (name, m.get("level", 0)), " · ".join(marks)))
+    warns = []
+    if hidden:
+        warns.append("숨은 특성을 가진 포켓몬이 %d마리 있습니다: %s" % (len(hidden), ", ".join(hidden)))
+    if shiny:
+        warns.append("이로치 포켓몬이 %d마리 있습니다: %s" % (len(shiny), ", ".join(shiny)))
+    if held:
+        warns.append("지니고 있는 도구 %d개(%s)는 가방으로 돌아갑니다." % (len(held), ", ".join(held)))
+    if away:
+        warns.append("탐험에 나가 있는 %d마리(%s)는 빼고 놓아줍니다."
+                     % (len(away), ", ".join(m.get("info", {}).get("name", "?") for m in away)))
+    head = "%d마리를 놓아줄까요?" % len(mons)
+    return head, rows, warns
+
+
+def confirm_release_many(parent, mons, away=()):
+    """여러 마리 놓아주기 확인. 몇 마리인지, 이름 전부, 경고 모음. 이름이 많으면 목록 칸이 굴러간다."""
+    head, rows, warns = release_many_text(mons, away)
+    win, f = _shell(parent, "놓아주기", 400, 260, danger=True)
+    out = {"v": False}
+    tk.Label(f, text=head, bg=U.BG, fg=U.FG, font=U.FONT_B, anchor="w").pack(anchor="w")
+    # 단추와 경고는 아래에 먼저 붙인다 - 이름 목록이 길어도 창 밖으로 밀려나지 않게 (목록만 굴러간다).
+    brow = tk.Frame(f, bg=U.BG)
+    brow.pack(side="bottom", fill="x", pady=(16, 0))
+
+    def ok():
+        out["v"] = True
+        win.destroy()
+    U.danger_button(brow, "%d마리 놓아주기" % len(mons), ok, height=34).pack(side="right")
+    U.ghost_button(brow, "취소", win.destroy, height=34).pack(side="right", padx=(0, 8))
+    tk.Label(f, text="정말 놓아줄까요? 되돌릴 수 없습니다.", bg=U.BG, fg=U.DANGER,
+             font=U.FONT_S, justify="left", anchor="w").pack(side="bottom", anchor="w", pady=(8, 0))
+    for w in reversed(warns):
+        # 숨은 특성·이로치는 한 마리 창처럼 금빛 굵은 글씨로, 나머지(도구·탐험)는 알림으로
+        strong = w.startswith("숨은 특성") or w.startswith("이로치")
+        tk.Label(f, text=natural(w), bg=U.BG, fg=U.SHINY if strong else U.FG_DIM,
+                 font=U.FONT_B if strong else U.FONT_S, anchor="w", justify="left",
+                 wraplength=350).pack(side="bottom", anchor="w", pady=(6, 0))
+    lst = tk.Frame(f, bg=U.BG)
+    lst.pack(fill="both", expand=True, pady=(8, 0))
+    inner, cv = scroll_body(lst)
+    for text, mark in rows:
+        line = tk.Frame(inner, bg=U.BG)
+        line.pack(fill="x")
+        tk.Label(line, text=text, bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, anchor="w").pack(side="left")
+        if mark:
+            tk.Label(line, text=mark, bg=U.BG, fg=U.SHINY, font=U.FONT_XS, anchor="e").pack(side="right", padx=(8, 4))
+    # 이름이 많으면 창을 키우지 않고 목록만 굴린다 (화면이 낮은 노트북에서도 단추가 보이게)
+    fit(win, hi=U.h(560), scroll=(cv, inner))
     win.grab_set()
     parent.wait_window(win)
     return out["v"]

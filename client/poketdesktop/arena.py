@@ -17,6 +17,7 @@
 그래서 cleanup() 은 몇 번을 불러도 안전하고, 중간에 무엇이 터지든
 반드시 불린다.
 """
+import tkinter as tk
 import traceback
 
 from common import party_battle as PB
@@ -117,6 +118,75 @@ def _short(text):
     return t[:14] if len(t) > 14 else t
 
 
+class StopPlate(object):
+    """재생 위쪽에 뜨는 작은 '그만 보기 ×' 판 (테두리 없는 작은 창).
+
+    투기장 레이어는 클릭이 통과해야 해서(바탕화면 작업을 안 가린다) 단추를 못 단다. 그래서 따로
+    작은 창 하나를 띄운다 - 친선전 구경의 이름표(ui_spectate.DesktopDuel)와 같은 모양·같은 ×.
+    누르면 on_stop() 을 부른다. 몇 번을 불러도 안전하다 (close).
+
+    Esc 도 먹는다. 다만 이 프로그램은 전역 키보드 훅을 안 쓰므로(hotkey.py) 키는 이 판에 포커스가
+    있을 때만 온다 - 마우스를 올리면 포커스를 가져온다 (남의 창에서 타이핑하는 중에 뺏지 않는다).
+    """
+
+    def __init__(self, root, rect, work, on_stop):
+        self.root = root
+        self.on_stop = on_stop
+        self.alive = True
+        win = self.win = tk.Toplevel(root)
+        win.overrideredirect(True)
+        win.configure(bg=U.LINE2)
+        row = tk.Frame(win, bg=U.BG)
+        row.pack(padx=1, pady=1)
+        tk.Label(row, text="대전 다시 보기", bg=U.BG, fg=U.FG, font=U.FONT_S
+                 ).pack(side="left", padx=(8, 4), pady=3)
+        self.x = tk.Label(row, text="×", bg=U.BG, fg=U.FG_DIM, font=U.FONT_B,
+                          cursor="hand2", padx=5)
+        self.x.pack(side="left")
+        self.x.bind("<Button-1>", lambda _e: self.stop())
+        win.bind("<Escape>", lambda _e: self.stop())
+        win.bind("<Enter>", lambda _e: self._focus())
+        self.place(rect, work)
+
+    def place(self, rect, work):
+        """링 위쪽 가운데. 작업 영역 밖으로 나가지 않게 한다."""
+        try:
+            self.win.update_idletasks()
+            w, h = self.win.winfo_reqwidth(), self.win.winfo_reqheight()
+            x1, y1, x2, _y2 = rect
+            wl, wt, wr, wb = work
+            x = int(max(wl, min(wr - w - 4, (x1 + x2) / 2.0 - w / 2.0)))
+            y = int(max(wt + 4, min(wb - h - 4, y1 - h - 4)))
+            self.win.geometry("%dx%d+%d+%d" % (w, h, x, y))
+            PLAT.raise_above(self.win)
+        except tk.TclError:
+            pass
+
+    def _focus(self):
+        try:
+            self.win.focus_set()
+        except tk.TclError:
+            pass
+
+    def stop(self):
+        """× 나 Esc. 한 번만 알린다."""
+        if not self.alive:
+            return
+        cb, self.on_stop = self.on_stop, None
+        self.close()
+        if cb:
+            cb()
+
+    def close(self):
+        if not self.alive:
+            return
+        self.alive = False
+        try:
+            self.win.destroy()
+        except tk.TclError:
+            pass
+
+
 class Arena(object):
 
     def __init__(self, app, view, on_done=None):
@@ -147,6 +217,7 @@ class Arena(object):
         self.bar_job = None
         # 이름표를 막아 둔 Overlay. _setup 이 막고 cleanup 이 한 번만 푼다.
         self._names_ov = None
+        self.stop_plate = None        # 그만 보기 × 판 (_setup 이 띄우고 cleanup 이 닫는다)
 
     # ---------------- 도구 ----------------
     def after(self, ms, fn):
@@ -231,6 +302,12 @@ class Arena(object):
         # 클릭 통과를 못 걸면 레이어 없이 싸운다. 아래는 전부
         # self.layer 가 None 이어도 도는 길이 있다.
         self.layer = FL.open_layer(self.root, rect)
+        # 언제든 끌 수 있게 (×, Esc). 끄는 길은 끝나는 다른 길들과 같은 cleanup 이다.
+        try:
+            self.stop_plate = StopPlate(self.root, rect, self.work, self.stop)
+        except Exception as e:                              # noqa: BLE001
+            self.stop_plate = None
+            config.log("투기장 그만 보기 단추를 못 띄웠습니다: %s" % e)
 
         self.roster = {"me": teams.get("me") or [], "foe": teams.get("foe") or []}
         self._my_side(ov, self.roster["me"])
@@ -801,6 +878,8 @@ class Arena(object):
             bits.append("%s원" % format(self.view["reward"], ","))
         if self.view.get("rpDelta"):
             bits.append("RP %+d" % self.view["rpDelta"])
+        if self.view.get("practice"):
+            bits.append("연습판 · 점수 변화 없음")      # 하루 20판 뒤의 랜덤 배틀 (옛 서버는 이 칸이 없다)
         self.app.notify("%s 와(과)의 대전 — %s%s"
                         % (foe, msg, ("  (" + " · ".join(bits) + ")")
                            if bits else ""))
@@ -842,6 +921,14 @@ class Arena(object):
         except Exception as e:                              # noqa: BLE001
             config.log("투기장 이름표를 되살리지 못했습니다: %s" % e)
 
+    def stop(self):
+        """사용자가 재생을 그만 본다 (× · Esc). 승패와 보상은 이미 확정되어 있어서 끊어도 된다.
+
+        끝나는 다른 길(로그아웃·종료·예외)과 똑같이 cleanup() 으로 간다 - on_done 이 앱의
+        close_arena 를 불러 바탕화면·미뤄 둔 랭킹 다시 읽기까지 원래대로 돌린다.
+        """
+        self.cleanup()
+
     def cleanup(self):
         """원상 복귀. **몇 번을 불러도 안전해야 한다.**
 
@@ -852,6 +939,9 @@ class Arena(object):
         if self.closed:
             return
         self.closed = True
+        sp, self.stop_plate = getattr(self, "stop_plate", None), None
+        if sp is not None:
+            sp.close()
         if getattr(self, "fx", None) is not None:
             try:
                 self.fx.stop()                  # 옮겨 둔 도트를 제자리로 (숨는 기술)

@@ -412,7 +412,8 @@ class SettingsWindow(object):
 
     CATCH_CHOICES = (("new", "아직 안 잡은 포켓몬만"),
                      ("always", "항상"),
-                     ("off", "끄기 (늘 끝까지 싸운다)"))
+                     ("off", "끄기 (늘 끝까지 싸운다)"),
+                     ("pick", "고른 포켓몬만"))
 
     def _catch_row(self, box, s):
         """야생 배틀의 잡기 모드 (desktop_battle 맨 위 설명)."""
@@ -426,10 +427,18 @@ class SettingsWindow(object):
                 activeforeground=U.FG, font=U.FONT_S, anchor="w",
                 highlightthickness=0, bd=0,
                 command=self._set_catch).pack(fill="x", padx=(22, 0))
+        # '고른 포켓몬만' 의 고를 단추와 몇 종 골랐는지 (ui_catch_pick). 다른 것을 골라도 단추는 둔다 -
+        # 미리 골라 두고 나중에 바꿀 수 있게.
+        row = tk.Frame(box, bg=U.BG)
+        row.pack(fill="x", padx=(44, 0), pady=(2, 2))
+        U.ghost_button(row, "고르기…", self._open_catch_pick, height=28).pack(side="left")
+        self.catch_pick_note = tk.Label(row, text=self._catch_pick_text(), bg=U.BG,
+                                        fg=U.FG_DIM, font=U.FONT_XS, anchor="w")
+        self.catch_pick_note.pack(side="left", padx=(10, 0))
         note = tk.Label(box, text="체력을 조금 남기고 멈춰서 볼을 던질 틈을 줍니다. "
                                   "10초 안에 안 던지거나 야생 포켓몬을 왼쪽 클릭하면 "
-                                  "끝까지 싸웁니다. 색이 다른 포켓몬은 잡은 적이 있어도 "
-                                  "이렇게 합니다.",
+                                  "끝까지 싸웁니다. 색이 다른 포켓몬은 잡은 적이 있거나 "
+                                  "고르지 않았어도 이렇게 합니다.",
                         bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
                         justify="left", wraplength=W - 60)
         note.pack(fill="x", padx=(22, 0), pady=(0, 6))
@@ -438,6 +447,27 @@ class SettingsWindow(object):
 
     def _set_catch(self):
         self._set("catchMode", config.catch_mode({"catchMode": self.catch.get()}))
+        self._repaint_pick_window()
+
+    def _catch_pick_text(self):
+        n = len(config.catch_pick(self.app.settings))
+        return "고른 포켓몬 %d종" % n if n else "아직 고른 포켓몬이 없습니다"
+
+    def _paint_catch_pick(self):
+        try:
+            self.catch_pick_note.configure(text=self._catch_pick_text())
+        except (tk.TclError, AttributeError):
+            pass
+
+    def _repaint_pick_window(self):
+        """열려 있는 고르는 창의 안내 글(지금 모드에 따라 다르다)과 고른 수를 다시 칠한다."""
+        w = getattr(self.app, "catch_pick_window", None)
+        if w is not None and w.alive():
+            w.repaint()
+
+    def _open_catch_pick(self):
+        from . import ui_catch_pick              # 단추를 누를 때만 부른다
+        ui_catch_pick.open_window(self.app)
 
     # ---------------- 긴급 숨기기 단축키 (1.10.3) ----------------
     def _zoom_row(self, box, s):
@@ -645,6 +675,9 @@ class SettingsWindow(object):
         keep = {k: self.app.settings[k]
                 for k in ("server", "lastBall", "autostart",
                           "lastRunVersion", "updateSkipped",
+                          # '고른 포켓몬만' 에서 고른 종은 하나씩 골라 모은 것이다 - 모드만 기본(new)으로 돌아가면
+                          # 쓰이지 않는다. 지우면 다시 고르려고 1025종을 또 훑어야 한다.
+                          "catchPick",
                           # 어디까지 읽었는지도 기록이다 (지우면 '새 글' 표시가 다시 뜬다)
                           "noticeSeen", "patchSeen",
                           # 화면 테마는 다시 켜야 바뀐다 - 여기서 조용히 기본으로 돌리면 다음에
@@ -672,6 +705,8 @@ class SettingsWindow(object):
         if self.app.wild:
             self.app.wild.set_enabled(self.app.settings.get("showGrass", True))
         self.app.refresh_tray()
+        self._paint_catch_pick()
+        self._repaint_pick_window()
 
     # ---------------- 끝 ----------------
     def focus(self):
