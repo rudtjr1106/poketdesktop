@@ -816,10 +816,11 @@ def panel(parent, root, title, w=None, h=None,
     """
     if parent is None:
         win = tk.Toplevel(root)
-        style_window(win, title, w, h)
+        # 크기는 기본 글자 크기로 잡은 값이다. 설정에서 글자를 키웠으면 창도 그만큼 (grow).
+        style_window(win, title, grow(w) if w else w, grow(h) if h else h)
         apply_theme(win)
         if minw and minh:
-            win.minsize(minw, minh)
+            fit_minsize(win, minw, minh)
         if on_close:
             win.protocol("WM_DELETE_WINDOW", on_close)
         win.embedded = False
@@ -919,6 +920,31 @@ def pt(n):
     숫자를 그대로 박아 두면 본문만 커지고 그것들만 작게 남는다.
     """
     return max(7, int(round(n * (BASE_PT / 10.0))))
+
+
+def grow(px):
+    """창 크기. 설정의 글자 크기를 이 OS 기본보다 올린 만큼만 키운다 (기본 크기면 그대로).
+
+    h() 와 다르다. h() 는 10pt 를 기준으로 재서 맥(12pt)에서는 늘 1.2 배인데, 창 크기는
+    맥에서도 윈도우와 같은 값으로 맞춰 두었다 - h() 를 쓰면 기본 크기의 맥 창이 커진다.
+    글자를 '아주 크게' 로 올리면 글이 든 칸이 다 높아져서, 창이 그대로면 탐험 칸 셋이
+    가장 작은 창에 안 들어가고 관장 요약이 옆 칸을 넘었다.
+    """
+    return int(round(px * BASE_PT / float(_BASE_PT_OS)))
+
+
+def fit_minsize(win, w, h):
+    """창의 최소 크기를 grow() 로 키워 건다. 작업 영역보다 크게는 안 잡는다 - 최소 크기가
+    화면보다 크면 창 아래가 화면 밖으로 나가서 바닥의 단추에 손이 안 닿는다."""
+    w, h = grow(w), grow(h)
+    try:
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        x1, y1, x2, y2 = PLAT.work_area(sw, sh)
+        w = min(w, max(320, (x2 - x1) - 16))
+        h = min(h, max(320, (y2 - y1) - CHROME_H))
+    except Exception:                                       # noqa: BLE001
+        pass
+    win.minsize(w, h)
 
 
 def h(px):

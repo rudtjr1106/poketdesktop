@@ -61,11 +61,12 @@ class HubWindow(object):
         self.order = [t[0] for t in TABS]
 
         self.win = tk.Toplevel(self.root)
-        U.style_window(self.win, "포스크탑", W, H)
+        # 글자 크기를 키웠으면 창도 그만큼 (U.grow) - 탐험 칸 셋이 가장 작은 창에도 들어가게.
+        U.style_window(self.win, "포스크탑", U.grow(W), U.grow(H))
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.minsize(980, 620)
+        U.fit_minsize(self.win, 980, 620)
         self.win.protocol("WM_DELETE_WINDOW", self.close)
         # 휠은 창 하나가 받아서 포인터 밑의 목록으로 보낸다. 탭마다 따로
         # 걸면 서로 덮어쓰고, 탭을 닫을 때 남의 것까지 지운다.
