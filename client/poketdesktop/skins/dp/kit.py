@@ -511,10 +511,17 @@ class VList(object):
 
 
 class Scroll(tk.Canvas):
-    """DP 풍 세로 막대 - 옅은 홈에 둥근 손잡이. 끌거나 홈을 누르면 굴린다."""
+    """DP 풍 막대 - 옅은 홈에 둥근 손잡이. 끌거나 홈을 누르면 굴린다.
 
-    def __init__(self, parent, target, bg, width=None):
-        tk.Canvas.__init__(self, parent, width=width or U.h(12), bg=bg, highlightthickness=0, bd=0)
+    orient="horizontal" 이면 가로 막대 (글자를 키워 판이 창보다 넓을 때 - scene.SceneCanvas)."""
+
+    def __init__(self, parent, target, bg, width=None, orient="vertical"):
+        self.horiz = orient == "horizontal"
+        size = width or U.h(12)
+        if self.horiz:
+            tk.Canvas.__init__(self, parent, height=size, bg=bg, highlightthickness=0, bd=0)
+        else:
+            tk.Canvas.__init__(self, parent, width=size, bg=bg, highlightthickness=0, bd=0)
         self.target = target
         self.lo, self.hi = 0.0, 1.0
         self._drag = None
@@ -532,27 +539,40 @@ class Scroll(tk.Canvas):
         w, h = self.winfo_width(), self.winfo_height()
         if w <= 1 or self.hi - self.lo >= 0.999:
             return
+        if self.horiz:
+            rrect(self, 2, 2, w - 2, h - 2, (h - 4) // 2, fill="#d8dde4")
+            x1 = 2 + (w - 4) * self.lo
+            x2 = max(x1 + 16, 2 + (w - 4) * self.hi)
+            rrect(self, x1, 2, x2, h - 2, (h - 4) // 2, fill="#8a96a8")
+            rrect(self, x1 + 2, 4, x2 - 3, h - 5, (h - 8) // 2, fill="#b8c2d0")
+            return
         rrect(self, 2, 2, w - 2, h - 2, (w - 4) // 2, fill="#d8dde4")
         y1 = 2 + (h - 4) * self.lo
         y2 = max(y1 + 16, 2 + (h - 4) * self.hi)
         rrect(self, 2, y1, w - 2, y2, (w - 4) // 2, fill="#8a96a8")
         rrect(self, 4, y1 + 2, w - 5, y2 - 3, (w - 8) // 2, fill="#b8c2d0")
 
-    def _press(self, e):
-        h = max(1, self.winfo_height())
-        y = e.y / float(h)
-        if self.lo <= y <= self.hi:
-            self._drag = (e.y, self.lo)
+    def _len(self):
+        return max(1, self.winfo_width() if self.horiz else self.winfo_height())
+
+    def _goto(self, f):
+        if self.horiz:
+            self.target.xview_moveto(max(0.0, f))
         else:
-            span = self.hi - self.lo
-            self.target.yview_moveto(max(0.0, y - span / 2))
+            self.target.yview_moveto(max(0.0, f))
+
+    def _press(self, e):
+        p = (e.x if self.horiz else e.y) / float(self._len())
+        if self.lo <= p <= self.hi:
+            self._drag = (e.x if self.horiz else e.y, self.lo)
+        else:
+            self._goto(p - (self.hi - self.lo) / 2)
 
     def _move(self, e):
         if not self._drag:
             return
-        h = max(1, self.winfo_height())
-        y0, lo0 = self._drag
-        self.target.yview_moveto(max(0.0, lo0 + (e.y - y0) / float(h)))
+        p0, lo0 = self._drag
+        self._goto(lo0 + ((e.x if self.horiz else e.y) - p0) / float(self._len()))
 
 
 # ---------------------------------------------------------------- 입력칸

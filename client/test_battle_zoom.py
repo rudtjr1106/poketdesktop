@@ -164,11 +164,21 @@ def main():
     Z.remember(h, "gym", 700, 500)
     chk("창 종류마다 따로 기억한다 (설정 파일에도 남는다)", Z.remembered(h, "live") == (900, 640) and Z.remembered(h, "gym") == (700, 500)
         and Z.remembered(h, "raid") is None and config.load_settings().get("battleSize", {}).get("live") == [900, 640])
+    chk("기억할 때의 글자 크기를 같이 적는다", h.settings.get("battleSizeText") == {"live": U.TEXT_SIZE, "gym": U.TEXT_SIZE},
+        h.settings.get("battleSizeText"))
+    # 다른 글자 크기에서 기억한 크기는 그 배율만큼 맞춘다 - px 그대로 쓰면 글자 크기 설정이 배틀 창에 안 먹었다
+    other = 2 if U.TEXT_SIZE == 0 else 0
+    h.settings["battleSizeText"]["live"] = other
+    base0 = int(round(U.BASE_PT / U.text_ratio()))
+    k = U.BASE_PT / float(U.text_pt(other, base0))
+    chk("다른 글자 크기에서 기억한 크기는 그 배율만큼 (%s)" % (Z.remembered(h, "live"),),
+        Z.remembered(h, "live") == (int(round(900 * k)), int(round(640 * k))) and Z.remembered(h, "gym") == (700, 500))
+    h.settings["battleSizeText"]["live"] = U.TEXT_SIZE
     h.settings["battleSize"]["raid"] = ["x", None]
     chk("이상한 값은 없는 것으로 친다", Z.remembered(h, "raid") is None)
     Z.forget(h)
     chk("지우면 다 기본 크기로 돌아간다", h.settings["battleSize"] == {} and Z.remembered(h, "live") is None
-        and config.load_settings().get("battleSize") == {})
+        and config.load_settings().get("battleSize") == {} and "battleSizeText" not in h.settings)
     chk("기본 설정에는 기억해 둔 크기가 없다", config.DEFAULTS.get("battleSize") == {})
 
     with open(os.path.join(L.DATA, "pokedex.json"), encoding="utf-8") as f:
@@ -210,7 +220,9 @@ def main():
     chk("칸은 배율만큼, 글자는 내림 (칸보다 크게 반올림되지 않는다)", Z.U.h(100) == int(round(U.h(100) * 0.85))
         and Z.px(100) == 85 and Z.U.pt(13) == int(U.pt(13) * 0.85) and Z.U.FONT_S == (U.FONT_S[0], int(U.FONT_S[1] * 0.85)),
         (Z.U.h(100), Z.U.pt(13), Z.U.FONT_S))
-    chk("  7pt 아래로는 안 내려간다", Z.font(("x", 8)) == ("x", 7) and Z.font(("x", 7, "bold")) == ("x", 7, "bold") and Z.U.pt(7) == 7)
+    # (U.pt(4) 로 본다: 글자 크기 설정(2.0)을 키우면 U.pt(7) 자체가 7 보다 커서 0.85 배를 해도 7 위에 있다)
+    chk("  7pt 아래로는 안 내려간다", Z.font(("x", 8)) == ("x", 7) and Z.font(("x", 7, "bold")) == ("x", 7, "bold") and Z.U.pt(4) == 7
+        and (Z.U.pt(7) == 7 or U.TEXT_SIZE > 0))
     chk("  크기가 아닌 것은 ui_common 그대로다", Z.U.BG is U.BG and Z.U.TYPE_COLOR is U.TYPE_COLOR and Z.U.wrap_to_width is U.wrap_to_width)
     Z.K = 1.0
     chk("배율 1 이면 예전과 한 치도 다르지 않다", Z.U.h(100) == U.h(100) and Z.U.pt(13) == U.pt(13) and Z.U.FONT_B == U.FONT_B
@@ -272,8 +284,11 @@ def main():
 
     look("처음 크기", FIRST)
     cells = w.left.winfo_children()[0].winfo_children()
+    # 두 배 비율은 '보통' 글자 크기에서만 본다: 글자를 키우면 명령 칸(U.h)은 본문만큼 커지는데 카드 안의 여백은
+    # 픽셀 그대로라 비율이 조금 넘는다 (맥 '아주 크게' 196 / 82). 카드는 글을 다 담고(아래 부등식 앞쪽) 누를 수 있다.
     chk("기술 카드는 안에 든 글의 두 배보다 낮다 (예전에는 두 배가 넘어 장면이 좁았다)", len(cells) == 4
-        and cells[0].winfo_reqheight() <= cells[0].winfo_height() < cells[0].winfo_reqheight() * 2.1,
+        and cells[0].winfo_reqheight() <= cells[0].winfo_height()
+        and (U.TEXT_SIZE > 0 or cells[0].winfo_height() < cells[0].winfo_reqheight() * 2.1),
         (cells[0].winfo_height(), cells[0].winfo_reqheight()))
 
     print("\n=== 줄인다 ===")

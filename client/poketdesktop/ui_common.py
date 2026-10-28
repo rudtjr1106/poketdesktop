@@ -10,6 +10,8 @@ tkinter 가 그대로 그릴 수 있는 것만 쓰기 위해서다.
     강조        몬스터볼 빨강은 머리띠와 위험한 동작에만
 """
 import bisect
+import json
+import os
 import queue
 import sys
 import threading
@@ -78,7 +80,75 @@ FAMILY_BLACK = FAMILY
 # 맥은 한 단계 크게 간다. 같은 pt 라도 맥 글꼴이 눈에 더 작게 앉아서,
 # 10pt 본문이 한글로는 확실히 작았다. 윈도우(맑은 고딕)는 지금 크기가
 # 맞으므로 건드리지 않는다 - 거기서 키우면 반대로 넘친다.
-BASE_PT = 12 if sys.platform == "darwin" else 10
+PLATFORM_PT = 12 if sys.platform == "darwin" else 10
+
+# 글자 크기 (2.0, 게시판 #359·#364 '글씨가 너무 작다'): 설정의 textSize - 0 보통 · 1 크게 · 2 아주 크게.
+# 본문이 1.0 · 1.2 · 1.4 배가 된다 (윈도우 10 · 12 · 14pt, 맥 12 · 14 · 17pt). 글꼴은 전부 이 본문에서
+# 몇 pt 위아래로 잡고(FONT_* · pt()), 글자가 든 칸도 같이 커지므로(h()) 본문 하나만 바꾸면 된다.
+# **켤 때 한 번 정한다** - 화면 테마처럼 바꾸면 다시 켜서 적용한다 (이 모듈을 처음 불러올 때 읽으므로,
+# 다른 모듈이 불러올 때 계산해 두는 크기까지 같이 맞는다). POKET_TEXT_SIZE 가 있으면 그것 (검사·캡처용).
+TEXT_SIZES = (("보통", 1.0), ("크게", 1.2), ("아주 크게", 1.4))
+
+
+def _saved_text_size():
+    """설정 파일(settings.json)에 적힌 textSize. **config 를 불러오지 않고** 읽는다.
+
+    config 는 불러오는 순간 설정 · 로그 경로를 그때의 POKET_HOME 으로 굳힌다. 이 모듈은 불러올 때 이 함수를
+    부르므로, 여기서 config 를 불러오면 ui_common 을 먼저 불러온 뒤 POKET_HOME 을 임시 폴더로 바꾸는 검사
+    (run_as_windows 로 돌리는 것)가 실제 앱의 설정 파일에 썼다. 자리는 config.data_dir 와 같은 규칙이다."""
+    d = os.environ.get("POKET_HOME")
+    if not d:
+        d = PLAT.data_dir("poketdesktop") or os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"),
+                                                         "poketdesktop")
+    with open(os.path.join(d, "settings.json"), encoding="utf-8") as f:
+        return json.load(f).get("textSize", 0)
+
+
+def text_size():
+    """이번 실행의 글자 크기 단계 (0 보통 · 1 크게 · 2 아주 크게)."""
+    raw = os.environ.get("POKET_TEXT_SIZE", "").strip()
+    if not raw:
+        try:
+            raw = _saved_text_size()
+        except Exception:                                   # noqa: BLE001
+            raw = 0
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = 0
+    return max(0, min(len(TEXT_SIZES) - 1, n))
+
+
+def text_size_of(settings):
+    """설정에 적힌 글자 크기 단계 (0 ~ 2)."""
+    try:
+        n = int((settings or {}).get("textSize", 0))
+    except (TypeError, ValueError):
+        n = 0
+    return max(0, min(len(TEXT_SIZES) - 1, n))
+
+
+def text_pt(level, platform_pt=None):
+    """그 단계의 본문 크기 (pt)."""
+    return int(round((platform_pt or PLATFORM_PT) * TEXT_SIZES[level][1]))
+
+
+TEXT_SIZE = text_size()
+BASE_PT = text_pt(TEXT_SIZE)
+
+
+def text_ratio():
+    """지금 글자가 보통 글자의 몇 배인가 (h() 가 키우는 배율과 같다). 보통 글자면 1.0.
+
+    BASE_PT 를 그 자리에서 읽는다 - run_as_windows 처럼 켠 뒤에 BASE_PT 를 바꿔도 맞게."""
+    base = max(1, int(round(BASE_PT / TEXT_SIZES[TEXT_SIZE][1])))
+    return BASE_PT / float(base)
+
+
+def wide(px):
+    """창 폭을 글자를 키운 만큼 넓힌다 (보통 글자에서는 그대로). 폭을 박아 둔 창이 글자만 커지면
+    글이 '…' 로 잘리거나 줄이 접힌다 - 글자를 줄이지 않고 창을 넓힌다."""
+    return int(round(px * text_ratio()))
 
 FONT = (FAMILY, BASE_PT)
 FONT_B = (FAMILY, BASE_PT, "bold")
@@ -443,6 +513,13 @@ class PushButton(object):
         self.label = tk.Label(self.box, text=text, bg=fill, fg=fg,
                               font=font or FONT_BTN, cursor="hand2")
         self.label.pack(expand=True)
+        # **높이는 글자보다 낮아지지 않는다** (글자 크기 설정, 2.0). 부르는 쪽이 높이를 숫자로 주는데, 글자를
+        # 키우면 글자만 커지고 단추는 그대로라 위아래가 잘렸다. 지금 크기에서 이미 들어가면 그대로다.
+        # 보통 글자에서는 하지 않는다 - 라벨의 요청 높이에는 안 보이는 테두리 · pady(6px)가 들어 있어서, 윈도우의
+        # 맑은 고딕처럼 줄 간격이 큰 글꼴이면 보통 크기에서도 24px 단추가 2px 커졌다 (보통 크기는 예전 그대로).
+        need = self.label.winfo_reqheight() + 2 * bw
+        if TEXT_SIZE and need > height:
+            self.holder.configure(height=need + 4)
         # pack_propagate 를 꺼놔서 폭을 직접 정해줘야 한다.
         # fill="x" 로 담으면 이 값은 덮어써지고, side="left" 로 담으면 이게 쓰인다.
         #
@@ -650,6 +727,20 @@ def style_window(win, title, w=None, h=None):
     return win
 
 
+def _work_area(win):
+    sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+    try:
+        return PLAT.work_area(sw, sh)
+    except Exception:                                       # noqa: BLE001
+        return 0, 0, sw, sh
+
+
+def work_size(win):
+    """창이 가질 수 있는 가장 큰 (폭, 높이) - place_window 가 줄이는 한계."""
+    x1, y1, x2, y2 = _work_area(win)
+    return max(320, (x2 - x1) - 16), max(320, (y2 - y1) - CHROME_H)
+
+
 def place_window(win, w, h, keep_pos=False):
     """창 크기와 자리를 잡는다. 작업 영역보다 크면 거기까지 줄인다. 잡은 (w, h) 를 돌려준다.
 
@@ -662,13 +753,10 @@ def place_window(win, w, h, keep_pos=False):
     내용을 받아 온 뒤 높이를 다시 맞출 때 창이 튀지 않게. 아래가 화면 밖으로 나가면
     그만큼만 올린다.
     """
-    sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
-    try:
-        x1, y1, x2, y2 = PLAT.work_area(sw, sh)
-    except Exception:                                       # noqa: BLE001
-        x1, y1, x2, y2 = 0, 0, sw, sh
-    w = int(min(w, max(320, (x2 - x1) - 16)))
-    h = int(min(h, max(320, (y2 - y1) - CHROME_H)))
+    x1, y1, x2, y2 = _work_area(win)
+    mw, mh = work_size(win)
+    w = int(min(w, mw))
+    h = int(min(h, mh))
     x = x1 + max(0, ((x2 - x1) - w) // 2)
     y = y1 + max(0, ((y2 - y1) - h - 30) // 3)
     if keep_pos:

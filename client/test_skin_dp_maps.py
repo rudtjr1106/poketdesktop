@@ -47,7 +47,9 @@ def gym(root, dex):
     app = TG.FakeApp(root, api, dex)
     app.settings = {}
     gw = ui_gym.GymWindow(root, app)
-    gw.win.geometry("1040x700+20+20")
+    # 허브의 기본 크기 (보통 글자에서 1040x700 - 글자를 키우면 허브도 그만큼 커진다: ui_hub.sizes)
+    from poketdesktop import ui_hub
+    gw.win.geometry("%dx%d+20+20" % ui_hub.sizes(gw.win)[:2])
     TG.pump(root, lambda: gw.data is not None and gw.map is not None, 20)
     TBL.settle(root, 0.5)
     chk("관장: 바다는 무늬 없는 한 빛깔", gw.cv.cget("bg") == DG.SEA and not gw.cv.find_withtag("sea"), gw.cv.cget("bg"))
@@ -121,15 +123,43 @@ def boss(root, dex):
     TBL.wait(root, lambda: bw.card is not None and bw.rows, 5)
     TBL.settle(root, 0.3)
     root.update()
-    # 기본 창(같은 자료)의 높이를 쟀을 때 480 px(맥 · 기본 글꼴)였다 - 그보다 키우지 않는다
-    chk("악당 창: 내용 높이가 기본 창을 넘지 않는다 (<= 480)", bw.body.winfo_height() <= 480, bw.body.winfo_height())
+    # 기본 창(같은 자료)의 높이를 쟀을 때 480 px(맥 · 기본 글꼴)였다 - 그보다 키우지 않는다.
+    # 글자를 키우면(2.0) 그 배율만큼까지 (아주 크게 1.42배: 기본 창 610 · DP 678 <= 680)
+    lim = int(480 * U.text_ratio())
+    chk("악당 창: 내용 높이가 기본 창을 넘지 않는다 (<= %d)" % lim, bw.body.winfo_height() <= lim, bw.body.winfo_height())
     chk("악당 창: 승부 단추가 창 안에 다 든다", bw.go_btn.box[2] <= bw.cv.winfo_width(), (bw.go_btn.box, bw.cv.winfo_width()))
     api.on = False
     bw.card = {"active": False}
     bw.paint()
     root.update()
-    chk("악당 창(없을 때): 높이가 기본 창 이하 (<= 64)", bw.body.winfo_height() <= 64, bw.body.winfo_height())
+    lim = int(64 * U.text_ratio())
+    chk("악당 창(없을 때): 높이가 기본 창 이하 (<= %d)" % lim, bw.body.winfo_height() <= lim, bw.body.winfo_height())
     bw.close()
+    # 작은 화면 (작업 영역 높이 560 - 1366x768 에서 글자를 아주 크게 한 것과 같은 처지): 창은 화면까지만 크고
+    # 판 안을 굴리면 승부 단추까지 닿는다 (예전에는 창 아래가 잘려 단추가 안 보였다)
+    keep = PLAT.work_area
+    PLAT.work_area = lambda *_a: (0, 0, 1920, 560)
+    try:
+        api.on = True
+        gw.open_boss()
+        bw = gw.boss_win
+        TBL.wait(root, lambda: bw.card is not None and bw.rows, 5)
+        TBL.settle(root, 0.3)
+        root.update()
+        room = U.work_size(bw.top)[1]
+        chk("작은 화면: 악당 창이 작업 영역에 든다 (<= %d)" % room, bw.top.winfo_height() <= room,
+            (bw.top.winfo_height(), room))
+        cv = bw.cv
+        cv.yview_moveto(1.0)
+        root.update()
+        bottom = cv.canvasy(cv.winfo_height())
+        chk("  판 안을 굴리면 승부 단추까지 보인다", bw.go_btn is not None and bottom >= bw.go_btn.box[3],
+            (bottom, bw.go_btn and bw.go_btn.box))
+        chk("  판의 폭은 그대로 (막대만큼 창이 넓어진다)", cv.winfo_width() >= int(cv.cget("width")) - 1,
+            (cv.winfo_width(), cv.cget("width")))
+        bw.close()
+    finally:
+        PLAT.work_area = keep
     gw.close()
 
 

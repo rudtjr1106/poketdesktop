@@ -32,6 +32,7 @@
 
 줄이면 글자도 작아진다 - 줄인 사람이 정한 것이다. 다만 7pt 아래로는 안 내려가고 (U.pt 와 같은
 바닥), 그래서 창도 MIN_K 아래로는 안 줄어든다 (윈도우의 작은 글자 8pt 가 바닥에 걸려 칸을 넘는다).
+글자 크기 설정(2.0)을 키웠으면 MIN_K 도 그만큼 낮다 - 가장 작은 창은 글자 크기와 상관없이 같은 모습이다.
 글자 크기는 **내림**한다: 칸은 0.85 배인데 글자가 반올림으로 0.9 배가 되면 넘친다.
 
 ## 창이 둘일 때
@@ -46,6 +47,13 @@ from . import platform_os as PLAT
 from . import ui_common as _U
 
 MIN_K, MAX_K = 0.8, 1.8
+# **글자 크기 설정(2.0)을 키웠으면 바닥 배율도 그만큼 낮다.** 칸(U.h)도 글자(U.pt)도 본문(BASE_PT) x 배율로
+# 정해지므로, 바닥은 '본문 x 배율' 이 '보통' 크기의 바닥(본문 x 0.8)과 같은 곳이다 - 7pt 바닥에 걸리는 모습도
+# 보통 크기의 가장 작은 창과 같다. 이게 없으면 글자를 키운 창이 작은 화면(1024 x 677)에 안 들어갔다
+# (가장 작은 창이 화면보다 넓었다). 보통 크기에서는 0.8 그대로다. 창은 처음에 기본 크기(배율 1 - 고른 글자 크기)로
+# 뜨고, 화면이 그보다 작을 때만 여기까지 내려간다.
+_BASE0 = int(round(_U.BASE_PT / _U.TEXT_SIZES[_U.TEXT_SIZE][1]))
+MIN_K = MIN_K * _BASE0 / float(_U.BASE_PT) if _U.BASE_PT != _BASE0 else MIN_K
 MIN_PT = 7
 SNAP = 0.95                 # 이만큼만 모자라면 줄이지 않는다 (화면이 조금 좁은 PC 에서 글자가 한 치 줄지 않게)
 SETTLE_MS = 140             # 끌기를 멈춘 뒤 다시 짓기까지
@@ -84,13 +92,29 @@ def scale_of(ww, wh, w, h_min):
 
 
 def remembered(app, kind):
-    """기억해 둔 창 크기 (w, h). 없거나 이상하면 None."""
+    """기억해 둔 창 크기 (w, h). 없거나 이상하면 None.
+
+    **기억한 뒤에 글자 크기(2.0)를 바꿨으면 그 배율만큼 늘리거나 줄인다.** 크기는 px 로 적어 두는데 창 배율은
+    '창 / 글자를 따라 커진 기본 크기' 라서, 그대로 쓰면 글자를 키운 만큼 배율이 작아져 배틀 창 글자가 예전
+    크기로 돌아갔다 (창을 한 번 끌어 본 사람에게는 글자 크기 설정이 배틀 창에 안 먹었다). 어느 글자 크기에서
+    기억했는지는 battleSizeText 에 둔다 - 없으면 글자 크기 설정이 생기기 전(보통)이다."""
+    s = getattr(app, "settings", None) or {}
     try:
-        w, h = ((getattr(app, "settings", None) or {}).get("battleSize") or {}).get(kind)
+        w, h = (s.get("battleSize") or {}).get(kind)
         w, h = int(w), int(h)
     except (TypeError, ValueError):
         return None
-    return (w, h) if w > 0 and h > 0 else None
+    if w <= 0 or h <= 0:
+        return None
+    try:
+        was = int((s.get("battleSizeText") or {}).get(kind, 0))
+    except (TypeError, ValueError, AttributeError):
+        was = 0
+    if was != _U.TEXT_SIZE and 0 <= was < len(_U.TEXT_SIZES):
+        base0 = int(round(_U.BASE_PT / _U.text_ratio()))      # 이 플랫폼의 보통 글자 본문 (pt)
+        k = _U.BASE_PT / float(_U.text_pt(was, base0))
+        w, h = int(round(w * k)), int(round(h * k))
+    return w, h
 
 
 def remember(app, kind, w, h):
@@ -98,10 +122,13 @@ def remember(app, kind, w, h):
     if s is None:
         return
     sizes = dict(s.get("battleSize") or {})
-    if sizes.get(kind) == [int(w), int(h)]:
+    at = dict(s.get("battleSizeText") or {})               # 창 종류 -> 기억할 때의 글자 크기 (remembered)
+    if sizes.get(kind) == [int(w), int(h)] and at.get(kind, 0) == _U.TEXT_SIZE:
         return
     sizes[kind] = [int(w), int(h)]
+    at[kind] = _U.TEXT_SIZE
     s["battleSize"] = sizes
+    s["battleSizeText"] = at
     try:
         from . import config
         config.save_settings(s)
@@ -115,6 +142,7 @@ def forget(app):
     if s is None or not s.get("battleSize"):
         return
     s["battleSize"] = {}
+    s.pop("battleSizeText", None)
     try:
         from . import config
         config.save_settings(s)
@@ -241,6 +269,50 @@ class Resizable(object):
         # 장면은 말풍선과 명령 칸을 뺀 나머지를 다 쓴다
         self.scene_h = max(U.h(60), int(wh) - U.h(self.ZOOM_MSG) - U.h(self.ZOOM_CMD) - 4)
         return self.zoom
+
+    # ---- 도트와 이름표
+    def plate_bbox(self, who):
+        """그 쪽 이름표가 장면에서 차지한 자리 (x1, y1, x2, y2). 테마마다 그리는 법이 달라서
+        바탕 사각형("bg")이 있으면 그것, 없으면 이름표 태그("tag")로 잰다. 못 재면 None."""
+        try:
+            box = self.box[who]
+            key = box.get("bg") or box.get("tag")
+            return self.cv.bbox(key) if key else None
+        except (AttributeError, KeyError, tk.TclError):
+            return None
+
+    def dot_fit(self, who, size, max_w):
+        """**포켓몬이 이름표에 가려지지 않게** 도트 높이(size)를 정한다 - 이름표의 실제 자리로 잰다.
+
+        글자 크기 설정(2.0)을 키우면 이름표가 글자와 같이 커지는데, 화면이 낮으면(맥 '아주 크게' 의
+        기본 창) 장면은 가장 낮은 높이보다도 낮아진다. 그러면 내 포켓몬의 머리가 상대 이름표 뒤로,
+        상대 포켓몬의 발이 내 이름표 뒤로 들어갔다. 글자는 줄이지 않는다 - 도트를 옮기고 줄인다:
+
+          * 상대 도트의 발이 내 이름표 꼭대기보다 아래면 **발을 이름표 위로 올린다** (장면 위로 넘치면 줄인다).
+          * 내 도트는 발은 그대로, **머리가 상대 이름표 바닥에 닿지 않을 만큼만** 높이를 줄인다.
+
+        이름표와 옆으로 겹칠 수 있을 때만 (도트의 가장 넓은 폭 max_w 로 본다). 자리가 넉넉하면(보통 크기의
+        창은 늘 그렇다 - 가장 낮은 장면이 그렇게 정해져 있다) 아무것도 바꾸지 않는다.
+        """
+        try:
+            cv, item = self.cv, self.sprite[who]
+            x, feet = cv.coords(item)[:2]
+        except (AttributeError, KeyError, ValueError, tk.TclError):
+            return size
+        plate = self.plate_bbox("me" if who == "foe" else "foe")
+        if not plate or x + max_w / 2.0 <= plate[0] or x - max_w / 2.0 >= plate[2]:
+            return size
+        if who == "foe":
+            if feet > plate[1]:
+                dy = int(round(feet - plate[1]))
+                cv.move(item, 0, -dy)
+                fx, fy = self.foe_pos
+                self.foe_pos = (fx, fy - dy)          # (볼에서 나오는 연출이 이 자리로 온다)
+                feet -= dy
+            room = int(feet)                          # 장면 위로 넘치지 않게
+        else:
+            room = int(feet - plate[3])
+        return max(int(size * 0.5), min(size, room))
 
     def zoom_use(self):
         """이 창의 배율로 그린다. 배틀 창이 둘 떠 있을 때를 위해 그리기 전의 길목에서 부른다."""

@@ -164,6 +164,8 @@ DEFAULTS = {
     "updateSkipped": "",
     # 화면 테마 (리소스팩, skins/). 켤 때 한 번 읽는다 - 바꾸면 다시 켜야 한다.
     "skin": "default",
+    # 글자 크기 (2.0): 0 보통 · 1 크게 · 2 아주 크게 (ui_common.TEXT_SIZES). 이것도 켤 때 한 번 읽는다.
+    "textSize": 0,
 }
 
 

@@ -674,6 +674,9 @@ def guild(root):
     srv.say("안녕하세요!", uid=2)
     app = TG.FakeApp(root, A)
     w = ui_guild.GuildWindow(app)
+    if U.TEXT_SIZE:
+        # 앱에서는 허브 탭 안이라 글자를 키우면 창도 같이 커진다 (ui_hub.sizes) - 따로 띄운 창도 그만큼
+        w.win.winfo_toplevel().geometry("%dx%d" % (U.wide(ui_guild.W), U.wide(ui_guild.H)))
     chk("길드는 DP", ours(type(w).__module__, "guild"), type(w).__module__)
     TBL.wait(root, lambda: w.data is not None and w.mode == "guild", 10)
     TBL.settle(root, 0.6)
@@ -1030,7 +1033,17 @@ def main():
         hub = ui_hub.make(app)
         app.hub = hub
         chk("허브는 DP 허브", ours(type(hub).__module__, "hub"), type(hub).__module__)
-        hub.win.geometry("1120x720+20+20")
+        # 글자 크기(2.0): 허브는 글자 배율만큼 커진다 (화면을 넘지 않게) - 가방 판이 옆으로 넘치지 않게 (사용자 결정)
+        r = U.text_ratio()
+        ww, wh = U.work_size(hub.win)
+        sz = ui_hub.sizes(hub.win)
+        chk("허브 크기 = 1040x700 · 가장 작게 980x620, 글자 배율만큼 (가장 작은 크기는 화면까지)",
+            sz == (int(round(1040 * r)), int(round(700 * r)), min(ww, int(round(980 * r))), min(wh, int(round(620 * r)))),
+            (sz, r))
+        if U.TEXT_SIZE:
+            hub.win.geometry("%dx%d+20+20" % (min(sz[0], ww), min(sz[1], wh)))      # 그 글자 크기의 기본 크기
+        else:
+            hub.win.geometry("1120x720+20+20")
         hub.show("bag")
         tabs = hub.panes.get("bag")
         chk("가방 탭은 DP 가방 탭", ours(type(tabs).__module__, "bag_tabs"), type(tabs).__module__)
@@ -1038,6 +1051,10 @@ def main():
         chk("도구 칸은 DP 가방", ours(type(bag).__module__, "bag"), type(bag).__module__)
         TBL.wait(root, lambda: bool(bag.items) and bag._wait is None, 15)
         TBL.settle(root, 0.5)
+        if U.TEXT_SIZE:
+            real = tk.Canvas.winfo_width(bag.cv)
+            chk("  글자를 키워도 가방 판이 옆으로 넘치지 않는다 (허브가 같이 커진다)",
+                real >= getattr(bag.cv, "min_w", 0), (real, getattr(bag.cv, "min_w", 0)))
 
         print("2. 허브 메뉴")
         chk("지금 탭은 가방", hub.current == "bag", hub.current)
@@ -1122,6 +1139,28 @@ def main():
         tm._toggle_filter()
         chk("전부 보기", len(tm._tm_rows) == len(tm.tms), len(tm._tm_rows))
         tm._toggle_filter()
+        if U.TEXT_SIZE and tm._tab_boxes.get("type"):
+            # 글자를 키워 판이 굴러가 있어도 타입 드롭다운은 탭 바로 아래에 뜬다 (굴린 만큼 어긋나 떴다)
+            spots = []
+            real_popup = U.PopupMenu
+            U.PopupMenu = lambda _root, _rows, x, y, **_kw: spots.append((x, y))
+            try:
+                tm.cv.yview_moveto(0.0)
+                tm.cv.xview_moveto(0.0)
+                root.update()
+                tm._menu(tm.type_btn, [])
+                tm.cv.yview_moveto(1.0)
+                tm.cv.xview_moveto(1.0)
+                root.update()
+                dx, dy = int(tm.cv.canvasx(0)), int(tm.cv.canvasy(0))
+                tm._menu(tm.type_btn, [])
+            finally:
+                U.PopupMenu = real_popup
+                tm.cv.yview_moveto(0.0)
+                tm.cv.xview_moveto(0.0)
+                root.update()
+            chk("  판을 굴린 만큼 드롭다운도 따라 옮겨 뜬다 (굴린 양 %d, %d)" % (dx, dy),
+                len(spots) == 2 and spots[1] == (spots[0][0] - dx, spots[0][1] - dy), spots)
         no = have[0]["no"]
         tm.pick(no)
         TBL.wait(root, lambda: tm._learners is not None, 5)

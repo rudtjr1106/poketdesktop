@@ -66,7 +66,7 @@ def guild(root):
     srv.say("안녕하세요!", uid=2)
     app = TG.FakeApp(root, A)
     w = ui_guild.GuildWindow(app)
-    w.win.winfo_toplevel().geometry("%dx%d" % (ui_guild.W, ui_guild.H))
+    w.win.winfo_toplevel().geometry("%dx%d" % (U.wide(ui_guild.W), U.wide(ui_guild.H)))   # 글자를 키우면 창도 그만큼
     TBL.wait(root, lambda: w.data is not None and w.mode == "guild", 10)
     TBL.settle(root, 0.5)
     cv = w.side_cv
@@ -118,7 +118,8 @@ def guild_war(root):
     srv.roles = {1: "master", 2: "member", 3: "member"}
     app = TW.App(root, TW.Api(srv, 1))
     w = ui_guild.GuildWindow(app)
-    w.win.winfo_toplevel().geometry("%dx%d" % (ui_guild.W, ui_guild.H))     # 기본 창 크기 그대로
+    # 기본 창 크기 그대로 (글자를 키우면 창도 같은 배율로 커진다 - ui_hub.sizes)
+    w.win.winfo_toplevel().geometry("%dx%d" % (U.wide(ui_guild.W), U.wide(ui_guild.H)))
     TBL.wait(root, lambda: w.data is not None and w.mode == "guild", 10)
     TBL.settle(root, 0.4)
     chk("다른 방에서는 기둥이 넓다 (깃발 판 + 방 목록)", w.info.winfo_width() == U.h(DG.SIDE_W), w.info.winfo_width())

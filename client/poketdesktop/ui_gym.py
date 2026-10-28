@@ -80,6 +80,7 @@ def boss_watch_in(boss, now=None):
 W, H = 1040, 700
 SIDE_W = 340
 PAD = 18
+STATUS_MIN = 220             # 지도 밑 줄: 출처 옆에 알림 글이 이만큼(글자 크기만큼 커진다)도 못 서면 출처를 둘째 줄로
 
 # 레벨 색: 쉬움(초록) -> 어려움(자주)
 STOPS = [(20, (58, 161, 126)), (40, (140, 194, 74)), (60, (242, 193, 78)),
@@ -88,6 +89,20 @@ CLEAR = "#ffc043"
 BOSS_FILL = "#0b0d13"        # 악당이 차지한 시·도 (시즌 4). 지도의 다른 어떤 색보다 어둡다
 BOSS_LINE = "#e5484d"
 TODAY = U.GOOD               # 오늘 보상을 받은 곳 (지도의 체크, 목록의 글)
+
+
+def side_px():
+    """오른쪽 칸의 폭. 보통 크기에서는 예전 그대로(U.h(SIDE_W)).
+
+    글자를 크게 하면 칸도 넓어지되 **글자가 커진 만큼의 절반만** 넓힌다. 글자만큼 다 넓혔더니
+    '아주 크게' 에서 창(1040)의 절반 넘게를 옆 칸이 먹어 지도가 457px 로 쪼그라들었고, 지도 밑 범례와
+    출처가 접혀 지도가 더 낮아져 이름표가 하나도 안 들어갔다. 줄은 그 폭으로도 넉넉하다 (가장 긴 줄이
+    아주 크게에서 322px), 카드의 긴 글은 접고 넘치면 굴린다.
+    """
+    full = U.h(SIDE_W)
+    base = SIDE_W * U.BASE_PT / (10.0 * U.TEXT_SIZES[U.TEXT_SIZE][1])     # 보통 크기의 폭
+    return int(round(full - (full - base) / 2.0))
+
 
 ROW_H = U.h(50)              # 목록의 한 줄 (이름·역할 / 지역 두 줄)
 # 목록의 글꼴. 처음에는 본문보다 한두 단계 작게 썼더니 작다는 말을 들었다 (사용자, 2026-10-11) -
@@ -361,7 +376,7 @@ class GymWindow(object):
         self.cv.bind("<ButtonRelease-1>", self._drag_end, add="+")
 
     def _side(self, body):
-        self.side = tk.Frame(body, bg=U.BG2, width=U.h(SIDE_W))
+        self.side = tk.Frame(body, bg=U.BG2, width=side_px())
         self.side.pack(side="right", fill="y")
         self.side.pack_propagate(False)
         tk.Frame(body, bg=U.LINE, width=1).pack(side="right", fill="y")
@@ -457,10 +472,45 @@ class GymWindow(object):
         bar = tk.Frame(parent, bg=U.INK, height=U.h(30))
         bar.pack(fill="x", side="bottom")
         bar.pack_propagate(False)
+        self.status_bar = bar
+        self._status_two = False
         self.status = tk.Label(bar, text="", bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w")
         self.status.pack(side="left", fill="x", expand=True, padx=12)
         self.source = tk.Label(bar, text="", bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS, anchor="e")
         self.source.pack(side="right", padx=12)
+        bar.bind("<Configure>", lambda _e: self._fit_status())
+
+    def _fit_status(self):
+        """지도 밑 줄이 좁으면 출처를 둘째 줄로 내린다.
+
+        글자를 크게 하면 옆 칸이 넓어지는 만큼 지도 밑 줄이 좁아져서, 한 줄에 같이 두었던
+        출처('지도: 통계청 SGIS · ...')가 반도 안 되는 폭으로 눌려 잘렸다. 글자는 줄이지 않는다 -
+        줄을 하나 더 둔다. 폭으로만 정한다 (알림 글이 바뀔 때마다 줄 높이가 바뀌면 지도를 다시 그린다).
+        """
+        bar = getattr(self, "status_bar", None)
+        if bar is None:
+            return
+        try:
+            width = bar.winfo_width()
+            if width <= 1:
+                return
+            src = self.source.winfo_reqwidth()
+            two = bool(self.source.cget("text")) and width < src + 48 + U.h(STATUS_MIN)
+            if two == self._status_two:
+                return
+            self._status_two = two
+            self.status.pack_forget()
+            self.source.pack_forget()
+            if two:
+                self.source.pack(side="bottom", anchor="e", padx=12, pady=(0, U.h(5)))
+                self.status.pack(side="top", fill="both", expand=True, padx=12)
+                bar.configure(height=U.h(30) + self.source.winfo_reqheight())
+            else:
+                self.status.pack(side="left", fill="x", expand=True, padx=12)
+                self.source.pack(side="right", padx=12)
+                bar.configure(height=U.h(30))
+        except tk.TclError:
+            pass
 
     def say(self, text, color=None):
         try:
@@ -502,6 +552,7 @@ class GymWindow(object):
             self.sub.configure(text="이긴 곳 %d / %d · 오늘 %d곳 완료"
                                % (self.data["cleared"], self.data["total"], today))
             self.source.configure(text="지도: 통계청 SGIS · vuski/admdongkor")
+            self._fit_status()
             self.boss = self.data.get("boss") or {}
             # 자정에는 '오늘 완료' 가 풀리고, 밤 11시에는 악당이 떠난다 - 먼저 오는 때에 다시 불러온다.
             # 악당이 아직 안 나왔으면 나올 때가 되었는지도 본다 (boss_watch_in). 몰려서 묻지 않게 조금씩 흩는다.
@@ -893,24 +944,55 @@ class GymWindow(object):
         self._label_fonts = (f_name, f_lv)
 
     def _legend(self):
+        """범례. 칸 높이는 전국·시·도 두 모양 중 높은 쪽에 맞춘다.
+
+        글자를 크게 하면 범례가 두 줄로 접히는데, 접히는 줄 수가 두 모양에서 다르다. 화면을 옮길 때마다
+        범례 높이가 바뀌면 지도 칸이 줄었다 늘며 한 번 더 그려진다 (방금 그린 지도가 곧바로 작아진다).
+        그래서 다른 모양도 한 번 그려 높이만 재고 지운다.
+        """
         cv = self.legend_cv
         cv.delete("all")
+        self._legend_draw("sgg" if self.sido is None else None)       # 다른 모양 (높이만 잰다)
+        box = cv.bbox("all")
+        other = box[3] if box else 0
+        cv.delete("all")
+        self._legend_draw(self.sido)
+        self._legend_height(other)
+        self._zoom_hint()
+
+    def _legend_draw(self, sido):
+        """sido 가 None 이면 전국의 범례, 아니면 시·도 안(트레이너 레벨 · 표식)의 범례를 그린다."""
+        cv = self.legend_cv
         x0, y0 = U.h(16), U.h(18)
-        if self.sido is None:
-            cv.create_text(x0, y0, anchor="w", fill=self.MAP["legend"], font=self._map_xs(),
-                           text="시·도를 누르면 그 안의 시·군·구로 들어갑니다   (금색 = 이긴 곳이 많을수록 진하게)")
-            self._zoom_hint()
+        width = max(100, cv.winfo_width())
+        f = tkfont.Font(root=cv, font=self._map_xs())
+        line = f.metrics("linespace")
+        if sido is None:
+            text = "시·도를 누르면 그 안의 시·군·구로 들어갑니다   (금색 = 이긴 곳이 많을수록 진하게)"
+            if x0 + f.measure(text) <= width:
+                cv.create_text(x0, y0, anchor="w", fill=self.MAP["legend"], font=self._map_xs(), text=text)
+            else:
+                # 글자를 키우면 한 줄에 안 든다 - 칸 폭에서 접고 칸을 늘린다 (글자는 줄이지 않는다)
+                cv.create_text(x0, y0 - line // 2, anchor="nw", fill=self.MAP["legend"], font=self._map_xs(),
+                               text=text, width=width - 2 * x0)
             return
         t0 = cv.create_text(x0, y0, anchor="w", fill=self.MAP["legend"], font=self._map_xs(), text="트레이너 레벨")
         bx = cv.bbox(t0)[2] + U.h(10)
         # 표식 둘(이긴 곳 · 오늘 완료)이 설 자리를 먼저 잰다. 색 띠는 남는 폭만큼만 쓴다 -
         # 허브를 가장 좁게 줄이면 띠를 14px 칸으로 그릴 자리가 없다.
-        f = tkfont.Font(root=cv, font=self._map_xs())
         r, gap = U.h(8), U.h(16)
         marks = [(CLEAR, "이긴 곳"), (TODAY, "오늘 완료")]
         need = sum(2 * r + U.h(6) + f.measure(text) for _c, text in marks) + gap * len(marks)
-        room = max(100, cv.winfo_width()) - bx - need - x0
+        room = width - bx - need - x0
         cell = max(6, min(U.h(14), room // 17))
+        my = y0                                    # 표식 줄
+        if bx + 17 * cell + need > width:
+            # 한 줄에 안 든다 (글자를 크게 하면 지도 칸이 좁아진다). 띠가 남는 폭을 다 쓰고 표식은 아랫줄로.
+            # 띠마저 글 옆에 못 서면 띠도 글 밑으로 내린다.
+            if bx + 17 * 6 + x0 > width:
+                bx, y0 = x0, y0 + line + U.h(4)
+            cell = max(6, min(U.h(14), (width - bx - x0) // 17))
+            my = y0 + U.h(16) + line + U.h(4)
         for i, lv in enumerate(range(20, 101, 5)):
             cv.create_rectangle(bx + i * cell, y0 - U.h(6), bx + (i + 1) * cell, y0 + U.h(6),
                                 fill=level_color(lv), outline="")
@@ -918,14 +1000,25 @@ class GymWindow(object):
             i = (lv - 20) // 5
             cv.create_text(bx + i * cell + cell // 2, y0 + U.h(16), text=str(lv),
                            fill=self.MAP["legend_dim"], font=self._map_xs())
-        ex = bx + 17 * cell + gap
+        ex = bx + 17 * cell + gap if my == y0 else x0
         for color, text in marks:
-            cv.create_oval(ex, y0 - r, ex + 2 * r, y0 + r, fill=color, outline=self.MAP["ink"], tags=("mark",))
-            cv.create_text(ex + r, y0, text="✓", fill=self.MAP["ink"], font=(self._map_family(), U.pt(8), self._map_bold()))
-            tid = cv.create_text(ex + 2 * r + U.h(6), y0, anchor="w", fill=self.MAP["legend"], font=self._map_xs(),
+            cv.create_oval(ex, my - r, ex + 2 * r, my + r, fill=color, outline=self.MAP["ink"], tags=("mark",))
+            cv.create_text(ex + r, my, text="✓", fill=self.MAP["ink"], font=(self._map_family(), U.pt(8), self._map_bold()))
+            tid = cv.create_text(ex + 2 * r + U.h(6), my, anchor="w", fill=self.MAP["legend"], font=self._map_xs(),
                                  text=text, tags=("marktext",))
             ex = cv.bbox(tid)[2] + gap
-        self._zoom_hint()
+
+    def _legend_height(self, other=0):
+        """범례 칸 높이: 평소에는 그대로(50), 접혀서 길어졌으면 그만큼 늘린다. other = 다른 모양의 바닥."""
+        cv = self.legend_cv
+        box = cv.bbox("all")
+        bottom = max(other, box[3] if box else 0)
+        want = U.h(50) if bottom + U.h(4) <= U.h(50) else bottom + U.h(10)
+        try:
+            if int(cv.cget("height")) != want:
+                cv.configure(height=want)
+        except (tk.TclError, ValueError):
+            pass
 
     def _zoom_hint(self):
         """오른쪽 위: 확대 안내, 키웠으면 배율과 '원래 크기'."""
@@ -1212,6 +1305,7 @@ class GymWindow(object):
             self.list_box.pack_forget()
             self._sido_buttons()
             return
+        self.head.pack_configure(fill="x", expand=False)     # (시·도 바로 가기는 남는 높이를 다 썼다)
         if not self.list_box.winfo_manager():
             self.list_box.pack(fill="both", expand=True)
         self._fill_list()
@@ -1219,8 +1313,7 @@ class GymWindow(object):
     def _sido_buttons(self):
         """시·도 열여섯 곳 바로 가기. 세종·대전·서울은 전국 지도에서 손톱만 하다."""
         U.marker_label(self.head, "시·도 바로 가기", bg=U.BG2).pack(anchor="w", pady=(14, 6))
-        grid = tk.Frame(self.head, bg=U.BG2)
-        grid.pack(fill="x")
+        grid = self._sido_scroller()
         for i, (code, label, won, total, done) in enumerate(self._sido_cells()):
             bg = shade(CLEAR, 0.45) if done else U.BG3
             cell = tk.Frame(grid, bg=bg, cursor="hand2", highlightthickness=1, highlightbackground=U.LINE)
@@ -1236,6 +1329,36 @@ class GymWindow(object):
                 w.bind("<Leave>", lambda _e, ws=(cell, name, cnt), b=bg: [x.configure(bg=b) for x in ws])
         for c in range(4):
             grid.grid_columnconfigure(c, weight=1, uniform="sido")
+
+    def _sido_scroller(self):
+        """시·도 바로 가기 칸을 담을 틀. 옆 칸에 다 안 들면 안쪽이 굴러간다.
+
+        글자를 크게 하고 창을 가장 작게 줄이면 요약 + 열여섯 칸이 옆 칸보다 26px 길어서
+        맨 아랫줄이 잘렸다. 다 들 때는 막대가 없고 모양도 예전과 같다.
+        """
+        self.head.pack_configure(fill="both", expand=True)
+        wrap = tk.Frame(self.head, bg=U.BG2)
+        wrap.pack(fill="both", expand=True)
+        cv = tk.Canvas(wrap, bg=U.BG2, highlightthickness=0, bd=0, height=1, width=1)
+        sb = tk.Scrollbar(wrap, orient="vertical", command=cv.yview)
+        grid = tk.Frame(cv, bg=U.BG2)
+        wid = cv.create_window((0, 0), window=grid, anchor="nw")
+        U.scroll_fitter(cv, grid, wid)
+
+        def on_scroll(lo, hi):
+            sb.set(lo, hi)
+            try:
+                if float(hi) - float(lo) >= 0.999:
+                    sb.pack_forget()
+                elif not sb.winfo_ismapped():
+                    sb.pack(side="right", fill="y", before=cv)
+            except tk.TclError:
+                pass
+        cv.configure(yscrollcommand=on_scroll)
+        cv.pack(side="left", fill="both", expand=True)
+        U.scrollable(cv, 60)
+        self.sido_cv = cv
+        return grid
 
     def _sido_cells(self):
         """시·도 바로 가기 열여섯 칸: [(코드, 짧은 이름, 이긴 곳, 전체, 다 이겼나)] (코드 순)."""

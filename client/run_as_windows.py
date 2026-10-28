@@ -19,6 +19,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
+# 글자 크기는 사용자 설정을 따르지 않고 보통으로 (돌리는 쪽이 POKET_TEXT_SIZE 를 주면 그것). ui_common 을
+# 불러오기 전에 정해야 한다 - 켤 때 한 번 읽는다.
+os.environ.setdefault("POKET_TEXT_SIZE", "0")
 from poketdesktop import ui_common as U                     # noqa: E402
 
 
@@ -26,7 +29,7 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
-    U.BASE_PT = 10                      # 윈도우와 같은 배율
+    U.BASE_PT = U.text_pt(U.TEXT_SIZE, 10)  # 윈도우와 같은 배율 (POKET_TEXT_SIZE 로 준 글자 크기도 따른다)
     target = sys.argv[1]
     sys.argv = sys.argv[1:]
     runpy.run_path(target, run_name="__main__")

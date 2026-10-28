@@ -217,13 +217,21 @@ def main():
     SB.settle(root)
     seg, bar = win.party_seg.frame, win.party_bar
     btn = win.btn_party_name.holder
-    chk("다섯 칸과 '이름 바꾸기' 가 한 줄에 다 들어간다", seg.winfo_width() >= seg.winfo_reqwidth()
-        and btn.winfo_rootx() + btn.winfo_width() <= bar.winfo_rootx() + bar.winfo_width()
-        and seg.winfo_rootx() + seg.winfo_width() <= btn.winfo_rootx(),
+    def apart():
+        """다섯 칸 오른쪽에 단추가 있거나 (한 줄), 다섯 칸 아래 줄에 단추가 있다 (두 줄). 겹치지 않는다."""
+        right = seg.winfo_rootx() + seg.winfo_width() <= btn.winfo_rootx()
+        below = seg.winfo_rooty() + seg.winfo_height() <= btn.winfo_rooty()
+        inside = (btn.winfo_rootx() + btn.winfo_width() <= bar.winfo_rootx() + bar.winfo_width()
+                  and btn.winfo_rooty() + btn.winfo_height() <= bar.winfo_rooty() + bar.winfo_height())
+        return seg.winfo_width() >= seg.winfo_reqwidth() and inside and (right or below)
+    # 보통 글자 크기에서는 한 줄에 다 들어간다. 글자 크기 '크게·아주 크게' 는 다섯 칸 + 단추가 목록 폭을
+    # 넘어 단추가 아래 줄로 내려간다 (글씨를 줄이지 않는다) - 그때는 겹치지 않고 줄 안에 있는지만 본다.
+    one_line = U.TEXT_SIZE != 0 or seg.winfo_rootx() + seg.winfo_width() <= btn.winfo_rootx()
+    chk("다섯 칸과 '이름 바꾸기' 가 한 줄에 다 들어간다", apart() and one_line,
         (seg.winfo_width(), seg.winfo_reqwidth(), btn.winfo_rootx() + btn.winfo_width(), bar.winfo_rootx() + bar.winfo_width()))
     top.geometry("950x620")                                       # 창을 가장 작게
     SB.settle(root, 20)
-    chk("  창을 가장 작게 줄여도", btn.winfo_rootx() + btn.winfo_width() <= bar.winfo_rootx() + bar.winfo_width(),
+    chk("  창을 가장 작게 줄여도", apart(),
         (btn.winfo_rootx() + btn.winfo_width(), bar.winfo_rootx() + bar.winfo_width()))
     bad = squeezed(win.party_bar)
     chk("  프리셋 줄에 눌린 위젯 없음", not bad, bad[:3])

@@ -48,6 +48,7 @@ PROFILE_BAR = 16                    # 굴러가는 막대의 몫
 # 채팅에 놓이는 카드(친선전)는 **내용만큼만 넓고 왼쪽에 붙는다** (채팅의 말 줄처럼). 폭은 아래 둘 사이다.
 CHAT_CARD_W = 540           # 상한. 이보다 긴 글은 줄을 바꾼다 (칸이 더 좁으면 칸에 맞춘다)
 CHAT_CARD_MIN = 200         # 칸이 아주 좁을 때의 바닥
+
 # 바닥: 이 글과 단추가 한 줄에 들어가는 폭 (글꼴 크기를 따라가게 글로 잰다). **가장 긴 닉네임(12자)**
 # 으로 잰다 - 상대를 구하는 카드는 누구 것이든 같은 폭이고, 넉넉해 보인다. (여섯 자로 쟀을 때는
 # 좁아 보였다)
@@ -167,6 +168,15 @@ def seen_text(m):
     if ago < 86400:
         return "%d시간 전" % (ago // 3600), U.FG_FAINT
     return "%d일 전" % (ago // 86400), U.FG_FAINT
+
+
+def _text_w(root, font, text):
+    """그 글꼴로 쓴 글의 폭 (px). 못 재면 0."""
+    try:
+        from tkinter import font as tkfont
+        return int(tkfont.Font(root=root, font=font).measure(text))
+    except Exception:                                       # noqa: BLE001
+        return 0
 
 
 @skins.skinnable
@@ -928,11 +938,21 @@ class GuildWindow(object):
             tk.Frame(inner, bg=CARD, width=lo, height=1).pack(anchor="w")    # 바닥 폭을 잡아 주는 살
             head = tk.Frame(inner, bg=CARD)
             head.pack(fill="x", padx=12, pady=(6, 0))
-            tk.Label(head, text=v.get("title") or "길드 친선전", bg=CARD, fg=U.ACCENT if live else U.FG_DIM, font=U.FONT_B,
-                     anchor="w").pack(side="left")
+            title = v.get("title") or "길드 친선전"
+            # 머리줄(제목 · 표시)도 상한을 넘지 않는다. 글자가 커져(글자 크기 '크게·아주 크게') 둘이 한 줄에
+            # 안 들어가면 표시를 제목 아래 줄로 내리고, 제목도 줄을 바꾼다 (글씨를 줄이지 않는다).
+            room = max(80, hi - 24)
+            stack = bool(v["tag"]) and (_text_w(self.root, U.FONT_B, title) + CHAT_CARD_GAP
+                                        + _text_w(self.root, U.FONT_XS, v["tag"]) > room)
+            tk.Label(head, text=title, bg=CARD, fg=U.ACCENT if live else U.FG_DIM, font=U.FONT_B,
+                     anchor="w", justify="left", wraplength=room).pack(side="top" if stack else "left", anchor="w")
             if v["tag"]:                         # 진행 중 · 관전 중 · 끝 · 마감 (상대를 구하는 카드에는 없다)
-                tk.Label(head, text=v["tag"], bg=CARD, font=U.FONT_XS, anchor="e",
-                         fg=U.GOOD if v["tone"] == "fight" else U.FG_FAINT).pack(side="right", padx=(CHAT_CARD_GAP, 0))
+                tag = tk.Label(head, text=v["tag"], bg=CARD, font=U.FONT_XS, anchor="e",
+                               fg=U.GOOD if v["tone"] == "fight" else U.FG_FAINT)
+                if stack:
+                    tag.pack(side="top", anchor="w")
+                else:
+                    tag.pack(side="right", padx=(CHAT_CARD_GAP, 0))
             row = tk.Frame(inner, bg=CARD)
             row.pack(fill="x", padx=12, pady=(4, 9))
             btn, used = None, 0

@@ -71,15 +71,52 @@ class BossWindow(object):
         self.busy = False
         self.photos = {}
         self.go_btn = None
-        self.top, f = ui_box._shell(gw.win.winfo_toplevel(), "악당 출현", W, U.h(260))
+        # 글자를 키우면 창도 그만큼 넓힌다 - 폭을 그대로 두면 안내 글이 더 많이 접혀 창이 길어졌다
+        self.top, f = ui_box._shell(gw.win.winfo_toplevel(), "악당 출현", U.wide(W), U.h(260))
         self.top.protocol("WM_DELETE_WINDOW", self.close)
-        self.body = tk.Frame(f, bg=U.BG)
-        self.body.pack(fill="both", expand=True)
+        self._shell_w0 = self.top.shell_w
+        # 아래 알림 줄을 몸통보다 먼저 담는다 - 창이 화면에 막혀 줄어들면 나중에 담은 것부터 잘린다
         self.status = tk.Label(f, text=" ", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
-                               justify="left", wraplength=W - 48)
-        self.status.pack(fill="x", pady=(6, 0))
+                               justify="left", wraplength=U.wide(W) - 48)
+        self.status.pack(side="bottom", fill="x", pady=(6, 0))
+        self.body = self._make_body(f)
         self._loading()
         self.reload()
+
+    def _make_body(self, f):
+        """몸통 틀. 보통 글자에서는 예전처럼 틀 하나.
+
+        글자를 키웠으면(2.0) 굴러가는 칸이다 - 작은 화면(1366x768 등)에서 '아주 크게' 면 창이 화면보다 길어져
+        아래 승부 단추가 잘렸고 굴릴 방법도 없었다. 창은 화면까지만 크고 넘치는 것은 안에서 굴린다 (_fit)."""
+        from . import ui_box
+        self._scroll = None
+        if U.TEXT_SIZE:
+            inner, cv = ui_box.scroll_body(f)
+            self._scroll = (cv, inner)
+            return inner
+        body = tk.Frame(f, bg=U.BG)
+        body.pack(fill="both", expand=True)
+        return body
+
+    def _fit(self):
+        """창 높이를 내용에 맞춘다. 굴러가는 칸이면 화면까지만 - 굴리게 되면 막대 폭만큼 창을 넓힌다
+        (글의 접는 폭은 막대가 없을 때로 잡았다)."""
+        from . import ui_box
+        top = self.top
+        if self._scroll is None:
+            ui_box.fit(top)
+            return
+        top.shell_w = self._shell_w0
+        hi = U.work_size(top)[1]
+        ui_box.fit(top, hi=hi, scroll=self._scroll)
+        try:
+            top.update_idletasks()
+            lo, up = self._scroll[0].yview()
+        except tk.TclError:
+            return
+        if up - lo < 0.999:
+            top.shell_w = self._shell_w0 + U.h(18)
+            ui_box.fit(top, hi=hi, scroll=self._scroll)
 
     # ---------------- 불러오기 ----------------
     def _loading(self):
@@ -103,7 +140,6 @@ class BossWindow(object):
 
     # ---------------- 그리기 ----------------
     def paint(self):
-        from . import ui_box
         for w in self.body.winfo_children():
             w.destroy()
         self.go_btn = None
@@ -114,7 +150,7 @@ class BossWindow(object):
                                            "나타나 밤 11시까지 머뭅니다.",
                            bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, justify="left", anchor="w")
             lab.pack(fill="x", pady=(4, 8))
-            ui_box.fit(self.top)
+            self._fit()
             return
         head = tk.Frame(self.body, bg=DARK, highlightthickness=2, highlightbackground=EVIL)
         head.pack(fill="x")
@@ -148,11 +184,17 @@ class BossWindow(object):
             self.go_btn.pack(side="right")
             if not can:
                 self.go_btn.configure(state="disabled")
+        wl = U.wide(W) - 48 - (190 if text else 0)
+        if text:
+            # 단추가 190 보다 넓으면(글자를 크게 하면 '... 와(과) 맞서기' 가 그렇다) 그만큼 더 접는다 -
+            # 안 그러면 줄이 창 폭을 넘어 단추와 글이 같이 눌렸다. 칸 폭 = 창 - 테두리 2x2 - 여백 18x2.
+            room = U.wide(W) - 4 - 36 - self.go_btn.holder.winfo_reqwidth() - 6 - U.h(12)
+            wl = min(wl, max(U.h(120), room))
         lab = tk.Label(foot, text=note, bg=U.BG, fg=U.FG if c.get("done") else U.FG_DIM, font=U.FONT_S,
-                       anchor="w", justify="left", wraplength=W - 48 - (190 if text else 0))
+                       anchor="w", justify="left", wraplength=wl)
         lab.pack(side="left", fill="x", expand=True)
         self._thumbs()
-        ui_box.fit(self.top)
+        self._fit()
 
     def _row(self, box, sprite, role, name, state, legend=None):
         row = tk.Frame(box, bg=U.BG2)

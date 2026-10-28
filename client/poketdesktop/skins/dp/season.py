@@ -457,7 +457,7 @@ class RewardsWindow(S.RewardsWindow):
         self._hover = None
         self._full = 0
         win = tk.Toplevel(self.root)
-        U.style_window(win, "칭호 · 명패", self.W, 520)
+        U.style_window(win, "칭호 · 명패", U.wide(self.W), 520)
         U.apply_theme(win)
         win.configure(bg=BODY, highlightthickness=0)
         dialog_bar(win, "칭호 · 명패")
@@ -510,10 +510,10 @@ class RewardsWindow(S.RewardsWindow):
         except tk.TclError:
             return
         if w <= 1:
-            w = U.h(self.W) - 2 * PAD - U.h(14)
+            w = U.wide(self.W) - 2 * PAD - U.h(14)
         full = self._draw_list(w)
         self.cv.configure(height=max(U.h(80), min(full, U.h(self.MAX_LIST))))
-        U.fit_window(self.win, self.W, keep_pos=True)
+        U.fit_window(self.win, U.wide(self.W), keep_pos=True)
         self._paint_preview()
         self._show_equipped()
 

@@ -368,6 +368,35 @@ def main():
     root.update()
     chk("이제 그 시·도로 들어간다", gw.sido == SIDO, gw.sido)
 
+    if U.TEXT_SIZE:
+        # 글자를 키웠을 때(2.0) 작은 화면: 창은 화면까지만 크고 안을 굴리면 승부 단추까지 닿는다
+        # (작업 영역 높이 560 - 1366x768 에서 아주 크게 한 것과 같은 처지. 예전에는 창 아래가 잘렸다)
+        print("\n=== 작은 화면 (글자를 키웠을 때) ===")
+        keep = PLAT.work_area
+        PLAT.work_area = lambda *_a: (0, 0, 1920, 560)
+        try:
+            gw.to_nation()
+            gw.open_boss()
+            bs = gw.boss_win
+            TG.pump(root, lambda: bs.card is not None and bs.rows)
+            root.update()
+            room = U.work_size(bs.top)[1]
+            chk("악당 창이 작업 영역에 든다 (<= %d)" % room, bs.top.winfo_height() <= room,
+                (bs.top.winfo_height(), room))
+            cv = bs._scroll[0]
+            cv.yview_moveto(1.0)
+            root.update()
+            foot = bs.body.winfo_children()[-1]          # 맨 아래 줄 (안내 글 · 승부 단추)
+            y_in = foot.winfo_rooty() - cv.winfo_rooty()
+            chk("  안을 굴리면 맨 아래 줄(승부 단추 자리)까지 보인다",
+                0 <= y_in and y_in + foot.winfo_height() <= cv.winfo_height() + 1,
+                (y_in, foot.winfo_height(), cv.winfo_height()))
+            root.update_idletasks()
+            chk("  눌린 것이 없다 (막대만큼 창이 넓어진다)", not squeezed(bs.top), squeezed(bs.top)[:3])
+            bs.close()
+        finally:
+            PLAT.work_area = keep
+
     print("\n=== 창을 닫으면 ===")
     gw.to_nation()
     gw.open_boss()

@@ -95,13 +95,13 @@ def ramp(stops, t):
 
 
 def gradient(cv, x1, y1, x2, y2, stops, band=4, tags=()):
-    """세로로 번지는 색 (가로띠를 촘촘히 깐다)."""
+    """세로로 번지는 색 (가로띠를 촘촘히 깐다). 띠는 높이를 고르게 나눈다 - band 씩 깔고 남는 것을 끝에
+    따로 깔면, 높이가 band 의 배수가 아닐 때(글자를 키워 창 높이가 바뀌면) 1~2px 짜리 줄이 한 가닥 생겼다."""
     h = max(1, y2 - y1)
-    y = y1
-    while y < y2:
-        cv.create_rectangle(x1, y, x2, min(y2, y + band), fill=ramp(stops, (y - y1) / float(h)),
-                            outline="", tags=tags)
-        y += band
+    n = max(1, h // band)
+    for i in range(n):
+        a, b = y1 + h * i // n, y1 + h * (i + 1) // n
+        cv.create_rectangle(x1, a, x2, b, fill=ramp(stops, (a - y1) / float(h)), outline="", tags=tags)
 
 
 def side_round(x1, y1, x2, y2, r, right=True):

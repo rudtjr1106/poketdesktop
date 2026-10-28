@@ -23,6 +23,7 @@
 tier_state · shop_match · _leave_data · 채팅의 줄 다루기 · 웹소켓 ...).
 """
 import tkinter as tk
+from tkinter import font as tkfont
 
 from common.korean import natural
 
@@ -110,6 +111,13 @@ class _Menu(object):
 
 
 # ---------------------------------------------------------------- 그리는 것
+def base_px(n):
+    """보통 글자일 때의 U.h(n) - 글자가 커져도 그만큼만 쓰는 자리 (그 안의 글이 접히거나 재서 넓히는 곳).
+
+    U.h 는 글자 크기에 비례해 늘어서, 칸 사이 간격 같은 자리까지 그만큼 벌어져 글이 들어갈 폭을 먹었다."""
+    return int(round(n * U.BASE_PT / U.TEXT_SIZES[U.TEXT_SIZE][1] / 10.0))
+
+
 def room_icon(cv, key, cx, cy, tags=()):
     """방의 아이콘 - 본가 4세대 도구 그림 (모든 방에 하나씩, 직접 그리지 않는다)."""
     ph = poke_icons.photo(ROOM_ICON.get(key, "journal"))
@@ -320,11 +328,12 @@ class GuildWindow(G.GuildWindow):
         s = U.h
         self._ensure_status()
         self.body.configure(bg=BASE_BG)
-        side = tk.Frame(self.body, bg=GLINE, width=s(RAIL_W if self.tab == "war" else SIDE_W))
+        side = tk.Frame(self.body, bg=GLINE, width=s(RAIL_W) if self.tab == "war" else self._side_w())
         side.pack(side="left", fill="y")
         side.pack_propagate(False)
-        self.side_cv = tk.Canvas(side, bg=BASE_BG, highlightthickness=0, bd=0)
+        self.side_cv = tk.Canvas(side, bg=BASE_BG, highlightthickness=0, bd=0, yscrollincrement=1)
         self.side_cv.pack(fill="both", expand=True, padx=(0, 1))          # 오른쪽 1px = 기둥과 방 사이 금
+        U.scrollable(self.side_cv, 3)                                     # 글자가 커서 넘치면 휠로 굴린다
         self.side_cv.bind("<Configure>", lambda _e: self._paint_side())
         self.side_cv.bind("<Button-1>", self._side_click)
         self.side_cv.bind("<Motion>", self._side_motion)
@@ -347,7 +356,7 @@ class GuildWindow(G.GuildWindow):
         if side is None:
             return
         try:
-            side.configure(width=U.h(RAIL_W if on else SIDE_W))
+            side.configure(width=U.h(RAIL_W) if on else self._side_w())
         except tk.TclError:
             return
         self._paint_side()
@@ -397,7 +406,8 @@ class GuildWindow(G.GuildWindow):
         s = U.h
         d = self.data or {}
         g = d.get("guild") or {}
-        # 깃발 판 - 방 목록이 다 들어가게: 모자라면 소개를 한 줄로, 그래도 모자라면 빼고, 그다음 줄을 낮춘다
+        # 깃발 판 - 방 목록이 다 들어가게: 모자라면 소개를 한 줄로, 그다음 줄을 낮춘다.
+        # 그래도 모자라면 (글자를 크게 했을 때) 기둥을 굴린다 - 소개를 빼지 않는다.
         x1, x2 = s(10), w - s(10)
         inner = x2 - x1 - s(24)
         menu = self.seg
@@ -405,12 +415,33 @@ class GuildWindow(G.GuildWindow):
         name = clamp_lines(cv, g.get("name", ""), font(13), inner, 2)
         nh = K.text_height(cv, name, font(13), inner)
         reqs = len(d.get("requests") or [])
+        # 꼬리표 줄 · 길드원 수 줄: 한 줄에 안 들어가면 다음 줄로 (글자가 클 때)
+        chips = []
+        if d.get("roleKr"):
+            chips.append((d["roleKr"], ROLE.get(d.get("role"), "#7a8698")))
+        if G.MODE_KR.get(g.get("joinMode")):
+            chips.append((G.MODE_KR[g["joinMode"]], "#7a8698"))
+        chip_rows, cur, used = [], [], 0
+        for c in chips:
+            cw = chip_w(cv, c[0])
+            if cur and used + s(4) + cw > inner:
+                chip_rows.append(cur)
+                cur, used = [], 0
+            used += (s(4) if cur else 0) + cw
+            cur.append(c)
+        chip_rows.append(cur)
+        count = "길드원 %d / %d명" % (g.get("members", 0), g.get("max", 0))
+        total = "누적 %s점" % format(int(g.get("points") or 0), ",")
+        stat_split = (K.tkfont_of(cv, font(10)).measure(count) + s(12)
+                      + K.tkfont_of(cv, font(9)).measure(total) > inner)
+        head = (s(5) + s(10) + nh + s(8) + len(chip_rows) * s(22) + (len(chip_rows) - 1) * s(4) + s(8)
+                + s(18) * (2 if stat_split else 1) + (s(18) if reqs else 0))
         rh = s(34)
         intro = ih = None
-        for lines in (3, 1, 0):
-            intro = clamp_lines(cv, g.get("intro") or "소개가 없습니다.", font(9), inner, lines) if lines else ""
-            ih = (K.text_height(cv, intro, font(9), inner) + s(8)) if lines else 0
-            ph = s(5) + s(10) + nh + s(8) + s(22) + s(8) + s(18) + (s(18) if reqs else 0) + ih + s(8)
+        for lines in (3, 1):
+            intro = clamp_lines(cv, g.get("intro") or "소개가 없습니다.", font(9), inner, lines)
+            ih = K.text_height(cv, intro, font(9), inner) + s(8)
+            ph = head + ih + s(8)
             if s(10) + ph + s(10) + n * rh + s(8) <= h:
                 break
         room = h - (s(10) + ph + s(10)) - s(8) - s(4)
@@ -424,25 +455,27 @@ class GuildWindow(G.GuildWindow):
         yy = y + s(5) + s(10)
         K.text(cv, x1 + s(12), yy, name, font(13), anchor="nw")
         yy += nh + s(8)
-        xx = x1 + s(12)
-        if d.get("roleKr"):
-            xx += chip(cv, xx, yy + s(11), d["roleKr"], ROLE.get(role, "#7a8698")) + s(4)
-        if G.MODE_KR.get(g.get("joinMode")):
-            chip(cv, xx, yy + s(11), G.MODE_KR[g["joinMode"]], "#7a8698")
+        for i, row in enumerate(chip_rows):
+            if i:
+                yy += s(22) + s(4)
+            xx = x1 + s(12)
+            for text, col in row:
+                xx += chip(cv, xx, yy + s(11), text, col) + s(4)
         yy += s(22) + s(8)
-        cv.create_text(x1 + s(12), yy + s(9), text="길드원 %d / %d명" % (g.get("members", 0), g.get("max", 0)),
-                       fill=INK, font=font(10), anchor="w")
-        cv.create_text(x2 - s(12), yy + s(9), text="누적 %s점" % format(int(g.get("points") or 0), ","), fill=INK2,
-                       font=font(9), anchor="e")
+        cv.create_text(x1 + s(12), yy + s(9), text=count, fill=INK, font=font(10), anchor="w")
+        if stat_split:
+            yy += s(18)
+            cv.create_text(x1 + s(12), yy + s(9), text=total, fill=INK2, font=font(9), anchor="w")
+        else:
+            cv.create_text(x2 - s(12), yy + s(9), text=total, fill=INK2, font=font(9), anchor="e")
         yy += s(18)
         if reqs:
             cv.create_text(x1 + s(12), yy + s(9), text="가입 신청 %d건" % reqs, fill="#c06810", font=font(9),
                            anchor="w")
             yy += s(18)
         yy += s(6)
-        if intro:
-            cv.create_text(x1 + s(12), yy, text=intro, fill=INK2 if g.get("intro") else DIM, font=font(9),
-                           anchor="nw")
+        cv.create_text(x1 + s(12), yy, text=intro, fill=INK2 if g.get("intro") else DIM, font=font(9),
+                       anchor="nw")
         # 방 목록 - 흰 판 한 장
         y += ph + s(10)
         card(cv, x1, y, x2, y + n * rh + s(8))
@@ -462,6 +495,30 @@ class GuildWindow(G.GuildWindow):
                 cv.create_oval(x2 - s(22), y + rh // 2 - s(5), x2 - s(12), y + rh // 2 + s(5), fill=CUR,
                                outline=WHITE, width=2, tags=tg)
             y += rh
+        self._side_region(cv, w, h, y + s(4) + s(8))
+
+    def _side_region(self, cv, w, h, total):
+        """기둥이 창보다 길면 굴린다 (글자를 크게 했을 때). 다 들어가면 맨 위에 붙여 둔다."""
+        try:
+            cv.configure(scrollregion=(0, 0, w, max(h, total)))
+            if total <= h:
+                cv.yview_moveto(0)
+        except tk.TclError:
+            pass
+
+    def _side_w(self):
+        """왼쪽 기둥의 폭 - 글자를 따라 커진다 (U.h(SIDE_W)). 방 이름이 안 들어가면 그만큼 더 넓힌다.
+
+        글자를 키우면 허브 창도 같은 배율로 커지므로(ui_hub.sizes) 기둥이 창에서 차지하는 몫은 그대로다.
+        (허브가 안 커지던 때는 기둥을 보통 글자의 폭에 묶어 뒀다 - 창의 절반을 먹었다.)"""
+        s = U.h
+        try:
+            f = tkfont.Font(root=self.win, font=font(11))
+            longest = max([f.measure(lb + " 99") for _k, lb in self.tabs()] or [0])
+        except tk.TclError:
+            return s(SIDE_W)
+        need = s(10) + s(46) + longest + s(26) + s(10) + 1
+        return max(s(SIDE_W), need)
 
     def _paint_rail(self, cv, w, h):
         """접은 기둥: 방마다 아이콘 + 작은 이름 (길드전 방)."""
@@ -488,6 +545,7 @@ class GuildWindow(G.GuildWindow):
                 cv.create_oval(cx - s(4), y + s(6), cx + s(4), y + s(6) + s(8), fill=CUR, outline=WHITE, width=2,
                                tags=tg)
             y += rh
+        self._side_region(cv, w, h, y + s(4))
 
     # ---------------- 채팅
     def _build_chat(self):
@@ -673,17 +731,38 @@ class GuildWindow(G.GuildWindow):
         note = G.mission_note(ms)
         nh = K.text_height(cv, note, font(9), inner)
         tiers = ms.get("tiers") or []
-        ph = s(14) + s(26) + s(10) + s(14) + s(10) + nh + s(8) + len(tiers) * s(28) + s(8)
+        # 단계 줄: 보상 글은 남은 폭에서 접고, 넘치면 줄이 높아진다 (글자를 크게 했을 때 … 로 잘라 먹지 않는다)
+        f9, f10 = K.tkfont_of(cv, font(9)), K.tkfont_of(cv, font(10))
+        # 점수 · 보상 칸의 자리: 보통 글자의 자리 그대로, 앞 글이 안 들어가면 그만큼만 민다
+        c_need = max(base_px(104), s(16) + max([f10.measure("%d단계" % t["tier"]) for t in tiers] or [0]) + s(12))
+        c_rew = max(base_px(156), c_need + max([f10.measure("%d점" % t["need"]) for t in tiers] or [0]) + s(12))
+        rows = []
+        for t in tiers:
+            kind, text = G.tier_state(t, ms)
+            rw = (f10.measure(text) + s(22)) if kind == "claim" else f9.measure(text)
+            room = max(s(40), x2 - s(16) - rw - s(10) - x1 - c_rew)
+            reward = K.wrap(cv, t.get("reward", ""), font(9), room)
+            th = max(s(28), K.text_height(cv, reward, font(9), room) + s(10))
+            rows.append((t, kind, text, reward, th))
+        f11 = K.tkfont_of(cv, font(11))
+        gp = "%d점" % int(ms.get("guildPoints") or 0)
+        reset = "%s 뒤에 새로 시작합니다" % G.span(ms.get("resetIn"))
+        # 남은 시간이 점수와 겹치면 (글자가 클 때) 그 밑 줄로 내린다
+        low = (x1 + s(16) + f11.measure("오늘의 길드 점수") + s(12) + K.tkfont_of(cv, font(15)).measure(gp) + s(12)
+               + f9.measure(reset) > x2 - s(16))
+        extra = (f9.metrics("linespace") + s(4)) if low else 0
+        ph = s(14) + s(26) + extra + s(10) + s(14) + s(10) + nh + s(8) + sum(r[4] for r in rows) + s(8)
         y = s(2)
         card(cv, x1, y, x2, y + ph)
         yy = y + s(14)
-        f11 = K.tkfont_of(cv, font(11))
         K.text(cv, x1 + s(16), yy + s(13), "오늘의 길드 점수", font(11), anchor="w")
         K.text(cv, x1 + s(16) + f11.measure("오늘의 길드 점수") + s(12), yy + s(13),
-               "%d점" % int(ms.get("guildPoints") or 0), font(15), fill="#c06810", anchor="w")
-        cv.create_text(x2 - s(16), yy + s(13), text="%s 뒤에 새로 시작합니다" % G.span(ms.get("resetIn")), fill=INK2,
-                       font=font(9), anchor="e")
-        yy += s(26) + s(10)
+               gp, font(15), fill="#c06810", anchor="w")
+        if low:
+            cv.create_text(x1 + s(16), yy + s(26), text=reset, fill=INK2, font=font(9), anchor="nw")
+        else:
+            cv.create_text(x2 - s(16), yy + s(13), text=reset, fill=INK2, font=font(9), anchor="e")
+        yy += s(26) + extra + s(10)
         # 막대: 옅은 홈 · 주황 막대 · 단계마다 눈금
         bx1, bx2, bh = x1 + s(16), x2 - s(16), s(14)
         top = float(ms.get("guildMax") or 1)
@@ -700,37 +779,40 @@ class GuildWindow(G.GuildWindow):
         yy += bh + s(10)
         K.text(cv, x1 + s(16), yy, note, font(9), fill=INK2, anchor="nw", width=inner)
         yy += nh + s(8)
-        for t in tiers:
+        for t, kind, text, reward, th in rows:
             reached = t.get("reached")
-            cy = yy + s(14)
+            cy = yy + th // 2
             K.text(cv, x1 + s(16), cy, "%d단계" % t["tier"], font(10), fill=INK if reached else INK2, anchor="w")
-            cv.create_text(x1 + s(104), cy, text="%d점" % t["need"], fill=INK2, font=font(10), anchor="w")
-            kind, text = G.tier_state(t, ms)
+            cv.create_text(x1 + c_need, cy, text="%d점" % t["need"], fill=INK2, font=font(10), anchor="w")
             if kind == "claim":
                 tier = t["tier"]
                 # 옛 서버(1.10.2 까지)에만 나온다 - 새 서버는 보상을 저절로 넣어 준다
-                rid = button(cv, x2 - s(16), cy, text,
-                             lambda tier=tier: self.act(lambda: self.app.api.guild_claim(tier), self._after_claim),
-                             "blue", h=s(26))
-                rx = rid.box[0]
+                button(cv, x2 - s(16), cy, text,
+                       lambda tier=tier: self.act(lambda: self.app.api.guild_claim(tier), self._after_claim),
+                       "blue", h=s(26))
             else:
-                rid = cv.create_text(x2 - s(16), cy, text=text, fill="#2c8a3c" if kind == "claimed" else INK2,
-                                     font=font(9), anchor="e")
-                rx = cv.bbox(rid)[0]
-            cv.create_text(x1 + s(156), cy, text=clamp_lines(cv, t.get("reward", ""), font(9),
-                                                             max(s(40), rx - s(10) - x1 - s(156)), 1),
-                           fill="#a05010" if reached else INK2, font=font(9), anchor="w")
-            yy += s(28)
+                cv.create_text(x2 - s(16), cy, text=text, fill="#2c8a3c" if kind == "claimed" else INK2,
+                               font=font(9), anchor="e")
+            cv.create_text(x1 + c_rew, cy, text=reward, fill="#a05010" if reached else INK2, font=font(9),
+                           anchor="w")
+            yy += th
         y += ph + s(14)
         y = section(cv, x1, x2, y, "내 미션", "오늘 %d / %d점" % (int(ms.get("myPoints") or 0),
                                                             int(ms.get("myMax") or 0)))
         missions = ms.get("missions") or []
-        lh = s(36)
-        total = max(1, len(missions)) * lh + s(8)
+        # 미션 이름도 접는다 - 넘치면 그 줄만 높아진다
+        mrows = []
+        for m in missions:
+            pts = "+%d점" % int(m.get("points") or 0)
+            cnt = "%d / %d" % (int(m.get("n") or 0), int(m.get("goal") or 0))
+            right = f10.measure(pts) + f10.measure(cnt) + s(30)
+            room = max(s(40), x2 - x1 - s(16) - s(44) - right)
+            name = K.wrap(cv, m.get("name", ""), font(10), room)
+            mrows.append((m, pts, cnt, name, max(s(36), K.text_height(cv, name, font(10), room) + s(12))))
+        total = (sum(r[4] for r in mrows) if mrows else s(36)) + s(8)
         card(cv, x1, y, x2, y + total)
         yy = y + s(4)
-        f10 = K.tkfont_of(cv, font(10))
-        for i, m in enumerate(missions):
+        for i, (m, pts, cnt, name, lh) in enumerate(mrows):
             cy = yy + lh // 2
             if i:
                 cv.create_line(x1 + s(14), yy, x2 - s(14), yy, fill=ROW_LINE)
@@ -738,11 +820,7 @@ class GuildWindow(G.GuildWindow):
             cv.create_text(x1 + s(16) + 10, cy, text="☑" if done else "☐", fill="#2c8a3c" if done else "#9aa6b6",
                            font=font(14))
             bx = x1 + s(16)
-            pts = "+%d점" % int(m.get("points") or 0)
-            cnt = "%d / %d" % (int(m.get("n") or 0), int(m.get("goal") or 0))
-            right = f10.measure(pts) + f10.measure(cnt) + s(30)
-            K.text(cv, bx + s(28), cy, clamp_lines(cv, m.get("name", ""), font(10), x2 - bx - s(44) - right, 1),
-                   font(10), fill=INK2 if done else INK, anchor="w")
+            K.text(cv, bx + s(28), cy, name, font(10), fill=INK2 if done else INK, anchor="w")
             pid = cv.create_text(x2 - s(16), cy, text=pts, fill="#2c8a3c" if done else "#c06810", font=font(10),
                                  anchor="e")
             cv.create_text(cv.bbox(pid)[0] - s(14), cy, text=cnt, fill="#2c8a3c" if done else INK2,
@@ -782,20 +860,37 @@ class GuildWindow(G.GuildWindow):
         bw = s(170)
         ph = poke_icons.photo("amulet-coin")
         cv.create_image(11, s(15), image=ph, tags=tg)
-        K.text(cv, 22 + s(8), s(15), "길드 코인 %s개" % format(int(sh.get("coin") or 0), ","), font(12),
-               fill="#c06810", anchor="w", tags=tg)
+        title = "길드 코인 %s개" % format(int(sh.get("coin") or 0), ",")
+        K.text(cv, 22 + s(8), s(15), title, font(12), fill="#c06810", anchor="w", tags=tg)
+        f10 = K.tkfont_of(cv, font(10))
+        # 코인 수 · '찾기' · 찾는 칸이 한 줄에 안 들어가면 (글자가 클 때) 찾는 줄을 코인 수 아래로 내린다
+        low = 22 + s(8) + K.tkfont_of(cv, font(12)).measure(title) + s(16) + f10.measure("찾기") + s(8) + bw > w
+        fy = s(32) + s(2) if low else 0                 # 찾는 줄의 위
+        ny = fy + s(32) + s(6) if low else s(32)        # 설명의 위
         note = "일일 미션의 단계 보상으로 모읍니다. 길드를 나가도 남습니다."
-        nw = max(60, w - bw - s(30))
-        K.text(cv, 0, s(32), note, font(9), fill=INK2, anchor="nw", width=nw, tags=tg)
-        want = max(s(52), s(32) + K.text_height(cv, note, font(9), nw) + s(8))
+        nw = max(60, w if low else w - bw - s(30))
+        K.text(cv, 0, ny, note, font(9), fill=INK2, anchor="nw", width=nw, tags=tg)
+        want = max(s(52), ny + K.text_height(cv, note, font(9), nw) + s(8))
+        if self.shop_query.strip() and low:
+            want += K.tkfont_of(cv, font(9)).metrics("linespace") + s(4)
         if int(cv.cget("height")) != want:
             cv.configure(height=want)
-        cv.coords(self._shop_win, w, s(1))
-        cv.itemconfigure(self._shop_win, width=bw, height=s(30))
-        cv.create_text(w - bw - s(8), s(16), text="찾기", fill=INK2, font=font(10), anchor="e", tags=tg)
+        if low:
+            lw = f10.measure("찾기")
+            cv.coords(self._shop_win, w, fy + s(1))
+            cv.itemconfigure(self._shop_win, width=max(s(60), w - lw - s(8)), height=s(30))
+            cv.create_text(0, fy + s(16), text="찾기", fill=INK2, font=font(10), anchor="w", tags=tg)
+        else:
+            cv.coords(self._shop_win, w, s(1))
+            cv.itemconfigure(self._shop_win, width=bw, height=s(30))
+            cv.create_text(w - bw - s(8), s(16), text="찾기", fill=INK2, font=font(10), anchor="e", tags=tg)
         if self.shop_query.strip():
-            cv.create_text(w, s(44), text="%d개" % len(self.shop_shown()), fill=INK2, font=font(9), anchor="e",
-                           tags=tg)
+            if low:
+                cv.create_text(w, want - s(4), text="%d개" % len(self.shop_shown()), fill=INK2, font=font(9),
+                               anchor="se", tags=tg)
+            else:
+                cv.create_text(w, s(44), text="%d개" % len(self.shop_shown()), fill=INK2, font=font(9),
+                               anchor="e", tags=tg)
 
     def _shop_layout(self, width=None):
         if self.dpage is not None:
@@ -835,8 +930,23 @@ class GuildWindow(G.GuildWindow):
 
         def note_of(it):
             return natural(it.get("note") or it.get("heldNote") or it.get("desc") or "")
-        hts = [max(s(66), s(32) + (K.text_height(cv, note_of(it), font(9), room) if note_of(it) else 0) + s(12))
-               for it in shown]
+
+        def head_w(it):
+            owned = int(bag.get(it["id"]) or 0)
+            return (K.tkfont_of(cv, font(11)).measure(it.get("kr", it["id"])) + s(10)
+                    + f10.measure("코인 %d" % int(it.get("coin") or 0))
+                    + ((f9.measure("가진 것 %d" % owned) + s(10)) if owned else 0))
+        # 이름 · 값이 단추 옆에 안 들어가면 (글자가 클 때) 단추를 줄 아래로 내리고 글은 줄 폭을 다 쓴다
+        low = any(head_w(it) > room for it in shown)
+        if low:
+            room = x2 - s(14) - tx
+        bh = (s(30) + s(8)) if low else 0
+        if low:                    # 글 줄 + 단추 줄 (단추가 글 옆에 없으니 보통 줄의 최소 높이는 안 쓴다)
+            hts = [max(s(66), s(32) + (K.text_height(cv, note_of(it), font(9), room) if note_of(it) else 0)
+                       + s(8) + bh) for it in shown]
+        else:
+            hts = [max(s(66), s(32) + (K.text_height(cv, note_of(it), font(9), room) if note_of(it) else 0) + s(12))
+                   for it in shown]
         card(cv, x1, y, x2, y + sum(hts) + s(8))
         yy = y + s(4)
         for i, it in enumerate(shown):
@@ -847,10 +957,11 @@ class GuildWindow(G.GuildWindow):
                 cv.create_line(x1 + s(12), yy, x2 - s(12), yy, fill=ROW_LINE)
             ph = item_icons.photo(iid, G.SHOP_ICON)
             if ph is not None:
-                cv.create_image(x1 + s(34), yy + rh // 2, image=ph)
+                cv.create_image(x1 + s(34), yy + (rh - bh) // 2, image=ph)
             bx = x2 - s(14)
+            by = (yy + rh - s(8) - s(15)) if low else (yy + rh // 2)
             for n in (10, 1):
-                b = button(cv, bx, yy + rh // 2, "%d개 사기" % n, (lambda n=n, iid=iid: self.buy(iid, n)), "blue",
+                b = button(cv, bx, by, "%d개 사기" % n, (lambda n=n, iid=iid: self.buy(iid, n)), "blue",
                            enabled=have >= price * n, h=s(30))
                 self.shop_btns[(iid, n)] = b
                 bx -= b.w + s(6)

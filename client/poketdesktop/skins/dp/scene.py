@@ -91,6 +91,37 @@ class Find(object):
 
 
 # ---------------------------------------------------------------- 판
+# 판을 이보다 작게 그리지 않는다 (글자를 키웠을 때만 - 이 크기 x 배율): 폭은 보통 글자에서 허브를 가장 좁게(980)
+# 했을 때, 높이는 허브의 기본 높이(700)일 때의 판. 높이를 가장 낮은 창(620 -> 567)에 맞추면 플라티나 · 금은의
+# '누구에게' 판이 한 장만 보였다 - 세로로 굴리는 것은 가로보다 덜 번거로우니 기본 창의 높이를 준다.
+SCENE_MIN = (980, 652)
+
+
+class SceneCanvas(tk.Canvas):
+    """판을 그리는 캔버스. **글자를 키우면 판이 창보다 커질 수 있다 - 그때는 판을 줄이지 않고 안에서 굴린다.**
+
+    판의 자리(왼쪽 다이얼 · 가운데 목록 · 오른쪽 칸 ...)는 전부 U.h 로 글자를 따라 커진다. 허브 창도 같은
+    배율로 커지지만(ui_hub.sizes) 화면보다 크게는 못 커진다 - 작은 화면에서 아주 크게(1.4배)를 고르면 창이
+    판보다 좁아져 오른쪽 칸이 글자 한 자 폭이 되고 판끼리 겹쳤다. 그래서 판은 '보통 글자의 가장 작은 판 x
+    배율' 보다 작게 그리지 않고 (winfo_width · winfo_height 가 그 크기를 돌려준다 - 테마마다 따로 그리는
+    _paint 가 그대로 쓴다), 넘치는 만큼 굴린다. 보통 글자에서는 min_w = min_h = 0 이라 예전과 똑같다."""
+    min_w = min_h = 0
+
+    def real_width(self):
+        return tk.Canvas.winfo_width(self)
+
+    def real_height(self):
+        return tk.Canvas.winfo_height(self)
+
+    def winfo_width(self):
+        w = tk.Canvas.winfo_width(self)
+        return max(w, self.min_w) if w > 1 else w
+
+    def winfo_height(self):
+        h = tk.Canvas.winfo_height(self)
+        return max(h, self.min_h) if h > 1 else h
+
+
 class Scene(object):
 
     def _scene_init(self):
@@ -99,9 +130,46 @@ class Scene(object):
         self._wins = {}
         self._msg_ids = None
         self.win.configure(bg=BEZEL, highlightthickness=0)
-        self.cv = tk.Canvas(self.win, bg=BEZEL, highlightthickness=0, bd=0)
+        self.cv = SceneCanvas(self.win, bg=BEZEL, highlightthickness=0, bd=0)
+        if U.TEXT_SIZE > 0 and getattr(self, "SCENE_MIN", None):
+            self._scene_scrolls()
         self.cv.pack(fill="both", expand=True)
-        self.cv.bind("<Configure>", lambda _e: self._soon())
+        self.cv.bind("<Configure>", lambda _e: self._scene_conf())
+
+    def _scene_scrolls(self):
+        """글자를 키웠을 때: 판이 창보다 크면 굴릴 막대 (가로 · 세로, 넘칠 때만 보인다).
+
+        SCENE_MIN 을 정한 판만 (PocketDial - 가방 · 기술머신). 작은 창(지닌 도구 고르기 등)은 쓰지 않는다."""
+        cv = self.cv
+        r = U.text_ratio()
+        cv.min_w, cv.min_h = int(round(self.SCENE_MIN[0] * r)), int(round(self.SCENE_MIN[1] * r))
+        cv.configure(xscrollincrement=1, yscrollincrement=1)
+        self._vsb = K.Scroll(self.win, cv, BEZEL)
+        self._hsb = K.Scroll(self.win, cv, BEZEL, orient="horizontal")
+
+        def hook(sb, side, fill):
+            def on(lo, hi):
+                sb.set(lo, hi)
+                try:
+                    if float(hi) - float(lo) >= 0.999:
+                        if sb.winfo_manager():
+                            sb.pack_forget()
+                    elif not sb.winfo_manager():
+                        sb.pack(side=side, fill=fill, before=cv)
+                except tk.TclError:
+                    pass
+            return on
+        cv.configure(xscrollcommand=hook(self._hsb, "bottom", "x"), yscrollcommand=hook(self._vsb, "right", "y"))
+        U.scrollable(cv, 3)
+
+    def _scene_conf(self):
+        cv = self.cv
+        if cv.min_w or cv.min_h:
+            try:
+                cv.configure(scrollregion=(0, 0, cv.winfo_width(), cv.winfo_height()))
+            except tk.TclError:
+                pass
+        self._soon()
 
     def _hand(self, *tags):
         for tag in tags:
@@ -252,6 +320,8 @@ class PocketDial(object):
     """
     LW_PX = 250
     TOPH_PX = 150
+    # 다이얼 판(가방 · 기술머신 - 허브의 가방 탭)은 글자를 키우면 이보다 작게 그리지 않고 굴린다 (SceneCanvas)
+    SCENE_MIN = SCENE_MIN
 
     def _paint_left(self, cv, H):
         LW, TOPH = U.h(self.LW_PX), U.h(self.TOPH_PX)

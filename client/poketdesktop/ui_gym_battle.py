@@ -429,7 +429,8 @@ class GymBattleWindow(Z.Resizable):
             self.sendout.forget(who)
             return
         num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
-        size = Z.px(MON_H[who])
+        # 이름표에 가려지지 않는 높이까지만 (글자 크기를 키워 장면이 낮아졌을 때 - Z.Resizable.dot_fit)
+        size = self.dot_fit(who, Z.px(MON_H[who]), U.h(MON_W[who]))
 
         def work():
             path = sprite_cache.ensure(self.app.api, num, shiny)

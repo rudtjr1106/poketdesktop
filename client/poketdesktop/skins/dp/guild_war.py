@@ -22,6 +22,7 @@ SIDE_W = 300                 # 지도 옆 칸의 폭 (기본 330 - 지도 자리
 
 
 class WarTab(GW.WarTab):
+    SIDE_W = SIDE_W
 
     def __init__(self, gw, parent):
         GW.WarTab.__init__(self, gw, parent)
@@ -40,7 +41,7 @@ class WarTab(GW.WarTab):
         was = self.wide
         GW.WarTab._layout(self, wide)
         if wide and not was:
-            self.right.configure(width=U.h(SIDE_W))
+            self.right.configure(width=self._side_w())      # (보통 크기에서는 U.h(SIDE_W) 그대로)
             self.left.pack_configure(padx=(0, U.h(8)))
 
     def _card(self, title=None):

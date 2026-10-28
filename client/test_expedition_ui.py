@@ -428,8 +428,11 @@ def main():
         len(w.vl.entries) == 300 and w.vl.made <= 24 and widgets(w.win) < 700, (len(w.vl.entries), w.vl.made, widgets(w.win)))
     first = w.shown()
     want = UE.candidates(api.pokemon(), dex, w.place)
+    # 보이는 줄 수는 보통 글자 크기 기준이다. 글자를 키우면 줄이 높아져 한 화면에 덜 보인다 (나머지는 굴려서 본다)
+    rows_min = 6 if U.TEXT_SIZE == 0 else 3
+    rows_narrow = 4 if U.TEXT_SIZE == 0 else 3          # 가장 낮은 창에서
     chk("  위에서부터 잘할 차례로: 이름 · 레벨 · 예상 성공도 · 탐험 레벨 (%d줄이 보인다)" % len(first),
-        len(first) >= 6 and [pid for pid, _r in first][:5] == [m["id"] for m, _p, _g in want[:5]]
+        len(first) >= rows_min and [pid for pid, _r in first][:5] == [m["id"] for m, _p, _g in want[:len(first[:5])]]
         and first[0][1].lv.cget("text") == "Lv.%d" % want[0][0]["level"]
         and first[0][1].grade.cget("text") == X.GRADE_KR[want[0][2]]
         and first[0][1].grow.cget("text") == "탐험 Lv.0",
@@ -457,19 +460,33 @@ def main():
     chk("  줄마다 글이 줄 안에 있고 서로 안 겹친다", not row_trouble(), row_trouble()[:4])
     chk("  맨 위의 포켓몬이 골라져 있고, 아래에 한 줄로 요약한다", w.pick == want[0][0]["id"] and [p for p, r in first if r.selected] == [w.pick]
         and "예상" in w.summary.cget("text") and X.place(w.place)["kr"] in w.summary.cget("text"), w.summary.cget("text"))
-    bad = squeezed(w.body)
+    def cols_bad():
+        """세 단의 눌린 위젯. 왼쪽·가운데 단은 굴러가는 칸이라 squeezed 가 안 보므로 그 안쪽도 따로 본다."""
+        return squeezed(w.body) + squeezed(w.slot_col.inner) + squeezed(w.mid_col.inner)
+
+    def cards_seen():
+        """탐험 칸 셋이 다 보이나. 글자를 키우면(1·2) 낮은 창에는 다 안 들어가므로 단 안에서 굴려서 닿으면 된다
+        (막대가 보이고, 굴리는 범위가 마지막 칸의 끝까지 닿는다). 보통 크기는 굴리지 않고 셋이 다 보여야 한다."""
+        last = w.cards[-1]
+        if last.winfo_rooty() + last.winfo_height() <= w.body.winfo_rooty() + w.body.winfo_height():
+            return True
+        if U.TEXT_SIZE == 0:
+            return False
+        region = [float(v) for v in str(w.slot_col.cv.cget("scrollregion")).split()]
+        return bool(w.slot_col.bar.winfo_ismapped()) and len(region) == 4 \
+            and region[3] >= last.winfo_y() + last.winfo_height()
+    bad = cols_bad()
     chk("  세 단(탐험 칸 · 어디로 · 누구를)에 눌린 위젯 없음", not bad, bad[:3])
     cards = [c.winfo_height() for c in w.cards]
-    chk("  탐험 칸 셋이 다 제 높이로 보인다", min(cards) >= UE.CARD_H - 1
-        and w.cards[-1].winfo_rooty() + cards[-1] <= w.body.winfo_rooty() + w.body.winfo_height(), cards)
+    chk("  탐험 칸 셋이 다 제 높이로 보인다", min(cards) >= UE.CARD_H - 1 and cards_seen(), cards)
     # 허브 창을 가장 작게 줄였을 때 (980 x 620 - 탭 줄을 빼면 본문은 더 낮다)
     top.geometry("980x%d" % (620 - U.h(30)))
     rest(root, 0.4)
-    bad = squeezed(w.body)
+    bad = cols_bad()
     cards = [c.winfo_height() for c in w.cards]
     chk("**창을 가장 작게 줄여도** 세 단에 눌린 것이 없고 칸 셋이 다 보인다 (목록 %d줄)" % len(w.shown()),
-        not bad and min(cards) >= UE.CARD_H - 1 and len(w.shown()) >= 4
-        and w.cards[-1].winfo_rooty() + cards[-1] <= w.body.winfo_rooty() + w.body.winfo_height(), (bad[:3], cards, len(w.shown())))
+        not bad and min(cards) >= UE.CARD_H - 1 and len(w.shown()) >= rows_narrow
+        and cards_seen(), (bad[:3], cards, len(w.shown())))
     # (1.10.4 에서는 한 줄에 다섯 칸이라 여기서 '예상' 과 '물건' 이 창 밖으로 나가 있었다)
     chk("  **가장 좁은 창에서도 예상 성공도와 탐험 레벨이 줄 안에 있다**", not row_trouble(), row_trouble()[:4])
     hb = w.reload_btn.holder
@@ -483,7 +500,8 @@ def main():
     rest(root, 0.15)
     want = UE.candidates(api.pokemon(), dex, "volcano")
     first = w.shown()
-    chk("곳을 바꾸면 그곳에서 잘할 차례로 다시 선다 (맨 위로 돌아간다)", [pid for pid, _r in first][:5] == [m["id"] for m, _p, _g in want[:5]]
+    chk("곳을 바꾸면 그곳에서 잘할 차례로 다시 선다 (맨 위로 돌아간다)",
+        [pid for pid, _r in first][:5] == [m["id"] for m, _p, _g in want[:len(first[:5])]] and len(first) >= rows_min
         and w.vl.canvas.yview()[0] == 0.0 and w.pick == want[0][0]["id"]
         and X.place("volcano")["hint"] in texts(w.win), [pid for pid, _r in first][:3])
     good = set(X.place("volcano")["types"])
@@ -825,14 +843,14 @@ def main():
         and d.top.winfo_height() < d.top.winfo_screenheight() * 0.85,
         (len(d.rows), d.top.winfo_height(), d.top.winfo_reqheight(), squeezed(d.top)[:3]))
     foot_h = w.summary.master.winfo_height()
-    chk("  요약이 세 줄이어도 보내기 줄에 다 들어간다 (줄이 그만큼 자란다)", not squeezed(w.body)
+    chk("  요약이 세 줄이어도 보내기 줄에 다 들어간다 (줄이 그만큼 자란다)", not cols_bad()
         and w.summary.winfo_height() >= w.summary.winfo_reqheight(), (foot_h, w.summary.winfo_height(), w.summary.winfo_reqheight()))
     top.geometry("980x%d" % (620 - U.h(30)))
     rest(root, 0.5)
-    chk("  **가장 좁은 창에서도** 요약이 잘리지 않고 목록이 네 줄 넘게 남는다", not squeezed(w.body)
-        and w.summary.winfo_height() >= w.summary.winfo_reqheight() and len(w.shown()) >= 4
+    chk("  **가장 좁은 창에서도** 요약이 잘리지 않고 목록이 네 줄 넘게 남는다", not cols_bad()
+        and w.summary.winfo_height() >= w.summary.winfo_reqheight() and len(w.shown()) >= rows_narrow
         and w.send_btn.holder.winfo_height() >= w.send_btn.holder.winfo_reqheight(),
-        (w.summary.winfo_height(), w.summary.winfo_reqheight(), len(w.shown()), squeezed(w.body)[:3]))
+        (w.summary.winfo_height(), w.summary.winfo_reqheight(), len(w.shown()), cols_bad()[:3]))
     top.geometry("1020x664")
     rest(root, 0.4)
     d.close()
@@ -978,8 +996,8 @@ def main():
     rest(root, 0.4)
     w.vl.see(len(ids) - 1)
     rest(root, 0.2)
-    chk("  **가장 좁은 창에서도** 쉬는 줄·데리고 다니는 줄이 줄 안에 있다", not row_trouble() and not squeezed(w.body),
-        (row_trouble()[:4], squeezed(w.body)[:3]))
+    chk("  **가장 좁은 창에서도** 쉬는 줄·데리고 다니는 줄이 줄 안에 있다", not row_trouble() and not cols_bad(),
+        (row_trouble()[:4], cols_bad()[:3]))
     top.geometry("1020x664")
     rest(root, 0.3)
     del api.grow[lead["id"]]

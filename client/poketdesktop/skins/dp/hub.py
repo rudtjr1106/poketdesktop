@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """DP 테마 - 허브 창 (v2).
 
-창 크기는 기본 허브 그대로다 (ui_hub.W x H). 위에 탭 줄 하나: 묶음(ui_hub.GROUPS)마다 포켓몬 도구 그림 + 이름,
+창 크기는 기본 허브 그대로다 (ui_hub.sizes - 글자를 키우면 같이 커진다). 위에 탭 줄 하나: 묶음(ui_hub.GROUPS)마다 포켓몬 도구 그림 + 이름,
 고른 탭은 빨간 글씨 · 빨간 줄 (DP 의 커서 빛깔), 새 소식은 빨간 점. 탭이 여럿 든 묶음은 그 아래에 얇은
 글자 탭 줄(빨간 밑줄 - kit.tabs)을 하나 더 둔다. 아래가 그 탭의 화면이다.
 
@@ -36,10 +36,11 @@ class HubWindow(ui_hub.HubWindow):
         self._sub_boxes = {}     # 묶음 -> [(탭 열쇠, 상자)]
 
         self.win = tk.Toplevel(self.root)
-        U.style_window(self.win, "포스크탑", ui_hub.W, ui_hub.H)        # 기본 허브와 같은 크기
+        w, h, min_w, min_h = ui_hub.sizes(self.win)                 # 기본 허브와 같은 크기
+        U.style_window(self.win, "포스크탑", w, h)
         U.apply_theme(self.win)
         self.win.configure(bg=WIN_BG, highlightthickness=0)
-        self.win.minsize(980, 620)
+        self.win.minsize(min_w, min_h)
         self.win.protocol("WM_DELETE_WINDOW", self.close)
         U.install_wheel(self.win)
 

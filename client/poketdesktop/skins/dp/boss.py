@@ -62,6 +62,37 @@ class BossWindow(BO.BossWindow):
             K.text(cv, x1 + s(14), y1 + s(pad) + th + s(3), hint, font(9), fill=INK2, anchor="nw", width=tw)
         return y2
 
+    def _make_body(self, f):
+        """몸통은 늘 틀 하나 - 판(캔버스)이 스스로 굴린다 (_fit_canvas)."""
+        self._scroll = None
+        body = tk.Frame(f, bg=U.BG)
+        body.pack(fill="both", expand=True)
+        return body
+
+    def _fit_canvas(self, cv):
+        """창 높이를 판에 맞춘다. **화면보다 길면 판을 줄이고 안에서 굴린다** - 작은 화면(1366x768 등)에서
+        글자를 '아주 크게' 하면 창이 화면보다 길어져 아래 승부 단추가 잘렸고 굴릴 방법도 없었다.
+        막대는 판 오른쪽에 붙이고 그만큼 창을 넓힌다 (판의 폭은 그대로). 화면에 들어가면 예전 그대로다."""
+        top = self.top
+        top.shell_w = self._shell_w0
+        try:
+            full = int(cv.cget("height"))
+            top.update_idletasks()
+            over = top.winfo_reqheight() - U.work_size(top)[1]
+        except (tk.TclError, ValueError):
+            over = 0
+        if over > 0:
+            sbw = U.h(12)
+            cv.configure(height=max(U.h(120), full - over), yscrollincrement=1,
+                         scrollregion=(0, 0, int(cv.cget("width")), full))
+            sb = K.Scroll(self.body, cv, BODY, width=sbw)
+            sb.pack(side="right", fill="y", padx=(U.h(4), 0), before=cv)
+            cv.configure(yscrollcommand=sb.set)
+            U.scrollable(cv, 3)
+            U.install_wheel(top)
+            top.shell_w = self._shell_w0 + sbw + U.h(4)
+        ui_box.fit(top)
+
     def paint(self):
         for w in self.body.winfo_children():
             w.destroy()
@@ -69,7 +100,7 @@ class BossWindow(BO.BossWindow):
         self.rows = []
         c = self.card or {}
         s = U.h
-        width = BO.W - 2 * PAD
+        width = self._shell_w0 - 2 * PAD          # 기본 창과 같은 폭 (글자를 키우면 같이 넓어진다)
         cv = tk.Canvas(self.body, bg=BODY, highlightthickness=0, bd=0, width=width, height=10)
         cv.pack(fill="x")
         self.cv = cv
@@ -79,7 +110,7 @@ class BossWindow(BO.BossWindow):
                            "하루에 한 번 오전 9시부터 낮 12시 사이에 나타나 밤 11시까지 머뭅니다.",
                            spec=font(9), pad=6)
             cv.configure(height=y + s(2))
-            ui_box.fit(self.top)
+            self._fit_canvas(cv)
             return
         # 머리
         hh = s(self.HEAD_H)
@@ -121,7 +152,7 @@ class BossWindow(BO.BossWindow):
             self.go_btn = b
         cv.configure(height=max(y2, y + s(42)) + s(2))
         self._thumbs()
-        ui_box.fit(self.top)
+        self._fit_canvas(cv)
 
     def _plate(self, cv, i, y, x2, rh, th, sprite, role, name, state, legend=None, hidden=False):
         """한 줄 (간부 또는 전설). 기본 창의 rows 와 같은 모양의 dict 를 돌려준다."""

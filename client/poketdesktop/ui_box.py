@@ -554,13 +554,16 @@ class BoxWindow(object):
         # 파티 프리셋 (1.10.3). 서버가 프리셋을 줄 때만 담는다 (_paint_party).
         self.party_bar = pbar = tk.Frame(wrap, bg=U.BG2, height=U.h(40))
         pbar.pack_propagate(False)
-        tk.Label(pbar, text="파티", bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS).pack(
-            side="left", padx=(12, 8))
+        self._party_lbl = tk.Label(pbar, text="파티", bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS)
+        self._party_lbl.pack(side="left", padx=(12, 8))
         self.party_seg = U.Segmented(pbar, [(i, "파티 %d" % i) for i in range(1, PARTY_TABS + 1)],
                                      1, self.use_party)
         self.party_seg.frame.pack(side="left")
         self.btn_party_name = U.ghost_button(pbar, "이름 바꾸기", self.rename_party, height=26)
         self.btn_party_name.pack(side="left", padx=(10, 0))
+        self._party_two = False          # '이름 바꾸기' 를 둘째 줄로 내렸나 (_fit_party_bar)
+        for w in (pbar, self.party_seg.frame):
+            w.bind("<Configure>", lambda _e: self._fit_party_bar(), add="+")
         self.party_line = tk.Frame(wrap, bg=U.LINE, height=U.h(1))
         self._party_shown = False
 
@@ -1013,9 +1016,25 @@ class BoxWindow(object):
         self.btn_multi_done.pack(side="left", pady=10)
 
         self.status = tk.Label(inner, text="", bg=U.INK, fg=U.FG_FAINT,
-                               font=U.FONT_S)
+                               font=U.FONT_S, justify="right", anchor="e")
         self.status.pack(side="right")
+        # 글자가 커지면 (글자 크기 '크게·아주 크게') 단추 옆 남은 자리보다 알림 글이 길다 - 글씨를
+        # 줄이지 않고 남은 폭에서 줄을 바꾼다. 줄 높이(58)에는 두 줄이 들어간다.
+        inner.bind("<Configure>", lambda _e: self._wrap_status(), add="+")
         self.set_buttons(False)
+
+    def _wrap_status(self):
+        """바닥 알림 글의 줄 바꿈 폭 = 바닥 줄 폭 - 지금 보이는 단추 묶음 - 띄움."""
+        try:
+            inner = self.status.master
+            bar = self.bar_multi if self.multi else self.bar_normal
+            room = inner.winfo_width() - bar.winfo_reqwidth() - 12
+            if room <= 40:
+                return
+            if int(self.status.cget("wraplength") or 0) != room:
+                self.status.configure(wraplength=room)
+        except (tk.TclError, AttributeError):
+            pass
 
     def set_buttons(self, on):
         # 떠올리기 단추는 상세 칸에 있어서 바닥보다 나중에 만들어진다.
@@ -1028,6 +1047,7 @@ class BoxWindow(object):
     # ---------------- 데이터 ----------------
     def say(self, msg, color=None):
         self.status.configure(text=natural(msg or ""), fg=color or U.FG_FAINT)
+        self._wrap_status()
 
     def reload(self):
         self.say("불러오는 중...")
@@ -1090,6 +1110,31 @@ class BoxWindow(object):
 
     def party_active(self):
         return int((self.party or {}).get("active") or 1)
+
+    def _fit_party_bar(self):
+        """프리셋 줄이 한 줄에 안 들어가면 '이름 바꾸기' 를 아래 줄로 내리고 줄을 높인다.
+
+        글자 크기 '크게·아주 크게' 에서 다섯 칸 + 단추가 목록 폭(창을 가장 작게 하면 606px)을 넘어
+        단추가 눌려 잘렸다. 글씨는 줄이지 않는다 - 줄을 하나 더 쓴다. 보통 크기는 한 줄 그대로.
+        """
+        try:
+            pbar, btn = self.party_bar, self.btn_party_name
+            need = (self._party_lbl.winfo_reqwidth() + 20 + self.party_seg.frame.winfo_reqwidth()
+                    + 10 + btn.holder.winfo_reqwidth() + 4)
+            two = pbar.winfo_width() > 1 and need > pbar.winfo_width()
+            if two == self._party_two:
+                return
+            self._party_two = two
+            btn.pack_forget()
+            if two:
+                bh = btn.holder.winfo_reqheight()
+                btn.pack(side="bottom", anchor="w", padx=(12, 0), pady=(0, 6), before=self._party_lbl)
+                pbar.configure(height=U.h(40) + bh + 6)
+            else:
+                btn.pack(side="left", padx=(10, 0))
+                pbar.configure(height=U.h(40))
+        except (tk.TclError, AttributeError):
+            pass
 
     def _paint_party(self):
         """프리셋 줄을 서버가 준 대로 칠한다. 프리셋이 없는 서버면 줄을 숨긴다."""

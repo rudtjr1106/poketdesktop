@@ -113,6 +113,7 @@ class SettingsWindow(object):
         p.configure(padx=20, pady=4)
 
         self._skin_box(p, s)
+        self._text_box(p, s)
         Row(p, "포켓몬 크기", "도트를 이 높이에 맞춰 통일합니다.",
             24, 120, s["targetHeight"], "%.0f px",
             lambda v: self._set_size(int(v)), step=4)
@@ -225,6 +226,62 @@ class SettingsWindow(object):
             self.skin_apply.pack(fill="x", pady=(4, 0))
         else:
             self.skin_apply.pack_forget()
+
+    # ---------------------------------------------------------------- 글자 크기 (2.0)
+    def _text_box(self, p, s):
+        """글자 크기 - 보통 · 크게 · 아주 크게 (ui_common.TEXT_SIZES). 칸마다 그 크기로 견본을 적는다.
+
+        화면 테마처럼 켤 때 한 번 정해지므로, 고르면 저장하고 지금 것과 다르면 '다시 켜서 적용' 을 띄운다.
+        """
+        self.text_pick = U.text_size_of(s)
+        self.text_rows = {}
+        box = tk.Frame(p, bg=U.BG)
+        box.pack(fill="x", pady=(12, 0))
+        tk.Label(box, text="글자 크기", bg=U.BG, fg=U.FG, font=U.FONT_B,
+                 anchor="w").pack(fill="x")
+        tk.Label(box, text="창과 메뉴의 글자를 키웁니다. 글자가 든 칸도 같이 커집니다. 바꾸면 프로그램을 다시 켜서 "
+                           "적용합니다.", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left",
+                 wraplength=W - 60).pack(fill="x")
+        grid = tk.Frame(box, bg=U.BG)
+        grid.pack(fill="x", pady=(6, 0))
+        for i, (name, _k) in enumerate(U.TEXT_SIZES):
+            cell = tk.Frame(grid, bg=U.BG2, highlightthickness=2, highlightbackground=U.LINE, cursor="hand2")
+            cell.grid(row=0, column=i, sticky="nsew", padx=(0 if i == 0 else 4, 0))
+            # 견본은 **그 크기 그대로** - 지금 크기에서 몇 배가 아니라, 다시 켜면 보일 본문 크기다
+            sample = tk.Label(cell, text="가나다", bg=U.BG2, fg=U.FG, cursor="hand2",
+                              font=(U.FAMILY, U.text_pt(i)))
+            sample.pack(pady=(6, 0))
+            lab = tk.Label(cell, text=name, bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS, cursor="hand2")
+            lab.pack(pady=(0, 6))
+            for w in (cell, sample, lab):
+                w.bind("<Button-1>", lambda _e, n=i: self._pick_text(n))
+            self.text_rows[i] = (cell, sample, lab)
+            grid.columnconfigure(i, weight=1, uniform="text")
+        self.text_apply = tk.Frame(box, bg=U.BG)
+        tk.Label(self.text_apply, text="글자 크기는 다시 켜면 적용됩니다.", bg=U.BG, fg=U.ACCENT_TEXT,
+                 font=U.FONT_S, anchor="w").pack(side="left")
+        U.PushButton(self.text_apply, "다시 켜서 적용", self._restart_for_skin,
+                     height=30, font=U.FONT_S).pack(side="right")
+        self._paint_text()
+
+    def _pick_text(self, level):
+        if level == self.text_pick:
+            return
+        self.text_pick = level
+        self._set("textSize", level)
+        self._paint_text()
+
+    def _paint_text(self):
+        for i, (cell, sample, lab) in self.text_rows.items():
+            on = i == self.text_pick
+            bg = U.ACCENT_SOFT if on else U.BG2
+            cell.configure(bg=bg, highlightbackground=U.ACCENT if on else U.LINE)
+            sample.configure(bg=bg, fg=U.ACCENT if on else U.FG)
+            lab.configure(bg=bg)
+        if self.text_pick != U.TEXT_SIZE:
+            self.text_apply.pack(fill="x", pady=(4, 0))
+        else:
+            self.text_apply.pack_forget()
 
     def _restart_for_skin(self):
         if not self.app.restart():
@@ -591,8 +648,8 @@ class SettingsWindow(object):
                           # 어디까지 읽었는지도 기록이다 (지우면 '새 글' 표시가 다시 뜬다)
                           "noticeSeen", "patchSeen",
                           # 화면 테마는 다시 켜야 바뀐다 - 여기서 조용히 기본으로 돌리면 다음에
-                          # 켤 때 영문도 모르게 테마가 바뀐다
-                          "skin")
+                          # 켤 때 영문도 모르게 테마가 바뀐다. 글자 크기도 같다.
+                          "skin", "textSize")
                 if k in self.app.settings}
         self.app.settings.clear()
         self.app.settings.update(dict(config.DEFAULTS))

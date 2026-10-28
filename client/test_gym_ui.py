@@ -310,7 +310,9 @@ def main():
             and btn.winfo_rooty() + btn.winfo_height() <= side_bottom,
             (btn.winfo_height(), btn.winfo_reqheight(), btn.winfo_rooty() + btn.winfo_height(), side_bottom))
         need, view = gw.card.winfo_reqheight(), gw.card_cv.winfo_height()
-        chk("%s: 기본 크기(1040x700)에서는 굴리지 않아도 에이스까지 보인다" % who, need <= view, (need, view))
+        # 글자를 크게 하면 카드가 길어져 굴려야 에이스가 보인다 - 보통 크기에서만 센다 (굴려지는지는 바로 아래에서 본다)
+        if U.TEXT_SIZE == 0:
+            chk("%s: 기본 크기(1040x700)에서는 굴리지 않아도 에이스까지 보인다" % who, need <= view, (need, view))
         chk("%s: 카드가 넘치면 굴릴 수 있다" % who,
             need <= view or float(gw.card_cv.cget("scrollregion").split()[3]) >= need,
             (need, view, gw.card_cv.cget("scrollregion")))
@@ -424,7 +426,9 @@ def main():
         abs((gw.vl.holder.winfo_rooty() + gw.vl.holder.winfo_height())
             - (gw.side.winfo_rooty() + gw.side.winfo_height())) <= 2,
         (gw.vl.holder.winfo_rooty() + gw.vl.holder.winfo_height(), gw.side.winfo_rooty() + gw.side.winfo_height()))
-    chk("목록이 다섯 줄 넘게 보인다", len(rows()) >= 6, len(rows()))
+    # 글자를 크게 하면 줄이 높아져 한 화면에 덜 든다 - 줄 수는 보통 크기에서만 센다 (나머지는 굴려서 본다)
+    if U.TEXT_SIZE == 0:
+        chk("목록이 다섯 줄 넘게 보인다", len(rows()) >= 6, len(rows()))
 
     state_of = {d[0]["region"]: S.region_state(d[0]) for _k, d in gw.vl.entries}
     chk("상태: 오늘 완료 · 오늘 남음 · 미도전", (state_of[low], state_of[mid], state_of[high]) == ("done", "left", "new"),
@@ -525,8 +529,9 @@ def main():
         and gw.browse.winfo_ismapped(), (gw._mode, gw.selected, gw.sido))
     chk("  보던 자리 그대로다", abs(gw.vl.canvas.canvasy(0) - top_before) <= 1, (gw.vl.canvas.canvasy(0), top_before))
     # 맥의 Tk 는 가렸다 다시 담은 캔버스를 다시 그리지 않아서, 줄이 하나도 안 올라와 있었다
+    # (여섯 줄은 보통 크기의 줄 수 - 글자를 크게 하면 덜 든다. 올라와 있는지·폭은 크기마다 본다)
     chk("  돌아온 목록의 줄이 화면에 올라와 있다 (폭도 제대로다)",
-        len(rows()) >= 6 and all(r.f.winfo_ismapped() and r.body.winfo_width() > 100 for r in rows()),
+        len(rows()) >= (6 if U.TEXT_SIZE == 0 else 2) and all(r.f.winfo_ismapped() and r.body.winfo_width() > 100 for r in rows()),
         [(r.f.winfo_ismapped(), r.body.winfo_width()) for r in rows()][:3])
     chk("  돌아온 목록에 잘리거나 겹친 글이 없다", not row_trouble(), row_trouble()[:4])
     chk("  경로 줄에서 '목록' 단추가 빠진다", gw.back_link is None and "목록" not in texts(gw.crumb), texts(gw.crumb))
@@ -544,7 +549,9 @@ def main():
         chk("  상금 줄: %s" % line, any(line in t for t in tx), [t for t in tx if "원" in t])
         chk("  카드 안에 눌린 것이 없다", not squeezed(gw.card), squeezed(gw.card)[:4])
         need, view = gw.card.winfo_reqheight(), gw.card_cv.winfo_height()
-        chk("  굴리지 않아도 에이스까지 보인다", need <= view, (need, view))
+        # 보통 크기에서만 (글자를 크게 하면 굴려서 본다 - 굴려지는지는 위 카드 검사가 본다)
+        if U.TEXT_SIZE == 0:
+            chk("  굴리지 않아도 에이스까지 보인다", need <= view, (need, view))
 
     print("  -- 전국: 시·도 바로 가기와 256곳 목록")
     gw.to_nation()
@@ -596,7 +603,9 @@ def main():
     gw.enter_sido("41")
     pump(root, lambda: False, 0.6)
     chk("가장 작은 창: 목록에 눌린 것이 없다", not squeezed(gw.win), squeezed(gw.win)[:4])
-    chk("가장 작은 창: 다섯 줄 넘게 보인다", len(rows()) >= 5 and not row_trouble(), (len(rows()), row_trouble()[:3]))
+    # 줄 수는 보통 크기에서만 센다 (글자를 크게 하면 줄이 높아 덜 든다 - 굴려서 본다). 잘림·겹침은 크기마다 본다
+    chk("가장 작은 창: 다섯 줄 넘게 보인다" if U.TEXT_SIZE == 0 else "가장 작은 창: 보이는 줄에 잘리거나 겹친 글이 없다",
+        (len(rows()) >= 5 or U.TEXT_SIZE != 0) and not row_trouble(), (len(rows()), row_trouble()[:3]))
     right = max(gw.legend_cv.bbox(i)[2] for i in gw.legend_cv.find_all())
     chk("가장 작은 창: 범례가 칸 안에 든다", right <= gw.legend_cv.winfo_width(), (right, gw.legend_cv.winfo_width()))
     gw.to_nation()

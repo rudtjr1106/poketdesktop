@@ -408,6 +408,24 @@ class ItemPicker(object):
             self._set_go(give and self.total() > 0)
             if not give:
                 self.say(self._no_give_text(), U.DANGER, U.DANGER)
+        self._grow()
+
+    def _grow(self):
+        """내용이 창보다 크면 그만큼 창을 늘린다 (줄이지는 않는다, 화면 작업 영역까지).
+
+        글자 크기 '크게·아주 크게' 에서는 오른쪽 칸(포켓몬 · 담은 줄 · 안내글)이 540 보다 길어
+        맨 아래 안내글이 눌려 잘렸다. 글씨를 줄이지 않고 창을 내용만큼 키운다 - 보통 크기는
+        내용이 창 안에 들어가 그대로다.
+        """
+        try:
+            if U.is_embedded(self.win):
+                return
+            self.win.update_idletasks()
+            have = self.win.winfo_height()
+            if have > 1 and self.win.winfo_reqheight() > have:
+                U.fit_window(self.win, self.win.winfo_width(), lo=have, keep_pos=True)
+        except tk.TclError:
+            pass
 
     def _no_give_text(self):
         who = (self.state.get("visit") or {}).get("partner") or "친구"

@@ -114,6 +114,8 @@ def log_mark(x):
 class WarTab(object):
     """gw 는 길드 창(GuildWindow). parent 는 그 탭의 빈 칸."""
 
+    SIDE_W = SIDE_W              # 지도 옆 칸의 폭 (테마가 바꾼다 - _side_w 가 쓴다)
+
     def __init__(self, gw, parent):
         self.gw = gw
         self.app = gw.app
@@ -159,6 +161,7 @@ class WarTab(object):
         self.fit = U.scroll_fitter(self.cv, self.inner, self._wid)
         U.scrollable(self.cv, 60)
         holder.bind("<Destroy>", self._gone, add="+")
+        holder.bind("<Configure>", lambda _e: self._fit_side(), add="+")
 
         keep = getattr(gw, "war_keep", None) or {}
         if keep.get("st"):
@@ -284,13 +287,44 @@ class WarTab(object):
         self.right.pack_forget()
         self.left.pack_forget()
         if wide:
-            self.right.configure(width=U.h(SIDE_W))
+            self.right.configure(width=self._side_w())
             self.right.pack_propagate(False)
             self.right.pack(side="right", fill="y")
             self.left.pack(side="left", fill="both", expand=True, padx=(0, 10))
         else:
             self.right.pack_propagate(True)
             self.right.pack(side="left", fill="both", expand=True)
+
+    def _side_w(self):
+        """지도 옆 칸의 폭. 보통 크기에서는 예전 그대로(U.h(self.SIDE_W)).
+
+        글자를 크게 하면 칸도 넓히되 **지도보다 넓어지지는 않게** (칸 전체의 45% 까지만, 보통 크기의 폭
+        밑으로는 안 줄인다). 글자만큼 다 넓혔더니 '아주 크게' 에서 옆 칸(561)이 지도(397)보다 넓어져
+        지도가 곁다리가 되었다. 옆 칸의 글은 접히고, 넘치면 굴러간다.
+        """
+        side = self.SIDE_W
+        full = U.h(side)
+        base = side * U.BASE_PT / (10.0 * U.TEXT_SIZES[U.TEXT_SIZE][1])     # 보통 크기의 폭
+        if full <= base:
+            return full
+        try:
+            room = self.holder.winfo_width()
+        except tk.TclError:
+            return full
+        if room <= 1:
+            return full
+        return int(max(base, min(full, (room - 10) * 0.45)))
+
+    def _fit_side(self):
+        """창 크기가 바뀌면 옆 칸 폭을 다시 맞춘다 (지도를 낀 모양일 때만)."""
+        if not self.wide:
+            return
+        w = self._side_w()
+        try:
+            if int(self.right.cget("width")) != w:
+                self.right.configure(width=w)
+        except (tk.TclError, ValueError):
+            pass
 
     def _clear(self):
         for w in self.inner.winfo_children():

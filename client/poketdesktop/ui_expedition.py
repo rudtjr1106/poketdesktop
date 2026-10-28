@@ -33,8 +33,10 @@
 성장치는 [성장] 단추의 창에서 찍는다 (GrowDialog). 레벨마다 받은 점수를 발걸음·눈썰미·주머니·호기심·
 친화력에 나눠 찍고, 찍기 전에는 얼마든지 넣었다 뺐다 할 수 있다. 서버에는 [찍기] 를 눌렀을 때 한 번 간다.
 """
+import re
 import time
 import tkinter as tk
+from tkinter import ttk
 
 from PIL import ImageTk
 
@@ -61,6 +63,98 @@ PIP = 9                      # 성장치 한 점의 네모 (px - 글자가 아�
 
 def _err(e):
     return natural(getattr(e, "message", None) or str(e))
+
+
+class Column(object):
+    """세 단 가운데 폭이 정해진 단 (왼쪽 탐험 칸 · 가운데 어디로/얼마나). 내용이 단보다 길면 **안에서 굴러간다.**
+
+    글자 크기를 키우면(2.0) 탐험 칸 셋과 갈 곳 여섯이 가장 낮은 창에 다 안 들어간다. 글자를 줄이거나 칸을
+    눌러 맞추지 않고 단을 굴린다. 막대는 굴러갈 때만 보인다.
+
+    글자를 키웠을 때는 막대 자리를 처음부터 비워 둔다 (inner_w) - 막대가 나타났다 사라질 때마다 안의 폭이
+    바뀌면 글이 다시 접혀 높이가 또 바뀐다. 보통 크기는 가장 낮은 창(620)에도 다 들어가서 막대 자리를
+    비우지 않는다 (지금까지와 한 픽셀도 다르지 않다). 그래도 넘치면 막대만큼 단을 넓힌다 (안의 폭은 그대로).
+    """
+
+    def __init__(self, parent, width, bg=None):
+        bg = bg or U.BG
+        self.width = width
+        self.outer = tk.Frame(parent, bg=bg, width=width)
+        self.outer.pack(side="left", fill="y")
+        self.outer.pack_propagate(False)
+        self.bar = ttk.Scrollbar(self.outer, orient="vertical")
+        self.bar_w = max(12, self.bar.winfo_reqwidth())
+        self.reserve = U.TEXT_SIZE > 0
+        self.inner_w = width - (self.bar_w if self.reserve else 0)
+        self.cv = tk.Canvas(self.outer, bg=bg, highlightthickness=0, bd=0, width=self.inner_w, height=1)
+        self.inner = tk.Frame(self.cv, bg=bg)
+        self.wid = self.cv.create_window((0, 0), window=self.inner, anchor="nw", width=self.inner_w)
+        self.cv.pack(side="left", fill="y")
+        self.bar.configure(command=self.cv.yview)
+        self.cv.configure(yscrollcommand=self._scrolled)
+        U.scroll_fitter(self.cv, self.inner)
+        U.scrollable(self.cv)
+
+    def ensure(self, inner_w):
+        """안의 폭이 적어도 inner_w 가 되게 단을 넓힌다 (줄을 접을 수 없는 것 - 고르기 단추 줄 - 이 들어가게)."""
+        if inner_w <= self.inner_w:
+            return
+        self.width += inner_w - self.inner_w
+        self.inner_w = inner_w
+        self.cv.configure(width=inner_w)
+        self.cv.itemconfigure(self.wid, width=inner_w)
+        self.outer.configure(width=self.width + (self.bar_w if self.bar.winfo_ismapped() and not self.reserve else 0))
+
+    def _scrolled(self, lo, hi):
+        self.bar.set(lo, hi)
+        try:
+            need = float(hi) - float(lo) < 0.999
+            if need and not self.bar.winfo_ismapped():
+                if not self.reserve:
+                    self.outer.configure(width=self.width + self.bar_w)
+                self.bar.pack(side="right", fill="y")
+            elif not need and self.bar.winfo_ismapped():
+                self.bar.pack_forget()
+                self.outer.configure(width=self.width)
+        except tk.TclError:
+            pass
+
+
+def flow(parent, avail, bg, specs, first=None):
+    """글 몇 조각을 한 줄에 나란히 놓되, **폭을 넘으면 다음 줄로 넘긴다.** 놓은 라벨 [..] 을 돌려준다.
+
+    specs = [(글, 색, 글꼴, 앞 간격)]. 첫 줄은 first(pack 옵션)로, 넘긴 줄은 그 바로 아래에 담는다.
+    다 들어가면 지금까지처럼 한 줄 (Frame 하나에 side="left") 이다 - 글자 크기를 키웠을 때만 접힌다.
+    """
+    rows, used, out = [], 0, []
+    for text, fg, font, gap in specs:
+        lab = None
+        if rows:
+            lab = tk.Label(rows[-1], text=text, bg=bg, fg=fg, font=font, anchor="w")
+            if used + gap + lab.winfo_reqwidth() > avail:
+                lab.destroy()
+                lab = None
+        if lab is None:
+            row = tk.Frame(parent, bg=bg)
+            row.pack(**(first if not rows and first is not None else {"fill": "x"}))
+            rows.append(row)
+            used, gap = 0, 0
+            lab = tk.Label(row, text=text, bg=bg, fg=fg, font=font, anchor="w")
+        lab.pack(side="left", padx=(gap, 0))
+        used += gap + lab.winfo_reqwidth()
+        out.append(lab)
+    return out
+
+
+def side_note(label, justify="right"):
+    """머리줄 오른쪽의 덧붙임 글: 남은 폭을 다 받아 오른쪽에 붙고, 모자라면 **줄을 접는다** (잘리지 않게).
+
+    다 들어가면 side="right" 로 놓은 것과 똑같이 보인다.
+    """
+    label.configure(anchor="e", justify=justify)
+    label.pack(side="right", fill="x", expand=True)
+    U.wrap_to_width(label)
+    return label
 
 
 def types_of(dex, mon):
@@ -279,9 +373,11 @@ class ExpeditionWindow(object):
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
         tip = tk.Frame(self.win, bg=U.INK)
         tip.pack(fill="x")
-        tk.Label(tip, text="타입이 맞고 레벨이 높을수록 잘 해냅니다.   꺼 두어도 시간은 흐릅니다.   "
-                           "다녀온 포켓몬은 %d시간 쉬고, 탐험 경험치가 쌓입니다." % X.REST_HOURS,
-                 bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left", padx=16, pady=6)
+        # 글자를 키우면 한 줄에 다 안 들어간다 - 창 폭에서 접는다 (보통 크기는 한 줄 그대로)
+        U.wrap_to_width(tk.Label(tip, text="타입이 맞고 레벨이 높을수록 잘 해냅니다.   꺼 두어도 시간은 흐릅니다.   "
+                                           "다녀온 포켓몬은 %d시간 쉬고, 탐험 경험치가 쌓입니다." % X.REST_HOURS,
+                                 bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left")
+                        ).pack(side="left", fill="x", expand=True, padx=16, pady=6)
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
 
     def _bottom(self):
@@ -298,14 +394,13 @@ class ExpeditionWindow(object):
 
     # ---------------- 왼쪽: 탐험 칸 ----------------
     def _slots(self, body):
-        left = tk.Frame(body, bg=U.BG, width=LEFT_W)
-        left.pack(side="left", fill="y")
-        left.pack_propagate(False)
+        # 글자를 키우면 칸 셋이 낮은 창에 다 안 들어간다 - 단 안에서 굴러간다 (Column)
+        self.slot_col = col = Column(body, LEFT_W)
+        left = col.inner
         head = tk.Frame(left, bg=U.BG)
         head.pack(fill="x", padx=14, pady=(10, 4))
         tk.Label(head, text="탐험 칸", bg=U.BG, fg=U.FG, font=U.FONT_B).pack(side="left")
-        self.slot_note = tk.Label(head, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS)
-        self.slot_note.pack(side="right")
+        self.slot_note = side_note(tk.Label(head, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS))
         for _i in range(X.SLOTS):
             card = tk.Frame(left, bg=PANEL, height=CARD_H, highlightthickness=2, highlightbackground=U.LINE)
             card.pack(fill="x", padx=14, pady=(0, 6))
@@ -348,6 +443,30 @@ class ExpeditionWindow(object):
             card.configure(highlightbackground=U.ACCENT if done else U.LINE)
             self._slot_card(card, o, done)
         self.slot_note.configure(text=note)
+        self._fit_cards()
+
+    def _fit_cards(self):
+        """칸의 높이는 CARD_H 가 바닥이다. 글자를 키워 안의 줄이 접히면 **칸이 그만큼 자란다** (안 눌리게).
+
+        보통 크기에서는 안의 것이 CARD_H 보다 작아서 지금까지와 같다.
+        """
+        try:
+            self.cards[0].update_idletasks()
+        except (tk.TclError, IndexError):
+            return
+        for card in self.cards:
+            try:
+                need = 2 * int(card.cget("highlightthickness"))
+                for c in card.pack_slaves():
+                    pady = re.findall(r"\d+", str(c.pack_info().get("pady", 0)))
+                    need += c.winfo_reqheight() + sum(int(p) for p in pady)
+                card.configure(height=max(CARD_H, need))
+            except tk.TclError:
+                pass
+
+    def slot_text_w(self):
+        """탐험 칸 안의 글이 쓸 수 있는 폭 (칸 = 단 - 양옆 14, 테두리 2, 안쪽 여백 10)."""
+        return self.slot_col.inner_w - 2 * 14 - 2 * 2 - 2 * 10
 
     def _slot_card(self, card, o, done):
         mon = o.get("pokemon") or {}
@@ -361,37 +480,44 @@ class ExpeditionWindow(object):
         self._thumb(art, mon)
         text = tk.Frame(top, bg=PANEL)
         text.pack(side="left", padx=(8, 0), fill="x", expand=True)
-        line = tk.Frame(text, bg=PANEL)
-        line.pack(fill="x")
-        tk.Label(line, text=("★ " if mon.get("shiny") else "") + (mon.get("name") or "?"), bg=PANEL,
-                 fg=U.SHINY if mon.get("shiny") else U.FG, font=U.FONT_B, anchor="w").pack(side="left")
-        tk.Label(line, text="Lv.%s" % mon.get("level", "?"), bg=PANEL, fg=U.FG_DIM,
-                 font=U.FONT_XS).pack(side="left", padx=(6, 0))
-        sub = tk.Frame(text, bg=PANEL)
-        sub.pack(fill="x", pady=(2, 0))
-        tk.Label(sub, text="%s · %s시간" % (o.get("placeKr") or "", o.get("hours")), bg=PANEL, fg=U.FG_DIM,
-                 font=U.FONT_XS).pack(side="left")
-        tk.Label(sub, text=o.get("gradeKr") or "", bg=PANEL, fg=GRADE_COLOR.get(o.get("grade"), U.FG_DIM),
-                 font=U.FONT_XS).pack(side="left", padx=(8, 0))
-        tk.Label(sub, text="물건 %s개" % o.get("items", "?"), bg=PANEL, fg=U.FG_FAINT,
-                 font=U.FONT_XS).pack(side="left", padx=(8, 0))
+        # 글자를 키우면 '곳 · 시간  성공도  물건' 이 칸 폭을 넘는다 - 넘는 조각은 다음 줄로 (flow)
+        avail = self.slot_text_w() - U.h(42) - 8
+        flow(text, avail, PANEL, [(("★ " if mon.get("shiny") else "") + (mon.get("name") or "?"),
+                                   U.SHINY if mon.get("shiny") else U.FG, U.FONT_B, 0),
+                                  ("Lv.%s" % mon.get("level", "?"), U.FG_DIM, U.FONT_XS, 6)], {"fill": "x"})
+        flow(text, avail, PANEL, [("%s · %s시간" % (o.get("placeKr") or "", o.get("hours")), U.FG_DIM, U.FONT_XS, 0),
+                                  (o.get("gradeKr") or "", GRADE_COLOR.get(o.get("grade"), U.FG_DIM), U.FONT_XS, 8),
+                                  ("물건 %s개" % o.get("items", "?"), U.FG_FAINT, U.FONT_XS, 8)],
+             {"fill": "x", "pady": (2, 0)})
 
         foot = tk.Frame(card, bg=PANEL)
         foot.pack(fill="x", side="bottom", padx=10, pady=(0, 7))
         if done:
-            U.PushButton(foot, "보따리 받기", lambda e=o["id"]: self.claim(e), height=28,
-                         font=U.FONT_B).pack(side="right")
-            tk.Label(foot, text="돌아왔습니다!", bg=PANEL, fg=U.ACCENT_TEXT, font=U.FONT_B).pack(side="left")
+            btn = U.PushButton(foot, "보따리 받기", lambda e=o["id"]: self.claim(e), height=28, font=U.FONT_B)
+            msg = tk.Label(foot, text="돌아왔습니다!", bg=PANEL, fg=U.ACCENT_TEXT, font=U.FONT_B)
+            self._foot_pair(foot, msg, btn, msg.winfo_reqwidth())
             return
-        U.ghost_button(foot, "불러들이기", lambda e=o: self.recall(e), height=26).pack(side="right")
+        btn = U.ghost_button(foot, "불러들이기", lambda e=o: self.recall(e), height=26)
         left_lbl = tk.Label(foot, text="", bg=PANEL, fg=U.FG, font=U.FONT_S)
-        left_lbl.pack(side="left")
+        # 남은 시간 글은 1초마다 바뀐다 - 가장 긴 모양으로 재서 자리를 정한다
+        widest = max(left_lbl.tk.call("font", "measure", left_lbl.cget("font"), t)
+                     for t in ("%s 남음" % X.hours_text(max(X.HOURS) * 3600 - 1), "돌아오는 중...")) + 6
+        self._foot_pair(foot, left_lbl, btn, widest)
         bar = tk.Frame(card, bg=U.INK, height=U.h(5))
         bar.pack(fill="x", side="bottom", padx=10, pady=(0, 6))
         fill = tk.Frame(bar, bg=U.GOOD)
         fill.place(x=0, y=0, relheight=1.0, relwidth=0.0)
         self.live.append((o, left_lbl, fill))
         self._paint_live(o, left_lbl, fill)
+
+    def _foot_pair(self, foot, label, btn, label_w):
+        """칸 아랫줄: 왼쪽 글 + 오른쪽 단추. 한 줄에 안 들어가면 (글자를 키웠을 때) 글을 위에, 단추를 그 아래 오른쪽에."""
+        if label_w + 8 + btn.holder.winfo_reqwidth() <= self.slot_text_w():
+            btn.pack(side="right")
+            label.pack(side="left")
+        else:
+            label.pack(side="top", anchor="w")
+            btn.pack(side="top", anchor="e", pady=(3, 0))
 
     def live_of(self, o):
         """나가 있는 탐험의 지금: ('3시간 12분 남음', 지난 몫 0~1)."""
@@ -439,13 +565,13 @@ class ExpeditionWindow(object):
 
     # ---------------- 가운데: 어디로 · 얼마나 ----------------
     def _send(self, body):
-        mid = tk.Frame(body, bg=U.BG, width=MID_W)
-        mid.pack(side="left", fill="y")
-        mid.pack_propagate(False)
+        # 글자를 키우면 갈 곳 여섯과 시간이 낮은 창에 다 안 들어간다 - 단 안에서 굴러간다 (Column)
+        self.mid_col = col = Column(body, MID_W)
+        mid = col.inner
         head = tk.Frame(mid, bg=U.BG)
         head.pack(fill="x", padx=14, pady=(10, 4))
         tk.Label(head, text="① 어디로", bg=U.BG, fg=U.FG, font=U.FONT_B).pack(side="left")
-        tk.Label(head, text="곳마다 잘 맞는 타입이 다릅니다", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="right")
+        side_note(tk.Label(head, text="곳마다 잘 맞는 타입이 다릅니다", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS))
         dex = self.app.dex
         for p in X.PLACES:
             card = tk.Frame(mid, bg=PANEL, height=PLACE_H, highlightthickness=2, highlightbackground=U.LINE,
@@ -467,18 +593,30 @@ class ExpeditionWindow(object):
         # 고른 곳에서 잘 나오는 것 (카드마다 적으면 카드가 두 줄이 되어 높이가 모자란다)
         box = tk.Frame(mid, bg=U.INK, highlightthickness=1, highlightbackground=U.LINE)
         box.pack(fill="x", padx=14, pady=(2, 0))
-        self.place_head = tk.Label(box, text="", bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w")
+        self.place_head = tk.Label(box, text="", bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left")
         self.place_head.pack(fill="x", padx=9, pady=(5, 0))
-        self.place_hint = tk.Label(box, text="", bg=U.INK, fg=U.ACCENT_TEXT, font=U.FONT_S, anchor="w")
+        self.place_hint = tk.Label(box, text="", bg=U.INK, fg=U.ACCENT_TEXT, font=U.FONT_S, anchor="w", justify="left")
         self.place_hint.pack(fill="x", padx=9, pady=(1, 6))
+        U.wrap_to_width(self.place_head)
+        U.wrap_to_width(self.place_hint)
 
         row = tk.Frame(mid, bg=U.BG)
         row.pack(fill="x", padx=14, pady=(10, 0))
-        tk.Label(row, text="② 얼마나", bg=U.BG, fg=U.FG, font=U.FONT_B).pack(side="left")
+        lbl = tk.Label(row, text="② 얼마나", bg=U.BG, fg=U.FG, font=U.FONT_B)
+        lbl.pack(side="left")
         self.hours_seg = U.Segmented(row, [(h, "%d시간" % h) for h in X.HOURS], self.hours, self.set_hours)
-        self.hours_seg.frame.pack(side="right")
-        self.hours_note = tk.Label(mid, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="e")
+        row.update_idletasks()
+        # 시간 셋은 접을 수 없다 - 글자를 키워 단보다 넓어지면 그만큼 단을 넓힌다 (보통 크기는 그대로)
+        col.ensure(self.hours_seg.frame.winfo_reqwidth() + 2 * 14)
+        if lbl.winfo_reqwidth() + 8 + self.hours_seg.frame.winfo_reqwidth() <= col.inner_w - 2 * 14:
+            self.hours_seg.frame.pack(side="right")
+        else:
+            # 글자를 키우면 '② 얼마나' 와 시간 셋이 한 줄에 안 들어간다 - 시간 셋을 그 아래 오른쪽에
+            lbl.pack_configure(side="top", anchor="w")
+            self.hours_seg.frame.pack(side="top", anchor="e", pady=(6, 0))
+        self.hours_note = tk.Label(mid, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="e", justify="right")
         self.hours_note.pack(fill="x", padx=14, pady=(4, 0))
+        U.wrap_to_width(self.hours_note)
         tk.Frame(body, bg=U.LINE, width=1).pack(side="left", fill="y")
 
         # ---- 오른쪽: 누구를
@@ -487,8 +625,7 @@ class ExpeditionWindow(object):
         head = tk.Frame(right, bg=U.BG)
         head.pack(fill="x", padx=14, pady=(10, 4))
         tk.Label(head, text="③ 누구를", bg=U.BG, fg=U.FG, font=U.FONT_B).pack(side="left")
-        self.pick_note = tk.Label(head, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS)
-        self.pick_note.pack(side="right")
+        self.pick_note = side_note(tk.Label(head, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS))
 
         # 바닥의 보내기 줄을 먼저 잡는다 (목록이 남은 높이를 다 먹는다).
         # 높이를 박아 두지 않는다: 요약 글이 좁은 창에서 서너 줄로 접히면 그만큼 자란다 (단추의 높이가

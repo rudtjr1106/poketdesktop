@@ -33,6 +33,19 @@ from .ui_rank import RankWindow
 from .ui_shop import ShopWindow
 
 W, H = 1040, 700
+MIN_W, MIN_H = 980, 620
+
+
+def sizes(win):
+    """허브 창의 (폭, 높이, 가장 작은 폭, 가장 작은 높이). 보통 글자에서는 W x H, MIN_W x MIN_H 그대로.
+
+    글자를 키우면 창도 같은 배율로 키운다 - 창은 그대로 두고 글자만 키웠더니 테마의 가방 판이 좁아져서
+    옆으로 굴려야 했다 (사용자 결정: 굴리지 말고 창을 키운다). 화면보다 커지면 place_window 가 화면까지
+    줄이고, 가장 작은 크기도 화면을 넘기지 않는다 - 그래도 모자라는 만큼은 판 안에서 굴린다."""
+    r = U.text_ratio()
+    mw, mh = U.work_size(win)
+    return (int(round(W * r)), int(round(H * r)),
+            min(mw, int(round(MIN_W * r))), min(mh, int(round(MIN_H * r))))
 
 # (열쇠, 탭 이름, 클래스, root 를 인자로 받는가)
 TABS = [
@@ -83,11 +96,12 @@ class HubWindow(object):
         self._init_state(app)
 
         self.win = tk.Toplevel(self.root)
-        U.style_window(self.win, "포스크탑", W, H)
+        w, h, min_w, min_h = sizes(self.win)
+        U.style_window(self.win, "포스크탑", w, h)
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
-        self.win.minsize(980, 620)
+        self.win.minsize(min_w, min_h)
         self.win.protocol("WM_DELETE_WINDOW", self.close)
         # 휠은 창 하나가 받아서 포인터 밑의 목록으로 보낸다. 탭마다 따로
         # 걸면 서로 덮어쓰고, 탭을 닫을 때 남의 것까지 지운다.
@@ -127,6 +141,7 @@ class HubWindow(object):
         ttk.Notebook 을 하나 더 겹치지 않는다 - 두 겹 탭처럼 보여 무엇이 위 탭인지 헷갈린다.
         """
         bar = tk.Frame(gf, bg=U.BG)
+        self._sub_pad = self._sub_pad_px(bar)
         bar.pack(side="top", fill="x", padx=6, pady=(4, 0))     # 위 탭 줄(tabmargins 6)과 왼쪽을 맞춘다
         tk.Frame(gf, bg=U.LINE, height=1).pack(side="top", fill="x")
         for key in keys:
@@ -134,7 +149,7 @@ class HubWindow(object):
             cell.pack(side="left")
             lab = tk.Label(cell, text=self.labels[key], font=U.FONT, bg=U.BG, fg=U.FG_DIM,
                            bd=0, padx=0, pady=U.h(5), cursor="hand2")
-            lab.pack(side="top", padx=self.SUB_PAD)
+            lab.pack(side="top", padx=self._sub_pad)
             line = tk.Frame(cell, bg=U.BG, height=2)
             line.pack(side="top", fill="x")
             for w in (cell, lab, line):
@@ -145,6 +160,19 @@ class HubWindow(object):
         body = tk.Frame(gf, bg=U.BG)
         body.pack(side="top", fill="both", expand=True)
         return body
+
+    def _sub_pad_px(self, w):
+        """하위 탭 글자 양옆 (px). 평소 SUB_PAD, 글자가 커져 점 그림이 그보다 넓으면 점 폭 + 1.
+
+        점을 켜면 오른쪽 여백을 점 폭만큼 줄여 칸 폭을 지키는데, 글자 크기 '크게·아주 크게'
+        에서는 점(빈칸 + 동그라미)이 12px 를 넘어 칸이 넓어졌다 - 여백을 점에 맞춰 넉넉히 둔다.
+        """
+        try:
+            sp = U.space_px(w, U.FONT)
+            iw = int(w.tk.call("image", "width", U.mark_image(w, U.FONT, U.FG_DIM, "dot", left=sp)))
+        except Exception:                                   # noqa: BLE001
+            return self.SUB_PAD
+        return max(self.SUB_PAD, iw + 1)        # 보통 크기(점 11px)는 12 그대로
 
     def _sub_hovered(self, key, left=None):
         if key is None and self._sub_hover != left:
@@ -173,10 +201,11 @@ class HubWindow(object):
                     lab.configure(fg=color, image=img, compound="right")
                     # 점 폭만큼 오른쪽 여백을 줄여 칸 폭을 그대로 둔다 (점을 켜고 끌 때 줄이 안 흔들린다)
                     iw = int(lab.tk.call("image", "width", img))
-                    lab.pack_configure(padx=(self.SUB_PAD, max(2, self.SUB_PAD - iw)))
+                    pad = self._sub_pad
+                    lab.pack_configure(padx=(pad, max(2, pad - iw)))
                 else:
                     lab.configure(fg=color, image="", compound="none")
-                    lab.pack_configure(padx=self.SUB_PAD)
+                    lab.pack_configure(padx=self._sub_pad)
             except tk.TclError:
                 pass
 

@@ -110,8 +110,9 @@ class TmWindow(Scene, PocketDial, Plates, Band, TM.TmWindow):
         box = self._tab_boxes.get(key)
         try:
             if box:
-                x = self.cv.winfo_rootx() + int(box[0])
-                y = self.cv.winfo_rooty() + int(box[3]) + 2
+                # 판 좌표 -> 화면 좌표. 글자를 키워 판이 굴러가 있으면(SceneCanvas) 굴린 만큼 뺀다
+                x = self.cv.winfo_rootx() + int(box[0] - self.cv.canvasx(0))
+                y = self.cv.winfo_rooty() + int(box[3] - self.cv.canvasy(0)) + 2
             else:
                 x, y = self.win.winfo_rootx() + 80, self.win.winfo_rooty() + 80
         except tk.TclError:

@@ -319,7 +319,13 @@ class LoginWindow(L.LoginWindow):
             self.tabs.tag_bind("tab_" + key, "<Button-1>", lambda _e, k=key: self.switch(k))
         self.tabs.tag_bind("tab", "<Enter>", lambda _e: self.tabs.configure(cursor="hand2"))
         self.tabs.tag_bind("tab", "<Leave>", lambda _e: self.tabs.configure(cursor=""))
-        self.panel = tk.Frame(self.win, bg=LOW, width=W, height=self.FORM_H)
+        # 화면보다 길면(작은 화면에서 글자를 아주 크게 - 1920x1080 에서도 회원가입이 1055 로 922 를 넘었다)
+        # 창을 화면까지만 키우고 아래 칸 안을 굴린다. 아래 글상자는 늘 보인다.
+        rest = self.TOP_H + s(6) + self.TABS_H + self.MSG_H
+        self.PANEL_H = min(self.FORM_H, max(s(160), U.work_size(self.win)[1] - rest))
+        if self.PANEL_H < self.FORM_H:
+            U.install_wheel(self.win)
+        self.panel = tk.Frame(self.win, bg=LOW, width=W, height=self.PANEL_H)
         self.panel.pack_propagate(False)
         self.panel.pack(fill="x")
         self.status = tk.Canvas(self.win, bg=LOW, width=W, height=self.MSG_H, highlightthickness=0, bd=0)
@@ -424,6 +430,23 @@ class LoginWindow(L.LoginWindow):
     def _form(self):
         cv = tk.Canvas(self.panel, bg=LOW, width=W, height=self.FORM_H, highlightthickness=0, bd=0)
         cv.pack(fill="both", expand=True)
+        if self.PANEL_H < self.FORM_H:
+            # 칸이 창보다 길다 - 굴린다. 막대는 오른쪽 여백(P) 위에 얹는다 (칸 폭을 줄이지 않는다)
+            cv.configure(scrollregion=(0, 0, W, self.FORM_H), yscrollincrement=1)
+            sb = K.Scroll(self.panel, cv, LOW)
+            sb.place(relx=1.0, x=-U.h(3), y=U.h(4), relheight=1.0, height=-U.h(8), anchor="ne")
+            cv.configure(yscrollcommand=sb.set)
+            U.scrollable(cv, 3)
+
+            def region():
+                # 그린 뒤에 실제 내용까지만 굴린다 - 로그인 칸은 회원가입보다 짧다 (다 들어가면 막대도 안 보인다)
+                try:
+                    box = cv.bbox("all")
+                    bottom = min(self.FORM_H, (box[3] + U.h(12)) if box else 0)
+                    cv.configure(scrollregion=(0, 0, W, max(self.PANEL_H, bottom)))
+                except tk.TclError:
+                    pass
+            cv.after_idle(region)
         cv.tag_bind("link", "<Enter>", lambda _e: cv.configure(cursor="hand2"))
         cv.tag_bind("link", "<Leave>", lambda _e: cv.configure(cursor=""))
         self._fcv = cv
@@ -476,7 +499,9 @@ class LoginWindow(L.LoginWindow):
         lh = _lh(cv, 10)
         keys_h = 2 * self.KEY_H + s(6)
         total = self.EH + s(18) + self.PIN_H + s(10) + keys_h + s(24) + self.BTN_H + s(18) + lh
-        y = max(s(16), (self.FORM_H - total) // 2)
+        # 보이는 칸(PANEL_H - 화면이 모자라 줄였으면 FORM_H 보다 낮다)의 가운데. FORM_H 의 가운데로 두면
+        # 위는 비고 아래 '회원가입' 줄이 칸 밖으로 밀렸다
+        y = max(s(16), (self.PANEL_H - total) // 2)
         fw = W - self.P - self.FX
         # 닉네임
         self._label(cv, y, self.EH, "닉네임")

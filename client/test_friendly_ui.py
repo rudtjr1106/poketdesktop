@@ -318,7 +318,10 @@ def main():
     shown = dict((ln, x["frame"]) for ln, x in w.chat_cards.items() if x["frame"].winfo_ismapped())
     grew = [ln for ln, f in shown.items() if ln in tall and f.winfo_height() > tall[ln]]
     plain = [f for ln, f in shown.items() if not w.chat_cards[ln]["btn"]]         # (단추가 붙은 카드는 단추만큼은 넓어야 한다)
-    chk("자리가 좁으면 카드는 그 폭을 넘지 않고 **글이 줄을 바꾼다** (글씨를 줄이지 않는다 - 카드가 높아진다)", len(plain) >= 2
+    # 보이는 카드 수(둘 이상)는 보통 글자 크기의 것이다 - 글자 크기 '크게·아주 크게' 는 줄을 바꾼 카드가 더
+    # 높아서 같은 칸에 한 장만 보이고 나머지는 굴려야 보인다 (그 카드도 아래에서 제 크기인지 본다).
+    few = 2 if U.TEXT_SIZE == 0 else 1
+    chk("자리가 좁으면 카드는 그 폭을 넘지 않고 **글이 줄을 바꾼다** (글씨를 줄이지 않는다 - 카드가 높아진다)", len(plain) >= few
         and all(f.winfo_width() <= 140 + 4 for f in plain) and grew
         and all(f.winfo_width() >= f.winfo_reqwidth() for f in shown.values()),
         ([(f.winfo_width(), f.winfo_reqwidth(), f.winfo_height()) for f in shown.values()], tall))
@@ -327,7 +330,7 @@ def main():
     w.chat_box.yview_moveto(0.0)
     settle(root, 0.3)
     again = [x["frame"] for x in w.chat_cards.values() if x["frame"].winfo_ismapped()]
-    chk("  위로 굴려서 다시 보이는 카드도 제 크기로 놓인다", len(again) >= 2 and all(f.winfo_height() >= f.winfo_reqheight() for f in again),
+    chk("  위로 굴려서 다시 보이는 카드도 제 크기로 놓인다", len(again) >= few and all(f.winfo_height() >= f.winfo_reqheight() for f in again),
         [(f.winfo_height(), f.winfo_reqheight()) for f in again])
     w.chat_box.see("end")
     ui_guild.CHAT_CARD_W, ui_guild.CHAT_CARD_MIN = keep_w, keep_min

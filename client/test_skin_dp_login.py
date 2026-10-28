@@ -286,6 +286,17 @@ def signup_flow(root):
     chk("도트가 카드에 붙는다", all(c.photos for c in lw.cards), [len(c.photos) for c in lw.cards])
     if DP:
         chk("카드 캔버스에 도트 그림", all(c.box.find_withtag("art") for c in lw.cards))
+        req, real = lw.win.winfo_reqheight(), lw.win.winfo_height()
+        chk("회원가입도 창이 작업 영역에 다 들어간다", req <= real + 1, (req, real))
+        if lw.PANEL_H < lw.FORM_H:
+            # 화면이 모자라면(작은 화면 · 글자 아주 크게) 칸 안을 굴린다 - 끝까지 굴리면 가입 단추가 다 보인다
+            cv = lw._fcv
+            cv.yview_moveto(1.0)
+            root.update()
+            bottom = cv.canvasy(cv.winfo_height())
+            chk("  칸 안을 굴리면 가입 단추까지 보인다", bottom >= lw.btn_signup.box[3], (bottom, lw.btn_signup.box))
+            cv.yview_moveto(0.0)                     # 아래 검사는 칸의 자리를 누른다 - 처음 자리로 되돌린다
+            root.update()
 
     # 닉네임 확인
     lw.rg_name.set("taken")

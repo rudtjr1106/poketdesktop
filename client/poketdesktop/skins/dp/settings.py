@@ -91,6 +91,7 @@ class SettingsWindow(ST.SettingsWindow):
         self.boot_var = tk.BooleanVar(value=st in ("on", "blocked"))
         self.skin_pick = s.get("skin") if skins.usable(s.get("skin")) else skins.DEFAULT
         self.skin_rows = {}
+        self.text_pick = U.text_size_of(s)
         self.btns = {}
         self._rows(s)
         self._paint_area()
@@ -129,6 +130,13 @@ class SettingsWindow(ST.SettingsWindow):
                               "get": lambda: self.skin_pick, "put": self._pick_skin,
                               "action": ("다시 켜서 적용", self._restart_for_skin,
                                          lambda: self.skin_pick != skins.active())})
+        self.rows.append({"kind": "choice", "label": "글자 크기",
+                          "note": "창과 메뉴의 글자를 키웁니다. 글자가 든 칸도 같이 커집니다. 바꾸면 프로그램을 다시 켜서 "
+                                  "적용합니다.",
+                          "choices": [(i, name) for i, (name, _k) in enumerate(U.TEXT_SIZES)],
+                          "get": lambda: self.text_pick, "put": self._pick_text,
+                          "action": ("다시 켜서 적용", self._restart_for_skin,
+                                     lambda: self.text_pick != U.TEXT_SIZE)})
         for var, label, key, note, how in (
                 (self.names, "이름표 보이기", "showNames", "포켓몬 위에 이름과 레벨을 띄웁니다.", self._toggle),
                 (self.drag, "포켓몬 들어서 옮기기", "petDrag",
@@ -179,7 +187,7 @@ class SettingsWindow(ST.SettingsWindow):
                           "value_note": lambda: self.boot_note.cget("text"),
                           "disabled": not autostart.supported()})
         self.rows.append({"kind": "buttons", "label": "기본값으로", "note": "모든 설정을 처음 값으로 되돌립니다. 자동 시작 · "
-                          "화면 테마 · 읽은 글 기록은 그대로 둡니다.", "buttons": [("되돌리기", self.reset)]})
+                          "화면 테마 · 글자 크기 · 읽은 글 기록은 그대로 둡니다.", "buttons": [("되돌리기", self.reset)]})
 
     # ---------------- 기본 창이 부르는 자리 ----------------
     def _say(self, text, color=None):
@@ -199,6 +207,15 @@ class SettingsWindow(ST.SettingsWindow):
         self._soon()
 
     def _paint_skin(self):
+        self._soon()
+
+    def _pick_text(self, level):
+        if level == self.text_pick:
+            return
+        self.text_pick = level
+        self._set("textSize", level)
+        if level != U.TEXT_SIZE:
+            self._say("글자 크기 '%s' 는 다시 켜면 적용됩니다." % U.TEXT_SIZES[level][0], U.ACCENT)
         self._soon()
 
     def show_grass(self):
