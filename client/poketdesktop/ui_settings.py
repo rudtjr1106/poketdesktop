@@ -378,16 +378,19 @@ class SettingsWindow(object):
         # 콤보 위를 지나는 것만으로 글꼴이 바뀌어 저장되면 안 된다 - 창을 굴리는 것으로 돌린다.
         for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
             self.font_combo.bind(seq, self._wheel_page)
+        self.size_var = tk.StringVar(value=config.font_size(s))
         self.font_preview = tk.Label(
             box, text=self.FONT_SAMPLE, bg=U.INK, fg=U.FG, anchor="w",
-            justify="left", padx=10, pady=6, font=(U.FAMILY, U.BASE_PT + 2))
+            justify="left", padx=10, pady=6, font=self._preview_font())
         self.font_preview.pack(fill="x", pady=(0, 4))
         # 본문보다 두 단계 큰 글자라 단독 창(460) 폭에서는 끝이 잘렸다. 잘리느니 접는다.
         U.wrap_to_width(self.font_preview)
+        self._size_row(box)
         # 다시 켤 필요는 없다. 허브는 탭을 처음 누를 때 만들고 닫을 때 전부 지운다 (ui_hub.close) -
         # 창을 닫았다 열면 모든 탭이 새로 그려진다. 앱은 그동안 트레이에 남아 있다.
-        note = tk.Label(box, text="아직 안 열어 본 탭과 새로 뜨는 창부터 바뀝니다. 이미 열어 본 탭은 "
-                                  "포스크탑 창을 닫았다 다시 열면 바뀝니다. 한글이 없는 글꼴을 고르면 한글은 "
+        note = tk.Label(box, text="글꼴은 아직 안 열어 본 탭과 새로 뜨는 창부터 바뀝니다. 이미 열어 본 탭은 "
+                                  "포스크탑 창을 닫았다 다시 열면 바뀝니다. 글자 크기는 프로그램을 다시 켜야 "
+                                  "바뀝니다. 한글이 없는 글꼴을 고르면 한글은 "
                                   "다른 글꼴로 대신 보일 수 있습니다. 바탕화면 배틀 연출의 글자는 "
                                   "바뀌지 않습니다.",
                         bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
@@ -456,13 +459,46 @@ class SettingsWindow(object):
         except tk.TclError:
             pass
 
+    def _preview_font(self):
+        """실제로 쓰게 된 글꼴(U.FAMILY)에 고른 글자 크기. 고른 이름이 이 PC 에 없으면 Tk 은 말없이
+        다른 글꼴로 바꿔 그려서, 고른 이름으로 그리면 미리보기가 거짓말을 한다. 크기는 아직
+        적용 전(다시 켜야 한다)이어도 고른 단계로 보여 준다 - 얼마나 커지는지 보고 고르게."""
+        return (U.FAMILY, U.base_pt_for(self.size_var.get()) + 2)
+
     def _paint_font_preview(self):
-        """실제로 쓰게 된 글꼴(U.FAMILY)로 그린다. 고른 이름이 이 PC 에 없으면 Tk 은 말없이
-        다른 글꼴로 바꿔 그려서, 고른 이름으로 그리면 미리보기가 거짓말을 한다."""
         try:
-            self.font_preview.configure(font=(U.FAMILY, U.BASE_PT + 2))
+            self.font_preview.configure(font=self._preview_font())
         except tk.TclError:
             pass
+
+    SIZE_CHOICES = (("normal", "보통"), ("large", "크게"), ("xlarge", "아주 크게"))
+
+    def _size_row(self, box):
+        """글자 크기. 저장만 하고 다음에 켤 때 적용한다 (ui_common.FONT_SIZE_STEPS).
+
+        **실행 중에는 바꾸지 않는다.** 줄 높이(U.h)가 글자 크기를 따르는데, 이미 열린
+        목록은 옛 높이로 만든 줄을 들고 있어서 새 높이로 늘어놓으면 줄이 겹친다.
+        """
+        row = tk.Frame(box, bg=U.BG)
+        row.pack(fill="x", pady=(2, 4))
+        tk.Label(row, text="글자 크기", bg=U.BG, fg=U.FG, font=U.FONT_S,
+                 anchor="w").pack(side="left", padx=(0, 8))
+        for value, label in self.SIZE_CHOICES:
+            tk.Radiobutton(
+                row, text=label, value=value, variable=self.size_var,
+                bg=U.BG, fg=U.FG, selectcolor=U.INK, activebackground=U.BG,
+                activeforeground=U.FG, font=U.FONT_S, anchor="w",
+                highlightthickness=0, bd=0,
+                command=self._pick_size).pack(side="left", padx=(0, 10))
+
+    def _pick_size(self):
+        want = config.font_size({"fontSize": self.size_var.get()})
+        self._set("fontSize", want)
+        self._paint_font_preview()
+        if U.base_pt_for(want) == U.BASE_PT:
+            U.set_status(self.status, "지금 크기 그대로입니다.")
+        else:
+            U.set_status(self.status, "다음에 켤 때부터 이 크기로 그립니다.")
 
     def _boss_row(self, box, s):
         """다른 프로그램을 쓰는 중에도 먹는 단축키 하나 (hotkey.py). **기본은 '쓰지 않음'.**
@@ -658,6 +694,8 @@ class SettingsWindow(object):
             U.apply_font_family(root, "")
             try:
                 self.font_var.set(self.FONT_AUTO)
+                # 크기도 '보통' 으로 저장됐다. 실제로 바뀌는 것은 다음에 켤 때다.
+                self.size_var.set(config.font_size(self.app.settings))
                 self._paint_font_preview()
             except (AttributeError, tk.TclError):
                 pass
