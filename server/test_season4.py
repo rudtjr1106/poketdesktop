@@ -70,8 +70,9 @@ def main():
         and rules["rewards"][2]["egg"] is None)
     chk("시즌 4 칭호가 정해져 있다 (받으면 달 수 있다)",
         all(k in season.TITLES for k in ("s4_champion", "s4_elite", "s4_master", "s4_hyper", "s4_super")))
-    chk("손질 목록의 맨 끝이 시즌 4 열기",
-        migrations.ONCE[-1] == ("0320-season4-open", migrations._season4_open), migrations.ONCE[-1][0])
+    seasonal = [o for o in migrations.ONCE if "season" in o[0]]   # 뒤에 0330(배틀 정리)이 붙었다
+    chk("시즌 손질 가운데 맨 끝이 시즌 4 열기",
+        seasonal[-1] == ("0320-season4-open", migrations._season4_open), seasonal[-1][0])
 
     print("\n=== 시즌 3 -> 4 전환 ===")
     # 시즌 3 이 끝난 상태: 마스터볼 여섯(자리는 다섯), 하이퍼·슈퍼·몬스터, 배치 못 마친 사람.
