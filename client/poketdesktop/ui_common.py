@@ -77,7 +77,17 @@ FAMILY_BLACK = FAMILY
 # 맥은 한 단계 크게 간다. 같은 pt 라도 맥 글꼴이 눈에 더 작게 앉아서,
 # 10pt 본문이 한글로는 확실히 작았다. 윈도우(맑은 고딕)는 지금 크기가
 # 맞으므로 건드리지 않는다 - 거기서 키우면 반대로 넘친다.
-BASE_PT = 12 if sys.platform == "darwin" else 10
+#
+# 설정의 '글자 크기' 는 이 OS 기본값에서 몇 pt 올릴지다 (FONT_SIZE_STEPS).
+# **켤 때 한 번만 정한다** (init_fonts 의 size). 줄 높이(h)가 이 값을 따르는데,
+# 실행 중에 바꾸면 이미 열린 목록이 옛 높이로 만든 줄을 새 높이로 늘어놓는다.
+_BASE_PT_OS = 12 if sys.platform == "darwin" else 10
+BASE_PT = _BASE_PT_OS
+# 단계마다 1pt. 윈도우의 '아주 크게'(12pt)는 맥 기본과 같은 크기라, 맥에서 한 번
+# 맞춰 둔 칸들이 그대로 받쳐 준다. 그보다 크게는 고정 크기 창들이 못 버틴다.
+FONT_SIZE_STEPS = {"normal": 0, "large": 1, "xlarge": 2}
+_SIZE = "normal"            # 지금 쓰는 단계 (init_fonts 가 정한다)
+_ON_FONTS = []              # 글꼴 크기를 따라가는 모듈 상수를 다시 정하는 함수들 (on_fonts)
 
 FONT = (FAMILY, BASE_PT)
 FONT_B = (FAMILY, BASE_PT, "bold")
@@ -145,12 +155,33 @@ def font_choices(root):
     return sorted({n for n in names if n and not n.startswith("@")})
 
 
-def init_fonts(root, prefer=""):
+def base_pt_for(size):
+    """이 글자 크기 단계의 본문 pt. 모르는 단계면 기본(normal)."""
+    return _BASE_PT_OS + FONT_SIZE_STEPS.get(size, 0)
+
+
+def on_fonts(fn):
+    """글꼴 크기를 따라가는 모듈 상수(줄 높이 ...)를 정하는 함수를 건다. 데코레이터로 쓴다.
+
+    **불러올 때 U.h() 로 정해 두면 안 된다.** app 은 설정을 읽기 전에 창 모듈을 다
+    불러서, 그때 정한 줄 높이는 설정의 글자 크기가 아니라 기본 크기를 따른다 -
+    글자만 커지고 줄은 그대로라 글이 눌린다. 그래서 지금 한 번 부르고, init_fonts 가
+    크기를 정할 때마다 다시 부른다. 쓰는 쪽은 예전처럼 ROW_H 를 그대로 읽으면 된다.
+    """
+    _ON_FONTS.append(fn)
+    fn()
+    return fn
+
+
+def init_fonts(root, prefer="", size=None):
     """설치된 글꼴 중 가장 나은 것을 골라 전역 글꼴을 정한다.
 
     prefer 는 설정에서 고른 글꼴(config.font_family). 비었거나 이 PC 에
-    없으면 예전처럼 자동으로 고른다. 실제로 쓰게 된 FAMILY 를 돌려준다.
+    없으면 예전처럼 자동으로 고른다. size 는 글자 크기 단계(config.font_size).
+    None 이면 지금 단계를 그대로 둔다 - 설정 화면에서 글꼴만 바꿀 때 크기까지
+    되돌리면 안 된다. 실제로 쓰게 된 FAMILY 를 돌려준다.
     """
+    global BASE_PT, _SIZE
     global FAMILY, FAMILY_LIGHT, FAMILY_MEDIUM, FAMILY_BLACK
     global FONT, FONT_B, FONT_S, FONT_XS, FONT_T, FONT_H
     global FONT_TIP, FONT_NUM, FONT_BTN, FONT_LABEL
@@ -165,6 +196,9 @@ def init_fonts(root, prefer=""):
     FAMILY_LIGHT = fam["FAMILY_LIGHT"]
     FAMILY_MEDIUM = fam["FAMILY_MEDIUM"]
     FAMILY_BLACK = fam["FAMILY_BLACK"]
+    if size is not None:
+        _SIZE = size if size in FONT_SIZE_STEPS else "normal"
+    BASE_PT = base_pt_for(_SIZE)
 
     # 크기는 한 곳에서 정한다. 여기저기 숫자를 박아 두면 하나만 고쳐도
     # 어긋나고, 무엇보다 "전부 한 단계 키우자" 를 할 수가 없다.
@@ -193,6 +227,8 @@ def init_fonts(root, prefer=""):
             tkfont.nametofont(name, root).configure(family=FAMILY, size=b)
     except Exception:
         pass
+    for fn in _ON_FONTS:
+        fn()
     return FAMILY
 
 

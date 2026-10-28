@@ -168,6 +168,9 @@ DEFAULTS = {
     # 이름이 들어 있어도(다른 PC 에서 옮겨 온 설정) 지우지 않는다. 그 PC 로
     # 돌아가면 다시 그 글꼴이어야 한다.
     "fontFamily": "",
+    # 글자 크기 단계 (FONT_SIZES). 다음에 켤 때부터 적용된다 - 줄 높이가 따라
+    # 커져야 해서 실행 중에는 바꾸지 않는다 (ui_common.FONT_SIZE_STEPS).
+    "fontSize": "normal",
 }
 
 
@@ -192,6 +195,15 @@ def catch_mode(settings):
     """설정의 잡기 모드. 모르는 값이면 기본(new)."""
     v = (settings or {}).get("catchMode")
     return v if v in CATCH_MODES else DEFAULTS["catchMode"]
+
+
+FONT_SIZES = ("normal", "large", "xlarge")
+
+
+def font_size(settings):
+    """설정의 글자 크기 단계. 모르는 값이면 기본(normal)."""
+    v = (settings or {}).get("fontSize")
+    return v if v in FONT_SIZES else DEFAULTS["fontSize"]
 
 
 def font_family(settings):

@@ -194,8 +194,10 @@ class App(object):
         # tk.Tk() **뒤에** 불러야 한다 (Tk 이 정책을 되돌려 놓는다).
         PLAT.hide_from_dock()
         PLAT.dpi_aware()
-        # 설정에서 고른 글꼴 (빈 값이면 자동). self.settings 는 맨 위에서 이미 읽었다.
-        U.init_fonts(self.root, config.font_family(self.settings))
+        # 설정에서 고른 글꼴 (빈 값이면 자동)과 글자 크기. self.settings 는 맨 위에서 이미 읽었다.
+        # 크기는 여기서 한 번만 정한다 - 창은 아직 하나도 안 만들었다.
+        U.init_fonts(self.root, config.font_family(self.settings),
+                     config.font_size(self.settings))
         apply_theme(self.root)
         # 긴급 숨기기 (1.10.3): 떠 있는 것을 전부 치웠다 되돌린다. 단축키는 설정에서 고른
         # 사람에게만 등록한다 (기본은 꺼짐). 트레이 메뉴에는 늘 있다.
