@@ -539,6 +539,10 @@ class PushButton(object):
         self.label = tk.Label(self.box, text=text, bg=fill, fg=fg,
                               font=font or FONT_BTN, cursor="hand2")
         self.label.pack(expand=True)
+        # **높이는 글자보다 작아지지 않는다.** height 는 부르는 쪽이 픽셀로 박아 둔 값이 많아서
+        # (30, 32 ...) 글자 크기를 '크게' 로 올리면 글자만 커지고 단추는 그대로라 글이 눌렸다.
+        # 기본 크기에서는 다 맞춰 둔 값이므로 이 줄은 아무것도 안 바꾼다.
+        self.holder.configure(height=max(height, self.label.winfo_reqheight() + 2 * bw) + 4)
         # pack_propagate 를 꺼놔서 폭을 직접 정해줘야 한다.
         # fill="x" 로 담으면 이 값은 덮어써지고, side="left" 로 담으면 이게 쓰인다.
         #
