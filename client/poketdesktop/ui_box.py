@@ -194,6 +194,8 @@ def evo_lines(dex, mon, item_kr=None):
             notes.append(EVO_TIME[b["time"]])
         if b.get("gender") in EVO_GENDER:
             notes.append(EVO_GENDER[b["gender"]])
+        if b.get("split") is not None:
+            notes.append("개체마다 정해진 쪽으로")       # 개무소 - 실쿤·카스쿤 반반 (본가는 성격값)
         if b.get("move"):
             notes.append("%s을(를) 알 때" % dex.move_name(b["move"]))
         if b.get("moveType"):

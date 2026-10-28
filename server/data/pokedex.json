@@ -71718,14 +71718,16 @@
      "mode": "level",
      "to": "SILCOON",
      "toNum": 266,
-     "trigger": "level-up"
+     "trigger": "level-up",
+     "split": 0
     },
     {
      "level": 7,
      "mode": "level",
      "to": "CASCOON",
      "toNum": 268,
-     "trigger": "level-up"
+     "trigger": "level-up",
+     "split": 1
     }
    ],
    "femaleRatio": 0.5,
@@ -134920,14 +134922,16 @@
      "mode": "level",
      "to": "SOLGALEO",
      "toNum": 791,
-     "trigger": "level-up"
+     "trigger": "level-up",
+     "time": "day"
     },
     {
      "level": 53,
      "mode": "level",
      "to": "LUNALA",
      "toNum": 792,
-     "trigger": "level-up"
+     "trigger": "level-up",
+     "time": "night"
     }
    ],
    "femaleRatio": null,

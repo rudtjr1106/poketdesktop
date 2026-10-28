@@ -308,6 +308,20 @@ def main():
         items.bag_count(uid4, "RARECANDY"))
 
     print()
+    print("=== 버전·개체로 갈리는 진화 (게시판 #370) ===")
+    cos = dict(bare("COSMOEM"), level=53, id=1)
+    chk("코스모움: 낮에는 솔가레오", (evolution.check_level(d, cos, 12) or {}).get("to") == "SOLGALEO")
+    chk("코스모움: 밤에는 루나아라 (예전에는 늘 솔가레오였다)",
+        (evolution.check_level(d, cos, 22) or {}).get("to") == "LUNALA")
+    chk("  Lv.52 에는 아직", evolution.check_level(d, dict(cos, level=52), 22) is None)
+    got = set((evolution.check_level(d, dict(bare("WURMPLE"), level=7, id=i), 12) or {}).get("to")
+              for i in range(1, 9))
+    chk("개무소: 개체마다 실쿤이나 카스쿤 (예전에는 늘 실쿤이었다)", got == {"SILCOON", "CASCOON"}, got)
+    same = set((evolution.check_level(d, dict(bare("WURMPLE"), level=7, id=5), h) or {}).get("to")
+               for h in (3, 12, 20))
+    chk("  같은 개체는 언제 올려도 같은 쪽", len(same) == 1, same)
+
+    print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0
 

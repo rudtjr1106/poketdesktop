@@ -759,6 +759,17 @@ def _branch(r, trigger, item_ident, move_ident, type_ident):
     return d
 
 
+# 본가에서 **버전이나 개체로** 갈리는 진화. PokeAPI 에는 두 갈래의 조건이 똑같이 적혀 있어서
+# (레벨만 같다) 먼저 보는 쪽만 늘 됐다 - 코스모움은 늘 솔가레오, 개무소는 늘 실쿤 (게시판 #370).
+# 이 게임에는 버전이 없으니 썬/문은 낮/밤으로, 성격값(개체)은 개체 번호로 가른다 (evolution._cond_ok).
+SPLIT_EVO = {
+    "SOLGALEO": {"time": "day"},
+    "LUNALA": {"time": "night"},
+    "SILCOON": {"split": 0},
+    "CASCOON": {"split": 1},
+}
+
+
 def load_evolutions(species_row, item_ident, move_ident, type_ident):
     """진화표를 두 방향으로 만든다.
 
@@ -785,6 +796,7 @@ def load_evolutions(species_row, item_ident, move_ident, type_ident):
         d = _branch(r, trigger, item_ident, move_ident, type_ident)
         d["to"] = norm(srow["identifier"])
         d["toNum"] = sid
+        d.update(SPLIT_EVO.get(d["to"], {}))
         evo_from.setdefault(src, []).append(d)
         if sid not in evo_of:
             evo_of[sid] = d
