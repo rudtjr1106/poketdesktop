@@ -93,7 +93,11 @@ def at(days=0, hours=0, minutes=0):
 
 
 def clock(t):
+    # 관장 배틀 쪽 시계도 같이. 공격 판은 gym_battle 에 있고 gym_routes 가 '1시간 손 놓은 판' 을 자기
+    # 시계로 접는다 - 길드전 시계만 옮기면, 진짜 날짜가 검사 속 전쟁 기간(T0 + 7일~)을 지난 뒤로는
+    # 막 연 판이 곧바로 접혔다 (10/29 CI, 날짜 폭탄).
     GW._now = lambda: t
+    gym_routes._now = lambda: t
 
 
 def mon_ids(uid):
