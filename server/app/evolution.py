@@ -99,6 +99,9 @@ def _cond_ok(b, dex, mon, hour=None):
         return False
     if not _move_type_ok(b.get("moveType"), dex, mon):
         return False
+    sp = b.get("split")
+    if sp is not None and int(mon.get("id") or 0) % 2 != sp:
+        return False                      # 개체마다 정해진 갈래 (개무소 - 본가는 성격값, 게시판 #370)
     return True
 
 
@@ -106,7 +109,7 @@ def _cond_ok(b, dex, mon, hour=None):
 # 시간대(낮/밤)는 가만히 있어도 반은 맞으므로 가장 약하다. 특정 기술을
 # 배우고 있어야 한다든가 하는 건 사용자가 일부러 맞춘 것이니 세다.
 _COND_WEIGHT = {"moveType": 8, "move": 8, "stats": 4, "gender": 4,
-                "held": 4, "time": 1}
+                "held": 4, "time": 1, "split": 1}
 
 
 def branches(dex, mon):
