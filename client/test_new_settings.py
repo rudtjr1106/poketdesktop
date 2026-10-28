@@ -705,6 +705,9 @@ def test_names_default():
             # 되돌린 뒤 '돌아다닐 영역' 설명을 다시 적는 자리. 여기서는 화면이
             # 없으니 하는 일이 없다.
             _paint_area = lambda self: None
+            # 잡기 '고른 포켓몬만' 의 'N종 골랐다' 줄과 열린 고르는 창을 다시 칠하는 자리. 마찬가지로 화면이 없다.
+            _paint_catch_pick = lambda self: None
+            _repaint_pick_window = lambda self: None
 
         win = FakeSettingsWin()
         win.app = app
@@ -783,6 +786,8 @@ def test_catch_mode():
             _save = ui_settings.SettingsWindow._save
             _set = ui_settings.SettingsWindow._set
             _set_catch = ui_settings.SettingsWindow._set_catch
+            _paint_catch_pick = lambda self: None           # 화면이 없다 (위 reset 검사와 같다)
+            _repaint_pick_window = lambda self: None
 
         win = FakeSettingsWin()
         win.app = FakeApp()

@@ -429,7 +429,8 @@ def main():
     first = w.shown()
     want = UE.candidates(api.pokemon(), dex, w.place)
     # 보이는 줄 수는 보통 글자 크기 기준이다. 글자를 키우면 줄이 높아져 한 화면에 덜 보인다 (나머지는 굴려서 본다)
-    rows_min = 6 if U.TEXT_SIZE == 0 else 3
+    # 목록 위에 찾기 줄(두 줄)이 생겨서 6 -> 5. 이 맥에서는 6줄이 보이지만 CI 맥 러너는 화면이 작아 5줄이었다.
+    rows_min = 5 if U.TEXT_SIZE == 0 else 3
     rows_narrow = 4 if U.TEXT_SIZE == 0 else 3          # 가장 낮은 창에서
     chk("  위에서부터 잘할 차례로: 이름 · 레벨 · 예상 성공도 · 탐험 레벨 (%d줄이 보인다)" % len(first),
         len(first) >= rows_min and [pid for pid, _r in first][:5] == [m["id"] for m, _p, _g in want[:len(first[:5])]]
