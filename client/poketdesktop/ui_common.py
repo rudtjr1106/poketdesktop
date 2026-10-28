@@ -100,16 +100,19 @@ def _system_family(root):
         return FAMILY
 
 
-def init_fonts(root):
-    """설치된 글꼴 중 가장 나은 것을 골라 전역 글꼴을 정한다."""
-    global FAMILY, FAMILY_LIGHT, FAMILY_MEDIUM, FAMILY_BLACK
-    global FONT, FONT_B, FONT_S, FONT_XS, FONT_T, FONT_H
-    global FONT_TIP, FONT_NUM, FONT_BTN, FONT_LABEL
-    try:
-        import tkinter.font as tkfont
-        have = set(tkfont.families(root))
-    except Exception:
-        have = set()
+def _resolve_families(have, prefer, system):
+    """어느 글꼴을 쓸지 정한다. Tk 없이 돌아서 검사에서 그대로 부를 수 있다.
+
+    have 는 설치된 글꼴 이름들, prefer 는 설정에서 고른 글꼴(빈 값이면
+    자동), system 은 후보를 하나도 못 찾았을 때 쓸 이 OS 의 기본 글꼴.
+    FAMILY, FAMILY_LIGHT, FAMILY_MEDIUM, FAMILY_BLACK 을 돌려준다.
+    """
+    # 고른 글꼴이 있으면 네 굵기를 **전부** 그것으로 둔다. 본문만 바꾸고
+    # 제목·버튼(FONT_T, FONT_BTN)은 Noto Black 으로 남기면 한 창 안에 글꼴이
+    # 둘 섞인다. 굵기는 아래에서 "bold" 스타일로 낸다 (FAMILY 와 같을 때의 길).
+    if prefer and prefer in have:
+        return {"FAMILY": prefer, "FAMILY_LIGHT": prefer,
+                "FAMILY_MEDIUM": prefer, "FAMILY_BLACK": prefer}
 
     def pick(cands, default):
         for c in cands:
@@ -120,10 +123,48 @@ def init_fonts(root):
     # 후보를 하나도 못 찾으면 Tk 이 실제로 쓰는 글꼴을 그대로 쓴다.
     # 없는 이름을 주면 Tk 은 예외 없이 조용히 대체하는데, 그러면
     # "되는 것처럼 보이지만 못생긴" 상태가 되고 알아채기 어렵다.
-    FAMILY = pick(_FAMILY_CANDIDATES, _system_family(root))
-    FAMILY_LIGHT = pick(_LIGHT_CANDIDATES, FAMILY)
-    FAMILY_MEDIUM = pick(_MEDIUM_CANDIDATES, FAMILY)
-    FAMILY_BLACK = pick(_BLACK_CANDIDATES, FAMILY)
+    # 고른 글꼴이 설치돼 있지 않을 때(다른 PC 에서 옮겨 온 설정)도 이 길로 온다.
+    family = pick(_FAMILY_CANDIDATES, system)
+    return {"FAMILY": family,
+            "FAMILY_LIGHT": pick(_LIGHT_CANDIDATES, family),
+            "FAMILY_MEDIUM": pick(_MEDIUM_CANDIDATES, family),
+            "FAMILY_BLACK": pick(_BLACK_CANDIDATES, family)}
+
+
+def font_choices(root):
+    """설정에서 고를 수 있는 글꼴 이름들 (정렬, 중복 없음). Tk 를 못 쓰면 [].
+
+    '@' 로 시작하는 것은 윈도우의 세로쓰기판이다. 고르면 글자가 옆으로
+    누워 나오므로 뺀다.
+    """
+    try:
+        import tkinter.font as tkfont
+        names = tkfont.families(root)
+    except Exception:                                       # noqa: BLE001
+        return []
+    return sorted({n for n in names if n and not n.startswith("@")})
+
+
+def init_fonts(root, prefer=""):
+    """설치된 글꼴 중 가장 나은 것을 골라 전역 글꼴을 정한다.
+
+    prefer 는 설정에서 고른 글꼴(config.font_family). 비었거나 이 PC 에
+    없으면 예전처럼 자동으로 고른다. 실제로 쓰게 된 FAMILY 를 돌려준다.
+    """
+    global FAMILY, FAMILY_LIGHT, FAMILY_MEDIUM, FAMILY_BLACK
+    global FONT, FONT_B, FONT_S, FONT_XS, FONT_T, FONT_H
+    global FONT_TIP, FONT_NUM, FONT_BTN, FONT_LABEL
+    try:
+        import tkinter.font as tkfont
+        have = set(tkfont.families(root))
+    except Exception:
+        have = set()
+
+    fam = _resolve_families(have, (prefer or "").strip(), _system_family(root))
+    FAMILY = fam["FAMILY"]
+    FAMILY_LIGHT = fam["FAMILY_LIGHT"]
+    FAMILY_MEDIUM = fam["FAMILY_MEDIUM"]
+    FAMILY_BLACK = fam["FAMILY_BLACK"]
 
     # 크기는 한 곳에서 정한다. 여기저기 숫자를 박아 두면 하나만 고쳐도
     # 어긋나고, 무엇보다 "전부 한 단계 키우자" 를 할 수가 없다.
@@ -153,6 +194,26 @@ def init_fonts(root):
     except Exception:
         pass
     return FAMILY
+
+
+def apply_font_family(root, family):
+    """설정 창에서 글꼴을 바꿨을 때. 이 PC 에 없는 이름이면 자동으로 떨어진다.
+
+    **새로 여는 창부터 바뀐다.** 위젯은 만들 때 FONT_* 튜플을 복사해 가서
+    지금 떠 있는 창은 옛 글꼴 그대로다 (명명 글꼴을 쓰는 곳만 바로 바뀐다).
+    ttk 스타일은 apply_theme 이 FONT 를 박아 두었으므로 같이 맞춘다 -
+    안 그러면 새 창의 탭·입력칸만 옛 글꼴로 남는다.
+    실제로 쓰게 된 이름을 돌려준다.
+    """
+    got = init_fonts(root, family)
+    try:
+        s = ttk.Style(root)
+        for name in (".", "TLabel", "TNotebook.Tab"):
+            if s.lookup(name, "font"):
+                s.configure(name, font=FONT)
+    except Exception:                                       # noqa: BLE001
+        pass
+    return got
 
 
 TYPE_COLOR = {

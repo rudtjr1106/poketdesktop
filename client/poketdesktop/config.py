@@ -162,6 +162,12 @@ DEFAULTS = {
     # 이 버전은 나중에 하겠다고 한 것. 켜 둔 동안 같은 판을 몇 번씩
     # 다시 물어보지 않기 위해서다. 다음에 새로 켤 때는 다시 묻는다.
     "updateSkipped": "",
+    # --- 글꼴 ---
+    # 설정 창에서 고른 전체 글꼴. 빈 값이면 자동 - 설치된 것 중 가장 나은
+    # 것을 고르는 예전 동작 그대로다 (ui_common.init_fonts). 이 PC 에 없는
+    # 이름이 들어 있어도(다른 PC 에서 옮겨 온 설정) 지우지 않는다. 그 PC 로
+    # 돌아가면 다시 그 글꼴이어야 한다.
+    "fontFamily": "",
 }
 
 
@@ -186,6 +192,13 @@ def catch_mode(settings):
     """설정의 잡기 모드. 모르는 값이면 기본(new)."""
     v = (settings or {}).get("catchMode")
     return v if v in CATCH_MODES else DEFAULTS["catchMode"]
+
+
+def font_family(settings):
+    """설정에서 고른 글꼴 이름. 빈 값이면 자동. 문자열이 아니면(손으로 고친
+    설정에 숫자·null 이 들어 있어도) 자동으로 본다."""
+    v = (settings or {}).get("fontFamily")
+    return v.strip() if isinstance(v, str) else ""
 
 
 def load_settings():
