@@ -349,8 +349,8 @@ class SettingsWindow(object):
     def _font_row(self, box, s):
         """전체 글꼴. 고르면 바로 저장하고 전역 글꼴(U.FONT_*)을 다시 정한다.
 
-        **새로 여는 창부터 바뀐다.** 위젯 천 곳 가까이가 만들 때 글꼴을 복사해 가서,
-        떠 있는 창까지 바꾸려면 그것을 전부 명명 글꼴로 바꿔야 한다. 그만한 값은
+        **이미 그려진 화면은 그대로다.** 위젯 천 곳 가까이가 만들 때 글꼴을 복사해 가서,
+        떠 있는 화면까지 바꾸려면 그것을 전부 명명 글꼴로 바꿔야 한다. 그만한 값은
         아니라고 보고 설명에 그렇게 적는다.
         """
         tk.Label(box, text="글꼴", bg=U.BG, fg=U.FG, font=U.FONT_B,
@@ -384,8 +384,10 @@ class SettingsWindow(object):
         self.font_preview.pack(fill="x", pady=(0, 4))
         # 본문보다 두 단계 큰 글자라 단독 창(460) 폭에서는 끝이 잘렸다. 잘리느니 접는다.
         U.wrap_to_width(self.font_preview)
-        note = tk.Label(box, text="새로 여는 창부터 바뀝니다. 지금 떠 있는 창까지 바꾸려면 "
-                                  "프로그램을 다시 켜 주세요. 한글이 없는 글꼴을 고르면 한글은 "
+        # 다시 켤 필요는 없다. 허브는 탭을 처음 누를 때 만들고 닫을 때 전부 지운다 (ui_hub.close) -
+        # 창을 닫았다 열면 모든 탭이 새로 그려진다. 앱은 그동안 트레이에 남아 있다.
+        note = tk.Label(box, text="아직 안 열어 본 탭과 새로 뜨는 창부터 바뀝니다. 이미 열어 본 탭은 "
+                                  "포스크탑 창을 닫았다 다시 열면 바뀝니다. 한글이 없는 글꼴을 고르면 한글은 "
                                   "다른 글꼴로 대신 보일 수 있습니다. 바탕화면 배틀 연출의 글자는 "
                                   "바뀌지 않습니다.",
                         bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
@@ -448,7 +450,7 @@ class SettingsWindow(object):
             # 상태줄은 한 줄이라 길면 잘린다 - 고른 이름은 콤보에 이미 보인다.
             U.set_status(self.status, "이 PC 에 없는 글꼴이라 자동으로 둡니다.", U.DANGER)
         else:
-            U.set_status(self.status, "새로 여는 창부터 이 글꼴로 그립니다.")
+            U.set_status(self.status, "창을 닫았다 열면 모든 탭에 적용됩니다.")
         try:
             self.font_combo.selection_clear()
         except tk.TclError:
