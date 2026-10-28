@@ -28,7 +28,14 @@ from . import item_icons
 from . import ui_common as U
 from . import ui_loading
 
-ROW_H = U.h(30)
+
+# 글자 크기를 따르는 높이. 불러올 때가 아니라 켤 때 정한 크기로 잡는다 (U.on_fonts).
+@U.on_fonts
+def _sizes():
+    global ROW_H
+    ROW_H = U.h(30)
+
+
 CATS_W = 136
 DETAIL_W = 348
 ICON = 24                     # 줄 왼쪽 도구 그림 크기

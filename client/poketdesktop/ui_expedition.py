@@ -49,12 +49,20 @@ from .ui_common import run_async
 
 LEFT_W = 300                 # 탐험 칸
 MID_W = 304                  # 어디로 · 얼마나
-CARD_H = U.h(96)             # 탐험 칸 하나. 창을 가장 낮게(620) 줄여도 셋이 다 들어가는 높이다
-PLACE_H = U.h(30)            # 갈 곳 한 줄 (이름 + 맞는 타입 셋)
-ROW_H = U.h(44)              # '누구를' 의 한 줄 (이름·레벨 / 타입 두 줄)
 THUMB = 40
 PANEL = "#101623"
 GRADE_COLOR = {"great": U.ACCENT, "good": U.GOOD, "normal": U.FG_DIM}
+
+
+# 글자 크기를 따르는 높이. 불러올 때가 아니라 켤 때 정한 크기로 잡는다 (U.on_fonts).
+@U.on_fonts
+def _sizes():
+    global CARD_H, PLACE_H, ROW_H
+    CARD_H = U.h(96)             # 탐험 칸 하나. 창을 가장 낮게(620) 줄여도 셋이 다 들어가는 높이다
+    PLACE_H = U.h(30)            # 갈 곳 한 줄 (이름 + 맞는 타입 셋)
+    ROW_H = U.h(44)              # '누구를' 의 한 줄 (이름·레벨 / 타입 두 줄)
+
+
 GROW_W = 470                 # 성장 창의 폭
 PIP = 9                      # 성장치 한 점의 네모 (px - 글자가 아니라서 글꼴 배율을 안 탄다)
 

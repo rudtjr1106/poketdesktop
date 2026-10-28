@@ -31,7 +31,14 @@ from . import ui_common as U
 from . import ui_loading
 from .ui_bond import BondPanel
 
-ROW_H = U.h(30)
+
+# 글자 크기를 따르는 높이. 불러올 때가 아니라 켤 때 정한 크기로 잡는다 (U.on_fonts).
+@U.on_fonts
+def _sizes():
+    global ROW_H
+    ROW_H = U.h(30)
+
+
 DETAIL_W = 340
 PARTY_TABS = 5               # 파티 프리셋 칸 수 (서버의 party.COUNT)
 # PC 박스 한 쪽에 몇 마리. **한 쪽만 그린다.**

@@ -23,14 +23,23 @@ from common import movetext as MT
 from common.korean import natural
 
 from . import ui_common as U
-from .ui_learn import MIN_H, SCREEN_PAD, W, ForgetAsk
+from . import ui_learn
+# MIN_H · SCREEN_PAD 는 글자 크기를 따라 켤 때 정해진다 - 불러올 때 복사해 오지 않고 ui_learn 에서 읽는다.
+from .ui_learn import W, ForgetAsk
 
-# 창 높이 상한. **화면을 꽉 채우지 않는다.** 떠올릴 기술은 스무 개가 넘기도
-# 해서 '무엇을 버릴까' 창처럼 화면 높이까지 키우면 창이 화면을 다 덮고,
-# 맥에서는 아래 '떠올리기' 단추가 Dock 뒤로 들어갔다. 줄 네 개쯤 보이는
-# 높이로 두고 나머지는 굴려서 본다(휠이 먹는다). 600 으로 잡았더니 900px
-# 화면의 3/4 라 여전히 컸다. 화면이 작으면 화면의 65% 까지만 쓴다.
-MAX_H = U.h(520)
+
+# 글자 크기를 따르는 높이. 불러올 때가 아니라 켤 때 정한 크기로 잡는다 (U.on_fonts).
+@U.on_fonts
+def _sizes():
+    global MAX_H
+    # 창 높이 상한. **화면을 꽉 채우지 않는다.** 떠올릴 기술은 스무 개가 넘기도
+    # 해서 '무엇을 버릴까' 창처럼 화면 높이까지 키우면 창이 화면을 다 덮고,
+    # 맥에서는 아래 '떠올리기' 단추가 Dock 뒤로 들어갔다. 줄 네 개쯤 보이는
+    # 높이로 두고 나머지는 굴려서 본다(휠이 먹는다). 600 으로 잡았더니 900px
+    # 화면의 3/4 라 여전히 컸다. 화면이 작으면 화면의 65% 까지만 쓴다.
+    MAX_H = U.h(520)
+
+
 SCREEN_SHARE = 0.65
 
 
@@ -72,7 +81,7 @@ class RememberAsk(ForgetAsk):
         self.money = int(money or 0)
 
         self.win = tk.Toplevel(parent)
-        U.style_window(self.win, "기술 떠올리기", W, MIN_H)
+        U.style_window(self.win, "기술 떠올리기", W, ui_learn.MIN_H)
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2,
                            highlightbackground=U.LINE2)
@@ -136,7 +145,7 @@ class RememberAsk(ForgetAsk):
 
     def _cap(self):
         sh = self.win.winfo_screenheight()
-        return max(MIN_H, min(sh - SCREEN_PAD, MAX_H, int(sh * SCREEN_SHARE)))
+        return max(ui_learn.MIN_H, min(sh - ui_learn.SCREEN_PAD, MAX_H, int(sh * SCREEN_SHARE)))
 
     # ---------------- 그리기 ----------------
     def _entry_row(self, parent, entry):

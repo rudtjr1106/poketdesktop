@@ -21,7 +21,7 @@ from . import ui_loading
 from .ui_common import run_async
 
 W, H = 900, 660
-CELL_W, CELL_H = 84, U.h(92)
+CELL_W = 84
 PAD = 6
 COLS = 9                       # 창 너비에 맞춰 다시 계산한다
 
@@ -29,6 +29,13 @@ GENS = [(0, "전체"), (1, "1세대"), (2, "2세대"), (3, "3세대"), (4, "4세
         (5, "5세대"), (6, "6세대"), (7, "7세대"), (8, "8세대"), (9, "9세대")]
 
 MODES = [("all", "전부"), ("caught", "잡은 것"), ("miss", "아직")]
+
+
+# 글자 크기를 따르는 높이. 불러올 때가 아니라 켤 때 정한 크기로 잡는다 (U.on_fonts).
+@U.on_fonts
+def _sizes():
+    global CELL_H
+    CELL_H = U.h(92)
 
 
 def _norm(s):

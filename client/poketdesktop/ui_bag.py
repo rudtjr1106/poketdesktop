@@ -42,9 +42,17 @@ LIST_W = 292            # 왼쪽 도구 목록 폭
 # 그 안을 이 순서로 세운다. 종류순은 지닌 도구를 하는 일(held.GROUPS)마다 머리줄로 나눈다.
 ITEM_SORTS = (("name", "이름"), ("kind", "종류"), ("rarity", "등급"), ("count", "개수"))
 RARITY_RANK = {"common": 1, "uncommon": 2, "rare": 3, "epic": 4, "legendary": 5}
-ITEM_H = U.h(28)        # 도구 한 줄 높이 (글꼴 따라 늘어난다)
-MON_H = U.h(34)         # 포켓몬 한 줄 높이
 THUMB = 22              # 목록에 놓는 도트 높이 (다른 창과 겹치지 않는 값)
+
+
+# 글자 크기를 따르는 높이. 불러올 때가 아니라 켤 때 정한 크기로 잡는다 (U.on_fonts).
+@U.on_fonts
+def _sizes():
+    global ITEM_H, MON_H, HEAD_H
+    ITEM_H = U.h(28)        # 도구 한 줄 높이 (글꼴 따라 늘어난다)
+    MON_H = U.h(34)         # 포켓몬 한 줄 높이
+    HEAD_H = U.h(26)        # 종류순의 머리줄 (HeadRow)
+
 
 EV_STAT_MAX = 252       # 서버 config 와 같은 값 (스탯 하나당)
 EV_TOTAL_MAX = 510      # 서버 config 와 같은 값 (여섯 개 합계)
@@ -305,7 +313,6 @@ def _scroller(parent, bg):
 
 
 SEP = "#161a24"          # 줄 사이의 금
-HEAD_H = U.h(26)
 
 
 class HeadRow(object):

@@ -42,18 +42,25 @@ from .ui_bag import _scroller, bag_title
 from .ui_learn import ask_forget
 
 LIST_W = 320
-ROW_H = U.h(30)
-MON_H = U.h(34)
 THUMB = 22
-# 도트 칸의 폭. **Label 의 width 로 잡으면 안 된다.** width 는 글자일 때는
-# 글자 수인데 그림일 때는 픽셀이라, width=3 이 22px 도트를 3px(테두리까지
-# 7px)로 잘랐다. 선물 창에서 한 번 겪은 함정이다. 고정 크기 칸(Frame)에
-# 넣으면 그림이 오기 전과 후에 이름 자리도 안 흔들린다. 맥은 테두리를
-# 1~2px 다르게 셀 수 있어서 넉넉히 잡는다.
-SLOT_W = U.h(52)
-# 칸에 넣을 도트의 최대 크기. 옆으로 긴 종은 높이를 덜 채우고 작아진다 -
-# 잘려서 반만 보이는 것보다 낫다.
-THUMB_MAX = (SLOT_W - 2, MON_H - 4)
+
+
+# 글자 크기를 따르는 높이. 불러올 때가 아니라 켤 때 정한 크기로 잡는다 (U.on_fonts).
+@U.on_fonts
+def _sizes():
+    global ROW_H, MON_H, SLOT_W, THUMB_MAX
+    ROW_H = U.h(30)
+    MON_H = U.h(34)
+    # 도트 칸의 폭. **Label 의 width 로 잡으면 안 된다.** width 는 글자일 때는
+    # 글자 수인데 그림일 때는 픽셀이라, width=3 이 22px 도트를 3px(테두리까지
+    # 7px)로 잘랐다. 선물 창에서 한 번 겪은 함정이다. 고정 크기 칸(Frame)에
+    # 넣으면 그림이 오기 전과 후에 이름 자리도 안 흔들린다. 맥은 테두리를
+    # 1~2px 다르게 셀 수 있어서 넉넉히 잡는다.
+    SLOT_W = U.h(52)
+    # 칸에 넣을 도트의 최대 크기. 옆으로 긴 종은 높이를 덜 채우고 작아진다 -
+    # 잘려서 반만 보이는 것보다 낫다.
+    THUMB_MAX = (SLOT_W - 2, MON_H - 4)
+
 
 TYPE_KR = {
     "NORMAL": "노말", "FIRE": "불꽃", "WATER": "물", "GRASS": "풀",
