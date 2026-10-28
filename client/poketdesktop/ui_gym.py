@@ -92,11 +92,24 @@ TODAY = U.GOOD               # 오늘 보상을 받은 곳 (지도의 체크, �
 ROW_H = U.h(50)              # 목록의 한 줄 (이름·역할 / 지역 두 줄)
 # 목록의 글꼴. 처음에는 본문보다 한두 단계 작게 썼더니 작다는 말을 들었다 (사용자, 2026-10-11) -
 # 이름은 본문보다 한 단계 크게, 나머지는 본문 크기 언저리로 둔다. 줄 높이도 그만큼 늘렸다.
-ROW_NAME = (U.FAMILY, U.BASE_PT + 1, "bold")
-ROW_SUB = U.FONT_S
-ROW_LV = U.FONT_B
-ROW_STATE = (U.FAMILY, U.BASE_PT - 1, "bold")
-BACK_FONT = (U.FAMILY, U.BASE_PT + 1, "bold")     # 카드의 '목록' (돌아가기)
+#
+# **불러올 때 정하지 않는다.** 이 모듈은 app 이 init_fonts 를 부르기 전에 불려서, 그때 복사해 두면
+# 설정에서 고른 글꼴이 아니라 U 의 처음 값(맑은 고딕)으로 굳는다. 쓸 때마다 U 에서 읽는다.
+def _font(name):
+    return {"ROW_NAME": (U.FAMILY, U.BASE_PT + 1, "bold"),
+            "ROW_SUB": U.FONT_S,
+            "ROW_LV": U.FONT_B,
+            "ROW_STATE": (U.FAMILY, U.BASE_PT - 1, "bold"),
+            "BACK_FONT": (U.FAMILY, U.BASE_PT + 1, "bold")}[name]     # 카드의 '목록' (돌아가기)
+
+
+def __getattr__(name):
+    """밖에서 S.ROW_SUB 처럼 읽는 자리(test_gym_ui)도 그대로 둔다 - 읽는 그 때의 글꼴을 준다."""
+    if name in ("ROW_NAME", "ROW_SUB", "ROW_LV", "ROW_STATE", "BACK_FONT"):
+        return _font(name)
+    raise AttributeError(name)
+
+
 # 그곳의 상태: 아직 못 이겼다 · 이겼고 오늘 보상이 남았다 · 오늘 보상을 받았다
 STATE_TEXT = {"new": ("미도전", U.FG_FAINT), "left": ("오늘 남음", U.ACCENT_TEXT), "done": ("오늘 완료", TODAY)}
 FILTERS = [("all", "전체"), ("new", "미도전"), ("left", "오늘 남음")]
@@ -194,14 +207,14 @@ class TrainerRow(object):
         self.bar = tk.Frame(self.body, bg=U.BG2, width=U.h(4))
         self.bar.place(x=0, y=0, relheight=1.0)
         x = U.h(13)
-        self.name = self._label(ROW_NAME, U.FG)
+        self.name = self._label(_font("ROW_NAME"), U.FG)
         self.name.place(x=x, rely=0.30, anchor="w")
-        self.role = self._label(ROW_SUB, U.FG_DIM)
-        self.lv = self._label(ROW_LV, U.FG_DIM)
+        self.role = self._label(_font("ROW_SUB"), U.FG_DIM)
+        self.lv = self._label(_font("ROW_LV"), U.FG_DIM)
         self.lv.place(relx=1.0, x=-U.h(8), rely=0.30, anchor="e")
-        self.where = self._label(ROW_SUB, U.FG_DIM)
+        self.where = self._label(_font("ROW_SUB"), U.FG_DIM)
         self.where.place(x=x, rely=0.72, anchor="w")
-        self.state = self._label(ROW_STATE, U.FG_FAINT)
+        self.state = self._label(_font("ROW_STATE"), U.FG_FAINT)
         self.state.place(relx=1.0, x=-U.h(8), rely=0.72, anchor="e")
         self.cells = [self.name, self.role, self.lv, self.where, self.state]
         for w in [self.body] + self.cells:
@@ -1084,7 +1097,7 @@ class GymWindow(object):
             cv.pack(side="left", padx=(9, 5), pady=2)
             cv.create_line(cw - 2, 2, 2, ch // 2, cw - 2, ch - 2, fill=U.ACCENT, width=2,
                            capstyle="round", joinstyle="round")
-            lab = tk.Label(chip, text="목록", bg=U.BG3, fg=U.ACCENT, font=BACK_FONT, cursor="hand2", bd=0, pady=0)
+            lab = tk.Label(chip, text="목록", bg=U.BG3, fg=U.ACCENT, font=_font("BACK_FONT"), cursor="hand2", bd=0, pady=0)
             # 위아래 여백은 1px 만: 경로 줄이 높아지면 그만큼 카드가 짧아져서, 화면이 낮은 맥(1024x768)
             # 에서 에이스 줄이 굴려야 보이는 자리로 밀렸다 (릴리스 빌드의 검사가 1px 차로 잡았다).
             lab.pack(side="left", padx=(0, 10), pady=1)
