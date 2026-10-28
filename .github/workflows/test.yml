@@ -101,6 +101,9 @@ jobs:
 
       - name: 풀숲 끄기·알림·패치노트
         run: python client/test_new_settings.py
+      # 설정에서 고르는 전체 글꼴: 이상한 저장값은 자동으로, 자동은 예전 후보 순서 그대로
+      - name: 글꼴 설정
+        run: python client/test_font_setting.py
       - name: 지닌 도구 (엔진)
         run: python common/test_held.py
       # 1.13: 그동안 없던 지닌 도구 110종 + 폼체인지 (지니면·써서·배틀 중·원시회귀)
