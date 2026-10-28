@@ -189,6 +189,13 @@ def main():
         ok2, _why = real.start("ctrl+alt+p")
         chk("  풀고 나면 같은 조합을 다시 등록할 수 있다", ok2)
         real.stop()
+        import gc
+        again = []
+        for combo in ("ctrl+alt+x", "ctrl+alt+p", "ctrl+alt+h", "ctrl+alt+p", "ctrl+alt+x"):
+            gc.collect()                                     # (옛 처리기가 지워진 자리에 새 것이 놓이면 -9866 이었다)
+            again.append(real.start(combo))
+        real.stop()
+        chk("  설정을 몇 번 바꿔도 다시 등록된다 (맥 -9866, 게시판 #365)", all(ok for ok, _w in again), again)
     else:
         chk("이 운영체제에서는 단축키를 쓰지 않는다", HK.Hotkey().start("ctrl+alt+h")[0] is False)
 

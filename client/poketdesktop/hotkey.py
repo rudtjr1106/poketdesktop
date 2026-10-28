@@ -156,14 +156,21 @@ def mac_code(combo):
     return MAC_KEYS[key], m
 
 
+# 맥: 단축키를 받는 처리기는 **프로그램에 하나만** 건다 (게시판 #365, 1.13.x).
+# 예전에는 등록할 때마다(설정을 바꿀 때마다) 새 처리기를 걸고 옛 것을 떼지 않았다. 옛 처리기 함수가
+# 지워진 자리에 새 것이 놓이면 Carbon 이 '이미 걸려 있다'(-9866, eventHandlerAlreadyInstalledErr) 로
+# 거절했다 - 두 번째 등록부터 늘 그랬다. 떼지 않은 옛 처리기는 지워진 함수를 가리키고 있어서
+# 단축키가 눌리면 죽을 수도 있었다. 이제 처리기는 한 번 걸고 놓지 않으며, 눌리면 지금 등록된 쪽에 알린다.
+_MAC = {"handler": None, "fire": None}
+
+
 class _Mac(object):
     """Carbon 의 단축키 등록. 눌리면 앱의 이벤트 처리 중에 handler 가 불린다 (Tk 스레드)."""
 
     def __init__(self, on_fire):
         self.on_fire = on_fire
         self.ref = None
-        self._handler = None      # 놓으면 안 된다 (C 쪽이 들고 있는 함수다)
-        self._installed = False
+        self._handler = None      # (검사가 운영체제 대신 직접 불러 본다 - _MAC 의 그것)
 
     def _lib(self):
         import ctypes
@@ -181,24 +188,28 @@ class _Mac(object):
 
             class HotKeyID(ctypes.Structure):
                 _fields_ = [("signature", ctypes.c_uint32), ("id", ctypes.c_uint32)]
-            proto = ctypes.CFUNCTYPE(ctypes.c_int32, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
             target = lib.GetApplicationEventTarget()
-            if not self._installed:
+            if _MAC["handler"] is None:
+                proto = ctypes.CFUNCTYPE(ctypes.c_int32, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p)
+
                 def handler(_call, _event, _data):
+                    fn = _MAC["fire"]
                     try:
-                        self.on_fire()
+                        if fn is not None:
+                            fn()
                     except Exception:                       # noqa: BLE001
                         pass
                     return 0
-                self._handler = proto(handler)
+                cb = proto(handler)                         # 놓으면 안 된다 (C 쪽이 들고 있는 함수다)
                 spec = Spec(0x6B657962, 5)                  # 'keyb', kEventHotKeyPressed
                 lib.InstallEventHandler.argtypes = [ctypes.c_void_p, proto, ctypes.c_ulong, ctypes.POINTER(Spec),
                                                     ctypes.c_void_p, ctypes.c_void_p]
                 lib.InstallEventHandler.restype = ctypes.c_int32
-                err = lib.InstallEventHandler(target, self._handler, 1, ctypes.byref(spec), None, None)
+                err = lib.InstallEventHandler(target, cb, 1, ctypes.byref(spec), None, None)
                 if err:
                     return False, "단축키를 받을 준비를 하지 못했습니다. (%d)" % err
-                self._installed = True
+                _MAC["handler"] = cb
+            self._handler = _MAC["handler"]
             code, mods = mac_code(combo)
             ref = ctypes.c_void_p()
             lib.RegisterEventHotKey.argtypes = [ctypes.c_uint32, ctypes.c_uint32, HotKeyID, ctypes.c_void_p,
@@ -208,12 +219,15 @@ class _Mac(object):
             if err or not ref.value:
                 return False, "다른 프로그램이 이미 쓰고 있는 단축키입니다. 다른 조합을 골라 주세요."
             self.ref = ref
+            _MAC["fire"] = self.on_fire
             return True, ""
         except Exception as e:                              # noqa: BLE001
             return False, "이 맥에서는 단축키를 등록하지 못했습니다. (%s)" % e
 
     def stop(self):
         ref, self.ref = self.ref, None
+        if _MAC["fire"] is self.on_fire:
+            _MAC["fire"] = None                   # 처리기는 그대로 두고 알릴 곳만 비운다
         if ref is None:
             return
         try:
