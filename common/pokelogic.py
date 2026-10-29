@@ -529,14 +529,17 @@ class Pokedex(object):
     def bst(species):
         return sum((species.get("base") or {}).values())
 
-    def spawn_pool(self, max_level, max_bst=None):
+    def spawn_pool(self, max_level, max_bst=None, boost=None):
         """해당 레벨까지 나올 수 있는 종과 누적 가중치.
 
         max_bst 는 '종족값 합' 상한이다. 이게 없으면 레벨 5 짜리 야생인데
         종족값 600 짜리가 나와서 스타팅 포켓몬이 손도 못 쓰고 진다.
         본가가 초반 루트에 약한 포켓몬만 배치하는 것과 같은 이유다.
+
+        boost 는 (타입들, 배수) - 그 타입이 하나라도 있는 종의 가중치를 배수만큼 곱한다
+        (할로윈 고스트, 서버 halloween.py). 나오는 종은 그대로고 비율만 바뀐다.
         """
-        key = (int(max_level), int(max_bst) if max_bst else 0)
+        key = (int(max_level), int(max_bst) if max_bst else 0, boost)
         if key in self._pool_cache:
             return self._pool_cache[key]
         pool, cum, total = [], [], 0
@@ -545,28 +548,31 @@ class Pokedex(object):
                 continue
             if max_bst and self.bst(s) > max_bst:
                 continue
-            total += s.get("weight", 0)
+            w = s.get("weight", 0)
+            if boost and set(boost[0]) & set(s.get("types") or ()):
+                w *= boost[1]
+            total += w
             pool.append(s)
             cum.append(total)
         if not pool and max_bst:            # 너무 좁으면 상한을 풀어준다
-            return self.spawn_pool(max_level, None)
+            return self.spawn_pool(max_level, None, boost)
         self._pool_cache[key] = (pool, cum, total)
         return pool, cum, total
 
-    def roll_species(self, max_level, rng=None, max_bst=None):
+    def roll_species(self, max_level, rng=None, max_bst=None, boost=None):
         rng = rng or random.Random()
-        pool, cum, total = self.spawn_pool(max_level, max_bst)
+        pool, cum, total = self.spawn_pool(max_level, max_bst, boost)
         if not pool or total <= 0:
             return None
         import bisect
         return pool[bisect.bisect_right(cum, rng.randrange(total))]
 
-    def roll_wild(self, min_level=2, max_level=12, rng=None, max_bst=None, **kw):
+    def roll_wild(self, min_level=2, max_level=12, rng=None, max_bst=None, boost=None, **kw):
         """야생 개체 하나. 종을 먼저 뽑고, 그 종이 나올 수 있는 레벨대로 맞춘다."""
         rng = rng or random.Random()
         max_level = max(1, min(LEVEL_MAX, int(max_level)))
         min_level = max(1, min(max_level, int(min_level)))
-        s = self.roll_species(max_level, rng, max_bst)
+        s = self.roll_species(max_level, rng, max_bst, boost)
         if s is None:
             return None
         lo = max(min_level, s.get("minLevel", 1))

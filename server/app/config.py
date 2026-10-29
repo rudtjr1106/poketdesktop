@@ -149,6 +149,15 @@ EVENT_BALL = os.environ.get("POKET_EVENT_BALL", "FLOWERBALL")
 # 주 서너 번이 된다.
 EVENT_RESPAWN = _float("POKET_EVENT_RESPAWN", 0.002)
 
+# 할로윈 (10/31 하루, app/halloween.py). 날짜는 **한국시간(KST)**, 둘 다 그날을 포함한다.
+# 고스트 타입 종의 야생 가중치를 GHOST_MULT 배로 - 평소 출현의 5% 쯤이 고스트라 8배면 30% 쯤이 된다.
+# 이상한사탕은 드랍표 가중치를 CANDY_MULT 배로 - 도구가 떨어질 때 0.2% 이던 것이 2% 쯤이 된다.
+# 표(items.json)는 그대로 두고 굴릴 때만 곱한다 - 탐험이 같은 표를 읽는다.
+HALLOWEEN_START = os.environ.get("POKET_HALLOWEEN_START", "2026-10-31")
+HALLOWEEN_END = os.environ.get("POKET_HALLOWEEN_END", "2026-10-31")
+HALLOWEEN_GHOST_MULT = _int("POKET_HALLOWEEN_GHOST_MULT", 8)
+HALLOWEEN_CANDY_MULT = _int("POKET_HALLOWEEN_CANDY_MULT", 10)
+
 # 조우 간격을 무시하고 풀숲을 바로 돋울지. 테스트에서만 쓴다.
 # 이게 없으면 야생이 걸린 테스트를 돌릴 수가 없다(첫 조우까지 기다려야 한다).
 # 운영에서 열리면 5~7분 간격이 아무 의미가 없어진다.

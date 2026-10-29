@@ -635,6 +635,7 @@ jobs:
           python test_stale_battle.py
           python test_troubles.py       # 1.13.3: 야생 배틀이 앱에서 끊긴 것을 서버가 남긴다 (trouble 표, 앱 알림)
           python test_db_lock.py        # db.run 이 실패해도 쓰기 잠금을 쥔 채 남지 않는다 (10/21 운영 장애)
+          python test_halloween.py      # 10/31 하루: 고스트 출현 · 이상한사탕 드랍 (KST 날짜)
           # 탐험 파견 (1.10.4): 규칙·보내기·시간·받기(두 번 못 받는다)·나가 있는 동안의 제한·굴리기
           python test_expedition.py
           # 시즌 4 (1.12.0): 점수 매칭 / Z링·Z크리스탈 / 시즌 3 -> 4 전환 /
