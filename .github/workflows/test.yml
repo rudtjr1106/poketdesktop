@@ -118,6 +118,9 @@ jobs:
       # 특성·6:6 교체 규칙·저장/복원, 256명 로스터가 엔진에 맞는지, 256판이 끝나는지
       - name: 관장 배틀 (엔진)
         run: python common/test_trainer_battle.py
+      # 시즌 5 랭크: 양쪽 다 길드전 AI - 끄면 예전 판과 한 글자도 같은가, 로그 꼴 · 무작위 없음 · 시간 상한 · 끝나는가
+      - name: 시즌 5 랭크 길드전 AI (엔진)
+        run: python common/test_ranked_war_ai.py
       # 야생 자동 전투의 잡기 모드: 쓰러뜨리지 않고 멈추는가, 잠재우기·마비를 먼저 거는가
       - name: 잡기 모드 (엔진)
         run: python common/test_spare.py
@@ -378,6 +381,7 @@ jobs:
         run: |
           python client/smoke_season.py
           python client/test_practice_ui.py   # 하루 20판 뒤 연습판: 단추·머리줄·대전 기록·트레이 (옛 서버면 예전 글)
+          python client/test_held_rank_ui.py  # 시즌 5 같은 지닌 도구 한 마리: 랭크 팀 '도구 겹침'·규칙 카드 (시즌 4·옛 서버면 표시 없음)
           python client/smoke_eggs.py
           python client/test_walk_shiny.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
@@ -541,6 +545,7 @@ jobs:
         run: |
           python client/smoke_season.py
           python client/test_practice_ui.py   # 하루 20판 뒤 연습판: 단추·머리줄·대전 기록·트레이 (옛 서버면 예전 글)
+          python client/test_held_rank_ui.py  # 시즌 5 같은 지닌 도구 한 마리: 랭크 팀 '도구 겹침'·규칙 카드 (시즌 4·옛 서버면 표시 없음)
           python client/smoke_eggs.py
           python client/test_walk_shiny.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
@@ -707,6 +712,7 @@ jobs:
           export PYTHONPATH="${{ github.workspace }}"
           cd server
           python test_pvp.py            # + 연습판 (하루 20판 뒤): 양쪽 점수 그대로 · 이기면 100원 · 하루 상한 같이 · 쿨타임 그대로
+          python test_held_v5.py        # 시즌 5 랭크 팀 같은 지닌 도구 한 마리 (시즌 4 는 그대로인지도)
           python test_walk.py
 
       - name: HTTP 로 두드리는 검사

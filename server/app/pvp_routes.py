@@ -9,6 +9,7 @@
 가져와 붙인다. 그래서 대기열도 도전장도 수락도 없다 - 누르면 그 자리에서
 끝나고, 상대는 다음에 켤 때 결과를 본다.
 """
+import threading
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -38,6 +39,14 @@ class RandomIn(BaseModel):
     practice: int = 0
 
 
+# 랜덤 배틀을 계산 중인 사람. 시즌 5 부터 한 판 계산이 0.01초에서 몇 초로 길어졌다(양쪽 길드전 AI). 하루 20판 상한 ·
+# 쿨타임 · 같은 상대 제한은 계산 **전에** 보고 **뒤에** 적으므로, 그사이 같은 사람이 또 걸면 둘 다 지나간다 -
+# 점수판을 21판 넘게 치거나 쿨타임 안에 여러 판을 돌릴 수 있었다 (10/29 검토). 서버는 한 프로세스(uvicorn)라
+# 프로세스 안의 표 하나로 막는다.
+_busy = set()
+_busy_lock = threading.Lock()
+
+
 @router.post("/api/pvp/random")
 def random_battle(body: Optional[RandomIn] = None, ctx=Depends(deps.current)):
     """아무나 하나 골라 붙는다. 상대는 접속해 있지 않아도 된다.
@@ -46,6 +55,18 @@ def random_battle(body: Optional[RandomIn] = None, ctx=Depends(deps.current)):
     서버라 '상대가 없습니다' 만 뜨는 것보다는 조금 기울어도 붙는 게 낫다.
     """
     uid = ctx["user"]["id"]
+    with _busy_lock:
+        if uid in _busy:
+            raise HTTPException(409, "앞서 건 랜덤 배틀을 아직 계산하고 있습니다. 끝나면 다시 해주세요.")
+        _busy.add(uid)
+    try:
+        return _random_battle(uid, body)
+    finally:
+        with _busy_lock:
+            _busy.discard(uid)
+
+
+def _random_battle(uid, body):
     practice_ok = bool(body and body.practice)
     # 내 쪽 조건을 먼저 본다. 상대까지 골라 놓고 막히면 애먼 사람의
     # 쿨다운만 태우게 된다.
@@ -134,7 +155,9 @@ def ranking(limit: int = 50, ctx=Depends(deps.current)):
             "rules": dict(season.rules_public(),
                           restrictedMax=pvp.RESTRICTED_MAX, sameSpeciesMax=pvp.SAME_SPECIES_MAX,
                           # 하루 20판 뒤의 연습판 (점수 없음, 이기면 100원). 옛 앱은 모르는 칸이라 안 그린다
-                          practice={"after": pvp.DAILY_BATTLES, "win": pvp.PRACTICE_REWARD["win"]}),
+                          practice={"after": pvp.DAILY_BATTLES, "win": pvp.PRACTICE_REWARD["win"]},
+                          # 같은 지닌 도구는 한 마리 (시즌 5 만 싣는다 - 시즌 4 는 칸 자체가 없다)
+                          **({"sameHeldMax": pvp.SAME_HELD_MAX} if pvp.held_rule_on() else {})),
             # 지난 시즌 명예의 전당. 시즌 1 은 티어가 없던 시즌이라 순위만 있다.
             "hall": {"season": pvp.SEASON - 1,
                      "rows": season.hall(pvp.SEASON - 1)}}
@@ -149,7 +172,7 @@ def _team_view(uid):
     source = pvp._ranked_source(uid)
     team, dropped, same = pvp.drop_counts(source)
     dex = deps.dex()
-    return {"registered": bool(pvp.team_ids(uid)),
+    out = {"registered": bool(pvp.team_ids(uid)),
             # 고르는 창에는 제한 전의 팀을 준다 (등록한 그대로 보여야 한다).
             "ids": [m["id"] for m in source],
             "pokemon": [deps.decorate(m) for m in team],
@@ -166,6 +189,13 @@ def _team_view(uid):
             # 랭크전 조건 (시즌 4): 실제로 나가는 팀에 Lv.50 이상 6마리
             "rankMin": {"count": season.RANK_MIN_COUNT, "level": season.RANK_MIN_LEVEL},
             "rankReady": pvp.rank_ready(team)[0], "rankReadyCount": pvp.rank_ready(team)[1]}
+    if pvp.held_rule_on():
+        # 시즌 5: 같은 지닌 도구는 한 마리. 창이 두 마리째를 미리 막고, 이미 겹친 것(등록 뒤 도구를 바꿨다 ·
+        # 바탕화면 파티)은 heldDupIds(뒤의 것)로 표시한다. 시즌 4 응답에는 이 칸이 없다.
+        out["sameHeldMax"] = pvp.SAME_HELD_MAX
+        out["heldDupIds"] = pvp.same_held_ids(team)
+        out["heldShort"] = pvp.held_short(uid)
+    return out
 
 
 @router.get("/api/pvp/team")

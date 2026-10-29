@@ -78,6 +78,15 @@ def rank_short_text(me, rules):
             % (lv, need, int(me.get("rankReadyCount") or 0)))
 
 
+def held_short_text(me):
+    """같은 지닌 도구(시즌 5)가 겹쳐 랜덤 배틀을 못 걸면 알릴 한 줄. 아니거나 시즌 4·옛 서버(heldDupes 없음)면 None."""
+    n = int(me.get("heldDupes") or 0)
+    if not n:
+        return None
+    return ("같은 지닌 도구를 지닌 포켓몬이 %d마리 더 있어 랜덤 배틀을 걸 수 없습니다. "
+            "도구를 하나만 남기고 바꾸거나 빼 주세요 ('랭크 팀' 에서 겹친 포켓몬이 보입니다)." % n)
+
+
 def today_text(fight):
     """머리줄에 적을 '오늘 몇 판 가능'. 하루 상한(랜덤 배틀 20판) 기준이다.
 
@@ -315,7 +324,7 @@ class RankWindow(object):
                 "title": me.get("title"), "color": me.get("frameColor"),
                 "lines": "  ·  ".join(lines),
                 # 랭크전 조건 (시즌 4): 못 채우면 랜덤 배틀을 못 건다 - 누르기 전에 보이게
-                "short": rank_short_text(me, self.rules)}
+                "short": rank_short_text(me, self.rules) or held_short_text(me)}
 
     RULES_NOTE = ("점수는 내가 건 랜덤 배틀만 오르내립니다. "
                   "걸려온 판과 친구 배틀은 점수에 들어가지 않습니다.")
@@ -354,6 +363,9 @@ class RankWindow(object):
         if r.get("sameSpeciesMax"):
             # 10/22: 같은 종도 한 마리 (server/app/pvp.SAME_SPECIES_MAX) - 전설 제한과 같은 곳에 건다
             text.append("같은 포켓몬은 한 팀에 %d마리까지 (랭크·친구·관장·레이드·길드전)" % r["sameSpeciesMax"])
+        if r.get("sameHeldMax"):
+            # 시즌 5: 같은 지닌 도구는 랭크 팀에 한 마리 (server/app/pvp.SAME_HELD_MAX). 시즌 4·옛 서버는 칸이 없다
+            text.append("같은 지닌 도구는 랭크 팀에 %d마리까지 (메가스톤·Z크리스탈 포함, 랭크만)" % r["sameHeldMax"])
         pr = r.get("practice") or {}
         if pr.get("after"):
             # 하루 20판 뒤의 랜덤 배틀 (새 서버만 싣는다)

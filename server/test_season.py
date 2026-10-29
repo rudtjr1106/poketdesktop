@@ -932,6 +932,29 @@ def main():
     migrations.run()
     chk("다시 켜도(run 한 번 더) 안 돈다", stat(strong)["rating"] == 1234, stat(strong)["rating"])
 
+    print("\n=== 시즌 5 RP 폭 (버전 2) ===")
+    keep = season.SEASON
+    try:
+        def ends():
+            g = lambda r, pw, rp: season.rp_change(r, 1000, 1000, 0, False, rp, rp, pw)[1]
+            return (g("win", 1000.0, 0), g("win", 0.001, 0), g("lose", 0.001, 100), g("lose", 1000.0, 100))
+        season.SEASON = 4
+        chk("시즌 4: 옛 폭 그대로 (10~30, 5~25)", ends() == (10, 30, -5, -25), ends())
+        r4 = season.rules_public()["rp"]
+        chk("  규칙 카드도 옛 값", (r4["win"], r4["lose"]) == ([10, 30], [5, 25]), r4)
+        season.SEASON = 5
+        chk("시즌 5: 이기면 15~25, 지면 10~20", ends() == (15, 25, -10, -20), ends())
+        chk("  비슷한 상대는 그대로 +20 / -15",
+            season.rp_change("win", 1000, 1000, 0, False, 0, 0)[1] == 20
+            and season.rp_change("lose", 1000, 1000, 0, False, 100, 100)[1] == -15)
+        chk("  첫 승 +10 · 연패 보호는 그대로",
+            season.rp_change("win", 1000, 1000, 0, True, 0, 0)[1] == 30
+            and season.rp_change("lose", 1000, 1000, -3, False, 100, 100)[1] == -8)
+        r5 = season.rules_public()["rp"]
+        chk("  규칙 카드는 서버 값 (15~25, 10~20)", (r5["win"], r5["lose"]) == ([15, 25], [10, 20]), r5)
+    finally:
+        season.SEASON = keep
+
     print("\n======================================================")
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))
     print("======================================================")

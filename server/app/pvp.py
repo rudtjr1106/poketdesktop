@@ -276,6 +276,96 @@ def too_many_same(species):
     return any(n > SAME_SPECIES_MAX for n in count.values())
 
 
+# ---- 같은 지닌 도구 (시즌 5, season.rules_v5) ----
+# 랭크 팀 안에서 같은 도구는 한 마리만 (10/29 사용자: 기합의띠를 여러 마리에게 들려 보내는 것 막기).
+# 메가스톤·Z크리스탈도 도구라 같은 것 둘이면 걸린다. 안 지닌 것(None)은 상관없다.
+#
+# **랭크(랜덤 배틀)에만 건다.** 친구·실시간·관장·레이드·길드전 방어팀은 그대로다 (사용자가 랭크만 말했다).
+# 같은 종처럼 '뒤의 것이 쉰다' 로 하지 않는다 - 도구는 팀을 등록한 뒤에도 가방·박스에서 바꿀 수 있어서
+# 쉬게 하면 모르는 사이에 팀이 다섯 마리가 된다. 그래서
+#   · 등록할 때 거절한다 (set_team)
+#   · 거는 쪽은 겹쳐 있으면 랜덤 배틀을 못 건다 - 무엇을 고칠지 알려 준다 (can_start / held_short)
+#   · 걸려온 쪽(상대)은 후보에서 빼지 않는다. 자는 사이에 겹친 것을 고칠 길이 없는데 빼면 그 사람만
+#     조용히 매칭에서 사라진다. 대신 **그 판에서만** 겹친 도구 중 뒤의 것을 안 지닌 셈으로 싸운다
+#     (strip_same_held - 사본만 고친다, 원본 도구는 그대로)
+# 시즌 4 에는 아무것도 바뀌지 않는다 - 모두 season.rules_v5() 를 그때그때 본다.
+SAME_HELD_MAX = 1
+
+
+def held_rule_on():
+    """같은 도구 규칙이 켜졌나. import 때 복사하지 않는다 (검사가 season.SEASON 을 바꿔 본다)."""
+    return season.rules_v5()
+
+
+def _held_key(m):
+    return ((m or {}).get("held") or "").upper() or None
+
+
+def same_held(mons):
+    """같은 도구를 둘 이상이 지녔으면 [(도구 열쇠, [포켓몬 ...]) ...]. 팀 차례, 도구도 처음 나온 차례.
+
+    시즌을 보지 않고 센다 - 켜졌는지는 부르는 쪽이 held_rule_on 으로 가른다."""
+    by, order = {}, []
+    for m in mons or []:
+        k = _held_key(m)
+        if not k:
+            continue
+        if k not in by:
+            by[k] = []
+            order.append(k)
+        by[k].append(m)
+    return [(k, by[k]) for k in order if len(by[k]) > SAME_HELD_MAX]
+
+
+def _mon_name(m, dex=None):
+    dex = dex or deps.dex()
+    return (m.get("nickname") or (dex.get(m.get("species")) or {}).get("kr")
+            or m.get("species") or "?")
+
+
+def same_held_text(dupes):
+    """겹친 도구를 이름으로: '기합의띠(한카리아스·갸라도스), 생명의구슬(...)'."""
+    dex = deps.dex()
+    return ", ".join("%s(%s)" % (items.name_of(k), "·".join(_mon_name(m, dex) for m in ms))
+                     for k, ms in dupes)
+
+
+def same_held_ids(mons):
+    """겹친 도구를 지닌 것 중 **뒤의 것**의 id (앞의 한 마리는 그대로 지녀도 된다). 화면이 표시한다."""
+    out = []
+    for _k, ms in same_held(mons):
+        out.extend(m.get("id") for m in ms[SAME_HELD_MAX:] if m.get("id") is not None)
+    return out
+
+
+def strip_same_held(mons):
+    """그 판에서만: 같은 도구를 지닌 것 중 뒤의 것은 안 지닌 셈으로. 사본을 돌려준다 (원본은 안 바꾼다).
+
+    메가스톤을 내려놓으면 bonded 도 뜻이 없어지지만 남겨 둔다 - 엔진은 도구가 메가스톤일 때만 그것을 본다."""
+    seen, out = {}, []
+    for m in mons or []:
+        k = _held_key(m)
+        if k and seen.get(k, 0) >= SAME_HELD_MAX:
+            m = dict(m)
+            m["held"] = None
+        elif k:
+            seen[k] = seen.get(k, 0) + 1
+        out.append(m)
+    return out
+
+
+def held_short(uid):
+    """같은 도구 규칙(시즌 5)에 걸려 랜덤 배틀을 못 걸면 그 까닭 한 줄, 아니면(시즌 4 포함) None."""
+    if not held_rule_on():
+        return None
+    dupes = same_held(ranked_team(uid))
+    if not dupes:
+        return None
+    where = "랭크 팀" if team_ids(uid) else "바탕화면 파티(랭크 팀이 없어 이 파티로 싸웁니다)"
+    return ("%s에서 같은 도구를 둘 이상이 지니고 있습니다: %s. 랭크전에서는 같은 도구를 %d마리만 지닐 수 있어요"
+            " - 하나만 남기고 도구를 바꾸거나 빼 주세요." % (where, same_held_text(dupes), SAME_HELD_MAX))
+
+
 def restrict(mons):
     """배틀에 실제로 나가는 팀. (팀, 빠진 마릿수)."""
     out, benched = split_restricted(mons)
@@ -371,7 +461,7 @@ def set_team(uid, ids):
         raise ValueError("랭크 팀은 최대 %d마리입니다." % config.MAX_PARTY)
     if clean:
         marks = ",".join("?" * len(clean))
-        rows = db.q("SELECT id, species FROM pokemon WHERE user_id=? AND id IN (%s)"
+        rows = db.q("SELECT id, species, nickname, held FROM pokemon WHERE user_id=? AND id IN (%s)"
                     % marks, (uid,) + tuple(clean))
         if len(rows) != len(clean):
             raise ValueError("내 포켓몬만 넣을 수 있습니다.")
@@ -384,6 +474,14 @@ def set_team(uid, ids):
                              % RESTRICTED_MAX)
         if too_many_same([r["species"] for r in rows]):
             raise ValueError("같은 포켓몬은 한 팀에 %d마리만 넣을 수 있습니다." % SAME_SPECIES_MAX)
+        if held_rule_on():
+            # 시즌 5: 같은 지닌 도구는 한 마리만. 넣은 차례대로 보고, 누가 겹쳤는지 이름으로 알린다
+            pos = dict((pid, n) for n, pid in enumerate(clean))
+            dupes = same_held([dict(r) for r in sorted(rows, key=lambda r: pos[r["id"]])])
+            if dupes:
+                raise ValueError("랭크 팀에서는 같은 도구를 %d마리만 지닐 수 있습니다: %s."
+                                 " 하나만 남기고 도구를 바꾸거나 빼 주세요."
+                                 % (SAME_HELD_MAX, same_held_text(dupes)))
     db.run("DELETE FROM rank_team WHERE user_id=?", (uid,))
     for pos, pid in enumerate(clean):
         db.run("INSERT INTO rank_team (user_id, pos, pokemon_id) VALUES (?,?,?)",
@@ -431,6 +529,11 @@ def run_match(a_uid, b_uid, kind="random", seed=None, practice=None):
     dex = deps.dex()
     if kind == "random":
         a_mons, b_mons = capped(ranked_team(a_uid)), capped(ranked_team(b_uid))
+        if held_rule_on():
+            # 시즌 5: 같은 도구는 한 마리만. 거는 쪽은 can_start 가 이미 막았고, 걸려온 쪽은 후보에서 안 빼는
+            # 대신 이 판에서만 뒤의 것을 안 지닌 셈으로 싸운다 (SAME_HELD_MAX 의 설명). 양쪽 다 거는 것은
+            # can_start 를 거치지 않고 부르는 곳(검사·운영 손질)에서도 같은 판이 되게 하려고다.
+            a_mons, b_mons = strip_same_held(a_mons), strip_same_held(b_mons)
     else:
         # 친구 배틀도 전설·환상은 한 마리 (시즌 3)
         a_mons, b_mons = battle_party(a_uid)[0], battle_party(b_uid)[0]
@@ -441,10 +544,15 @@ def run_match(a_uid, b_uid, kind="random", seed=None, practice=None):
     # 메가진화 (시즌 3): 각자 관장 8곳이면 키스톤. 스톤을 든 애가 나오면 AI 가 쓴다.
     from . import gimmick, mega
     # Z기술 (시즌 4): 조건은 키스톤과 같다. 이것도 AI 가 알아서 쓴다.
+    # 시즌 5 (버전 2): 랜덤(랭크) 배틀과 그 연습판은 양쪽 다 길드전 방어 AI 로 싸운다 - 15% 무작위 없이, 라운드 도중
+    # 교체도 한다 (common/party_battle.py 맨 위). 친구 배틀은 예전 그대로다 - 점수가 안 걸린 판이라 무거운 셈을
+    # 돌릴 까닭이 없고, 친구끼리 해 온 판의 느낌을 바꾸지 않는다. **부를 때마다 season.rules_v5() 를 본다**
+    # (시즌 번호를 올리는 순간 켜진다 - import 때 복사해 두면 시즌이 바뀌어도 그대로다).
+    war_ai = kind == "random" and season.rules_v5()
     out = PB.simulate(dex, a_mons, b_mons, seed=seed,
                       keystone={"me": mega.has_keystone(a_uid),
                                 "foe": mega.has_keystone(b_uid)},
-                      zring=gimmick.flags(a_uid, b_uid))
+                      zring=gimmick.flags(a_uid, b_uid), war_ai=war_ai)
 
     # 엔진은 a 시점으로 me/foe 를 말한다. 여기서 사람 쪽으로 옮긴다.
     win = out["winner"]
@@ -870,7 +978,7 @@ def can_start(uid, kind="random", practice_ok=False):
     if not team:
         return "데리고 다니는 포켓몬이 없습니다."
     if kind == "random":
-        why = rank_short(uid)
+        why = rank_short(uid) or held_short(uid)
         if why:
             return why
         # 하루 상한과 쿨타임은 **랜덤 배틀에만** 건다. 새 앱(practice_ok)은 20판을 넘겨도 막지 않는다 -
@@ -913,11 +1021,11 @@ def note_fight(uid, kind="random"):
     """
     if kind != "random":
         return
-    row = _rating_row(uid)
+    _rating_row(uid)                 # 줄이 없으면 만든다
     today = _today()
-    used = row["fought"] if row["fought_day"] == today else 0
-    db.run("UPDATE rank_stat SET fought_day=?, fought=? WHERE user_id=?",
-           (today, used + 1, uid))
+    # 읽고 +1 해서 쓰면 동시에 끝난 두 판이 같은 값을 써서 한 판이 빠진다 - 한 문장으로 올린다 (10/29 검토).
+    db.run("UPDATE rank_stat SET fought = CASE WHEN fought_day=? THEN fought + 1 ELSE 1 END, fought_day=?"
+           " WHERE user_id=?", (today, today, uid))
 
 
 def is_practice(uid):
@@ -1157,6 +1265,10 @@ def summary(uid):
            "levelCap": season.LEVEL_CAP,
            # 랭크전 조건 (시즌 4): 실제로 나가는 팀에 Lv.50 이상이 몇 마리인가
            "rankReady": rank_ready(fighting)[0], "rankReadyCount": rank_ready(fighting)[1]}
+    if held_rule_on():
+        # 시즌 5 만 싣는다 - 시즌 4 응답은 예전 모양 그대로. 옛 앱은 모르는 칸이라 무시한다.
+        out["sameHeldMax"] = SAME_HELD_MAX
+        out["heldDupes"] = len(same_held_ids(fighting))
     out.update(season.tier_public(tier))
     return out
 

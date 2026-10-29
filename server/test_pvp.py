@@ -243,6 +243,51 @@ def _practice_win_checks(a, b, win, m0, normal_keys, before_a, before_b):
             and db.q1("SELECT practice FROM pvp_match WHERE id=?", (old[0]["matchId"],))["practice"] == 0)
 
 
+def war_ai_checks():
+    """시즌 5 (버전 2): 랜덤(랭크) 배틀 · 연습판만 양쪽 다 길드전 AI (PB.simulate 의 war_ai). 시즌 4 는 그대로.
+
+    season.rules_v5() 를 **부를 때마다** 보는지까지 본다 - SEASON 을 바꾸면 바로 따라와야 한다.
+    """
+    from app import season
+    a, b = mkuser("zz_s5_a", rank=True), mkuser("zz_s5_b", rank=True)
+    real_sim, seen = pvp.PB.simulate, []
+
+    def spy(*args, **kw):
+        seen.append(kw.get("war_ai"))
+        return real_sim(*args, **dict(kw, war_ai=False))      # 판은 가볍게 (무엇을 넘겼는지만 본다)
+    old = season.SEASON
+    pvp.PB.simulate = spy
+    try:
+        season.SEASON = 4
+        pvp.run_match(a, b, kind="random", seed=41)
+        pvp.run_match(a, b, kind="random", seed=42, practice=True)
+        chk("시즌 4: 랜덤 배틀 · 연습판은 예전 AI (war_ai 거짓)", seen == [False, False], seen)
+        del seen[:]
+        season.SEASON = 5
+        pvp.run_match(a, b, kind="random", seed=43)
+        pvp.run_match(a, b, kind="random", seed=44, practice=True)
+        pvp.run_match(a, b, kind="friend", seed=45)
+        chk("시즌 5: 랜덤 배틀 · 연습판은 길드전 AI, 친구 배틀은 예전 그대로", seen == [True, True, False], seen)
+        del seen[:]
+        season.SEASON = 4
+        pvp.run_match(a, b, kind="random", seed=46)
+        chk("SEASON 을 되돌리면 바로 예전 AI (import 때 복사해 두지 않는다)", seen == [False], seen)
+        # 진짜로 한 판 (시즌 5): 저장된 로그가 예전 꼴 그대로 풀리고, 남은 마릿수 · 판정이 그 로그와 맞는다
+        pvp.PB.simulate = real_sim
+        season.SEASON = 5
+        r = pvp.run_match(a, b, kind="random", seed=47)
+        row = db.q1("SELECT log, winner FROM pvp_match WHERE id=?", (r["matchId"],))
+        ev = pvp.unpack(row["log"])
+        chk("시즌 5 랭크 한 판: 로그가 teams 로 시작해 match 로 끝난다",
+            ev and ev[0]["t"] == "teams" and ev[-1]["t"] == "match", (ev[:1], ev[-1:]))
+        want = {"me": a, "foe": b, "draw": None}[ev[-1]["winner"]]
+        chk("  저장된 승자가 로그의 승자와 같다", row["winner"] == want, (row["winner"], want))
+        chk("  over 이벤트가 새지 않는다", not any(e.get("t") == "over" for e in ev))
+    finally:
+        pvp.PB.simulate = real_sim
+        season.SEASON = old
+
+
 def main():
     db.init()
     print("=== 준비 ===")
@@ -489,6 +534,9 @@ def main():
         chk('그래도 규칙 밖의 사람을 데려오지는 않는다 (받는 쪽 마릿수)',
             op is None or pvp.can_defend(len(teams[lo]), len(teams[op])), op)
 
+        print("\n=== 시즌 5: 랭크는 길드전 AI ===")
+        war_ai_checks()
+
         print("\n=== 로그 정리 ===")
         n0 = db.q1("SELECT COUNT(*) c FROM pvp_match")["c"]
         pvp.prune(days=0)
@@ -503,12 +551,38 @@ def main():
         # a 의 전적은 위에서 통째로 지웠다. b 쪽으로 확인한다.
         chk("로그를 지워도 전적은 그대로 남는다", len(pvp.records(b, 100)) >= 5,
             len(pvp.records(b, 100)))
+        print("\n=== 계산 중에는 같은 사람이 또 못 건다 · 판수는 한 문장으로 오른다 (10/29 검토) ===")
+        from fastapi import HTTPException
+        from app import pvp_routes
+        busy = mkuser("zz_busy", rank=True)
+        pvp_routes._busy.add(busy)
+        try:
+            pvp_routes.random_battle(None, {"user": {"id": busy}})
+            code = None
+        except HTTPException as e:
+            code = e.status_code
+        finally:
+            pvp_routes._busy.discard(busy)
+        chk("앞선 랜덤 배틀을 계산하는 동안 또 걸면 409", code == 409, code)
+        try:
+            pvp_routes.random_battle(None, {"user": {"id": busy}})
+        except HTTPException:
+            pass                      # 상대가 없거나 막혀도 된다 - 아래는 표가 비었는지만 본다
+        chk("  끝나면(막혀도) 계산 중 표에서 빠진다", busy not in pvp_routes._busy, sorted(pvp_routes._busy))
+        db.run("UPDATE rank_stat SET fought_day=?, fought=7 WHERE user_id=?", ("2000-01-01", busy))
+        pvp.note_fight(busy)
+        r = pvp._rating_row(busy)
+        chk("  지난 날의 판수는 1 부터 다시", (r["fought_day"], r["fought"]) == (pvp._today(), 1), dict(r))
+        pvp.note_fight(busy)
+        pvp.note_fight(busy, "friend")
+        chk("  같은 날은 하나씩 오르고 친구 배틀은 안 센다", pvp._rating_row(busy)["fought"] == 2,
+            pvp._rating_row(busy)["fought"])
     finally:
-        for n in ("zz_pvp_a", "zz_pvp_b", "zz_pvp_c", "zz_pvp_d",
+        for n in ("zz_busy", "zz_pvp_a", "zz_pvp_b", "zz_pvp_c", "zz_pvp_d",
                   "zz_pvp_e", "zz_pvp_f", "zz_mm_lo", "zz_mm_lo2",
                   "zz_mm_mid", "zz_mm_hi", "zz_pvp_pad", "zz_pvp_pad_filler",
                   "zz_pvp_cap", "zz_pvp_cap2", "zz_pvp_cap3", "zz_pvp_cap4",
-                  "zz_pr_a", "zz_pr_b", "zz_pr_c", "zz_pr_d"):
+                  "zz_pr_a", "zz_pr_b", "zz_pr_c", "zz_pr_d", "zz_s5_a", "zz_s5_b"):
             db.run("DELETE FROM users WHERE username=?", (n,))
 
     print("\n======================================================")

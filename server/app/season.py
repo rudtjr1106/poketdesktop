@@ -33,6 +33,16 @@ SEASON = 4
 SEASON_STARTS = "2026-10-17"
 SEASON_ENDS = "2026-10-31"
 
+
+def rules_v5():
+    """시즌 5 규칙이 켜졌나 (버전 2, 2026-10-29 사용자 결정): 랭크 배틀은 양쪽 다 길드전 AI 로 싸우고(15% 무작위
+    없음, 교체함) · 랭크 팀 안에서 같은 도구는 한 마리만 · 점수 폭은 기본에서 ±5.
+
+    **시즌 번호에 묶는다.** 시즌 중에는 판정 규칙을 바꾸지 않는다 - SEASON 을 5 로 올려 시즌 5 를 여는 순간 켜진다.
+    시즌 번호를 import 때 복사해 두지 말고 이 함수를 그때그때 부른다 (검사가 SEASON 을 바꿔 본다).
+    """
+    return SEASON >= 5
+
 # 랜덤(랭크) 배틀에서만 쓴다. 이보다 높은 포켓몬은 이 레벨로 싸운다.
 # 모두를 50 으로 올리지는 않는다 - 아래쪽은 키운 만큼 강해지는 재미가 그대로
 # 남고, 위쪽은 전부 50 에서 만나 팀 구성과 기술로 갈린다.
@@ -72,6 +82,14 @@ WIN_BASE, WIN_SWING = 10, 20
 LOSS_BASE, LOSS_SWING = 5, 20
 # 하루 첫 승. 하루 한 판만 해도 의미가 있게.
 FIRST_WIN_RP = 10
+
+
+def rp_bounds():
+    """(이긴 기본, 이긴 폭, 진 기본, 진 폭). 시즌 5 부터는 기본에서 ±5 라 이기면 15~25, 지면 10~20.
+    비슷한 상대(기대 0.5)일 땐 +20 / -15 로 옛 값과 같다. 부를 때마다 규칙을 본다."""
+    if rules_v5():
+        return 15, 10, 10, 10
+    return WIN_BASE, WIN_SWING, LOSS_BASE, LOSS_SWING
 # 이만큼 연달아 진 뒤에는 져도 절반만 깎는다.
 LOSS_GUARD = 3
 
@@ -244,13 +262,14 @@ def rp_change(result, my_mmr, foe_mmr, streak, first_win, rp, peak, power_ratio=
     """
     exp = expected(my_mmr, foe_mmr, power_ratio)
     notes = []
+    wb, ws, lb, ls = rp_bounds()
     if result == "win":
-        d = WIN_BASE + int(round(WIN_SWING * (1.0 - exp)))
+        d = wb + int(round(ws * (1.0 - exp)))
         if first_win:
             d += FIRST_WIN_RP
             notes.append("오늘 첫 승 +%d" % FIRST_WIN_RP)
     elif result == "lose":
-        d = -(LOSS_BASE + int(round(LOSS_SWING * exp)))
+        d = -(lb + int(round(ls * exp)))
         if streak <= -LOSS_GUARD:
             d = -int(round(abs(d) / 2.0))
             notes.append("연패 보호")
@@ -376,6 +395,7 @@ def deco(uid):
 # ---------------------------------------------------------------- 보여 줄 표
 def rules_public():
     """랭킹 화면에 적을 규칙과 보상. 숫자는 여기 한 곳에만 둔다."""
+    wb, ws, lb, ls = rp_bounds()
     return {
         "season": SEASON, "startsAt": SEASON_STARTS, "endsAt": SEASON_ENDS,
         "levelCap": LEVEL_CAP,
@@ -386,8 +406,8 @@ def rules_public():
                     {"tier": "champion", "tierKr": TIER_KR["champion"],
                      "seats": 1}],
         "safeRp": SAFE_RP,
-        "rp": {"win": [WIN_BASE, WIN_BASE + WIN_SWING],
-               "lose": [LOSS_BASE, LOSS_BASE + LOSS_SWING],
+        "rp": {"win": [wb, wb + ws],
+               "lose": [lb, lb + ls],
                "firstWin": FIRST_WIN_RP, "lossGuard": LOSS_GUARD,
                "powerK": POWER_K},
         "rewards": [{"tier": t, "tierKr": TIER_KR[t],

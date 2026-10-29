@@ -383,6 +383,11 @@ class TeamWindow(Scene, S.TeamWindow):
             cw = chip_w(cv, "전설", font(8))
             chip(cv, right - cw, name_y, "전설", LEGEND, font(8), tags=tg)
             name_right = right - cw - s(4)
+        if m["id"] in self.held_dup_ids(self._fighting(self.picked)):   # 나가는 팀으로 센다 (기본 창과 같다)
+            # 시즌 5: 앞의 포켓몬과 같은 도구 (기본 창은 자리 글에 '도구 겹침' 을 붙인다)
+            cw = chip_w(cv, "도구 겹침", font(8))
+            chip(cv, name_right - cw, name_y, "도구 겹침", U.DANGER, font(8), tags=tg)
+            name_right -= cw + s(4)
         name = ("★" if r["shiny"] else "") + r["name"]
         K.text(cv, nx, name_y, one_line(cv, name, font(10), max(s(30), name_right - nx)), font(10),
                fill=tone(U.SHINY) if r["shiny"] else INK, anchor="w", tags=tg)

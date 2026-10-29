@@ -125,8 +125,17 @@ MAGNITUDES = [(5, 4, 10), (15, 5, 30), (35, 6, 50), (65, 7, 70), (85, 8, 90), (9
               (100, 10, 150)]
 
 
+_KEYS = {}      # 영어 이름 -> 열쇠. 같은 이름이면 늘 같은 열쇠다 (기술 수만큼만 쌓인다)
+
+
 def key(move):
-    return "".join(c for c in ((move or {}).get("en") or "").upper() if c.isalnum())
+    # 외워 둔다 (시즌 5, 2026-10-29). 셈하는 AI(길드전 · 시즌 5 랭크)가 사본을 굴리며 한 판에 수십만 번 부른다 -
+    # 매번 글자를 다시 거르면 셈 시간의 4분의 1 이 여기서 나갔다. 값은 예전과 똑같다.
+    en = (move or {}).get("en") or ""
+    k = _KEYS.get(en)
+    if k is None:
+        k = _KEYS[en] = "".join(c for c in en.upper() if c.isalnum())
+    return k
 
 
 def attacks(move):

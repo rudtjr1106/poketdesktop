@@ -93,6 +93,7 @@ class TeamWindow(object):
         self.restricted_max = 1
         self.same_max = None           # 같은 종 상한 (10/22 서버만 준다)
         self.rank_min = None           # 랭크전 조건 {"count", "level"} (시즌 4 서버만 준다)
+        self.held_max = None           # 같은 지닌 도구 상한 (시즌 5 서버만 준다, 랭크 팀만)
         # 찾기 (1.10.0). 포켓몬이 수백 마리가 되면 레벨 순 목록을 끝까지 굴려야 했다.
         # 포켓몬 관리의 '이름 찾기' 와 같은 규칙이다 - 별명·종 이름·도감 번호를 다 본다.
         self.q = tk.StringVar()
@@ -217,6 +218,9 @@ class TeamWindow(object):
         # 같은 종 상한 (10/22). 옛 서버는 안 보낸다 - 그때는 막지 않는다 (서버가 본다).
         self.same_max = int(team["sameSpeciesMax"]) if team.get("sameSpeciesMax") else None
         self.rank_min = None if self.spec else team.get("rankMin")
+        # 같은 지닌 도구 (시즌 5). 시즌 4·옛 서버는 안 보낸다 - 그때는 표시도 막기도 안 한다. 길드전 팀(spec)에는
+        # 안 건다 (서버도 랭크 팀에만 건다).
+        self.held_max = (int(team["sameHeldMax"]) if team.get("sameHeldMax") and not self.spec else None)
         self.registered = bool(team.get("registered"))
         self.picked = [int(i) for i in team.get("ids") or []]
         # 레벨 높은 순. 랭크 팀은 대개 제일 센 애들로 짠다.
@@ -243,6 +247,8 @@ class TeamWindow(object):
                     % (self.cap, self.cap, self.max, self.max, self.restricted_max))
         if self.same_max and not self.spec.get("note"):
             note += " 같은 포켓몬은 %d마리까지 넣을 수 있습니다." % self.same_max
+        if self.held_max:
+            note += " 같은 지닌 도구는 %d마리만 지닐 수 있습니다 (메가스톤·Z크리스탈 포함)." % self.held_max
         return note
 
     def open_warnings(self):
@@ -256,6 +262,11 @@ class TeamWindow(object):
         if same and not self.spec:
             out.append("같은 포켓몬이 %d마리 더 있어 랭크 배틀에는 앞의 %d마리만 나갑니다. "
                        "등록하려면 %d마리를 빼세요." % (same, self.same_max, same))
+        held = self.held_text(self._fighting(self.picked))
+        if held:
+            # 등록한 뒤 가방·박스에서 도구를 바꿨거나, 랭크 팀 없이 바탕화면 파티로 싸울 때 생긴다
+            out.append(natural("같은 지닌 도구가 겹쳐 랜덤 배틀을 걸 수 없습니다: %s. "
+                               "하나만 남기고 도구를 바꾸거나 빼 주세요." % held))
         return out
 
     def row_info(self, m):
@@ -289,12 +300,18 @@ class TeamWindow(object):
         n = len(self.picked)
         if self.spec:
             return "", U.GOOD
+        # 마릿수가 모자라 못 거는 것을 먼저 말한다 - 그게 진짜로 막는 까닭이면 도구 이야기에 가리면 안 된다
         if self.rank_min:
             need, lv = int(self.rank_min.get("count") or 6), int(self.rank_min.get("level") or 50)
             ready = self.rank_ready_count()
             if ready < need:
                 return ("랭크전은 Lv.%d 이상 %d마리가 있어야 걸 수 있습니다 - 지금 %d마리."
                         % (lv, need, ready)), U.ACCENT
+        held = self.held_text(self._fighting(self.picked))
+        if held:
+            return natural("같은 지닌 도구가 겹칩니다: %s. 하나만 남기고 도구를 바꾸거나 빼야 랜덤 배틀을 걸 수 있습니다."
+                           % held), U.DANGER
+        if self.rank_min:
             return "", U.GOOD
         if n and n < self.max:
             return ("%d마리 팀에는 %d마리 이하로 거는 사람만 걸어옵니다. "
@@ -398,11 +415,15 @@ class TeamWindow(object):
         """고른 여섯 자리."""
         for w in self.slots.winfo_children():
             w.destroy()
+        dup = set(self.held_dup_ids(self._fighting(self.picked)))
         for i, m in enumerate(self.slot_mons()):
             text = ("%d. %s" % (i + 1, (m.get("info") or {}).get("name", "?"))
                     if m else "%d. 빈 자리" % (i + 1))
+            bad = bool(m) and m["id"] in dup
+            if bad:
+                text += " · 도구 겹침"           # 시즌 5: 앞의 포켓몬과 같은 도구 (held_dup_ids)
             tk.Label(self.slots, text=text, bg=U.BG2 if m else U.BG,
-                     fg=U.FG if m else U.FG_FAINT, font=U.FONT_XS,
+                     fg=U.DANGER if bad else (U.FG if m else U.FG_FAINT), font=U.FONT_XS,
                      padx=6, pady=2, highlightthickness=1,
                      highlightbackground=U.LINE).grid(
                 row=i // 3, column=i % 3, sticky="we", padx=2, pady=2)
@@ -464,6 +485,75 @@ class TeamWindow(object):
                 count[sp] = count.get(sp, 0) + 1
         return sum(max(0, n - self.same_max) for n in count.values())
 
+    def _fighting(self, ids):
+        """이 차례로 고른 것 가운데 랭크 배틀에 실제로 나가는 것 (서버 pvp.split_restricted 와 같은 차례 -
+        같은 종은 앞의 것만, 그다음 전설·환상은 앞에서부터 몇 마리).
+
+        같은 지닌 도구는 서버가 **나가는 팀**으로 센다. 쉬는 포켓몬이 같은 도구를 지녔는데 앱이 고른 것 전부로
+        세면, 서버는 문제 삼지 않는데 앱만 '도구 겹침' 을 띄웠다 (10/29 검토). 길드전 팀(spec)은 그대로."""
+        if self.spec:
+            return list(ids)
+        by = dict((m["id"], m) for m in self.mons)
+        out, seen, kinds = [], 0, {}
+        for i in ids:
+            m = by.get(i)
+            sp = self._species(m)
+            if self.same_max and sp and kinds.get(sp, 0) >= self.same_max:
+                continue
+            if self._is_restricted(m):
+                if seen >= self.restricted_max:
+                    continue
+                seen += 1
+            if sp:
+                kinds[sp] = kinds.get(sp, 0) + 1
+            out.append(i)
+        return out
+
+    @staticmethod
+    def _held(m):
+        """지닌 도구 열쇠 (대문자). 안 지녔거나 옛 자료면 None - 그 포켓몬은 겹침을 세지 않는다."""
+        return ((m or {}).get("held") or "").upper() or None
+
+    def held_dup_ids(self, ids):
+        """같은 도구를 앞의 포켓몬이 이미 지닌 것(뒤의 것)의 id. 규칙이 꺼졌으면(시즌 4·옛 서버) 빈 목록.
+
+        서버(pvp.same_held_ids)처럼 고른 차례대로 보고, 앞의 한 마리는 그대로 둔다."""
+        if not self.held_max:
+            return []
+        by = dict((m["id"], m) for m in self.mons)
+        count, out = {}, []
+        for i in ids:
+            k = self._held(by.get(i))
+            if not k:
+                continue
+            if count.get(k, 0) >= self.held_max:
+                out.append(i)
+            count[k] = count.get(k, 0) + 1
+        return out
+
+    def held_text(self, ids):
+        """겹친 도구를 이름으로 '기합의띠(한카리아스·갸라도스)'. 겹친 게 없으면 빈 글."""
+        if not self.held_max:
+            return ""
+        by = dict((m["id"], m) for m in self.mons)
+        groups, order = {}, []
+        for i in ids:
+            m = by.get(i)
+            k = self._held(m)
+            if not k:
+                continue
+            if k not in groups:
+                groups[k] = []
+                order.append(k)
+            groups[k].append(m)
+        bits = []
+        for k in order:
+            ms = groups[k]
+            if len(ms) > self.held_max:
+                kr = ms[0].get("heldKr") or k
+                bits.append("%s(%s)" % (kr, "·".join((x.get("info") or {}).get("name", "?") for x in ms)))
+        return ", ".join(bits)
+
     def toggle(self, pid):
         if pid in self.picked:
             self.picked.remove(pid)
@@ -478,6 +568,15 @@ class TeamWindow(object):
                                 % self.restricted_max, U.ACCENT)
             if self.same_max and self._same_count(self.picked, self._species(by.get(pid))) >= self.same_max:
                 return self.say("같은 포켓몬은 %d마리까지 넣을 수 있습니다." % self.same_max, U.ACCENT)
+            if self.held_dup_ids(self._fighting(self.picked + [pid]))[-1:] == [pid]:
+                # 시즌 5: 이미 고른 포켓몬이 같은 도구를 지녔다 - 누가 지녔는지 알려 준다
+                m = by.get(pid)
+                holder = next(by[i] for i in self.picked if self._held(by.get(i)) == self._held(m))
+                return self.say(natural("%s 은(는) %s 이(가) 이미 지니고 있습니다. 랭크 팀에서는 같은 지닌 도구를 "
+                                        "%d마리만 지닐 수 있어요 - 도구를 바꾼 뒤 넣으세요."
+                                        % (m.get("heldKr") or self._held(m),
+                                           (holder.get("info") or {}).get("name", "?"), self.held_max)),
+                                U.ACCENT)
             self.picked.append(pid)
         self._paint()
 
