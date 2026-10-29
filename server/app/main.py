@@ -32,7 +32,7 @@ from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
 from . import (achievements, auth, avatar, battle_routes, board, board_routes, mega, config, db, deps, eggs, expedition, item_routes,  # noqa: E402
-               errors, friendly, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
+               errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws,
                boss_routes, gym_routes, social_routes, tm_routes, tms, troubles, visit, walk)
@@ -1810,7 +1810,7 @@ def _make_grass(uid):
         mon = achievements.unlock_mon(uid, RNG)
     if mon is None:
         lo, hi, cap = _wild_levels(uid)
-        mon = dex().roll_wild(lo, hi, RNG, max_bst=cap,
+        mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=halloween.spawn_boost(),
                               shiny_rate=config.SHINY_RATE)
     if mon is None:
         raise HTTPException(500, "등장 가능한 포켓몬이 없습니다.")
