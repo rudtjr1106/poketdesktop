@@ -51,8 +51,22 @@
 
 '몇 분 전' 은 **서버가 센 초**로 준다(agoSec). 시각을 받아 화면이 자기
 시계로 빼면 PC 시계가 틀어진 사람에게 엉뚱하게 보인다 (korean.ago 의 규칙).
+
+## 이미지 (버전 2)
+
+글 하나에 IMG_MAX 장. 먼저 올리고(/api/board/images - 번호를 받는다) 글을 쓰거나 고칠 때 그 번호들을
+붙인다. 올라온 그림은 **늘 다시 저장한다** - 사진 속 위치 정보(EXIF)·덧붙은 자료가 지워지고, 그림인 척하는
+파일과 터무니없이 큰 그림(압축 폭탄)이 걸러진다. 긴 변은 IMG_SIDE 로 줄인다. 움직이는 GIF 는 작으면
+(GIF_SIDE · GIF_FRAMES · GIF_OUT_MAX) 움직이는 채로 두고, 크면 첫 장만 남긴다.
+
+그림은 DB 가 아니라 파일이다 (config.BOARD_IMG_DIR). 글을 지우면 그 글의 그림도 지운다. 올리고 글에 안 붙인
+것은 하루 뒤 치운다 (그 사람이 다음에 올릴 때). 하루 IMG_PER_DAY 장까지 (운영자는 제한 없음).
+보는 것은 로그인한 사람만 - 붙은 글이 지워졌으면 아무도 못 본다, 아직 안 붙은 것은 올린 사람만.
 """
 import datetime
+import io
+import os
+import threading
 
 from common import patchnotes
 
@@ -76,6 +90,20 @@ POST_COOLDOWN = 30            # 초
 COMMENT_COOLDOWN = 5
 POSTS_PER_DAY = 20
 COMMENTS_PER_DAY = 200
+# 이미지 (위 '이미지')
+IMG_MAX = 4                          # 글 하나에
+IMG_BYTES_MAX = 8 * 1024 * 1024      # 올리는 원본 (휴대폰 사진도 들어오게)
+IMG_SIDE = 1280                      # 저장할 때 긴 변
+GIF_SIDE = 640                       # 움직이는 채로 두는 GIF 의 긴 변 · 프레임 · 저장 크기
+GIF_FRAMES = 120
+GIF_OUT_MAX = 4 * 1024 * 1024
+IMG_PIXELS_MAX = 40000000            # 열기 전에 막는 가로x세로 (압축 폭탄) - 프레임마다 본다
+ANIM_PIXELS_MAX = 30000000           # 움직이는 GIF 를 움직이는 채로 풀 때 프레임 전부의 칸 합 (넘으면 첫 장만)
+IMG_PER_DAY = 40                     # 하루 올리기 시도 (실패한 것 · 나중에 지운 것도 센다)
+ENCODE_AT_ONCE = 2                   # 동시에 푸는 그림 수 - 서버 하나가 배틀까지 다 맡는다
+ENCODE_WAIT = 20                     # 자리가 안 나면 이만큼(초) 기다리다 503
+ORPHAN_HOURS = 24                    # 글에 안 붙은 채 이만큼 지나면 치운다
+MIME = {"png": "image/png", "jpg": "image/jpeg", "gif": "image/gif"}
 
 
 def _now():
@@ -260,12 +288,18 @@ def listing(user, kind="all", page=1, now=None, q=None):
     authors = _authors([r["user_id"] for r in both])
     counts = _counts([r["id"] for r in both])
     likes = _likes([r["id"] for r in both], uid)
+    imgs = _img_counts([r["id"] for r in both])
+
+    def row(r):
+        out = _post_row(r, authors, uid, admin, now, counts, likes)
+        out["images"] = imgs.get(r["id"], 0)
+        return out
     return {"kind": kind, "page": page, "pages": pages, "total": total, "q": q,
-            "pinned": [_post_row(r, authors, uid, admin, now, counts, likes) for r in pinned],
-            "posts": [_post_row(r, authors, uid, admin, now, counts, likes) for r in rows],
+            "pinned": [row(r) for r in pinned],
+            "posts": [row(r) for r in rows],
             "canNotice": admin,
             "limits": {"title": TITLE_MAX, "body": BODY_MAX, "comment": COMMENT_MAX,
-                       "search": SEARCH_MAX}}
+                       "search": SEARCH_MAX, "images": IMG_MAX, "imageBytes": IMG_BYTES_MAX}}
 
 
 def _post(pid):
@@ -288,6 +322,8 @@ def detail(user, pid, now=None):
     authors = _authors([r["user_id"]] + [c["user_id"] for c in rows])
     post = _post_row(r, authors, uid, admin, now, _counts([pid]), _likes([pid], uid))
     post["body"] = r["body"]
+    post["images"] = [_img_view(i) for i in db.q(
+        "SELECT * FROM board_image WHERE post_id=? ORDER BY pos, id", (pid,))]
 
     def one(c):
         out = {"id": c["id"], "createdAt": c["created_at"],
@@ -321,7 +357,7 @@ def detail(user, pid, now=None):
 
 
 # ---------------------------------------------------------------- 쓰기
-def create(user, kind, title, body, now=None):
+def create(user, kind, title, body, now=None, images=None):
     if kind not in KINDS:
         raise ValueError("글의 종류를 알 수 없습니다.")
     if kind == "patch":
@@ -330,15 +366,20 @@ def create(user, kind, title, body, now=None):
         raise PermissionError("공지는 운영자만 쓸 수 있습니다.")
     title = clean(title, TITLE_MAX, "제목", one_line=True)
     body = clean(body, BODY_MAX, "내용")
+    ids = _check_images(user["id"], images, None)
     if not is_admin(user):
         _throttle(user["id"], "board_post", POST_COOLDOWN, POSTS_PER_DAY, "글", now)
     cur = db.run("INSERT INTO board_post (kind, user_id, author, title, body, created_at)"
                  " VALUES (?,?,?,?,?,?)",
                  (kind, user["id"], user["username"], title, body, _iso(now)))
-    return cur.lastrowid
+    pid = cur.lastrowid
+    if ids:
+        _attach(user["id"], pid, ids)
+    return pid
 
 
-def edit(user, pid, title, body, now=None):
+def edit(user, pid, title, body, now=None, images=None):
+    """images 가 None 이면 그림은 그대로 둔다 (그림 칸을 모르는 옛 앱). 목록이면 그대로 바꾼다 - 빠진 것은 지운다."""
     r = _post(pid)
     if not r:
         raise LookupError("없는 글이거나 지워진 글입니다.")
@@ -348,8 +389,11 @@ def edit(user, pid, title, body, now=None):
         raise PermissionError("패치노트는 고칠 수 없습니다.")
     title = clean(title, TITLE_MAX, "제목", one_line=True)
     body = clean(body, BODY_MAX, "내용")
+    ids = _check_images(user["id"], images, pid) if images is not None else None
     db.run("UPDATE board_post SET title=?, body=?, updated_at=? WHERE id=?",
            (title, body, _iso(now), pid))
+    if ids is not None:
+        _attach(user["id"], pid, ids)
     return pid
 
 
@@ -363,6 +407,8 @@ def remove(user, pid):
         raise PermissionError("패치노트는 지울 수 없습니다.")
     db.run("UPDATE board_post SET deleted=1 WHERE id=?", (pid,))
     db.run("DELETE FROM board_notify WHERE post_id=?", (pid,))
+    for r in db.q("SELECT * FROM board_image WHERE post_id=?", (pid,)):
+        _drop_image(r)                        # 글을 지우면 그림도 (올린 사람이 지운 것을 남겨 두지 않는다)
 
 
 def like(user, pid, now=None):
@@ -598,3 +644,271 @@ def ensure_patch_posts(now=None, upto=None):
                (admin["id"], admin["username"], title, body, _patch_time(ver, now), ref))
         made.append(ver)
     return made
+
+
+# ---------------------------------------------------------------- 이미지 (버전 2)
+def img_dir():
+    d = config.BOARD_IMG_DIR
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _img_path(row):
+    return os.path.join(img_dir(), "%d.%s" % (int(row["id"]), row["fmt"]))
+
+
+def _img_view(r):
+    return {"id": r["id"], "w": r["w"], "h": r["h"], "fmt": r["fmt"], "frames": r["frames"]}
+
+
+def _img_counts(ids):
+    if not ids:
+        return {}
+    marks = ",".join("?" * len(ids))
+    return dict((r["post_id"], r["c"]) for r in db.q(
+        "SELECT post_id, COUNT(*) c FROM board_image WHERE post_id IN (%s) GROUP BY post_id" % marks,
+        tuple(ids)))
+
+
+def _drop_image(r):
+    """줄과 파일을 지운다. 파일이 이미 없어도 그만이다."""
+    db.run("DELETE FROM board_image WHERE id=?", (r["id"],))
+    try:
+        os.remove(_img_path(r))
+    except OSError:
+        pass
+
+
+def _sweep_images(now=None, limit=50):
+    """글에 안 붙인 채 ORPHAN_HOURS 가 지난 그림을 치운다 (누구의 것이든 - 다시 안 올리는 사람 것도). 한 번에 limit 개."""
+    cut = ((now or _now()) - datetime.timedelta(hours=ORPHAN_HOURS)).replace(microsecond=0).isoformat()
+    for r in db.q("SELECT * FROM board_image WHERE post_id IS NULL AND created_at < ? ORDER BY id LIMIT ?",
+                  (cut, int(limit))):
+        _drop_image(r)
+    db.run("DELETE FROM board_upload WHERE created_at < ?",
+           (((now or _now()) - datetime.timedelta(days=2)).replace(microsecond=0).isoformat(),))
+
+
+def drop_user_images(uid):
+    """계정을 지울 때 - 그 사람이 올린 그림 줄과 파일을 다 지운다 (글은 users 와 함께 지워진다)."""
+    for r in db.q("SELECT * FROM board_image WHERE user_id=?", (uid,)):
+        _drop_image(r)
+    db.run("DELETE FROM board_upload WHERE user_id=?", (uid,))
+
+
+def encode_image(raw):
+    """올라온 바이트 -> (저장할 바이트, 형식, 폭, 높이, 프레임 수). 그림이 아니면 ValueError.
+
+    **늘 다시 저장한다.** 그대로 두면 휴대폰 사진의 위치 정보(EXIF)가 남에게 그대로 간다.
+    """
+    from PIL import Image, ImageOps
+    bad = ValueError("이미지 파일이 아니거나 열 수 없는 형식입니다. (PNG · JPG · GIF · WEBP)")
+    try:
+        probe = Image.open(io.BytesIO(raw))
+        # MPO = 요즘 폰 사진 (JPEG 뒤에 HDR · 미리보기 그림이 붙었다). 첫 장만 쓴다.
+        fmt_in = (probe.format or "").upper()
+        if fmt_in not in ("PNG", "JPEG", "MPO", "GIF", "WEBP", "BMP"):
+            raise bad
+        # 크기는 머리만 읽고 본다 - 풀기 전에 막아야 압축 폭탄이 메모리를 먹지 않는다
+        _too_big(probe.size)
+        probe.verify()                                   # 깨진 파일
+        im = Image.open(io.BytesIO(raw))
+        if fmt_in == "GIF":
+            # 프레임 수와 크기는 파일 구조만 읽고 센다 (Pillow 로 넘기면 앞 프레임을 다 풀어 버린다)
+            frames, cw, ch = gif_scan(raw)
+            _too_big((cw, ch))
+            if 1 < frames <= GIF_FRAMES and frames * cw * ch <= ANIM_PIXELS_MAX:
+                got = _animated(im, Image)
+                if got:
+                    return got
+        im.seek(0)
+        _too_big(im.size)                                # 첫 프레임이 화면보다 크게 적혀 있을 수 있다
+        if fmt_in in ("JPEG", "MPO"):
+            # 큰 사진은 줄여서 푼다 (1/2 · 1/4 · 1/8) - 5천만 화소도 가볍게
+            im.draft("RGB", (IMG_SIDE, IMG_SIDE))
+        im = ImageOps.exif_transpose(im)                 # 휴대폰 사진의 돌린 방향을 그림에 반영
+        alpha = im.mode in ("RGBA", "LA", "PA") or (im.mode == "P" and "transparency" in im.info)
+        im = im.convert("RGBA" if alpha else "RGB")
+        if max(im.size) > IMG_SIDE:
+            im.thumbnail((IMG_SIDE, IMG_SIDE), Image.LANCZOS)
+        out = io.BytesIO()
+        if alpha or fmt_in in ("PNG", "GIF", "BMP"):
+            im.save(out, "PNG", optimize=True)
+            fmt = "png"
+            if not alpha and out.tell() > 2500000:       # 큰 사진을 PNG 로 받았다 - JPG 가 훨씬 작다
+                out = io.BytesIO()
+                im.save(out, "JPEG", quality=88, optimize=True)
+                fmt = "jpg"
+        else:
+            im.save(out, "JPEG", quality=88, optimize=True)
+            fmt = "jpg"
+        return out.getvalue(), fmt, im.width, im.height, 1
+    except ValueError:
+        raise
+    except Exception:                                    # noqa: BLE001 - PIL 은 갖가지 오류를 낸다
+        raise bad
+
+
+def _too_big(size):
+    w, h = size
+    if w < 1 or h < 1 or w * h > IMG_PIXELS_MAX:
+        raise ValueError("이미지가 너무 큽니다 (%d x %d)." % (w, h))
+
+
+def gif_scan(raw):
+    """GIF 를 풀지 않고 (프레임 수, 그림판 폭, 높이) 를 센다. 그림판 = 화면 크기와 프레임마다 적힌 끝자리 가운데 큰 것.
+
+    **프레임마다 끝자리를 본다.** 화면 크기(맨 앞 머리)는 1x1 인데 뒤 프레임을 12000x12000 으로 적으면 Pillow 가
+    그 프레임을 풀 때 그림을 키운다 - 앞의 검사를 지나 메모리 2GB 를 먹었다 (10/30 검토). Pillow 로 프레임을
+    넘기며 크기를 보면 앞 프레임을 다 풀어서 그것만으로 CPU 를 먹는다 - 그래서 블록을 직접 건너뛴다.
+    GIF_FRAMES 를 넘으면 거기서 센다를 멈춘다 (움직이는 채로 두지 않으니 더 셀 까닭이 없다).
+    """
+    bad = ValueError("이미지 파일이 아니거나 열 수 없는 형식입니다. (PNG · JPG · GIF · WEBP)")
+    n = len(raw)
+    if n < 13 or raw[:3] != b"GIF":
+        raise bad
+    cw, ch = raw[6] | raw[7] << 8, raw[8] | raw[9] << 8
+    flags = raw[10]
+    i = 13 + (3 * (2 << (flags & 7)) if flags & 0x80 else 0)
+
+    def skip_sub(i):
+        while True:
+            if i >= n:
+                raise bad
+            size = raw[i]
+            i += 1
+            if size == 0:
+                return i
+            i += size
+
+    frames = 0
+    while i < n:
+        b = raw[i]
+        if b == 0x3B:                                    # 끝
+            break
+        if b == 0x21:                                    # 덧붙임 블록
+            i = skip_sub(i + 2)
+            continue
+        if b != 0x2C or i + 10 > n:                      # 그림 블록이 아니면 깨진 파일
+            raise bad
+        x, y = raw[i + 1] | raw[i + 2] << 8, raw[i + 3] | raw[i + 4] << 8
+        w, h = raw[i + 5] | raw[i + 6] << 8, raw[i + 7] | raw[i + 8] << 8
+        lflags = raw[i + 9]
+        cw, ch = max(cw, x + w), max(ch, y + h)
+        i += 10 + (3 * (2 << (lflags & 7)) if lflags & 0x80 else 0)
+        i = skip_sub(i + 1)                              # LZW 첫 길이 한 칸 + 자료 덩어리
+        frames += 1
+        if frames > GIF_FRAMES:
+            break
+    return frames, cw, ch
+
+
+def _animated(im, Image):
+    """움직이는 GIF 를 움직이는 채로 다시 저장한다. 너무 크면 None (첫 장만 남긴다)."""
+    from PIL import ImageSequence
+    frames, durs = [], []
+    for fr in ImageSequence.Iterator(im):
+        _too_big(fr.size)
+        f = fr.convert("RGBA")
+        f.info.clear()                                   # 설명 글(comment) 같은 덧붙은 자료를 옮기지 않는다
+        if max(f.size) > GIF_SIDE:
+            k = GIF_SIDE / float(max(f.size))
+            f = f.resize((max(1, int(f.width * k)), max(1, int(f.height * k))), Image.NEAREST)
+        frames.append(f)
+        durs.append(max(20, int(fr.info.get("duration", 100) or 100)))
+    out = io.BytesIO()
+    frames[0].save(out, "GIF", save_all=True, append_images=frames[1:], duration=durs, loop=0, disposal=2)
+    if out.tell() > GIF_OUT_MAX:
+        return None
+    return out.getvalue(), "gif", frames[0].width, frames[0].height, len(frames)
+
+
+_encode_slots = threading.BoundedSemaphore(ENCODE_AT_ONCE)
+
+
+def upload_image(user, raw, now=None):
+    """그림 하나를 올린다 (아직 글에 안 붙었다). {id, w, h, fmt, frames}"""
+    uid = user["id"]
+    now = now or _now()
+    if not raw:
+        raise ValueError("이미지가 비어 있습니다.")
+    if len(raw) > IMG_BYTES_MAX:
+        raise ValueError("이미지는 한 장에 %dMB 까지 올릴 수 있습니다." % (IMG_BYTES_MAX // (1024 * 1024)))
+    _sweep_images(now)
+    if not is_admin(user):
+        # 푸는 **앞에** 시도를 적는다 - 실패한 것 · 나중에 지운 것도 세고, 셈과 적기가 한 문장이라 동시에 보내도
+        # 한도를 못 넘는다.
+        since = (now - datetime.timedelta(days=1)).replace(microsecond=0).isoformat()
+        cur = db.run("INSERT INTO board_upload (user_id, created_at) SELECT ?, ?"
+                     " WHERE (SELECT COUNT(*) FROM board_upload WHERE user_id=? AND created_at > ?) < ?",
+                     (uid, _iso(now), uid, since, IMG_PER_DAY))
+        if getattr(cur, "rowcount", 1) == 0:
+            raise PermissionError("하루에 올릴 수 있는 이미지 수(%d장)를 넘었습니다." % IMG_PER_DAY)
+    if not _encode_slots.acquire(timeout=ENCODE_WAIT):
+        raise RuntimeError("이미지를 올리는 사람이 많습니다. 잠시 후 다시 올려 주세요.")
+    try:
+        data, fmt, w, h, frames = encode_image(raw)
+    finally:
+        _encode_slots.release()
+    cur = db.run("INSERT INTO board_image (user_id, fmt, w, h, bytes, frames, created_at) VALUES (?,?,?,?,?,?,?)",
+                 (uid, fmt, w, h, len(data), frames, _iso(now)))
+    row = {"id": cur.lastrowid, "fmt": fmt, "w": w, "h": h, "frames": frames}
+    path = _img_path(row)
+    try:
+        with open(path + ".part", "wb") as f:
+            f.write(data)
+        os.replace(path + ".part", path)
+    except OSError:
+        db.run("DELETE FROM board_image WHERE id=?", (row["id"],))
+        raise RuntimeError("이미지를 저장하지 못했습니다. 잠시 후 다시 올려 주세요.")
+    return _img_view(row)
+
+
+def _check_images(uid, images, pid):
+    """글에 붙일 그림 번호들을 다듬고 본다 (붙이기 전에 - 글이 반쯤 써지는 일이 없게). [번호]"""
+    ids = []
+    for i in images or []:
+        try:
+            i = int(i)
+        except (TypeError, ValueError):
+            raise ValueError("이미지 번호를 알 수 없습니다.")
+        if i not in ids:
+            ids.append(i)
+    if len(ids) > IMG_MAX:
+        raise ValueError("이미지는 글 하나에 %d장까지 붙일 수 있습니다." % IMG_MAX)
+    if ids:
+        marks = ",".join("?" * len(ids))
+        rows = dict((r["id"], r) for r in db.q("SELECT * FROM board_image WHERE id IN (%s)" % marks, tuple(ids)))
+        for i in ids:
+            r = rows.get(i)
+            if not r or r["user_id"] != uid or (r["post_id"] is not None and r["post_id"] != pid):
+                raise ValueError("붙일 수 없는 이미지가 있습니다. 다시 올려 주세요.")
+    return ids
+
+
+def _attach(uid, pid, ids):
+    """그림 번호들을 이 글에 이 차례로 붙인다. 이 글에 붙어 있던 것 가운데 빠진 것은 지운다."""
+    for r in db.q("SELECT * FROM board_image WHERE post_id=?", (pid,)):
+        if r["id"] not in ids:
+            _drop_image(r)
+    for pos, i in enumerate(ids):
+        cur = db.run("UPDATE board_image SET post_id=?, pos=? WHERE id=? AND user_id=?"
+                     " AND (post_id IS NULL OR post_id=?)", (pid, pos, i, uid, pid))
+        if getattr(cur, "rowcount", 1) == 0:
+            raise ValueError("붙일 수 없는 이미지가 있습니다. 다시 올려 주세요.")
+
+
+def image_file(user, iid):
+    """보여 줄 그림 파일 (경로, MIME). 붙은 글이 살아 있으면 누구나, 아직 안 붙었으면 올린 사람만."""
+    r = db.q1("SELECT * FROM board_image WHERE id=?", (int(iid),))
+    if not r:
+        raise LookupError("없는 이미지입니다.")
+    if r["post_id"] is None:
+        if r["user_id"] != user["id"] and not is_admin(user):
+            raise LookupError("없는 이미지입니다.")
+    elif not _post(r["post_id"]):
+        raise LookupError("지워진 글의 이미지입니다.")
+    path = _img_path(r)
+    if not os.path.exists(path):
+        raise LookupError("이미지 파일이 없습니다.")
+    return path, MIME.get(r["fmt"], "application/octet-stream")

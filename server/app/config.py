@@ -172,6 +172,9 @@ GYMS_PATH = os.environ.get("POKET_GYMS", os.path.join(ROOT, "data", "gyms.json")
 KOREA_MAP_PATH = os.environ.get("POKET_KOREA_MAP", os.path.join(ROOT, "data", "korea_map.json"))
 # 악당 조직 표 (시즌 4, tools/build_villains.py). 간부의 팀은 gyms.json 의 것을 쓴다.
 VILLAINS_PATH = os.environ.get("POKET_VILLAINS", os.path.join(ROOT, "data", "villains.json"))
+# 게시판 이미지 (버전 2). DB 에 넣지 않고 파일로 둔다 - DB 가 커지면 백업이 무거워진다 (10/28 3GB 사고).
+# 운영은 /data 볼륨(DB · 도트 캐시와 같은 곳)에 남는다.
+BOARD_IMG_DIR = os.environ.get("POKET_BOARD_IMG_DIR", "/data/board_img")
 TRAINER_SPRITE_DIR = os.environ.get("POKET_TRAINER_SPRITES",
                                     os.path.join(ROOT, "data", "trainer_sprites"))
 # 처음 이기면 레벨 x 50원 (Lv.20 1,000원 ~ Lv.100 5,000원). 원작 상금 느낌.

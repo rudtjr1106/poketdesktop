@@ -561,6 +561,40 @@ def board(root):
     w.submit_post()
     TBL.wait(root, lambda: w.view == "post" and w.post and w.post.get("title") == "새 글 제목", 5)
     chk("새 글을 올리면 그 글이 열린다 (Q&A)", w.post.get("kind") == "qna", w.post and w.post.get("kind"))
+    # 버전 2: 이미지 - 쓰기 판에 사진 줄 · 글 판에 그림 · 목록에 '사진 N'
+    from poketdesktop import board_images as BI
+    real_pick = BI.pick_files
+    paths = []
+    for i in range(2):
+        pth = os.path.join(os.environ["POKET_HOME"], "dp_pic%d.png" % i)
+        with open(pth, "wb") as f:
+            f.write(TB.png_bytes(40, 30))
+        paths.append(pth)
+    try:
+        w.show_write()
+        TBL.settle(root, 0.3)
+        chk("쓰기 판에 사진 줄이 놓인다", "attach" in w._wwins and w._attach_frame.winfo_ismapped(),
+            list(w._wwins))
+        BI.pick_files = lambda _parent: paths
+        w.pick_images()
+        TBL.wait(root, lambda: len(w.attach) == 2 and len(w.thumb_refs) == 2, 5)
+        TBL.settle(root, 0.2)                                    # 작은 그림이 온 뒤 판이 저절로 다시 놓인다
+        placed = int(float(w.wcv.itemcget(w._wwins["attach"], "height")))
+        chk("사진 줄이 잘리지 않는다 ('빼기' 까지)", placed >= w._attach_frame.winfo_reqheight(),
+            (placed, w._attach_frame.winfo_reqheight()))
+        w.title_var.set("사진 두 장")
+        w.text.insert("1.0", "그림")
+        w.submit_post()
+        TBL.wait(root, lambda: w.view == "post" and w.post and w.post.get("title") == "사진 두 장", 5)
+        TBL.wait(root, lambda: len([i for i in w.pcv.find_all() if w.pcv.type(i) == "image"]) == 2, 5)
+        chk("글 판에 그림 둘이 그려진다", len([i for i in w.pcv.find_all() if w.pcv.type(i) == "image"]) == 2)
+        w.show_list()
+        TBL.wait(root, lambda: w.view == "list" and bool(w._rows), 5)
+        TBL.settle(root, 0.3)
+        lt = [w.vl.cv.itemcget(i, "text") for i in w.vl.cv.find_all() if w.vl.cv.type(i) == "text"]
+        chk("목록에 '사진 2'", "사진 2" in lt, [t for t in lt if "사진" in t or "댓글" in t][:6])
+    finally:
+        BI.pick_files = real_pick
     w.close()
 
 

@@ -32,6 +32,12 @@
 새 버전이 나오면 서버가 글을 올린다. 사람은 못 쓰고, 댓글과 좋아요는 된다.
 업데이트한 뒤 뜨던 '새로운 기능' 창 대신 이 칸을 본다.
 
+## 이미지 (버전 2)
+
+글쓰기 아래 줄의 [사진 붙이기] 로 고르거나 내용 칸에 붙여 넣으면(Ctrl+V · Cmd+V, 캡처한 화면) 바로 올리고
+작은 그림으로 보여 준다 - x 로 뺀다. 글에는 칸 폭에 맞춰 차례대로 놓고, 누르면 크게 본다 (움직이는 GIF 는
+거기서 움직인다). 장수 · 크기는 서버가 정해 limits 로 알려 준다. 그리기는 board_images 가 한다.
+
 ## 판정은 서버가 한다
 
 글자 수, 공지 권한, 도배(글 30초·댓글 5초), 지울 수 있는지 - 전부 서버가
@@ -44,6 +50,7 @@ from tkinter import ttk
 
 from common.korean import ago, natural
 
+from . import board_images as BI
 from . import skins
 from . import ui_common as U
 from .ui_common import run_async
@@ -423,6 +430,10 @@ class BoardWindow(object):
         if n:
             tk.Label(top, text="댓글 %d" % n, bg=bg, fg=U.ACCENT, font=U.FONT_XS).pack(
                 side="right", anchor="n", padx=(8, 0), pady=(2, 0))
+        pics = int(p.get("images") or 0)
+        if pics:
+            tk.Label(top, text="사진 %d" % pics, bg=bg, fg=U.INFO, font=U.FONT_XS).pack(
+                side="right", anchor="n", padx=(8, 0), pady=(2, 0))
         likes = int(p.get("likes") or 0)
         extra = []
         if likes:
@@ -500,6 +511,7 @@ class BoardWindow(object):
         self._author(f, p, U.BG).pack(anchor="w", pady=(6, 10))
         tk.Frame(f, bg=U.LINE, height=U.h(1)).pack(fill="x", padx=(0, 8))
         self._body(f, p)
+        self._images(f, p)
         self._like_bar(f, p)
         tk.Frame(f, bg=U.LINE, height=U.h(1)).pack(fill="x", padx=(0, 8))
         U.marker_label(f, "댓글 %d" % int(p.get("comments") or 0),
@@ -543,6 +555,48 @@ class BoardWindow(object):
                               anchor="w", justify="left")
             lb.pack(fill="x")
             U.wrap_to_width(lb)
+
+    # ---------------- 이미지 (버전 2) ----------------
+    def _images(self, parent, p):
+        """본문 아래에 차례대로. 자리를 먼저 잡아 두고(크기를 서버가 알려 준다) 받는 대로 채운다."""
+        imgs = p.get("images") or []
+        if not imgs:
+            return
+        self.img_refs = {}
+        box = tk.Frame(parent, bg=U.BG)
+        box.pack(fill="x", pady=(0, 14), padx=(0, 8))
+        max_w = U.h(660)
+        for im in imgs:
+            w, h, _sharp = BI.fit_size(im.get("w") or 1, im.get("h") or 1, max_w, U.h(460))
+            cell = tk.Frame(box, bg=U.BG3, width=w, height=h, cursor="hand2")
+            cell.pack(anchor="w", pady=(0, 8))
+            cell.pack_propagate(False)
+            lb = tk.Label(cell, text="불러오는 중...", bg=U.BG3, fg=U.FG_FAINT, font=U.FONT_XS, bd=0)
+            lb.pack(fill="both", expand=True)
+            if int(im.get("frames") or 1) > 1:
+                tk.Label(box, text="움직이는 그림 · 눌러서 크게 보기", bg=U.BG, fg=U.FG_FAINT,
+                         font=U.FONT_XS).pack(anchor="w", pady=(0, 8))
+            self._load_image(im["id"], lb, w, h)
+
+    def _load_image(self, iid, label, w, h):
+        gen = self._gen
+
+        def done(raw, err):
+            if not self.alive or gen != self._gen:
+                return
+            try:
+                if err or not raw:
+                    return label.configure(text="이미지를 볼 수 없습니다.")
+                ph = BI.photo(raw, w, h, bg=U.BG)
+                if ph is None:
+                    return label.configure(text="이미지를 열 수 없습니다.")
+                self.img_refs[iid] = ph
+                label.configure(image=ph, text="")
+                for wdg in (label, label.master):
+                    wdg.bind("<Button-1>", lambda _e, r=raw: BI.Viewer(self.root, r))
+            except tk.TclError:
+                pass
+        run_async(self.root, lambda: self.app.api.board_image(iid), done)
 
     # ---------------- 좋아요 ----------------
     def _like_bar(self, parent, p):
@@ -770,6 +824,11 @@ class BoardWindow(object):
     def _write_form(self, post):
         self._clear("write")
         self.edit_id = post["id"] if post else None
+        # 붙인 그림: [{id, w, h, fmt, frames}] (고칠 때는 그 글의 것부터). 올리는 중인 수.
+        self.attach = [dict(i) for i in (post or {}).get("images") or []]
+        self.uploading = 0
+        self.thumb_refs = {}
+        self.thumb_busy = set()               # 받는 중인 작은 그림 (같은 것을 여러 번 받지 않게)
         self.write_btn.configure(state="disabled")
         self.count.configure(text="")
         self.kind_var = self._write_kind(post)
@@ -854,6 +913,143 @@ class BoardWindow(object):
         if post:
             self.text.insert("1.0", post.get("body") or "")
         self.text.bind("<KeyRelease>", lambda _e: self._count_post())
+        self.text.bind("<<Paste>>", self.paste_image, add="+")
+        self._attach_row(form).pack(fill="x", pady=(8, 0))
+
+    # ---------------- 쓰기: 이미지 붙이기 (버전 2) ----------------
+    def _attach_row(self, parent, bg=None):
+        """[사진 붙이기] 단추 · 안내 · 붙인 그림들. 테마도 이 틀을 가져다 제자리에 놓는다."""
+        bg = bg or U.BG
+        row = tk.Frame(parent, bg=bg)
+        top = tk.Frame(row, bg=bg)
+        top.pack(fill="x")
+        self.attach_btn = U.ghost_button(top, "사진 붙이기", self.pick_images, height=28)
+        self.attach_btn.pack(side="left")
+        self.attach_note = tk.Label(top, text="", bg=bg, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w")
+        self.attach_note.pack(side="left", padx=(10, 0))
+        self.thumbs = tk.Frame(row, bg=bg)
+        self.thumbs.pack(fill="x", pady=(6, 0))
+        self._attach_bg = bg
+        self._paint_attach()
+        return row
+
+    def _img_max(self):
+        return int(self.limits.get("images") or 4)
+
+    def _paint_attach(self):
+        box = getattr(self, "thumbs", None)
+        if box is None:
+            return
+        try:
+            for w in box.winfo_children():
+                w.destroy()
+        except tk.TclError:
+            return
+        bg = self._attach_bg
+        n, top = len(self.attach), self._img_max()
+        note = "%d / %d장 · 내용 칸에 붙여 넣어도 돼요 (캡처한 화면)" % (n, top)
+        if self.uploading:
+            note = "올리는 중... (%d장)" % self.uploading
+        self.attach_note.configure(text=note)
+        self.attach_btn.configure(state="normal" if n + self.uploading < top else "disabled")
+        side = U.h(64)
+        for im in self.attach:
+            cell = tk.Frame(box, bg=bg)
+            cell.pack(side="left", padx=(0, 8))
+            frame = tk.Frame(cell, bg=U.BG3, width=side, height=side)      # 그림이 오기 전에도 자리는 같다
+            frame.pack()
+            frame.pack_propagate(False)
+            pic = tk.Label(frame, bg=U.BG3, bd=0, text="...", fg=U.FG_FAINT, font=U.FONT_XS)
+            ph = self.thumb_refs.get(im["id"])
+            if ph is not None:
+                pic.configure(image=ph, text="")
+            pic.pack(fill="both", expand=True)
+            x = tk.Label(cell, text="빼기", bg=bg, fg=U.DANGER, font=U.FONT_XS, cursor="hand2")
+            x.pack(pady=(2, 0))
+            x.bind("<Button-1>", lambda _e, i=im["id"]: self.remove_image(i))
+            if ph is None:
+                self._load_thumb(im["id"])
+        self._attach_resized()
+
+    def _attach_resized(self):
+        """사진 줄 높이가 바뀌었다 (작은 그림이 왔다 · 뺐다). 기본 화면은 pack 이라 저절로 맞는다 - 테마가 다시 놓는다."""
+
+    def _load_thumb(self, iid, raw=None):
+        gen = self._gen
+        busy = self.__dict__.setdefault("thumb_busy", set())
+        if raw is None and iid in busy:
+            return
+        busy.add(iid)
+
+        def done(data, err):
+            busy.discard(iid)
+            if not self.alive or gen != self._gen or err or not data:
+                return
+            ph = BI.thumb(data, U.h(64), bg=self._attach_bg)
+            if ph is not None:
+                self.thumb_refs[iid] = ph
+                self._paint_attach()
+        if raw is not None:
+            return done(raw, None)
+        run_async(self.root, lambda: self.app.api.board_image(iid), done)
+
+    def pick_images(self):
+        room = self._img_max() - len(self.attach) - self.uploading
+        if room <= 0:
+            return self.say("이미지는 글 하나에 %d장까지입니다." % self._img_max(), U.DANGER)
+        paths = BI.pick_files(self.win)
+        if len(paths) > room:
+            self.say("이미지는 %d장까지라 앞의 %d장만 붙입니다." % (self._img_max(), room), U.DANGER)
+        limit = int(self.limits.get("imageBytes") or BI.BYTES_MAX)
+        for path in paths[:room]:
+            try:
+                raw = BI.read_file(path, limit)
+            except ValueError as e:
+                self.say(str(e), U.DANGER)
+                continue
+            self._upload(raw)
+
+    def paste_image(self, _e=None):
+        """내용 칸에 붙여 넣기: 클립보드에 그림**만** 있으면 올리고 글자 붙여 넣기는 막는다.
+
+        글자도 같이 있으면(엑셀 칸 · 웹 글처럼 그림과 글을 같이 담는 앱) 글자를 붙인다 - 쓰려던 것은 대개 글이다.
+        """
+        try:
+            if self.root.clipboard_get():
+                return None
+        except tk.TclError:
+            pass                              # 글자가 없다
+        raw = BI.clipboard_image()
+        if raw is None:
+            return None
+        if len(self.attach) + self.uploading >= self._img_max():
+            self.say("이미지는 글 하나에 %d장까지입니다." % self._img_max(), U.DANGER)
+            return "break"
+        self._upload(raw)
+        return "break"
+
+    def _upload(self, raw):
+        gen = self._gen
+        self.uploading += 1
+        self._paint_attach()
+
+        def done(r, err):
+            if not self.alive or gen != self._gen:
+                return
+            self.uploading = max(0, self.uploading - 1)
+            if err:
+                self.say(_err(err), U.DANGER)
+            elif r and r.get("id"):
+                if len(self.attach) < self._img_max():
+                    self.attach.append(r)
+                    self._load_thumb(r["id"], raw)
+            self._paint_attach()
+        run_async(self.root, lambda: self.app.api.board_image_upload(raw), done)
+
+    def remove_image(self, iid):
+        self.attach = [i for i in self.attach if i["id"] != iid]
+        self.thumb_refs.pop(iid, None)
+        self._paint_attach()
 
     def _pick_post_kind(self, kind):
         self.kind_var = kind
@@ -878,15 +1074,18 @@ class BoardWindow(object):
             return self.say("제목을 적어 주세요.", U.DANGER)
         if not body:
             return self.say("내용을 적어 주세요.", U.DANGER)
+        if getattr(self, "uploading", 0):
+            return self.say("이미지를 올리는 중입니다. 다 올라간 뒤에 등록해 주세요.", U.DANGER)
         gen = self._gen
         api = self.app.api
         pid, kind = self.edit_id, self.kind_var
+        images = [i["id"] for i in getattr(self, "attach", [])]
         self.post_btn.configure(state="disabled")
 
         def work():
             if pid:
-                return api.board_edit(pid, title, body)
-            return api.board_write(kind, title, body)
+                return api.board_edit(pid, title, body, images)
+            return api.board_write(kind, title, body, images)
 
         def done(r, err):
             if not self.alive or gen != self._gen:

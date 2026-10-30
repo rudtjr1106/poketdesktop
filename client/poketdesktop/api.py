@@ -814,13 +814,55 @@ class Api(object):
         """글 하나와 댓글."""
         return self._call("GET", "/api/board/%d" % int(pid))
 
-    def board_write(self, kind, title, body):
-        return self._call("POST", "/api/board",
-                          {"kind": kind, "title": title, "body": body})
+    def board_write(self, kind, title, body, images=None):
+        """images = 붙일 이미지 번호들 (버전 2 - board_image_upload 로 먼저 올린 것)."""
+        d = {"kind": kind, "title": title, "body": body}
+        if images is not None:
+            d["images"] = [int(i) for i in images]
+        return self._call("POST", "/api/board", d)
 
-    def board_edit(self, pid, title, body):
-        return self._call("PUT", "/api/board/%d" % int(pid),
-                          {"title": title, "body": body})
+    def board_edit(self, pid, title, body, images=None):
+        """images 를 주면 그 목록대로 바뀐다 (빠진 것은 서버가 지운다). None 이면 그림은 그대로."""
+        d = {"title": title, "body": body}
+        if images is not None:
+            d["images"] = [int(i) for i in images]
+        return self._call("PUT", "/api/board/%d" % int(pid), d)
+
+    def board_image_upload(self, raw):
+        """이미지 하나를 올린다 (버전 2). {id, w, h, fmt, frames} - 서버가 다시 저장해 위치 정보를 지운다."""
+        import base64
+        return self._call("POST", "/api/board/images",
+                          {"data": base64.b64encode(raw).decode("ascii")}, timeout=90)
+
+    def board_image(self, iid):
+        """이미지 바이트 (버전 2). 번호마다 그림이 안 바뀌어서 이 PC 에 담아 두고 다시 묻지 않는다."""
+        import hashlib
+        import os
+        import threading
+        # 서버마다 따로 담는다 - 로그인 화면에서 서버 주소를 바꾸면 번호가 겹친다
+        d = os.path.join(config.data_dir(), "board_img", hashlib.sha1(self.base.encode("utf-8")).hexdigest()[:10])
+        path = os.path.join(d, "%d.img" % int(iid))
+        try:
+            with open(path, "rb") as f:
+                return f.read()
+        except OSError:
+            pass
+        headers = {"Authorization": "Bearer " + self.token} if self.token else {}
+        try:
+            r = self.session.get("%s/api/board/images/%d" % (self.base, int(iid)), headers=headers, timeout=40)
+        except requests.RequestException as e:
+            raise ApiError("이미지를 받지 못했습니다: %s" % e)
+        if r.status_code != 200 or not r.content:
+            raise ApiError("이미지를 볼 수 없습니다. (%d)" % r.status_code, r.status_code)
+        try:
+            os.makedirs(d, exist_ok=True)
+            part = "%s.%d.part" % (path, threading.get_ident())       # 같은 그림을 둘이 받아도 안 섞인다
+            with open(part, "wb") as f:
+                f.write(r.content)
+            os.replace(part, path)
+        except OSError:
+            pass                    # 못 담아 두면 다음에 또 받으면 된다
+        return r.content
 
     def board_delete(self, pid):
         return self._call("DELETE", "/api/board/%d" % int(pid))

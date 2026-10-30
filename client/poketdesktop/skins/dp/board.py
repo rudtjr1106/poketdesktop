@@ -6,7 +6,8 @@
                흰 판 한 장에 글 줄(종류 꼬리표 · 제목 / 쓴 사람 · 언제 · 댓글 · 좋아요). 공지는 크림색 줄에 주황 막대.
     글         제목 · 쓴 사람 · 본문(공지 · 패치노트의 주소는 파랗게, 누르면 열린다) · 좋아요 단추(하트 아이콘) ·
                파란 꼬리표 '댓글 N' · 댓글(답글은 들여 쓰고 주황 막대). 맨 아래에 늘 보이는 댓글 칸.
-    쓰기       종류 고르기 · 제목 칸 · 내용 칸 · 글자 수 · 등록
+    쓰기       종류 고르기 · 제목 칸 · 내용 칸 · 사진 붙이기 줄(기본 게시판의 것을 그대로 놓는다) · 글자 수 · 등록
+    이미지     (버전 2) 본문 아래에 판 폭에 맞춰 차례대로 - 받는 대로 채우고, 누르면 크게 보기
     아래 줄    진한 테의 글상자 (알림)
 
 아이콘은 쓰지 않는다 (좋아요의 ♥ 는 글자).
@@ -312,6 +313,10 @@ class BoardWindow(B.BoardWindow):
         if n:
             nid = cv.create_text(rx, ty, text="댓글 %d" % n, fill="#c06810", font=font(9), anchor="e", tags=tags)
             rx = cv.bbox(nid)[0] - s(10)
+        pics = int(p.get("images") or 0)
+        if pics:
+            pid_ = cv.create_text(rx, ty, text="사진 %d" % pics, fill=LINK, font=font(9), anchor="e", tags=tags)
+            rx = cv.bbox(pid_)[0] - s(10)
         tx = lx + cw + s(8)
         _a, b = K.text(cv, tx, ty - K.tkfont_of(cv, font(11)).metrics("linespace") // 2, p.get("title") or "",
                        font(11), anchor="nw", width=max(60, rx - tx), tags=tags)
@@ -345,6 +350,7 @@ class BoardWindow(B.BoardWindow):
     def _show_post(self, p, bottom=False, keep=None):
         self._clear("post")
         self.post = p
+        self.dp_imgs, self.dp_img_raw, self.dp_img_bad = {}, {}, set()      # 그림은 글마다 새로
         self.reply_to = None
         self.like_busy = False
         s = U.h
@@ -418,6 +424,7 @@ class BoardWindow(B.BoardWindow):
                 _a, b = K.text(cv, x, y, chunk, font(11), anchor="nw", width=iw)
                 y = cv.bbox(b)[3] + s(4)
         y += s(12)
+        y = self._paint_images(cv, p, x, y, iw)
         # 좋아요
         self._like_y = y
         self._paint_like(p)
@@ -436,6 +443,69 @@ class BoardWindow(B.BoardWindow):
         if getattr(self, "_post_bottom", False):
             self._post_bottom = False
             cv.yview_moveto(1.0)
+
+    # ---------------- 이미지 (버전 2)
+    def _paint_images(self, cv, p, x, y, iw):
+        """본문 아래 그림들. 받기 전에는 자리만 (크기는 서버가 알려 준다), 받으면 다시 그린다."""
+        s = U.h
+        imgs = p.get("images") or []
+        if not imgs:
+            return y
+        refs = self.__dict__.setdefault("dp_imgs", {})
+        raws = self.__dict__.setdefault("dp_img_raw", {})
+        bad = self.__dict__.setdefault("dp_img_bad", set())
+        for im in imgs:
+            w, h, _sharp = B.BI.fit_size(im.get("w") or 1, im.get("h") or 1, iw, s(460))
+            tag = "img%d" % im["id"]
+            got = refs.get(im["id"])
+            if (got is None or got[0] != (w, h)) and im["id"] in raws:
+                # 받아 둔 바이트로 이 폭에 맞춰 다시 만든다 (창 크기를 바꿔도 다시 받지 않는다 · 크기마다 쌓지 않는다)
+                ph = B.BI.photo(raws[im["id"]], w, h, bg=WHITE)
+                got = ((w, h), ph) if ph is not None else None
+                if got:
+                    refs[im["id"]] = got
+            if got is not None and got[0] == (w, h):
+                cv.create_image(x, y, image=got[1], anchor="nw", tags=(tag,))
+            else:
+                cv.create_rectangle(x, y, x + w, y + h, fill="#eef2f6", outline=LINE, tags=(tag,))
+                cv.create_text(x + s(10), y + s(10), text="이미지를 볼 수 없습니다." if im["id"] in bad
+                               else "불러오는 중...", fill=DIM, font=font(9), anchor="nw", tags=(tag,))
+                if im["id"] not in bad:
+                    self._load_dp_image(im["id"], w, h)
+            cv.tag_bind(tag, "<Button-1>", lambda _e, i=im["id"]: self._view_dp_image(i))
+            cv.tag_bind(tag, "<Enter>", lambda _e: cv.configure(cursor="hand2"))
+            cv.tag_bind(tag, "<Leave>", lambda _e: cv.configure(cursor=""))
+            y += h + s(8)
+            if int(im.get("frames") or 1) > 1:
+                cv.create_text(x, y, text="움직이는 그림 · 눌러서 크게 보기", fill=DIM, font=font(9), anchor="nw")
+                y += s(20)
+        return y + s(6)
+
+    def _load_dp_image(self, iid, w, h):
+        busy = self.__dict__.setdefault("dp_img_busy", set())
+        if iid in busy:
+            return
+        busy.add(iid)
+        gen, post = self._gen, self.post
+
+        def done(raw, err):
+            busy.discard(iid)
+            if not self.alive or gen != self._gen or post is not self.post:
+                return
+            if err or not raw or B.BI.open_first(raw) is None:
+                self.dp_img_bad.add(iid)             # 못 받았다 - 자리에 그렇다고 적고 다시 묻지 않는다
+            else:
+                self.dp_img_raw[iid] = raw
+            try:
+                self._paint_post(self.pcv.winfo_width())
+            except tk.TclError:
+                pass
+        B.run_async(self.root, lambda: self.app.api.board_image(iid), done)
+
+    def _view_dp_image(self, iid):
+        raw = self.__dict__.get("dp_img_raw", {}).get(iid)
+        if raw:
+            B.BI.Viewer(self.root, raw)
 
     def _paint_comment(self, cv, c, x, y, iw, reply):
         s = U.h
@@ -578,9 +648,25 @@ class BoardWindow(B.BoardWindow):
         if post:
             self.text.insert("1.0", post.get("body") or "")
         self.text.bind("<KeyRelease>", lambda _e: self._count_post())
+        self.text.bind("<<Paste>>", self.paste_image, add="+")
+        self._attach_frame = self._attach_row(cv, bg=WHITE)          # 기본 게시판의 사진 줄을 그대로 놓는다
         self._counts = ("", "", False, False)
         self._wwins = {}
         cv.bind("<Configure>", lambda _e: self._paint_write_frame())
+
+    def _attach_resized(self):
+        """사진 줄 높이가 바뀌면 쓰기 판을 다시 놓는다 (작은 그림이 나중에 와서 '빼기' 가 잘렸다 - 10/30 검토)."""
+        f = getattr(self, "_attach_frame", None)
+        box = getattr(self, "thumbs", None)
+        if f is None or box is None or self.view != "write":
+            return
+        if not str(box).startswith(str(f) + "."):               # 사진 줄을 막 만드는 중 (_attach_frame 은 아직 옛것)
+            return
+        try:
+            f.update_idletasks()
+        except tk.TclError:
+            return
+        self._paint_write_frame()
 
     def _wplace(self, key, widget, x, y, w, h):
         cv = self.wcv
@@ -639,7 +725,10 @@ class BoardWindow(B.BoardWindow):
         y += s(44)
         cv.create_text(ix1, y + s(10), text="내용", fill=INK2, font=font(10), anchor="w", tags=t)
         y += s(24)
-        self._wplace("text", self._text_frame, ix1, y, ix2 - ix1, ph_bottom - s(16) - y)
+        # 사진 줄 (단추 · 안내 + 작은 그림 한 줄 + '빼기') - 위젯이 원하는 높이만큼 (글자 크기에 따라 다르다)
+        att = max(s(104), self._attach_frame.winfo_reqheight())
+        self._wplace("text", self._text_frame, ix1, y, ix2 - ix1, ph_bottom - s(16) - att - y)
+        self._wplace("attach", self._attach_frame, ix1, ph_bottom - s(8) - att, ix2 - ix1, att)
         # 아래: 글자 수 · 등록
         pw = self.post_btn.want_width(s(36))
         self.post_btn.layout(x2 - pw, h - s(48), x2, h - s(10))

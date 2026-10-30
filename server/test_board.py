@@ -324,8 +324,9 @@ def main():
     chk("공지 글쓴이에 운영자 표시", all(x["authorAdmin"] for x in ln["posts"]))
     chk("운영자만 공지를 쓸 수 있다고 알려 준다",
         board.listing(op)["canNotice"] is True and lst["canNotice"] is False)
-    chk("글자 수 한도를 같이 준다", lst["limits"] == {"title": 40, "body": 2000, "comment": 300,
-                                                 "search": 30}, lst["limits"])
+    chk("글자 수 한도를 같이 준다 (버전 2: 이미지 장수 · 크기도)", lst["limits"] == {
+        "title": 40, "body": 2000, "comment": 300, "search": 30, "images": 4, "imageBytes": 8 * 1024 * 1024},
+        lst["limits"])
 
     print("\n=== 댓글과 답글 ===")
     c1 = board.comment(b, f1, "첫 댓글", now=at(3000))

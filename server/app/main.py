@@ -1127,6 +1127,7 @@ def delete_account(body: DeleteIn, ctx=Depends(current)):
     n = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=?", (u["id"],))["c"]
     # 길드 마스터가 그냥 사라지면 마스터 없는 길드가 남는다. 자리를 넘기고 지운다.
     guild.on_user_deleted(u["id"])
+    board.drop_user_images(u["id"])        # 게시판 이미지 파일 (줄은 users 와 묶여 있지 않다)
     db.run("DELETE FROM users WHERE id=?", (u["id"],))
     return {"ok": True, "deletedPokemon": n,
             "message": "계정과 포켓몬 %d마리를 삭제했습니다." % n}

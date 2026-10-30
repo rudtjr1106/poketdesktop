@@ -22,6 +22,8 @@
      누른 뒤에 글을 다시 그리지 않는다 (읽던 자리가 안 튄다).
  11. (1.9.0) 찾기: 말을 넣으면 그 말이 든 글만. '전체 보기' 로 돌아온다.
  12. (1.9.0) 패치노트 칸: 서버가 올린 글. 본문의 주소를 누를 수 있고, 수정·삭제는 없다.
+ 13. (버전 2) 이미지: 파일을 고르거나 붙여 넣으면 올리고 작은 그림이 뜬다 · 4장 한도 · 빼기 · 등록할 때
+     번호가 같이 간다 · 글에 그림이 뜨고 누르면 크게 보기 · 고칠 때 붙은 그림이 실린다 · 목록에 '사진 N'.
 """
 import os
 import sys
@@ -69,6 +71,8 @@ class FakeApi(object):
         self.fail = None
         self._id = 0
         self.likes = {}          # 글 번호 -> 누른 사람들 (1.9.0)
+        self.images = {}         # 그림 번호 -> 바이트 (버전 2)
+        self.post_images = {}    # 글 번호 -> [그림 번호]
 
     def _next(self):
         self._id += 1
@@ -104,7 +108,8 @@ class FakeApi(object):
                "likes": len(who), "liked": self.uid in who,
                "mine": p["uid"] == self.uid,
                "canDelete": (p["uid"] == self.uid or admin) and not patch,
-               "canEdit": p["uid"] == self.uid and not patch}
+               "canEdit": p["uid"] == self.uid and not patch,
+               "images": len(self.post_images.get(p["id"], []))}
         out.update(self._who(p))
         return out
 
@@ -149,6 +154,8 @@ class FakeApi(object):
             raise ApiError("없는 글이거나 지워진 글입니다.", 404)
         out = self._row(p)
         out["body"] = p["body"]
+        out["images"] = [{"id": i, "w": 40, "h": 30, "fmt": "png", "frames": 1}
+                         for i in self.post_images.get(pid, [])]
         admin = self.me == ADMIN
 
         def one(c):
@@ -172,19 +179,35 @@ class FakeApi(object):
         out["canComment"] = True
         return out
 
-    def board_write(self, kind, title, body):
-        self.calls.append(("write", kind, title, body))
+    def board_write(self, kind, title, body, images=None):
+        self.calls.append(("write", kind, title, body) + ((list(images),) if images else ()))
         if self.fail:
             raise ApiError(self.fail, 403)
         if kind == "notice" and self.me != ADMIN:
             raise ApiError("공지는 운영자만 쓸 수 있습니다.", 403)
-        return self.board_post(self.seed_post(kind, self.me, self.uid, title, body, ago=0))
+        pid = self.seed_post(kind, self.me, self.uid, title, body, ago=0)
+        if images:
+            self.post_images[pid] = list(images)
+        return self.board_post(pid)
 
-    def board_edit(self, pid, title, body):
-        self.calls.append(("edit", pid, title, body))
+    def board_edit(self, pid, title, body, images=None):
+        self.calls.append(("edit", pid, title, body) + ((list(images),) if images is not None else ()))
         p = next(x for x in self.posts if x["id"] == pid)
         p.update({"title": title, "body": body, "edited": True})
+        if images is not None:
+            self.post_images[pid] = list(images)
         return self.board_post(pid)
+
+    def board_image_upload(self, raw):
+        self.calls.append(("upload", len(raw)))
+        iid = 900 + len(self.images)
+        self.images[iid] = raw
+        return {"id": iid, "w": 40, "h": 30, "fmt": "png", "frames": 1}
+
+    def board_image(self, iid):
+        if iid not in self.images:
+            raise ApiError("이미지를 볼 수 없습니다. (404)", 404)
+        return self.images[iid]
 
     def board_delete(self, pid):
         self.calls.append(("delete", pid))
@@ -220,6 +243,127 @@ class FakeApp(object):
 
     def mark_patch_seen(self, n):
         self.patch_seen = getattr(self, "patch_seen", []) + [n]
+
+
+def png_bytes(w=40, h=30):
+    import io
+    from PIL import Image
+    out = io.BytesIO()
+    Image.new("RGBA", (w, h), (240, 120, 40, 255)).save(out, "PNG")
+    return out.getvalue()
+
+
+def t_images(root):
+    """버전 2: 게시판 이미지."""
+    from poketdesktop import board_images as BI
+    print("\n=== 이미지 (버전 2) ===")
+    api = FakeApi("지우", 2)
+    app = FakeApp(root, api)
+    w = ui_board.BoardWindow(app)
+    wait(root, lambda: w.data is not None)
+    paths = []
+    for i in range(6):
+        pth = os.path.join(os.environ["POKET_HOME"], "pic%d.png" % i)
+        with open(pth, "wb") as f:
+            f.write(png_bytes(40 + i, 30))
+        paths.append(pth)
+    real_pick, real_clip = BI.pick_files, BI.clipboard_image
+    try:
+        w.show_write()
+        settle(root, 0.2)
+        chk("쓰기 화면에 '사진 붙이기' 와 0 / 4장", "사진 붙이기" in texts(w.win)
+            and any("0 / 4장" in x for x in texts(w.win)), [x for x in texts(w.win) if "장" in x])
+        BI.pick_files = lambda _parent: paths[:2]
+        w.pick_images()
+        wait(root, lambda: len(w.attach) == 2 and len(w.thumb_refs) == 2)
+        settle(root, 0.1)
+        chk("고르면 올리고 작은 그림이 뜬다", len(w.attach) == 2 and len(w.thumb_refs) == 2
+            and [c for c in api.calls if c[0] == "upload"].__len__() == 2, (w.attach, api.calls[-3:]))
+        chk("  2 / 4장", any("2 / 4장" in x for x in texts(w.win)))
+        BI.clipboard_image = lambda: png_bytes(16, 16)
+        root.clipboard_clear()
+        root.clipboard_append("글도 같이 복사됐다")
+        root.update()
+        chk("클립보드에 글자도 있으면 글자를 붙인다 (엑셀 칸 · 웹 글)", w.paste_image() is None and len(w.attach) == 2)
+        root.clipboard_clear()
+        root.update()
+        r = w.paste_image()
+        wait(root, lambda: len(w.attach) == 3)
+        chk("그림만 있으면 그림으로 올린다 (글자 붙여 넣기는 막는다)", r == "break" and len(w.attach) == 3)
+        BI.clipboard_image = lambda: None
+        chk("  클립보드에 그림이 없으면 글자 그대로", w.paste_image() is None)
+        BI.pick_files = lambda _parent: paths[3:6]
+        w.pick_images()
+        wait(root, lambda: len(w.attach) == 4)
+        settle(root, 0.2)
+        chk("4장 한도 - 남은 자리만큼만 붙이고 알린다", len(w.attach) == 4
+            and any("4장까지" in x for x in texts(w.win)), (len(w.attach), [x for x in texts(w.win) if "장" in x]))
+        chk("  다 차면 '사진 붙이기' 가 꺼진다", not w.attach_btn.enabled)
+        first = w.attach[0]["id"]
+        w.remove_image(first)
+        settle(root, 0.1)
+        chk("빼기", first not in [i["id"] for i in w.attach] and len(w.attach) == 3 and w.attach_btn.enabled)
+        bad = squeezed(w.win)
+        chk("  쓰기 화면에 눌린 위젯 없음 (사진 줄 · 빼기)", not bad, bad[:3])
+        w.title_var.set("사진 글")
+        w.text.insert("1.0", "그림 셋")
+        w.submit_post()
+        wait(root, lambda: w.view == "post" and w.post and w.post.get("title") == "사진 글")
+        call = [c for c in api.calls if c[0] == "write"][-1]
+        chk("등록할 때 이미지 번호가 차례대로 간다", call[-1] == [i["id"] for i in w.post["images"]]
+            and len(call[-1]) == 3, call)
+        wait(root, lambda: len(getattr(w, "img_refs", {})) == 3)
+        settle(root, 0.2)
+        chk("글에 그림 셋이 뜬다", len(w.img_refs) == 3, getattr(w, "img_refs", None))
+        bad = squeezed(w.win)
+        chk("  글 화면에 눌린 위젯 없음", not bad, bad[:3])
+        opened = []
+        real_viewer = BI.Viewer
+        BI.Viewer = lambda root_, raw, *a, **k: opened.append(raw)
+        try:
+            pics = [x for x in all_widgets(w.body) if x.winfo_class() == "Label" and str(x.cget("image"))]
+            pics[0].event_generate("<Button-1>")
+            root.update()
+        finally:
+            BI.Viewer = real_viewer
+        chk("그림을 누르면 크게 보기가 열린다 (그 그림 바이트로)", len(pics) == 3 and opened
+            and opened[0] in api.images.values(), (len(pics), len(opened)))
+        v = BI.Viewer(root, png_bytes(40, 30))
+        root.update()
+        chk("크게 보기 창 (작은 그림은 정수배로 키운다)", v.frames and v.frames[0].width() >= 80)
+        v.close()
+        import io as _io
+        from PIL import Image as _Im
+        g = _io.BytesIO()
+        fs = [_Im.new("RGB", (300, 200), (k, 0, 0)) for k in range(120)]
+        fs[0].save(g, "GIF", save_all=True, append_images=fs[1:], duration=40)
+        import time as _t
+        t0 = _t.time()
+        v = BI.Viewer(root, g.getvalue())
+        root.update()
+        built = sum(1 for f in v.frames if f is not None)
+        chk("긴 움직이는 GIF 도 바로 열린다 (프레임은 보일 때 만든다)", _t.time() - t0 < 1.5 and built <= 2
+            and len(v.frames) == 120, (round(_t.time() - t0, 2), built))
+        v.close()
+        w.show_edit()
+        settle(root, 0.2)
+        wait(root, lambda: len(w.thumb_refs) == 3)
+        chk("고칠 때 붙은 그림이 실린다", [i["id"] for i in w.attach] == api.post_images[w.edit_id]
+            and len(w.thumb_refs) == 3)
+        w.remove_image(w.attach[0]["id"])
+        w.submit_post()
+        wait(root, lambda: w.view == "post")
+        call = [c for c in api.calls if c[0] == "edit"][-1]
+        chk("고치면 남은 그림 번호가 간다", len(call[-1]) == 2, call)
+        w.show_list()
+        wait(root, lambda: w.view == "list" and w.data is not None)
+        settle(root, 0.2)
+        chk("목록에 '사진 2'", "사진 2" in texts(w.win), [x for x in texts(w.win) if "사진" in x])
+        bad = squeezed(w.win)
+        chk("눌린 위젯 없음 (이미지)", not bad, bad[:3])
+    finally:
+        BI.pick_files, BI.clipboard_image = real_pick, real_clip
+        w.close()
 
 
 def t_190(root, top, w, api, app, new_id):
@@ -727,6 +871,7 @@ def main():
         w2.text.get("1.0", "end-1c"))
     w2.close()
 
+    t_images(root)
     ui_box.confirm = real_confirm
     settle(root, 0.3)
     chk("콜백에서 난 예외가 없다", not errors, errors[:2])

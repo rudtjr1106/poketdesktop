@@ -186,6 +186,28 @@ CREATE INDEX IF NOT EXISTS idx_board_comment_post ON board_comment(post_id, id);
 CREATE INDEX IF NOT EXISTS idx_board_comment_user ON board_comment(user_id, created_at);
 
 -- 좋아요 (1.9.0). 글 하나에 한 사람이 한 번. 다시 누르면 줄을 지운다.
+-- 게시판 이미지 (버전 2). 그림은 파일(config.BOARD_IMG_DIR/<id>.<fmt>)이고 여기는 그 목록이다.
+-- 먼저 올리고(post_id NULL) 글을 쓸 때 붙인다. 하루 넘게 안 붙은 것은 치운다 (board._sweep_images).
+CREATE TABLE IF NOT EXISTS board_image (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    post_id     INTEGER,                    -- 붙은 글 (아직 안 붙었으면 NULL)
+    pos         INTEGER NOT NULL DEFAULT 0, -- 글 안의 차례
+    fmt         TEXT NOT NULL,              -- png / jpg / gif
+    w           INTEGER NOT NULL,
+    h           INTEGER NOT NULL,
+    bytes       INTEGER NOT NULL,
+    frames      INTEGER NOT NULL DEFAULT 1, -- 움직이는 GIF 면 프레임 수
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_board_image_post ON board_image(post_id, pos);
+CREATE INDEX IF NOT EXISTS idx_board_image_user ON board_image(user_id, created_at);
+-- 이미지 올리기 시도 (하루 한도를 센다). 그림을 풀기 **전에** 적는다 - 실패한 것 · 나중에 지운 것도 센다.
+CREATE TABLE IF NOT EXISTS board_upload (
+    user_id     INTEGER NOT NULL,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_board_upload_user ON board_upload(user_id, created_at);
 CREATE TABLE IF NOT EXISTS board_like (
     post_id     INTEGER NOT NULL REFERENCES board_post(id) ON DELETE CASCADE,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

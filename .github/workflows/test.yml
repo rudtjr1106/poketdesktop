@@ -617,6 +617,7 @@ jobs:
           python test_mega.py
           python test_legend_limit.py
           python test_board.py
+          python test_board_images.py    # 버전 2: 게시판 이미지 (다시 저장 · 위치 정보 지우기 · 붙이기 · 권한)
           python test_mypage.py
           python test_walk_ow.py
           python test_shiny_recolor.py
