@@ -720,7 +720,9 @@ def main():
         == ["0290-season3-open", "0300-s3-void-early"], names[-3:])
     chk("시즌 4 는 10/17 부터 2주", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
         == (4, "2026-10-17", "2026-10-31"))
-    chk("시즌 4 열기는 손질 목록의 맨 끝", names[-1] == "0320-season4-open", names[-2:])
+    # 그 뒤로 시즌과 무관한 손질(0330 끝난 배틀 정리)이 붙었다 - 시즌 손질 가운데 맨 끝이면 된다.
+    chk("시즌 4 열기는 시즌 손질 가운데 맨 끝", [n for n in names if "season" in n][-1] == "0320-season4-open",
+        names[-3:])
 
     print("\n=== 규칙표 ===")
     rules = season.rules_public()
