@@ -125,10 +125,23 @@ def is_holdable(item_id):
 
 
 # ---------------------------------------------------------------- 드랍
-def roll_drop(rng, shiny=False):
-    """도구 하나를 뽑는다. 이로치면 여러 번 뽑아 가장 귀한 것을 준다."""
+def drop_table(now=None):
+    """지금 굴릴 드랍표 ([(도구 id, 가중치)], 합). 이벤트 날이면 그 도구의 가중치를 곱한다 (할로윈 사탕).
+
+    items.json 의 표는 건드리지 않는다 - 탐험(expedition._pools)이 같은 표에서 지닌 도구를 고른다.
+    """
+    from . import halloween
     table = data()["dropTable"]
-    total = data()["dropTotal"]
+    more = halloween.drop_boost(now)
+    if not more:
+        return table, data()["dropTotal"]
+    table = [(i, w * more.get(i, 1)) for i, w in table]
+    return table, sum(w for _i, w in table)
+
+
+def roll_drop(rng, shiny=False, now=None):
+    """도구 하나를 뽑는다. 이로치면 여러 번 뽑아 가장 귀한 것을 준다."""
+    table, total = drop_table(now)
 
     def once():
         x = rng.random() * total
