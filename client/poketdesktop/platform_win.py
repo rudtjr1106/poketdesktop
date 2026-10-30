@@ -66,6 +66,20 @@ def keep_on_top(win):
         pass
 
 
+def order_below(win, ref):
+    """win 을 ref 바로 아래로 (꾸미기 효과 창 - deco_fx). SetWindowPos 의 '뒤에 넣기' - 다른 창 · 포커스는 그대로."""
+    SWP_NOSIZE, SWP_NOMOVE, SWP_NOACTIVATE, SWP_NOOWNERZORDER = 0x0001, 0x0002, 0x0010, 0x0200
+    try:
+        u = ctypes.windll.user32
+        a = u.GetParent(win.winfo_id()) or win.winfo_id()
+        b = u.GetParent(ref.winfo_id()) or ref.winfo_id()
+        u.SetWindowPos(ctypes.c_void_p(a), ctypes.c_void_p(b), 0, 0, 0, 0,
+                       SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER)
+        return True
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 NAME = "poketdesktop-single-instance"
 
 

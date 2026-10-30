@@ -13,6 +13,7 @@ import random
 import time
 import tkinter as tk
 
+from common import deco as DECO
 from common import tint as T
 
 from . import config
@@ -132,6 +133,20 @@ def look_num(mon):
     return mon.get("lookNum") or mon.get("formNum") or mon.get("num")
 
 
+def walk_entry(walks, mon, num=None):
+    """그 포켓몬(num 의 모습)의 걷기 시트 (시트경로, meta). 이로치는 이로치 시트부터, 없으면 보통 색."""
+    num = num or look_num(mon)
+    return walks.get(walk_cache.key(num, T.skin(mon))) or walks.get(num) or (None, None)
+
+
+def build_walk(settings, sheet, meta, mon):
+    """바탕화면의 걷는 도트. **작업 스레드에서 미리 불러 둘 수 있다** (장식 얹기는 0.05~0.1초 -
+    app 이 동기화 때 같은 인자로 먼저 만들어 두면 Overlay.anim_of 는 sprites 캐시에서 바로 꺼낸다)."""
+    s = settings
+    return sprites.load_walk(sheet, meta, s["targetHeight"], s["minScale"], max(2.5, s["maxScale"]),
+                             deco=DECO.parts(mon.get("deco"))[0])
+
+
 class Pet(object):
     """포켓몬 한 마리."""
 
@@ -148,6 +163,11 @@ class Pet(object):
         self.look_hold = False
         # 빛나는 돌 표식 (bond_stone, 시즌 3). place() 가 옮기므로 먼저 둔다.
         self.stone_badge = None
+        # 꾸미기 (버전 2). 장식은 도트에 얹혀 있고(anim_of - 다른 동작도 같은 것을 얹는다),
+        # 효과는 따로 창 하나(deco_fx.Trail).
+        self.deco_acc = tuple(getattr(anim, "deco", ()) or ())
+        self.deco_fx = DECO.parts(mon.get("deco"))[1]
+        self.trail = None
         self._first_anim = anim
         self.fw, self.fh = anim.w, anim.h
         key = anim.key                    # 투명색은 그림마다 다르다
@@ -237,6 +257,7 @@ class Pet(object):
 
         self.redraw()
         self.place()
+        self.set_trail(self.deco_fx)
 
     # ---------------- 이름표 ----------------
     def nameplate_text(self):
@@ -556,7 +577,8 @@ class Pet(object):
         try:
             anim = sprites.load_walk(sheet, meta,
                                      self.ov.settings["targetHeight"],
-                                     scale=self.base_scale, name=name)
+                                     scale=self.base_scale, name=name,
+                                     deco=getattr(self, "deco_acc", ()))
         except Exception:                                  # noqa: BLE001
             self.miss.add(key)
             return None
@@ -927,11 +949,47 @@ class Pet(object):
         self.x, self.y = nx, ny
         self.place()
 
+    def drop_guessed(self, sheets):
+        """머리 자리 없이(어림으로) 장식을 얹어 둔 다른 동작을, 자리가 생긴 시트를 받았으면 버린다 (다음에 다시 만든다).
+        지금 하고 있는 동작은 그대로 둔다 - 다음에 바꿀 때 새로 만든다."""
+        if not getattr(self, "deco_acc", ()):
+            return
+        for name, a in list(self.anims.items()):
+            if name in ("Walk", self.anim_name) or getattr(a, "pts", True) or not getattr(a, "deco", ()):
+                continue
+            ent = sheets.get(walk_cache.sheet_key(self.look, name, T.skin(self.mon)))
+            if ent and ent[1] and ent[1].get("pts"):
+                self.anims.pop(name, None)
+                self.photo_cache.pop(name, None)
+
+    def set_trail(self, fx):
+        """꾸미기 효과(발자국 · 별가루 ...)를 fx 로 맞춘다. 같으면 그대로, 없으면 창을 치운다."""
+        fx = tuple(fx or ())
+        self.deco_fx = fx
+        t = self.trail
+        if t is not None and t.keys == fx:
+            return
+        if t is not None:
+            t.destroy()
+            self.trail = None
+        if not fx:
+            return
+        from . import deco_fx
+        try:
+            t = deco_fx.Trail(self, fx)
+        except Exception as e:                              # noqa: BLE001
+            config.log("꾸미기 효과를 못 띄웠습니다: %s" % e)
+            return
+        self.trail = t if t.ok else None
+
     def destroy(self):
         self.cancel_tip()
         if self.stone_badge is not None:
             self.stone_badge.destroy()
             self.stone_badge = None
+        if self.trail is not None:
+            self.trail.destroy()
+            self.trail = None
         try:
             self.view.destroy()
         except Exception:                                   # noqa: BLE001
@@ -1108,6 +1166,20 @@ class Overlay(object):
         """
         if getattr(pet, "evolving", False) or getattr(pet, "look_hold", False):
             return
+        # 꾸미기를 바꿨다 (버전 2). 장식은 도트에 얹혀 있어서 갈아 입히고, 효과는 창만 바꾼다.
+        acc, fx = DECO.parts(pet.mon.get("deco"))
+        if fx != getattr(pet, "deco_fx", ()):
+            pet.set_trail(fx)
+        # 걷는 도트에만 얹는다 (배틀 도트로 대신하는 종은 안 얹는다 - 견주면 매번 갈아 입힌다)
+        if pet.walking_sprite and acc != getattr(pet, "deco_acc", ()):
+            self.reskin(pet, pet.look)
+            return
+        # 머리 자리(pts)를 나중에 받았다 (walk_cache.needs_points) - 어림으로 얹은 장식을 제자리로
+        if pet.walking_sprite and acc and not getattr(pet.anims.get("Walk") or pet._first_anim, "pts", True):
+            _sheet, meta = walk_entry(self.walks, pet.mon, pet.look)
+            if meta and meta.get("pts"):
+                self.reskin(pet, pet.look)
+                return
         # 이로치가 색을 바꿨다 (1.8.0) - 번호는 같고 색만 다르다.
         if T.skin(pet.mon) != getattr(pet, "skin", T.skin(pet.mon)):
             self.reskin(pet, pet.look)
@@ -1158,12 +1230,10 @@ class Overlay(object):
         # 걷는 도트가 있으면 그걸 먼저 쓴다. 4방향에 걷기 프레임이 있어서
         # 위로 가면 등이 보이고 걸을 때 발이 바뀐다.
         # 이로치는 이로치 시트부터. 아직 안 받았으면 보통 색으로라도 걷는다.
-        sheet, meta = (self.walks.get(walk_cache.key(num, T.skin(mon)))
-                       or self.walks.get(num) or (None, None))
+        sheet, meta = walk_entry(self.walks, mon, num)
         if sheet and meta:
             try:
-                anim = sprites.load_walk(sheet, meta, s["targetHeight"],
-                                         s["minScale"], max(2.5, s["maxScale"]))
+                anim = build_walk(s, sheet, meta, mon)
             except Exception:                              # noqa: BLE001
                 anim = None
 
@@ -1211,6 +1281,8 @@ class Overlay(object):
         """
         for p in list(self.pets.values()) + list(self.extra) + list(self.eggs.values()):
             self.paint_alpha(p.win)
+            if getattr(p, "trail", None) is not None:
+                p.trail.set_alpha(self.alpha())       # 클릭 통과를 다시 건다 (윈도우)
 
     def clear(self):
         """화면의 도트를 전부 없앤다.
@@ -1261,6 +1333,8 @@ class Overlay(object):
                 except Exception:
                     pass
             p.hide_tip()
+            if hidden and getattr(p, "trail", None) is not None:
+                p.trail.step(0)             # 숨김을 보고 바로 치운다
         self.place_badges()
         if not hidden:
             self.apply_names()
@@ -1393,7 +1467,13 @@ class Overlay(object):
                     continue
             except Exception:                              # noqa: BLE001
                 continue
+            if getattr(w, "_poket_under", False):
+                continue                # 꾸미기 효과 창 - 올리지 않고 아래에서 제 포켓몬 밑으로 넣는다
             PLAT.keep_on_top(w)
+        for p in list(getattr(self, "pets", {}).values()) + list(getattr(self, "extra", [])):
+            t = getattr(p, "trail", None)
+            if t is not None:
+                t.below_pet()
 
     def _tick(self):
         if not self._running:
@@ -1414,6 +1494,9 @@ class Overlay(object):
         for p in list(self.pets.values()) + list(self.extra) + list(self.eggs.values()):
             try:
                 p.update(ms)
+                t = getattr(p, "trail", None)
+                if t is not None:
+                    t.step(ms)
                 if cx is not None:
                     p.view.update_hit(cx - int(p.x), cy - int(p.y))
             except Exception as e:                       # noqa: BLE001

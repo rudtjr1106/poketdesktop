@@ -56,10 +56,19 @@ def _found(item_id):
         _no_file.pop(item_id, None)
 
 
+def _deco_key(item_id):
+    """가방의 꾸미기 ('deco:crown_gold') 면 그 열쇠. 꾸미기 그림은 앱이 그린다 (deco_art) - 서버에 묻지 않는다."""
+    from .deco_art import ITEM_PREFIX
+    s = str(item_id or "")
+    return s[len(ITEM_PREFIX):] if s.startswith(ITEM_PREFIX) else None
+
+
 def raw(api, item_id):
     """그림 파일 경로. 없으면 서버에서 받아온다. **작업 스레드에서 부를 것.**"""
     if not item_id:
         return None
+    if _deco_key(item_id):
+        return item_id              # 그릴 수 있다 (파일은 없다 - pil · photo 가 deco_art 로 만든다)
     p = local_path(item_id)
     if p:
         _found(item_id)
@@ -106,6 +115,10 @@ def pil(item_id):
     서버를 기다리면 그 사이 화면이 얼어붙는다. 아직 없으면 None 을
     돌려주고, 부르는 쪽이 직접 그린 볼로 넘어간다.
     """
+    key = _deco_key(item_id)
+    if key:
+        from . import deco_art
+        return deco_art.item_icon(key, 48)
     p = local_path(item_id)
     if not p:
         return None
@@ -139,6 +152,8 @@ def _decode(item_id):
     img = _rgba.get(item_id)
     if img is not None:
         return img
+    if _deco_key(item_id):
+        return pil(item_id)
     p = local_path(item_id)
     if not p:
         return None
@@ -168,12 +183,19 @@ def photo(item_id, size=28):
         if t is not None and time.time() - t < RETRY_AFTER:
             return None
         try:
-            base = _decode(item_id)
-            if base is None:
-                with _lock:
-                    _no_file[item_id] = time.time()
-                return None
-            img = _fit(base, size)
+            dk = _deco_key(item_id)
+            if dk:
+                from . import deco_art
+                img = deco_art.item_icon(dk, size)      # 크기마다 정수 배로 다시 그린다 (줄여서 뭉개지 않게)
+                if img is None:
+                    return None
+            else:
+                base = _decode(item_id)
+                if base is None:
+                    with _lock:
+                        _no_file[item_id] = time.time()
+                    return None
+                img = _fit(base, size)
         except Exception:
             return None
     try:
@@ -196,6 +218,8 @@ def prefetch(api, item_ids, sizes=()):
         if not raw(api, i):
             continue
         got += 1
+        if _deco_key(i):
+            continue                # 그릴 때 만든다 (작고 빠르다)
         try:
             base = _decode(i)
             if base is None:

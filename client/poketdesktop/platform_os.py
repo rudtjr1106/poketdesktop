@@ -77,3 +77,5 @@ already_running_hint = _M.already_running_hint
 
 # 맥에만 있는 것. 없는 데서는 아무 일도 안 하게 해 둔다.
 keep_click_through = getattr(_M, "keep_click_through", lambda win: None)
+# win 을 ref 바로 아래로 (꾸미기 효과 창이 제 포켓몬 밑에 깔리게 - 다른 창은 안 올린다)
+order_below = getattr(_M, "order_below", lambda win, ref: False)

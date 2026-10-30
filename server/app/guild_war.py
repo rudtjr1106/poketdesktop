@@ -1344,6 +1344,7 @@ def settle(now=None):
             if not _mark("gw:%d:paid:%d" % (s, uid), _iso(now)):
                 continue
             guild._coin_add(uid, n)
+            _deco_reward(uid, rank, s, r["name"], now)
             if rank == 1:
                 msg = ("시즌 %d 길드전에서 [%s] 길드가 우승했습니다! 칭호 '%s' 을(를) 드립니다. "
                        "칭호는 랭킹 탭에서 바꿀 수 있습니다." % (s, r["name"], season.TITLES[TITLE]))
@@ -1353,12 +1354,36 @@ def settle(now=None):
                        % (r["name"], rank, r["tiles"], n,
                           "와 칭호 '%s' 을(를) 드렸습니다." % season.TITLES[TITLE] if rank == 1
                           else "를 드렸습니다."))
+        if v5():
+            msg_of[gid] += " 꾸미기 보상(%s)은 선물함으로 갑니다." % (
+                DECO_RANK_KR[rank] if rank in DECO_RANK else "참가 묶음 선택권")
     for gid, text in msg_of.items():
         if db.q1("SELECT 1 FROM guild WHERE id=?", (gid,)) and _mark("gw:%d:said:%d" % (s, gid), _iso(now)):
             guild._say(gid, text, now)
             guild._changed(gid)
     _mark("gw:%d:settled" % s, _iso(now))
     return True
+
+
+# 꾸미기 순위 보상 (시즌 5, 버전 2 - common/deco.py). 1 · 2 · 3위 길드는 묶음, 그 밖은 참가 묶음 선택권.
+DECO_RANK = {1: "bundle:rank1", 2: "bundle:rank2", 3: "bundle:rank3"}
+DECO_RANK_KR = {1: "금관 · 금빛 별가루 · 발밑 빛", 2: "은관 · 은빛 별가루", 3: "동관 · 동빛 별가루"}
+
+
+def _deco_reward(uid, rank, s, gname, now=None):
+    """결산 때 한 번이라도 공격한 길드원에게 꾸미기 보상을 선물함으로 (시즌 5 부터). 받는 것은 꾸미기 창에서 낀다."""
+    if not v5():
+        return
+    from common import deco as C
+    what = DECO_RANK.get(rank, C.PICK)
+    if rank in DECO_RANK:
+        msg = ("시즌 %d 길드전 %d위 [%s] - 꾸미기 보상 (%s). 가방의 '꾸미기' 주머니에 들어갑니다 - 거기서나 "
+               "바탕화면 포켓몬 우클릭 '꾸미기...' 에서 씌울 수 있습니다." % (s, rank, gname, DECO_RANK_KR[rank]))
+    else:
+        msg = ("시즌 %d 길드전에 참가해 주셔서 고맙습니다. 참가 묶음(리본+발자국 · 꽃핀+꽃잎 · 진주+하트) 가운데 "
+               "하나를 고르세요 - 가방의 '꾸미기' 주머니에 든 '참가 묶음 선택권' 으로 고릅니다." % s)
+    db.run("INSERT INTO gift (user_id, kind, item_id, count, title, message, created_at) VALUES (?,?,?,?,?,?,?)",
+           (uid, "deco", what, 1, "시즌 %d 길드전 꾸미기" % s, msg, _iso(now)))
 
 
 # ---------------------------------------------------------------- 보여주기

@@ -229,7 +229,8 @@ def _public_mon(m):
     sp = d.get(m["species"]) or {}
     return {"id": m["id"], "num": sp.get("num"), "species": m["species"],
             "name": m.get("nickname") or sp.get("kr") or m["species"], "level": int(m.get("level") or 1),
-            "shiny": bool(m.get("shiny")), "tint": m.get("tint") if m.get("shiny") else None}
+            "shiny": bool(m.get("shiny")), "tint": m.get("tint") if m.get("shiny") else None,
+            "deco": m.get("deco") or {}}             # 꾸미기 (버전 2) - 놀러 간 포켓몬도 쓰고 간다
 
 
 def received_today(uid, now=None):
@@ -441,8 +442,12 @@ def state(uid, now=None):
 
 
 # ---------------------------------------------------------------- 소켓으로 오는 것
-def _clean_party(raw):
-    """주인이 보낸 파티를 다듬는다 (믿지 않는다 - 숫자만, 여섯 마리까지). 자리는 없다 - 걷는 것은 손님 화면 몫."""
+def _clean_party(raw, uid=None):
+    """주인이 보낸 파티를 다듬는다 (믿지 않는다 - 숫자만, 여섯 마리까지). 자리는 없다 - 걷는 것은 손님 화면 몫.
+
+    꾸미기(버전 2)는 보낸 값을 안 믿는다 - 주인(uid)의 포켓몬이 서버에 쓰고 있는 것(pokemon.deco)을 싣는다.
+    고친 화면이 안 가진 금관을 친구에게 보여 주지 못하게.
+    """
     out = []
     for p in (raw or [])[:6]:
         try:
@@ -456,6 +461,15 @@ def _clean_party(raw):
             x["tint"] = tint
         if x["num"] > 0 and x["id"] not in [o["id"] for o in out]:
             out.append(x)
+    if uid and out:
+        # 꾸미기 (버전 2) - 손님 화면도 장식 · 효과를 그린다
+        from . import deco
+        rows = db.q("SELECT id, deco FROM pokemon WHERE user_id=? AND deco IS NOT NULL AND id IN (%s)"
+                    % ",".join("?" * len(out)), tuple([uid] + [x["id"] for x in out]))
+        worn = dict((r["id"], deco.worn(r["deco"])) for r in rows)
+        for x in out:
+            if worn.get(x["id"]):
+                x["deco"] = worn[x["id"]]
     return out
 
 
@@ -486,7 +500,7 @@ def receive(uid, msg, now_s=None, conn=None):
         if now_s - last.get("party", 0) < PARTY_GAP:
             return None
         last["party"] = now_s
-        party = _clean_party(msg.get("party"))
+        party = _clean_party(msg.get("party"), uid)
         lead = next((p["id"] for p in party if p["lead"]), party[0]["id"] if party else None)
         v["party"], v["hostLead"] = party, lead
         return to, {"t": "party", "party": party, "lead": lead}

@@ -128,8 +128,11 @@ def swap_sprite(pet, anim):
     발밑 한가운데를 기준으로 자리를 맞춘다. 왼쪽 위를 기준으로 두면
     커진 만큼 아래로 자라나서 땅에 박힌 것처럼 보인다.
     """
-    cx = pet.x + pet.fw / 2.0
-    by = pet.y + pet.fh
+    # 기준은 **장식 전 몸**의 가운데 · 발 (body_cx · foot, 꾸미기 버전 2). 장식은 칸을 한쪽으로만 늘려서 칸 가운데를
+    # 잡으면 끼우고 뺄 때 몸이 옆으로 밀린다. 장식이 없으면 칸 가운데 · 칸 밑 그대로다 (예전과 같다).
+    old = (getattr(pet, "anims", None) or {}).get(getattr(pet, "anim_name", "Walk")) or getattr(pet, "_first_anim", None)
+    cx = pet.x + getattr(old, "body_cx", pet.fw / 2.0)
+    by = pet.y + getattr(old, "foot", pet.fh)
 
     # **다른 동작들도 같이 버려야 한다.** 안 그러면 진화한 뒤에도 가만히
     # 있을 때만 옛 모습이 튀어나온다 - 걷기는 새 것, Idle 은 옛 것이 된다.
@@ -146,6 +149,8 @@ def swap_sprite(pet, anim):
     pet.ay = getattr(anim, "ay", anim.h / 2.0)
     pet._diag = None
     pet.fw, pet.fh = anim.w, anim.h
+    # 이 도트에 얹힌 장식 (버전 2). 다른 동작(anim_for)도 같은 것을 얹고, sync 가 이 값과 견주어 갈아 입힌다.
+    pet.deco_acc = tuple(getattr(anim, "deco", ()) or ())
     # 투명색은 그림마다 다르다. 창까지 같이 바꿔주지 않으면 새 도트 배경이
     # 그대로 남아 네모난 판이 하나 떠다닌다. (맥은 색으로 뚫는 방식이
     # 아니라서 이 문제가 없지만, 같은 자리에서 부르면 된다.)
@@ -171,8 +176,8 @@ def swap_sprite(pet, anim):
 
     pet.frame = 0
     pet.elapsed = 0
-    pet.x = cx - pet.fw / 2.0
-    pet.y = by - pet.fh
+    pet.x = cx - getattr(anim, "body_cx", pet.fw / 2.0)
+    pet.y = by - getattr(anim, "foot", pet.fh)
     pet.clamp()
     pet.redraw()
     pet.place()
@@ -248,6 +253,7 @@ class Evolution(object):
         num = self.info.get("toNum")
         shiny = T.skin(self.pet.mon)          # 이로치가 고른 색까지
         facing = self.pet.facing
+        deco = tuple(getattr(self.pet, "deco_acc", ()) or ())     # 쓰던 장식은 진화해도 그대로 (버전 2)
 
         def work():
             """도트 받기와 PIL 작업은 전부 여기서 끝낸다 (작업 스레드)."""
@@ -266,7 +272,7 @@ class Evolution(object):
                     try:
                         anim = sprites.load_walk(
                             sheet, meta, s["targetHeight"], s["minScale"],
-                            max(2.5, s["maxScale"]))
+                            max(2.5, s["maxScale"]), deco=deco)
                         walk = (sheet, meta)
                     except Exception:                       # noqa: BLE001
                         anim = None

@@ -88,6 +88,15 @@ def bind_right(widget, fn):
         widget.bind(seq, fn)
 
 
+def order_below(win, ref):
+    """win 을 ref 바로 아래로 (꾸미기 효과 창). Tk 의 lower 가 최상위 창끼리도 순서를 바꾼다."""
+    try:
+        win.lower(ref)
+        return True
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 def show_again(win):
     """숨겨 둔 창을 다시 보여준다.
 

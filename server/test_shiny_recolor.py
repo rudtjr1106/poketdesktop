@@ -240,7 +240,9 @@ def main():
         chk("이로치 시트 → 보통 시트 → 얼굴 두 장 차례로 물었다",
             [u.split("/master/")[1] for u in net.calls]
             == ["sprite/%04d/0000/0001/AnimData.xml" % kora, "sprite/%04d/AnimData.xml" % kora,
-                "sprite/%04d/Walk-Anim.png" % kora, "portrait/%04d/Normal.png" % kora,
+                "sprite/%04d/Walk-Anim.png" % kora,
+                "sprite/%04d/Walk-Offsets.png" % kora,     # 꾸미기 위치 점 (버전 2) - 없으면(404) pts 0
+                "portrait/%04d/Normal.png" % kora,
                 "portrait/%04d/0000/0001/Normal.png" % kora], net.calls)
         png_path, meta_path = M._anim_paths(kora, "Walk", True)
         _w, _h, spx = read_rgba(open(png_path, "rb").read())

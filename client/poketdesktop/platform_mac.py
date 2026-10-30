@@ -240,6 +240,25 @@ def bind_right(widget, fn):
     return
 
 
+def order_below(win, ref):
+    """win 을 ref 바로 아래로 (같은 '떠 있는 창' 층 안에서, 꾸미기 효과 창 - deco_fx). 다른 창은 안 건드린다.
+
+    `orderWindow:relativeTo:` 는 숨긴 창도 화면에 올린다 - 둘 다 보일 때만 한다.
+    """
+    a, b = nswindow(win), nswindow(ref)
+    if a is None or b is None:
+        return False
+    try:
+        if not (a.isVisible() and b.isVisible()):
+            return False
+        if a.level() != b.level():
+            a.setLevel_(b.level())
+        a.orderWindow_relativeTo_(-1, b.windowNumber())      # NSWindowBelow
+        return True
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 def show_again(win):
     """숨겨 둔 창을 다시 보여준다.
 

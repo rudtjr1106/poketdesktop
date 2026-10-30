@@ -365,6 +365,9 @@ jobs:
       # 1.8.0: 이로치 색 고르기 - 색조 돌리기·캐시·바탕화면 갈아 입기·고르기 창
       - name: 이로치 색 고르기 (진짜 Tk)
         run: python client/test_tint_ui.py
+      # 버전 2: 꾸미기 - 걷는 도트에 장식 얹기 · 발자국/별가루 효과 창 · 꾸미기 창(테마 7개)
+      - name: 꾸미기 (진짜 Tk)
+        run: python client/test_deco.py
       # 1.8.1: 잡았을 때의 경험치 - 받은 레벨업·진화를 화면이 다루는지
       - name: 잡았을 때의 경험치
         run: python client/test_catch_exp.py
@@ -531,6 +534,9 @@ jobs:
       # 1.8.0: 이로치 색 고르기 - 색조 돌리기·캐시·바탕화면 갈아 입기·고르기 창
       - name: 이로치 색 고르기 (진짜 Tk)
         run: python client/test_tint_ui.py
+      # 버전 2: 꾸미기 - 걷는 도트에 장식 얹기 · 발자국/별가루 효과 창 · 꾸미기 창(테마 7개)
+      - name: 꾸미기 (진짜 Tk)
+        run: python client/test_deco.py
       # 1.8.1: 잡았을 때의 경험치 - 받은 레벨업·진화를 화면이 다루는지
       - name: 잡았을 때의 경험치
         run: python client/test_catch_exp.py
@@ -651,6 +657,7 @@ jobs:
           python test_boss.py
           python test_guild_war.py
           python test_guild_war_v5.py    # 시즌 5: 조커(길드마다 3명) · 개인 기여 보상 (게시판 #373)
+          python test_deco.py            # 버전 2: 꾸미기 - 위치 점 · 끼우기(한 마리만) · 선물 · 길드전 순위 보상
 
       - name: 서버 띄우기
         env:

@@ -129,6 +129,7 @@ def pet_mon(p, base_id):
     num = int(p.get("num") or 0)
     look = int(p.get("look") or 0)
     out = {"id": base_id, "num": num, "shiny": bool(p.get("shiny")), "tint": p.get("tint"),
+           "deco": p.get("deco") or {},              # 꾸미기 (버전 2) - 서버가 실어 준 것 (주인이 보낸 값이 아니다)
            "info": {"name": p.get("name") or "?", "level": p.get("level") or 1,
                     "species": p.get("species"), "types": []}}
     if look and look != num:
@@ -1354,6 +1355,9 @@ class Visit(object):
                                     or (pet.mon.get("tint") or None) != (mon.get("tint") or None)):
                 self._drop_pet(self.mirrors.pop(pid))       # 색이 바뀌었다 - 새로 만든다
                 pet = None
+            elif pet is not None and (pet.mon.get("deco") or {}) != mon["deco"]:
+                pet.mon["deco"] = mon["deco"]               # 꾸미기를 바꿨다 - 갈아 입힌다 (자리는 그대로)
+                ov._match_look(pet)
             if pet is None:
                 if not self._have_sprite(mon):
                     want_fetch.append(mon)
@@ -1527,7 +1531,9 @@ class Visit(object):
             out.append({"id": p.id, "num": mon.get("num"), "look": p.look or mon.get("num"),
                         "shiny": bool(mon.get("shiny")), "tint": mon.get("tint"),
                         "name": info.get("name") or mon.get("nickname") or "",
-                        "level": info.get("level") or mon.get("level") or 1, "lead": p is lead})
+                        "level": info.get("level") or mon.get("level") or 1, "lead": p is lead,
+                        # 꾸미기를 바꾸면 파티가 '바뀐 것' 이 되어 다시 보낸다 (서버는 이 값을 안 믿고 DB 것을 싣는다)
+                        "deco": dict(mon.get("deco") or {})})
         return out
 
     def _host_tick(self):

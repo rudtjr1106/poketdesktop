@@ -321,6 +321,17 @@ CREATE TABLE IF NOT EXISTS gift (
 );
 CREATE INDEX IF NOT EXISTS idx_gift_user ON gift(user_id, claimed_at);
 
+-- 꾸미기 (버전 2, deco.py · common/deco.py). 가진 장식 · 효과. deco 는 common.deco.DECOS 의 열쇠이거나
+-- 'pick_join'(참가 묶음 선택권 - 이것만 count 가 쌓인다). 포켓몬이 쓰고 있는 것은 pokemon.deco (JSON {칸: 열쇠}).
+CREATE TABLE IF NOT EXISTS deco_owned (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    deco       TEXT NOT NULL,
+    count      INTEGER NOT NULL DEFAULT 1,
+    season     INTEGER NOT NULL DEFAULT 0,      -- 받은 시즌 (길드전 보상)
+    got_at     TEXT NOT NULL,
+    PRIMARY KEY (user_id, deco)
+);
+
 -- 기술머신은 개수가 없다. 한 번 얻으면 계속 쓰고, 팔지도 사지도 못한다.
 -- 그래서 가방(bag)에 안 넣는다 - 거기는 개수를 세는 곳이다.
 -- seen (1.11.0): 가방에서 확인했는지. 0 이면 '새 기술머신' 이라 노란 점이 찍힌다.
@@ -1155,6 +1166,8 @@ MIGRATIONS = [
     # 연습판 대전 로그 표시 - 점수판 로그(14일)보다 빨리(2일) 치우려고. 옛 행은 0 = 점수판
     ("pvp_match", "practice",
      "ALTER TABLE pvp_match ADD COLUMN practice INTEGER NOT NULL DEFAULT 0"),
+    # 꾸미기 (버전 2): 포켓몬이 쓰고 있는 장식 · 효과 {칸: 열쇠}. 옛 행은 NULL = 아무것도 안 씀
+    ("pokemon", "deco", "ALTER TABLE pokemon ADD COLUMN deco TEXT"),
     # 시즌 5 길드전 (게시판 #373 의견): 조커 · 개인 기여 보상. 옛 행은 0 = 조커 아님 · 받은 것 없음
     ("guild_war_team", "joker", "ALTER TABLE guild_war_team ADD COLUMN joker INTEGER NOT NULL DEFAULT 0"),
     ("guild_war_team", "earned", "ALTER TABLE guild_war_team ADD COLUMN earned INTEGER NOT NULL DEFAULT 0"),
@@ -1418,7 +1431,16 @@ def _row_to_mon(r):
                  if "tint" in r.keys() and r["shiny"] else None),
         # 폼 (1.13). 도구를 써서 바꾼 모습의 열쇠
         "form": (r["form"] if "form" in r.keys() else None) or None,
+        # 꾸미기 (버전 2) {칸: 열쇠}. 앱이 걷는 도트에 얹고 효과를 그린다. 아무것도 안 쓰면 빈 dict
+        "deco": _deco_of(r),
     }
+
+
+def _deco_of(r):
+    if "deco" not in r.keys() or not r["deco"]:
+        return {}
+    from . import deco
+    return deco.worn(r["deco"])
 
 
 def insert_mon(user_id, mon, now):

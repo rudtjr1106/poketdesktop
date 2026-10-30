@@ -5,6 +5,7 @@ import random
 import sys
 import tkinter as tk
 
+from common import deco as DECO                # noqa: E402
 from common import patchnotes                  # noqa: E402
 from common import pokelogic as P              # noqa: E402
 from common import tint as T                   # noqa: E402
@@ -670,10 +671,14 @@ class App(object):
             # 폼(1.13)으로 바뀐 포켓몬은 그 폼의 도트도 받는다 (못 받으면 원래 모습으로 걷는다)
             want += [(m["formNum"], T.skin(m)) for m in mons if m.get("formNum")]
             want += self.dress_megas(mons, stone)
+            # 장식을 낀 포켓몬은 머리 자리가 있는 meta 가 필요하다 (꾸미기, 버전 2)
+            walk_cache.want_points(n for m in mons if DECO.parts(m.get("deco"))[0]
+                                   for n in (look_num(m), m.get("num")))
             paths = sprite_cache.ensure_many(self.api, want)
             # 걷는 도트도 같이 받아 둔다. 없는 종은 알아서 건너뛴다.
             walks = walk_cache.ensure_many(self.api, want)
             self.undress_missing(mons, paths, walks)
+            self._prebuild_walks(mons, walks)
             if me and me.get("eggs"):
                 # 알 그림도 여기서 받아 둔다 (tk 스레드에서 받으면 멈춘다)
                 from . import eggs_ui
@@ -747,6 +752,7 @@ class App(object):
                     self.overlay.sync_eggs(me.get("eggs") or [])
                     self.announce_hatch(me.get("eggs") or [])
                 self._prefetch_anims(mons or [])
+                self.prebuild_deco(list(self.overlay.pets.values()))    # 꾸미기를 바꿨으면 다른 동작을 미리
                 # 배틀 중에 새 도트가 생기면(창에서 바탕화면에 올렸을 때)
                 # '항상 위' 맨 위에 놓여 체력바 층을 가린다. 체력바 틱은 더
                 # 이상 순서를 올리지 않으므로(메뉴 위로 올라오던 원인이라
@@ -2157,6 +2163,9 @@ class App(object):
         # 이로치는 색을 고를 수 있다 (1.8.0). 모든 사람의 화면에 그 색으로 나온다.
         tint = ({"text": "색 고르기...", "command": lambda: self.open_tint(pet)}
                 if pet.mon.get("shiny") and (pet.id or 0) > 0 else None)
+        # 꾸미기 (버전 2): 내 포켓몬에만 (놀러 온 친구 포켓몬 · 야생은 id 가 0 아래)
+        deco = ({"text": "꾸미기...", "command": lambda: self.open_deco(pet)}
+                if (pet.id or 0) > 0 else None)
         if not PLAT.NATIVE_MENU:
             # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
             rows = [
@@ -2171,6 +2180,8 @@ class App(object):
                 rows.append(mega)
             if tint:
                 rows.append(tint)
+            if deco:
+                rows.append(deco)
             rows += [
                 None,
                 {"text": "포켓몬 관리...", "command": self.open_box},
@@ -2198,6 +2209,8 @@ class App(object):
                           state="normal" if mega.get("enabled", True) else "disabled")
         if tint:
             m.add_command(label=tint["text"], command=tint["command"])
+        if deco:
+            m.add_command(label=deco["text"], command=deco["command"])
         m.add_separator()
         m.add_command(label="포켓몬 관리...", command=self.open_box)
         m.add_separator()
@@ -2267,6 +2280,27 @@ class App(object):
                 except Exception:                           # noqa: BLE001
                     pass
         TintPicker(self, pet.mon, on_done=done)
+
+    def open_deco(self, pet):
+        """꾸미기 창 (버전 2). 끼우거나 빼면 바탕화면을 다시 맞춘다 (장식은 도트에, 효과는 따로 창에)."""
+        if self.arena or self.battle or (pet.id or 0) <= 0:
+            return
+        from .ui_deco import DecoWindow
+        old = getattr(self, "deco_window", None)
+        if old is not None and old.alive:
+            old.close()
+
+        self.deco_window = DecoWindow(self, pet.mon, on_done=lambda mon: self.deco_changed(pet.id, mon.get("deco")))
+
+    def deco_changed(self, pid, deco):
+        """꾸미기를 씌우거나 뺐다 (꾸미기 창 · 가방). 서버가 준 것으로 바탕화면 도트를 바로 갈아 입힌다 -
+        동기화를 기다리면 몇 초 늦게 바뀐다. 다른 포켓몬에서 빠진 것은 동기화가 맞춘다."""
+        p = self.overlay.pets.get(pid) if self.overlay else None
+        if p is not None:
+            p.mon["deco"] = dict(deco or {})
+            self.overlay._match_look(p)
+            self.prebuild_deco([p])
+        self.request_sync()
 
     # ---------------- 메가진화한 모습으로 걷기 (1.8.0) ----------------
     # 겉모습뿐이다. 능력치도 배틀도 그대로고, 배틀 창에서는 여전히 메가진화
@@ -2689,8 +2723,10 @@ class App(object):
                     and (self.overlay.walks.get(walk_cache.key(n, sh))
                          or self.overlay.walks.get(n))):
                 nums.append((n, sh))
+        sheets = self.overlay.sheets
         want = [(n, sh, a) for n, sh in nums for a in self.ANIM_ORDER
-                if walk_cache.sheet_key(n, a, sh) not in self.overlay.sheets]
+                if walk_cache.sheet_key(n, a, sh) not in sheets
+                or walk_cache.needs_points(n, a, sh, (sheets[walk_cache.sheet_key(n, a, sh)] or (None, None))[1])]
         if not want:
             return
         self._anim_job = True
@@ -2709,8 +2745,60 @@ class App(object):
             if err or not r or self._quitting or not self.overlay:
                 return
             self.overlay.sheets.update(r)
+            pets = list(self.overlay.pets.values())
+            for p in pets:
+                p.drop_guessed(self.overlay.sheets)        # 머리 자리를 이제 받은 동작은 제자리로 다시 얹는다
+            self.prebuild_deco(pets)
 
         run_async(self.root, work, done)
+
+    # ---------------- 꾸미기 (버전 2): 장식 얹기는 작업 스레드에서 미리 ----------------
+    # 장식을 얹는 데 동작 하나에 0.05~0.1초 걸린다. 화면 스레드에서 처음 그 동작을 할 때 만들면 그동안 모든 포켓몬과
+    # 배틀이 멈춘다. 같은 인자로 작업 스레드에서 먼저 불러 두면 sprites 캐시에서 바로 나온다.
+    def _prebuild_walks(self, mons, walks):
+        """(작업 스레드) 동기화 때 받은 걷기 시트로, 장식을 낀 포켓몬의 걷는 도트를 미리 만든다 (Overlay.anim_of 와 같은 인자)."""
+        from . import overlay as O
+        settings = self.overlay.settings if self.overlay else self.settings
+        for m in mons:
+            if not DECO.parts(m.get("deco"))[0]:
+                continue
+            sheet, meta = O.walk_entry(walks, m)
+            if sheet and meta:
+                try:
+                    O.build_walk(settings, sheet, meta, m)
+                except Exception:                           # noqa: BLE001
+                    pass
+
+    def prebuild_deco(self, pets):
+        """장식을 낀 포켓몬의 다른 동작(서기 · 앉기 · 점프 ...)을 작업 스레드에서 미리 만든다 (Pet.anim_for 와 같은 인자)."""
+        ov = self.overlay
+        if ov is None:
+            return
+        jobs = []
+        for p in pets:
+            acc = getattr(p, "deco_acc", ())
+            if not acc or not getattr(p, "walking_sprite", False):
+                continue
+            for a in walk_cache.ANIMS:
+                if a in p.anims:
+                    continue
+                ent = ov.sheets.get(walk_cache.sheet_key(p.look, a, T.skin(p.mon)))
+                if ent and ent[0] and ent[1]:
+                    jobs.append((ent[0], ent[1], p.base_scale, a, acc))
+        if not jobs:
+            return
+        th = ov.settings["targetHeight"]
+
+        def work():
+            from . import sprites
+            for sheet, meta, scale, a, acc in jobs:
+                if self._quitting:
+                    break
+                try:
+                    sprites.load_walk(sheet, meta, th, scale=scale, name=a, deco=acc)
+                except Exception:                           # noqa: BLE001
+                    pass
+        run_async(self.root, work, lambda _r, _e: None)
 
     def toggle_names(self):
         self.settings["showNames"] = not self.settings.get("showNames")

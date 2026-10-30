@@ -25,6 +25,7 @@ from tkinter import ttk
 
 from PIL import ImageTk
 
+from common import deco as DECO
 from common import held as H
 from common import pokelogic as P
 from common import tint as T
@@ -56,20 +57,21 @@ STAT_ROWS = [("hp", "HP"), ("atk", "공격"), ("def", "방어"),
 STAT_KR = dict(STAT_ROWS)
 
 # 분류 — 실제로 쓸 수 있는 것부터 위로 올린다
-CAT_ORDER = ["megastone", "zcrystal", "form", "held", "stone", "ev", "iv", "misc", "ball"]
+CAT_ORDER = ["megastone", "zcrystal", "form", "held", "stone", "ev", "iv", "misc", "ball", "deco"]
 CAT_KR = {"megastone": "메가스톤", "zcrystal": "Z크리스탈", "form": "폼 도구", "held": "지닌 도구",
-          "stone": "진화의 돌", "ev": "노력치", "iv": "단련", "misc": "기타", "ball": "볼"}
+          "stone": "진화의 돌", "ev": "노력치", "iv": "단련", "misc": "기타", "ball": "볼", "deco": "꾸미기"}
 CAT_COLOR = {"megastone": "#a98bff", "zcrystal": "#ffd23c", "form": "#5fd3c6", "held": U.ACCENT,
-             "stone": U.PINK, "ev": U.GOOD, "iv": U.SHINY, "misc": U.INFO, "ball": U.RED}
+             "stone": U.PINK, "ev": U.GOOD, "iv": U.SHINY, "misc": U.INFO, "ball": U.RED, "deco": "#ff8fc8"}
 
 # /api/bag/use 가 받아주는 효과. 나머지(볼, 파는 물건)는 여기서 쓸 수 없다.
 # "held" 는 use 가 아니라 /api/pokemon/{id}/hold 로 간다 - 대상을 고르는
 # 흐름은 같아서 여기서 같이 다룬다.
 # "form" (1.13) 은 폼 도구 - 고르는 도구(로토무카탈로그·운석)는 쓰기 전에 모습을 한 번 더 묻는다.
 # "tmticket" (1.13.1) 은 랭크 시즌 보상인 기술머신 뽑기권 - 타입 확정은 쓰기 전에 타입을 묻는다.
-USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket", "form", "tmticket")
+# "deco" (버전 2) 는 꾸미기 - /api/deco/equip 으로 씌우고 뺀다. "decopick" 은 참가 묶음 선택권 (묶음을 고른다).
+USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket", "form", "tmticket", "deco", "decopick")
 # **대상 포켓몬이 없는 도구.** 고를 것이 없으니 목록을 띄우지 않고 바로 쓴다.
-NO_TARGET = ("ticket", "tmticket")
+NO_TARGET = ("ticket", "tmticket", "decopick")
 
 ROW_BG = "#10131c"      # 목록 한 줄 바탕
 SEL_BG = "#2b2417"      # 고른 줄
@@ -136,6 +138,60 @@ def mega_fits(dex, item, mon):
 
 
 # ---------------------------------------------------------------- 설명 만들기
+# ---------------------------------------------------------------- 꾸미기 (버전 2)
+# 꾸미기는 서버의 가방(/api/shop 의 bag)이 아니라 /api/deco 에 있다. 가방은 그것을 '꾸미기' 분류의 도구로
+# 섞어 보여 준다 (이름 'deco:<열쇠>', 그림은 deco_art - item_icons 가 서버에 안 묻는다). 팔 수 없다 (sell 0).
+def fetch_deco(api):
+    """꾸미기 목록 (/api/deco). 옛 서버거나 실패하면 None - 가방은 꾸미기 없이 연다."""
+    fn = getattr(api, "deco_state", None)
+    if fn is None:
+        return None
+    try:
+        return fn()
+    except Exception:                                       # noqa: BLE001
+        return None
+
+
+def deco_items(state, names=None):
+    """/api/deco 의 답 -> (도구 명세 목록, {도구ID: 개수}, {포켓몬id: {칸: 열쇠}}). 가진 것만.
+
+    names 는 {포켓몬id: 이름} - '쓰는 포켓몬' 을 설명에 적는다."""
+    from .deco_art import ITEM_PREFIX
+    if not state:
+        return [], {}, {}
+    names = names or {}
+    worn = {}
+    for pid, d in (state.get("worn") or {}).items():
+        try:
+            worn[int(pid)] = DECO.clean(d)
+        except (TypeError, ValueError):
+            pass
+    items, bag = [], {}
+    for it in state.get("items") or []:
+        key = it.get("key")
+        if not it.get("owned") or key not in DECO.DECOS:
+            continue
+        slot = DECO.slot_of(key)
+        by = it.get("wornBy")
+        who = names.get(by) if by else None
+        desc = "%s (%s 칸) %s" % (DECO.name(key), DECO.SLOT_KR.get(slot, slot), DECO.DECOS[key].get("desc", ""))
+        if by:
+            desc += "\n지금 %s 이(가) 쓰고 있다." % (who or "다른 포켓몬")
+        iid = ITEM_PREFIX + key
+        items.append({"id": iid, "kr": DECO.name(key), "en": key, "cat": "deco", "sell": 0, "note": desc,
+                      "effect": {"kind": "deco", "deco": key, "slot": slot, "wornBy": by}})
+        bag[iid] = 1
+    picks = int(state.get("picks") or 0)
+    if picks > 0:
+        iid = ITEM_PREFIX + DECO.PICK
+        items.append({"id": iid, "kr": DECO.PICK_KR, "en": DECO.PICK, "cat": "deco", "sell": 0,
+                      "note": "길드전 참가 보상. 참가 묶음 (%s) 가운데 하나를 고른다. 고른 뒤에는 바꿀 수 없다."
+                      % " · ".join(DECO.BUNDLE_KR[b] for b in DECO.JOIN_CHOICES),
+                      "effect": {"kind": "decopick", "choices": state.get("choices") or []}})
+        bag[iid] = picks
+    return items, bag, worn
+
+
 def item_desc(item):
     """도구 설명 한 줄. items.json 에 설명 문구가 없어서 effect 로 만든다.
 
@@ -255,6 +311,8 @@ def target_hint(item):
         return "한 마리에 하나. 이미 지닌 것은 가방으로 돌아온다"
     if kind == "form":
         return "이 도구가 통하는 포켓몬을 밝게 표시했다"
+    if kind == "deco":
+        return "한 마리에 칸마다 하나. 다른 포켓몬이 쓰던 것이면 옮겨 온다"
     return ""
 
 
@@ -562,6 +620,7 @@ class BagWindow(object):
         self._mon_ids = set()
         self._view = []          # 오른쪽 목록에 보이는 포켓몬 - 찾는 말로 거르고 줄 세운 것 (1.13.1)
         self.tm_left = None      # {타입: 아직 없는 기술머신 수} - 타입 확정 뽑기권이 있을 때만 온다 (1.13.1)
+        self.deco_worn = {}      # {포켓몬id: {칸: 열쇠}} - 꾸미기 (버전 2, deco_items)
         self.item_sort = "name"  # 도구 목록 순서 (ITEM_SORTS). 다시 불러와도 그대로다 (1.13.4)
 
         # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
@@ -856,6 +915,7 @@ class BagWindow(object):
 
         def work():
             shop = fetch_shop(api)
+            deco = fetch_deco(api)
             mons = api.pokemon()
             # 도트는 여기서 그림까지 다 만들어 둔다. tk 스레드에서 만들면
             # 마릿수만큼 창이 멈춘다. PhotoImage 만 tk 쪽에서 씌운다.
@@ -886,7 +946,7 @@ class BagWindow(object):
                 item_icons.prefetch(api, list(bag), sizes=(20,))
             except Exception:                           # noqa: BLE001
                 pass
-            return shop, mons, thumbs
+            return shop, mons, thumbs, deco
         U.run_async(self.root, work, self._loaded)
 
     def _loaded(self, r, err):
@@ -900,9 +960,13 @@ class BagWindow(object):
                 w.close()
             return self.say(getattr(err, "message", str(err)), U.DANGER,
                             U.DANGER)
-        shop, mons, thumbs = r
-        self.items = shop.get("items") or []
-        self.bag = shop.get("bag") or {}
+        shop, mons, thumbs, deco = r
+        self.items = list(shop.get("items") or [])
+        self.bag = dict(shop.get("bag") or {})
+        names = dict((m["id"], (m.get("info") or {}).get("name") or m.get("nickname") or "?") for m in mons or [])
+        d_items, d_bag, self.deco_worn = deco_items(deco, names)
+        self.items += d_items
+        self.bag.update(d_bag)
         self.money = int(shop.get("money") or 0)
         self.tm_left = shop.get("tmLeft")
         self.mons = mons or []
@@ -1244,7 +1308,28 @@ class BagWindow(object):
         if kind == "form":
             return self._form_state(it, mon)
 
+        if kind == "deco":
+            return self._deco_state(it, mon)
+
         return False, True, "쓸 수 없다", U.FG_FAINT
+
+    def _deco_state(self, it, mon):
+        """꾸미기 (버전 2): 쓰고 있으면 '빼기', 그 칸에 다른 것을 쓰고 있으면 '바꿔 씀', 바탕화면에 있으면 밝게."""
+        eff = it.get("effect") or {}
+        key, slot = eff.get("deco"), eff.get("slot")
+        mine = self.deco_worn.get(mon.get("id")) or {}
+        if mine.get(slot) == key:
+            return True, False, "쓰는 중 · 빼기", U.PINK
+        if mine.get(slot):
+            return False, False, "%s 대신" % DECO.name(mine[slot]), U.FG_DIM
+        if mon.get("onDesktop"):
+            return True, False, "", U.GOOD          # 밝게만 ('따라다님' 이 이미 줄에 있다)
+        return False, False, "", U.FG_FAINT
+
+    def _deco_on(self, it, mon):
+        """이 포켓몬에 끼우나(True) 빼나(False)."""
+        eff = it.get("effect") or {}
+        return (self.deco_worn.get((mon or {}).get("id")) or {}).get(eff.get("slot")) != eff.get("deco")
 
     @staticmethod
     def _form_state(it, mon):
@@ -1379,6 +1464,10 @@ class BagWindow(object):
         free = usable and kind in NO_TARGET          # 대상을 안 고르는 도구
         ok = bool(usable and (free or (mon and (not self.stat_needed or self.stat))))
         use_text = "%s 쓰기" % it["kr"] if (it and usable and (mon or free)) else "쓰기"
+        if kind == "deco":
+            use_text = ("씌우기" if self._deco_on(it, mon) else "빼기") if mon else "씌우기"
+        elif kind == "decopick":
+            use_text = "묶음 고르기"
 
         # 팔기는 포켓몬을 안 골라도 된다. 값이 붙어 있고 실제로 갖고
         # 있으면 팔 수 있다. 몬스터볼은 게임이 안 돌아가므로 뺀다.
@@ -1480,6 +1569,8 @@ class BagWindow(object):
             return
         if self.stat_needed and not self.stat:
             return self.say("어느 능력을 단련할지 골라 주세요.", U.ACCENT, U.FG_DIM)
+        if (it.get("effect") or {}).get("kind") == "deco":
+            return self._use_deco(it, mon)
         # 이로치사탕은 시즌 보상이라 다시 구할 길이 없다. 한 번 묻는다.
         if (it.get("effect") or {}).get("kind") == "shiny":
             name = (mon.get("info") or {}).get("name") or "이 포켓몬"
@@ -1572,8 +1663,62 @@ class BagWindow(object):
                                  "어느 타입을 뽑을까요? 고른 타입의 기술머신 가운데 아직 없는 것 "
                                  "하나가 무작위로 나옵니다.", opts)
 
+    def _use_deco(self, it, mon):
+        """꾸미기를 씌우거나 뺀다 (/api/deco/equip). 바탕화면 도트도 바로 갈아 입힌다."""
+        api = self.app.api
+        key = (it.get("effect") or {}).get("deco")
+        pid = mon["id"]
+        on = self._deco_on(it, mon)
+        name = (mon.get("info") or {}).get("name") or "이 포켓몬"
+        self.use_btn.configure(state="disabled")
+        self.say("씌우는 중..." if on else "빼는 중...", U.FG_FAINT)
+
+        def done(r, err):
+            if not self.alive:
+                return
+            if err:
+                self.say(getattr(err, "message", str(err)), U.DANGER, U.DANGER)
+                return self._refresh_button()
+            self.mon_id = pid
+            text = ("%s 에게 %s 을(를) 씌웠다." if on else "%s 의 %s 을(를) 뺐다.") % (name, it["kr"])
+            self._pending = (natural(text), U.GOOD)
+            changed = getattr(self.app, "deco_changed", None)
+            if changed is not None:
+                changed(pid, (r or {}).get("deco") or {})
+            else:
+                self.app.request_sync()
+            self.reload()
+        U.run_async(self.root, lambda: api.deco_equip(pid, key, on), done)
+
+    def _use_deco_pick(self, it):
+        """참가 묶음 선택권: 묶음 셋 가운데 하나를 고른다 (되돌릴 수 없다 - 고르는 창이 그렇게 말한다)."""
+        choices = (it.get("effect") or {}).get("choices") or [
+            {"key": b, "kr": DECO.BUNDLE_KR[b]} for b in DECO.JOIN_CHOICES]
+        opts = [(c["key"], c.get("kr") or DECO.name(c["key"]), None) for c in choices]
+        bundle = ui_box.ask_choice(self.win, DECO.PICK_KR,
+                                   "참가 묶음 하나를 고르세요. 고른 뒤에는 바꿀 수 없습니다.", opts)
+        if not bundle:
+            return
+        api = self.app.api
+        self.use_btn.configure(state="disabled")
+        self.say("고르는 중...", U.FG_FAINT)
+
+        def done(r, err):
+            if not self.alive:
+                return
+            if err:
+                self.say(getattr(err, "message", str(err)), U.DANGER, U.DANGER)
+                return self._refresh_button()
+            got = (r or {}).get("got") or [DECO.name(bundle)]
+            self._pending = ("받았다: %s - 꾸미기 주머니에서 포켓몬에게 씌울 수 있다." % " · ".join(got), U.GOOD)
+            self.item_id = None
+            self.reload()
+        U.run_async(self.root, lambda: api.deco_pick(bundle), done)
+
     def _use_no_target(self, it):
         """대상이 없는 도구(뽑기권). 포켓몬을 안 고르고 바로 쓴다."""
+        if (it.get("effect") or {}).get("kind") == "decopick":
+            return self._use_deco_pick(it)
         api = self.app.api
         item_id = it["id"]
         eff = it.get("effect") or {}
@@ -1678,6 +1823,8 @@ def gift_line(g):
         return "명패 · %s" % (g.get("name") or "?")
     if g.get("kind") == "egg":
         return g.get("name") or "포켓몬 알"
+    if g.get("kind") == "deco":
+        return "꾸미기 · %s" % (g.get("name") or "?")     # 묶음은 여러 개를 한 줄에 (개수가 없다)
     return "%s ×%d" % (g.get("name") or "?", n)
 
 
@@ -1700,6 +1847,9 @@ def gift_notes(gifts):
                     "자리가 없으면 박스에 들어가니 포켓몬 관리에서 데리고 다니세요.")
     if kinds & {"title", "frame"}:
         bits.append("칭호·명패는 마이페이지에서 바꿀 수 있습니다.")
+    if "deco" in kinds:
+        bits.append("꾸미기는 가방의 '꾸미기' 주머니에 들어갑니다 - 거기서 고르거나, 바탕화면 포켓몬을 우클릭해 "
+                    "'꾸미기...' 로 씌울 수 있습니다.")
     return head, msg, " ".join(bits) or "가방에 넣어 두었습니다."
 
 

@@ -925,6 +925,20 @@ class Api(object):
         """미션을 다 채웠다 - 메가스톤을 받는다 (X/Y 는 여기서 고른다)."""
         return self._call("POST", "/api/bond/%d/claim" % int(pid), {"stone": stone})
 
+    # ---------------- 꾸미기 (버전 2) ----------------
+    def deco_state(self):
+        """꾸미기 목록 · 가진 것 · 누가 무엇을 쓰고 있나 · 참가 묶음 선택권."""
+        return self._call("GET", "/api/deco")
+
+    def deco_equip(self, pid, deco, on=True):
+        """그 포켓몬에 장식 · 효과를 끼우거나(on) 뺀다. 장식 하나는 한 마리만 - 다른 포켓몬이 쓰던 것은 빠진다."""
+        return self._call("POST", "/api/deco/equip",
+                          {"pokemonId": int(pid), "deco": str(deco), "on": bool(on)})
+
+    def deco_pick(self, bundle):
+        """참가 묶음 선택권 한 장으로 묶음 하나를 고른다."""
+        return self._call("POST", "/api/deco/pick", {"bundle": str(bundle)})
+
     # ---------------- 기술머신 ----------------
     # 사고팔 수 없고 쓴다고 없어지지도 않는다. 그래서 개수를 주고받는
     # 자리가 없다 - 가졌는지 아닌지만 있다.

@@ -14,6 +14,7 @@ import json
 import os
 import random
 import sys
+import threading
 import time
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -31,7 +32,8 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
-from . import (achievements, auth, avatar, battle_routes, board, board_routes, mega, config, db, deps, eggs, expedition, item_routes,  # noqa: E402
+from . import (achievements, auth, avatar, battle_routes, board, board_routes, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
+               expedition, item_routes, walkpts,
                errors, friendly, halloween, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws,
@@ -48,6 +50,7 @@ app.include_router(boss_routes.router)          # 악당 출현 (시즌 4)
 app.include_router(raid_routes.router)
 app.include_router(live_routes.router)
 app.include_router(board_routes.router)
+app.include_router(deco_routes.router)            # 꾸미기 (버전 2)
 app.include_router(mypage.router)
 app.include_router(avatar.router)
 app.include_router(party.router)
@@ -604,12 +607,7 @@ def _anim_fetch(num, name, shiny=False):
         if name != "Walk":
             return _mark_missing(meta_path)
         return _walk_fetch_ow(mega[len(OW_MARK):], png_path, meta_path, shiny)
-    if mega:
-        # 메가 폼 (1.8.0). SpriteCollab 은 폼을 종 아래 폴더로 둔다
-        # (sprite/0006/0001/ = 메가리자몽X). 이로치는 그 아래 0001.
-        base = "%s/%s/%s" % (WALK_BASE, mega, "0001/" if shiny else "")
-    else:
-        base = "%s/%04d/%s" % (WALK_BASE, num, SHINY_SUBDIR if shiny else "")
+    base = _pmd_base(num, shiny)
 
     def grab(fn):
         with urllib.request.urlopen(base + fn, timeout=12) as r:
@@ -665,12 +663,123 @@ def _anim_fetch(num, name, shiny=False):
     meta = {"ok": True, "frameW": fw, "frameH": fh,
             "durations": durs, "frames": len(durs), "rows": rows,
             "rowmap": ROWMAP_PMD, "src": "pmd", "anim": name}
+    _put_points(meta, lambda: grab("%s-Offsets.png" % png_name))
+    if shiny and meta.get("pts") == 0:
+        _points_from_normal(num, name, meta)
     if shiny:
         # 클라이언트는 이 표시가 있어야 이로치 시트로 믿는다. 옛 서버는
         # ?shiny=1 을 모르고 보통 시트를 주는데, 그걸 이로치로 굳히면 안 된다.
         meta["shiny"] = True
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f)
+    return meta
+
+
+def _pmd_base(num, shiny=False):
+    """SpriteCollab 에서 이 종(폼)의 폴더 주소. 세 번째 출처에만 있는 메가 폼이면 None."""
+    mega = _mega_walk(num)
+    if mega and mega.startswith(OW_MARK):
+        return None
+    if mega:
+        # 메가 폼 (1.8.0). SpriteCollab 은 폼을 종 아래 폴더로 둔다
+        # (sprite/0006/0001/ = 메가리자몽X). 이로치는 그 아래 0001.
+        return "%s/%s/%s" % (WALK_BASE, mega, "0001/" if shiny else "")
+    return "%s/%04d/%s" % (WALK_BASE, num, SHINY_SUBDIR if shiny else "")
+
+
+def _put_points(meta, fetch):
+    """위치 점(머리 · 몸 가운데)을 meta 에 싣는다 (꾸미기, walkpts.py). 받은 것을 meta 에 적고 True.
+
+    pts 1 = 실었다, 0 = 이 동작에는 Offsets 그림이 없다(404 - 다시 안 묻는다). 끊겼거나 못 읽으면 아무것도 안
+    적는다 - _anim_meta 가 다음에 다시 받는다 (_backfill_points).
+    """
+    import urllib.error
+    try:
+        meta.update(walkpts.points(fetch(), int(meta["frameW"]), int(meta["frameH"]),
+                                   meta.get("rows"), meta.get("frames")))
+        meta["pts"] = 1
+        return True
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            meta["pts"] = 0
+            return True
+        return False
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
+def _points_from_normal(num, name, meta):
+    """이로치 폴더에 Offsets 만 없을 때 - 받아 둔 보통 meta 의 점을 빌린다 (칸이 같을 때만, 새로 받지는 않는다)."""
+    try:
+        with open(_anim_paths(num, name)[1], encoding="utf-8") as f:
+            normal = json.load(f)
+    except (OSError, ValueError):
+        return False
+    if normal.get("pts") != 1 or any(normal.get(k) != meta.get(k) for k in ("frameW", "frameH")):
+        return False
+    meta.update(head=normal.get("head"), center=normal.get("center"), pts=1)
+    return True
+
+
+# 위치 점을 나중에 붙이려고 물어본 동작 -> 시각. 이만큼(초) 지나기 전에는 다시 안 묻는다 (저쪽이 안 될 때 요청마다
+# GitHub 를 두드리지 않게). **묻기 전에 적는다** - 받는 동안 같은 동작을 찾는 요청이 겹쳐도 한 번만 간다.
+_PTS_TRIED = {}
+PTS_RETRY = 600
+# 한꺼번에 GitHub 에 다녀오는 늦은 점 붙이기는 둘까지 - 옛 캐시가 많은 서버에서 요청 스레드가 다 묶이지 않게.
+# 자리가 없으면 점 없이 바로 돌려준다 (앱은 그림 윗부분으로 어림한다, 다음 실행에 다시 묻는다).
+_PTS_SEM = threading.BoundedSemaphore(2)
+
+
+def _backfill_points(num, name, shiny, meta, meta_path):
+    """위치 점이 생기기 전(버전 2 전)에 받아 둔 meta 에 점을 붙인다. 시트는 다시 안 받는다."""
+    key = (num, name, bool(shiny))
+    t = _PTS_TRIED.get(key)
+    if t and time.time() - t < PTS_RETRY:
+        return meta
+    if not _PTS_SEM.acquire(blocking=False):
+        return meta
+    try:
+        _PTS_TRIED[key] = time.time()
+        return _backfill_now(num, name, shiny, meta, meta_path)
+    finally:
+        _PTS_SEM.release()
+
+
+def _backfill_now(num, name, shiny, meta, meta_path):
+    import urllib.request
+    import xml.etree.ElementTree as ET
+    if meta.get("recolor"):
+        # 보통 시트에 색만 입힌 이로치 - 점은 보통 시트의 것과 같다
+        normal = _anim_meta(num, name) or {}
+        if "pts" not in normal:
+            return meta
+        meta = dict(meta, head=normal.get("head"), center=normal.get("center"), pts=normal["pts"])
+    else:
+        base = _pmd_base(num, shiny)
+        if not base:
+            return meta
+
+        def grab(fn):
+            with urllib.request.urlopen(base + fn, timeout=12) as r:
+                return r.read()
+
+        def offsets():
+            got = _pick_anim(ET.fromstring(grab("AnimData.xml").decode("utf-8")), name)
+            if got is None:
+                raise ValueError("%s 없음" % name)
+            return grab("%s-Offsets.png" % got[3])
+        meta = dict(meta)
+        if not _put_points(meta, offsets):
+            return meta
+        if shiny and meta.get("pts") == 0:
+            _points_from_normal(num, name, meta)
+    try:
+        tmp = meta_path + ".part"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+        os.replace(tmp, meta_path)
+    except OSError:
+        pass
     return meta
 
 
@@ -889,6 +998,8 @@ def _anim_meta(num, name, shiny=False):
             # 동작도 (1.10.1 - 얼굴 그림으로 만드는 길은 모든 동작에 붙었다).
             if not ((name == "Walk" or shiny) and not meta.get("ok")
                     and int(meta.get("gen") or 1) < MISS_GEN):
+                if meta.get("ok") and meta.get("src") == "pmd" and "pts" not in meta:
+                    meta = _backfill_points(num, name, shiny, meta, meta_path)    # 꾸미기 (버전 2)
                 return meta
         except (OSError, ValueError):
             pass

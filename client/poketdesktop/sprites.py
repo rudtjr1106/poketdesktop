@@ -301,7 +301,7 @@ class WalkAnimation(object):
 
 
 def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
-              max_scale=3.0, key=None, scale=None, name=None):
+              max_scale=3.0, key=None, scale=None, name=None, deco=()):
     """스프라이트시트를 잘라 방향별 애니메이션으로 만든다.
 
     meta 는 서버가 준 {frameW, frameH, durations, rows, rowmap} 이다.
@@ -311,10 +311,15 @@ def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
     scale 을 주면 그 배율을 쓴다. 한 종의 걷기에서 정한 배율을 나머지
     동작에 물려주기 위한 것이다 - 동작마다 목표 높이에 맞추면 공격할
     때만 몸이 작아진다.
+
+    deco 는 꾸미기 장식 열쇠들 (버전 2, deco_place). 키운 뒤에 화면 픽셀 단위로 얹는다 - 배율은 장식 없는
+    몸으로 정하고(장식 때문에 몸이 작아지지 않게), 장식이 잘리지 않게 칸을 늘려 기준점(ax, ay)을 옮긴다.
     """
     name = name or meta.get("anim") or "Walk"
+    deco = tuple(deco or ())
+    # 장식은 머리 자리(pts)에 따라 놓이는 곳이 다르다 - 자리를 나중에 받으면 다시 만든다 (walk_cache.needs_points)
     ck = ("anim", sheet_path, name, key, target_height, min_scale, max_scale,
-          scale)
+          scale, deco, bool(meta.get("pts")) if deco else None)
     if ck in _cache:
         return _cache[ck]
 
@@ -389,18 +394,67 @@ def load_walk(sheet_path, meta, target_height=48, min_scale=0.25,
     ax = (fw / 2.0 - l) * scale
     ay = (fh / 2.0 - t) * scale
 
+    big = {}
+    for d in DIRS:
+        big[d] = [_resize(premultiply(c.crop((l, t, r, b))), (ow, oh)) for c in cut[d]]
+    foot = oh                    # 몸 밑(발) 의 y - 장식이 칸을 늘려도 그대로 몸 밑이다 (deco_fx 발자국)
+    body_cx = ow / 2.0           # 장식 전 칸의 가운데 - 장식을 끼우고 빼도 몸이 옆으로 안 밀리게 (evolve_fx.swap_sprite)
+    if deco:
+        ax0, ay0 = ax, ay
+        big, durs, ow, oh, ax, ay = _decorate(big, cut, rows, meta, (l, t), scale, deco, durs, ow, oh, ax, ay,
+                                              name)
+        foot += ay - ay0
+        body_cx += ax - ax0
     frames = {}
     for d in DIRS:
-        out = []
-        for c in cut[d]:
-            im = premultiply(c.crop((l, t, r, b)))
-            im = _resize(im, (ow, oh))
-            out.append(flatten_rgba(im, key))
-        frames[d] = out
+        frames[d] = [flatten_rgba(im, key) for im in big[d]]
 
     anim = WalkAnimation(frames, durs, ow, oh, key, ax, ay, scale, name)
+    anim.foot = foot
+    anim.body_cx = body_cx
+    anim.deco = tuple(deco or ())
+    anim.pts = bool(meta.get("pts"))     # 머리 자리로 얹었나 (아니면 어림 - 자리를 나중에 받으면 다시 만든다)
     _cache[ck] = anim
     return anim
+
+
+# 왕관 반짝임은 계속 도는 동작에만 - 반짝임은 동작을 몇 번 되풀이한 끝에 넣는데, 한 번 도는 동작(아파하기 ·
+# 점프 · 쓰러지기)은 프레임 수로 끝을 알아서 되풀이한 만큼 여러 번 돈다.
+GLINT_ANIMS = ("Walk", "Idle", "Sit", "Laying", "Sleep", "EventSleep")
+
+
+def _decorate(big, cut, rows, meta, crop, scale, deco, durs, ow, oh, ax, ay, name="Walk"):
+    """꾸미기 장식을 얹는다 (deco_place). 못 하면 그대로 - 장식 때문에 포켓몬이 안 걸으면 안 된다."""
+    try:
+        from . import deco_place as DP
+        heads, centers = meta.get("head"), meta.get("center")
+        pts = {}
+        if meta.get("pts") and isinstance(heads, list):
+            for d in DIRS:
+                r = rows[d]
+                pts[d] = ((heads[r] if r < len(heads) else None),
+                          (centers[r] if isinstance(centers, list) and r < len(centers) else None))
+        # 얼굴 방향은 **실제로 쓴 줄**의 것 - 줄이 모자라 다른 줄로 때운 방향(Sleep 은 1줄 · 4줄 시트의 대각선)에
+        # 원래 방향으로 얹으면 리본이 반대쪽에 붙고, 위를 보다 잠들면 목걸이가 빠진다.
+        rowmap = meta.get("rowmap") or {}
+        face_of = {}
+        for d in DIRS:
+            r = rowmap.get(DIR_KEY[d]) if rowmap else ROW_OF[d]
+            if r is not None:
+                face_of.setdefault(r, DIR_KEY[d])
+        faces = dict((d, face_of.get(rows[d], DIR_KEY[d])) for d in DIRS)
+        new, pad, spots, k = DP.decorate(big, cut, faces, pts, crop, scale, deco)
+        durs2 = durs
+        if name in GLINT_ANIMS:
+            new, durs2 = DP.with_glint(new, durs, spots, k)
+        return (new, durs2, ow + pad[0] + pad[2], oh + pad[1] + pad[3], ax + pad[0], ay + pad[1])
+    except Exception as e:                                  # noqa: BLE001
+        try:
+            from . import config
+            config.log("꾸미기를 얹지 못했습니다: %s" % e)
+        except Exception:                                   # noqa: BLE001
+            pass
+        return big, durs, ow, oh, ax, ay
 
 
 # 8방향을 각도로 나눈다. 시트에 대각선 그림이 진짜로 들어 있어서

@@ -37,6 +37,11 @@ ANIMS = ("Idle", "Sleep", "Sit", "Laying", "Wake", "Hop", "Hurt",
 
 _lock = threading.Lock()
 _failed = {}
+# 꾸미기 (버전 2): 장식을 얹으려면 머리 · 몸 가운데 자리(meta 의 head/center, pts)가 있어야 한다.
+# 그 전에 받아 둔 meta 에는 없다. **장식을 낀 포켓몬의 것만** 한 번 새로 묻는다 (시트는 그대로) -
+# 다 새로 물으면 사람마다 수십 번씩 서버가 SpriteCollab 에 다녀와야 한다.
+_want_pts = set()            # 장식을 낀 포켓몬의 도감 번호 (app 이 동기화 때 알려 준다)
+_pts_tried = set()           # 이번 실행에서 이미 물어본 (번호, 동작, 색)
 RETRY_AFTER = 300.0        # 못 받았을 때 다시 시도하기까지 (초)
 # '이 종에는 걷는 도트가 없다' 는 표시의 세대 (서버의 MISS_GEN 과 같은 뜻).
 # 서버에 출처가 늘면 올린다. 1.9.0 에서 세 번째 출처가 붙어 미라이돈 등 40종과
@@ -171,9 +176,21 @@ def _ensure_tinted(api, num, name, skin):
     """이로치가 고른 색의 시트. 밑그림 시트의 색조를 돌려 옆 폴더에 둔다."""
     from . import sprite_tint
     png, meta = local(num, name, skin)
-    if png:
-        return png, meta
     base, hue = T.split(skin)
+    if png:
+        if needs_points(num, name, skin, meta):
+            with _lock:
+                _pts_tried.add((int(num), name, T.norm(skin)))
+            _src, bmeta = _ensure_one(api, num, name, base)
+            if bmeta and "pts" in bmeta and all(bmeta.get(k) == meta.get(k)
+                                                for k in ("frameW", "frameH", "rows")):
+                meta = dict(meta, **dict((k, bmeta[k]) for k in ("pts", "head", "center") if k in bmeta))
+                try:
+                    with open(_paths(num, name, skin)[1], "w", encoding="utf-8") as f:
+                        json.dump(meta, f)
+                except OSError:
+                    pass
+        return png, meta
     src, meta = _ensure_one(api, num, name, base)
     if not src:
         # 이로치 시트가 없는 종은 기본 색 시트로 걷는다 (ensure 의 약속 그대로).
@@ -198,9 +215,52 @@ def _takes_shiny(fn):
         return False
 
 
+def want_points(nums):
+    """이 번호들은 장식을 얹는다 - 받아 둔 meta 에 머리 자리가 없으면 다음 ensure 때 새로 묻는다."""
+    with _lock:
+        _want_pts.update(int(n) for n in nums if n)
+
+
+def needs_points(num, name, shiny, meta):
+    """받아 둔 meta 에 머리 자리가 없어서 새로 물어야 하나 (SpriteCollab 시트만 있다)."""
+    if not num or not meta or not meta.get("ok") or "pts" in meta or meta.get("src", "pmd") != "pmd":
+        return False
+    with _lock:
+        return int(num) in _want_pts and (int(num), name, T.norm(shiny)) not in _pts_tried
+
+
+def _refresh_points(api, num, name, shiny, meta, meta_path):
+    """meta 만 다시 받아 머리 · 몸 가운데 자리를 붙인다. 시트가 그대로일 때만 (칸 크기 · 줄 수가 같다)."""
+    with _lock:
+        _pts_tried.add((int(num), name, T.norm(shiny)))
+    try:
+        new = (api.anim_meta(num, name, shiny=True) if shiny is True and _takes_shiny(api.anim_meta)
+               else api.anim_meta(num, name))
+    except Exception:                                   # noqa: BLE001
+        return meta
+    if not new or not new.get("ok") or "pts" not in new:
+        return meta                 # 옛 서버거나 서버도 아직 모른다 - 다음 실행에 다시
+    if any(new.get(k) != meta.get(k) for k in ("frameW", "frameH", "rows")):
+        return meta                 # 시트가 바뀌었다 - 섞으면 자리가 어긋난다
+    out = dict(meta)
+    for k in ("pts", "head", "center"):
+        if k in new:
+            out[k] = new[k]
+    tmp = meta_path + ".part"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(out, f)
+        os.replace(tmp, meta_path)
+    except OSError:
+        pass
+    return out
+
+
 def _ensure_one(api, num, name, shiny):
     png, meta = local(num, name, shiny)
     if png:
+        if needs_points(num, name, shiny, meta):
+            meta = _refresh_points(api, num, name, shiny, meta, _paths(num, name, shiny)[1])
         return png, meta
     if meta is not None and not meta.get("ok"):
         return None, None          # 없다고 이미 확인해 둔 것

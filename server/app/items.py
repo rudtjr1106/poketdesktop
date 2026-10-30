@@ -300,6 +300,13 @@ def gift_claim(uid, now=None):
             table = season.TITLES if kind == "title" else dict(
                 (k, v[0]) for k, v in season.FRAMES.items())
             name = table.get(r["item_id"]) or r["item_id"]
+        elif kind == "deco" and r["item_id"]:
+            # 꾸미기 (버전 2) - 'bundle:rank1' 같은 묶음, 장식 하나, 참가 묶음 선택권(pick_join)
+            from . import deco
+            got = deco.grant(uid, r["item_id"], _season_of(r["item_id"]), now)
+            if not got:
+                continue
+            name = " · ".join(got)
         else:
             continue          # 모르는 종류. 지급하지 않는다
         out.append({
