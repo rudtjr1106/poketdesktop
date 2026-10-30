@@ -60,7 +60,7 @@ class WarMap(object):
         self.on_pick = on_pick
         self.on_hover = on_hover
         self.geo = None
-        self.cells = {}              # 칸 -> {"codes", "g", "name", "me", "ai", "taken", "wins"}
+        self.cells = {}              # 칸 -> {"codes", "g", "name", "me", "ai", "taken", "wins", "joker"}
         self.cell_of = {}            # 시·군·구 -> 칸
         self.colors = {}             # 길드 -> 색
         self.my_gid = None
@@ -289,7 +289,7 @@ class WarMap(object):
         return (sx / sw, sy / sw) if sw else None
 
     def _marks(self):
-        """내가 지키는 칸에 흰 점, 우리 길드가 쌓은 승수, 넘어간 칸 표시."""
+        """내가 지키는 칸에 흰 점, 우리 길드가 쌓은 승수, 넘어간 칸, 조커 칸('?', 시즌 5) 표시."""
         cv = self.cv
         cv.delete("mark")
         if not self.geo or not self.items:
@@ -302,6 +302,8 @@ class WarMap(object):
                 text = "점령"
             elif x.get("wins"):
                 text = "%d/%d" % (x["wins"], self.need)
+            elif x.get("joker"):
+                text = "?"
             if not (text or x.get("me")):
                 continue
             c = self._center(cid)

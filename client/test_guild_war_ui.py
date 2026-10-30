@@ -20,6 +20,9 @@ server/test_guild_war.py 가 본다. 여기서는 **화면**을 본다:
   8. 지도는 칸을 한 번만 그리고 색만 고친다 (걸린 시간을 잰다). 칸이 다시 만들어져도 보던 자리가 이어진다.
      전쟁 중에는 가끔 다시 받아 남이 뺏은 칸도 칠한다.
   9. 끝 단계: 마지막 지도와 순위, 보상 안내. 어느 단계에도 글이 잘리지 않고, 창은 그대로다.
+ 10. 시즌 5 (서버가 jokerMax · contrib 를 보낼 때만): 규칙 칸의 조커 · 기여 보상 줄, 길드장의 '조커로 숨기기'
+     (몇 명인지, 꽉 차면 단추가 죽는다), 우리 조커 칸 표시, 남의 조커 칸은 '???' + 마릿수, 지도의 '?'.
+     옛 서버에는 조커 단추가 없다.
 """
 import io
 import json
@@ -127,6 +130,10 @@ class War(object):
         for k, cid in enumerate(mine[:3]):
             self.guard[cid] = (1, 2, 3)[k]
         self.attacked = {mine[1]}            # 이 우리 칸은 공격받은 적이 있다
+        self.v5 = False                      # 시즌 5 서버 (조커 · 기여 보상)
+        self.jokers = set()                  # 우리 길드의 조커 (사람)
+        self.foe_jokers = set()              # 남의 조커 칸 (우리에게 가려진 것)
+        self.joked = []
 
     def lands(self, gid):
         return [c for c in IDS if self.owner[c] == gid]
@@ -161,6 +168,7 @@ class War(object):
               "rewards": [{"rank": 1, "coins": 300}, {"rank": 2, "coins": 200}, {"rank": 3, "coins": 150},
                           {"rank": None, "coins": 50}],
               "title": "시즌 4 길드전 우승", "levelCap": 50,
+              "jokerMax": 3 if self.v5 else None,
               "guild": {"id": 1, "members": self.members, "role": self.role},
               "entered": self.entered, "dropped": False,
               "can": {"apply": ph == "apply" and self.role in ("master", "sub"), "team": ph in ("apply", "plan"),
@@ -169,6 +177,8 @@ class War(object):
               "entries": list(self.entries) + ([{"guildId": 1, "name": "피카단", "state": "applied"}]
                                                if self.entered else []),
               "ranking": self.ranking() if ph in ("plan", "war", "done") else [], "teams": self.teams}
+        if self.v5:
+            st["contrib"] = {"win": 20, "joker": 20, "defend": 20, "max": 300, "earned": 40}
         if ph in ("plan", "war", "done") and self.entered:
             st["attacks"] = {"total": mine[0], "used": mine[1],
                              "left": max(0, mine[0] - mine[1]) if ph in ("plan", "war") else 0}
@@ -176,6 +186,9 @@ class War(object):
             where = dict((u, CELL_NAME(c)) for c, u in self.guard.items() if u and self.owner[c] == 1)
             st["mates"] = [{"userId": u, "name": names[u], "attacks": a, "used": used, "tile": where.get(u)}
                            for u, (a, used) in sorted(self.attacks.items())]
+            if self.v5:
+                for m in st["mates"]:
+                    m["joker"] = m["userId"] in self.jokers
             st["received"] = 8
             if self.battle:
                 st["battle"] = {"id": self.battle, "region": "c01"}
@@ -197,6 +210,9 @@ class War(object):
                 x["taken"] = 1
             if self.wins.get(cid) and self.owner[cid] != 1:
                 x["wins"] = self.wins[cid]
+            if self.v5 and cid not in self.taken and (cid in self.foe_jokers or (
+                    self.owner[cid] == 1 and self.guard[cid] in self.jokers)):
+                x["joker"] = 1
             cells[cid] = x
         rows = self.ranking()
         if have != "testdigest":
@@ -225,6 +241,12 @@ class War(object):
                "team": shown, "size": 6, "hidden": 6 - len(shown), "taken": cid in self.taken,
                "home": "로켓단" if cid in self.taken else None, "wins": 0 if mine else self.wins.get(cid, 0),
                "need": 3, "guildReceived": 8, "guildMax": 30, "can": why is None, "blocked": why}
+        if self.v5:
+            veil = cid in self.foe_jokers and not mine
+            out["joker"] = veil or (mine and uid in self.jokers)
+            out["jokerHidden"] = veil
+            if veil:
+                out.update(guard="???", guardId=None, team=[], hidden=6, size=6)
         if mine:
             out["threats"] = [{"guild": "로켓단", "wins": 2}] if cid in self.attacked else []
             out["locked"] = cid in self.attacked
@@ -233,6 +255,8 @@ class War(object):
                 where = dict((u, CELL_NAME(c)) for c, u in self.guard.items() if u and self.owner[c] == 1)
                 out["members"] = [{"userId": u, "name": n, "tile": where.get(u)}
                                   for u, n in ((1, "가람"), (2, "나래"), (3, "다솜"))]
+                if self.v5:
+                    out["jokerCount"], out["jokerMax"] = len(self.jokers), 3
         return out
 
     def log(self):
@@ -246,6 +270,11 @@ class War(object):
         return rows
 
     fought = ()
+
+
+def AI_FREE(w):
+    """우리 길드의 AI 수비대 칸 하나 (넘어온 칸 말고)."""
+    return next(c for c in w.lands(1) if not w.guard[c] and c not in w.taken)
 
 
 def CELL_NAME(cid):
@@ -316,6 +345,16 @@ class Api(TG.Api):
         w.guard[region] = uid
         if old:
             w.guard[old] = here
+        return w.tile(region)
+
+    def guild_war_joker(self, region, on=True):
+        w = self.s.war
+        w.joked.append((region, bool(on)))
+        uid = w.guard[region]
+        if on:
+            w.jokers.add(uid)
+        else:
+            w.jokers.discard(uid)
         return w.tile(region)
 
     def gym_battle(self):
@@ -738,6 +777,67 @@ def main():
     tx = pick(root, war, own)
     chk("공격 나누기·지키는 사람 바꾸기가 없다", "plan" not in war.buttons and "guard" not in war.buttons)
     srv.war.role = "master"
+    war.reload()
+    TG.wait(root, lambda: "plan" in war.buttons and war.st.get("guild", {}).get("role") == "master")
+    war.tile = None
+    pick(root, war, next(c for c in srv.war.lands(1) if srv.war.guard[c] and c not in srv.war.taken))
+    chk("옛 서버(시즌 4): 길드장에게도 조커 단추가 없다 (지키는 사람 바꾸기는 있다)", "guard" in war.buttons
+        and "joker" not in war.buttons, list(war.buttons))
+
+    print("\n=== 시즌 5: 조커 · 기여 보상 (전략 기간, 길드장) ===")
+    srv.war.v5 = True
+    srv.war.phase = "plan"
+    war.reload()
+    TG.wait(root, lambda: war.st.get("jokerMax") == 3 and "plan" in war.buttons)
+    TG.settle(root, 0.2)
+    tx = texts(war.inner)
+    chk("규칙 칸에 조커 · 기여 보상 줄", any("조커로 숨길 수 있습니다" in x for x in tx)
+        and any("기여 보상(판이 끝나면 바로)" in x and "조커를 이기면 40" in x and "지금 40개" in x for x in tx), tx)
+    chk("  전략 카드: 조커 0 / 3명", any("조커 0 / 3명" in x for x in tx), tx)
+    # 넘어온 칸(점령)은 조커가 아니다 - 처음부터 우리 것인 사람 칸을 고른다
+    guarded = next(c for c in srv.war.lands(1) if srv.war.guard[c] and c not in srv.war.taken)
+    war.tile = None                          # 앞서 받아 둔 같은 칸(시즌 4 응답)을 기다림으로 치지 않게
+    pick(root, war, guarded)
+    b = war.buttons.get("joker")
+    chk("우리 사람 칸에 '조커로 숨기기 (0/3명)'", b is not None and b.enabled
+        and b.label.cget("text") == "조커로 숨기기 (0/3명)", b and b.label.cget("text"))
+    b.command()
+    TG.wait(root, lambda: srv.war.joked and war.tile and war.tile.get("joker") and "joker" in war.buttons
+            and war.buttons["joker"].label.cget("text").startswith("조커 풀기"))
+    TG.wait(root, lambda: any("조커 1 / 3명" in x for x in texts(war.inner)))
+    TG.settle(root, 0.2)
+    tx = texts(war.tile_box)
+    chk("누르면 숨겨지고 '조커 풀기 (1/3명)' · 우리 쪽 안내", srv.war.joked[-1] == (guarded, True)
+        and war.buttons["joker"].label.cget("text") == "조커 풀기 (1/3명)"
+        and any("다른 길드에는 이 칸이 '???'" in x for x in tx), tx)
+    chk("  전략 카드: 조커 1 / 3명 + 이름", any("조커 1 / 3명: " in x for x in texts(war.inner)))
+    chk("  지도에 '?'", "?" in marks_of(war), marks_of(war))
+    srv.war.jokers |= {u for u in (1, 2, 3)}
+    war.tile = None
+    pick(root, war, AI_FREE(srv.war))
+    chk("AI 수비대 칸에는 조커 단추가 없다", "joker" not in war.buttons)
+    other = next(c for c in srv.war.lands(1) if srv.war.guard[c] and c != guarded and c not in srv.war.taken)
+    srv.war.jokers.discard(srv.war.guard[other])
+    srv.war.jokers.add(99)                   # 다른 칸의 조커 하나 더 (모두 3명)
+    war.tile = None
+    pick(root, war, other)
+    b = war.buttons.get("joker")
+    chk("3명이 차면 숨기기 단추가 죽고 까닭이 적힌다", b is not None and not b.enabled
+        and any("조커는 3명까지입니다" in x for x in texts(war.tile_box)), b and b.label.cget("text"))
+    foe = next(c for c in IDS if srv.war.owner[c] != 1)
+    srv.war.foe_jokers.add(foe)
+    war.reload()
+    TG.wait(root, lambda: "?" in marks_of(war) and marks_of(war).count("?") >= 2)
+    war.tile = None
+    tx = pick(root, war, foe)
+    chk("남의 조커 칸: 지키는 쪽 ??? · 방어팀은 마릿수만", "지키는 쪽: ???" in tx
+        and any("조커 칸 - 지키는 사람과 방어팀이 숨겨져 있습니다" in x for x in tx)
+        and any("방어팀 6마리 (싸워 봐야 압니다)" in x for x in tx)
+        and not [x for x in tx if "Lv.50" in x], tx)
+    chk("눌린 위젯이 없다 (시즌 5)", not squeezed(top) and not clipped(war.inner),
+        (squeezed(top)[:4], clipped(war.inner)[:4]))
+    srv.war.v5 = False
+    srv.war.jokers, srv.war.foe_jokers = set(), set()
 
     print("\n=== 끝 ===")
     srv.war.phase = "done"

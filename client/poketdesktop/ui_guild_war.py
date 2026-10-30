@@ -17,6 +17,9 @@
   · 길드장(마스터·부마스터)은 **전략 기간에** 공격 횟수를 나누고(합 30번, 한 사람 최소 1번), 우리 칸을
     지킬 사람을 옮긴다. 전쟁이 시작되면 못 바꾼다 (2026-10-15 사용자 결정 - 신청 3일·전략 4일·전쟁 6일·결산 1일).
   · 팀 짜기는 랭크 팀 창을 그대로 쓴다 (ui_season.TeamWindow, spec).
+  · 시즌 5 (서버가 jokerMax · contrib 를 보낼 때만): 길드장이 전략 기간에 우리 칸을 눌러 그 칸을 지키는
+    길드원을 **조커로 숨긴다** (길드마다 3명). 남의 조커 칸은 서버가 이름·방어팀을 '???' 로 보낸다 - 지도에는
+    '?' 표시. 판이 끝날 때마다 받는 **기여 보상**(이기면 · 조커를 이기면 · 막아 내면)을 규칙 칸에 적는다.
   · 전략·전쟁 중에는 지도를 30초마다 다시 받는다 (다른 길드가 뺏는 것이 보이게, 단계가 넘어가면
     통째로 다시 받게). 색만 고친다.
 
@@ -82,15 +85,29 @@ def rule_line(st):
             "칸은 AI 수비대가 지킵니다. 남의 방어팀은 앞에서부터 %d마리만 미리 보입니다. 팀은 Lv.%d 상한에 "
             "전설·환상 한 마리, 같은 포켓몬 한 마리까지입니다."
             % (schedule_line(st), st.get("tilesPer") or 15, st.get("need") or 3, st.get("total") or 30,
-               st.get("shown") or 3, st.get("levelCap") or 50))
+               st.get("shown") or 3, st.get("levelCap") or 50)) + joker_line(st)
+
+
+def joker_line(st):
+    """시즌 5: 조커 규칙 한 문장 (옛 서버 · 시즌 4 면 빈 글)."""
+    if not st.get("jokerMax"):
+        return ""
+    return (" 길드장은 전략 기간에 길드원을 %d명까지 조커로 숨길 수 있습니다 - 다른 길드에는 그 칸을 지키는 사람과 "
+            "방어팀이 '???' 로 보이고(지도의 ? 칸), 한 번 붙어 본 길드에게만 보입니다." % st["jokerMax"])
 
 
 def reward_line(st):
     bits = []
     for r in st.get("rewards") or []:
         bits.append(("%d위 %d" % (r["rank"], r["coins"])) if r.get("rank") else "그 밖 %d" % r["coins"])
-    return "보상(길드 코인, 한 번이라도 공격한 길드원): %s · 1위 길드에는 칭호 '%s'" % (
+    out = "보상(길드 코인, 한 번이라도 공격한 길드원): %s · 1위 길드에는 칭호 '%s'" % (
         " · ".join(bits), st.get("title") or "")
+    c = st.get("contrib")
+    if c:
+        out += ("\n기여 보상(판이 끝나면 바로): 공격에서 이기면 %d · 조커를 이기면 %d · 내 칸이 상대를 다 "
+                "쓰러뜨려 막으면 %d (기권 · 시간 초과는 없음, 한 시즌 %d개까지, 지금 %d개)" % (c["win"], c["win"] + c["joker"], c["defend"], c["max"],
+                                            c.get("earned", 0)))
+    return out
 
 
 def team_text(mons):
@@ -497,6 +514,13 @@ class WarTab(object):
                 st.get("received", 0), st.get("total") or 30))
         if mine is not None:
             bits.append("내가 지키는 칸: %s (지도의 흰 점)" % (mine.get("tile") or "없음 - 빼앗겼습니다"))
+        if st.get("jokerMax"):
+            jokers = [m["name"] for m in mates if m.get("joker")]
+            if plan and (st.get("can") or {}).get("manage"):
+                bits.append("조커 %d / %d명%s - 우리 칸을 누르고 '조커로 숨기기' (전쟁이 시작되면 고정)" % (
+                    len(jokers), st["jokerMax"], (": " + ", ".join(jokers)) if jokers else ""))
+            elif jokers:
+                bits.append("우리 조커: %s (다른 길드에는 '???' 로 보입니다)" % ", ".join(jokers))
         if plan:
             bits.append("전쟁이 시작되면 우리 칸과 맞닿은 남의 칸을 칠 수 있습니다. 지금은 지도에서 상대 칸의 "
                         "방어팀을 미리 살펴 두세요.")
@@ -522,7 +546,7 @@ class WarTab(object):
                 w.destroy()
         except tk.TclError:
             return
-        for k in ("attack", "guard"):
+        for k in ("attack", "guard", "joker"):
             self.buttons.pop(k, None)
         t = self.tile
         if not self.sel:
@@ -545,10 +569,16 @@ class WarTab(object):
             self._text(box, "넘어간 칸입니다 (처음 주인 [%s]). 다시 뺏을 수 없습니다." % (t.get("home") or "?"),
                        fg=U.FG_FAINT, font=U.FONT_XS)
         self._text(box, "지키는 쪽: %s" % (t.get("guard") or "?"), fg=U.FG, pady=(4, 0))
+        if t.get("jokerHidden"):
+            self._text(box, "조커 칸 - 지키는 사람과 방어팀이 숨겨져 있습니다. 한 번 붙어 보면 보입니다.",
+                       fg=U.PINK, font=U.FONT_XS, padx=24)
+        elif t.get("joker") and t.get("mine"):
+            self._text(box, "조커 - 다른 길드에는 이 칸이 '???' 로 보입니다.", fg=U.PINK, font=U.FONT_XS, padx=24)
         for m in t.get("team") or []:
             self._text(box, "%s  Lv.%d" % (m.get("kr") or "?", m.get("level") or 0), fg=U.FG_DIM, padx=24)
         if t.get("hidden"):
-            self._text(box, "+ 가려진 %d마리 (싸워 봐야 압니다)" % t["hidden"], fg=U.FG_FAINT, padx=24)
+            self._text(box, ("방어팀 %d마리 (싸워 봐야 압니다)" if not t.get("team") else
+                             "+ 가려진 %d마리 (싸워 봐야 압니다)") % t["hidden"], fg=U.FG_FAINT, padx=24)
         need = t.get("need") or 3
         if t.get("mine"):
             threats = t.get("threats") or []
@@ -556,6 +586,7 @@ class WarTab(object):
                        if threats else "아직 이 칸을 이긴 길드가 없습니다.", fg=U.FG_FAINT, font=U.FONT_XS, pady=(4, 0))
             if t.get("manager"):
                 self._guard_row(box, t)
+                self._joker_row(box, t)
         elif not t.get("taken"):
             self._text(box, "우리 길드: %d승 중 %d승 (같은 상대를 %d번 이기면 칸을 가져옵니다)"
                        % (need, t.get("wins", 0), need), fg=U.FG, font=U.FONT_XS, pady=(4, 0))
@@ -580,6 +611,21 @@ class WarTab(object):
         b = U.ghost_button(box, "지키는 사람 바꾸기", lambda: self.guard_menu(t), height=30)
         b.pack(fill="x", padx=14, pady=(8, 2))
         self.buttons["guard"] = b
+
+    def _joker_row(self, box, t):
+        """길드장 (시즌 5): 이 칸을 지키는 길드원을 조커로 숨기거나 푼다."""
+        if not t.get("jokerMax") or t.get("ai") or t.get("taken"):
+            return
+        on = bool(t.get("joker"))
+        n, top = t.get("jokerCount", 0), t["jokerMax"]
+        b = U.ghost_button(box, ("조커 풀기 (%d/%d명)" if on else "조커로 숨기기 (%d/%d명)") % (n, top),
+                           lambda: self.joker(t["region"], not on), height=30)
+        b.pack(fill="x", padx=14, pady=(4, 2))
+        if not on and n >= top:
+            b.configure(state="disabled")
+            self._text(box, "조커는 %d명까지입니다. 다른 조커를 먼저 풀어 주세요." % top, fg=U.FG_FAINT,
+                       font=U.FONT_XS)
+        self.buttons["joker"] = b
 
     def guard_menu(self, t):
         rows = [{"text": "%s 에 배치할 길드원" % (t.get("name") or ""), "header": True}]
@@ -792,6 +838,13 @@ class WarTab(object):
             self.tile = r
             self.reload()
         self._call(lambda: self.app.api.guild_war_guard(region, uid), "지키는 사람을 옮겼습니다.", then)
+
+    def joker(self, region, on):
+        def then(r):
+            self.tile = r
+            self.reload()
+        self._call(lambda: self.app.api.guild_war_joker(region, on),
+                   "조커로 숨겼습니다." if on else "조커를 풀었습니다.", then)
 
     def pick_team(self, kind, kr):
         """방어팀·공격팀 짜기 - 랭크 팀 창을 그대로 쓴다."""

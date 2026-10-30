@@ -635,6 +635,10 @@ class Api(object):
         """길드장: 길드원을 우리 칸에 배치한다."""
         return self._call("POST", "/api/guild/war/guard", {"region": str(region), "userId": int(uid)})
 
+    def guild_war_joker(self, region, on=True):
+        """길드장: 그 칸을 지키는 길드원을 조커로 숨기거나 푼다 (시즌 5). 그 칸의 모습(tile)을 돌려준다."""
+        return self._call("POST", "/api/guild/war/joker", {"region": str(region), "on": bool(on)})
+
     def guild_war_log(self):
         return self._call("GET", "/api/guild/war/log")["log"]
 

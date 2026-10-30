@@ -59,6 +59,20 @@ Z기술·메가진화도 쓴다). **판을 시작하는 순간 공격권 하나�
 ## 이기는 길드
 
 **가진 칸이 가장 많은 길드.** 같으면 방어 성공 수, 그다음 공격 승리 수, 먼저 닿은 길드.
+
+## 조커 · 개인 기여 보상 (시즌 5 - season.rules_v5, 2026-10-30 사용자 결정, 게시판 #373 의견)
+
+**조커**: 길드장이 전략 기간에 길드원을 JOKER_MAX 명까지 숨긴다 (사람에 붙는다 - 칸을 옮겨도 따라간다).
+남의 길드에는 그 사람이 지키는 칸의 이름·방어팀이 '???' 로 온다 (마릿수만). 그 길드가 그 사람과 한 번이라도
+붙어 보면(그 사람이 지키는 칸에 판을 열면) 보통 칸처럼 보인다 - 싸우면서 이름과 나온 포켓몬을 이미 봤다.
+조커가 남의 칸을 뺏어 지키게 된 칸도 똑같이 가린다 (거기서 보이면 숨긴 칸의 방어팀이 드러난다 - 10/30 검토).
+지도에는 조커 칸이 표시된다 (누가 숨었는지는 모른다). AI 수비대 칸은 조커가 아니다.
+
+**기여 보상**: 판이 끝날 때마다 바로 길드 코인 - 공격에서 이기면 CONTRIB_WIN (조커를 이기면 CONTRIB_JOKER 더),
+내가 지키는 칸이 막아 내면 CONTRIB_DEFEND - **공격 팀을 실제로 다 쓰러뜨렸을 때만** (판의 결과 lost). 기권·시간
+초과도 공격한 쪽에서는 진 것이지만 지킨 사람은 안 받는다 - 짠 길드끼리 바로 기권해 주며 코인을 주고받지 못하게
+(10/30 검토). 한 사람이 한 시즌에 CONTRIB_MAX 까지 (guild_war_team.earned). 비기면 없다. 순위 보상(settle)은
+그대로 따로 나간다.
 """
 import datetime
 import hashlib
@@ -95,6 +109,12 @@ AI_LEVEL = 50
 PREFIX = "gw:"               # gym_battle.region 의 머리 ("gw:4:c07")
 REWARD_COINS = {1: 300, 2: 200, 3: 150}
 REWARD_OTHER = 50
+# 시즌 5 (위 '조커 · 개인 기여 보상')
+JOKER_MAX = 3                # 길드마다 숨길 수 있는 길드원
+CONTRIB_WIN = 20             # 공격에서 이길 때마다 (길드 코인, 1개 = 250원어치)
+CONTRIB_JOKER = 20           # 조커를 이기면 더
+CONTRIB_DEFEND = 20          # 내가 지키는 칸이 공격을 막아 낼 때마다
+CONTRIB_MAX = 300            # 한 사람이 한 시즌에 받는 기여 보상 상한
 TITLE = "s4_guildwar"
 GIFT_TITLE = "시즌 %d 길드전"
 KINDS = ("def", "atk")
@@ -750,6 +770,130 @@ def _why(uid, t, s, adj=None, now=None, memo=None):
     return None
 
 
+# ---------------------------------------------------------------- 조커 · 기여 보상 (시즌 5)
+def v5():
+    """조커 · 기여 보상이 켜졌나 (시즌 번호에 묶는다 - season.rules_v5)."""
+    return season.rules_v5()
+
+
+def _joker_ids(s):
+    """조커로 숨긴 사람들 (전쟁에 나간 줄). 꺼져 있으면 빈 것."""
+    if not v5():
+        return set()
+    return set(r["user_id"] for r in db.q(
+        "SELECT user_id FROM guild_war_team WHERE season=? AND locked=1 AND joker=1", (s,)))
+
+
+def _joker_tile(t, jokers):
+    """조커 칸인가 (지도 표시 · 조커를 이긴 보상) - 사람이 지키고, 그 사람이 조커이고, 아직 안 넘어간 칸."""
+    return bool(t["guard_user"] != AI_GUARD and not t["taken_at"] and t["guard_user"] in jokers)
+
+
+def _joker_hidden(t, my, s, jokers):
+    """길드 my 에게 이 칸을 지키는 쪽이 가려지나 - 지키는 사람이 조커면. **조커가 뺏어 지키는 칸(넘어간 칸)도**
+    가린다: 거기서 이름과 방어팀 앞 몇 마리가 보이면 숨긴 칸의 것이 그대로 드러난다 (같은 방어팀이다).
+    우리 길드 칸이면, 또는 우리 길드가 그 사람과 한 번이라도 붙어 봤으면 안 가린다 (이미 봤다)."""
+    if t["guard_user"] == AI_GUARD or t["guard_user"] not in jokers or (my is not None and t["guild_id"] == my):
+        return False
+    if my is None:
+        return True
+    return not db.q1("SELECT 1 FROM guild_war_attack WHERE season=? AND def_user=? AND atk_guild=? LIMIT 1",
+                     (s, t["guard_user"], my))
+
+
+def joker_count(gid, s=None):
+    return db.q1("SELECT COUNT(*) c FROM guild_war_team WHERE season=? AND guild_id=? AND locked=1 AND joker=1",
+                 (s or season.SEASON, gid))["c"]
+
+
+def set_joker(uid, region, on, now=None):
+    """길드장이 그 칸을 지키는 길드원을 조커로 숨기거나 푼다 (전략 기간에만, 길드마다 JOKER_MAX 명).
+    조커는 사람에 붙는다 - 나중에 그 사람을 다른 칸으로 옮겨도 그대로다."""
+    if not v5():
+        raise HTTPException(409, "조커는 시즌 5 부터입니다.")
+    m = guild._need_manager(uid)
+    if phase(now)[0] != "plan":
+        raise HTTPException(409, "조커는 전략 기간에만 정할 수 있습니다. 전쟁이 시작되면 바꿀 수 없습니다.")
+    s = season.SEASON
+    gid = m["guild_id"]
+    t = tile(region, s)
+    if not t or t["guild_id"] != gid or t["home_guild"] != gid:
+        raise HTTPException(409, "우리 길드의 칸이 아닙니다.")
+    if t["guard_user"] == AI_GUARD:
+        raise HTTPException(409, "AI 수비대는 조커로 숨길 수 없습니다. 길드원이 지키는 칸을 고르세요.")
+    who = _row(t["guard_user"], s)
+    if not who or who["locked"] != 1 or who["guild_id"] != gid:
+        raise HTTPException(404, "이번 길드전에 나간 길드원이 아닙니다.")
+    want = 1 if on else 0
+    if int(who["joker"] or 0) == want:
+        return False
+    if want:
+        # 셈과 고치기를 한 문장에 - 두 길드장이 같이 눌러도 JOKER_MAX 를 못 넘는다
+        cur = db.run("UPDATE guild_war_team SET joker=1 WHERE season=? AND user_id=? AND locked=1 AND joker=0"
+                     " AND (SELECT COUNT(*) FROM guild_war_team WHERE season=? AND guild_id=? AND locked=1"
+                     " AND joker=1) < ?", (s, who["user_id"], s, gid, JOKER_MAX))
+        if getattr(cur, "rowcount", 1) == 0:
+            raise HTTPException(409, "조커는 길드마다 %d명까지입니다. 다른 조커를 먼저 풀어 주세요." % JOKER_MAX)
+    else:
+        db.run("UPDATE guild_war_team SET joker=0 WHERE season=? AND user_id=?", (s, who["user_id"]))
+    n = joker_count(gid, s)
+    guild._say(gid, ("%s 님이 %s 님을 조커로 숨겼습니다 (%d/%d명). 다른 길드에는 이름과 방어팀이 '???' 로 보입니다."
+                     if want else "%s 님이 %s 님의 조커를 풀었습니다 (%d/%d명).")
+               % (guild._name_of(uid), who["name"], n, JOKER_MAX), now)
+    return True
+
+
+def _pay(s, uid, n):
+    """기여 보상을 준다 - 이번 시즌 받은 것(guild_war_team.earned)이 CONTRIB_MAX 를 넘지 않게. 준 수를 돌려준다.
+
+    받은 것을 먼저 늘린다(조건을 건 UPDATE - 두 판이 같이 끝나도 상한을 못 넘는다) 그리고 코인을 넣는다."""
+    if n <= 0 or not uid:
+        return 0
+    for _ in range(5):
+        r = db.q1("SELECT earned FROM guild_war_team WHERE season=? AND user_id=?", (s, uid))
+        if not r:
+            return 0
+        had = int(r["earned"] or 0)
+        give = min(n, CONTRIB_MAX - had)
+        if give <= 0:
+            return 0
+        cur = db.run("UPDATE guild_war_team SET earned=earned+? WHERE season=? AND user_id=? AND earned=?",
+                     (give, s, uid, had))
+        if getattr(cur, "rowcount", 1) > 0:
+            guild._coin_add(uid, give)
+            return give
+    return 0
+
+
+def _reward(a, res, raw=None):
+    """공격 한 판이 끝났다 (_finish 가 적은 뒤에 한 번) - 이긴 공격자, 막아 낸 지키는 사람에게 기여 보상.
+    (공격자가 받은 것, 지킨 사람이 받은 것, 조커를 이겼나). 보상이 깨져도 판의 결과는 그대로다.
+
+    raw 는 판의 진짜 결과 (won / lost / draw / forfeit / expired). 지킨 사람은 lost 일 때만 받는다 (위 설명)."""
+    if not v5():
+        return 0, 0, False
+    s = a["season"]
+    got = kept = 0
+    joker = False
+    try:
+        if res == "win":
+            joker = bool(a["def_user"]) and a["def_user"] in _joker_ids(s)
+            got = _pay(s, a["atk_user"], CONTRIB_WIN + (CONTRIB_JOKER if joker else 0))
+        elif res == "lose" and raw == "lost" and a["def_user"] != AI_GUARD:
+            kept = _pay(s, a["def_user"], CONTRIB_DEFEND)
+        if got or kept:
+            db.run("UPDATE guild_war_attack SET coins=?, def_coins=? WHERE id=?", (got, kept, a["id"]))
+    except Exception as err:                                  # noqa: BLE001
+        from . import errors
+        errors.record("GWAR", "guild_war._reward %s" % a["id"], err)
+    return got, kept, joker
+
+
+def _earned(s, uid):
+    r = db.q1("SELECT earned FROM guild_war_team WHERE season=? AND user_id=?", (s, uid))
+    return int(r["earned"] or 0) if r else 0
+
+
 # ---------------------------------------------------------------- 길드장이 하는 일
 def set_attacks(uid, plan, now=None):
     """길드장이 공격 횟수를 나눈다 (전략 기간에만). plan = {사람: 횟수}. 한 사람 최소 1번(이미 쓴 것보다
@@ -959,6 +1103,7 @@ def on_end(uid, row, tb, events=None, now=None):
     wrote, took = _finish(a, res, tb.turn, now)
     if not wrote:
         return None
+    got, kept, joker = _reward(a, res, tb.result)
     s = a["season"]
     t = tile(a["region"], s)
     wins = _wins(s, a["region"], a["atk_guild"])
@@ -985,6 +1130,14 @@ def on_end(uid, row, tb, events=None, now=None):
         mine_text = "길드전: %s 님이 [%s] %s 에게 졌습니다. - %s" % (a["atk_name"], gname, a["def_name"], where)
         foe_text = "길드전: [%s] %s 님의 공격을 %s 이(가) 막아냈습니다! - %s" % (
             mine_name, a["atk_name"], a["def_name"], where)
+        if kept:
+            foe_text += " (기여 보상: 길드 코인 %d개)" % kept
+    if v5() and res == "win":
+        if got:
+            lines.append("기여 보상: 길드 코인 %d개%s - 이번 시즌 %d / %d개." % (
+                got, " (조커를 이겼다!)" if joker else "", _earned(s, uid), CONTRIB_MAX))
+        else:
+            lines.append("기여 보상은 이번 시즌 상한(%d개)을 다 받았다." % CONTRIB_MAX)
     guild._say(a["atk_guild"], mine_text, now)
     if db.q1("SELECT 1 FROM guild WHERE id=?", (a["def_guild"],)):
         guild._say(a["def_guild"], foe_text, now)
@@ -1006,6 +1159,7 @@ def expire(now=None, everything=False):
         res = RESULT_OF.get(b["result"], "lose")
         wrote, took = _finish(a, res, b["turn"], now)
         if wrote:
+            _reward(a, res, b["result"])
             _watch_end(a, None, None, None, res, took, _wins(a["season"], a["region"], a["atk_guild"]),
                        "길드전: %s 님의 공격이 끝났습니다 (시간이 지나 진 것으로)." % a["atk_name"])
 
@@ -1237,19 +1391,29 @@ def tile_view(uid, region, now=None):
     my = _my_gid(uid, s)
     mine = t["guild_id"] == my
     # 판에 나가는 것과 같게 - 규칙(같은 종 한 마리, 10/22) 전에 고정된 팀도 거른다 (_ready 와 같다)
-    mons, hidden = _hide(pvp.restrict(_guard_team(t, s))[0], mine)
+    jokers = _joker_ids(s)
+    veil = _joker_hidden(t, my, s, jokers)
+    if veil:
+        # 조커: 이름도 포켓몬도 싣지 않는다 (마릿수만). 화면에서만 가리면 요청을 들여다봐서 알 수 있다.
+        mons, hidden = [], len(pvp.restrict(_guard_team(t, s))[0])
+    else:
+        mons, hidden = _hide(pvp.restrict(_guard_team(t, s))[0], mine)
     e = entry(t["guild_id"], s)
     home = entry(t["home_guild"], s) if t["home_guild"] != t["guild_id"] else None
     adj = neighbors(s)
     why = _why(uid, t, s, adj, now)
     out = {"region": t["region"], "name": t["name"], "codes": json.loads(t["codes"] or "[]"),
            "guildId": t["guild_id"], "guild": e["name"] if e else "?", "mine": mine,
-           "ai": t["guard_user"] == AI_GUARD, "guardId": t["guard_user"] or None, "guard": _guard_name(t, s),
+           "ai": t["guard_user"] == AI_GUARD, "guardId": None if veil else (t["guard_user"] or None),
+           "guard": "???" if veil else _guard_name(t, s),
            "team": mons, "size": len(mons) + hidden, "hidden": hidden,
            "taken": bool(t["taken_at"]), "home": home["name"] if home else None,
            "wins": _wins(s, t["region"], my) if my and not mine else 0, "need": WINS_TO_TAKE,
            "guildReceived": _received(s, t["guild_id"]), "guildMax": TOTAL_ATTACKS,
            "can": why is None, "blocked": why}
+    if v5():
+        out["joker"] = _joker_tile(t, jokers)
+        out["jokerHidden"] = veil
     if mine:
         # 우리 칸: 누가 몇 승까지 쌓았나 (지키는 쪽이 알아야 한다)
         out["threats"] = [{"guild": (entry(r["atk_guild"], s) or {"name": "?"})["name"], "wins": r["c"]}
@@ -1260,6 +1424,9 @@ def tile_view(uid, region, now=None):
         manager = bool(m and m["role"] in ("master", "sub") and phase(now)[0] == "plan")
         out["locked"] = _attacked(s, t["region"]) or bool(t["taken_at"])
         out["manager"] = manager
+        if v5():
+            out["jokerCount"] = joker_count(t["guild_id"], s)
+            out["jokerMax"] = JOKER_MAX
         if manager:
             where = dict((r["guard_user"], r["name"]) for r in db.q(
                 "SELECT guard_user, name FROM guild_war_tile WHERE season=? AND guild_id=? AND taken_at IS NULL",
@@ -1287,10 +1454,13 @@ def map_view(uid, now=None, have=None):
         "SELECT region, COUNT(*) c FROM guild_war_attack WHERE season=? AND atk_guild=? AND result='win'"
         " GROUP BY region", (s, my or -1)))
     cells, hit, memo = {}, [], {}
+    jokers = _joker_ids(s)
     for t in tiles(s):
         x = {"codes": [t["region"]], "g": t["guild_id"], "name": t["name"]}     # 지도 그림(geo)의 칸 이름
         if t["guard_user"] == uid:
             x["me"] = 1
+        if jokers and _joker_tile(t, jokers):
+            x["joker"] = 1                    # 누가 숨었는지는 안 싣는다 (칸을 누르면 tile_view 가 가린다)
         if t["guard_user"] == AI_GUARD:
             x["ai"] = 1
         if t["taken_at"]:
@@ -1335,6 +1505,8 @@ def state(uid, now=None):
                         "state": "out" if e["locked"] == -1 else ("in" if e["locked"] == 1 else "applied")}
                        for e in entries(s)],
            "ranking": scores(s) if ph in ("plan", "war", "done") else []}
+    if v5():
+        out["jokerMax"] = JOKER_MAX           # 길드가 없어도 규칙 칸에 적는다
     if not m:
         return out
     gid = m["guild_id"]
@@ -1359,6 +1531,9 @@ def state(uid, now=None):
             teams[kind] = {"fixed": False, "set": bool(mons),
                            "mons": preview(mons if mons else pvp.restrict(_default_team(uid))[0])}
     out["teams"] = teams
+    if v5():
+        out["contrib"] = {"win": CONTRIB_WIN, "joker": CONTRIB_JOKER, "defend": CONTRIB_DEFEND, "max": CONTRIB_MAX,
+                          "earned": int(t["earned"] or 0) if t else 0}
     me = _me_in_war(uid) if ph in ("plan", "war") else None
     if t and t["locked"] == 1:
         out["attacks"] = {"total": t["attacks"], "used": t["used"],
@@ -1374,6 +1549,9 @@ def state(uid, now=None):
             "SELECT guard_user, name FROM guild_war_tile WHERE season=? AND guild_id=? AND taken_at IS NULL", (s, gid)))
         out["mates"] = [{"userId": r["user_id"], "name": r["name"], "attacks": r["attacks"], "used": r["used"],
                          "tile": where.get(r["user_id"])} for r in rows]
+        if v5():
+            for x, r in zip(out["mates"], rows):
+                x["joker"] = bool(r["joker"])
         out["received"] = _received(s, gid)
     return out
 

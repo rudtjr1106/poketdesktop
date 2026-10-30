@@ -649,6 +649,7 @@ jobs:
           python test_season4.py
           python test_boss.py
           python test_guild_war.py
+          python test_guild_war_v5.py    # 시즌 5: 조커(길드마다 3명) · 개인 기여 보상 (게시판 #373)
 
       - name: 서버 띄우기
         env:

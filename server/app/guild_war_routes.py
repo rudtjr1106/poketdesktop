@@ -9,6 +9,7 @@
     POST   /api/guild/war/attack          {region: 칸} - 관장 배틀 판이 열린다 (관장 배틀 창이 그대로 한다)
     POST   /api/guild/war/attacks         길드장: 공격 횟수 나누기 {plan: {사람: 횟수}}
     POST   /api/guild/war/guard           길드장: 길드원을 우리 칸에 배치 {region, userId}
+    POST   /api/guild/war/joker           길드장: 그 칸을 지키는 길드원을 조커로 숨기기·풀기 {region, on} (시즌 5)
     GET    /api/guild/war/log             내 길드가 낀 판들
 """
 from fastapi import APIRouter, Depends, HTTPException
@@ -35,6 +36,11 @@ class PlanIn(BaseModel):
 class GuardIn(BaseModel):
     region: str = ""
     userId: int = 0
+
+
+class JokerIn(BaseModel):
+    region: str = ""
+    on: bool = True
 
 
 def _uid(ctx):
@@ -93,6 +99,12 @@ def attacks(body: PlanIn, ctx=Depends(deps.current)):
 @router.post("/api/guild/war/guard")
 def guard(body: GuardIn, ctx=Depends(deps.current)):
     guild_war.place(_uid(ctx), body.userId, (body.region or "")[:16])
+    return guild_war.tile_view(_uid(ctx), (body.region or "")[:16])
+
+
+@router.post("/api/guild/war/joker")
+def joker(body: JokerIn, ctx=Depends(deps.current)):
+    guild_war.set_joker(_uid(ctx), (body.region or "")[:16], bool(body.on))
     return guild_war.tile_view(_uid(ctx), (body.region or "")[:16])
 
 

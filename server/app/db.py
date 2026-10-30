@@ -810,6 +810,8 @@ CREATE TABLE IF NOT EXISTS guild_war_team (
     attacks     INTEGER NOT NULL DEFAULT 0,     -- 이 사람이 칠 수 있는 횟수
     used        INTEGER NOT NULL DEFAULT 0,
     locked      INTEGER NOT NULL DEFAULT 0,
+    joker       INTEGER NOT NULL DEFAULT 0,     -- 시즌 5: 길드장이 숨긴 사람 (남의 길드에는 이름·방어팀이 '???')
+    earned      INTEGER NOT NULL DEFAULT 0,     -- 시즌 5: 이번 시즌에 받은 기여 보상 (길드 코인, CONTRIB_MAX 까지)
     updated_at  TEXT NOT NULL,
     PRIMARY KEY (season, user_id)
 );
@@ -849,6 +851,8 @@ CREATE TABLE IF NOT EXISTS guild_war_attack (
     took        INTEGER NOT NULL DEFAULT 0,
     battle_id   INTEGER,
     turns       INTEGER NOT NULL DEFAULT 0,
+    coins       INTEGER NOT NULL DEFAULT 0,     -- 시즌 5: 이 판으로 공격한 사람이 받은 기여 보상
+    def_coins   INTEGER NOT NULL DEFAULT 0,     -- 시즌 5: 이 판을 막아 낸 사람이 받은 기여 보상
     created_at  TEXT NOT NULL,
     ended_at    TEXT
 );
@@ -1129,6 +1133,12 @@ MIGRATIONS = [
     # 연습판 대전 로그 표시 - 점수판 로그(14일)보다 빨리(2일) 치우려고. 옛 행은 0 = 점수판
     ("pvp_match", "practice",
      "ALTER TABLE pvp_match ADD COLUMN practice INTEGER NOT NULL DEFAULT 0"),
+    # 시즌 5 길드전 (게시판 #373 의견): 조커 · 개인 기여 보상. 옛 행은 0 = 조커 아님 · 받은 것 없음
+    ("guild_war_team", "joker", "ALTER TABLE guild_war_team ADD COLUMN joker INTEGER NOT NULL DEFAULT 0"),
+    ("guild_war_team", "earned", "ALTER TABLE guild_war_team ADD COLUMN earned INTEGER NOT NULL DEFAULT 0"),
+    ("guild_war_attack", "coins", "ALTER TABLE guild_war_attack ADD COLUMN coins INTEGER NOT NULL DEFAULT 0"),
+    ("guild_war_attack", "def_coins",
+     "ALTER TABLE guild_war_attack ADD COLUMN def_coins INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
