@@ -116,7 +116,7 @@ class BoxWindow(DPX.BoxWindow):
         self.d_art = SwArt(self)
         for b, kind in ((self.btn_party, "go"), (self.btn_nick, "white"), (self.btn_move, "white"),
                         (self.btn_tint, "white"), (self.btn_release, "red"),
-                        (self.btn_multi_move, "go"), (self.btn_multi_all, "white"),
+                        (self.btn_multi_move, "go"), (self.btn_multi_release, "red"), (self.btn_multi_all, "white"),
                         (self.btn_multi_clear, "white"), (self.btn_multi_done, "white"),
                         (self.btn_prev, "navy"), (self.btn_next, "navy"),
                         (self.btn_rename, "white"), (self.btn_party_name, "white"), (self.btn_reload, "white"),
@@ -195,18 +195,16 @@ class BoxWindow(DPX.BoxWindow):
         by = gy2 + s(8)
         bh2 = s(36)
         if self.multi:
-            btns = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            btns = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
             hide = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
         else:
             btns = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
-            hide = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            hide = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
         for b in hide:
             b.hide()
-        x = x0
-        for b in btns:
-            w = b.want_width(s(30))
-            b.layout(x, by, x + w, by + bh2)
-            x += w + s(6)
+        self._button_row(btns, x0, x2, by, by + bh2, s(30), s(6))
         text, color = self.msg
         shown = text or self._count_text
         my1, my2 = by + bh2 + s(5), H - s(8)

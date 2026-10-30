@@ -86,9 +86,9 @@ class BoxWindow(DPX.BoxWindow):
         self.dsb.configure(bg=PANEL)
         # 단추를 캡슐로 (주된 일은 주황, 놓아주기는 빨강, 메가진화는 보라)
         for b in (self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release,
-                  self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done,
-                  self.btn_prev, self.btn_next, self.btn_rename, self.btn_party_name, self.btn_reload,
-                  self.btn_hold, self.btn_unhold, self.btn_remember):
+                  self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                  self.btn_multi_done, self.btn_prev, self.btn_next, self.btn_rename, self.btn_party_name,
+                  self.btn_reload, self.btn_hold, self.btn_unhold, self.btn_remember):
             P.to_capsule(b)
         P.to_capsule(self.btn_bond, "purple")
 
@@ -136,13 +136,14 @@ class BoxWindow(DPX.BoxWindow):
         ins = s(9)
         self._place("detail", self.dframe, x1 + ins, y1 + ins, x2 - x1 - 2 * ins, line_y - s(4) - y1 - ins)
         if self.multi:
-            row_a = [(self.btn_multi_move, 3), (self.btn_multi_done, 1)]
-            row_b = [(self.btn_multi_all, 1), (self.btn_multi_clear, 1)]
+            row_a = [(self.btn_multi_move, 3), (self.btn_multi_release, 2)]
+            row_b = [(self.btn_multi_all, 1), (self.btn_multi_clear, 1), (self.btn_multi_done, 1)]
             hide = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
         else:
             row_a = [(self.btn_party, 3), (self.btn_release, 2)]
             row_b = [(self.btn_nick, 1), (self.btn_move, 1), (self.btn_tint, 1)]
-            hide = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            hide = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
         for b in hide:
             b.hide()
         for row, (ry1, ry2) in ((row_a, (top_btn, top_btn + bh)), (row_b, (r1 + gap, r1 + gap + bh))):

@@ -97,7 +97,8 @@ class BoxWindow(DPX.BoxWindow):
         except tk.TclError:
             pass
         kinds = ((self.btn_party, "go"), (self.btn_nick, "dark"), (self.btn_move, "dark"), (self.btn_tint, "dark"),
-                 (self.btn_release, "danger"), (self.btn_multi_move, "go"), (self.btn_multi_all, "dark"),
+                 (self.btn_release, "danger"), (self.btn_multi_move, "go"), (self.btn_multi_release, "danger"),
+                 (self.btn_multi_all, "dark"),
                  (self.btn_multi_clear, "dark"), (self.btn_multi_done, "dark"), (self.btn_prev, "dark"),
                  (self.btn_next, "dark"), (self.btn_rename, "dark"), (self.btn_party_name, "dark"),
                  (self.btn_reload, "dark"), (self.btn_hold, "go"), (self.btn_unhold, "dark"),
@@ -177,18 +178,16 @@ class BoxWindow(DPX.BoxWindow):
         by = gy2 + s(9)
         bh2 = s(34)
         if self.multi:
-            btns = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            btns = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
             hide = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
         else:
             btns = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
-            hide = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            hide = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
         for b in hide:
             b.hide()
-        x = x0
-        for i, b in enumerate(btns):
-            w = b.want_width(s(36) if i == 0 else s(28))
-            b.layout(x, by, x + w, by + bh2)
-            x += w + s(8)
+        self._button_row(btns, x0, x2, by, by + bh2, s(28), s(8), first_pad=s(36))
         text, color = self.msg
         shown = text or self._count_text
         my1, my2 = by + bh2 + s(7), H - s(9)

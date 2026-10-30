@@ -1260,6 +1260,24 @@ def main():
             bx.toggle_check(m["id"])
         chk("여러 마리 고르기 - 둘", len(bx.checked) == 2 and "2마리" in bx.btn_multi_move.text,
             (bx.checked, bx.btn_multi_move.text))
+        # 여러 마리 놓아주기 (버전 2) - 동작 · 확인 창은 기본 창의 것, 테마는 단추만 그린다
+        from poketdesktop import ui_box
+        TBL.settle(root, 0.3)
+        mb = [bx.btn_multi_move, bx.btn_multi_release, bx.btn_multi_all, bx.btn_multi_clear, bx.btn_multi_done]
+        cw = bx.cv.winfo_width()
+        chk("  놓아주기 (2마리) 도 단추 줄에 - 다섯 단추가 판 안에 든다",
+            "2마리" in bx.btn_multi_release.text and bx.btn_multi_release.enabled
+            and all(b.box and b.box[2] <= cw for b in mb), ([b.box for b in mb], cw))
+        real_many = ui_box.confirm_release_many
+        seen = []
+        ui_box.confirm_release_many = lambda parent, mons, away=(): seen.append([m["id"] for m in mons]) and False
+        try:
+            n = len(api.calls)
+            bx.btn_multi_release.invoke()
+        finally:
+            ui_box.confirm_release_many = real_many
+        chk("  누르면 고른 둘로 확인 창 - 그만두면 서버로 안 간다", len(seen) == 1 and sorted(seen[0]) == sorted(bx.checked)
+            and not any(c[0] == "release" for c in api.calls[n:] if isinstance(c, tuple)), (seen, api.calls[n:]))
         ids = sorted(bx.checked)
         bx._do_move_many(ids, 3)
         TBL.wait(root, lambda: any(c[0] == "boxes" for c in api.calls if isinstance(c, tuple)), 5)
@@ -1281,6 +1299,24 @@ def main():
         TBL.wait(root, lambda: len(api.calls) > n, 5)
         chk("데리고 다니기 단추", any(c[0] == "desktop" for c in api.calls[n:] if isinstance(c, tuple)), api.calls[n:])
         TBL.settle(root, 0.5)
+        bx.enter_multi()
+        gone = next(m["id"] for m in reversed(bx._page_mons) if bx._can_check(m))
+        bx.toggle_check(gone)
+        ui_box.confirm_release_many = lambda *a, **kw: True
+        try:
+            n = len(api.calls)
+            bx.btn_multi_release.invoke()
+            TBL.wait(root, lambda: ("release", [gone]) in api.calls[n:] and not bx._releasing and bx._wait is None, 5)
+        finally:
+            ui_box.confirm_release_many = real_many
+        TBL.settle(root, 0.3)
+        chk("  놓아주기 (1마리) → 서버로 그 포켓몬, 박스에서 빠지고 고름은 빈다",
+            ("release", [gone]) in api.calls[n:] and gone not in bx._by_id and bx.multi and not bx.checked
+            and "0마리" in bx.btn_multi_release.text and not bx.btn_multi_release.enabled,
+            (api.calls[n:], bx.checked, bx.btn_multi_release.text))
+        bx.exit_multi()
+        TBL.settle(root, 0.3)
+        chk("  고르기를 끄면 놓아주기 (N마리) 도 숨는다", bx.btn_multi_release.box is None and bx.btn_release.box is not None)
 
         print("8. 상점")
         hub.show("shop")

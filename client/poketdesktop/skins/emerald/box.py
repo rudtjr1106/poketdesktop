@@ -198,18 +198,16 @@ class BoxWindow(DPB.BoxWindow):
         by = gy2 + s(6)
         bh2 = s(36)
         if self.multi:
-            btns = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            btns = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
             hide = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
         else:
             btns = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
-            hide = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            hide = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
         for b in hide:
             b.hide()
-        x = x0
-        for b in btns:
-            w = b.want_width(s(28))
-            b.layout(x, by, x + w, by + bh2)
-            x += w + s(6)
+        self._button_row(btns, x0, x2, by, by + bh2, s(28), s(6))
         text, color = self.msg
         shown = text or self._count_text
         tid = K.msgbox(cv, x0, by + bh2 + s(4), x2, H - m, shown,

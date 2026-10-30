@@ -225,12 +225,13 @@ class BoxWindow(DPB.BoxWindow):
             _gs(b, "menu")
         _gs(self.btn_release, "menu", danger=True)
         _gs(self.btn_multi_move, "menu", primary=True)
+        _gs(self.btn_multi_release, "menu", danger=True)
         for b in (self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done):
             _gs(b, "menu")
         for b in (self.btn_party, self.btn_multi_move):
             b.spec = font(11)
-        for b in (self.btn_nick, self.btn_move, self.btn_tint, self.btn_release, self.btn_multi_all,
-                  self.btn_multi_clear, self.btn_multi_done):
+        for b in (self.btn_nick, self.btn_move, self.btn_tint, self.btn_release, self.btn_multi_release,
+                  self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done):
             b.spec = font(11)
         # 머리 상자
         _gs(self.btn_prev, "arrow", left=True)
@@ -328,11 +329,13 @@ class BoxWindow(DPB.BoxWindow):
         s = U.h
         ix1, iy1, ix2, iy2 = gbox(cv, x1, y1, x2, y2, tags=T)
         if self.multi:
-            btns = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            btns = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
             hide = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
         else:
             btns = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
-            hide = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            hide = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
         for b in hide:
             b.hide()
         y = iy1 + s(3)

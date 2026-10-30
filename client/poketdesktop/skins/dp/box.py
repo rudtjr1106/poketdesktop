@@ -250,6 +250,8 @@ class BoxWindow(Scene, BX.BoxWindow):
         self.btn_tint = K.CButton(self.cv, "색 고르기", self.do_tint, "gray", font(10))
         self.btn_release = K.CButton(self.cv, "놓아주기", self.do_release, "red", font(10))
         self.btn_multi_move = K.CButton(self.cv, "옮기기 (0마리)", self.move_checked, "blue", font(11))
+        # 고른 것을 한 번에 놓아준다 (기본 창의 release_checked · 확인 창 그대로). 평소의 '놓아주기' 와 같은 붉은 단추
+        self.btn_multi_release = K.CButton(self.cv, "놓아주기 (0마리)", self.release_checked, "red", font(10))
         self.btn_multi_all = K.CButton(self.cv, "이 화면 전부", self.check_all_shown, "gray", font(10))
         self.btn_multi_clear = K.CButton(self.cv, "고르기 풀기", self.clear_checks, "gray", font(10))
         self.btn_multi_done = K.CButton(self.cv, "그만", self.exit_multi, "gray", font(10))
@@ -314,7 +316,7 @@ class BoxWindow(Scene, BX.BoxWindow):
         self.multi = True
         self._last_check = None
         self._paint_multi()
-        self.say("옮길 포켓몬을 눌러 고르세요. Shift 를 누른 채 누르면 사이의 것까지 고릅니다.", U.FG_DIM)
+        self.say("옮기거나 놓아줄 포켓몬을 눌러 고르세요. Shift 를 누른 채 누르면 사이의 것까지 고릅니다.", U.FG_DIM)
         self._soon()
 
     def exit_multi(self):
@@ -573,23 +575,41 @@ class BoxWindow(Scene, BX.BoxWindow):
         by = gy2 + s(10)
         bh2 = s(34)
         if self.multi:
-            btns = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            btns = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
             hide = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
         else:
             btns = [self.btn_party, self.btn_nick, self.btn_move, self.btn_tint, self.btn_release]
-            hide = [self.btn_multi_move, self.btn_multi_all, self.btn_multi_clear, self.btn_multi_done]
+            hide = [self.btn_multi_move, self.btn_multi_release, self.btn_multi_all, self.btn_multi_clear,
+                    self.btn_multi_done]
         for b in hide:
             b.hide()
-        x = x0
-        for b in btns:
-            w = b.want_width(s(24))
-            b.layout(x, by, x + w, by + bh2)
-            x += w + s(6)
+        self._button_row(btns, x0, x2, by, by + bh2, s(24), s(6))
         text, color = self.msg
         shown = text or self._count_text
         tid = K.msgbox(cv, x0, by + bh2 + s(6), x2, H - s(8), shown,
                        (tone(color) if color else (INK if text else INK2)), tags=T)
         self._msg_ids = (None, tid)
+
+    def _button_row(self, btns, x0, x2, y1, y2, pad, gap, first_pad=None):
+        """단추 줄을 x0 부터 붙여 놓는다. x2 를 넘으면 단추 안 여백과 사이만 같은 비율로 줄인다 - 글씨는 그대로.
+
+        여러 마리 고르기는 단추가 다섯이고 '놓아주기 (120마리)' 처럼 글이 길어서, 작은 창 · 큰 글자에서 판을 넘는다.
+        자리가 넉넉하면 여백 · 사이가 그대로라 줄이 바뀌지 않는다.
+        """
+        pads = [pad] * len(btns)
+        if btns and first_pad is not None:
+            pads[0] = first_pad
+        text = sum(b.want_width(0) for b in btns)
+        give = sum(pads) + gap * max(0, len(btns) - 1)
+        k = 1.0
+        if give and text + give > x2 - x0:
+            k = max(0.0, float(x2 - x0 - text) / give)
+        x = x0
+        for b, p in zip(btns, pads):
+            w = b.want_width(0) + int(p * k)
+            b.layout(x, y1, x + w, y2)
+            x += w + int(gap * k)
 
     def _paint_party_slots(self, cv, x1, y1, x2, y2):
         """데리고 다니는 포켓몬 여섯 자리 (+ 위에 파티 고르기)."""
