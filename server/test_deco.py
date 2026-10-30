@@ -16,6 +16,8 @@
   5. 선물 (items.gift_claim kind 'deco'): 묶음 · 선택권을 지급하고 이름을 준다. 모르는 것은 안 준다.
   6. 길드전 결산 (시즌 5): 1 · 2 · 3위 길드의 공격한 사람에게 순위 묶음, 그 밖의 길드는 선택권 - 선물함으로 한 번만.
      공격 안 한 사람은 없다. 시즌 4 에는 꾸미기를 안 준다.
+  7. 버전 2 감사의 선물 (migrations 0340): 있는 계정 모두에게 발자국 선물 한 줄씩 - 두 번 돌아도 한 줄,
+     받으면 꾸미기 주머니에 발자국. 그 뒤에 만든 계정은 없다.
 """
 import json
 import os
@@ -31,7 +33,7 @@ import test_guild_war_v5 as T5                                 # noqa: E402  (�
 
 from fastapi import HTTPException                              # noqa: E402
 
-from app import db, deco, guild_war as GW, items, main, pngmini, season, visit, walkpts  # noqa: E402
+from app import db, deco, guild_war as GW, items, main, migrations, pngmini, season, visit, walkpts  # noqa: E402
 from common import deco as C                                   # noqa: E402
 
 OK = FAIL = 0
@@ -348,6 +350,35 @@ def war_part():
     chk("  코인 보상은 그대로 나간다", any(db.q("SELECT 1 FROM meta WHERE k LIKE ?", ("gw:4:paid:%",))))
 
 
+# ---------------------------------------------------------------- 7. 버전 2 감사의 선물
+def paw_part():
+    print("\n=== 7. 버전 2 감사의 선물 (migrations 0340) ===")
+    chk("손질 목록에 있다", ("0340-v2-paw-gift", migrations._v2_paw_gift) in migrations.ONCE)
+    a = T5.mkuser("발자국_가", "PIKACHU", 10)
+    b = T5.mkuser("발자국_나", "PIKACHU", 10)
+    users = db.q1("SELECT COUNT(*) AS n FROM users")["n"]
+    conn = db.connect()
+    note = migrations._v2_paw_gift(conn)
+    conn.commit()
+
+    def paws(uid=None):
+        sql = "SELECT COUNT(*) AS n FROM gift WHERE kind='deco' AND item_id=? AND title=?"
+        args = (migrations.PAW_GIFT, migrations.PAW_GIFT_TITLE)
+        if uid:
+            sql, args = sql + " AND user_id=?", args + (uid,)
+        return db.q1(sql, args)["n"]
+    chk("있는 계정 모두에게 한 줄씩", paws() == users and paws(a) == 1 and paws(b) == 1, (note, paws(), users))
+    again = migrations._v2_paw_gift(conn)
+    conn.commit()
+    chk("  두 번 돌아도 한 줄", paws() == users and again == "0명에게 발자국", again)
+    out = items.gift_claim(a)
+    got = [x for x in out if x["kind"] == "deco" and x["item"] == migrations.PAW_GIFT]
+    chk("받으면 꾸미기 주머니에 발자국", len(got) == 1 and got[0]["name"] == "발자국"
+        and deco.owned(a).get("fx_paw") == 1 and got[0]["title"] == "감사의 선물", (out, deco.owned(a)))
+    c = T5.mkuser("발자국_다", "PIKACHU", 10)
+    chk("  그 뒤에 만든 계정은 없다", paws(c) == 0)
+
+
 def main_():
     db.init()
     cols = set(r["name"] for r in db.q("PRAGMA table_info(pokemon)"))
@@ -357,6 +388,7 @@ def main_():
         points_part()
         own_part()
         war_part()
+        paw_part()
     finally:
         season.SEASON = real
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))

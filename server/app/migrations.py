@@ -673,6 +673,31 @@ def _box_overflow(conn):
     return "유저 %d명, 포켓몬 %d마리를 자리 있는 박스로" % (len(users), moved)
 
 
+# 버전 2 감사의 선물 (게시판 공지 10/30 '업데이트와 동시에 모든 분께 기본 이펙트(발자국)를 하나씩').
+PAW_GIFT = "fx_paw"
+PAW_GIFT_TITLE = "감사의 선물"
+PAW_GIFT_MSG = ("늘 포스크탑을 즐겨 주셔서 고맙습니다. 꾸미기 효과 '발자국' 을 드립니다. "
+                "가방의 '꾸미기' 주머니에 들어갑니다 - 거기서나 바탕화면 포켓몬 우클릭 '꾸미기...' 에서 "
+                "씌우면 걸어간 자리에 발자국이 찍힙니다.")
+
+
+def _v2_paw_gift(conn):
+    """버전 2 가 뜨는 순간 있는 계정 모두에게 꾸미기 효과 '발자국' 을 선물함으로 넣는다.
+
+    선물함(kind 'deco')으로 넣는다 - 받을 때 deco.grant 가 가방의 꾸미기 주머니에 넣는다 (길드전 꾸미기 보상과 같은 길).
+    그 뒤에 만든 계정은 받지 않는다. 같은 선물이 이미 있는 계정은 건너뛰므로 두 번 돌아도 두 번 안 준다.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0).isoformat()
+    cur = conn.execute(
+        "INSERT INTO gift (user_id, kind, item_id, count, title, message, created_at)"
+        " SELECT u.id, 'deco', ?, 1, ?, ?, ? FROM users u"
+        " WHERE NOT EXISTS (SELECT 1 FROM gift g WHERE g.user_id=u.id AND g.kind='deco'"
+        " AND g.item_id=? AND g.title=?)",
+        (PAW_GIFT, PAW_GIFT_TITLE, PAW_GIFT_MSG, now, PAW_GIFT, PAW_GIFT_TITLE))
+    return "%d명에게 발자국" % cur.rowcount
+
+
 ONCE = [
     ("0140-refund-heals", _refund_heals),
     ("0190-season1-reset", _season1_reset),
@@ -686,6 +711,8 @@ ONCE = [
     ("0310-box-overflow", _box_overflow),
     # 시즌 4 (2026-10-17). **서버가 이 판으로 뜨는 순간 시즌 3 이 닫힌다** - 자정에 맞춰 배포한다.
     ("0320-season4-open", _season4_open),
+    # 버전 2 (main 의 0330-prune-battles 다음). 서버가 이 판으로 뜨는 순간 모두에게 발자국 선물.
+    ("0340-v2-paw-gift", _v2_paw_gift),
 ]
 
 
