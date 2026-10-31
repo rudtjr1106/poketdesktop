@@ -160,14 +160,14 @@ def main():
     db.init()
 
     print("=== 일정 ===")
-    chk("시즌 4 가 시작하는 날 0시(한국)부터", T0.astimezone(KST).isoformat() == "2026-10-17T00:00:00+09:00",
+    # 시즌마다 시작한 날부터 센다 (시즌 4 는 10/17, 시즌 5 는 11/1).
+    chk("시즌이 시작하는 날 0시(한국)부터", T0.astimezone(KST).isoformat() == GW.season.SEASON_STARTS + "T00:00:00+09:00",
         T0.isoformat())
+    day = datetime.timedelta(days=1)
     chk("신청 3일, 전략 4일, 전쟁 6일, 결산 1일 (시즌 2주)",
         (GW.APPLY_DAYS, GW.PLAN_DAYS, GW.WAR_DAYS, GW.SETTLE_DAYS) == (3, 4, 6, 1)
         and GW.APPLY_DAYS + GW.PLAN_DAYS + GW.WAR_DAYS + GW.SETTLE_DAYS == 14
-        and GW.plan_at().astimezone(KST).isoformat() == "2026-10-20T00:00:00+09:00"
-        and GW.war_at().astimezone(KST).isoformat() == "2026-10-24T00:00:00+09:00"
-        and GW.ends_at().astimezone(KST).isoformat() == "2026-10-30T00:00:00+09:00")
+        and GW.plan_at() - T0 == 3 * day and GW.war_at() - T0 == 7 * day and GW.ends_at() - T0 == 13 * day)
     chk("시작 전", GW.phase(at(minutes=-1))[0] == "before")
     chk("시작한 순간부터 신청", GW.phase(at())[0] == "apply" and GW.phase(at(days=2, hours=23, minutes=59))[0] == "apply")
     chk("사흘 뒤부터 전략", GW.phase(at(days=3))[0] == "plan" and GW.phase(at(days=6, hours=23, minutes=59))[0] == "plan")

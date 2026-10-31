@@ -33,6 +33,7 @@ os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
 from fastapi import HTTPException                             # noqa: E402
 
 from app import boss, boss_routes, config, db, deps, eggs, gym, gym_routes, items  # noqa: E402
+from app import season                                         # noqa: E402
 from common import pokelogic as P                             # noqa: E402
 from common import trainer_battle as TB                       # noqa: E402
 
@@ -90,6 +91,8 @@ def win_now(uid, region, trainer_id, level, seed):
 
 
 def main():
+    # 아래 날짜는 시즌 4 (10/17 시작) 기준이다. 악당은 시즌마다 시작한 날부터 2주 나온다 (boss.in_event).
+    season.SEASON_STARTS = "2026-10-17"
     db.init()
     d = deps.dex()
 
