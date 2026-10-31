@@ -209,13 +209,19 @@ def t_190(op, a, b):
     chk("두 번 부르면 아무것도 안 올린다", board.ensure_patch_posts(now=at(base + 600)) == [])
     lst = board.listing(a, "patch", 1)
     top = lst["posts"][0]
-    chk("패치노트 칸에 최신 버전이 맨 위", lst["total"] == len(patchnotes.NOTES)
-        and top["title"] == "v%s 업데이트" % patchnotes.NOTES[0]["version"]
-        and top["kindKr"] == "패치노트", top)
+    n_posts = sum(len(patchnotes.as_posts(n["version"])) for n in patchnotes.NOTES)
+    newest = patchnotes.as_posts(patchnotes.NOTES[0]["version"])
+    chk("패치노트 칸에 최신 버전이 맨 위 (나눠 올린 판은 (1) 이 위)", lst["total"] == n_posts
+        and top["title"] == newest[0][1] and top["kindKr"] == "패치노트", (lst["total"], n_posts, top))
+    if len(newest) > 1:
+        chk("  2.0.0 은 두 글: 'v2.0.0 업데이트 (1)' 다음 '(2)', 항목이 나뉘어 다 들어간다",
+            [x["title"] for x in lst["posts"][:2]] == ["v2.0.0 업데이트 (1)", "v2.0.0 업데이트 (2)"]
+            and sum(b.count("■ ") for _t, _ti, b in newest) == len(patchnotes.NOTES[0]["items"]),
+            [x["title"] for x in lst["posts"][:3]])
     chk("운영자 이름으로 올라간다", top["author"] == op["username"] and top["authorAdmin"] is True)
     d = board.detail(a, top["id"])
     chk("내용은 요약과 항목들", patchnotes.NOTES[0]["headline"] in d["body"] and "■ " in d["body"])
-    old = lst["posts"][1]
+    old = lst["posts"][len(newest)]
     ver = old["title"].split()[0].lstrip("v")
     chk("옛 버전은 나온 날짜로", old["createdAt"] == patchnotes.RELEASED[ver], (ver, old["createdAt"]))
     chk("'전체' 에는 안 흐른다", all(x["kind"] != "patch" for x in board.listing(a, "all", 1)["posts"]))
@@ -234,7 +240,7 @@ def t_190(op, a, b):
         all(x["kind"] != "patch" for x in board.mine_page(op["id"], "posts", 1)["items"])
         and board.mine(op["id"])["postCount"] == board.mine_page(op["id"], "posts", 1)["total"])
     chk("upto 로 끊어 올릴 수 있다 (새 판이 나오면 그 글만 생긴다)",
-        (db.run("DELETE FROM board_post WHERE ref=?", ("patch:" + patchnotes.NOTES[0]["version"],)),
+        (db.run("DELETE FROM board_post WHERE ref LIKE ?", ("patch:" + patchnotes.NOTES[0]["version"] + "%",)),
          board.ensure_patch_posts(now=at(base + 800)))[1] == [patchnotes.NOTES[0]["version"]])
 
 

@@ -610,7 +610,7 @@ def _patch_time(version, now=None):
 
 
 def ensure_patch_posts(now=None, upto=None):
-    """버전마다 패치노트 글 하나. 없는 것만 올린다. 올린 버전 목록을 돌려준다.
+    """버전마다 패치노트 글 하나 (너무 긴 판은 둘 - patchnotes.as_posts). 없는 것만 올린다. 올린 버전 목록을 돌려준다.
 
     **서버가 뜰 때 한 번 부른다.** 새 판을 배포하면 그 판의 글이 그때 생긴다.
     옛 버전은 처음 한 번 몰아서 올라가는데, 날짜는 그 판이 나온 때로 적는다
@@ -635,14 +635,18 @@ def ensure_patch_posts(now=None, upto=None):
         ver = n["version"]
         if upto and patchnotes._key(ver) > patchnotes._key(upto):
             continue
-        ref = "patch:" + ver
-        if ref in have:
-            continue
-        title, body = patchnotes.as_post(ver)
-        db.run("INSERT INTO board_post (kind, user_id, author, title, body, created_at, ref)"
-               " VALUES ('patch',?,?,?,?,?,?)",
-               (admin["id"], admin["username"], title, body, _patch_time(ver, now), ref))
-        made.append(ver)
+        put = False
+        # 나눠 올리는 판(2.0.0)은 (2) 를 먼저 넣는다 - 목록이 새 글부터라 (1) 이 위에 온다.
+        for tail, title, body in reversed(patchnotes.as_posts(ver)):
+            ref = "patch:" + ver + tail
+            if ref in have:
+                continue
+            db.run("INSERT INTO board_post (kind, user_id, author, title, body, created_at, ref)"
+                   " VALUES ('patch',?,?,?,?,?,?)",
+                   (admin["id"], admin["username"], title, body, _patch_time(ver, now), ref))
+            put = True
+        if put:
+            made.append(ver)
     return made
 
 

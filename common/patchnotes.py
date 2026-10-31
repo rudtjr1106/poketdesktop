@@ -26,6 +26,9 @@ NOTES = [
     {
         "version": "2.0.0",
         "headline": "화면 테마 6종 · 글자 크기, 시즌 5 (랭크 AI · 같은 도구 한 마리 · 길드전 조커 · 꾸미기), 게시판 사진, 감사의 선물",
+        # 게시판에는 너무 길어서 두 글로 나눠 올린다 (as_posts): 앞 11줄이 (1), 나머지가 (2).
+        "split": 11,
+        "headline2": "게시판 사진 · 숨었다가 때리는 기술 · 여러 마리 놓아주기 · 연습판 · 편의 기능과 고친 것",
         "items": [
             ('시즌 4가 끝나고 시즌 5가 열립니다',
              '시즌 5는 11월 1일부터 11월 15일까지입니다. 시즌 4 순위 보상은 선물함으로 들어갑니다.'),
@@ -2100,25 +2103,48 @@ RELEASED = {
 }
 
 
-def as_post(version):
-    """게시판에 올릴 꼴 — (제목, 내용). 없으면 None.
-
-    제목은 'v1.9.0 업데이트', 내용은 한 줄 요약 뒤에 항목마다
-    '■ 제목' 과 설명을 적는다.
-    """
-    n = entry(version)
-    if not n:
-        return None
+def _post_body(headline, items):
     out = []
-    if n.get("headline"):
-        out.append(n["headline"])
+    if headline:
+        out.append(headline)
         out.append("")
-    for title, body in n["items"]:
+    for title, body in items:
         out.append("■ %s" % title)
         if body:
             out.append(body)
         out.append("")
-    return "v%s 업데이트" % version, "\n".join(out).strip()
+    return "\n".join(out).strip()
+
+
+def as_post(version):
+    """게시판에 올릴 꼴 — (제목, 내용). 없으면 None.
+
+    제목은 'v1.9.0 업데이트', 내용은 한 줄 요약 뒤에 항목마다
+    '■ 제목' 과 설명을 적는다. 나눠 올리는 판(split)도 여기는 한 글로 준다 - 게시판은 as_posts 를 쓴다.
+    """
+    n = entry(version)
+    if not n:
+        return None
+    return "v%s 업데이트" % version, _post_body(n.get("headline"), n["items"])
+
+
+def as_posts(version):
+    """게시판에 올릴 글들 [(ref 꼬리, 제목, 내용)] - (1) 이 앞. 없으면 빈 목록.
+
+    보통은 하나다 (꼬리 ''). 'split' 이 있으면 그 줄에서 둘로 나눈다 - 2.0.0 은 22줄이라 한 글로는 너무 길었다
+    (사용자 2026-10-31 '2.0(1) 이렇게'). 제목은 'v2.0.0 업데이트 (1)' · '(2)', 꼬리는 '#1' · '#2'.
+    """
+    n = entry(version)
+    if not n:
+        return []
+    cut = n.get("split")
+    if not cut:
+        title, body = as_post(version)
+        return [("", title, body)]
+    parts = [(n.get("headline"), n["items"][:cut]),
+             (n.get("headline2") or n.get("headline"), n["items"][cut:])]
+    return [("#%d" % i, "v%s 업데이트 (%d)" % (version, i), _post_body(h, items))
+            for i, (h, items) in enumerate(parts, 1)]
 
 
 def entry(version):
