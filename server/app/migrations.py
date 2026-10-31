@@ -17,6 +17,7 @@ db.MIGRATIONS 는 '칸 추가' 만 한다. 없는 칸을 더하는 일이라 몇
      더 나쁘다. 기록만 남기고 넘어간다.
 """
 import datetime
+import os
 
 from . import config, db
 
@@ -821,6 +822,31 @@ def _season5_open(conn):
                gifts, n_eggs, candies, tickets, n_all))
 
 
+def _db_bytes():
+    return sum(os.path.getsize(config.DB_PATH + s) for s in ("", "-wal")
+               if os.path.exists(config.DB_PATH + s))
+
+
+def _prune_battles(conn):
+    """10/28: 끝난 배틀을 처음으로 치우고 파일을 줄인다.
+
+    gym_battle 이 한 번도 안 지워져서 DB 3.1GB 중 2.3GB 였다(housekeep.py). 요청을 받기 전이라
+    덩어리를 크게, 쉬지 않고 지운다. 그다음 VACUUM - 지운 자리는 그냥 두면 새 줄이 다시 쓰지만
+    파일은 안 줄어서, 백업(하루 하나씩 14개, 압축 없음)이 계속 DB 크기만큼 디스크를 먹는다.
+    VACUUM 은 트랜잭션 밖에서만 돈다. 지우기는 db.run 이 이미 커밋했다.
+    """
+    from . import housekeep
+    conn.commit()
+    done = housekeep.prune_battles(batch=5000, pause=0)
+    note = ", ".join("%s %d줄" % kv for kv in done.items())
+    if db.using_turso():
+        return note
+    before = _db_bytes()
+    conn.execute("VACUUM")
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    return "%s · 파일 %dMB -> %dMB" % (note, before // 1000000, _db_bytes() // 1000000)
+
+
 ONCE = [
     ("0140-refund-heals", _refund_heals),
     ("0190-season1-reset", _season1_reset),
@@ -834,6 +860,8 @@ ONCE = [
     ("0310-box-overflow", _box_overflow),
     # 시즌 4 (2026-10-17). **서버가 이 판으로 뜨는 순간 시즌 3 이 닫힌다** - 자정에 맞춰 배포한다.
     ("0320-season4-open", _season4_open),
+    # 끝난 배틀 첫 정리 + VACUUM (10/28). **서버가 뜨는 데 그만큼 더 걸린다** - 배포 뒤 health 를 기다릴 것.
+    ("0330-prune-battles", _prune_battles),
     # 버전 2 (main 의 0330-prune-battles 다음). 서버가 이 판으로 뜨는 순간 모두에게 발자국 선물.
     ("0340-v2-paw-gift", _v2_paw_gift),
     # 시즌 5 (2026-11-01, 버전 2). **서버가 이 판으로 뜨는 순간 시즌 4 가 닫힌다.**

@@ -34,7 +34,7 @@ from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
 from . import (achievements, auth, avatar, battle_routes, board, board_routes, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
                expedition, item_routes, walkpts,
-               errors, friendly, halloween, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
+               errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws,
                boss_routes, gym_routes, social_routes, tm_routes, tms, troubles, visit, walk)
@@ -115,6 +115,8 @@ def _startup():
     except Exception as e:                                  # noqa: BLE001
         print("[pvp] 오래된 로그 정리 실패: %s" % e)
     errors.sweep()
+    # 끝난 배틀은 한 시간마다 치운다 (10/28). 처음 한 번의 큰 정리는 위 migrations 의 0330 이 했다.
+    housekeep.start()
     d = dex()
     n = sum(1 for s in d.species if s.get("spawnable"))
     print("[poketdesktop] 도감 %d종 (야생 등장 %d종) 준비 완료" % (len(d.species), n))
