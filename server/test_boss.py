@@ -91,8 +91,11 @@ def win_now(uid, region, trainer_id, level, seed):
 
 
 def main():
-    # 아래 날짜는 시즌 4 (10/17 시작) 기준이다. 악당은 시즌마다 시작한 날부터 2주 나온다 (boss.in_event).
-    season.SEASON_STARTS = "2026-10-17"
+    # 아래 날짜는 시즌 4 (10/17 시작) 기준이다. 악당은 시즌 4 에만, 시작한 날부터 2주 나온다 (boss.in_event).
+    print("=== 시즌 5 에는 안 나온다 (2026-10-31 사용자 결정) ===")
+    chk("시즌 5 (11/1~) 에는 2주 안이어도 안 나온다", not boss.in_event("2026-11-01") and not boss.in_event("2026-11-10"),
+        (season.SEASON, season.SEASON_STARTS))
+    season.SEASON, season.SEASON_STARTS = 4, "2026-10-17"
     db.init()
     d = deps.dex()
 

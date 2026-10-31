@@ -37,6 +37,7 @@ KST = datetime.timezone(datetime.timedelta(hours=9))
 START_HOUR, LAST_HOUR = 9, 12           # 이 사이의 어느 때에 나타난다 (한국 시각)
 LEAVE_HOUR = 23                         # 그날 밤 11시에 떠난다 (전설을 쓰러뜨린 사람에게는 그 전에 사라진다)
 EVENT_DAYS = 14                         # 시즌이 시작한 날부터 이만큼만 나온다
+EVENT_SEASONS = (4,)                    # 나오는 시즌 (2026-10-31 사용자 결정 '시즌 5 엔 끄기')
 EGG_RATE = 0.70                         # 전설을 쓰러뜨렸을 때 알이 나올 확률
 ADMINS = 3
 LEGEND_STAGE = ADMINS                   # region 의 자리 번호: 0~2 간부, 3 전설
@@ -130,7 +131,9 @@ def leaves_at(day):
 
 
 def in_event(day):
-    """이날이 악당이 나오는 2주 안인가 (시즌이 시작한 날부터 EVENT_DAYS 일)."""
+    """이날이 악당이 나오는 2주 안인가 (시즌이 시작한 날부터 EVENT_DAYS 일). EVENT_SEASONS 밖의 시즌에는 안 나온다."""
+    if season.SEASON not in EVENT_SEASONS:
+        return False
     first = datetime.date.fromisoformat(season.SEASON_STARTS)
     return first <= datetime.date.fromisoformat(day) < first + datetime.timedelta(days=EVENT_DAYS)
 
