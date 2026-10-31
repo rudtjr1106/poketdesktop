@@ -343,10 +343,11 @@ def main():
     chk("  팽도리 계열·윽우지·떨구새도", all(tms.can_learn(n, r) for n in (393, 394, 395, 845, 962)))
     chk("  원작에서 어떤 길로도 못 배우는 종은 여전히 못 배운다 (갸라도스·레쿠쟈)", not tms.can_learn(130, r) and not tms.can_learn(384, r))
     c = tms.data()["counts"]
-    chk("  자료에 알 기술 · 가르침 기술 · Z-A 전용으로 들어간 줄 수가 적혀 있다 (전 세대 기술머신 61463줄 + 알 기술 + "
-        "최신작 가르침 1.13.3 + Z-A 전용 기술머신 1.13.4)",
+    chk("  자료에 알 기술 · 가르침 기술 · Z-A 전용 · 떠올리기로 들어간 줄 수가 적혀 있다 (전 세대 기술머신 61463줄 + 알 기술 + "
+        "최신작 가르침 1.13.3 + Z-A 전용 기술머신 1.13.4 + 떠올리기 기술 2.0)",
         c.get("eggRows", 0) > 1000 and c.get("tutorRows", 0) > 200 and c.get("zaRows", 0) > 400
-        and c["rows"] == 61463 + c["eggRows"] + c["tutorRows"] + c["zaRows"], c)
+        and c.get("remindRows", 0) > 200
+        and c["rows"] == 61463 + c["eggRows"] + c["tutorRows"] + c["zaRows"] + c["remindRows"], c)
     chk("  기술머신의 수는 그대로다 (새 기술머신을 만들지 않는다)", tms.count() == 358)
 
     # 1.13.4 (게시판 #313 Leica '더블촙 기술머신을 배울 수 있는 포켓몬이 없다'): 레전즈 Z-A · 메가디멘션에만 있는
@@ -365,6 +366,20 @@ def main():
         and tms.can_learn(26, by_move["MAGNETBOMB"]) and tms.can_learn(479, by_move["MAGNETBOMB"]))
     chk("  본편 기술머신은 안 건드린다 (킬가르도는 폴터가이스트를 여전히 못 배운다 - 본편 최신작 · Z-A 둘 다 못 배운다)",
         not tms.can_learn(681, by_move["POLTERGEIST"]))
+
+    # 2.0 (게시판 #382 '번치코 떠올리기에는 드레인펀치가 있는데 기술머신에는 번치코가 안 나온다'): 떠올리기로 배우는
+    # 기술에 기술머신이 있으면 그 기술머신으로도 배운다 (tools/build_tms.py '떠올리기 기술'). 새로 배우는 기술은 없다.
+    print("\n=== 떠올리기 기술은 그 기술머신으로도 (2.0, 게시판 #382) ===")
+    chk("번치코가 드레인펀치 기술머신으로 배운다 (떠올리기에 있다)",
+        "DRAINPUNCH" in (d.get("BLAZIKEN").get("remind") or []) and tms.can_learn(257, by_move["DRAINPUNCH"]))
+    gap = [(s["internal"], mv) for s in d.raw["species"] for mv in s.get("remind") or []
+           if mv in by_move and not tms.can_learn(s["num"], by_move[mv])]
+    chk("  떠올리기 기술인데 그 기술머신으로 못 배우는 종이 없다", not gap, gap[:5])
+    fr = tms.data().get("fromRemind") or {}
+    chk("  그렇게 들어간 줄이 fromRemind 에 적혀 있다 (add_reminder 가 기술머신으로 치지 않게)",
+        sum(len(v) for v in fr.values()) == c["remindRows"] and 73 in fr.get("257", []), (len(fr), c["remindRows"]))
+    chk("  떠올리기에 없는 기술은 안 연다 (영치코 · 아차모는 드레인펀치를 여전히 못 배운다)",
+        not tms.can_learn(256, by_move["DRAINPUNCH"]) and not tms.can_learn(255, by_move["DRAINPUNCH"]))
 
     print("\n=== 누가 배울 수 있나 ===")
     # 이상해씨(1) 는 배울 게 많고, 메타몽(132) 은 하나도 못 배운다.

@@ -22,7 +22,8 @@
 배웠다. 기술머신이 있는 것은 build_tms 가 기술머신 호환에 넣고(알 기술 · 최신작 가르침), 없는 것은 여기서
 떠올리기로 넣는다. **알 기술은 진화 전 단계의 것도 물려받는다** - SV 자료는 대개 진화형에도 알 기술을 적지만,
 아기 포켓몬이 있는 계열은 아기에게만 적는다 (피츄 7개 · 피카츄 0개). '최신작' 은 tools/learn_ref.py 가 고른다.
-**build_tms.py 를 먼저 돌린다** (기술머신이 있는지를 server/data/tms.json 에서 본다).
+**build_tms.py 를 먼저 돌린다** (기술머신이 있는지를 server/data/tms.json 에서 본다). **그리고 다시 한 번
+돌린다** - 떠올리기 기술은 그 기술머신으로도 배운다 (2.0, build_tms 의 '떠올리기 기술').
 
 **메가진화하는 종은 레전즈 Z-A 의 학습표도 (1.13.4, 사용자 결정 '메가 있는 종만'):** 2026-10-20 게시판 #291 (니뉴) -
 메가픽시는 Z-A 에서 나온 메가라 Z-A 학습표(픽시 Lv.52 에어슬래시)를 바탕으로 짜였는데, 이 게임은 SV 학습표만 따라서
@@ -159,7 +160,10 @@ def build(dex):
             p = cur.get("prevo")
             cur = by_num.get(p) if isinstance(p, int) else None
         za_only = set(learn_tm.get("zaOnly") or [])
-        tm = set(tm_no.get(str(no)) for no in learn_tm["learn"].get(str(sp["num"]), []) if no not in za_only)
+        # 떠올리기 기술이라서 build_tms 가 넣은 기술머신 줄(fromRemind, 2.0)도 치지 않는다 - 치면 서로 지운다.
+        mine = set((learn_tm.get("fromRemind") or {}).get(str(sp["num"])) or [])
+        tm = set(tm_no.get(str(no)) for no in learn_tm["learn"].get(str(sp["num"]), [])
+                 if no not in za_only and no not in mine)
         lst = out.setdefault(name, [])
         for mv, zlv in sorted(za[name].items()):
             if mv not in dex["moves"] or mv in lst:

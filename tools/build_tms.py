@@ -51,6 +51,15 @@ machines.csv 를 합쳐 만드는데, PokeAPI 에는 Z-A 의 '누가 기술머�
 쇼다운의 Z-A 학습표(learn_ref.za_codes)에서 그 기술이 기술머신("9M")인 종을 붙인다. 본편에도 있는 기술머신은
 건드리지 않는다 (본편 자료로 이미 덮인다). 폼(영원의 꽃 플라엣테 등)은 원래 종 이름이 아니라서 빠진다.
 
+## 떠올리기 기술 (2.0)
+
+**떠올리기로 배우는 기술(도감의 remind - tools/add_reminder.py)에 기술머신이 있으면 그 기술머신으로도 배운다.**
+2026-10-30 게시판 #382 '번치코 떠올리기에는 드레인펀치가 있는데 드레인펀치 기술머신에는 번치코가 안 나온다' - 메가 종에
+Z-A 학습표 기술을 떠올리기로 넣으면서(1.13.4) 기술머신 표와 어긋났다 (77종 253줄). 이미 떠올리기로 배울 수 있는
+기술이라 새로 배우는 기술은 없다 (사용자 결정 - Z-A 기술머신 줄 955개를 다 여는 쪽은 안 함).
+그래서 **add_reminder 다음에도 돌린다**: build_tms -> add_reminder -> build_tms. 이렇게 들어간 줄은 fromRemind 에
+적어서 add_reminder 가 기술머신으로 치지 않는다 (치면 떠올리기에서 빠지고, 그러면 이 줄도 빠진다).
+
 ## 돌리는 법
 
     python tools/build_tms.py
@@ -214,6 +223,18 @@ def build(pokedex_path):
                 learn.setdefault(num, set()).add(no)
                 za_rows += 1
 
+    # ---- 떠올리기 기술 (2.0): 떠올리기로 배우는 기술은 그 기술의 기술머신으로도 ----
+    remind_rows, from_remind = 0, {}
+    for s in dex["species"]:
+        num = s["num"]
+        for key in s.get("remind") or []:
+            no = no_of_move.get((dex["moves"].get(key) or {}).get("id"))
+            if no is None or no in learn.get(num, set()):
+                continue
+            learn.setdefault(num, set()).add(no)
+            from_remind.setdefault(str(num), []).append(no)
+            remind_rows += 1
+
     out_learn = dict((str(k), sorted(v)) for k, v in sorted(learn.items()))
 
     if skipped:
@@ -221,7 +242,8 @@ def build(pokedex_path):
 
     return {
         "version": 2,
-        "source": "PokeAPI (전 세대 기술머신 합집합 + 알 기술 + 최신작 가르침 기술) + 쇼다운 Z-A 학습표 (Z-A 전용 기술머신)",
+        "source": "PokeAPI (전 세대 기술머신 합집합 + 알 기술 + 최신작 가르침 기술) + 쇼다운 Z-A 학습표 (Z-A 전용 기술머신)"
+                  " + 도감의 떠올리기 기술",
         "counts": {
             "tms": len(tms),
             "species": len(out_learn),
@@ -229,12 +251,16 @@ def build(pokedex_path):
             "eggRows": egg_rows,          # 그 가운데 알 기술이라서 들어간 줄
             "tutorRows": tutor_rows,      # 그 가운데 최신작 가르침 기술이라서 들어간 줄 (1.13.3)
             "zaRows": za_rows,            # 그 가운데 Z-A 전용 기술머신이라서 들어간 줄 (1.13.4)
+            "remindRows": remind_rows,    # 그 가운데 떠올리기로 배우는 기술이라서 들어간 줄 (2.0)
         },
         "tms": tms,
         "learn": out_learn,
         # Z-A 전용 기술머신 번호 (1.13.4). add_reminder 가 본다 - 메가 종의 Z-A 떠올리기 기술은 이 기술머신으로
         # 배울 수 있게 됐다고 빼지 않는다 (먼저 떠올리기로 줬고, 기술머신은 잡아야 나온다).
         "zaOnly": sorted(za_only),
+        # 떠올리기 기술이라서 들어간 줄 {도감번호: [번호들]} (2.0). add_reminder 가 본다 - 이 줄을 기술머신으로 치면
+        # '기술머신으로 배운다' 고 떠올리기에서 빼고, 그러면 다음 build_tms 에서 이 줄도 사라진다 (서로 지운다).
+        "fromRemind": dict((k, sorted(v)) for k, v in sorted(from_remind.items())),
     }
 
 
@@ -253,8 +279,9 @@ def main():
 
     c = data["counts"]
     mb = os.path.getsize(a.out) / 1048576.0
-    print("  기술머신 %d개 · %d종 · 학습 %d줄 (그 가운데 알 기술 %d줄 · 가르침 기술 %d줄 · Z-A 전용 %d줄)  (%s, %.1fMB)"
-          % (c["tms"], c["species"], c["rows"], c["eggRows"], c["tutorRows"], c["zaRows"], a.out, mb))
+    print("  기술머신 %d개 · %d종 · 학습 %d줄 (그 가운데 알 기술 %d줄 · 가르침 기술 %d줄 · Z-A 전용 %d줄 · 떠올리기 %d줄)"
+          "  (%s, %.1fMB)" % (c["tms"], c["species"], c["rows"], c["eggRows"], c["tutorRows"], c["zaRows"],
+                              c["remindRows"], a.out, mb))
     sv = sum(1 for t in data["tms"].values() if t["sv"] is not None)
     print("  스칼렛/바이올렛 번호 그대로 %d개, 옛 세대에서 가져온 것 %d개"
           % (sv, c["tms"] - sv))
