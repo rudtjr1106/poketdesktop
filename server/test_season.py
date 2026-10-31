@@ -88,6 +88,8 @@ def main():
     db.init()
 
     print("=== RP 한 판 ===")
+    # 아래 숫자는 시즌 4 까지의 폭이다 (+10~30, -5~25). 시즌 5 의 폭은 아래 '시즌 5: 이기면 15~25' 에서 본다.
+    keep_season, season.SEASON = season.SEASON, 4
     new, d, notes = season.rp_change("win", 1000, 1000, 0, False, 0, 0)
     chk("비슷한 상대를 이기면 +20", d == 20, d)
     new, d, notes = season.rp_change("lose", 1000, 1000, 0, False, 100, 100)
@@ -148,6 +150,7 @@ def main():
     new, d, _ = season.rp_change("lose", 1000, 1000, -3, False, 100, 100, 1.14)
     chk("연패 보호도 그대로 (절반)", d == -10, d)
     chk("규칙표에 전력 무게가 실린다", season.rules_public()["rp"]["powerK"] == season.POWER_K)
+    season.SEASON = keep_season
 
     print("\n=== 티어 ===")
     chk("0 은 몬스터볼", season.tier_of(0) == "monster")
@@ -718,10 +721,10 @@ def main():
     i = names.index("0290-season3-open")
     chk("손질 차례: 0290(시즌 3 열기) 다음에 0300", names[i:i + 2]
         == ["0290-season3-open", "0300-s3-void-early"], names[-3:])
-    chk("시즌 4 는 10/17 부터 2주", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
-        == (4, "2026-10-17", "2026-10-31"))
-    # 그 뒤로 시즌과 무관한 손질(0330 끝난 배틀 정리)이 붙었다 - 시즌 손질 가운데 맨 끝이면 된다.
-    chk("시즌 4 열기는 시즌 손질 가운데 맨 끝", [n for n in names if "season" in n][-1] == "0320-season4-open",
+    chk("시즌 5 는 11/1 부터 2주", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
+        == (5, "2026-11-01", "2026-11-15"))
+    # 시즌과 무관한 손질(0330 끝난 배틀 정리 · 0340 감사의 선물)도 붙는다 - 시즌 손질 가운데 맨 끝이면 된다.
+    chk("시즌 5 열기는 시즌 손질 가운데 맨 끝", [n for n in names if "season" in n][-1] == "0350-season5-open",
         names[-3:])
 
     print("\n=== 규칙표 ===")

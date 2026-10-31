@@ -698,6 +698,129 @@ def _v2_paw_gift(conn):
     return "%d명에게 발자국" % cur.rowcount
 
 
+# 시즌 4 보상표. 시즌 3 과 같은 틀이고, **여기 숫자를 적는다** (규칙 2). 시즌 4 부터 맨 위 다섯 자리에
+# 도구를 더 준다 (season.S4_ITEMS, 2026-10-18 사용자 결정) - 1등 타입 확정 기술머신 뽑기권, 2~5등 랜덤 기술머신 뽑기권.
+# 1등의 관장 등록(season.S4_PERKS)은 운영자가 따로 들어준다 - 선물로 넣을 것이 없다.
+S4_TIER_RP = S3_TIER_RP
+S4_SEATS = S3_SEATS
+S4_MIG_REWARDS = {
+    "champion": ("s4_champion", "gold", 1, "legendary"),
+    "elite": ("s4_elite", "silver", 1, "mythical"),
+    "master": ("s4_master", "master", 1, None),
+    "hyper": ("s4_hyper", None, 0, None),
+    "super": ("s4_super", None, 0, None),
+}
+S4_MIG_ITEMS = {
+    "champion": (("RANKTICKETTMTYPE", 1, "타입 확정 기술머신 뽑기권"),),
+    "elite": (("RANKTICKETTM", 1, "랜덤 기술머신 뽑기권"),),
+}
+S4_TITLE_KR = {"s4_champion": "시즌 4 챔피언", "s4_elite": "시즌 4 사천왕",
+               "s4_master": "시즌 4 마스터볼", "s4_hyper": "시즌 4 하이퍼볼",
+               "s4_super": "시즌 4 슈퍼볼"}
+S4_GIFT_TITLE = "시즌 4 보상"
+
+
+def _season5_open(conn):
+    """시즌 4 를 닫고 시즌 5 를 연다 (2026-11-01, 버전 2 와 함께 - 랭크 AI · 같은 도구 한 마리 · 점수 폭 · 조커).
+
+    시즌 4 열기(_season4_open)와 같은 순서다 (규칙 1 — 먼저 주고 나중에 지운다).
+      1) 시즌 4 순위표(RP 순)를 season_result 에 옮긴다 - 명예의 전당
+      2) 최고 티어·자리대로 보상을 선물(gift)로 넣는다 - 맨 위 다섯 자리에는 기술머신 뽑기권도 (S4_MIG_ITEMS)
+      3) 그다음에 점수를 비운다
+
+    **이 손질은 서버가 새 판으로 뜨는 순간에 돈다** - 그때 시즌 4 가 닫힌다.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0).isoformat()
+    rows = conn.execute(
+        "SELECT r.user_id, u.username, r.rating, r.rp, r.peak_rp, r.games, r.wins,"
+        " r.losses, r.draws FROM rank_stat r JOIN users u ON u.id=r.user_id"
+        " WHERE r.ranked=1 ORDER BY r.rp DESC, r.rating DESC, r.wins DESC").fetchall()
+    master_rp = S4_TIER_RP[-1][1]
+    seated = gifts = candies = n_eggs = tickets = 0
+    tiers = {}
+    for i, r in enumerate(rows, 1):
+        uid = _v(r, "user_id", 0)
+        rp = int(_v(r, "rp", 3) or 0)
+        peak = max(rp, int(_v(r, "peak_rp", 4) or 0))
+        seat = None
+        if rp >= master_rp and seated < S4_SEATS:
+            seat = "champion" if seated == 0 else "elite"
+            seated += 1
+        tier = seat or _s3_tier(peak)
+        tiers[tier] = tiers.get(tier, 0) + 1
+        reward = S4_MIG_REWARDS.get(tier)
+        title = reward[0] if reward else None
+        conn.execute(
+            "INSERT INTO season_result (season, user_id, rank, name, rating,"
+            " rp, tier, games, wins, losses, draws, title, at)"
+            " VALUES (4,?,?,?,?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(season, user_id) DO NOTHING",
+            (uid, i, _v(r, "username", 1), _v(r, "rating", 2), rp, tier,
+             _v(r, "games", 5), _v(r, "wins", 6), _v(r, "losses", 7),
+             _v(r, "draws", 8), title, now))
+        if reward is None:
+            continue            # 몬스터볼은 보관만 하고 보상은 없다
+        if conn.execute("SELECT 1 FROM gift WHERE user_id=? AND title=?",
+                        (uid, S4_GIFT_TITLE)).fetchone():
+            continue
+        title, frame, n, egg = reward
+        extra = S4_MIG_ITEMS.get(tier, ())
+        bits = []
+        if egg:
+            bits.append(S1_EGG_KR[egg])
+        bits.append("칭호 '%s'" % S4_TITLE_KR[title])
+        if frame:
+            bits.append(S2_FRAME_KR[frame])
+        if n:
+            bits.append("이로치사탕 %d개" % n)
+        for _item, cnt, kr in extra:
+            bits.append("%s %d장" % (kr, cnt))
+        if seat:
+            head = "시즌 4 를 %s 자리로 마쳤습니다 (최종 %d위)." % (S2_TIER_KR[seat], i)
+        else:
+            head = "시즌 4 에서 %s 티어까지 올랐습니다 (최종 %d위)." % (S2_TIER_KR[tier], i)
+        msg = "%s %s을(를) 드립니다. %s은(는) 랭킹 탭에서 바꿀 수 있습니다." % (
+            head, ", ".join(bits), "칭호와 명패" if frame else "칭호")
+        if n:
+            msg += " 이로치사탕은 가방에서 포켓몬에게 먹이면 이로치가 됩니다."
+        if egg:
+            msg += (" 알은 바탕화면에 나타나고, 게임을 켜 둔 시간만큼 자라서 "
+                    "부화합니다.")
+        if seat == "champion":
+            msg += " 관장 등록은 따로 안내해 드립니다."
+        lines = []
+        if egg:
+            lines.append(("egg", egg, 1))
+            n_eggs += 1
+        lines.append(("title", title, 1))
+        if frame:
+            lines.append(("frame", frame, 1))
+        if n:
+            lines.append(("item", "SHINYCANDY", n))
+            candies += n
+        for item, cnt, _kr in extra:
+            lines.append(("item", item, cnt))
+            tickets += cnt
+        for kind, rid, cnt in lines:
+            conn.execute(
+                "INSERT INTO gift (user_id, kind, item_id, count, title,"
+                " message, created_at) VALUES (?,?,?,?,?,?,?)",
+                (uid, kind, rid, cnt, S4_GIFT_TITLE, msg, now))
+            gifts += 1
+
+    n_all = conn.execute("SELECT COUNT(*) FROM rank_stat").fetchone()[0]
+    conn.execute(
+        "UPDATE rank_stat SET rating = 1000 + CAST((rating - 1000) / 2 AS INTEGER),"
+        " games=0, wins=0, losses=0, draws=0, streak=0, ranked=0,"
+        " rp=0, peak_rp=0, win_day='', updated_at=?", (now,))
+    conn.execute("UPDATE rank_stat SET best = rating")
+    return ("시즌 4 순위 %d명 보관 (%s), 선물 %d줄 (알 %d개, 이로치사탕 %d개, 뽑기권 %d장), %d명 점수 전환"
+            % (len(rows), ", ".join("%s %d" % (S2_TIER_KR[k], v) for k, v in
+                                    sorted(tiers.items())),
+               gifts, n_eggs, candies, tickets, n_all))
+
+
 ONCE = [
     ("0140-refund-heals", _refund_heals),
     ("0190-season1-reset", _season1_reset),
@@ -713,6 +836,8 @@ ONCE = [
     ("0320-season4-open", _season4_open),
     # 버전 2 (main 의 0330-prune-battles 다음). 서버가 이 판으로 뜨는 순간 모두에게 발자국 선물.
     ("0340-v2-paw-gift", _v2_paw_gift),
+    # 시즌 5 (2026-11-01, 버전 2). **서버가 이 판으로 뜨는 순간 시즌 4 가 닫힌다.**
+    ("0350-season5-open", _season5_open),
 ]
 
 

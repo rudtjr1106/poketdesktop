@@ -9,7 +9,7 @@
   2. 보상은 **도달한 최고 티어**로, 챔피언·사천왕은 끝날 때의 자리로 준다 (선물함).
   3. 그다음에 RP 를 0, 숨은 점수를 1000 쪽으로 절반만 남긴다. 친구 전적은 그대로.
   4. 두 번 돌려도 선물을 또 넣지 않는다.
-  5. 시즌 4 의 규칙표·칭호 목록이 시즌 4 것으로 나온다.
+  5. 시즌 4 칭호가 있다 (지금 시즌의 규칙표는 test_season5.py).
 """
 import os
 import sys
@@ -56,23 +56,12 @@ def main():
     db.init()
 
     print("=== 시즌 4 ===")
-    chk("시즌 4 는 10/17 ~ 10/31", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
-        == (4, "2026-10-17", "2026-10-31"))
+    # 지금 시즌의 날짜 · 규칙표는 test_season5.py 가 본다 (시즌 5, 2026-11-01). 여기는 시즌 4 를 연 손질만.
     chk("티어 경계는 시즌 3 과 같다", [(k, rp) for k, _n, rp in season.TIERS] == migrations.S3_TIER_RP,
         season.TIERS)
-    rules = season.rules_public()
-    chk("규칙표가 시즌 4 것", rules["season"] == 4 and rules["endsAt"] == "2026-10-31"
-        and [r["title"] for r in rules["rewards"]]
-        == ["시즌 4 챔피언", "시즌 4 사천왕", "시즌 4 마스터볼", "시즌 4 하이퍼볼", "시즌 4 슈퍼볼"],
-        [r["title"] for r in rules["rewards"]])
-    chk("보상의 틀은 그대로 (챔피언 전설의 알, 사천왕 환상의 알)",
-        rules["rewards"][0]["egg"] == "전설의 포켓몬 알" and rules["rewards"][1]["egg"] == "환상의 포켓몬 알"
-        and rules["rewards"][2]["egg"] is None)
     chk("시즌 4 칭호가 정해져 있다 (받으면 달 수 있다)",
         all(k in season.TITLES for k in ("s4_champion", "s4_elite", "s4_master", "s4_hyper", "s4_super")))
-    seasonal = [o for o in migrations.ONCE if "season" in o[0]]   # 뒤에 0330(배틀 정리)이 붙었다
-    chk("시즌 손질 가운데 맨 끝이 시즌 4 열기",
-        seasonal[-1] == ("0320-season4-open", migrations._season4_open), seasonal[-1][0])
+    chk("시즌 4 열기 손질이 목록에 있다", ("0320-season4-open", migrations._season4_open) in migrations.ONCE)
 
     print("\n=== 시즌 3 -> 4 전환 ===")
     # 시즌 3 이 끝난 상태: 마스터볼 여섯(자리는 다섯), 하이퍼·슈퍼·몬스터, 배치 못 마친 사람.
