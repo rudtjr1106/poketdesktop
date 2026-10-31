@@ -111,9 +111,9 @@ def fresh_wild():
 
 
 def my_ko(events):
-    """급소가 아닌 내 기술로 상대를 쓰러뜨린 hit 이벤트."""
+    """급소가 아닌 내 기술로 상대를 쓰러뜨린 hit 이벤트. 혼란으로 나를 친 것(target me)은 뺀다 (10/31 CI 에서 걸렸다)."""
     return [e for e in events if e.get("t") == "hit" and e.get("who") == "me"
-            and e.get("hp") == 0 and not e.get("crit")]
+            and e.get("target") != "me" and e.get("hp") == 0 and not e.get("crit")]
 
 
 def catch_mode_checks():
