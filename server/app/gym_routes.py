@@ -165,7 +165,8 @@ def start(region: str, ctx=Depends(deps.current)):
     party, benched = pvp.split_restricted(_party(uid))
     if not party:
         raise HTTPException(409, "데리고 다니는 포켓몬이 없습니다.")
-    tb = TB.TrainerBattle(deps.dex(), party, t, random.Random())
+    # ai="gym": 관장도 판의 사본으로 수를 셈한다 (2026-11-02, trainer_battle 의 GYM_TUNE). 이어 하는 옛 판은 그대로.
+    tb = TB.TrainerBattle(deps.dex(), party, dict(t, ai="gym"), random.Random())
     tb.keystone["me"] = mega.has_keystone(uid)          # 관장 8곳 (시즌 3)
     tb.zring["me"] = gimmick.has_zring(uid)          # Z기술 (시즌 4)
     events = tb.start()

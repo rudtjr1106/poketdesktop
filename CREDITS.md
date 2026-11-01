@@ -64,6 +64,13 @@ GBA 풍 4방향 도트이고, 그 프로젝트에 기여한 팬들이 그린 것
 트레이너 스프라이트. `server/data/trainer_sprites/` 에 있다.
 의정부시의 이스터에그 트레이너와 지우의 도트는 개발자가 따로 준비한 그림이다.
 
+## 길드전 · 랭크 AI 의 형세 평가
+[pmariglia/poke-engine](https://github.com/pmariglia/poke-engine) 의 평가 함수(`src/genx/evaluate.rs`) —
+Pokémon Showdown 봇 [Foul Play](https://github.com/pmariglia/foul-play) 가 쓰는 엔진.
+**라이선스: MIT**
+
+2026-11-01 부터 항목과 값(살아 있는 한 마리 · 체력 · 상태이상 · 랭크 배율 · 깔기 · 벽 …)을 우리 단위로 옮겨 쓴다 (`common/trainer_battle.py` 의 `_eval_pe`, 코드는 파이썬으로 새로 썼다). 테라스탈 항목만 뺐다.
+
 ## 화면 테마의 글꼴
 화면 테마(설정 → 화면 테마)에서 쓰는 글꼴. `client/poketdesktop/fonts/` 에 있고,
 그 테마를 골랐을 때만 이 프로그램 안에서 등록해 쓴다 (컴퓨터에 깔지 않는다).

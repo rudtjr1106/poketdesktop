@@ -275,7 +275,8 @@ def t_무효(dex):
     chk("7. 사념의박치기 · 깜짝베기는 효과 있음 (탈이 막아도 깨진다)",
         not m._no_effect("ZENHEADBUTT") and not m._no_effect("NIGHTSLASH"))
     g = TB.TrainerBattle.__new__(TB.TrainerBattle)
-    chk("7. 길드전 TrainerBattle 은 감점이 꺼져 있다", g.WAR_NOEFFECT_PEN == 0.0)
+    # 2026-11-01 길드전도 켰다 (사람 대역 상대 400판에 판 100개당 8.5번 - 사용자 '멍청해 보이는 수를 줄이자')
+    chk("7. 길드전 TrainerBattle 도 같은 감점이 켜져 있다", g.WAR_NOEFFECT_PEN == m.WAR_NOEFFECT_PEN > 0)
     picks = {}
     for seed in range(32):
         pb, bt = _404_scene(dex, seed)

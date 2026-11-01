@@ -171,8 +171,9 @@ class TrainerBattle(object):
         if trainer.get("wild"):
             self.trainer["wild"] = True
         # 길드전 (시즌 4): 사람이 짠 방어팀을 **센 AI** 가 굴린다 (_war_choice). 자기 키스톤·Z링을 쓴다.
-        if trainer.get("ai") == "war":
-            self.trainer["ai"] = "war"
+        # 관장 (2026-11-02): 같은 셈으로 두되 얕게 · 레벨이 낮으면 가끔 셈 없이 (GYM_TUNE, _gym_slip).
+        if trainer.get("ai") in ("war", "gym"):
+            self.trainer["ai"] = trainer["ai"]
         # 관장 탭 카드와 배틀 화면의 그림이 다른 트레이너가 있다 (이스터에그: 렌트라와 함께 / 혼자)
         self.trainer["battleSprite"] = trainer.get("battleSprite") or trainer.get("sprite")
         # 판을 시작할 때 한 번 재생하는 등장 연출 (움직이는 PNG) 과 그 그림에서 발이 닿는 자리 (2.0.3)
@@ -211,9 +212,11 @@ class TrainerBattle(object):
         # 누가 누구를 쓰러뜨렸나. 서버가 경험치를 줄 때 본다 (내 자리가 받는다).
         self.kos = []
         self.war_stall = {}                     # 길드전 새 셈: AI 자리마다 시간 끌기 수(회복 · 방어 …)를 고른 횟수
-        self.war_sent = -1                      # 길드전 새 셈: AI 가 쓰러진 포켓몬 대신 다음 포켓몬을 낸 턴
+        self.war_sent = -1                      # 길드전 새 셈: AI 가 다음 포켓몬을 낸 턴 (쓰러진 자리 · 스스로 교체)
+        self.war_left = {}                      # 길드전 새 셈: AI 가 스스로 물러나게 한 자리(str) -> 그 턴
         # 내 포켓몬이 유턴·배턴터치·순간이동으로 물러난다 - 그 기술이 끝나자마자 사람이 고른다 (_pause)
         self.pending_out = None
+        self._tune()
 
     # ---------------- 만들기 ----------------
     def _make_duel(self, field):
@@ -236,6 +239,28 @@ class TrainerBattle(object):
     def war(self):
         """길드전 방어 AI 인가 (판의 사본으로 수를 셈하는 중에는 그 사본도 같은 AI 다)."""
         return self.trainer.get("ai") == "war"
+
+    @property
+    def searches(self):
+        """수를 판의 사본으로 셈하나 - 길드전 방어 AI 와 관장 (ai="gym", 2026-11-02)."""
+        return self.trainer.get("ai") in ("war", "gym")
+
+    # ---------------- 관장 AI (ai="gym", 2026-11-02) ----------------
+    # 관장도 길드전 방어 AI 의 셈(_war_choice_v2 · _war_pick, 형세 평가 · 헛수 감점 그대로)으로 둔다 (사용자 '이 AI 를
+    # 관장에도'). 서버 gym_routes 가 관장 판을 열 때만 ai="gym" 을 붙인다 - 악당 · 레이드는 그대로.
+    #   - 셈은 랭크(_RankedWar)처럼 얕게: 운영 관장 배틀이 하루 3천 판 · 3만 5천 턴(10/31 · 11/01)이라 길드전 깊이(한 수
+    #     0.15초쯤)는 서버(2GB)에 버겁다. 깊이 1 · 시드 1 은 그 1/3 쯤이다.
+    #   - 레벨이 낮은 관장은 mistake() 만큼(Lv.20 10% -> Lv.100 0%) 그 턴을 셈 없이 예전 관장 AI 로 둔다 (_gym_slip).
+    #   - 키스톤 · Z링 · 불리할 때 바꾸는 확률(smartness)은 관장 그대로 (길드전만 판의 trainer 값 · 늘 바꾸기).
+    GYM_TUNE = {"WAR2_DEPTH": 1, "WAR2_SEEDS": 1, "WAR2_EMERGENCY": 0.5}
+
+    def _tune(self):
+        if self.trainer.get("ai") == "gym":
+            self.__dict__.update(self.GYM_TUNE)
+
+    def _gym_slip(self):
+        """관장이 이번 턴은 셈 없이 예전 관장 AI 로 두나 (레벨이 낮을수록 자주, 길드전은 늘 셈한다)."""
+        return not self.war and self.rng.random() < self.mistake()
 
     def _fighter(self, mon):
         f = B.Fighter(self.dex, mon)
@@ -663,8 +688,24 @@ class TrainerBattle(object):
     # '따라큐가 빠지고 마기라스가 들어오면' 갈래와 사본의 운으로 인파이트가 뽑혔다. 비슷할 때 뒤로 미는 만큼만 (WAR2_PRIOR 와
     # 같은 크기) - 상대 교체를 노려 일부러 쓰는 값이 그보다 크면 그대로 쓴다. 240판: 무효 기술 0.30 -> 0.05/판, 교체 · 턴 ·
     # 지금 AI 와 맞붙여 50.0% 그대로. ('쓰러뜨릴 수 있는 상대는 안 바꾼다' 로 교체 갈래를 빼 보았으나 무효는 거의 그대로에
-    # 교체만 판마다 0.5 늘어 뺐다.)
-    WAR_NOEFFECT_PEN = 0.0
+    # 교체만 판마다 0.5 늘어 뺐다.) 2026-11-01 길드전도 켠다 - 사람 대역 상대 600판에 판 100개당 8.5 -> 2.5번.
+    WAR_NOEFFECT_PEN = 0.3
+    # 헛수(지금 쓰면 아무 일도 없는 변화기)에 매기는 감점 (2026-11-01, 사용자 '아 멍청하네 하는 느낌이 없으면'). 깔기를
+    # 또 깔기 · 벽을 또 세우기 · 방어 연달아 · 체력이 가득한데 회복 · 랭크가 꽉 찼는데 또 올리기, 그 밖에 관장 AI 가
+    # '소용없다(0)' 고 보는 것 (이미 혼란인 상대에게 이상한빛 · 넘길 것 없는 배턴터치 ...). 사본에서는 한 턴을 그냥 넘긴
+    # 값이라 다른 수가 다 나쁘면 뽑혔다. 무효 공격과 같은 크기 - 막지는 않고 비슷할 때 뒤로 민다. 판 100개당 관장 AI 가
+    # '소용없다' 고 보는 수 랭크 10.9 -> 5.1 · 길드전 13.0 -> 7.3, 체력 가득 회복 1.8 -> 0.2, 방어 연달아 2.2 -> 1.5.
+    WAR_WASTE_PEN = 0.3
+    # 교체 버릇 (2026-11-01, 랭크의 RANK_SETTLE · RANK_RECALL 과 같은 것을 길드전에도). 사람 대역 상대 600판에 판 100개당
+    # '상대는 그대로인데 막 바꿔 넣은 포켓몬을 또 바꿈' 8번 · 'A -> B -> A 되돌아가기' 8.7번 있었다.
+    #   - 스스로 바꿔 넣은 포켓몬도 '막 낸 포켓몬' 이다 (WAR2_REENTRY_PEN). 예전에는 쓰러진 자리에 낸 것만 쳤다.
+    #   - 막 낸 포켓몬을 또 바꾸는 수가 관장 AI 의 수(plain)여도 WAR2_PRIOR 를 안 얹는다 - 얹으면 감점이 상쇄됐다.
+    #   - 스스로 물러나게 한 지 WAR2_RECALL_TURNS 턴 안의 포켓몬을 다시 부르면 WAR2_RECALL_PEN.
+    # 랭크(_RankedWar)는 이 판의 war_sent · war_left 를 안 쓰고 PartyBattle 의 RANK_* 가 따로 본다.
+    # 같은 600판: 되돌아가기 8.7 -> 1.0 · 그대로인데 또 바꿈 7.8 -> 6.0 · 교체 223 -> 203, 방어 승률 64.7% -> 65.0%.
+    WAR_SWITCH_HABIT = True
+    WAR2_RECALL_TURNS = 5
+    WAR2_RECALL_PEN = 0.5
     WAR_DEPTH = 1                    # 몇 턴 앞까지 굴려 보나 (첫 턴 + 그 뒤를 양쪽 다 무난하게 둔 것)
     WAR_SIM = True                   # 사본으로 셈하나 (끄면 실수 없는 관장 AI 다)
     WAR_BUDGET = 0.5                 # 한 턴에 셈에 쓰는 시간 상한 (초)
@@ -744,6 +785,9 @@ class TrainerBattle(object):
         if best[0] == "move" and self._is_stall(best[1]):
             k = str(self.fi)
             self.war_stall[k] = self.war_stall.get(k, 0) + 1
+        if best[0] == "switch" and self.WAR_SWITCH_HABIT:
+            self.war_sent = self.turn
+            self.war_left[str(self.fi)] = self.turn
         return (best[1], None) if best[0] == "switch" else (None, best[1])
 
     def _war_pick(self):
@@ -876,16 +920,22 @@ class TrainerBattle(object):
                 continue
             mean = sum(w * v for w, v in vals) / sum(w for w, _v in vals)
             sc = (1 - self.WAR2_RISK) * mean + self.WAR2_RISK * min(v for _w, v in vals) + self.rng.random() * 0.01
-            if opt == plain:
+            settle = opt[0] == "switch" and self.war_sent == self.turn - 1
+            if opt == plain and not (settle and self.WAR_SWITCH_HABIT):
                 sc += self.WAR2_PRIOR
             if opt[0] == "move" and self._is_stall(opt[1]):
                 sc -= stall_pen
-            if opt[0] == "switch" and self.war_sent == self.turn - 1:
+            if settle:
                 sc -= self.WAR2_REENTRY_PEN                # 막 낸 포켓몬을 바로 바꾸면 그 턴을 공짜로 준다
+            if opt[0] == "switch" and self.WAR_SWITCH_HABIT and \
+                    self.turn - self.war_left.get(str(opt[1]), -999) <= self.WAR2_RECALL_TURNS:
+                sc -= self.WAR2_RECALL_PEN                 # A -> B -> A 되돌아가기
             if opt[0] == "switch":
                 sc -= self._switch_cost(opt[1])
             if opt[0] == "move" and self.WAR_NOEFFECT_PEN and self._no_effect(opt[1]):
                 sc -= self.WAR_NOEFFECT_PEN
+            if opt[0] == "move" and self.WAR_WASTE_PEN and self._wasted(opt[1]):
+                sc -= self.WAR_WASTE_PEN
             if best_sc is None or sc > best_sc:
                 best, best_sc = opt, sc
         took = time.time() - t0
@@ -909,10 +959,34 @@ class TrainerBattle(object):
         _d, _crit, eff = B.damage(self.dex, md, self.foe, self.me, B.EST_RNG, crit=False)
         return eff == 0
 
+    def _wasted(self, key):
+        """AI 의 이 변화기가 지금 헛수인가 (WAR_WASTE_PEN). 공격 기술은 _no_effect 가 본다."""
+        md = self.bt.move_of(key)
+        if not md or key == B.STRUGGLE or MC.attacks(md) or not self.me.alive():
+            return False
+        user, target = self.foe, self.me
+        own, opp = self.bt.field.side("foe"), self.bt.field.side("me")
+        if key in SM.HAZARD_MOVES:
+            name, most = SM.HAZARD_MOVES[key]
+            if (opp.get(name) or 0) >= most:
+                return True
+        if key in SM.SCREENS or key in SM.SIDE_MOVES:
+            if own.get(SM.SCREENS.get(key) or SM.SIDE_MOVES[key][0]):
+                return True
+        if key in SM.PROTECTS and user.cond.get("streak"):
+            return True
+        if (md.get("heal") or 0) > 0 and user.hp >= user.maxhp:
+            return True
+        ups = [s for s, c in (md.get("stat") or []) if c > 0]
+        if md.get("statSelf") and ups and all(user.stages.get(s, 0) >= 6 for s in ups):
+            return True
+        return self.bt._status_score(md, self.bt.best_damage(user, target), user, target) <= 0
+
     def _war_log(self, text):
         """서버 로그(docker logs)에 한 줄 - 전쟁 중 새 셈을 되돌릴지 정할 근거 (2026-10-22 사용자 결정)."""
         try:
-            sys.stderr.write("[길드전 AI] %s T%d 자리 %s: %s\n" % (self.trainer.get("id"), self.turn, self.fi, text))
+            sys.stderr.write("[%s AI] %s T%d 자리 %s: %s\n" % ("길드전" if self.war else "관장", self.trainer.get("id"),
+                                                             self.turn, self.fi, text))
             sys.stderr.flush()
         except Exception:                                   # noqa: BLE001
             pass
@@ -1092,6 +1166,7 @@ class TrainerBattle(object):
 
         옛 _eval + 깔기가 앞으로 깎을 체력 · 실제로 쓰는 능력의 랭크(±6, 올라갈수록 덜) · 스피드 역전 ·
         상태이상의 종류와 상대 · 벽 · 순풍. **무승부는 진 것과 같다** - 400턴을 끌어 무승부로 칸을 지키지 않게.
+        WAR_PE_EVAL 이면 끝나지 않은 판은 _eval_pe 로 잰다.
         """
         if self.over:
             if self.result in ("lost", "forfeit"):
@@ -1099,6 +1174,8 @@ class TrainerBattle(object):
             if self.result == "draw" and self.turn < MAX_TURNS:
                 return 90.0                 # 마지막끼리 같이 쓰러졌다 - 길드전에서 무승부는 칸을 지킨다 (defends)
             return -100.0                   # 진 판 · 400턴 무승부 (시간 끌기로 노리지 않게)
+        if self.WAR_PE_EVAL:
+            return self._eval_pe()
 
         def side(team):
             return sum(0.5 + f.hp / float(f.maxhp or 1) for f in team if f.alive())
@@ -1114,6 +1191,93 @@ class TrainerBattle(object):
             for k in ("reflect", "lightscreen", "auroraveil", "tailwind"):
                 v += sign * self.SIDE_W * int(sd.get(k) or 0)
         return v
+
+    # ---- poke-engine 형세 평가 (2026-11-01) ----
+    # github.com/pmariglia/poke-engine (MIT) 의 src/genx/evaluate.rs 를 우리 단위로 옮긴 것 (그 값 / 100 = 체력 100% 한
+    # 마리가 1.0). 테라스탈 항목만 뺐다. tools/eval_bench.py 로 위의 식과 견주었다: 랭크 판 1,000판 · 길드전 600판 · 사람
+    # 대역 상대 600판 모두 승률이 같다 (오차 안). 대신 랭크업을 두 배 쓰고, 교체가 5~8% 적고, 바꿔 넣자마자 쓰러지는
+    # 교체가 줄었다 (사용자 결정 - 체감). 끄면(False) 위의 식 그대로 - 전쟁 · 랭크에서 문제가 보이면 이것만 끈다.
+    # 헛수 감점 · 교체 버릇과 합친 지금 AI 대 11/01 전 AI: 랭크 1,000판 49.5% (±3.1) · 길드전 방어 600판 64.7% -> 65.0%,
+    # 멍청해 보이는 수(tools/eval_bench.py --feel) 판 100개당 랭크 25.7 -> 16.8 · 길드전 48.9 -> 25.0.
+    WAR_PE_EVAL = True
+    PE_ALIVE = 0.30         # 살아 있는 한 마리 (체력 · 상태이상 · 도구 합은 0 밑으로 안 내려간다)
+    PE_ITEM = 0.10          # 도구를 아직 지님 (탁쳐서떨구기 · 먹어서 없어지면 빠진다)
+    PE_SUB, PE_SEED, PE_CONFUSED = 0.75, -0.30, -0.20                       # 나와 있는 포켓몬만
+    PE_BOOST_W = {"atk": 0.30, "def": 0.15, "spa": 0.30, "spd": 0.15, "spe": 0.30}
+    PE_BOOST_MULT = {6: 3.3, 5: 3.15, 4: 3.0, 3: 2.5, 2: 2.0, 1: 1.0, 0: 0.0,
+                     -1: -1.0, -2: -2.0, -3: -2.5, -4: -3.0, -5: -3.15, -6: -3.3}
+    PE_SIDE = {"reflect": 0.20, "lightscreen": 0.20, "auroraveil": 0.40, "safeguard": 0.05, "tailwind": 0.07,
+               "healingwish": 0.30, "lunardance": 0.30}                   # 남은 턴(겹) 마다
+
+    @staticmethod
+    def _pe_n(v):
+        """장 상태의 값 -> 수 (남은 턴 · 겹 수. 참/거짓이나 dict 면 0/1)."""
+        if isinstance(v, (int, float)):
+            return float(v)
+        return 1.0 if v else 0.0
+
+    def _pe_status(self, f):
+        s = f.status
+        if s == "burn":
+            if A.has(f, "GUTS", "MARVELSCALE", "QUICKFEET"):
+                return 0.50
+            phys = 0
+            for k in f.moves:
+                md = self.bt.move_of(k) or {}
+                if MC.attacks(md) and md.get("cat") == "physical":
+                    phys += 1
+            v = -0.25 * phys
+            return v / 2 if f.stat("spa", stages=False) > f.stat("atk", stages=False) else v
+        if s == "freeze":
+            return -0.40
+        if s in ("sleep", "paralysis"):
+            return -0.25
+        if s == "poison":
+            if A.has(f, "POISONHEAL"):
+                return 0.15
+            if A.has(f, "GUTS", "MARVELSCALE", "QUICKFEET", "TOXICBOOST", "MAGICGUARD"):
+                return 0.10
+            return -0.30 if f.cond.get("toxic") else -0.10
+        return 0.0
+
+    def _pe_hazards(self, f, sd):
+        """깔린 것이 이 포켓몬(나와 있는 것까지)에게 매기는 값 - 겹 수에 비례, 상성은 안 본다 (poke-engine 그대로)."""
+        if H.no_hazards(f):
+            return 0.0
+        n = self._pe_n
+        v = 0.0
+        ground = SM.grounded(f)
+        if not A.has(f, "MAGICGUARD"):
+            v -= 0.10 * n(sd.get("stealthrock"))
+            if ground:
+                v -= 0.07 * (n(sd.get("spikes")) + n(sd.get("toxicspikes")))
+        if ground:
+            v -= 0.25 * n(sd.get("stickyweb"))
+        return v
+
+    def _pe_side(self, team, active, sd):
+        v = 0.0
+        for f in team:
+            if not f.alive():
+                continue
+            x = f.hp / float(f.maxhp or 1) + self._pe_status(f) + (self.PE_ITEM if f._held else 0.0)
+            v += max(0.0, x) + self.PE_ALIVE + self._pe_hazards(f, sd)
+            if f is active:
+                if f.cond.get("sub"):
+                    v += self.PE_SUB
+                if f.seeded:
+                    v += self.PE_SEED
+                if f.cond.get("confused"):
+                    v += self.PE_CONFUSED
+                v += sum(w * self.PE_BOOST_MULT[max(-6, min(6, int(f.stages.get(k, 0))))]
+                         for k, w in self.PE_BOOST_W.items())
+        return v + sum(w * self._pe_n(sd.get(k)) for k, w in self.PE_SIDE.items())
+
+    def _eval_pe(self):
+        """끝나지 않은 판을 AI(방어) 쪽에서 본 값 (poke-engine 식, WAR_PE_EVAL)."""
+        fld = self.bt.field
+        return self._pe_side(self.foe_team, self.foe, fld.side("foe")) \
+            - self._pe_side(self.me_team, self.me, fld.side("me"))
 
     # ---------------- 한 턴 ----------------
     def valid_switches(self):
@@ -1174,7 +1338,7 @@ class TrainerBattle(object):
             if why and not (enc and enc.get("move") == value):
                 raise ValueError(why)
 
-        if self.war and self.WAR_V2 and not getattr(self, "_sim", False):
+        if self.searches and self.WAR_V2 and not getattr(self, "_sim", False):
             # 길드전 새 셈은 **이번 턴을 열기 전의 판**에서 사본을 뜬다. 연 뒤에 뜨면 사본의 act 가 턴을 또 열어서
             # (나온 뒤 턴 수 · 시계가 둘씩 감) 나오자마자 쓰는 속이기 · 만나자마자가 사본에서는 늘 실패했다.
             self._war_pre = json.dumps(self.dump())
@@ -1190,7 +1354,7 @@ class TrainerBattle(object):
         if forced is not None:                 # 수를 셈하는 사본: 셈하려는 수를 그대로 둔다
             foe_slot = forced[1] if forced[0] == "switch" else None
             foe_move = forced[1] if forced[0] == "move" else None
-        elif self.war and not getattr(self, "_sim", False):
+        elif self.searches and not getattr(self, "_sim", False) and not self._gym_slip():
             foe_slot, foe_move = self._war_choice()
         else:
             foe_slot = self._foe_wants_switch()
@@ -1338,7 +1502,7 @@ class TrainerBattle(object):
         if not me_left:
             return self._finish("lost", ev)
         if foe_down:
-            if self.war and self.WAR_V2 and not me_down and not getattr(self, "_sim", False):
+            if self.searches and self.WAR_V2 and not me_down and not getattr(self, "_sim", False):
                 nxt = self._war_pick()
                 self.war_sent = self.turn
             else:
@@ -1470,7 +1634,7 @@ class TrainerBattle(object):
             "field": self.bt.field.dump(), "pendingOut": self.pending_out, "mid": self.mid,
             "keystone": dict(self.keystone), "megaDone": sorted(self.mega_done),
             "gimmick": B.gimmick_dump(self),
-            "warStall": dict(self.war_stall), "warSent": self.war_sent,
+            "warStall": dict(self.war_stall), "warSent": self.war_sent, "warLeft": dict(self.war_left),
         }
 
     @classmethod
@@ -1502,4 +1666,6 @@ class TrainerBattle(object):
         self.kos = list(d.get("kos") or [])
         self.war_stall = dict(d.get("warStall") or {})
         self.war_sent = int(d.get("warSent", -1))
+        self.war_left = dict(d.get("warLeft") or {})
+        self._tune()
         return self
