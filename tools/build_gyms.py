@@ -267,6 +267,58 @@ SPECIAL = {
                  ("WOBBUFFET", []), ("SEVIPER", []), ("MEOWTH", [])]},
 }
 
+# 시즌 챔피언 관장 - 챔피언이 직접 고른 자리 · 팀 · 그림 그대로 넣는다 (자동으로 짜지 않는다).
+# 그 자리에 있던 트레이너는 빠진다. 노력치 · 성격 · 도구 · 특성 · 이로치 색은 신청서에 적은 그대로다.
+# entrySprite: 판을 시작할 때 한 번 재생하는 등장 연출(움직이는 PNG), entryFoot: 그 그림에서 발이 닿는 자리.
+# zring: 따라큐Z 를 쥐었으니 관장 AI 가 Z기술을 쓴다 (common/trainer_battle).
+def _fixed_mon(species, ability, nature, held, moves, evs, gender, shiny=False, tint=None):
+    m = {"species": species, "level": 100, "ability": ability, "nature": nature, "held": held,
+         "moves": moves, "iv": 31, "evs": evs, "gender": gender}
+    if shiny:
+        m["shiny"] = True
+        if tint:
+            m["tint"] = tint
+    return m
+
+
+_ATK = {"atk": 252, "spe": 252}
+FIXED = {
+    # 시즌 2 · 3 · 4 챔피언 WhiteSna (2026-11-01 신청). 드래펄트 색은 그 사람이 쓰는 이로치 색(s180).
+    "41271": {
+        "id": "whitesna", "name": "WhiteSna", "en": "WhiteSna", "role": "시즌 챔피언",
+        "sprite": "whitesna", "battleSprite": "whitesna-solo",
+        "entrySprite": "whitesna-entry", "entryFoot": [89.5, 190],
+        "level": 100, "type": "GHOST", "zring": True,
+        "why": "[시즌 2, 3, 4 챔피언] - THREEPEAT 1 DYNASTY",
+        # 순서는 신청서 그대로(드래펄트가 먼저 나온다). 에이스 표시는 보통 맨 뒤지만 ace 로 따로 정한다.
+        "ace": "DRAGAPULT",
+        "team": [
+            _fixed_mon("DRAGAPULT", "CLEARBODY", "HASTY", "EXPERTBELT",
+                       ["DRAGONDARTS", "PHANTOMFORCE", "FLAMETHROWER", "UTURN"], _ATK, "M", True, "s180"),
+            _fixed_mon("KORAIDON", "ORICHALCUMPULSE", "RELAXED", "LIFEORB",
+                       ["COLLISIONCOURSE", "FLAREBLITZ", "OUTRAGE", "IRONHEAD"], _ATK, "N", True),
+            _fixed_mon("FLUTTERMANE", "PROTOSYNTHESIS", "CAREFUL", "BOOSTERENERGY",
+                       ["POWERGEM", "MOONBLAST", "SHADOWBALL", "MYSTICALFIRE"], {"spa": 252, "spe": 252}, "N", True),
+            _fixed_mon("KANGASKHAN", "PARENTALBOND", "NAUGHTY", "KANGASKHANITE",
+                       ["DOUBLEEDGE", "SUCKERPUNCH", "EARTHQUAKE", "ICEPUNCH"], _ATK, "F"),
+            _fixed_mon("MIMIKYU", "DISGUISE", "ADAMANT", "MIMIKIUMZ",
+                       ["SHADOWSNEAK", "WOODHAMMER", "PLAYROUGH", "SHADOWCLAW"], _ATK, "M"),
+            _fixed_mon("EXCADRILL", "SANDFORCE", "NAIVE", "CHOICESCARF",
+                       ["ROCKSLIDE", "ROCKTOMB", "EARTHQUAKE", "IRONHEAD"], _ATK, "M"),
+        ]},
+}
+
+
+def apply_fixed(trainers, regions):
+    """FIXED 의 자리에 그 트레이너를 앉힌다 (그 자리에 있던 사람은 뺀다)."""
+    for code, t in FIXED.items():
+        old = regions.get(code)
+        trainers[:] = [x for x in trainers if x["id"] not in (old, t["id"])]
+        trainers.append(dict(t, region=code))
+        regions[code] = t["id"]
+    return trainers, regions
+
+
 # 원작 수치로 줄을 세우면 어긋나는 사람만 레벨을 박는다.
 TIER_PIN = {"Red (game)": 100, "Ash Ketchum": 100, "Cynthia": 100, "Leon": 100,
             "Steven Stone": 100, "Geeta": 100, "Easter Egg": 100}
@@ -1187,12 +1239,38 @@ def report(trainers, dex, districts, path):
         f.write("\n".join(lines))
 
 
+def _write(body, out):
+    body.pop("digest", None)
+    raw = json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    body["digest"] = hashlib.sha256(raw.encode()).hexdigest()[:16]
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(body, f, ensure_ascii=False, indent=1, sort_keys=True)
+
+
+def write_fixed_only(out):
+    body = json.load(open(out, encoding="utf-8"))
+    dex = Dex(json.load(open(DEX_PATH, encoding="utf-8")))
+    districts = json.load(open(MAP_PATH, encoding="utf-8"))["sgg"]
+    body["trainers"], body["regions"] = apply_fixed(body["trainers"], body["regions"])
+    errs, _tiers = check(body["trainers"], body["regions"], dex, districts)
+    if errs:
+        print("\n".join("  !! " + e for e in errs[:40]))
+        return 1
+    _write(body, out)
+    print("  FIXED %d곳 적용 -> %s (트레이너 %d명)" % (len(FIXED), out, len(body["trainers"])))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=OUT_PATH)
     ap.add_argument("--report", default="")
     ap.add_argument("--fetch", action="store_true", help="불바피디아 원문을 다시 받는다")
+    ap.add_argument("--fixed-only", action="store_true",
+                    help="지금 gyms.json 에 FIXED(시즌 챔피언 관장)만 다시 적용한다 (다른 자리는 그대로)")
     a = ap.parse_args()
+    if a.fixed_only:
+        return write_fixed_only(a.out)
 
     pages_path = os.path.join(CACHE, "pages.json")
     cats = json.load(open(os.path.join(CACHE, "categories.json"), encoding="utf-8"))
@@ -1212,16 +1290,14 @@ def main():
     sprites = set(open(sprites_path).read().split())
 
     trainers, regions, skipped = build(pages, cats, dex, districts, sprites)
+    trainers, regions = apply_fixed(trainers, regions)
     errs, tiers = check(trainers, regions, dex, districts)
     if errs:
         print("\n".join("  !! " + e for e in errs[:40]))
         return 1
 
     body = {"version": 1, "source": SOURCE, "tiers": TIERS, "trainers": trainers, "regions": regions}
-    raw = json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    body["digest"] = hashlib.sha256(raw.encode()).hexdigest()[:16]
-    with open(a.out, "w", encoding="utf-8") as f:
-        json.dump(body, f, ensure_ascii=False, indent=1, sort_keys=True)
+    _write(body, a.out)
     print("  트레이너 %d명 · 자리 %d곳 · %.0fKB -> %s"
           % (len(trainers), len(regions), os.path.getsize(a.out) / 1024, a.out))
     print("  레벨별 인원: %s" % " ".join("%d:%d" % (k, tiers[k]) for k in TIERS))

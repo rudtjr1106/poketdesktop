@@ -46,7 +46,7 @@ import time
 import tkinter as tk
 import tkinter.font as tkfont
 
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw, ImageSequence, ImageTk
 
 from . import config, skins, sprite_cache, sprites
 from . import ui_common as U
@@ -151,16 +151,8 @@ def shade(hexcolor, k):
     return "#%02x%02x%02x" % tuple(max(0, min(255, int(v * k))) for v in (r, g, b))
 
 
-def trainer_photo(api, key, scale=None):
-    """트레이너 도트를 받아(이 PC 에 남겨) 키운 PhotoImage 재료를 돌려준다.
-
-    scale 을 안 주면 그림 크기로 정한다. 쇼다운 트레이너 도트는 80x80 틀에
-    키 74칸이라 두 배로 키운다. 이스터에그처럼 칸이 촘촘한 그림(키 134칸)은
-    두 배면 카드를 넘치므로 그대로 쓴다.
-
-    **작업 스레드에서 부른다.** PhotoImage 는 tk 스레드에서만 만들 수 있어서
-    PIL 이미지까지만 만든다.
-    """
+def _trainer_file(api, key):
+    """트레이너 그림 파일을 받아 이 PC 에 남기고 그 경로를 준다 (못 받으면 None). 작업 스레드에서."""
     d = os.path.join(config.data_dir(), "trainers")
     os.makedirs(d, exist_ok=True)
     p = os.path.join(d, "%s.png" % key)
@@ -171,6 +163,37 @@ def trainer_photo(api, key, scale=None):
         with open(p + ".part", "wb") as f:
             f.write(raw)
         os.replace(p + ".part", p)
+    return p
+
+
+def trainer_frames(api, key):
+    """움직이는 트레이너 그림(관장 등장 연출, 움직이는 PNG)의 장들 [(PIL RGBA, ms)]. 작업 스레드에서.
+
+    시즌 챔피언 관장처럼 판을 시작할 때 한 번 재생하는 그림이다 (ui_gym_battle). 장마다 틀 전체를
+    그려 둔 그림이라 그대로 갈아 끼우면 된다. 못 받으면 None.
+    """
+    p = _trainer_file(api, key)
+    if not p:
+        return None
+    out = []
+    for fr in ImageSequence.Iterator(Image.open(p)):
+        out.append((fr.convert("RGBA"), int(fr.info.get("duration") or 66)))
+    return out or None
+
+
+def trainer_photo(api, key, scale=None):
+    """트레이너 도트를 받아(이 PC 에 남겨) 키운 PhotoImage 재료를 돌려준다.
+
+    scale 을 안 주면 그림 크기로 정한다. 쇼다운 트레이너 도트는 80x80 틀에
+    키 74칸이라 두 배로 키운다. 이스터에그처럼 칸이 촘촘한 그림(키 134칸)은
+    두 배면 카드를 넘치므로 그대로 쓴다.
+
+    **작업 스레드에서 부른다.** PhotoImage 는 tk 스레드에서만 만들 수 있어서
+    PIL 이미지까지만 만든다.
+    """
+    p = _trainer_file(api, key)
+    if not p:
+        return None
     im = Image.open(p).convert("RGBA")
     bb = im.getbbox()
     if bb:
@@ -1454,6 +1477,8 @@ class GymWindow(object):
                       "done": "오늘 상금을 받았다 · 내일 다시 %s원"}[st_key] % format(t["prize"], ","),
             "why": t.get("why") or None,
             "team": t["team"],
+            # 에이스 자리 - 보통 맨 뒤. 서버가 따로 정해 주면 그것 (시즌 챔피언 관장, 2.0.3)
+            "ace": t.get("ace", len(t["team"]) - 1),
             "button": label, "can": other is None, "other": other,
         }
 
@@ -1511,7 +1536,8 @@ class GymWindow(object):
             # 그림(28px)이 들어가는 줄이라 글꼴 배율만 따르면 윈도우(배율 1.0)에서 30px 로
             # 모자란다. 그림 높이보다 작아지지 않게 한다.
             row_h = max(U.h(30), 32)
-            row = tk.Frame(team, bg=U.BG3 if i == len(d["team"]) - 1 else U.BG2, height=row_h)
+            ace = i == d.get("ace", len(d["team"]) - 1)        # 서버가 정한 에이스 (옛 서버면 맨 뒤)
+            row = tk.Frame(team, bg=U.BG3 if ace else U.BG2, height=row_h)
             row.pack(fill="x", pady=1)
             row.pack_propagate(False)
             bg = row["bg"]
@@ -1525,7 +1551,7 @@ class GymWindow(object):
                 tk.Label(slot, image=ph, bg=bg, bd=0, highlightthickness=0).pack(expand=True)
             tk.Label(row, text=m["kr"] or m["species"], bg=bg, fg=U.FG, font=U.FONT_B,
                      anchor="w").pack(side="left", padx=(6, 0))
-            if i == len(d["team"]) - 1:
+            if ace:
                 tk.Label(row, text="에이스", bg=bg, fg=U.ACCENT, font=U.FONT_XS).pack(side="left", padx=6)
             tk.Label(row, text="Lv.%d" % m["level"], bg=bg, fg=U.FG_DIM, font=U.FONT_S).pack(side="right", padx=8)
             tk.Label(row, text="/".join(m.get("types") or []), bg=bg, fg=U.FG_FAINT,
