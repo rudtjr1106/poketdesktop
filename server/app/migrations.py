@@ -674,6 +674,25 @@ def _box_overflow(conn):
     return "유저 %d명, 포켓몬 %d마리를 자리 있는 박스로" % (len(users), moved)
 
 
+# 2.0.3: 안산시 상록구(41271)의 관장이 타로(lacey) -> WhiteSna(시즌 챔피언 관장, PR #11). 클리어 기록은 지역으로
+# 남아서 타로를 이긴 사람에게 새 관장도 깬 것으로 보였고 첫 승리 상금도 없었다 (사용자 11/02 '미클리어로').
+GYM_SWAPS = [("41271", "lacey")]          # (지역, 그 자리의 옛 관장)
+
+
+def _gym_swap_reset(conn):
+    """관장이 바뀐 자리의 옛 관장 클리어 기록을 지운다 - 그 사람들에게 그 지역은 다시 미클리어 (첫 승리 상금도 다시).
+
+    관장 몇 곳 이겼나(키스톤 8곳 · 관장 탭 · 마이페이지)에서도 하나 빠진다. 운영 11/02: 33명, 모두 208곳 넘게
+    이겨서 키스톤은 그대로다. 옛 관장과 하던 판은 접는다 - 이기면 이제 없는 트레이너를 찾다가 오류가 난다.
+    """
+    cleared = fights = 0
+    for region, old in GYM_SWAPS:
+        cleared += conn.execute("DELETE FROM gym_clear WHERE region=? AND trainer=?", (region, old)).rowcount
+        fights += conn.execute("UPDATE gym_battle SET state='done', result='expired'"
+                               " WHERE region=? AND trainer=? AND state='active'", (region, old)).rowcount
+    return "클리어 %d줄 지움 · 하던 판 %d개 접음" % (cleared, fights)
+
+
 # 버전 2 감사의 선물 (게시판 공지 10/30 '업데이트와 동시에 모든 분께 기본 이펙트(발자국)를 하나씩').
 PAW_GIFT = "fx_paw"
 PAW_GIFT_TITLE = "감사의 선물"
@@ -866,6 +885,8 @@ ONCE = [
     ("0340-v2-paw-gift", _v2_paw_gift),
     # 시즌 5 (2026-11-01, 버전 2). **서버가 이 판으로 뜨는 순간 시즌 4 가 닫힌다.**
     ("0350-season5-open", _season5_open),
+    # 2.0.3: 안산시 상록구 관장이 WhiteSna 로 바뀌었다 - 타로를 이긴 기록은 지워 다시 미클리어로.
+    ("0360-gym-swap-reset", _gym_swap_reset),
 ]
 
 
