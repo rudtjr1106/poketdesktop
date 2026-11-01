@@ -193,7 +193,7 @@ class BondStones(object):
         name = (pet.mon.get("info") or {}).get("name") or "포켓몬"
         PLAT.activate()
         if not confirm(app.root, "빛나는 돌",
-                       natural("%s 와(과)의 유대가 가득 찼습니다!\n\n세 가지 미션을 마치면 "
+                       natural("%s 와(과)의 친밀도가 가득 찼습니다!\n\n세 가지 미션을 마치면 "
                                "이 포켓몬이 메가진화할 수 있습니다 (그 종의 메가스톤이 아직 없으면 받습니다). "
                                "시작할까요?" % name),
                        danger=False, ok_text="시작"):

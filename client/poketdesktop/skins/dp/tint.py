@@ -27,6 +27,9 @@ from . import CUR, DIM, INK, INK2, LINE, LINE_D, SEL, TAGC, WHITE, font, tone
 from . import kit as K
 from .dialogs import BODY, PAD, heading
 
+# 칸 밖을 누른 것. 맨 앞 칸(이로치 색 그대로)의 값이 None 이라 None 으로는 '칸 밖' 을 가를 수 없다.
+_OUT = object()
+
 
 class _Text(object):
     """상태 글 - 기본 창의 Label 처럼 cget("text") 로 읽힌다."""
@@ -177,15 +180,15 @@ class TintPicker(B.TintPicker):
         for v, (x1, y1, x2, y2) in self.rects.items():
             if x1 <= x <= x2 and y1 <= y <= y2:
                 return v
-        return None
+        return _OUT
 
     def _motion(self, e):
         v = self._at(e)
-        self.cv.configure(cursor="hand2" if v is not None and v in self.photos else "")
+        self.cv.configure(cursor="hand2" if v is not _OUT and v in self.photos else "")
 
     def _click(self, e):
         v = self._at(e)
-        if v is not None:
+        if v is not _OUT:
             self.pick(v)
 
     def _step(self, d):

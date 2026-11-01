@@ -146,7 +146,7 @@ def start(uid, pid, now=None):
     if not stones_for(r["species"]):
         raise ValueError("이 포켓몬은 메가스톤으로 메가진화하지 않습니다.")
     if (r["happiness"] or 0) < BOND_HAPPINESS:
-        raise ValueError("아직 유대가 부족합니다. 더 오래 데리고 다녀 주세요.")
+        raise ValueError("아직 친밀도가 부족합니다. 더 오래 데리고 다녀 주세요.")
     db.run("INSERT INTO bond (pokemon_id, user_id, species, started_at)"
            " VALUES (?,?,?,?) ON CONFLICT(pokemon_id) DO NOTHING",
            (pid, uid, r["species"], now or _now_iso()))

@@ -307,7 +307,7 @@ class BondPanel(object):
         fr.pack(fill="x", pady=(8, 0))
         line = tk.Frame(fr, bg=CARD)
         line.pack(fill="x")
-        tk.Label(line, text="유대", bg=CARD, fg=U.FG_DIM, font=U.FONT_XS).pack(side="left")
+        tk.Label(line, text="친밀도", bg=CARD, fg=U.FG_DIM, font=U.FONT_XS).pack(side="left")
         tk.Label(line, text="%d / %d" % (now, need), bg=CARD,
                  fg=U.PINK if now >= need else U.FG_FAINT,
                  font=U.FONT_XS).pack(side="right")
@@ -318,12 +318,12 @@ class BondPanel(object):
             msg, fg, btn = ("관장 8곳을 이기면 키스톤을 받습니다. 키스톤이 있어야 "
                             "메가진화할 수 있어요."), U.FG_DIM, None
         elif now < need:
-            msg, fg, btn = ("데리고 다니며 유대를 끝까지 채우면 바탕화면에 빛나는 돌이 "
+            msg, fg, btn = ("데리고 다니며 친밀도를 끝까지 채우면 바탕화면에 빛나는 돌이 "
                             "나타납니다. 누르면 유대 미션이 시작돼요."), U.FG_DIM, None
             if not missing:
                 msg = "이 종의 메가스톤은 이미 있지만, 메가진화는 유대 미션을 마친 포켓몬만 할 수 있어요. " + msg
         else:
-            msg, fg, btn = ("유대가 가득 찼습니다! 미션 셋을 마치면 " + reward
+            msg, fg, btn = ("친밀도가 가득 찼습니다! 미션 셋을 마치면 " + reward
                             ), MEGA, ("미션 시작", self.do_start)
         self._label(self.body, msg, fg).pack(fill="x", pady=(6, 0))
         self._button(btn)

@@ -141,17 +141,17 @@ class Bond(BD.BondPanel):
         btn = None
         if not c.get("started"):
             now, need = int(c.get("happiness") or 0), int(c.get("need") or 255)
-            out.append(("bar", "유대", "%d / %d" % (now, need), now / float(need or 1), "#e858a0"))
+            out.append(("bar", "친밀도", "%d / %d" % (now, need), now / float(need or 1), "#e858a0"))
             reward = "메가스톤을 받습니다." if missing else "이 포켓몬도 메가진화할 수 있어요."
             if not has_key:
                 msg, fg = "관장 8곳을 이기면 키스톤을 받습니다. 키스톤이 있어야 메가진화할 수 있어요.", U.FG_DIM
             elif now < need:
-                msg, fg = ("데리고 다니며 유대를 끝까지 채우면 바탕화면에 빛나는 돌이 나타납니다. "
+                msg, fg = ("데리고 다니며 친밀도를 끝까지 채우면 바탕화면에 빛나는 돌이 나타납니다. "
                            "누르면 유대 미션이 시작돼요."), U.FG_DIM
                 if not missing:
                     msg = "이 종의 메가스톤은 이미 있지만, 메가진화는 유대 미션을 마친 포켓몬만 할 수 있어요. " + msg
             else:
-                msg, fg, btn = "유대가 가득 찼습니다! 미션 셋을 마치면 " + reward, BD.MEGA, ("미션 시작", self.do_start)
+                msg, fg, btn = "친밀도가 가득 찼습니다! 미션 셋을 마치면 " + reward, BD.MEGA, ("미션 시작", self.do_start)
             out.append(("text", msg, fg))
         else:
             for i, ms in enumerate(c.get("missions") or []):

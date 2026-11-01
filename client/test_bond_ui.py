@@ -11,8 +11,8 @@
 
   1. 메가가 없는 종(피카츄)에는 칸이 없다. 리자몽에는 있다.
   2. 칸은 진화 칸 아래, 능력치 위. 몇 번을 골라도 순서가 안 바뀐다.
-  3. 키스톤이 없으면 몇 곳 남았는지. 유대가 덜 찼으면 막대와 안내.
-  4. 유대가 차고 키스톤이 있으면 '미션 시작' - 누르면 미션 셋이 뜬다.
+  3. 키스톤이 없으면 몇 곳 남았는지. 친밀도가 덜 찼으면 막대와 안내 (막대 이름은 정보 칸과 같은 '친밀도').
+  4. 친밀도가 차고 키스톤이 있으면 '미션 시작' - 누르면 미션 셋이 뜬다.
   5. 다 채우면 '메가스톤 받기'. X/Y 는 고르게 하고, 고른 것으로 받는다.
   6. 목록을 빨리 넘겨도 늦게 온 옛 응답이 칸을 덮지 않는다.
   7. 레쿠쟈는 화룡점정 한 줄. 눌린 위젯이 없다.
@@ -184,7 +184,7 @@ def main():
     chk("진화 칸 아래, 능력치 위", order(win) == ["메가", "능력치"] or order(win)[-2:] == ["메가", "능력치"],
         order(win))
 
-    print("\n=== 유대가 덜 찼을 때 ===")
+    print("\n=== 친밀도가 덜 찼을 때 ===")
     api.keystone = {"has": True, "gyms": 9, "need": 8}
     api.happy[1] = 200
     win.select(2)
@@ -193,10 +193,12 @@ def main():
     wait(root, lambda: win.bond.card and win.bond.card["species"] == "CHARIZARD")
     settle(root)
     t = panel_text(win)
-    chk("유대 200 / 255 와 빛나는 돌 안내", "200 / 255" in t and "빛나는 돌" in t, t)
+    chk("친밀도 200 / 255 와 빛나는 돌 안내", "친밀도" in t and "200 / 255" in t and "빛나는 돌" in t, t)
+    chk("  같은 숫자를 '유대' 라고 부르지 않는다 ('유대 미션' 은 미션 이름)",
+        "유대" not in t.replace("유대 미션", ""), t)
     chk("  시작 단추는 없다", win.bond.btn is None)
 
-    print("\n=== 유대가 가득 -> 시작 ===")
+    print("\n=== 친밀도가 가득 -> 시작 ===")
     api.happy[1] = 255
     win.select(2)
     wait(root, lambda: win.bond.card and win.bond.card["species"] == "GENGAR")

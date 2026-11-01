@@ -8,7 +8,7 @@
   2. 칸을 누르면 고른 표시만 바뀐다 (서버엔 안 간다). 바꾼 게 없으면 '이 색으로' 는 안 눌린다.
   3. 화살표 키로 칸을 옮긴다.
   4. 실패하면 창에 까닭이 남는다. 다시 누르면 서버에 그 값으로 간다 · 창이 닫히고 콜백.
-  5. 이로치 색(None)으로 되돌릴 수 있다. 그리는 중 예외가 없다.
+  5. 맨 앞 칸(이로치 색, 값 None)을 눌러서 되돌릴 수 있다. 그리는 중 예외가 없다.
 """
 import os
 import sys
@@ -96,7 +96,14 @@ def main():
     done[:] = []
     w = ui_tint.TintPicker(app, m, on_done=lambda p: done.append(p))
     TT.wait(root, lambda: len(w.photos) == 16)
-    w.pick(None)
+    # 맨 앞 칸의 값이 None 이라 '칸 밖' 과 헷갈리기 쉽다 - pick 을 바로 부르지 않고 진짜로 누른다
+    x1, y1, x2, y2 = w.rects[None]
+    w.cv.event_generate("<Motion>", x=(x1 + x2) // 2, y=(y1 + y2) // 2)
+    root.update()
+    chk("맨 앞 칸 위에서도 손 모양 커서", w.cv.cget("cursor") == "hand2", w.cv.cget("cursor"))
+    click(root, w, None)
+    chk("맨 앞 칸(이로치 색)을 누르면 골라진다", w.picked is None and w.state[None][0] and w.ok_btn.enabled,
+        (w.picked, w.state[None]))
     w.apply()
     chk("맨 앞 칸(이로치 색)은 None", TT.wait(root, lambda: done) and api.calls[-1] == ("tint", 9, None),
         api.calls[-1])
