@@ -232,7 +232,8 @@ def t_190(op, a, b):
             (top["createdAt"], lst["posts"][1]["createdAt"]))
         chk("  덧붙임 글에 그 항목이 다 들어간다",
             d["body"].count("■ ") == len(patchnotes.NOTES[0]["extras"][-1]["items"]), d["body"].count("■ "))
-    old = lst["posts"][len(newest)]
+    # 바로 앞 판에 덧붙임 글('(추가)', 올린 때 날짜)이 있으면 그 아래 본 글을 본다 (2.0.3 위의 2.0.2)
+    old = next(x for x in lst["posts"][len(newest):] if not x["title"].endswith(")"))
     ver = old["title"].split()[0].lstrip("v")
     chk("옛 버전은 나온 날짜로", old["createdAt"] == patchnotes.RELEASED[ver], (ver, old["createdAt"]))
     chk("'전체' 에는 안 흐른다", all(x["kind"] != "patch" for x in board.listing(a, "all", 1)["posts"]))
