@@ -88,6 +88,8 @@ def public(t, dex, full=False):
                          "level": m["level"],
                          "types": [dex.type_name(x) for x in sp.get("types", [])]})
         out["team"] = team
+        # 에이스 = 보통 맨 뒤. 시즌 챔피언 관장처럼 자료에 ace(종) 가 있으면 그 포켓몬 (순서는 그대로 두고)
+        out["ace"] = next((i for i, m in enumerate(t["team"]) if m["species"] == t.get("ace")), len(team) - 1)
     return out
 
 

@@ -133,7 +133,9 @@ def trainer_mon(entry):
         "evs": dict((s, int(evs.get(s, ev))) for s in STATS),
         "nature": entry.get("nature") or "HARDY", "ability": entry.get("ability"),
         "moves": list(entry.get("moves") or []), "held": entry.get("held"),
-        "gender": entry.get("gender") or "N", "shiny": False, "nickname": None,
+        "gender": entry.get("gender") or "N", "nickname": None,
+        # 관장 포켓몬은 보통 이로치가 아니다. 자료에 적힌 관장만 (시즌 챔피언 관장: 그 사람이 쓰는 이로치 색 그대로)
+        "shiny": bool(entry.get("shiny")), "tint": entry.get("tint") if entry.get("shiny") else None,
         "statBoost": entry.get("boost"),
         "happiness": 255,           # 잘 키운 포켓몬 - 은혜갚기가 제 위력(102)으로 들어간다
     }
@@ -173,6 +175,10 @@ class TrainerBattle(object):
             self.trainer["ai"] = "war"
         # 관장 탭 카드와 배틀 화면의 그림이 다른 트레이너가 있다 (이스터에그: 렌트라와 함께 / 혼자)
         self.trainer["battleSprite"] = trainer.get("battleSprite") or trainer.get("sprite")
+        # 판을 시작할 때 한 번 재생하는 등장 연출 (움직이는 PNG) 과 그 그림에서 발이 닿는 자리 (2.0.3)
+        if trainer.get("entrySprite"):
+            self.trainer["entrySprite"] = trainer["entrySprite"]
+            self.trainer["entryFoot"] = trainer.get("entryFoot")
         self.me_team = [self._fighter(m) for m in my_mons[:TEAM_MAX]]
         self.foe_team = [self._fighter(trainer_mon(e)) for e in trainer["team"][:TEAM_MAX]]
         self.mi = next(i for i, f in enumerate(self.me_team) if f.alive())
@@ -190,6 +196,8 @@ class TrainerBattle(object):
         if self.war:
             self.keystone["foe"] = bool(trainer.get("keystone"))
             self.zring["foe"] = bool(trainer.get("zring"))
+        elif trainer.get("zring"):
+            self.zring["foe"] = True           # Z링을 가진 관장 (시즌 챔피언 관장) - 알아서 Z기술을 쓴다
         self._make_duel(FD.Field())
         self.turn = 0
         self.over = False
@@ -221,7 +229,7 @@ class TrainerBattle(object):
         self.bt.mega_done = self.mega_done
         self.bt.auto_mega = {"me": False, "foe": bool(self.keystone.get("foe"))}
         B.gimmick_share(self, self.bt)
-        if self.war:                           # 길드전의 방어 AI 는 Z기술을 알아서 쓴다
+        if self.war or self.zring.get("foe"):  # 길드전의 방어 AI · Z링을 가진 관장은 Z기술을 알아서 쓴다
             self.bt.auto_z["foe"] = True
 
     @property

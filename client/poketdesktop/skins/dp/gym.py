@@ -548,7 +548,7 @@ class GymWindow(G.GymWindow):
         yy += bh + s(4)
         row_h = max(s(30), 32)
         for i, m in enumerate(d["team"]):
-            ace = i == len(d["team"]) - 1
+            ace = i == d.get("ace", len(d["team"]) - 1)         # 서버가 정한 에이스 (옛 서버면 맨 뒤)
             if ace:
                 K.rrect(cv, x, yy, w - s(8), yy + row_h, s(6), fill=SEL, outline=LINE, width=1)
             th = thumbs.get(m["num"])

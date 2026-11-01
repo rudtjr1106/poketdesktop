@@ -1,5 +1,5 @@
 {
- "digest": "c623ace176aae53e",
+ "digest": "ed4ed07fab921875",
  "regions": {
   "11110": "cynthia",
   "11140": "rose",
@@ -116,7 +116,7 @@
   "41210": "clay",
   "41220": "lt-surge",
   "41250": "dexio",
-  "41271": "lacey",
+  "41271": "whitesna",
   "41273": "lucy",
   "41281": "saturn",
   "41285": "beni",
@@ -15562,139 +15562,6 @@
     }
    ],
    "type": "PSYCHIC",
-   "why": ""
-  },
-  {
-   "en": "Lacey",
-   "id": "lacey",
-   "level": 95,
-   "name": "타로",
-   "region": "41271",
-   "role": "사천왕",
-   "sprite": "lacey",
-   "team": [
-    {
-     "ability": "SWEETVEIL",
-     "evs": {
-      "def": 2,
-      "hp": 118,
-      "spa": 118
-     },
-     "gender": "F",
-     "held": "LEFTOVERS",
-     "iv": 31,
-     "level": 92,
-     "moves": [
-      "RECOVER",
-      "GIGADRAIN",
-      "ALLURINGVOICE",
-      "DAZZLINGGLEAM"
-     ],
-     "nature": "MODEST",
-     "species": "ALCREMIE"
-    },
-    {
-     "ability": "OBLIVIOUS",
-     "evs": {
-      "hp": 118,
-      "spa": 118,
-      "spd": 2
-     },
-     "gender": "F",
-     "held": "SITRUSBERRY",
-     "iv": 31,
-     "level": 93,
-     "moves": [
-      "SHELLSIDEARM",
-      "PSYCHIC",
-      "FLAMETHROWER",
-      "ICEBEAM"
-     ],
-     "nature": "MODEST",
-     "species": "SLOWBRO"
-    },
-    {
-     "ability": "LIQUIDVOICE",
-     "evs": {
-      "def": 2,
-      "hp": 118,
-      "spa": 118
-     },
-     "gender": "M",
-     "held": null,
-     "iv": 31,
-     "level": 94,
-     "moves": [
-      "HYPERVOICE",
-      "MOONBLAST",
-      "ICEBEAM",
-      "SHADOWBALL"
-     ],
-     "nature": "MODEST",
-     "species": "PRIMARINA"
-    },
-    {
-     "ability": "INTIMIDATE",
-     "evs": {
-      "atk": 118,
-      "hp": 118,
-      "spd": 2
-     },
-     "gender": "F",
-     "held": "EXPERTBELT",
-     "iv": 31,
-     "level": 96,
-     "moves": [
-      "PLAYROUGH",
-      "FIREPUNCH",
-      "ICEPUNCH",
-      "LASTRESORT"
-     ],
-     "nature": "ADAMANT",
-     "species": "GRANBULL"
-    },
-    {
-     "ability": "PRANKSTER",
-     "evs": {
-      "hp": 2,
-      "spa": 118,
-      "spe": 118
-     },
-     "gender": "F",
-     "held": "FOCUSSASH",
-     "iv": 31,
-     "level": 97,
-     "moves": [
-      "LIGHTSCREEN",
-      "TAILWIND",
-      "ENERGYBALL",
-      "MOONBLAST"
-     ],
-     "nature": "TIMID",
-     "species": "WHIMSICOTT"
-    },
-    {
-     "ability": "MOLDBREAKER",
-     "evs": {
-      "atk": 118,
-      "hp": 2,
-      "spe": 118
-     },
-     "gender": "F",
-     "held": null,
-     "iv": 31,
-     "level": 98,
-     "moves": [
-      "TERABLAST",
-      "IRONHEAD",
-      "ROCKTOMB",
-      "EARTHQUAKE"
-     ],
-     "nature": "JOLLY",
-     "species": "EXCADRILL"
-    }
-   ],
-   "type": "FAIRY",
    "why": ""
   },
   {
@@ -33503,6 +33370,145 @@
    ],
    "type": "NORMAL",
    "why": ""
+  },
+  {
+   "ace": "DRAGAPULT",
+   "battleSprite": "whitesna-solo",
+   "en": "WhiteSna",
+   "entryFoot": [
+    89.5,
+    190
+   ],
+   "entrySprite": "whitesna-entry",
+   "id": "whitesna",
+   "level": 100,
+   "name": "WhiteSna",
+   "region": "41271",
+   "role": "시즌 챔피언",
+   "sprite": "whitesna",
+   "team": [
+    {
+     "ability": "CLEARBODY",
+     "evs": {
+      "atk": 252,
+      "spe": 252
+     },
+     "gender": "M",
+     "held": "EXPERTBELT",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "DRAGONDARTS",
+      "PHANTOMFORCE",
+      "FLAMETHROWER",
+      "UTURN"
+     ],
+     "nature": "HASTY",
+     "shiny": true,
+     "species": "DRAGAPULT",
+     "tint": "s180"
+    },
+    {
+     "ability": "ORICHALCUMPULSE",
+     "evs": {
+      "atk": 252,
+      "spe": 252
+     },
+     "gender": "N",
+     "held": "LIFEORB",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "COLLISIONCOURSE",
+      "FLAREBLITZ",
+      "OUTRAGE",
+      "IRONHEAD"
+     ],
+     "nature": "RELAXED",
+     "shiny": true,
+     "species": "KORAIDON"
+    },
+    {
+     "ability": "PROTOSYNTHESIS",
+     "evs": {
+      "spa": 252,
+      "spe": 252
+     },
+     "gender": "N",
+     "held": "BOOSTERENERGY",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "POWERGEM",
+      "MOONBLAST",
+      "SHADOWBALL",
+      "MYSTICALFIRE"
+     ],
+     "nature": "CAREFUL",
+     "shiny": true,
+     "species": "FLUTTERMANE"
+    },
+    {
+     "ability": "PARENTALBOND",
+     "evs": {
+      "atk": 252,
+      "spe": 252
+     },
+     "gender": "F",
+     "held": "KANGASKHANITE",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "DOUBLEEDGE",
+      "SUCKERPUNCH",
+      "EARTHQUAKE",
+      "ICEPUNCH"
+     ],
+     "nature": "NAUGHTY",
+     "species": "KANGASKHAN"
+    },
+    {
+     "ability": "DISGUISE",
+     "evs": {
+      "atk": 252,
+      "spe": 252
+     },
+     "gender": "M",
+     "held": "MIMIKIUMZ",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "SHADOWSNEAK",
+      "WOODHAMMER",
+      "PLAYROUGH",
+      "SHADOWCLAW"
+     ],
+     "nature": "ADAMANT",
+     "species": "MIMIKYU"
+    },
+    {
+     "ability": "SANDFORCE",
+     "evs": {
+      "atk": 252,
+      "spe": 252
+     },
+     "gender": "M",
+     "held": "CHOICESCARF",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "ROCKSLIDE",
+      "ROCKTOMB",
+      "EARTHQUAKE",
+      "IRONHEAD"
+     ],
+     "nature": "NAIVE",
+     "species": "EXCADRILL"
+    }
+   ],
+   "type": "GHOST",
+   "why": "[시즌 2, 3, 4 챔피언] - THREEPEAT 1 DYNASTY",
+   "zring": true
   }
  ],
  "version": 1

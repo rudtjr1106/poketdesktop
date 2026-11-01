@@ -19,6 +19,7 @@
 판은 서버에 남는다. 지도에서 그 지역을 다시 누르면 이어서 한다. 한 시간
 손을 놓으면 서버가 접는다.
 """
+import time
 import tkinter as tk
 
 from PIL import ImageTk
@@ -32,7 +33,7 @@ from . import sendout_fx as SO
 from . import battle_zoom as Z
 from . import platform_os as PLAT
 from .ui_common import run_async
-from .ui_gym import level_color, shade, trainer_photo
+from .ui_gym import level_color, shade, trainer_frames, trainer_photo
 from . import ui_gimmick
 from . import ui_spectate as SP
 from . import ui_mega
@@ -218,9 +219,10 @@ class GymBattleWindow(Z.Resizable):
         self.zoom_watch()                    # 이제부터 창을 끌어 크기를 바꾸면 따라간다
 
         events = data.get("events") or []
+        self._entry = None
         if events:
-            # 시작 연출: 아직 아무도 안 나와 있다
-            self.play(events, data)
+            # 시작 연출: 아직 아무도 안 나와 있다. 등장 연출이 있는 관장(시즌 챔피언)은 그것부터 한 번 (2.0.3)
+            self._entry_then(lambda: self.play(events, data))
         else:
             self.sync_view(self.view)
             # 쓰러진 채로 창을 닫았다가 다시 들어오면 교체부터 해야 한다. 기술 칸을
@@ -884,9 +886,102 @@ class GymBattleWindow(Z.Resizable):
         view = self.view
         self.turn_lbl.configure(text="%d턴 · %s" % (view.get("turn", 0), view["trainer"].get("name", "")))
 
+    # ---------------- 등장 연출 (2.0.3) ----------------
+    def _entry_then(self, cont):
+        """관장에게 등장 연출(entrySprite)이 있으면 한 번 틀고 cont 를 부른다. 없거나 못 받으면 바로 cont.
+
+        연출 그림은 틀이 배틀 그림보다 크다 (불꽃 · 볼이 사람 밖으로 나간다). 서버가 그 그림에서 발이 닿는
+        자리(entryFoot)를 같이 준다 - 배틀 그림의 발 자리(trainer_item, 아래 가운데)에 그 점을 맞춘다.
+        도는 동안 배틀 그림은 숨겨 둔다. 마지막 장이 배틀 그림과 같은 자세라 넘어갈 때 튀지 않는다.
+        """
+        t = self.view.get("trainer") or {}
+        key = t.get("entrySprite")
+        if not key:
+            return cont()
+        self.busy = True
+        self.hide_commands()
+        # src: 받은 장(1배), photos: 지금 배율로 키운 장, k: 그 배율, i: 지금 장
+        self._entry = {"cont": cont, "item": None, "photos": [], "src": None, "k": None, "i": 0,
+                       "foot": t.get("entryFoot"), "done": False}
+
+        def done(frames, err):
+            if not self.alive or self._entry is None or self._entry["done"]:
+                return
+            if err or not frames:
+                return self._entry_end()
+            e = self._entry
+            e["src"] = frames
+            if not e["foot"]:
+                e["foot"] = [frames[0][0].width / 2.0, frames[0][0].height]
+            self._entry_place()
+            # 장마다 끝나는 시각 (시작부터 초). 재생은 시계를 보고 장을 고른다 - after(ms) 를 이어 걸면
+            # 윈도우 타이머가 15.6ms 단위로 올림해 장마다 늦어지고(66ms -> 78ms) 들쭉날쭉해진다.
+            acc, e["ends"] = 0.0, []
+            for _ph, ms in e["photos"]:
+                acc += ms / 1000.0
+                e["ends"].append(acc)
+            e["t0"] = time.monotonic()
+            self._entry_step(0)
+        run_async(self.root, lambda: trainer_frames(self.app.api, key), done)
+
+    def _entry_place(self):
+        """연출 그림을 지금 장면의 배틀 그림 자리 · 배율에 놓는다. 창 크기를 바꿔 장면을 새로 지으면 다시 부른다
+        (창은 열리자마자 한 번 제 크기를 잡기도 한다 - 그때 연출이 끊기지 않고 새 자리에서 이어진다)."""
+        e = self._entry
+        k = Z.K
+        if e["k"] != k:
+            from PIL import Image
+            e["photos"] = [(ImageTk.PhotoImage(im if k == 1.0 else im.resize(
+                (max(1, int(round(im.width * k))), max(1, int(round(im.height * k)))), Image.NEAREST)), ms)
+                for im, ms in e["src"]]
+            e["k"] = k
+        x, y = self.cv.coords(self.trainer_item)[:2]
+        fx, fy = e["foot"]
+        e["item"] = self.cv.create_image(int(round(x - fx * k)), int(round(y - fy * k)), anchor="nw",
+                                         image=e["photos"][min(e["i"], len(e["photos"]) - 1)][0])
+        self.cv.tag_raise(e["item"], self.trainer_item)
+        self.cv.itemconfigure(self.trainer_item, state="hidden")
+
+    def _entry_step(self, _i=None):
+        """지금 시각에 맞는 장을 보이고 다음 장의 시각에 다시 부른다 (늦었으면 장을 건너뛴다)."""
+        e = self._entry
+        if not self.alive or e is None or e["done"]:
+            return
+        el = time.monotonic() - e["t0"]
+        ends = e["ends"]
+        i = e["i"]
+        while i < len(ends) and ends[i] <= el:
+            i += 1
+        if i >= len(ends):
+            return self._entry_end()
+        if i != e["i"] or _i == 0:
+            e["i"] = i
+            self.cv.itemconfigure(e["item"], image=e["photos"][i][0])
+        self.later(max(1, int((ends[i] - el) * 1000)), self._entry_step)
+
+    def _entry_end(self):
+        """연출을 걷고 배틀 그림을 다시 보인 뒤 판을 시작한다 (한 번만)."""
+        e = self._entry
+        if e is None or e["done"]:
+            return
+        e["done"] = True
+        try:
+            if e["item"] is not None:
+                self.cv.delete(e["item"])
+            self.cv.itemconfigure(self.trainer_item, state="normal")
+        except tk.TclError:
+            pass
+        e["photos"] = []
+        if self.alive:
+            e["cont"]()
+
     def _restore(self):
         """창 크기를 바꿔 다시 지은 화면을, 들고 있던 것으로 되돌린다 (battle_zoom.Resizable)."""
         self._load_trainer()
+        e = getattr(self, "_entry", None)
+        if e and not e["done"] and e["src"]:
+            # 등장 연출 도중에 장면을 새로 지었다 (연출 그림도 지워졌다) - 새 자리 · 배율로 다시 놓고 이어 간다
+            self._entry_place()
         for who in ("me", "foe"):
             self.set_mon(who, self.shown.get(who))
         self._balls(self.view)
