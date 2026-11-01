@@ -285,7 +285,7 @@ _ATK = {"atk": 252, "spe": 252}
 FIXED = {
     # 시즌 2 · 3 · 4 챔피언 WhiteSna (2026-11-01 신청). 드래펄트 색은 그 사람이 쓰는 이로치 색(s180).
     "41271": {
-        "id": "whitesna", "name": "WhiteSna", "en": "WhiteSna", "role": "시즌 챔피언",
+        "id": "whitesna", "name": "WhiteSna", "en": "WhiteSna", "role": "트레이너의 정점",
         "sprite": "whitesna", "battleSprite": "whitesna-solo",
         "entrySprite": "whitesna-entry", "entryFoot": [89.5, 190],
         "level": 100, "type": "GHOST", "zring": True,

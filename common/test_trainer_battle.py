@@ -529,13 +529,13 @@ def t_상대_AI(dex, gyms):
              if not any((dex.move(k) or {}).get("power") for k in m["moves"])]
     chk("모두 때리는 기술이 있다", not nohit, nohit[:5])
     chk("개체값은 모두 31", all(m["iv"] == 31 for t in gyms["trainers"] for m in t["team"]))
-    # 시즌 챔피언 관장(2.0.3 WhiteSna)은 신청서 그대로라 노력치도 그 사람 것 (252/252) - 합만 본가 상한 안
-    made = [t for t in gyms["trainers"] if t.get("role") != "시즌 챔피언"]
+    # 시즌 챔피언 관장(2.0.3 WhiteSna, 역할 '트레이너의 정점')은 신청서 그대로라 노력치도 그 사람 것 (252/252) - 합만 본가 상한 안
+    made = [t for t in gyms["trainers"] if t.get("role") != "트레이너의 정점"]
     lo20 = [sum(m["evs"].values()) for t in made if t["level"] == 20 for m in t["team"]]
     hi100 = [sum(m["evs"].values()) for t in made if t["level"] == 100 for m in t["team"]]
     chk("노력치: Lv.20 은 0, Lv.100 은 절반쯤", max(lo20) == 0 and 240 <= min(hi100) and max(hi100) <= 256,
         (max(lo20), min(hi100), max(hi100)))
-    champ = [sum(m["evs"].values()) for t in gyms["trainers"] if t.get("role") == "시즌 챔피언" for m in t["team"]]
+    champ = [sum(m["evs"].values()) for t in gyms["trainers"] if t.get("role") == "트레이너의 정점" for m in t["team"]]
     chk("  시즌 챔피언 관장의 노력치 합은 510 이하", all(n <= 510 for n in champ), champ)
     natures = collections.Counter(m["nature"] for t in gyms["trainers"] for m in t["team"])
     chk("성격을 포켓몬에 맞춘다 (무보정 없음)", "HARDY" not in natures and len(natures) >= 4, natures)
@@ -697,7 +697,7 @@ def t_관장_AI(dex, gyms):
     """관장 (ai="gym", 2026-11-02): 길드전 방어 AI 의 셈을 얕게 쓴다. 레벨이 낮으면 가끔 셈 없이 (_gym_slip)."""
     print("\n=== 관장 AI (셈하는 관장) ===")
     import time
-    by_lv = dict((t["level"], t) for t in gyms["trainers"] if t.get("role") != "시즌 챔피언")
+    by_lv = dict((t["level"], t) for t in gyms["trainers"] if t.get("role") != "트레이너의 정점")
     hi, lo = by_lv[max(by_lv)], by_lv[min(by_lv)]
     mine = [TB.trainer_mon(dict(e, level=50, iv=31)) for e in gyms["trainers"][-2]["team"]]
     tb = TB.TrainerBattle(dex, mine, dict(hi, ai="gym"), random.Random(3))
