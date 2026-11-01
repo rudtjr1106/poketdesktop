@@ -8,10 +8,15 @@
 
 name: test
 
+# 사이트(docs/)만 바꾼 푸시는 건너뛴다 - 검사가 앱 · 서버를 보는데 20분 넘게 걸린다. 다른 파일이 하나라도
+# 섞이면 그대로 돈다. 안내서의 탐험 확률표(server/test_expedition.py 가 맞대어 봄)만 고친 푸시도 건너뛰니,
+# 표를 손댔으면 Actions 에서 손으로 돌린다 (workflow_dispatch).
 on:
   push:
     branches: [main]
+    paths-ignore: ["docs/**"]
   pull_request:
+    paths-ignore: ["docs/**"]
   workflow_dispatch:
 
 permissions:
