@@ -7,6 +7,8 @@
 
 꽃은 꽃잎 다섯 장을 계산으로 찍고 사이를 선으로 나눈 것(시안의 flower5.flower(11, 0.3, 0.18))을 격자로 굳혔다.
 꽃핀의 파란 핀은 뺐다 (사용자 '오히려 더 이상하다').
+
+사이트 안내서의 꾸미기 장(docs/guide/#deco)도 이 그림을 쓴다 - 고치면 tools/make_site_deco.py 를 다시 돌린다.
 """
 import functools
 

@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>포스크탑 안내서</title>
-<meta name="description" content="포스크탑 안내서. 시작하기부터 키우기, 관장, 배틀, 랭크, 메가진화, 길드, 문제 해결까지.">
+<meta name="description" content="포스크탑 안내서. 시작하기부터 키우기, 관장, 배틀, 랭크, 메가진화, 길드, 꾸미기, 문제 해결까지.">
 <link rel="icon" href="../images/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=4">
+<link rel="stylesheet" href="../assets/site.css?v=5">
 <script src="https://unpkg.com/@phosphor-icons/web@2.1.1" defer></script>
 </head>
 <body>
@@ -36,6 +36,7 @@
       <a href="#rank">랭크</a>
       <a href="#mega">메가진화</a>
       <a href="#guild">길드</a>
+      <a href="#deco">꾸미기</a>
       <a href="#dex">도감·게시판</a>
       <a href="#settings">설정</a>
       <a href="#help">문제 해결</a>
@@ -816,13 +817,128 @@
         <li>팀은 랭크 배틀과 같은 규칙입니다 (여섯 마리까지, Lv.50 상한, 전설·환상 한 마리, 같은 포켓몬 한 마리, 같은 지닌 도구 한 마리 - 도구가 겹치면 저장되지 않습니다). 전략 기간까지 바꿀 수 있고, 전쟁이 시작되는 순간의 기술·도구·노력치로 고정됩니다. 그 뒤에 바꿔도 길드전에는 그때 그 모습으로 나갑니다. 안 짠 사람은 랭크 팀으로 나갑니다. 길드전 승부에는 경험치가 없습니다.</li>
         <li>보상은 한 번이라도 공격한 길드원이 받습니다. 길드 코인 1위 300 · 2위 200 · 3위 150 · 그 밖 50, 1위 길드는 칭호도 받습니다.</li>
         <li>2.0.2 부터는 <b>랜덤 기술머신 뽑기권</b>도 받습니다. 1위 길드 2장 · 2위 1장 · 3위 1장이고, 순위와 상관없이 공격에서 3번 이상 이기면 활약 보상으로 1장 더 받습니다. 뽑기권은 공격에서 한 번이라도 이긴 길드원만 받습니다. 전쟁이 시작될 때 도구가 겹쳐 있던 팀(짠 뒤에 도구를 바꿨거나 팀을 안 짜 랭크 팀으로 나가는 사람 - 전쟁 중에는 팀을 못 고칩니다)은 그 판에서만 뒤의 포켓몬이 도구 없이 싸우고, 판 처음에 알려 드립니다.</li>
-        <li>시즌 5 부터는 <b>꾸미기</b>도 선물함으로 받습니다. 1위 금관 · 금빛 별가루 · 발밑 빛, 2위 은관 · 은빛 별가루, 3위 동관 · 동빛 별가루, 그 밖의 길드는 참가 묶음(리본 + 발자국 · 꽃핀 + 꽃잎 · 진주 목걸이 + 하트) 가운데 하나를 고릅니다. 받은 꾸미기는 가방의 '꾸미기' 주머니에 들어가고, 거기서 포켓몬을 골라 씌우거나 바탕화면 포켓몬을 우클릭해 '꾸미기...' 에서 씌웁니다 (참가 묶음 선택권도 그 주머니에서 씁니다). 장식은 걷는 도트의 머리 · 목에 얹히고, 효과는 걸어간 자리에 남습니다. 꾸미기 하나는 포켓몬 한 마리만 씁니다 (다른 포켓몬에 씌우면 먼저 쓰던 포켓몬에서 빠집니다). 순위 묶음을 이미 다 가진 사람(같은 순위를 또 한 사람)은 대신 참가 묶음 선택권을 받습니다.</li>
+        <li>시즌 5 부터는 <b>꾸미기</b>도 선물함으로 받습니다. 1위 금관 묶음 · 2위 은관 묶음 · 3위 동관 묶음, 그 밖의 길드는 참가 묶음 선택권입니다. 생김새와 씌우는 법은 <a href="#deco">꾸미기</a> 장에 있습니다.</li>
       </ul>
     </div>
 
     <div class="blk">
       <h3>마스터와 부마스터</h3>
       <p>마스터는 소개와 가입 방식을 바꾸고, 가입 신청을 받거나 돌려보내고, 부마스터를 1명 임명하고, 길드원을 내보내고, 마스터 자리를 넘기고, 길드를 해산할 수 있습니다. 부마스터는 가입 신청을 받고 일반 길드원을 내보낼 수 있습니다. 길드원의 프로필을 누르면 그 사람의 마이페이지 내용이 보입니다.</p>
+    </div>
+    <div class="grass" aria-hidden="true"></div>
+  </section>
+
+  <!-- ============================================================ 꾸미기 -->
+  <section id="deco">
+    <div class="sec-head">
+      <h2>왕관을 쓰고, 별가루를 뿌리며 걷습니다</h2>
+      <p class="lead">2.0 부터 바탕화면 포켓몬을 꾸밀 수 있습니다. 머리와 목에 얹는 장식, 걸어간 자리에 남는 효과가 있습니다. 상점에서는 팔지 않고 길드전 보상과 선물로만 받습니다.</p>
+    </div>
+
+    <div class="blk wide">
+      <h3>포켓몬이 쓰면</h3>
+      <div class="deco-looks">
+        <figure><img src="../images/deco-0025-crown_gold.png" alt="루비 구슬이 달린 금관을 쓴 피카츄" width="84" height="108" loading="lazy"><figcaption><b>금관</b><span>1위 묶음</span></figcaption></figure>
+        <figure><img src="../images/deco-0133-crown_silver.png" alt="은관을 쓴 이브이" width="84" height="104" loading="lazy"><figcaption><b>은관</b><span>2위 묶음</span></figcaption></figure>
+        <figure><img src="../images/deco-0004-crown_bronze.png" alt="동관을 쓴 파이리" width="84" height="108" loading="lazy"><figcaption><b>동관</b><span>3위 묶음</span></figcaption></figure>
+        <figure><img src="../images/deco-0025-bow.png" alt="귀에 분홍 리본을 단 피카츄" width="84" height="108" loading="lazy"><figcaption><b>분홍 리본</b><span>참가 묶음</span></figcaption></figure>
+        <figure><img src="../images/deco-0133-flower.png" alt="머리에 분홍 꽃핀을 꽂은 이브이" width="84" height="92" loading="lazy"><figcaption><b>꽃핀</b><span>참가 묶음</span></figcaption></figure>
+        <figure><img src="../images/deco-0004-pearls.png" alt="하트 펜던트가 달린 진주 목걸이를 건 파이리" width="84" height="96" loading="lazy"><figcaption><b>진주 목걸이</b><span>참가 묶음</span></figcaption></figure>
+      </div>
+      <p>장식은 포켓몬마다 머리 꼭대기와 목 자리를 찾아 얹히고, 걸을 때 머리를 따라 까딱입니다. 왕관은 1.4초마다 한 번 반짝입니다. 옆을 보고 걸으면 리본과 꽃핀은 뒤통수 쪽으로 옮겨 가고, 등을 보이면 목걸이는 가려집니다.</p>
+    </div>
+
+    <div class="blk wide">
+      <h3>입혀 보기</h3>
+      <div class="deco-try" data-deco hidden>
+        <div class="deco-stage">
+          <canvas role="img" aria-label="꾸미기를 쓰고 걷는 도트"></canvas>
+          <span class="deco-now" aria-live="polite"></span>
+        </div>
+        <div class="deco-sets" role="group" aria-label="묶음으로 입혀 보기">
+          <button type="button" class="deco-set" data-set="rank1" aria-pressed="false"><span class="ico"><i data-icon="crown_gold"></i><i data-icon="fx_stars_gold"></i><i data-icon="fx_glow"></i></span><b>1위 묶음</b><span>금관 · 금빛 별가루 · 발밑 빛</span></button>
+          <button type="button" class="deco-set" data-set="rank2" aria-pressed="false"><span class="ico"><i data-icon="crown_silver"></i><i data-icon="fx_stars_silver"></i></span><b>2위 묶음</b><span>은관 · 은빛 별가루</span></button>
+          <button type="button" class="deco-set" data-set="rank3" aria-pressed="false"><span class="ico"><i data-icon="crown_bronze"></i><i data-icon="fx_stars_bronze"></i></span><b>3위 묶음</b><span>동관 · 동빛 별가루</span></button>
+          <button type="button" class="deco-set" data-set="join_bow" aria-pressed="false"><span class="ico"><i data-icon="bow"></i><i data-icon="fx_paw"></i></span><b>참가 묶음</b><span>분홍 리본 + 발자국</span></button>
+          <button type="button" class="deco-set" data-set="join_flower" aria-pressed="false"><span class="ico"><i data-icon="flower"></i><i data-icon="fx_petals"></i></span><b>참가 묶음</b><span>꽃핀 + 꽃잎</span></button>
+          <button type="button" class="deco-set" data-set="join_pearls" aria-pressed="false"><span class="ico"><i data-icon="pearls"></i><i data-icon="fx_hearts"></i></span><b>참가 묶음</b><span>진주 목걸이 + 하트</span></button>
+        </div>
+        <div class="deco-slots">
+          <div class="deco-slot" role="group" aria-label="머리"><b>머리</b><div>
+            <button type="button" class="deco-chip" data-key="crown_gold" aria-pressed="false"><i data-icon="crown_gold"></i>금관</button>
+            <button type="button" class="deco-chip" data-key="crown_silver" aria-pressed="false"><i data-icon="crown_silver"></i>은관</button>
+            <button type="button" class="deco-chip" data-key="crown_bronze" aria-pressed="false"><i data-icon="crown_bronze"></i>동관</button>
+          </div></div>
+          <div class="deco-slot" role="group" aria-label="머리 장식"><b>머리 장식</b><div>
+            <button type="button" class="deco-chip" data-key="bow" aria-pressed="false"><i data-icon="bow"></i>분홍 리본</button>
+            <button type="button" class="deco-chip" data-key="flower" aria-pressed="false"><i data-icon="flower"></i>꽃핀</button>
+          </div></div>
+          <div class="deco-slot" role="group" aria-label="목"><b>목</b><div>
+            <button type="button" class="deco-chip" data-key="pearls" aria-pressed="false"><i data-icon="pearls"></i>진주 목걸이</button>
+          </div></div>
+          <div class="deco-slot" role="group" aria-label="발밑"><b>발밑</b><div>
+            <button type="button" class="deco-chip" data-key="fx_glow" aria-pressed="false"><i data-icon="fx_glow"></i>발밑 빛</button>
+          </div></div>
+          <div class="deco-slot wide" role="group" aria-label="발자취"><b>발자취</b><div>
+            <button type="button" class="deco-chip" data-key="fx_stars_gold" aria-pressed="false"><i data-icon="fx_stars_gold"></i>금빛 별가루</button>
+            <button type="button" class="deco-chip" data-key="fx_stars_silver" aria-pressed="false"><i data-icon="fx_stars_silver"></i>은빛 별가루</button>
+            <button type="button" class="deco-chip" data-key="fx_stars_bronze" aria-pressed="false"><i data-icon="fx_stars_bronze"></i>동빛 별가루</button>
+            <button type="button" class="deco-chip" data-key="fx_paw" aria-pressed="false"><i data-icon="fx_paw"></i>발자국</button>
+            <button type="button" class="deco-chip" data-key="fx_petals" aria-pressed="false"><i data-icon="fx_petals"></i>꽃잎</button>
+            <button type="button" class="deco-chip" data-key="fx_hearts" aria-pressed="false"><i data-icon="fx_hearts"></i>하트</button>
+          </div></div>
+        </div>
+        <div class="deco-acts">
+          <button type="button" class="btn ghost small" data-deco-other><i class="ph ph-shuffle" aria-hidden="true"></i>다른 친구</button>
+          <button type="button" class="btn ghost small" data-deco-bare><i class="ph ph-eraser" aria-hidden="true"></i>다 벗기</button>
+        </div>
+      </div>
+      <p class="deco-tip">무대에서 걷는 것은 이 사이트의 도트 친구입니다 (누르면 이쪽을 봅니다). 게임에서는 내 포켓몬이 같은 그림을 같은 규칙으로 씁니다. 효과는 걸을 때만 나오고, 발밑 빛은 서 있을 때도 빛납니다.</p>
+    </div>
+
+    <div class="blk wide">
+      <h3>다섯 칸에 하나씩</h3>
+      <p>한 포켓몬은 칸마다 하나씩, 다섯 칸을 한꺼번에 쓸 수 있습니다. 금관에 꽃핀과 진주 목걸이를 걸고 금빛 별가루와 발밑 빛을 함께 써도 됩니다.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>칸</th><th>꾸미기</th><th>모습</th></tr></thead>
+        <tbody>
+          <tr><td>머리</td><td>금관 · 은관 · 동관</td><td>뾰족한 끝 셋에 루비 구슬이 달린 관입니다. 가끔 반짝입니다.</td></tr>
+          <tr><td>머리 장식</td><td>분홍 리본 · 꽃핀</td><td>머리 오른쪽 위에 작게 답니다. 왕관과 같이 쓰면 조금 아래로 내려앉습니다.</td></tr>
+          <tr><td>목</td><td>진주 목걸이</td><td>진주 줄에 하트 펜던트가 달려 있습니다.</td></tr>
+          <tr><td>발자취</td><td>금빛 · 은빛 · 동빛 별가루, 발자국, 꽃잎, 하트</td><td>걸을 때만 나옵니다. 별가루와 꽃잎은 몸 뒤로 흩날리고, 발자국은 찍혔다가 옅어지고, 하트는 머리 위로 퐁퐁 떠오릅니다.</td></tr>
+          <tr><td>발밑</td><td>발밑 빛</td><td>발밑에 금빛 고리가 은은하게 빛납니다.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="blk wide">
+      <h3>얻는 법</h3>
+      <p>상점에서 사거나 팔 수 없습니다. 선물함으로만 들어옵니다.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>언제</th><th>받는 것</th></tr></thead>
+        <tbody>
+          <tr><td>길드전 1위</td><td><span class="deco-ico"><i data-icon="crown_gold"></i><i data-icon="fx_stars_gold"></i><i data-icon="fx_glow"></i></span>금관 · 금빛 별가루 · 발밑 빛</td></tr>
+          <tr><td>길드전 2위</td><td><span class="deco-ico"><i data-icon="crown_silver"></i><i data-icon="fx_stars_silver"></i></span>은관 · 은빛 별가루</td></tr>
+          <tr><td>길드전 3위</td><td><span class="deco-ico"><i data-icon="crown_bronze"></i><i data-icon="fx_stars_bronze"></i></span>동관 · 동빛 별가루</td></tr>
+          <tr><td>그 밖의 참가 길드</td><td><span class="deco-ico"><i data-icon="pick_join"></i></span>참가 묶음 선택권. 분홍 리본 + 발자국, 꽃핀 + 꽃잎, 진주 목걸이 + 하트 가운데 하나를 고릅니다.</td></tr>
+          <tr><td>2.0 감사의 선물</td><td><span class="deco-ico"><i data-icon="fx_paw"></i></span>발자국. 2.0 이 나올 때 있던 계정 모두에게 한 번 드렸습니다.</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li>길드전 꾸미기는 시즌 5 부터, 그 길드에서 <strong>한 번이라도 공격한</strong> 길드원이 결산 때 받습니다 (<a href="#guild">길드전</a>).</li>
+        <li>같은 꾸미기는 하나만 가집니다. 순위 묶음을 이미 다 가진 사람이 같은 순위를 또 하면 대신 참가 묶음 선택권을 받습니다.</li>
+      </ul>
+    </div>
+
+    <div class="blk">
+      <h3>씌우는 법</h3>
+      <ul>
+        <li>받은 꾸미기는 <strong>가방의 '꾸미기' 주머니</strong>에 들어갑니다. 하나를 고르면 아래에 포켓몬 목록이 나오고, 포켓몬을 골라 [씌우기] · [빼기] 를 누릅니다.</li>
+        <li>바탕화면 포켓몬을 <strong>오른쪽 클릭해 '꾸미기...'</strong> 를 열어도 됩니다. 가진 것만 보이고, 누르면 바로 씌우거나 뺍니다.</li>
+        <li>참가 묶음 선택권은 꾸미기 주머니에서 [묶음 고르기] 로 씁니다. 한 번 고르면 되돌릴 수 없습니다.</li>
+        <li>꾸미기 하나는 한 마리만 씁니다. 다른 포켓몬에 씌우면 먼저 쓰던 포켓몬에서 빠집니다.</li>
+        <li>친구 집에 놀러 가면 친구 화면에서도 내 포켓몬이 꾸민 그대로 걷습니다.</li>
+      </ul>
     </div>
     <div class="grass" aria-hidden="true"></div>
   </section>
@@ -971,5 +1087,7 @@
 </footer>
 <script src="../assets/site.js?v=3" defer></script>
 <script src="../assets/download.js?v=3" defer></script>
+<script src="../assets/deco-data.js?v=1" defer></script>
+<script src="../assets/deco.js?v=1" defer></script>
 </body>
 </html>
