@@ -5,7 +5,7 @@
 
 못 박는 것:
 
-  1. 도구 둘이 있고 상점(10,000원)과 길드 코인 상점 '풀숲' 묶음에서 판다. 드랍 표에는 없다.
+  1. 도구 둘이 있고 상점(10,000원)에서만 판다 - 길드 코인 상점 · 드랍 표에는 없다.
   2. 타입 스프레이: 타입을 안 골랐거나 없는 타입(스텔라 포함)이면 거절하고 **도구는 그대로**.
      쓰면 1시간, 같은 타입이면 더하고(3시간까지 - 넘으면 거절하고 도구는 그대로), 다른 타입이면 바꾸고 다시 1시간.
   3. 스프레이가 켜져 있으면 실제 풀숲(main._make_grass)에 그 타입이 훨씬 자주 나온다. 끝나면 평소대로.
@@ -87,10 +87,8 @@ def catalog():
     chk("  상점 값 10,000원 · 되팔면 0원", items.buy_price("TYPESPRAY") == 10000 and items.buy_price("BURNINGBOOST") == 10000
         and sp["sell"] == 0 and bn["sell"] == 0)
     rows = dict((r["id"], r) for r in guild.shop(mkuser("상점구경"))["items"])
-    chk("  길드 코인 상점 '풀숲' 묶음에도 있다", rows.get("TYPESPRAY", {}).get("group") == "풀숲"
-        and rows.get("BURNINGBOOST", {}).get("group") == "풀숲"
-        and rows["TYPESPRAY"]["coin"] == guild.coin_price("TYPESPRAY") == 40,
-        [(k, v.get("group")) for k, v in rows.items() if k in ("TYPESPRAY", "BURNINGBOOST")])
+    chk("  길드 코인 상점에는 없다 (사용자 결정 - 상점에서만)", "TYPESPRAY" not in rows and "BURNINGBOOST" not in rows
+        and guild.coin_price("TYPESPRAY") == 0 == guild.coin_price("BURNINGBOOST"), sorted(rows)[:5])
     drops = set(i for i, _w in items.data()["dropTable"])
     chk("  드랍 표에는 없다", not drops & {"TYPESPRAY", "BURNINGBOOST", "RENAMETICKET"})
 

@@ -116,9 +116,7 @@ SHOP_HELD = ("LIFEORB", "CHOICESCARF", "CHOICEBAND", "CHOICESPECS", "FOCUSSASH",
              "SITRUSBERRY", "LUMBERRY", "HEAVYDUTYBOOTS", "LIGHTCLAY", "BOOSTERENERGY", "BLACKSLUDGE",
              "CLEARAMULET", "COVERTCLOAK", "LOADEDDICE")
 # 상점 화면의 묶음 (차례대로). 앱이 group 글을 머리글로 쓴다.
-# 풀숲 부스트 (2.1.1): 타입 스프레이 · 버닝 부스터 - 상점 값에서 코인 값이 나온다
-SHOP_BOOSTS = ("TYPESPRAY", "BURNINGBOOST")
-SHOP_GROUPS = ("볼", "성장", "진화", "지닌 도구", "풀숲")
+SHOP_GROUPS = ("볼", "성장", "진화", "지닌 도구")
 BUY_MAX = 99
 
 # 슬롯머신 (2.1.0). 한 번에 SLOT_COST 코인, 하루 횟수 제한 없음 (사용자 결정).
@@ -966,8 +964,7 @@ def coin_price(item_id):
     it = items.get(item_id)
     if not it or items.buy_price(it["id"]) <= 0:
         return 0
-    if it.get("cat") not in SHOP_CATS and it["id"] not in SHOP_ITEMS and it["id"] not in SHOP_HELD \
-            and it["id"] not in SHOP_BOOSTS:
+    if it.get("cat") not in SHOP_CATS and it["id"] not in SHOP_ITEMS and it["id"] not in SHOP_HELD:
         return 0
     return max(1, int(math.ceil(items.buy_price(it["id"]) / float(config.GUILD_COIN_WON))))
 
@@ -980,8 +977,6 @@ def _group(it):
         return "지닌 도구"
     if it["cat"] == "stone":
         return "진화"
-    if it["id"] in SHOP_BOOSTS:
-        return "풀숲"
     return "성장"
 
 
