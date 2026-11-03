@@ -108,6 +108,12 @@ DEFAULTS = {
     # **이 목록을 제자리에서 고치지 말 것** - 기본값으로 돌릴 때 DEFAULTS 의 이 리스트를 그대로 같이 쓴다.
     # 늘 새 리스트로 갈아 끼운다 (ui_catch_pick).
     "catchPick": [],
+    # 여러 개 팔기에서 '판매 제외' 별표를 단 도구 id 목록 (2.1.1, 게시판 #426). '전부 고르기' 에서 빠지고, 별을 풀기
+    # 전에는 그 창에서 팔 수 없다. PC 마다 하나다 (도구 이름은 계정과 상관없다). 제자리에서 고치지 말 것 - 늘 새 리스트로.
+    "sellKeep": [],
+    # 야생에 볼을 던지면 잡힐 때까지 같은 볼로 이어 던진다 (2.1.1, 게시판 #425). 볼 메뉴 맨 위 줄로 켜고 끈다.
+    # 배틀 밖 야생만 - 마스터볼 · 볼이 떨어짐 · 야생이 사라짐 · 배틀 시작 · 30번이면 멈춘다 (wild_ui).
+    "autoThrow": False,
     # 마지막에 던진 볼. 두 번 누르면 이걸로 바로 던진다.
     # 게임 상태가 아니라 취향이라 서버에 두지 않는다.
     "lastBall": "POKEBALL",
@@ -200,6 +206,14 @@ def catch_mode(settings):
 def catch_pick(settings):
     """'안 잡은 포켓몬 + 고른 포켓몬' 에서 고른 종 (내부 이름 집합). 리스트가 아니거나 글이 아닌 것은 버린다."""
     v = (settings or {}).get("catchPick")
+    if not isinstance(v, (list, tuple)):
+        return frozenset()
+    return frozenset(x.strip().upper() for x in v if isinstance(x, str) and x.strip())
+
+
+def sell_keep(settings):
+    """'판매 제외' 별표를 단 도구 id 집합. 리스트가 아니거나 글이 아닌 것은 버린다."""
+    v = (settings or {}).get("sellKeep")
     if not isinstance(v, (list, tuple)):
         return frozenset()
     return frozenset(x.strip().upper() for x in v if isinstance(x, str) and x.strip())

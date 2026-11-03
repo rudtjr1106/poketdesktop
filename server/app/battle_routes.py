@@ -449,8 +449,9 @@ def store_caught(uid, mon):
 
 
 def reschedule(uid):
-    """다음 풀숲 시각을 다시 잡는다."""
-    secs = deps.RNG.randint(config.WILD_COOLDOWN_MIN, config.WILD_COOLDOWN_MAX)
+    """다음 풀숲 시각을 다시 잡는다. 버닝 부스터가 켜져 있으면 2~3분 (2.1.1 - main._cooldown 과 같은 함수)."""
+    from . import boosts
+    secs = boosts.cooldown(uid, deps.RNG)
     at = (_now() + datetime.timedelta(seconds=secs)).isoformat()
     db.run("INSERT INTO wild_state (user_id, next_at) VALUES (?,?)"
            " ON CONFLICT(user_id) DO UPDATE SET next_at=?", (uid, at, at))

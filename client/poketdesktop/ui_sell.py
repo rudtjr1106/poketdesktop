@@ -17,6 +17,12 @@
 
 숫자 칸을 직접 고치게 하면 키보드를 오가야 한다. `-` 와 `+`, 그리고 '전부'
 로 정한다. 줄을 누르면 하나 올라간다 - 몇 개씩만 파는 것이 흔해서다.
+
+## 판매 제외 (2.1.1, 게시판 #426)
+
+줄마다 [−] 왼쪽의 별(☆/★)을 누르면 그 도구는 '판매 제외' 다. '전부 고르기' 에서 빠지고, 별을 풀기 전에는
++ · 전부 · 줄 누르기도 안 먹는다 (아끼는 도구가 한꺼번에 팔릴까 봐 일일이 확인하던 것). 목록은 앱 설정
+sellKeep 에 남는다 - 서버는 모른다 (취향이다).
 """
 import tkinter as tk
 
@@ -56,11 +62,17 @@ def sellable(items, bag):
 class SellMany(object):
     """고른 것을 (도구, 개수) 목록으로 돌려준다. 그만두면 None."""
 
-    def __init__(self, parent, root, items, bag, money=0):
+    KEEP_TEXT = "★ 를 누르면 판매 제외 - '전부 고르기' 에서 빠지고 못 팝니다."
+    KEPT_SAY = "판매 제외한 도구입니다. ★ 를 다시 누르면 팔 수 있습니다."
+
+    def __init__(self, parent, root, items, bag, money=0, keep=None, on_keep=None):
         self.root = root
         self.result = None
         self.rows = {}           # 도구 id -> (틀, 개수 라벨, 있는 수, 값)
         self.pick = {}           # 도구 id -> 팔 개수
+        self.keep = set(keep or ())  # 판매 제외 (별표) 도구 id
+        self.on_keep = on_keep       # 별을 켜고 끌 때 (판매 제외 집합) - 설정에 적는다
+        self.stars = {}              # 도구 id -> 별 라벨 (기본 테마)
         self.lines = sellable(items, bag)
         self.money = int(money or 0)
 
@@ -84,6 +96,8 @@ class SellMany(object):
         f.pack(fill="both", expand=True, padx=16, pady=(12, 12))
         tk.Label(f, text="팔 물건과 개수를 고르세요. 판 물건은 되돌릴 수 없습니다.",
                  bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, anchor="w").pack(fill="x")
+        tk.Label(f, text=self.KEEP_TEXT, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS,
+                 anchor="w").pack(fill="x")
 
         # 단추를 먼저 담는다 (굴러가는 칸이 자리를 다 먹지 않게 - ui_learn 과 같다).
         foot = tk.Frame(f, bg=U.BG)
@@ -142,6 +156,10 @@ class SellMany(object):
         cnt.pack(side="right", padx=2)
         U.ghost_button(f, "−", (lambda i=it["id"]: self._add(i, -1)),
                        height=26).pack(side="right")
+        star = tk.Label(f, text="☆", bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_B, cursor="hand2", padx=6)
+        star.pack(side="right", padx=(0, 4))
+        star.bind("<Button-1>", lambda _e, i=it["id"]: self.toggle_keep(i))
+        self.stars[it["id"]] = star
 
         # 줄을 누르면 하나씩 올라간다. 몇 개만 파는 일이 흔하다.
         for w in (f, name, note):
@@ -158,6 +176,10 @@ class SellMany(object):
             n = self.pick.get(iid, 0)
             cnt.configure(text=str(n), fg=U.ACCENT_TEXT if n else U.FG_FAINT)
             f.configure(highlightbackground=U.ACCENT if n else U.LINE)
+            star = self.stars.get(iid)
+            if star is not None:
+                kept = iid in self.keep
+                star.configure(text="★" if kept else "☆", fg=U.ACCENT if kept else U.FG_FAINT)
         if pieces:
             self.total.configure(
                 text="%d가지 %d개  ·  %s원" % (len(self.pick), pieces, won(total)),
@@ -168,9 +190,34 @@ class SellMany(object):
         self.ok_btn.configure(text="팔기" if not pieces else "%s원에 팔기" % won(total))
 
     # ---------------- 고르기 ----------------
+    def toggle_keep(self, iid):
+        """판매 제외 별을 켜고 끈다. 켜면 그 도구는 고른 것에서도 빠진다."""
+        if iid not in self.rows:
+            return
+        if iid in self.keep:
+            self.keep.discard(iid)
+        else:
+            self.keep.add(iid)
+            self.pick.pop(iid, None)
+        if self.on_keep:
+            try:
+                self.on_keep(frozenset(self.keep))
+            except Exception:                               # noqa: BLE001
+                pass
+        self._paint()
+
+    def _kept(self, iid):
+        """판매 제외면 알리고 True (고르기가 안 먹는다)."""
+        if iid in self.keep:
+            self.total.configure(text=self.KEPT_SAY, fg=U.ACCENT)
+            return True
+        return False
+
     def _add(self, iid, d):
         got = self.rows.get(iid)
         if not got:
+            return
+        if d > 0 and self._kept(iid):
             return
         have = got[2]
         n = max(0, min(have, self.pick.get(iid, 0) + d))
@@ -179,6 +226,8 @@ class SellMany(object):
     def _set(self, iid, n):
         got = self.rows.get(iid)
         if not got:
+            return
+        if (n is None or n > 0) and self._kept(iid):
             return
         self._put(iid, got[2] if n is None else max(0, min(got[2], n)))
 
@@ -191,6 +240,9 @@ class SellMany(object):
 
     def _all(self):
         for iid, (_f, _c, have, _p) in self.rows.items():
+            if iid in self.keep:                 # 판매 제외는 빼고
+                self.pick.pop(iid, None)
+                continue
             self.pick[iid] = have
         self._paint()
 
@@ -224,9 +276,10 @@ class SellMany(object):
         return self.result
 
 
-def ask_sell_many(parent, root, items, bag, money=0):
-    """고른 것을 [{"item", "count"}] 로 돌려준다. 그만두면 None."""
-    return SellMany(parent, root, items, bag, money).show()
+def ask_sell_many(parent, root, items, bag, money=0, keep=None, on_keep=None):
+    """고른 것을 [{"item", "count"}] 로 돌려준다. 그만두면 None. keep = 판매 제외 도구 id,
+    on_keep(집합) = 별을 켜고 끌 때 (설정에 적는다)."""
+    return SellMany(parent, root, items, bag, money, keep=keep, on_keep=on_keep).show()
 
 
 def summary(lines, items):

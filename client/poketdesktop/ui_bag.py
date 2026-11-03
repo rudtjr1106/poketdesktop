@@ -31,6 +31,7 @@ from common import pokelogic as P
 from common import tint as T
 from common.korean import natural
 
+from . import config
 from . import sprite_cache, sprites
 from . import ui_box
 from . import item_icons
@@ -69,9 +70,11 @@ CAT_COLOR = {"megastone": "#a98bff", "zcrystal": "#ffd23c", "form": "#5fd3c6", "
 # "form" (1.13) 은 폼 도구 - 고르는 도구(로토무카탈로그·운석)는 쓰기 전에 모습을 한 번 더 묻는다.
 # "tmticket" (1.13.1) 은 랭크 시즌 보상인 기술머신 뽑기권 - 타입 확정은 쓰기 전에 타입을 묻는다.
 # "deco" (버전 2) 는 꾸미기 - /api/deco/equip 으로 씌우고 뺀다. "decopick" 은 참가 묶음 선택권 (묶음을 고른다).
-USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket", "form", "tmticket", "deco", "decopick")
+# "lure" · "burn" (2.1.1) 은 타입 스프레이 · 버닝 부스터 (풀숲), "rename" 은 닉네임 변경권.
+USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket", "form", "tmticket", "deco", "decopick",
+          "lure", "burn", "rename")
 # **대상 포켓몬이 없는 도구.** 고를 것이 없으니 목록을 띄우지 않고 바로 쓴다.
-NO_TARGET = ("ticket", "tmticket", "decopick")
+NO_TARGET = ("ticket", "tmticket", "decopick", "lure", "burn", "rename")
 
 ROW_BG = "#10131c"      # 목록 한 줄 바탕
 SEL_BG = "#2b2417"      # 고른 줄
@@ -100,27 +103,32 @@ def fetch_shop(api):
     return api._call("GET", "/api/shop")
 
 
-def use_item(api, item_id, pid, stat, hour, form="", tm_type=""):
+def use_item(api, item_id, pid, stat, hour, form="", tm_type="", name=""):
     """도구를 쓴다. 시각(hour)은 **이 PC 기준**으로 반드시 같이 보낸다.
 
     서버는 도커 안에서 UTC 로 돌기 때문에 사용자의 밤낮을 스스로 알 수 없다.
     (이브이의 밤 진화처럼 시각을 보는 조건이 있다.)
-    form 은 폼 도구(1.13)에서만 - 고른 모습. tm_type 은 타입 확정 기술머신 뽑기권(1.13.1)에서만.
+    form 은 폼 도구(1.13)에서만 - 고른 모습. tm_type 은 타입 확정 기술머신 뽑기권(1.13.1) · 타입 스프레이(2.1.1)
+    에서만 - 고른 타입. name 은 닉네임 변경권(2.1.1)에서만 - 새 닉네임.
     """
     fn = getattr(api, "use_item", None)
     if fn is not None and _takes(fn, "hour") and (_takes(fn, "form") or not form) \
-            and (_takes(fn, "tm_type") or not tm_type):
+            and (_takes(fn, "tm_type") or not tm_type) and (_takes(fn, "name") or not name):
         kw = {"hour": hour}
         if form:
             kw["form"] = form
         if tm_type:
             kw["tm_type"] = tm_type
+        if name:
+            kw["name"] = name
         return fn(item_id, pid, stat or "", **kw)
     body = {"item": item_id, "pokemon": pid, "stat": stat or "", "hour": hour}
     if form:
         body["form"] = form
     if tm_type:
         body["type"] = tm_type
+    if name:
+        body["name"] = name
     return api._call("POST", "/api/bag/use", body)
 
 
@@ -263,11 +271,91 @@ def item_desc(item):
         # 랜덤 뽑기권은 2.0.2 부터 길드전 결산 보상으로도 받는다 (타입 확정은 랭크 챔피언 것 그대로)
         return out + ("\n\n%s 받는다. 가진 기술머신은 나오지 않는다 - 뽑을 것이 없으면 쓸 수 없고 표는 남는다."
                       % ("랭크 시즌 보상으로만" if eff.get("pickType") else "랭크 시즌 보상과 길드전 보상으로"))
+    if kind in ("lure", "burn"):
+        out = boost_text(item) + "\n\n" + boost_note(item)
+        if item.get("boostNow"):
+            out += "\n\n" + item["boostNow"]
+        return out
+    if kind == "rename":
+        return RENAME_TEXT + "\n\n" + RENAME_NOTE
     if kind == "ball":
         return "야생 포켓몬을 만났을 때 던지는 볼이다. 가방에서는 쓸 수 없다."
     if kind == "sell":
         return "쓸 데는 없지만 상점에 팔면 값을 쳐준다."
     return "아직 쓸 수 없는 도구다."
+
+
+# ---------------------------------------------------------------- 풀숲 부스트 · 닉네임 변경권 (2.1.1)
+# 상점(ui_shop.effect_text/effect_note)도 이 글을 쓴다. 3시간 = 서버 boosts.MAX_LEFT_MIN.
+BOOST_MAX_KR = "3시간"
+RENAME_TEXT = "닉네임을 한 번 바꾼다."
+RENAME_NOTE = ("닉네임은 로그인 아이디이기도 해서 다음 로그인부터는 새 닉네임으로 들어온다 (비밀번호는 그대로). "
+               "게시판 글 · 댓글 · 길드 채팅의 이름도 함께 바뀌고, 지난 대전 · 레이드 기록은 그때 이름으로 남는다. "
+               "운영자 계정은 쓸 수 없다.")
+
+
+def left_kr(secs):
+    """남은 초 -> '1시간 20분' · '42분' (서버 item_routes._left_kr 와 같은 꼴)."""
+    m = (max(0, int(secs or 0)) + 59) // 60
+    if m >= 60:
+        return "%d시간 %d분" % (m // 60, m % 60) if m % 60 else "%d시간" % (m // 60)
+    return "%d분" % m
+
+
+def boost_text(item):
+    """타입 스프레이 · 버닝 부스터가 하는 일 한 줄."""
+    eff = (item or {}).get("effect") or {}
+    span = left_kr(int(eff.get("minutes") or 60) * 60)
+    if eff.get("kind") == "lure":
+        return "%s 동안 고른 타입의 포켓몬이 풀숲에 훨씬 자주 나온다 (둘에 하나 넘게). 쓸 때 타입을 고른다." % span
+    return "%s 동안 풀숲이 2~3분마다 돋는다 (보통은 5~7분)." % span
+
+
+def boost_note(item):
+    """덧말: 겹쳐 쓰면 어떻게 되는지."""
+    if ((item or {}).get("effect") or {}).get("kind") == "lure":
+        return ("같은 타입으로 또 쓰면 남은 시간에 더해진다 (%s까지). 다른 타입을 쓰면 그 타입으로 바뀌고 "
+                "새로 시작한다. 풀숲이 돋는 간격은 그대로다 - 버닝 부스터와 함께 쓸 수 있다." % BOOST_MAX_KR)
+    return ("또 쓰면 남은 시간에 더해진다 (%s까지). 나오는 포켓몬은 그대로다 - 타입 스프레이와 함께 쓸 수 있다."
+            % BOOST_MAX_KR)
+
+
+def type_kr(t):
+    from .ui_tms import TYPE_KR            # ui_tms 가 이 모듈을 부르므로 여기서 늦게 부른다
+    return TYPE_KR.get(t, t or "?")
+
+
+def mark_boosts(items, boosts):
+    """켜져 있는 풀숲 부스트의 남은 시간을 그 도구에 적어 둔다 (item_desc 가 설명 끝에 붙인다).
+    boosts = 서버 /api/shop 의 {"burnLeft", "lureLeft", "lureType"} (옛 서버면 None)."""
+    b = boosts or {}
+    for it in items:
+        it.pop("boostNow", None)
+        kind = (it.get("effect") or {}).get("kind")
+        if kind == "burn" and int(b.get("burnLeft") or 0) > 0:
+            it["boostNow"] = "지금 켜져 있다: %s 남음" % left_kr(b["burnLeft"])
+        elif kind == "lure" and int(b.get("lureLeft") or 0) > 0 and b.get("lureType"):
+            it["boostNow"] = "지금 켜져 있다: %s 타입 · %s 남음" % (type_kr(b["lureType"]), left_kr(b["lureLeft"]))
+
+
+def renamed(app, name):
+    """닉네임이 바뀌었다 (닉네임 변경권). 앱 · 트레이 · 자동 로그인 세션 · 열린 마이페이지의 이름을 새 것으로.
+    세션 토큰은 user_id 에 묶여 있어 그대로 산다 - 로그인 창이 미리 채우는 이름만 바꾼다."""
+    app.username = name
+    try:
+        sess = config.load_session()
+        if sess.get("token"):
+            sess["username"] = name
+            config.save_session(sess)
+    except Exception as e:                                  # noqa: BLE001
+        config.log("닉네임 바뀜 - 세션 저장 실패: %s" % e)
+    for fn in (getattr(app, "refresh_tray", None),
+               getattr(getattr(app, "mypage_window", None), "refresh", None)):
+        if fn is not None:
+            try:
+                fn()
+            except Exception:                               # noqa: BLE001
+                pass
 
 
 def form_desc(item):
@@ -633,6 +721,7 @@ class BagWindow(object):
         self._mon_ids = set()
         self._view = []          # 오른쪽 목록에 보이는 포켓몬 - 찾는 말로 거르고 줄 세운 것 (1.13.1)
         self.tm_left = None      # {타입: 아직 없는 기술머신 수} - 타입 확정 뽑기권이 있을 때만 온다 (1.13.1)
+        self.boosts = {}         # 켜져 있는 풀숲 부스트 {"burnLeft", "lureLeft", "lureType"} (2.1.1)
         self.deco_worn = {}      # {포켓몬id: {칸: 열쇠}} - 꾸미기 (버전 2, deco_items)
         self.item_sort = "name"  # 도구 목록 순서 (ITEM_SORTS). 다시 불러와도 그대로다 (1.13.4)
 
@@ -982,6 +1071,8 @@ class BagWindow(object):
         self.bag.update(d_bag)
         self.money = int(shop.get("money") or 0)
         self.tm_left = shop.get("tmLeft")
+        self.boosts = shop.get("boosts") or {}
+        mark_boosts(self.items, self.boosts)
         self.mons = mons or []
         self._mon_ids = set(m["id"] for m in self.mons)
         self.photos = {}
@@ -1548,7 +1639,15 @@ class BagWindow(object):
 
         if not self.items:
             return self.say("가방을 아직 불러오지 못했습니다.", U.DANGER, U.DANGER)
-        lines = ask_sell_many(self.win, self.root, self.items, self.bag, self.money)
+        settings = getattr(self.app, "settings", None)
+
+        def on_keep(keep):
+            if settings is None:
+                return
+            settings["sellKeep"] = sorted(keep)            # 새 리스트로 갈아 끼운다 (DEFAULTS 를 안 건드리게)
+            config.save_settings(settings)
+        lines = ask_sell_many(self.win, self.root, self.items, self.bag, self.money,
+                              keep=config.sell_keep(settings or {}), on_keep=on_keep)
         if not lines:
             return
         if not ui_box.confirm(self.win, "여러 개 팔기",
@@ -1728,10 +1827,63 @@ class BagWindow(object):
             self.reload()
         U.run_async(self.root, lambda: api.deco_pick(bundle), done)
 
+    def _ask_lure_type(self, it):
+        """타입 스프레이: 어느 타입을 부를지 (2.1.1). 고른 타입, 그만두면 None.
+        켜져 있는 타입에는 남은 시간을 적는다 - 다른 타입을 고르면 그 시간은 사라진다고 미리 말한다."""
+        from .ui_tms import TYPE_KR
+        b = self.boosts or {}
+        cur = b.get("lureType") if int(b.get("lureLeft") or 0) > 0 else None
+        opts = [(t, kr, ("켜져 있음 · %s 남음" % left_kr(b["lureLeft"])) if t == cur else None)
+                for t, kr in TYPE_KR.items() if t != "STELLAR"]
+        msg = "어느 타입을 부를까요? 고른 타입의 포켓몬이 풀숲에 훨씬 자주 나옵니다."
+        if cur:
+            msg += (" 지금은 %s 타입이 켜져 있습니다 - 같은 타입이면 시간이 더해지고, 다른 타입을 고르면 "
+                    "남은 시간은 사라지고 새 타입으로 시작합니다." % type_kr(cur))
+        return ui_box.ask_choice(self.win, it["kr"], msg, opts)
+
+    def _use_rename(self, it):
+        """닉네임 변경권 (2.1.1): 새 닉네임을 묻고 한 번 더 확인한 뒤 바꾼다."""
+        old = getattr(self.app, "username", "") or ""
+        name = ui_box.ask_text(
+            self.win, it["kr"],
+            "새 닉네임을 적어 주세요. 닉네임은 로그인 아이디이기도 해서 다음에 로그인할 때는 새 닉네임으로 "
+            "들어옵니다 (비밀번호는 그대로).",
+            hint="2~12자 · 한글 · 영문 · 숫자와 _ - . 만. 게시판 글 · 댓글 · 길드 채팅의 이름도 함께 바뀝니다.",
+            initial=old)
+        name = " ".join((name or "").split())
+        if not name or name == old:
+            return
+        if not ui_box.confirm(self.win, it["kr"],
+                              "닉네임을 '%s'(으)로 바꿀까요?\n변경권 한 장이 없어지고, 다음 로그인부터 '%s'(으)로 "
+                              "들어옵니다." % (name, name), danger=False, ok_text="바꾸기"):
+            return
+        api = self.app.api
+        item_id = it["id"]
+        hour = datetime.datetime.now().hour
+        self.use_btn.configure(state="disabled")
+        self.say("닉네임을 바꾸는 중...", U.FG_FAINT)
+
+        def done(r, err):
+            if err:
+                if self.alive:
+                    self.say(getattr(err, "message", str(err)), U.DANGER, U.DANGER)
+                    self._refresh_button()
+                return
+            r = r or {}
+            renamed(self.app, r.get("username") or name)   # 가방을 닫았어도 앱의 이름은 바꾼다
+            if not self.alive:
+                return
+            self._pending = (r.get("message") or "닉네임을 바꿨다.", U.GOOD)
+            self.reload()
+        U.run_async(self.root, lambda: use_item(api, item_id, 0, "", hour, name=name), done)
+
     def _use_no_target(self, it):
-        """대상이 없는 도구(뽑기권). 포켓몬을 안 고르고 바로 쓴다."""
-        if (it.get("effect") or {}).get("kind") == "decopick":
+        """대상이 없는 도구(뽑기권 · 풀숲 부스트 · 닉네임 변경권). 포켓몬을 안 고르고 바로 쓴다."""
+        kind = (it.get("effect") or {}).get("kind")
+        if kind == "decopick":
             return self._use_deco_pick(it)
+        if kind == "rename":
+            return self._use_rename(it)
         api = self.app.api
         item_id = it["id"]
         eff = it.get("effect") or {}
@@ -1740,11 +1892,20 @@ class BagWindow(object):
             tm_type = self._ask_tm_type(it)
             if not tm_type:
                 return                              # 창을 닫았다
+        if kind == "lure":
+            tm_type = self._ask_lure_type(it)       # 고른 타입은 뽑기권과 같은 칸(type)으로 간다
+            if not tm_type:
+                return
         hour = datetime.datetime.now().hour
         self.use_btn.configure(state="disabled")
         self.say("%s을(를) 쓰는 중..." % it["kr"], U.FG_FAINT)
 
         def done(r, err):
+            if not err and kind in ("lure", "burn"):
+                # 버닝은 서버가 다음 풀숲 시각을 당겼다 - 예전 시각으로 걸어 둔 확인을 다시 건다 (가방을 닫았어도)
+                wild = getattr(self.app, "wild", None)
+                if wild is not None:
+                    wild.check()
             if not self.alive:
                 return
             if err:

@@ -116,6 +116,30 @@ def main():
     d2.cancel_btn.invoke()
     chk("닫기는 None", d2.result is None and not d2.win.winfo_exists(), d2.result)
 
+    # 판매 제외 별 (2.1.1, 게시판 #426): − 칸 바로 왼쪽의 별을 누르면 켜고 끈다
+    from poketdesktop.skins.dp import sell as DS
+    saved = []
+    dk = ui_sell.SellMany(host, root, ITEMS, BAG, money=0, keep={"PEARL"}, on_keep=saved.append)
+    root.update()
+    dk.vl.refresh()
+    root.update()
+    stars = [dk.vl.cv.itemcget(i, "text") for i in dk.vl.cv.find_all() if dk.vl.cv.type(i) == "text"
+             and dk.vl.cv.itemcget(i, "text") in ("★", "☆")]
+    chk("DP: 줄마다 별 (판매 제외는 ★)", sorted(stars) == ["★", "☆"], stars)
+    dk.all_btn.invoke()
+    chk("DP: 전부 고르기는 판매 제외를 뺀다", "PEARL" not in dk.pick and dk.pick.get("STARDUST") == 3, dk.pick)
+    w = dk.vl.cv.winfo_width()
+    sx = sum(DS._star(w)) // 2
+    dk._click("STARDUST", sx, 10, w)
+    chk("DP: 별 칸을 누르면 판매 제외가 켜지고 고른 것에서 빠진다 (설정 콜백)", "STARDUST" not in dk.pick
+        and saved and "STARDUST" in saved[-1], (dk.pick, saved[-1:]))
+    click(dk, "STARDUST", "row")
+    chk("DP: 판매 제외 줄은 줄 누르기도 안 먹는다", "STARDUST" not in dk.pick, dk.pick)
+    dk._click("STARDUST", sx, 10, w)
+    click(dk, "STARDUST", "row")
+    chk("DP: 별을 다시 누르면 풀린다", dk.pick.get("STARDUST") == 1 and "STARDUST" not in saved[-1], dk.pick)
+    dk.cancel_btn.invoke()
+
     d3 = ui_sell.SellMany(host, root, [], {}, money=0)
     root.update()
     texts = [d3.vl.cv.itemcget(i, "text") for i in d3.vl.cv.find_all() if d3.vl.cv.type(i) == "text"]

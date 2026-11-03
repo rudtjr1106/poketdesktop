@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from common import korean
 from common import pokelogic as P
 
-from . import config, db, deps, eggs, evolution, items, tms
+from . import boosts, config, db, deps, eggs, evolution, items, rename, tms
 
 router = APIRouter()
 
@@ -51,7 +51,8 @@ class UseIn(BaseModel):
     stat: str = ""       # 은색병뚜껑처럼 능력을 골라야 하는 것
     hour: int = -1       # 클라이언트의 시각 (낮/밤 조건용)
     form: str = ""       # 폼 도구로 고르는 모습 (로토무카탈로그·운석, 1.13). 빈 글자 = 원래 모습
-    type: str = ""       # 타입 확정 기술머신 뽑기권으로 고른 타입 (1.13.1)
+    type: str = ""       # 타입 확정 기술머신 뽑기권 · 타입 스프레이(2.1.1)로 고른 타입
+    name: str = ""       # 닉네임 변경권으로 바꿀 닉네임 (2.1.1)
 
 
 def _now():
@@ -106,6 +107,8 @@ def shop(me=Depends(deps.current)):
     if any(bag.get(i, 0) > 0 for i, it in items.catalog().items()
            if (it.get("effect") or {}).get("kind") == "tmticket"):
         out["tmLeft"] = tm_left(u["id"])
+    # 타입 스프레이 · 버닝 부스터가 켜져 있으면 가방 설명에 남은 시간을 적는다 (2.1.1)
+    out["boosts"] = boosts.state(u["id"])
     return out
 
 
@@ -247,6 +250,13 @@ def use(body: UseIn, me=Depends(deps.current)):
         out["message"] = korean.natural(out.get("message", ""))
         return out
 
+    # 풀숲 부스트 · 닉네임 변경권 (2.1.1) - 이것도 대상이 없다
+    if kind in ("lure", "burn", "rename"):
+        out = {"lure": _use_lure, "burn": _use_burn, "rename": _use_rename}[kind](uid, it, eff, body)
+        out.update(_wallet(uid))
+        out["message"] = korean.natural(out.get("message", ""))
+        return out
+
     mon = _mon(uid, body.pokemon) if body.pokemon else None
     if mon is None:
         raise HTTPException(400, "어느 포켓몬에게 쓸지 골라 주세요.")
@@ -375,6 +385,62 @@ def tm_left(uid):
         if no not in have:
             out[t["type"]] = out.get(t["type"], 0) + 1
     return out
+
+
+def _left_kr(secs):
+    m = int((secs + 59) // 60)
+    return ("%d시간 %d분" % (m // 60, m % 60) if m % 60 else "%d시간" % (m // 60)) if m >= 60 else "%d분" % m
+
+
+def _use_lure(uid, it, eff, body):
+    """타입 스프레이 (2.1.1, 게시판 #426): 고른 타입이 풀숲에 훨씬 자주 나온다 (boosts). 거절할 일을 다 본 뒤 뺀다."""
+    want = (body.type or "").strip().upper()
+    types = deps.dex().raw.get("types") or {}
+    if not want:
+        raise HTTPException(400, "어느 타입을 부를지 골라 주세요.")
+    if want not in types or want == "STELLAR":
+        raise HTTPException(400, "그런 타입은 없습니다.")
+    minutes = int(eff.get("minutes") or 60)
+    s = boosts.state(uid)
+    if s["lureType"] == want and not boosts.room(s["lureLeft"], minutes):
+        raise HTTPException(409, "이미 %s 남아 있습니다 (%d시간까지만 쌓입니다)."
+                            % (_left_kr(s["lureLeft"]), boosts.MAX_LEFT_MIN // 60))
+    if not items.bag_take(uid, it["id"], 1):
+        raise HTTPException(400, "%s이(가) 없습니다." % it["kr"])
+    try:
+        secs = boosts.lure(uid, want, minutes)
+    except Exception:                                       # noqa: BLE001
+        items.bag_add(uid, it["id"], 1)
+        raise
+    kr = types.get(want, {}).get("kr") or want
+    return {"ok": True, "won": True, "boosts": boosts.state(uid),
+            "message": "앞으로 %s 동안 %s 타입 포켓몬이 풀숲에 훨씬 자주 나타난다!" % (_left_kr(secs), kr)}
+
+
+def _use_burn(uid, it, eff, body):
+    """버닝 부스터 (2.1.1): 풀숲이 2~3분마다 돋는다 (boosts). 이미 잡힌 다음 풀숲 시각도 당긴다."""
+    minutes = int(eff.get("minutes") or 60)
+    s = boosts.state(uid)
+    if not boosts.room(s["burnLeft"], minutes):
+        raise HTTPException(409, "이미 %s 남아 있습니다 (%d시간까지만 쌓입니다)."
+                            % (_left_kr(s["burnLeft"]), boosts.MAX_LEFT_MIN // 60))
+    if not items.bag_take(uid, it["id"], 1):
+        raise HTTPException(400, "%s이(가) 없습니다." % it["kr"])
+    try:
+        secs = boosts.burn(uid, minutes, deps.RNG)
+    except Exception:                                       # noqa: BLE001
+        items.bag_add(uid, it["id"], 1)
+        raise
+    return {"ok": True, "won": True, "boosts": boosts.state(uid),
+            "message": "앞으로 %s 동안 풀숲이 2~3분마다 돋는다!" % _left_kr(secs)}
+
+
+def _use_rename(uid, it, eff, body):
+    """닉네임 변경권 (2.1.1). 검사 · 표 빼기 · 이름 바꾸기가 한 트랜잭션이다 (rename.apply)."""
+    got = rename.apply(uid, body.name)
+    return {"ok": True, "won": True, "username": got["username"],
+            "message": "닉네임이 '%s' 이(가) 되었습니다. 다음에 로그인할 때는 새 닉네임을 쓰세요 (비밀번호는 그대로)."
+                       % got["username"]}
 
 
 def _use_tm_ticket(uid, it, eff, want):

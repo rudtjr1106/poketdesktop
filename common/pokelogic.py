@@ -539,10 +539,13 @@ class Pokedex(object):
 
         boost 는 (타입들, 배수) - 그 타입이 하나라도 있는 종의 가중치를 배수만큼 곱한다
         (할로윈 고스트, 서버 halloween.py). 나오는 종은 그대로고 비율만 바뀐다.
+        **배수가 0 이면 그 타입 종만** 남긴다 (타입 스프레이, 서버 boosts.py). 그때는 종족값 상한을 풀지 않는다 -
+        비면 빈 표를 돌려주고, 부르는 쪽이 평소 표로 다시 뽑는다.
         """
         key = (int(max_level), int(max_bst) if max_bst else 0, boost)
         if key in self._pool_cache:
             return self._pool_cache[key]
+        only = bool(boost) and not boost[1]
         pool, cum, total = [], [], 0
         for s in self.species:
             if not s.get("spawnable") or s.get("minLevel", 1) > max_level:
@@ -550,12 +553,15 @@ class Pokedex(object):
             if max_bst and self.bst(s) > max_bst:
                 continue
             w = s.get("weight", 0)
-            if boost and set(boost[0]) & set(s.get("types") or ()):
+            hit = bool(boost) and bool(set(boost[0]) & set(s.get("types") or ()))
+            if only and not hit:
+                continue
+            if hit and not only:
                 w *= boost[1]
             total += w
             pool.append(s)
             cum.append(total)
-        if not pool and max_bst:            # 너무 좁으면 상한을 풀어준다
+        if not pool and max_bst and not only:   # 너무 좁으면 상한을 풀어준다
             return self.spawn_pool(max_level, None, boost)
         self._pool_cache[key] = (pool, cum, total)
         return pool, cum, total

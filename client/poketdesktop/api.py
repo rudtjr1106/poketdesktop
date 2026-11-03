@@ -1010,15 +1010,17 @@ class Api(object):
                           body={"pokemon": int(pokemon), "move": move,
                                 "forget": forget}, timeout=LEARN_TIMEOUT)
 
-    def use_item(self, item, pokemon=0, stat="", hour=None, form="", tm_type=""):
-        """form = 폼 도구로 고른 모습 (1.13), tm_type = 타입 확정 기술머신 뽑기권으로 고른 타입 (1.13.1).
-        옛 서버는 모르는 칸을 무시한다."""
+    def use_item(self, item, pokemon=0, stat="", hour=None, form="", tm_type="", name=""):
+        """form = 폼 도구로 고른 모습 (1.13), tm_type = 타입 확정 기술머신 뽑기권 · 타입 스프레이로 고른 타입
+        (1.13.1 · 2.1.1), name = 닉네임 변경권으로 바꿀 닉네임 (2.1.1). 옛 서버는 모르는 칸을 무시한다."""
         body = {"item": item, "pokemon": pokemon, "stat": stat,
                 "hour": _hour() if hour is None else hour}
         if form:
             body["form"] = form
         if tm_type:
             body["type"] = tm_type
+        if name:
+            body["name"] = name
         return self._call("POST", "/api/bag/use", body)
 
 

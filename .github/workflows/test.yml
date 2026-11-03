@@ -283,6 +283,7 @@ jobs:
           python client/test_topmost.py
           python client/test_area.py
           python client/test_sell_many.py
+          python client/test_auto_throw.py     # 2.1.1: 잡힐 때까지 계속 던지기 (#425)
       # 배틀 장면이 창 밖으로 잘리고, 트레이너 카드의 '도전하기' 가 통째로
       # 잘려 있었다. 글꼴이 다른 두 OS 에서 다 재 본다.
       - name: 관장 지도·배틀 창 (진짜 Tk)
@@ -334,6 +335,9 @@ jobs:
       # 1.13.1: 랭크 시즌 보상 - 기술머신 뽑기권(타입 고르기) · 랭킹 탭 보상 표(관장 등록은 글로만)
       - name: 기술머신 뽑기권·랭크 보상 표 화면 (진짜 Tk)
         run: python client/test_reward_tickets.py
+      # 2.1.1: 타입 스프레이(타입 고르기) · 버닝 부스터 · 닉네임 변경권(이름 묻기 · 세션 이름)
+      - name: 풀숲 부스트·닉네임 변경권 가방 화면 (진짜 Tk)
+        run: python client/test_boost_items.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
         run: python client/test_dual_monitor.py
@@ -464,6 +468,7 @@ jobs:
           python client/test_topmost.py
           python client/test_area.py
           python client/test_sell_many.py
+          python client/test_auto_throw.py     # 2.1.1: 잡힐 때까지 계속 던지기 (#425)
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
       # 레이드 탭·배틀 창·바탕화면 빛기둥. 여섯 명이 한 화면에 들어가는지 본다.
@@ -510,6 +515,9 @@ jobs:
       # 1.13.1: 랭크 시즌 보상 - 기술머신 뽑기권(타입 고르기) · 랭킹 탭 보상 표(관장 등록은 글로만)
       - name: 기술머신 뽑기권·랭크 보상 표 화면 (진짜 Tk)
         run: python client/test_reward_tickets.py
+      # 2.1.1: 타입 스프레이(타입 고르기) · 버닝 부스터 · 닉네임 변경권(이름 묻기 · 세션 이름)
+      - name: 풀숲 부스트·닉네임 변경권 가방 화면 (진짜 Tk)
+        run: python client/test_boost_items.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
         run: python client/test_dual_monitor.py
@@ -675,6 +683,9 @@ jobs:
           python test_forms.py           # 1.13: 폼 도구 (켜고 끄기·고르기·꽃꿀)
           python test_errors.py          # 1.13.1: 서버 오류 기록에 문구·역추적이 남는다
           python test_tm_ticket.py       # 1.13.1: 랭크 보상 - 기술머신 뽑기권
+          python test_boosts.py          # 2.1.1: 타입 스프레이 · 버닝 부스터 (풀숲 간격 · 출현)
+          python test_rename.py          # 2.1.1: 닉네임 변경권 (규칙 · 한 트랜잭션 · 로그인)
+          python test_client_ip.py       # 2.1.1: cf-connecting-ip 는 Cloudflare 가 앞에 있을 때만 믿는다 (IP 위조)
           python test_move_needs.py      # 기술이 걸린 것(전용 Z · 기술 메가 · 기술 폼 · 기술 진화)을 배울 수 있다 (#277)
           python test_gimmick.py
           python test_season4.py

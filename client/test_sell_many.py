@@ -114,6 +114,31 @@ def main():
     d2._cancel()
     chk("닫으면 None", d2.result is None, d2.result)
 
+    print("\n=== 판매 제외 별 (2.1.1, 게시판 #426)")
+    saved = []
+    dk = ui_sell.SellMany(root, root, ITEMS, BAG, money=0, keep={"PEARL"}, on_keep=saved.append)
+    root.update()
+    chk("넘겨준 판매 제외는 ★, 나머지는 ☆", dk.stars["PEARL"].cget("text") == "★"
+        and dk.stars["STARDUST"].cget("text") == "☆", [dk.stars[i].cget("text") for i in dk.stars])
+    dk._all()
+    chk("'전부 고르기' 는 판매 제외를 빼고 고른다", "PEARL" not in dk.pick and dk.pick.get("STARDUST") == 3, dk.pick)
+    dk._add("PEARL", 1)
+    dk._set("PEARL", None)
+    chk("판매 제외는 + · 전부가 안 먹고 까닭을 적는다", "PEARL" not in dk.pick
+        and "판매 제외" in dk.total.cget("text"), dk.total.cget("text"))
+    dk.toggle_keep("STARDUST")
+    chk("별을 켜면 고른 것에서도 빠지고 설정 콜백이 불린다", "STARDUST" not in dk.pick
+        and saved and saved[-1] == frozenset({"PEARL", "STARDUST"}), (dk.pick, saved[-1:]))
+    dk.toggle_keep("PEARL")
+    dk._add("PEARL", 2)
+    chk("별을 풀면 다시 팔 수 있다", dk.pick.get("PEARL") == 2 and saved[-1] == frozenset({"STARDUST"}),
+        (dk.pick, saved[-1:]))
+    dk._cancel()
+    from poketdesktop import config
+    chk("설정 sellKeep 읽기: 리스트가 아니거나 글이 아닌 것은 버린다",
+        config.sell_keep({"sellKeep": ["pearl", 3, " ", "STARDUST"]}) == frozenset({"PEARL", "STARDUST"})
+        and config.sell_keep({"sellKeep": "PEARL"}) == frozenset() and config.sell_keep({}) == frozenset())
+
     d3 = ui_sell.SellMany(root, root, [], {}, money=0)
     root.update()
     texts = []

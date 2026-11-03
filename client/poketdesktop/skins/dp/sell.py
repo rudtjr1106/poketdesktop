@@ -58,6 +58,12 @@ def _geo(w):
     return dn, cnt, up, allb
 
 
+def _star(w):
+    """판매 제외 별 칸 (− 칸 바로 왼쪽, 2.1.1). 왼쪽 끝은 줄 누르기 자리라 비워 둔다."""
+    dn = _geo(w)[0]
+    return (dn[0] - U.h(8) - U.h(28), dn[0] - U.h(8))
+
+
 class SellMany(S.SellMany):
     # ---------------- 짓기 ----------------
     def _build(self):
@@ -112,7 +118,7 @@ class SellMany(S.SellMany):
         if w <= 1:
             return
         cv.delete("all")
-        msg = "팔 물건과 개수를 고르세요. 판 물건은 되돌릴 수 없습니다."
+        msg = "팔 물건과 개수를 고르세요. 판 물건은 되돌릴 수 없습니다.\n" + self.KEEP_TEXT
         th = K.text_height(cv, msg, font(10), w)
         K.text(cv, 0, 0, msg, font(10), fill=INK2, width=w)
         by = th + s(6)
@@ -161,6 +167,7 @@ class SellMany(S.SellMany):
         _f, _c, have, price = self.rows[iid]
         n = self.pick.get(iid, 0)
         on = n > 0
+        kept = iid in self.keep
         if on:
             cv.create_rectangle(x, y, x + w, y + h, fill=SEL, outline="", tags=tags)
         elif hov is not None:
@@ -175,21 +182,25 @@ class SellMany(S.SellMany):
             cv.create_image(left, cy, image=ph, anchor="w", tags=tags)
         tx = left + (s(32) if ph is not None else 0)
         dn, cnt, up, allb = _geo(w)
-        tw = max(s(40), dn[0] - s(8) - tx)
+        star = _star(w)
+        tw = max(s(40), star[0] - s(8) - tx)
         name = K.wrap(cv, it["kr"], font(11), tw).split("\n")
         K.text(cv, tx, cy - s(2), name[0] + ("…" if len(name) > 1 else ""), font(11),
                fill=INK, anchor="sw", tags=tags)
         K.text(cv, tx, cy + s(2), "%d개 있음 · 개당 %s원" % (have, S.won(price)), font(9), fill=INK2,
                anchor="nw", tags=tags, width=tw)
         by1, by2 = cy - s(BTN_H) // 2, cy + s(BTN_H) // 2
-        for box, name, ok in ((dn, "minus", n > 0), (up, "plus", n < have)):
+        # 판매 제외 별 (켜면 금빛 ★ - 전부 고르기 · + · 전부가 안 먹는다)
+        cv.create_text((star[0] + star[1]) // 2, cy, text="★" if kept else "☆",
+                       fill="#c08a10" if kept else FAINT, font=font(15), anchor="center", tags=tags)
+        for box, name, ok in ((dn, "minus", n > 0), (up, "plus", n < have and not kept)):
             self._flat(cv, box, by1, by2, ok, tags)
             cv.create_text((box[0] + box[1]) // 2, cy, text="−" if name == "minus" else "+",
                            fill=INK if ok else FAINT, font=font(14), tags=tags)
         K.panel(cv, cnt[0], by1, cnt[1], by2, tags=tags)
         K.text(cv, (cnt[0] + cnt[1]) // 2, cy, "×%02d" % n, font(11), fill=CUR if on else DIM, anchor="center",
                tags=tags)
-        ok = n < have
+        ok = n < have and not kept
         self._flat(cv, allb, by1, by2, ok, tags)
         cv.create_text((allb[0] + allb[1]) // 2, cy, text="전부", fill=INK if ok else FAINT, font=font(9),
                        anchor="center", tags=tags)
@@ -203,7 +214,10 @@ class SellMany(S.SellMany):
         if iid is None:
             return
         dn, cnt, up, allb = _geo(w)
-        if dn[0] <= x <= dn[1]:
+        star = _star(w)
+        if star[0] <= x <= star[1]:
+            self.toggle_keep(iid)
+        elif dn[0] <= x <= dn[1]:
             self._add(iid, -1)
         elif allb[0] <= x <= allb[1]:
             self._set(iid, None)
@@ -221,7 +235,9 @@ class SellMany(S.SellMany):
                 text="%d가지 %d개  ·  %s원" % (len(self.pick), pieces, S.won(total)), fg=U.ACCENT_TEXT)
         else:
             self.total.configure(text="고른 것이 없습니다.", fg=U.FG_DIM)
-        self.hint.configure(text="가진 돈 %s원" % S.won(self.money))
+        self.hint.configure(text="가진 돈 %s원" % S.won(self.money)
+                            + ("  ·  판매 제외 %d가지" % len(self.keep & set(self.rows)) if self.keep & set(self.rows)
+                               else ""))
         self.ok_btn.configure(text="팔기" if not pieces else "%s원에 팔기" % S.won(total))
         self._layout_foot_buttons()
         self.vl.refresh()

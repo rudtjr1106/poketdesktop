@@ -52,6 +52,8 @@ TOKEN_DAYS = _int("POKET_TOKEN_DAYS", 30)
 REQUIRE_IP = _bool("POKET_REQUIRE_IP", True)
 # 리버스 프록시 뒤에 있을 때만 켠다. 켜면 X-Forwarded-For 를 믿는다.
 TRUST_PROXY = _bool("POKET_TRUST_PROXY", False)
+# Cloudflare 가 바로 앞에 있을 때만 켠다 (cf-connecting-ip 를 믿는다, auth.client_ip). 지금 운영은 Caddy 뿐이라 끈다.
+TRUST_CF = _bool("POKET_TRUST_CF", False)
 PW_ITERATIONS = _int("POKET_PW_ITERATIONS", 200000)
 # 계정은 최대한 간단하게 — 닉네임 + 숫자 4자리.
 # 4자리는 만 가지뿐이라 대신 로그인 시도 제한을 세게 건다.

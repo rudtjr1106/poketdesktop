@@ -181,8 +181,11 @@ def client_ip(request):
     """
     if config.TRUST_PROXY:
         # Cloudflare 가 앞에 있으면 이게 가장 믿을 만하다. 클라이언트가 무엇을
-        # 보내든 Cloudflare 가 덮어쓰기 때문이다. (Render 가 Cloudflare 뒤에 있다)
-        cf = request.headers.get("cf-connecting-ip")
+        # 보내든 Cloudflare 가 덮어쓰기 때문이다. (Render 가 Cloudflare 뒤에 있었다)
+        # **Cloudflare 가 앞에 없으면 아무나 이 헤더를 지어 보낼 수 있다** - 지금 운영(Lightsail + Caddy)이 그렇다.
+        # Caddy 는 X-Real-IP 만 덮어쓰고 이 헤더는 그대로 넘겨서, 헤더 값을 바꿔 가며 보내면 로그인 5번 제한
+        # (숫자 4자리 비밀번호의 유일한 방어선)이 풀렸다 (2.1.1 검토). 그래서 TRUST_CF 를 켠 곳에서만 본다.
+        cf = request.headers.get("cf-connecting-ip") if config.TRUST_CF else None
         if cf:
             return cf.strip()
         real = request.headers.get("x-real-ip")

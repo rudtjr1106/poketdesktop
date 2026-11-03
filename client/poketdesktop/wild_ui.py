@@ -397,6 +397,9 @@ class WildController(object):
         self.pet = None
         self.wild_id = None
         self.throwing = False
+        self.auto_ball = None     # 잡힐 때까지 이어 던지는 볼 (2.1.1) - None 이면 이어 던지지 않는다
+        self.auto_n = 0           # 이번에 이어 던진 수 (AUTO_MAX 에서 멈춘다)
+        self._auto_job = None
         self.revealing = False    # 풀숲을 눌러 응답을 기다리는 중인가
         self.hint = None
         self._job = None
@@ -632,8 +635,76 @@ class WildController(object):
         else:
             self.check()
 
+    # ---------------- 잡힐 때까지 계속 던지기 (2.1.1, 게시판 #425 레드 36세) ----------------
+    # 볼 메뉴 맨 위 줄로 켜고 끈다 (설정 autoThrow). 켜 두면 볼을 던졌을 때(메뉴 · 두 번 클릭) 같은 볼로 잡힐 때까지
+    # 이어 던진다. 배틀 밖 야생만이다 - 배틀 안에서는 놓치면 상대가 움직인다. 서버는 여느 던지기와 같다
+    # (한 번에 하나씩, 놓치면 throws+1 - 타이머볼 배율도 그대로). 멈추는 때: 잡힘 · 오류 · 그 볼이 떨어짐 ·
+    # 야생이 사라짐(clear) · 배틀 시작 · 메뉴를 다시 엶 · 설정을 끔 · AUTO_MAX 번. 마스터볼은 이어 던지지 않는다.
+    AUTO_MAX = 30
+    AUTO_GAP_MS = 350
+
+    def auto_on(self):
+        return bool((getattr(self.app, "settings", None) or {}).get("autoThrow"))
+
+    def toggle_auto(self):
+        on = not self.auto_on()
+        self.app.settings["autoThrow"] = on
+        config.save_settings(self.app.settings)
+        if not on:
+            self.stop_auto()
+        self.app.notify("볼을 던지면 잡힐 때까지 같은 볼로 계속 던집니다." if on
+                        else "잡힐 때까지 계속 던지기를 껐습니다.")
+
+    def stop_auto(self):
+        self.auto_ball = None
+        job = getattr(self, "_auto_job", None)
+        self._auto_job = None
+        if job is not None:
+            try:
+                self.app.root.after_cancel(job)
+            except Exception:                               # noqa: BLE001
+                pass
+
+    def _ball_left(self, ball):
+        """그 볼이 몇 개 남았나 (몬스터볼은 app.balls, 나머지는 서버가 준 볼 목록)."""
+        if ball == "POKEBALL":
+            return int(self.app.balls or 0)
+        for o in getattr(self, "ball_options", None) or ():
+            if o.get("id") == ball:
+                return int(o.get("count") or 0)
+        return 0
+
+    def _auto_more(self):
+        """놓친 뒤: 이어 던질까. 이어 던지면 몇 번째인지 글을 돌려준다 (안 던지면 None)."""
+        ball = getattr(self, "auto_ball", None)
+        if not ball:
+            return None
+        why = None
+        if not self.auto_on():
+            why = ""                                        # 그사이 설정에서 껐다 (설정 초기화 등)
+        elif self._ball_left(ball) <= 0:
+            why = "볼이 떨어져 계속 던지기를 멈췄습니다."
+        elif getattr(self, "auto_n", 0) + 1 >= self.AUTO_MAX:
+            why = "%d번 던져 계속 던지기를 멈췄습니다." % self.AUTO_MAX
+        elif not self.pet or not self.wild_id or self.app.battle:
+            why = ""
+        if why is not None:
+            self.stop_auto()
+            return why or None
+        self._auto_job = self.app.root.after(self.AUTO_GAP_MS, self._auto_next)
+        return "계속 던지는 중 (%d번째) · 멈추려면 오른쪽 클릭" % (self.auto_n + 2)
+
+    def _auto_next(self):
+        self._auto_job = None
+        ball = getattr(self, "auto_ball", None)
+        if not ball or not self.auto_on() or self.throwing or not self.pet or not self.wild_id or self.app.battle:
+            return self.stop_auto()
+        self.auto_n += 1
+        self.throw_ball(ball, _auto=True)
+
     # ---------------- 화면 ----------------
     def clear(self):
+        self.stop_auto()
         self.hide_hint()
         # 만료 타이머도 같이 끈다. 안 끄면 이미 사라진 야생을 두고
         # 나중에 한 번 더 깨어나 쓸데없이 서버를 부른다.
@@ -824,6 +895,7 @@ class WildController(object):
 
     def start_battle(self):
         """야생 포켓몬을 눌렀다. 배틀 창을 연다."""
+        self.stop_auto()
         if self.throwing or not self.pet or not self.wild_id:
             return
         if self.app.battle:
@@ -850,13 +922,19 @@ class WildController(object):
         누를 때마다 서버를 왕복하면 야생은 60초짜리라 그 시간을 깎아먹고,
         서버가 자다 깨는 중이면 메뉴가 아예 안 뜬다.
         """
+        if getattr(self, "auto_ball", None):
+            # 이어 던지는 동안 오른쪽 클릭 = 멈추기. 볼이 날아가고 흔들리는 동안(throwing)이 대부분이라 아래의
+            # 막기보다 먼저 본다 - 안 그러면 던지기 사이 0.35초에만 멈출 수 있었다 (2.1.1 검토)
+            self.stop_auto()
+            self.app.notify("계속 던지기를 멈췄습니다.")
+            return
         if self.throwing or not self.pet or not self.wild_id:
             return
         opts = self.ball_options
         if not opts:
             return self.throw_ball()          # 목록이 아직이면 예전처럼
         self.hide_hint()
-        ball_menu.popup(self.app.root, e, opts, self.throw_ball)
+        ball_menu.popup(self.app.root, e, opts, self.throw_ball, auto=self.auto_on(), on_auto=self.toggle_auto)
 
     def last_ball(self):
         """마지막에 쓴 볼. 없으면 몬스터볼."""
@@ -883,7 +961,7 @@ class WildController(object):
             got = got.get("id")
         return got or self.last_ball()
 
-    def throw_ball(self, ball=None):
+    def throw_ball(self, ball=None, _auto=False):
         # **배틀이 걸려 있으면 배틀 안에서 던진다** (1.10.4, 게시판 #174 '퀵볼로 잡으면 전투 중
         # 판정이 유지된다'). 볼 메뉴를 연 뒤에 배틀이 시작됐을 때, 메뉴에서 고른 볼이 이 길
         # (배틀 밖의 /wild/catch)로 나갔다 - 야생은 잡혔는데 서버의 배틀은 안 끝나서 내 포켓몬이
@@ -895,8 +973,14 @@ class WildController(object):
             return
         ball = ball or self.last_ball()
         if ball == "POKEBALL" and self.app.balls <= 0:
+            self.stop_auto()
             self.app.notify("몬스터볼이 없습니다.")
             return
+        if not _auto:                         # 사람이 던졌다: 켜져 있으면 이 볼로 이어 던지기를 시작한다
+            self.stop_auto()
+            self.auto_n = 0
+            if self.auto_on() and ball != ball_menu.MASTER:
+                self.auto_ball = ball
         self.throwing = True
         self.hide_hint()
         wid = self.wild_id
@@ -908,6 +992,7 @@ class WildController(object):
         def done(r, err):
             if err:
                 self.throwing = False
+                self.stop_auto()
                 self.app.notify(getattr(err, "message", str(err)))
                 self.check()
                 return
@@ -957,6 +1042,7 @@ class WildController(object):
         def after():
             self.throwing = False
             if r.get("caught"):
+                self.stop_auto()
                 self.clear()
                 info = (r.get("pokemon") or {}).get("info", {})
                 # 잡아도 경험치를 받는다 (1.8.1). 싸우지 않고 볼만 던졌으니 파티 맨
@@ -990,7 +1076,8 @@ class WildController(object):
             else:
                 self.show_wild_sprite()
                 left = "  (남은 볼 %d개)" % self.app.balls
-                self.app.notify((r.get("message") or "놓쳤다!") + left)
+                more = self._auto_more()           # 잡힐 때까지 계속 던지기 (2.1.1)
+                self.app.notify((r.get("message") or "놓쳤다!") + left + ("  · " + more if more else ""))
                 if self.app.balls <= 0:
                     self.app.notify("몬스터볼이 다 떨어졌습니다.")
 

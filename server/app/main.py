@@ -32,7 +32,7 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
-from . import (achievements, auth, avatar, battle_routes, board, board_routes, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
+from . import (achievements, auth, avatar, battle_routes, board, board_routes, boosts, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
                expedition, item_routes, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
@@ -1175,7 +1175,7 @@ def register(body: RegisterIn, request: Request):
     # 첫 풀숲은 조금 빨리 — 다만 정해진 간격보다 늦지는 않게.
     # min 이 없으면 간격을 짧게 잡아 둔 곳(테스트)에서도 첫 판만
     # 60~180초를 기다려야 한다.
-    _schedule_next(uid, min(RNG.randint(60, 180), _cooldown()))
+    _schedule_next(uid, min(RNG.randint(60, 180), _cooldown(uid)))
     _give_starter(uid, body.starter)
     token, exp = auth.issue_token(uid, ip, body.device, auth.ip_is_real(request))
     user = db.q1("SELECT * FROM users WHERE id=?", (uid,))
@@ -1329,6 +1329,8 @@ def me(ctx=Depends(current)):
         "expedition": expedition.me_card(uid),
         # 새 기술머신 (1.11.0): 받고 가방에서 아직 안 본 수. 화면이 가방 탭에 점을 찍는다
         "tmNew": tms.new_count(uid),
+        # 풀숲 부스트 (2.1.1): 버닝 부스터 · 타입 스프레이 남은 초 (가방 설명은 /api/shop 에 실린 같은 값을 쓴다)
+        "boosts": boosts.state(uid),
         "session":{"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 
@@ -1925,8 +1927,9 @@ def _bump(uid, field):
            (uid,))
 
 
-def _cooldown():
-    return RNG.randint(config.WILD_COOLDOWN_MIN, config.WILD_COOLDOWN_MAX)
+def _cooldown(uid=None):
+    """다음 풀숲까지 (초). 버닝 부스터가 켜져 있으면 2~3분 (2.1.1, boosts)."""
+    return boosts.cooldown(uid, RNG)
 
 
 def _wild_public(row, reveal):
@@ -1955,10 +1958,10 @@ def _sweep(uid):
         deps.close_battles_of(uid, r["id"], "fled", "wild_expired")
         if r["state"] == "grass":
             _bump(uid, "fled")
-            _schedule_next(uid, config.MISS_COOLDOWN)
+            _schedule_next(uid, min(config.MISS_COOLDOWN, _cooldown(uid)))
         else:
             _bump(uid, "fled")
-            _schedule_next(uid, _cooldown())
+            _schedule_next(uid, _cooldown(uid))
     return [r["id"] for r in gone]
 
 
@@ -2038,8 +2041,14 @@ def _make_grass(uid):
         mon = achievements.unlock_mon(uid, RNG)
     if mon is None:
         lo, hi, cap = _wild_levels(uid)
-        mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=halloween.spawn_boost(),
-                              shiny_rate=config.SHINY_RATE)
+        # 타입 스프레이(2.1.1)가 켜져 있으면 둘에 하나는 그 타입 종에서만 뽑는다. 그 레벨에 그 타입 종이 없으면
+        # (빈 표) 평소대로. 평소 표에는 이벤트(할로윈)가 얹힌다.
+        lure = boosts.roll_boost(uid, RNG)
+        if lure:
+            mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=lure, shiny_rate=config.SHINY_RATE)
+        if mon is None:
+            mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=halloween.spawn_boost(),
+                                  shiny_rate=config.SHINY_RATE)
     if mon is None:
         raise HTTPException(500, "등장 가능한 포켓몬이 없습니다.")
     t = now()
@@ -2049,7 +2058,7 @@ def _make_grass(uid):
         (uid, "grass", mon["species"], json.dumps(mon), iso(t),
          iso(t + datetime.timedelta(seconds=config.GRASS_TTL))))
     _bump(uid, "encounters")
-    _schedule_next(uid, config.GRASS_TTL + _cooldown())
+    _schedule_next(uid, config.GRASS_TTL + _cooldown(uid))
     return db.q1("SELECT * FROM wild WHERE id=?", (cur.lastrowid,))
 
 
@@ -2084,10 +2093,11 @@ def wild_state(ctx=Depends(current), force: bool = False):
                 # 영영 안 돋는 고장으로만 보였다. 이유를 알려주고 시각도
                 # 다시 잡는다(안 그러면 지난 시각에 멈춰 있는다).
                 full = True
-                next_at = _schedule_next(uid, _cooldown())
+                next_at = _schedule_next(uid, _cooldown(uid))
 
     out = {"wild": _wild_public(row, row["state"] == "revealed") if row else None,
-           "nextAt": next_at, "balls": ctx["user"]["balls"], "expired": expired}
+           "nextAt": next_at, "balls": ctx["user"]["balls"], "expired": expired,
+           "boosts": boosts.state(uid)}                     # 버닝 · 타입 스프레이 남은 초 (2.1.1)
     if full:
         out["boxFull"] = {"max": config.MAX_BOX,
                           "message": "포켓몬이 %d마리로 가득 차서 풀숲이 돋지"
@@ -2256,7 +2266,7 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     # 배틀 줄만 남아, 내 포켓몬이 계속 '배틀 중' 이라 도구를 못 쓴다 (게시판 #174).
     deps.close_battles_of(uid, wid, "caught", "field_catch")
     _bump(uid, "caught")
-    _schedule_next(uid, _cooldown())
+    _schedule_next(uid, _cooldown(uid))
     items.mark_seen(uid, mon["species"], True, auth.now_iso())
     achievements.on_obtain(uid, mon, "catch", ball=ball_id)
     mega.on_catch(uid)                                   # 유대 미션 ③ (시즌 3)
@@ -2294,8 +2304,8 @@ def wild_flee(wid: int, ctx=Depends(current)):
         db.run("DELETE FROM wild WHERE id=?", (wid,))
         deps.close_battles_of(uid, wid, "fled", "wild_flee")
         _bump(uid, "fled")
-        _schedule_next(uid, _cooldown() if row["state"] == "revealed"
-                       else config.MISS_COOLDOWN)
+        _schedule_next(uid, _cooldown(uid) if row["state"] == "revealed"
+                       else min(config.MISS_COOLDOWN, _cooldown(uid)))
     st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
     return {"ok": True, "nextAt": st["next_at"] if st else None}
 
