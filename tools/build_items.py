@@ -57,6 +57,8 @@ WEIGHT_OVERRIDE = {
     "sacred-ash": 4,
     "big-nugget": 8,
     "comet-shard": 6,
+    # 족자 둘은 희귀(14)를 반씩 나눈다 - 물의 족자를 더해도(2.1.0) 치고마 진화 도구가 떨어지는 몫은 그대로다.
+    "scroll-of-darkness": 7, "scroll-of-waters": 7,
 }
 
 # 파는 값은 사는 값의 절반. 본가 프렌들리샵과 같다.

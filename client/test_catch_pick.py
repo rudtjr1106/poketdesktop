@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""잡기 모드 '고른 포켓몬만' (catchMode pick) - 판단과 서버에 보내는 값.
+"""잡기 모드 '안 잡은 포켓몬 + 고른 포켓몬' (catchMode pick, 2.1.0 전에는 '고른 포켓몬만') - 판단과 서버에 보내는 값.
 
     python client/test_catch_pick.py
 
@@ -52,9 +52,13 @@ def pick(*names):
 def t_고른_종만_멈춘다():
     s = pick("PIKACHU", "EEVEE")
     chk("고른 종 -> always", config.catch_for(s, {"species": "PIKACHU"}, DEX) == "always")
-    chk("안 고른 종 -> off", config.catch_for(s, {"species": "RATTATA"}, DEX) == "off")
+    # 2.1.0 (#407): 안 고른 종은 off 가 아니라 new - 아직 안 잡은 종이면 서버가 멈춘다
+    chk("안 고른 종 -> new", config.catch_for(s, {"species": "RATTATA"}, DEX) == "new")
     chk("소문자로 적어 둬도 맞춘다", config.catch_for(pick("pikachu"), {"species": "PIKACHU"}) == "always")
-    chk("아무것도 안 골랐으면 늘 off", config.catch_for(pick(), {"species": "PIKACHU"}, DEX) == "off")
+    chk("아무것도 안 골랐으면 new (안 잡은 포켓몬만과 같다)", config.catch_for(pick(), {"species": "PIKACHU"}, DEX) == "new")
+    chk("종을 모르면 new", config.catch_for(s, {}, DEX) == "new")
+    chk("다른 모드는 그대로", [config.catch_for({"catchMode": m}, {"species": "RATTATA"}, DEX)
+                               for m in ("new", "always", "off")] == ["new", "always", "off"])
 
 
 def t_이로치는_늘_멈춘다():
@@ -88,10 +92,10 @@ def t_이상한_설정():
     for bad in (None, "PIKACHU", 3, {"PIKACHU": 1}, [None, 3, "", " "]):
         chk("목록이 %r 이면 빈 것" % (bad,), config.catch_pick({"catchPick": bad}) == frozenset())
     chk("섞여 있으면 글만 남긴다", config.catch_pick({"catchPick": ["PIKACHU", 3, None]}) == {"PIKACHU"})
-    chk("목록이 이상해도 off", config.catch_for({"catchMode": "pick", "catchPick": "PIKACHU"},
-                                            {"species": "PIKACHU"}) == "off")
-    chk("야생 자료가 없으면 off", config.catch_for(pick("PIKACHU"), None) == "off"
-        and config.catch_for(pick("PIKACHU"), {"species": None}) == "off")
+    chk("목록이 이상해도 new", config.catch_for({"catchMode": "pick", "catchPick": "PIKACHU"},
+                                            {"species": "PIKACHU"}) == "new")
+    chk("야생 자료가 없으면 new", config.catch_for(pick("PIKACHU"), None) == "new"
+        and config.catch_for(pick("PIKACHU"), {"species": None}) == "new")
     chk("설정이 None 이어도 new", config.catch_for(None, {"species": "PIKACHU"}) == "new")
 
 
@@ -107,8 +111,8 @@ def t_기본값():
         os.remove(path)
     s = config.load_settings()
     chk("기본 목록은 비어 있다", s["catchPick"] == [])
-    chk("CATCH_CHOICES 에 '고른 포켓몬만'",
-        ("pick", "고른 포켓몬만") in ui_settings.SettingsWindow.CATCH_CHOICES)
+    chk("CATCH_CHOICES 에 '안 잡은 포켓몬 + 고른 포켓몬'",
+        ("pick", "안 잡은 포켓몬 + 고른 포켓몬") in ui_settings.SettingsWindow.CATCH_CHOICES)
 
 
 # ---------------------------------------------------------------- 배틀이 보내는 값
@@ -154,7 +158,7 @@ def t_배틀이_턴마다_보낸다():
     real = DB.run_async
     DB.run_async = lambda root, fn, cb: cb(fn(), None)
     try:
-        for foe, want in (({"species": "PIKACHU"}, "always"), ({"species": "RATTATA"}, "off"),
+        for foe, want in (({"species": "PIKACHU"}, "always"), ({"species": "RATTATA"}, "new"),
                           ({"species": "RATTATA", "shiny": True}, "always"),
                           ({"species": "ROTOM_FAN"}, "always")):
             d = 판(pick("PIKACHU", "ROTOM"), foe)
@@ -163,7 +167,7 @@ def t_배틀이_턴마다_보낸다():
         d = 판({"catchMode": "new"}, {"species": "PIKACHU"})
         d.next_turn()
         chk("new 모드는 예전처럼 new", d.app.api.moves == ["new"], d.app.api.moves)
-        # 안내 글은 그 판에 실제로 off 를 보냈을 때만 붙는다
+        # 안내 글은 그 판에 실제로 new 를 보냈을 때만 붙는다 (고르지 않은 종 - 쓰러졌으면 이미 잡은 종)
         for foe, want_note in (({"species": "RATTATA"}, True), ({"species": "PIKACHU"}, False),
                                ({"species": "RATTATA", "shiny": True}, False)):
             d = 판(pick("PIKACHU"), foe)

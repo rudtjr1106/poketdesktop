@@ -100,7 +100,7 @@ missing = []          # (종 kr, internal, 기술, 방법들, 기준판)
 no_tm = []
 not_in_game = collections.Counter()
 targets = [(s, None, s["num"]) for s in raw["species"]]
-targets += [(by_int[f["formOf"]], f, f["num"]) for f in raw["forms"] if f.get("formKind") in ("use", "held", "move")]
+targets += [(by_int[f["formOf"]], f, f["num"]) for f in raw["forms"] if f.get("formKind") in ("use", "held", "move", "evo")]
 for s, form, pid in targets:
     ref, ml = mainline(pid)
     if not ml:

@@ -837,6 +837,7 @@ class GuildWindow(G.GuildWindow):
         self.shop_q = tk.StringVar(value=self.shop_query)
         self.shop_cards = [(it, None) for it in sh.get("items") or []]
         self.shop_btns = {}
+        self._gacha_banner(self.content, BASE_BG)         # 2.1.0 랜덤 캡슐 띠 (기본 테마와 같은 것, ui_gacha)
         # 머리 (찾는 칸은 굴러가는 목록 밖에 둔다 - 적는 동안 목록만 다시 그린다)
         self.shop_head = tk.Canvas(self.content, bg=BASE_BG, highlightthickness=0, bd=0, height=s(56))
         self.shop_head.pack(fill="x", padx=(s(12), s(22)), pady=(s(8), 0))

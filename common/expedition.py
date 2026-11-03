@@ -127,9 +127,10 @@ PLACES = [
      "special": {"rare": ["MOONSTONE", "DUSKSTONE", "OVALSTONE", "PROTECTOR", "KINGSROCK", "RAZORFANG"]}},
     {"id": "sea", "kr": "바다", "types": ["WATER", "FLYING", "ELECTRIC"], "tm": 1.0,
      "hint": "깃털 · 물의돌 · 천둥의돌",
+     # 물의 족자(2.1.0) = 유적의 악의 족자 짝. 치고마를 연격의 태세 우라오스로 진화시킨다.
      "special": {"uncommon": ["HEALTHWING", "SWIFTWING"],
                  "rare": ["WATERSTONE", "THUNDERSTONE", "DEEPSEATOOTH", "DEEPSEASCALE", "PRISMSCALE",
-                          "DRAGONSCALE"]}},
+                          "DRAGONSCALE", "SCROLLOFWATERS"]}},
     {"id": "volcano", "kr": "화산", "types": ["FIRE", "DRAGON", "STEEL"], "tm": 1.0,
      "hint": "깃털 · 불꽃의돌 · 금속코트",
      "special": {"uncommon": ["MUSCLEWING", "RESISTWING"],

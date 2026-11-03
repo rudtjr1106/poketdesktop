@@ -117,6 +117,12 @@ def buy(body: BuyIn, ctx=Depends(deps.current)):
     return guild.buy(_uid(ctx), body.item, body.count)
 
 
+@router.post("/api/guild/shop/slot")
+def slot(ctx=Depends(deps.current)):
+    """슬롯머신 한 번 (2.1.0). 몸은 없어도 되고 {} 여도 된다 - 읽지 않는다."""
+    return guild.slot(_uid(ctx))
+
+
 @router.post("/api/guild/mission/{tier}/claim")
 def claim(tier: int, ctx=Depends(deps.current)):
     return guild.claim(_uid(ctx), tier)

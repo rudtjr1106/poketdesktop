@@ -354,4 +354,4 @@ def try_evolve(uid, mon_id, hour=None):
     before = mon["species"]
     got = evolution.apply(uid, mon, b, d, "")
     return evolution.public(d, before, b["to"],
-                            got.get("learned") or [], got.get("pendingIds") or [])
+                            got.get("learned") or [], got.get("pendingIds") or [], form=b.get("form"))

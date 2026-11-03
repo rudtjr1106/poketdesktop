@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""꾸미기 효과 (버전 2) - 바탕화면 포켓몬이 걸어간 자리에 남는 발자국 · 별가루 · 꽃잎 · 하트, 발밑 빛 고리.
+"""꾸미기 효과 (버전 2) - 바탕화면 포켓몬이 걸어간 자리에 남는 발자국 · 별가루 · 꽃잎 · 하트 · 비눗방울 · 음표 ·
+눈송이(2.1.0), 발밑 빛 고리.
 
 포켓몬마다 **투명 창 하나**(Trail)를 둔다. 입자마다 작은 창을 띄우는 것보다 가볍다. 창은 클릭이 그대로
 통과하고(fx_layer 와 같은 까닭 - 통과를 못 걸면 아예 안 띄운다), **제 포켓몬 창 바로 아래**에 깔린다
@@ -73,11 +74,12 @@ def glow_phase(tick):
 
 
 class Particle(object):
-    __slots__ = ("kind", "x", "y", "life", "age", "size", "tw", "vy", "ph", "rot", "tone")
+    __slots__ = ("kind", "x", "y", "life", "age", "size", "tw", "vy", "ph", "rot", "tone", "two", "dir")
 
     def __init__(self, kind, x, y, life, **kw):
         self.kind, self.x, self.y, self.life, self.age = kind, float(x), float(y), life, 0
         self.size, self.tw, self.vy, self.ph, self.rot, self.tone = 3, 0.0, 0.0, 0.0, 0, "gold"
+        self.two, self.dir = False, 0
         for k, v in kw.items():
             setattr(self, k, v)
 
@@ -98,6 +100,18 @@ def draws(p, k):
         im = ART.heart_fx()
         xx = p.x + math.sin(p.ph + p.age / 200.0) * 3 * k
         return im, xx - im.width * k / 2.0, p.y - p.age / 28.0, fade(f, 0.55)
+    if p.kind == "bubble":                  # 둥실 떠오르며 살랑 - 끝에 톡 사라진다
+        im = ART.bubble(p.size)
+        xx = p.x + math.sin(p.ph + p.age / 300.0) * 3 * k
+        return im, xx - im.width * k / 2.0, p.y - p.age / 45.0 - im.height * k / 2.0, fade(f, 0.75)
+    if p.kind == "note":                    # 머리 위에서 뒤로 흘러가며 오른다
+        im = ART.note(p.rot, p.two)
+        xx = p.x + p.dir * p.age / 60.0 + math.sin(p.ph + p.age / 220.0) * 4 * k
+        return im, xx - im.width * k / 2.0, p.y - p.age / 30.0 - im.height * k, fade(f, 0.6)
+    if p.kind == "snow":                    # 몸 둘레로 사르르 내린다
+        im = ART.snow()
+        xx = p.x + math.sin(p.ph + p.age / 260.0) * 3 * k
+        return im, xx - im.width * k / 2.0, p.y + p.age / 40.0 - im.height * k / 2.0, fade(f, 0.6)
     return None
 
 
@@ -114,7 +128,7 @@ class Trail(object):
         self.last = None             # 지난 발 자리 (걸은 거리 · 방향을 잰다)
         self.walked = 0.0
         self.back = 0                # 몸 뒤쪽 (-1 왼쪽 · 1 오른쪽 · 0 위아래로 걷는 중)
-        self.since = {"star": 0, "petal": 0, "heart": 0}
+        self.since = {"star": 0, "petal": 0, "heart": 0, "bubble": 0, "note": 0, "snow": 0}
         self.paw_side = 0
         self.k = max(1, int(round((getattr(pet, "base_scale", None) or 2.0) / 2.0)))
         self.ox = self.oy = None
@@ -297,6 +311,26 @@ class Trail(object):
                     self.since["heart"] -= 300
                     self.parts.append(Particle("heart", mid + random.uniform(-6, 6) * k, y0 - 2 * k, 1200,
                                                ph=random.uniform(0, 6.28)))
+            elif key == "fx_bubbles":
+                self.since["bubble"] += ms
+                while self.since["bubble"] >= 200:
+                    self.since["bubble"] -= 200
+                    self.parts.append(Particle("bubble", behind(), random.uniform(y0 + (y1 - y0) * 0.3, y1 - 4),
+                                               random.randint(1500, 2300), size=random.choice((5, 7, 7, 9, 9)),
+                                               ph=random.uniform(0, 6.28)))
+            elif key == "fx_notes":
+                self.since["note"] += ms
+                while self.since["note"] >= 280:
+                    self.since["note"] -= 280
+                    self.parts.append(Particle("note", mid + random.uniform(-5, 5) * k, y0 + 2 * k, 1400,
+                                               ph=random.uniform(0, 6.28), rot=random.randint(0, 3),
+                                               two=random.random() < 0.35, dir=back or random.choice((-1, 1))))
+            elif key == "fx_snow":
+                self.since["snow"] += ms
+                while self.since["snow"] >= 80:
+                    self.since["snow"] -= 80
+                    self.parts.append(Particle("snow", behind(), y0 + random.uniform(0, (y1 - y0) * 0.5),
+                                               random.randint(1100, 1600), ph=random.uniform(0, 6.28)))
         if len(self.parts) > MAX_PARTS:
             self.parts = self.parts[-MAX_PARTS:]
 

@@ -436,7 +436,8 @@ class Pokedex(object):
     def form_for(self, mon):
         """이 포켓몬이 **배틀 밖에서** 서 있는 폼 (도감 forms 의 것). 원래 모습이면 None.
 
-          1) 적어 둔 폼 (mon["form"]) - 도구를 써서 바꾼 것 (formKind use)
+          1) 적어 둔 폼 (mon["form"]) - 도구를 써서 바꾼 것 (formKind use), 진화할 때 정해진 것 (formKind evo -
+             물의 족자로 진화한 연격의 태세 우라오스, 2.1.0)
           2) 지닌 도구로 바뀌는 폼 (kind held) - 백금옥을 지닌 기라티나, 가면을 쓴 오거폰
           3) 그 기술을 알면 그 모습 (kind move) - 신비의칼을 아는 케르디오
 
@@ -448,7 +449,7 @@ class Pokedex(object):
         want = mon.get("form")
         if want:
             for m in forms:
-                if m["form"] == want and m["formKind"] == "use":
+                if m["form"] == want and m["formKind"] in ("use", "evo"):
                     return m
         held = mon.get("held")
         if held:

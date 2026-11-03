@@ -10,6 +10,7 @@
     guild_mission   그날 그 사람이 한 미션
     guild_user      사람마다: 길드 코인, 마지막으로 나온 때
     guild_claim     그날 받은 단계 보상
+    guild_slot_log  코인 상점 랜덤 캡슐(서버 이름 slot) 한 판씩 (2.1.0)
 
 ## 자리와 권한
 
@@ -58,6 +59,7 @@ listeners 에 건 함수를 부르고, 그쪽이 붙어 있는 길드원에게 �
 import datetime
 import json
 import math
+import random
 import sqlite3
 import time
 import zlib
@@ -103,10 +105,51 @@ TIERS = (
 
 # 코인 상점에 내놓는 것. **상점에서 살 수 있는 것만** 판다 (값은 상점 값에서 나온다).
 # 금구슬 같은 '팔아서 돈으로 바꾸는 물건' 은 뺐다 - 코인을 돈으로 바꾸는 창구가 된다.
-SHOP_CATS = ("ball",)
+# 2.1.0: 진화 도구(cat 'stone' - 진화의 돌·통신 진화 도구·족자 …)를 통째로 더했다.
+SHOP_CATS = ("ball", "stone")
 SHOP_ITEMS = ("RARECANDY", "BOTTLECAP", "HPUP", "PROTEIN", "IRON", "CALCIUM", "ZINC", "CARBOS",
               "HEALTHWING", "MUSCLEWING", "RESISTWING", "GENIUSWING", "CLEVERWING", "SWIFTWING")
+# 배틀용 지닌 도구 (2.1.0). 랭크·길드전에서 실제로 많이 쓰는 것만 골랐다 - 타입 강화 도구·플레이트처럼
+# 수십 개가 비슷한 것은 상점 목록만 길게 만들어서 뺐다. 상점에서 파는 것만 (값은 상점 값에서 나온다).
+SHOP_HELD = ("LIFEORB", "CHOICESCARF", "CHOICEBAND", "CHOICESPECS", "FOCUSSASH", "LEFTOVERS",
+             "ASSAULTVEST", "ROCKYHELMET", "EVIOLITE", "WEAKNESSPOLICY", "EXPERTBELT", "AIRBALLOON",
+             "SITRUSBERRY", "LUMBERRY", "HEAVYDUTYBOOTS", "LIGHTCLAY", "BOOSTERENERGY", "BLACKSLUDGE",
+             "CLEARAMULET", "COVERTCLOAK", "LOADEDDICE")
+# 상점 화면의 묶음 (차례대로). 앱이 group 글을 머리글로 쓴다.
+SHOP_GROUPS = ("볼", "성장", "진화", "지닌 도구")
 BUY_MAX = 99
+
+# 슬롯머신 (2.1.0). 한 번에 SLOT_COST 코인, 하루 횟수 제한 없음 (사용자 결정).
+# **앱 화면은 캡슐 뽑기 기계 '랜덤 캡슐'이다** (client/poketdesktop/ui_gacha.py - 처음 슬롯머신으로 만들었다가 사용자가 바꾸라고
+# 해서 서버 쪽 이름은 slot 으로 남았다). 앱은 등급(tier)으로 캡슐 빛깔을 정하고, reels 는 쓰지 않는다.
+# (결과 열쇠, 이름, 천분율, 등급, 주는 것, 개수). 천분율의 합은 1000 이다.
+# 주는 것: 도구 id · 후보 튜플(그중 하나) · 'held'(SHOP_HELD 중 하나) · 'deco' · 'egg' · None(꽝).
+# **기대값은 낸 코인보다 적다** - 코인을 불리는 창구가 되면 안 된다 (test_guild_slot 이 코인 값으로 센다).
+SLOT_COST = 20
+SLOT_STONES = ("FIRESTONE", "WATERSTONE", "THUNDERSTONE", "LEAFSTONE", "MOONSTONE", "SUNSTONE",
+               "SHINYSTONE", "DUSKSTONE", "DAWNSTONE", "ICESTONE")
+SLOT_VITAMINS = ("HPUP", "PROTEIN", "IRON", "CALCIUM", "ZINC", "CARBOS")
+SLOT_WINGS = ("HEALTHWING", "MUSCLEWING", "RESISTWING", "GENIUSWING", "CLEVERWING", "SWIFTWING")
+SLOT_TABLE = (
+    ("lose", "꽝", 400, "lose", None, 0),
+    ("ball", "몬스터볼", 140, "common", "POKEBALL", 5),
+    ("hyper", "하이퍼볼", 100, "common", "ULTRABALL", 3),
+    ("feather", "깃털", 80, "common", SLOT_WINGS, 3),
+    ("stone", "진화의 돌", 70, "common", SLOT_STONES, 1),
+    ("vitamin", "비타민", 60, "rare", SLOT_VITAMINS, 1),
+    ("cap", "은색병뚜껑", 50, "rare", "BOTTLECAP", 1),
+    ("candy", "이상한사탕", 50, "rare", "RARECANDY", 1),
+    ("held", "지닌 도구", 30, "rare", "held", 1),
+    ("deco", "꾸미기", 10, "epic", "deco", 1),
+    ("ticket", "기술머신 뽑기권", 6, "epic", "RANKTICKETTM", 1),
+    ("shiny", "이로치 사탕", 3, "jackpot", "SHINYCANDY", 1),
+    ("egg", "전설·환상 알", 1, "jackpot", "egg", 1),
+)
+SLOT_BY = dict((r[0], r) for r in SLOT_TABLE)
+# 앱이 릴을 멈출 기호. 결과 열쇠와 같은 이름 (꽝은 기호가 없다 - 셋이 다 같지 않은 조합으로 보인다).
+SLOT_SYMBOLS = tuple(r[0] for r in SLOT_TABLE if r[0] != "lose")
+SLOT_DECO_SPARE = ("RARECANDY", 2)      # 꾸미기 후보를 다 가졌으면 대신 주는 것
+SLOT_NEAR = 0.3                         # 꽝일 때 앞 둘만 같은 '아깝다' 조합이 나오는 몫
 
 
 def _now():
@@ -921,9 +964,20 @@ def coin_price(item_id):
     it = items.get(item_id)
     if not it or items.buy_price(it["id"]) <= 0:
         return 0
-    if it.get("cat") not in SHOP_CATS and it["id"] not in SHOP_ITEMS:
+    if it.get("cat") not in SHOP_CATS and it["id"] not in SHOP_ITEMS and it["id"] not in SHOP_HELD:
         return 0
     return max(1, int(math.ceil(items.buy_price(it["id"]) / float(config.GUILD_COIN_WON))))
+
+
+def _group(it):
+    """상점 화면의 묶음 이름 (SHOP_GROUPS 중 하나)."""
+    if it["cat"] == "ball":
+        return "볼"
+    if it["id"] in SHOP_HELD:
+        return "지닌 도구"
+    if it["cat"] == "stone":
+        return "진화"
+    return "성장"
 
 
 def shop(uid):
@@ -931,11 +985,14 @@ def shop(uid):
     for it in items.public_list():
         price = coin_price(it["id"])
         if price:
-            rows.append(dict(it, coin=price))
-    rows.sort(key=lambda x: (0 if x["cat"] == "ball" else 1, x["coin"], x["kr"]))
+            rows.append(dict(it, coin=price, group=_group(it)))
+    rows.sort(key=lambda x: (SHOP_GROUPS.index(x["group"]), x["coin"], x["kr"]))
     r = db.q1("SELECT balls FROM users WHERE id=?", (uid,))
     return {"items": rows, "coin": coin(uid), "bag": items.bag_get(uid, r["balls"] if r else 0),
-            "inGuild": member(uid) is not None}
+            "inGuild": member(uid) is not None, "groups": list(SHOP_GROUPS),
+            "slot": {"cost": SLOT_COST,
+                     "odds": [{"key": k, "kr": kr, "pct": per / 10.0, "tier": tier}
+                              for k, kr, per, tier, _g, _n in SLOT_TABLE]}}
 
 
 def buy(uid, item_id, count=1):
@@ -953,6 +1010,103 @@ def buy(uid, item_id, count=1):
     items.bag_add(uid, it["id"], n)
     return {"ok": True, "spent": total, "coin": coin(uid),
             "message": "%s %d개를 길드 코인 %d개로 샀습니다!" % (it["kr"], n, total)}
+
+
+# ---------------------------------------------------------------- 슬롯머신
+def slot_roll(rng):
+    """결과 한 줄 (SLOT_TABLE 의 행). 천분율로 고른다."""
+    n = rng.randrange(1000)
+    for row in SLOT_TABLE:
+        if n < row[2]:
+            return row
+        n -= row[2]
+    return SLOT_TABLE[0]
+
+
+def slot_reels(key, rng):
+    """릴 기호 셋. 당첨이면 그 결과의 기호 셋이 같고, 꽝이면 셋이 다 같지는 않다 (가끔 앞 둘만 같다)."""
+    if key != "lose":
+        return [key] * 3
+    if rng.random() < SLOT_NEAR:
+        a = rng.choice(SLOT_SYMBOLS)
+        b = rng.choice([x for x in SLOT_SYMBOLS if x != a])
+        return [a, a, b]
+    while True:
+        out = [rng.choice(SLOT_SYMBOLS) for _ in range(3)]
+        if len(set(out)) > 1:
+            return out
+
+
+def _slot_give(uid, row, rng, now):
+    """당첨된 것을 준다. (도구 id, 개수, 꾸미기 열쇠, 알 (id, 종류)) 를 돌려준다."""
+    from common import deco as C
+    from . import deco, eggs
+    key, _kr, _per, _tier, what, n = row
+    if what is None:
+        return None, 0, None, None
+    if what == "egg":
+        kind = "legendary" if rng.random() < 0.5 else "mythical"
+        # 알 수에는 한도가 없다 - 파티가 꽉 찼으면 박스로 간다 (eggs.give). 대신 줄 것이 필요 없다.
+        return None, 0, None, (eggs.give(uid, kind, rng=rng, now=_iso(now)), kind)
+    if what == "deco":
+        have = deco.owned(uid)
+        left = [k for k in C.slot_pool() if not have.get(k)]
+        if left:
+            k = rng.choice(left)
+            deco.grant(uid, k, now=_iso(now))
+            return None, 0, k, None
+        item, n = SLOT_DECO_SPARE
+    elif what == "held":
+        item = rng.choice(SHOP_HELD)
+    elif isinstance(what, tuple):
+        item = rng.choice(what)
+    else:
+        item = what
+    items.bag_add(uid, item, n)
+    return item, n, None, None
+
+
+def slot(uid, rng=None, now=None):
+    """슬롯머신 한 번. 코인을 먼저 (조건부로) 빼고, 빠졌을 때만 굴려서 준다.
+
+    코인은 사람 것이라 길드를 나와도 돌릴 수 있다 (buy 와 같다). 동시에 두 번 눌러도 조건부 UPDATE 라
+    코인이 음수가 되지 않는다. 주다가 터지면 코인을 돌려준다 - 낸 코인만 사라지는 일이 없게.
+    """
+    rng = rng or random.SystemRandom()
+    cur = db.run("UPDATE guild_user SET coin = coin - ? WHERE user_id=? AND coin >= ?",
+                 (SLOT_COST, uid, SLOT_COST))
+    if cur.rowcount <= 0:
+        raise HTTPException(400, "길드 코인이 모자랍니다. (%d개 필요)" % SLOT_COST)
+    row = slot_roll(rng)
+    key, kr, _per, tier, _what, _n = row
+    try:
+        item, n, dk, egg = _slot_give(uid, row, rng, now)
+    except Exception:
+        _coin_add(uid, SLOT_COST)
+        raise
+    # 운영에서 확률이 표대로 나오는지 볼 수 있게 한 판씩 남긴다.
+    db.run("INSERT INTO guild_slot_log (user_id, at, cost, prize, item, count, deco, egg_id, egg_kind)"
+           " VALUES (?,?,?,?,?,?,?,?,?)",
+           (uid, _iso(now), SLOT_COST, key, item, n, dk, egg[0] if egg else None,
+            egg[1] if egg else None))
+    from common import deco as C
+    from . import eggs
+    item_kr = items.name_of(item) if item else None
+    deco_kr = C.name(dk) if dk else None
+    egg_out = {"kind": egg[1], "kr": eggs.KINDS[egg[1]][0]} if egg else None
+    if key == "lose":
+        msg = "꽝! 다음에는 맞을 거예요."
+    elif dk:
+        msg = "꾸미기 '%s' 이(가) 나왔습니다! 꾸미기 창에서 끼울 수 있습니다." % deco_kr
+    elif egg_out:
+        msg = "대박! %s 이(가) 나왔습니다!" % egg_out["kr"]
+    elif key == "deco":
+        msg = "꾸미기를 이미 다 가지고 있어서 대신 %s %d개를 드립니다." % (item_kr, n)
+    else:
+        msg = "%s %d개가 나왔습니다!" % (item_kr, n)
+    return {"ok": True, "prize": key, "kr": kr, "tier": tier, "item": item, "itemKr": item_kr,
+            "count": n, "deco": dk, "decoKr": deco_kr, "egg": egg_out,
+            "reels": slot_reels(key, rng), "coin": coin(uid), "message": msg}
 
 
 # ---------------------------------------------------------------- 길드원 프로필

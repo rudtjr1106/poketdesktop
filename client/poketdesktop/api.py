@@ -560,6 +560,11 @@ class Api(object):
     def guild_buy(self, item, count=1):
         return self._call("POST", "/api/guild/shop/buy", {"item": item, "count": int(count)})
 
+    def guild_slot(self):
+        """랜덤 캡슐 한 번 (2.1.0, 서버 이름은 slot). 결과는 서버가 정한다 - 화면(ui_gacha)은 그 등급의
+        캡슐을 배출하고 열어 보일 뿐이다."""
+        return self._call("POST", "/api/guild/shop/slot", {})
+
     # 도감 업적 (시즌 3)
     def achievements(self):
         return self._call("GET", "/api/achievements")

@@ -198,7 +198,7 @@ def catch_mode(settings):
 
 
 def catch_pick(settings):
-    """'고른 포켓몬만' 에서 고른 종 (내부 이름 집합). 리스트가 아니거나 글이 아닌 것은 버린다."""
+    """'안 잡은 포켓몬 + 고른 포켓몬' 에서 고른 종 (내부 이름 집합). 리스트가 아니거나 글이 아닌 것은 버린다."""
     v = (settings or {}).get("catchPick")
     if not isinstance(v, (list, tuple)):
         return frozenset()
@@ -222,9 +222,10 @@ def base_species(species, dex=None):
 def catch_for(settings, foe, dex=None):
     """이 야생과 싸울 때 서버에 보낼 잡기 모드 (new/always/off).
 
-    'pick' 은 **앱이 정해서 always / off 로 바꿔 보낸다** - 서버는 그 모드대로 멈출 뿐이라, 옛 서버도
-    그대로 알아듣는다. 색이 다른 포켓몬은 고르지 않은 종이어도 멈춘다 ('new' 와 같은 규칙 - 놓치면 아깝다).
-    foe 는 배틀의 야생 쪽 (/api/battle 의 battle.foe: species · shiny). 종을 모르면 끝까지 싸운다.
+    'pick' 은 **앱이 정해서 always / new 로 바꿔 보낸다** - 서버는 그 모드대로 멈출 뿐이라, 옛 서버도
+    그대로 알아듣는다. 고른 종과 색이 다른 포켓몬은 always, 나머지는 new (서버가 아직 안 잡은 종이면 멈춘다 -
+    2.1.0, 게시판 #407 '안 잡은 포켓몬 + 고른 포켓몬'. 그 전에는 off 였다).
+    foe 는 배틀의 야생 쪽 (/api/battle 의 battle.foe: species · shiny). 종을 모르면 new 로 서버에 맡긴다.
     """
     mode = catch_mode(settings)
     if mode != "pick":
@@ -234,11 +235,11 @@ def catch_for(settings, foe, dex=None):
         return "always"
     sp = foe.get("species")
     if not isinstance(sp, str) or not sp.strip():
-        return "off"
+        return "new"
     picked = catch_pick(settings)
     if sp.strip().upper() in picked or base_species(sp, dex) in picked:
         return "always"
-    return "off"
+    return "new"
 
 
 def load_settings():

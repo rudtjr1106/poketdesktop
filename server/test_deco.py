@@ -222,7 +222,8 @@ def own_part():
     chk("  다 쓰면 목록에서 빠진다", C.PICK not in deco.owned(u), deco.owned(u))
     chk("  없으면 409", code_of(lambda: deco.pick(u, "join_pearls")) == 409)
     st = deco.state(u)
-    chk("창에 줄 것: 13개 · 가진 표시 · 선택권 0 · 고를 묶음 셋", len(st["items"]) == 13 and st["picks"] == 0
+    chk("창에 줄 것: 꾸미기 전부(%d개) · 가진 표시 · 선택권 0 · 고를 묶음 셋" % len(C.DECOS),
+        len(st["items"]) == len(C.DECOS) and st["picks"] == 0
         and len(st["choices"]) == 3 and sum(1 for i in st["items"] if i["owned"]) == 7, st["picks"])
 
     print("\n=== 4. 끼우기 (equip) ===")

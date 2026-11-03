@@ -485,10 +485,10 @@ def _use_level(uid, it, eff, mon, dex, hour):
         before = mon["species"]
         got = evolution.apply(uid, mon, b, dex, _now())
         info = evolution.public(dex, before, b["to"], got.get("learned") or [],
-                                got.get("pendingIds") or [])
+                                got.get("pendingIds") or [], form=b.get("form"))
         return {"ok": True, "level": mon["level"], "learned": [], "evolve": info,
                 "message": "축하합니다! %s은(는) %s(으)로 진화했다!"
-                           % (info["fromKr"], info["toKr"])}
+                           % (info["fromKr"], evolution.name_kr(info))}
     got = deps.set_level(uid, mon["id"],
                          mon["level"] + int(eff.get("amount", 1)), hour)
     if got is None:
@@ -538,10 +538,10 @@ def _use_stone(uid, it, mon, dex, hour):
     before = mon["species"]
     got = evolution.apply(uid, mon, b, dex, _now())
     info = evolution.public(dex, before, b["to"],
-                            got.get("learned") or [], got.get("pendingIds") or [])
+                            got.get("learned") or [], got.get("pendingIds") or [], form=b.get("form"))
     return {"ok": True, "evolve": info,
             "message": "축하합니다! %s은(는) %s(으)로 진화했다!"
-                       % (info["fromKr"], info["toKr"])}
+                       % (info["fromKr"], evolution.name_kr(info))}
 
 
 def _use_everstone(uid, it, mon):

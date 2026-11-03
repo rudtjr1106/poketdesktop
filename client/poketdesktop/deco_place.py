@@ -14,6 +14,20 @@
 
 위치 점이 없는 출처(followers · ow)는 그림 윗부분 가운데를 머리 점으로 친다.
 
+## 눈 (2.1.0 - 선글라스 · 그리고 다른 장식이 눈을 가리지 않게)
+
+Offsets 에는 눈 점이 없다. 그래서 그림에서 찾는다 (find_eyes): 머리 꼭대기 ~ 입 사이에서
+  1. 짙은 눈동자(사방이 칠해진 아주 짙은 픽셀) 덩어리 + 바로 옆에 흰색에 가까운 빛(흰자 · 눈빛)
+  2. 1 이 없으면 머리 띠에서 드문 색(몇 칸 안 되는 색 - 블래키 빨강 · 님피아 파랑 · 푸린 청록) 덩어리
+정면은 입 줄을 가운데로 좌우 대칭인 한 쌍, 옆모습은 보는 쪽에 하나. 둘이 다르면 예상 높이(표본 69종에서 잰
+정면 64% · 옆 55%)에 가까운 쪽. 그래도 없으면 그 예상 높이와 눈 간격(머리 폭의 43%)으로 둔다.
+표본 69종 x 앞 · 옆 · 뒤 207 장면에서 '렌즈가 눈을 덮나 · 관이 머리에 걸치고 눈을 안 가리나 · 핀이 허공에
+안 뜨나 · 넥타이가 몸 위에 있나' 를 픽셀로 셌다 (client/test_deco_place.py 에 일부 장면을 그림 없이 남겼다).
+
+자리 고르기(2.1.0): 처음 자리가 눈을 가리거나 허공에 뜨면 가까운 다른 자리를 고른다 - 관은 눈 위로 올리거나
+옆모습이면 뒤통수 쪽으로(_crown_fit), 머리 장식은 뒤통수 · 위 · 안쪽으로(_settle), 옆모습 렌즈는 코끝 밖으로
+나오면 뒤로(_lens_fit), 넥타이는 몸 밖으로 삐지면 몸 쪽으로(_body_fit).
+
 ## 걸을 때 튀지 않게 (10/30 사용자 제보)
 
 프레임마다 자리를 새로 재면 귀 · 털이 흔들리거나 원본 점이 들쭉날쭉해서 장식이 4~10칸씩 튀었다. 그래서 **방향마다
@@ -35,7 +49,10 @@ from . import deco_art as ART
 S = 2                                   # 원래 도트 칸 1 = 촘촘한 칸 S x S
 SEARCH = 6                              # 머리 움직임을 찾아보는 칸 수 (원래 칸)
 CROWNS = {"crown_gold": "gold", "crown_silver": "silver", "crown_bronze": "bronze"}
-HAIR = ("bow", "flower")
+HEADS = ("flower_crown",)                # 왕관 자리에 얹지만 반짝이지 않는 것
+HAIR = ("bow", "flower", "star_pin")
+FACE = ("shades", "heart_shades")
+NECK = ("pearls", "bowtie")
 # 방향 -> SpriteCollab 행 번호의 뜻 (sprites 의 방향 상수와 상관없이 '어느 쪽을 보나' 만 쓴다)
 FRONT = ("down", "downleft", "downright")
 BACK = ("up", "upleft", "upright")
@@ -46,7 +63,7 @@ GLINT_EVERY_MS = 1400                   # 왕관이 이만큼마다 한 번 반�
 
 def accessories(items):
     """그릴 장식만 (효과는 deco_fx 가 따로). 순서 = 그리는 차례."""
-    return tuple(k for k in items or () if k in CROWNS or k in HAIR or k == "pearls")
+    return tuple(k for k in items or () if k in CROWNS or k in HEADS or k in HAIR or k in FACE or k in NECK)
 
 
 # ---------------------------------------------------------------- 그림 재기 (촘촘한 칸)
@@ -83,6 +100,274 @@ def _head_top(im, hx, hy):
             break
         y -= 1
     return y
+
+
+def _lum(p):
+    return 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2]
+
+
+FRONT_EYE, SIDE_EYE, EYE_SEP = 0.64, 0.55, 0.43     # 표본 69종에서 잰 눈 높이(꼭대기 0 ~ 입 1) · 눈 간격(머리 폭)
+
+
+def _blobs(pts):
+    """8방향으로 이어진 덩어리들."""
+    left, out = set(pts), []
+    while left:
+        st = [left.pop()]
+        b = list(st)
+        while st:
+            x, y = st.pop()
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    q = (x + dx, y + dy)
+                    if q in left:
+                        left.discard(q)
+                        st.append(q)
+                        b.append(q)
+        out.append(b)
+    return out
+
+
+def _center(b):
+    return sum(q[0] for q in b) / float(len(b)), sum(q[1] for q in b) / float(len(b))
+
+
+def find_eyes(cell, sp):
+    """원래 칸 좌표의 눈 [(cx, cy, 픽셀들)] - 정면 둘, 옆 하나, 뒤 · 못 찾음은 []. (위 '눈' 설명)"""
+    if sp.face in BACK:
+        return []
+    W, H = cell.size
+    px = cell.load()
+
+    def op(x, y):
+        return 0 <= x < W and 0 <= y < H and px[x, y][3] > 0
+
+    top, hy = sp.top // S, sp.hy // S
+    band = max(2, hy - top)
+    y0, y1 = top + max(1, int(band * 0.3)), max(top + 1, hy - 1)     # 머리 점 줄은 입이다
+    span = _run(sp.im, sp.hx, (sp.top + sp.hy) // 2) or (sp.hx - 16, sp.hx + 16)
+    x0, x1 = span[0] // S - 1, span[1] // S + 1
+    hx, hw = sp.hx / float(S), max(4.0, (x1 - x0) / 2.0)
+    front = sp.face in FRONT
+    right = sp.face in FACE_RIGHT
+    mid_y = top + band * (FRONT_EYE if front else SIDE_EYE)
+    half = x0 + (x1 - x0) * (0.4 if right else 0.6)
+
+    def light(x, y):                # 흰자 · 눈빛 (밝기만 보면 노랑 · 살구 같은 밝은 몸 색이 걸린다)
+        return op(x, y) and min(px[x, y][:3]) >= 185
+
+    def pair(blobs, cap):
+        best, score = None, 1e9
+        for i in range(len(blobs)):
+            for j in range(i + 1, len(blobs)):
+                a, c = sorted((blobs[i], blobs[j]), key=lambda t: t[0])
+                dx = c[0] - a[0]
+                if dx < 2.5 or dx > hw * 1.25 or abs(a[1] - c[1]) > 1.6:
+                    continue
+                if abs((a[0] + c[0]) / 2 - hx) > max(2.0, dx * 0.35):      # 입 줄을 가운데로 마주 본다
+                    continue
+                if max(abs(a[0] - hx), abs(c[0] - hx)) > hw * 0.72:        # 볼 · 수염 · 얼굴 가장자리는 아니다
+                    continue
+                sc = (abs(a[1] - c[1]) * 3 + abs((a[0] + c[0]) / 2 - hx) * 1.5
+                      + abs((a[1] + c[1]) / 2 - mid_y) * 0.6 - min(a[3], c[3]) * cap)
+                if sc < score:
+                    best, score = [a, c], sc
+        return best
+
+    def side(blobs, wx):
+        blobs = [b for b in blobs if (b[0] >= half if right else b[0] <= half)]
+        blobs.sort(key=lambda t: (-t[0] if right else t[0]) * wx + abs(t[1] - mid_y) * 0.8 - t[3] * 0.1)
+        return blobs[:1] or None
+
+    # 1. 짙은 눈동자 + 흰 빛
+    dark = [(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)
+            if op(x, y) and _lum(px[x, y]) < 70
+            and all(op(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+    lit = []
+    for b in _blobs(dark):
+        xs, ys = [q[0] for q in b], [q[1] for q in b]
+        if len(b) > 16 or max(xs) - min(xs) > 4 or max(ys) - min(ys) > 5:
+            continue
+        n = len({(x + dx, y + dy) for (x, y) in b for dx in (-1, 0, 1) for dy in (-1, 0, 1) if light(x + dx, y + dy)})
+        if n:
+            lit.append(_center(b) + (b, n))
+    # 2. 드문 색
+    count, where = {}, {}
+    for y in range(max(0, y0), min(H, y1)):          # 입 바로 위 줄까지
+        for x in range(max(0, x0), min(W, x1 + 1)):
+            if px[x, y][3]:
+                k = px[x, y][:3]
+                count[k] = count.get(k, 0) + 1
+                where.setdefault(k, []).append((x, y))
+    total = sum(count.values()) or 1
+    rare = []
+    for k, pts in where.items():
+        if len(pts) > max(28, total * 0.08) or _lum(k) >= 200 or max(k) - min(k) < 40:
+            continue                                  # 흰 · 회색 · 흔한 몸 색은 눈이 아니다
+        for b in _blobs(pts):
+            if _lum(k) >= 110 and not any(op(x + dx, y + dy) and _lum(px[x + dx, y + dy]) < 80
+                                          for (x, y) in b for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+                continue                              # 눈은 짙은 테두리에 붙어 있다 (색 자체가 짙으면 그것이 눈동자)
+            if not front and len(b) > 16:
+                continue
+            rare.append(_center(b) + (b, 0))
+    if front:
+        a, b = pair(lit, 0.15), None
+        groups = {}                                   # 드문 색 쌍은 같은 색끼리 (님피아: 눈과 같은 파랑이 리본에도)
+        for e in rare:
+            groups.setdefault(px[e[2][0]][:3], []).append(e)
+        for g in groups.values():
+            got = pair(g, 0)
+            if got and (b is None or abs((got[0][1] + got[1][1]) / 2 - mid_y) < abs((b[0][1] + b[1][1]) / 2 - mid_y)):
+                b = got
+        pick = a or b
+        if a and b and abs((b[0][1] + b[1][1]) / 2.0 - mid_y) + 1.0 < abs((a[0][1] + a[1][1]) / 2.0 - mid_y):
+            pick = b                                  # 두 길이 다르면 예상 높이에 더 가까운 쪽
+    else:
+        a, b = side(lit, 0.3), side(rare, 0.1)
+        pick = a or b
+        if a and b and abs(b[0][1] - mid_y) + 1.0 < abs(a[0][1] - mid_y):
+            pick = b
+    return [_refine(cell, e) for e in (pick or [])]
+
+
+def _refine(cell, eye):
+    """찾은 눈 덩어리를 한 칸 넓혀(덩어리 색 · 짙은 색 · 흰자) 가운데를 다시 잡는다 (블래키: 살구 한 점 -> 빨간 눈).
+    볼 · 몸 색으로는 안 퍼진다."""
+    _cx, _cy, b = eye[:3]
+    W, H = cell.size
+    px = cell.load()
+    own = set(px[q][:3] for q in b)
+    pts = set(b)
+    for (x, y) in b:
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                q = (x + dx, y + dy)
+                if 0 <= q[0] < W and 0 <= q[1] < H and px[q][3]:
+                    col = px[q][:3]
+                    if col in own or _lum(col) < 110 or min(col) >= 185:
+                        pts.add(q)
+    cx, cy = _center(list(pts))
+    return cx, cy, list(pts)
+
+
+def eye_points(cell, sp):
+    """-> ([(촘촘 x, 촘촘 y)], 찾았나). 못 찾으면 예상 높이 · 간격. 등을 보이면 []."""
+    if sp.face in BACK:
+        return [], False
+    ey = find_eyes(cell, sp)
+    want = 2 if sp.face in FRONT else 1
+    if len(ey) == want:
+        return [(int(round(cx * S + S // 2)), int(round(cy * S + S // 2))) for cx, cy, _b in ey], True
+    span = _run(sp.im, sp.hx, (sp.top + sp.hy) // 2) or (sp.hx - 16, sp.hx + 16)
+    band = sp.hy - sp.top
+    if sp.face in FRONT:
+        y = int(round(sp.top + band * FRONT_EYE))
+        half, mid = (span[1] - span[0]) * EYE_SEP / 2.0, (span[0] + span[1]) / 2.0
+        return [(int(round(mid - half)), y), (int(round(mid + half)), y)], False
+    y = int(round(sp.top + band * SIDE_EYE))
+    row = _run(sp.im, sp.hx, y) or span
+    return [(row[1] - 5 if sp.face in FACE_RIGHT else row[0] + 5, y)], False
+
+
+# ---------------------------------------------------------------- 자리 고르기 (2.1.0)
+def _over(big, it, xy, rows=None):
+    """그림 칠한 칸 가운데 도트 위에 얹힌 몫 (0~1). rows 면 그 줄만."""
+    W, H = big.size
+    n = hit = 0
+    for y in range(it.height):
+        if rows is not None and y not in rows:
+            continue
+        for x in range(it.width):
+            if it.getpixel((x, y))[3]:
+                n += 1
+                X, Y = xy[0] + x, xy[1] + y
+                if 0 <= X < W and 0 <= Y < H and big.getpixel((X, Y))[3] > 0:
+                    hit += 1
+    return hit / float(n or 1)
+
+
+def _covers(it, xy, eyes, r=2):
+    for (ex, ey) in eyes:
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                x, y = ex + dx - xy[0], ey + dy - xy[1]
+                if 0 <= x < it.width and 0 <= y < it.height and it.getpixel((x, y))[3]:
+                    return True
+    return False
+
+
+def _lift(xy, it, eyes, gap=3):
+    """아래 끝이 눈 가운데보다 gap 칸 위가 되게 올린다."""
+    if not eyes:
+        return xy
+    return xy[0], min(xy[1], min(y for _x, y in eyes) - gap - it.height + 1)
+
+
+def _crown_fit(big, it, xy, eyes, back=0, need=0.35):
+    """관: 눈을 안 가리면서 아래 세 줄이 머리에 걸치는 가장 가까운 자리 (눈 위로 -> 옆모습은 뒤통수 쪽)."""
+    rows = set(range(it.height - 3, it.height))
+    up = _lift(xy, it, eyes)
+    cand = [xy, up]
+    for d in ((2, 4, 6, 8, 10) if back else ()):
+        cand += [(xy[0] + back * d, xy[1]), (up[0] + back * d, up[1])]
+    best, bf = up, -1
+    for c in cand:
+        if eyes and _covers(it, c, eyes):
+            continue
+        f = _over(big, it, c, rows)
+        if f >= need:
+            return c
+        if f > bf:
+            best, bf = c, f
+    return best
+
+
+def _settle(big, it, xy, eyes, back=1, need=0.5):
+    """머리 장식: 눈을 안 가리고 절반 이상 머리에 얹히는 가장 가까운 자리 (처음 -> 뒤통수 쪽 -> 위 -> 안쪽)."""
+    x0, y0 = xy
+    cand = [xy] + [(x0 + back * d, y0) for d in (2, 4, 6, 8)]
+    for d in (2, 4, 6):
+        cand += [(x0, y0 - d), (x0 + back * d, y0 - d)]
+    for d in (2, 4, 6):                                   # 작은 머리는 안쪽으로 (토게피 · 우파)
+        cand += [(x0 - back * d, y0), (x0 - back * d, y0 + d // 2)]
+    best, bf = None, -1
+    for c in cand:
+        if eyes and _covers(it, c, eyes):
+            continue
+        f = _over(big, it, c)
+        if f >= need:
+            return c
+        if f > bf:
+            best, bf = c, f
+    return best or _lift(xy, it, eyes)
+
+
+def _lens_fit(big, it, xy, face, need=0.8):
+    """옆모습 렌즈가 코끝 밖으로 나오면 뒤로 한 칸씩 (3칸까지)."""
+    if face in FRONT:
+        return xy
+    step = -1 if face in FACE_RIGHT else 1
+    for i in range(4):
+        c = (xy[0] + step * i, xy[1])
+        if _over(big, it, c) >= need:
+            return c
+    return xy
+
+
+def _body_fit(big, it, xy, cx, need=0.8):
+    """넥타이가 몸 밖으로 삐지면 몸 가운데 쪽으로, 그래도 안 되면 위아래로 - 가장 많이 얹히는 자리."""
+    x0, y0 = xy
+    toward = 1 if cx > x0 + it.width / 2.0 else -1
+    cand = [(x0 + toward * d, y0) for d in range(10)] + [(x0, y0 + d) for d in (1, 2, 3, -1, -2)]
+    best, bf = xy, -1
+    for c in cand:
+        f = _over(big, it, c)
+        if f >= need:
+            return c
+        if f > bf:
+            best, bf = c, f
+    return best
 
 
 def guess_head(cell):
@@ -204,24 +489,41 @@ def plan(cells, heads, centers, face, items):
     big = c0.resize((c0.width * S, c0.height * S), Image.NEAREST)
     sp = Spot(big, head, center, face)
     hsh = shifts(cells, _head_box(sp)) if n > 1 else [(0, 0)]
+    eyes = []
+    if face not in BACK:
+        eyes, _found = eye_points(c0, sp)
     head_draws, neck_draws = [], []
     crown_at = None
-    has_crown = any(k in CROWNS for k in items)
+    has_crown = any(k in CROWNS or k in HEADS for k in items)
+    back = -sp.side() if face not in FRONT else 0          # 뒤통수 쪽 (+1 = 화면 오른쪽)
     for k in items:
-        if k in CROWNS:
-            c = ART.crown(CROWNS[k])
+        if k in CROWNS or k in HEADS:
+            c = ART.crown(CROWNS[k]) if k in CROWNS else ART.flower_crown()
             x, y = sp.crown(c)
+            x, y = _crown_fit(big, c, (x, y + (1 if k in HEADS else 0)), eyes, back=back)
             head_draws.append((c, x, y))
-            crown_at = (x, y, c.width)
+            if k in CROWNS:
+                crown_at = (x, y, c.width)
     for k in items:
         if k in HAIR:
-            art = ART.bow() if k == "bow" else ART.flower_pin()
+            art = {"bow": ART.bow, "flower": ART.flower_pin, "star_pin": ART.star_pin}[k]()
             if sp.side() < 0:
                 art = art.transpose(Image.FLIP_LEFT_RIGHT)
             x, y = sp.hair(art, low=6 if has_crown else 0)
             if has_crown:
                 x += 3 if sp.side() > 0 else -3
+            x, y = _settle(big, art, (x, y), eyes, back=back or 1)
             head_draws.append((art, x, y))
+    for k in items:
+        if k in FACE and face not in BACK and eyes:
+            if face in FRONT and len(eyes) == 2:
+                (ax, ay), (bx, by) = sorted(eyes)
+                im, cx, ey = ART.glasses(k, bx - ax)
+                xy = (ax - cx, (ay + by) // 2 - ey)
+            else:
+                im, cx, ey = ART.glasses(k, None, face in FACE_RIGHT)
+                xy = (eyes[0][0] - cx, eyes[0][1] - ey)
+            head_draws.append((im, ) + _lens_fit(big, im, xy, face))
     nsh = [(0, 0)] * n
     if "pearls" in items and face not in BACK:
         nx, ny, half = sp.neck()
@@ -244,9 +546,20 @@ def plan(cells, heads, centers, face, items):
             neck_draws.append((p, x - 1, y - 1))
         h = ART.heart()
         neck_draws.append((h, low[0] - h.width // 2, low[1]))
-        if n > 1:
-            box = (max(0, (nx - half) // S - 1), max(0, (ny - 4) // S), (nx + half) // S + 2, (ny + 7) // S + 1)
-            nsh = shifts(cells, box)
+    if "bowtie" in items and face not in BACK:
+        nx, ny, half = sp.neck()
+        it = ART.bowtie()
+        top = sp.hy + 4 - it.height // 2                 # 매듭(가운데)이 입 줄 두 칸 아래
+        bb = big.getbbox()
+        if bb:
+            top = min(top, bb[3] - it.height - 2)          # 몸 바닥 밖으로 처지지 않게
+        if eyes:
+            top = max(top, max(y for _x, y in eyes) + 3)    # 눈 아래로
+        neck_draws.append((it, ) + _body_fit(big, it, (nx - it.width // 2, top), sp.cx))
+    if neck_draws and n > 1:
+        nx, ny, half = sp.neck()
+        box = (max(0, (nx - half) // S - 1), max(0, (ny - 4) // S), (nx + half) // S + 2, (ny + 7) // S + 1)
+        nsh = shifts(cells, box)
     frames, crowns = [], []
     for i in range(n):
         hx, hy = hsh[i][0] * S, hsh[i][1] * S

@@ -376,6 +376,12 @@ jobs:
       # 버전 2: 꾸미기 - 걷는 도트에 장식 얹기 · 발자국/별가루 효과 창 · 꾸미기 창(테마 7개)
       - name: 꾸미기 (진짜 Tk)
         run: python client/test_deco.py
+      # 2.1.0: 꾸미기 자리 - 눈 찾기(선글라스) · 관 · 핀 · 넥타이가 눈을 안 가리고 허공에 안 뜨나 · 새 효과
+      - name: 꾸미기 자리
+        run: python client/test_deco_place.py
+      # 2.1.0: 랜덤 캡슐 창 - 동전 · 손잡이 · 섞기 · 배출 · 열기 · 등급 연출 · 오류 · 확률표 · 상점 띠 (진짜 Tk)
+      - name: 랜덤 캡슐 (진짜 Tk)
+        run: python client/test_gacha_ui.py
       # 1.8.1: 잡았을 때의 경험치 - 받은 레벨업·진화를 화면이 다루는지
       - name: 잡았을 때의 경험치
         run: python client/test_catch_exp.py
@@ -546,6 +552,12 @@ jobs:
       # 버전 2: 꾸미기 - 걷는 도트에 장식 얹기 · 발자국/별가루 효과 창 · 꾸미기 창(테마 7개)
       - name: 꾸미기 (진짜 Tk)
         run: python client/test_deco.py
+      # 2.1.0: 꾸미기 자리 - 눈 찾기(선글라스) · 관 · 핀 · 넥타이가 눈을 안 가리고 허공에 안 뜨나 · 새 효과
+      - name: 꾸미기 자리
+        run: python client/test_deco_place.py
+      # 2.1.0: 랜덤 캡슐 창 - 동전 · 손잡이 · 섞기 · 배출 · 열기 · 등급 연출 · 오류 · 확률표 · 상점 띠 (진짜 Tk)
+      - name: 랜덤 캡슐 (진짜 Tk)
+        run: python client/test_gacha_ui.py
       # 1.8.1: 잡았을 때의 경험치 - 받은 레벨업·진화를 화면이 다루는지
       - name: 잡았을 때의 경험치
         run: python client/test_catch_exp.py
@@ -642,6 +654,7 @@ jobs:
           python test_wild_faint.py
           # 길드 (1.10.0): 만들기·가입·권한·채팅·일일 미션·단계 보상·코인 상점
           python test_guild.py
+          python test_guild_slot.py      # 2.1.0: 코인 상점 진화 도구 · 지닌 도구 + 슬롯머신 (확률표 · 기대값 · 꾸미기 후보 · 기록)
           # 캐릭터 (1.10.3): 고른 것만 저장한다, 보내온 것은 믿지 않는다, 마이페이지 카드에 실린다
           python test_avatar.py
           # 파티 프리셋 (1.10.3): 번호를 오가도 잃는 것이 없다, 알·꽉 찬 박스·놓아준 포켓몬

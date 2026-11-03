@@ -3791,6 +3791,109 @@
   },
   {
    "abil": [
+    "UNSEENFIST"
+   ],
+   "base": {
+    "atk": 130,
+    "def": 100,
+    "hp": 100,
+    "spa": 63,
+    "spd": 60,
+    "spe": 97
+   },
+   "dot": true,
+   "en": "Urshifu",
+   "evo": [],
+   "form": "RAPIDSTRIKE",
+   "formKind": "evo",
+   "formKr": "연격의 태세",
+   "formOf": "URSHIFU",
+   "height": 1.9,
+   "hidden": null,
+   "internal": "URSHIFU_RAPIDSTRIKE",
+   "kg": 105.0,
+   "kr": "우라오스",
+   "moves": [
+    [
+     0,
+     "SURGINGSTRIKES"
+    ],
+    [
+     1,
+     "AQUAJET"
+    ],
+    [
+     1,
+     "ENDURE"
+    ],
+    [
+     1,
+     "FOCUSENERGY"
+    ],
+    [
+     1,
+     "LEER"
+    ],
+    [
+     1,
+     "ROCKSMASH"
+    ],
+    [
+     12,
+     "AERIALACE"
+    ],
+    [
+     16,
+     "SCARYFACE"
+    ],
+    [
+     20,
+     "HEADBUTT"
+    ],
+    [
+     24,
+     "BRICKBREAK"
+    ],
+    [
+     28,
+     "DETECT"
+    ],
+    [
+     32,
+     "BULKUP"
+    ],
+    [
+     36,
+     "IRONHEAD"
+    ],
+    [
+     40,
+     "DYNAMICPUNCH"
+    ],
+    [
+     44,
+     "COUNTER"
+    ],
+    [
+     48,
+     "CLOSECOMBAT"
+    ],
+    [
+     52,
+     "FOCUSPUNCH"
+    ]
+   ],
+   "num": 10191,
+   "prevo": null,
+   "spawnable": false,
+   "types": [
+    "FIGHTING",
+    "WATER"
+   ],
+   "walk": "0892/0001"
+  },
+  {
+   "abil": [
     "PRESSURE"
    ],
    "base": {
@@ -146295,6 +146398,14 @@
    "evo": [
     {
      "item": "SCROLLOFDARKNESS",
+     "mode": "stone",
+     "to": "URSHIFU",
+     "toNum": 892,
+     "trigger": "use-item"
+    },
+    {
+     "form": "RAPIDSTRIKE",
+     "item": "SCROLLOFWATERS",
      "mode": "stone",
      "to": "URSHIFU",
      "toNum": 892,

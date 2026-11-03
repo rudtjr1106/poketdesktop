@@ -178,6 +178,34 @@ def main():
         view.get("moveTypes") == ["FIRE", None], view.get("moveTypes"))
     chk("  그런 기술이 없으면 싣지 않는다", "moveTypes" not in deps.decorate(db.row_to_mon(row(sh))))
 
+    print("== 진화하면서 정해지는 폼: 연격의 태세 우라오스 (2.1.0)")
+    rs = d.get("URSHIFU_RAPIDSTRIKE") or {}
+    chk("도감 forms 에 있다: 종류 evo, 그림 10191, 격투/물, 보이지않는주먹, 걷는 도트",
+        rs.get("formKind") == "evo" and rs.get("num") == 10191 and rs.get("types") == ["FIGHTING", "WATER"]
+        and rs.get("abil") == ["UNSEENFIST"] and rs.get("formKr") == "연격의 태세" and rs.get("walk") and rs.get("dot"),
+        dict((k, rs.get(k)) for k in ("formKind", "num", "types", "abil", "walk", "dot")))
+    lv0 = [mv for lv, mv in rs.get("moves") or [] if lv <= 0]
+    chk("  폼 표의 진화 기술(레벨 0)은 수류연타 하나", lv0 == ["SURGINGSTRIKES"], lv0)
+    chk("  다른 폼 표에는 레벨 0 이 없다 (개굴닌자 · 마이티폼은 그대로)",
+        not [m["internal"] for m in d.forms if m["internal"] != "URSHIFU_RAPIDSTRIKE"
+             and any(lv <= 0 for lv, _mv in (m.get("moves") or []))
+             and m.get("moves") is not (d.get(m["formOf"]) or {}).get("moves")])
+    ur = mkmon(uid, "URSHIFU", ["CLOSECOMBAT"], level=50)
+    db.run("UPDATE pokemon SET form='RAPIDSTRIKE' WHERE id=?", (ur,))
+    view = deps.decorate(db.row_to_mon(row(ur)))
+    chk("  화면 자료: num 892 그대로, 그림 formNum 10191, 타입 격투/물", view["num"] == 892
+        and view.get("formNum") == 10191 and view["info"]["types"] == ["격투", "물"]
+        and view["info"]["form"] == "연격의 태세", (view["num"], view.get("formNum"), view["info"]["types"]))
+    names = [mv for mv, _lv in TR.rememberable(row(ur), d.get("URSHIFU"), d)]
+    chk("  떠올리기: 수류연타 · 아쿠아제트 (일격의 암흑강타 · 기습은 안 나온다)",
+        "SURGINGSTRIKES" in names and "AQUAJET" in names and "WICKEDBLOW" not in names
+        and "SUCKERPUNCH" not in names, names)
+    single = mkmon(uid, "URSHIFU", ["CLOSECOMBAT"], level=50)
+    names = [mv for mv, _lv in TR.rememberable(row(single), d.get("URSHIFU"), d)]
+    chk("  일격의 태세는 그대로 (암흑강타 · 기습, 수류연타 없음)", "WICKEDBLOW" in names and "SUCKERPUNCH" in names
+        and "SURGINGSTRIKES" not in names, names)
+    chk("  폼 도구로 바꿀 수 있는 폼이 아니다 (useItem 없음)", not rs.get("useItem"))
+
     print("== 합체 도구는 없다")
     cat = items.catalog()
     chk("유전자쐐기·네크로플러스·유대의고삐는 상점에 없다",

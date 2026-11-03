@@ -7,6 +7,12 @@
     {"to": "샤미드", "toNum": 134, "mode": "stone", "item": "WATERSTONE"}
     {"to": "에브이", "toNum": 196, "mode": "friend", "happiness": 160,
      "time": "day"}
+    {"to": "URSHIFU", "toNum": 892, "mode": "stone", "item": "SCROLLOFWATERS",
+     "form": "RAPIDSTRIKE"}
+
+`form` 이 있는 갈래는 진화하면서 그 폼으로 정해진다 (도감 forms 의 formKind evo, 2.1.0). 치고마가
+물의 족자를 쓰면 연격의 태세 우라오스 - 종은 URSHIFU 그대로고 pokemon.form 칸에 RAPIDSTRIKE 를 적는다
+(폼체인지와 같은 틀, tools/add_forms.py). 악의 족자 갈래에는 form 이 없다 - 일격의 태세가 원래 종이다.
 
 교환 진화는 이 게임에 교환이 없으므로 도구 사용으로 바뀌어 있다
 (조건 없는 교환은 '연결의끈', 지닌 물건이 있던 것은 그 물건).
@@ -225,6 +231,13 @@ def apply(uid, mon, branch, dex, now):
     if not new_sp:
         raise ValueError("진화 대상이 도감에 없습니다: %s" % new_key)
 
+    # 진화하면서 정해지는 폼 (연격의 태세 우라오스). 진화 기술(레벨 0)도 그 폼의 표에서 본다 - 원래 종의
+    # 표로 보면 연격의 태세가 일격의 태세의 암흑강타를 배운다.
+    form_key = branch.get("form") or None
+    form = dex.get(new_key + "_" + form_key) if form_key else None
+    if form_key and not form:
+        raise ValueError("진화 폼이 도감에 없습니다: %s %s" % (new_key, form_key))
+
     old_sp = dex.get(mon["species"]) or {}
     level = mon["level"]
     exp = mon["exp"]
@@ -245,7 +258,7 @@ def apply(uid, mon, branch, dex, now):
     moves = list(mon.get("moves") or [])
     pending = list(mon.get("pending") or [])
     learned = []
-    for m in P.evolution_moves(new_sp):
+    for m in P.evolution_moves(form or new_sp):
         if m in moves or m in pending:
             continue
         if len(moves) < P.MAX_MOVES:
@@ -254,10 +267,11 @@ def apply(uid, mon, branch, dex, now):
         else:
             pending.append(m)
 
+    # 폼 칸은 진화하면 새로 정한다. 갈래에 폼이 없으면 비운다 - 진화 전 종의 폼이 진화한 종에 남으면 안 된다.
     db.run("UPDATE pokemon SET species=?, exp=?, ability=?, hidden_ability=?,"
-           " moves=?, pending=? WHERE id=? AND user_id=?",
+           " moves=?, pending=?, form=? WHERE id=? AND user_id=?",
            (new_key, exp, ability, int(bool(hidden)), json.dumps(moves),
-            json.dumps(pending), mon["id"], uid))
+            json.dumps(pending), form_key, mon["id"], uid))
     # **진화한 종도 도감에 올린다.** 도감(seen)은 잡을 때만 올리고 있어서,
     # 파이리를 키워 리자드가 돼도 리자드 칸은 비어 있었다. 이제 가진
     # 포켓몬이니 '잡음' 으로 올린다. 이미 쓰던 사람 몫은 migrations 가 한 번 채운다.
@@ -267,6 +281,7 @@ def apply(uid, mon, branch, dex, now):
 
     out = dict(mon)
     out["species"] = new_key
+    out["form"] = form_key
     out["exp"] = exp
     out["ability"] = ability
     out["hiddenAbility"] = hidden
@@ -277,20 +292,32 @@ def apply(uid, mon, branch, dex, now):
     return out
 
 
-def public(dex, before, after, learned=(), pending=()):
+def public(dex, before, after, learned=(), pending=(), form=None):
     """클라이언트에 보낼 진화 알림 한 덩이.
 
     **무엇을 배웠는지 같이 보낸다.** 진화하면서 배우는 기술이 있는데
     말없이 들어가면 언제 생긴 건지 알 길이 없다. 밀려난 것도 적는다 -
     아끼던 기술이 조용히 사라지면 나중에야 알게 된다.
+
+    form = 진화하면서 정해진 폼 열쇠 (갈래의 "form"). 있으면 **toNum 은 그 폼의 도트 번호**다 - 앱의 진화
+    연출이 이 번호로 새 그림을 받는다. 도감 번호는 toDexNum 에 따로 싣는다 (앱이 mon["num"] 에 넣는 것).
     """
     a = dex.get(before) or {}
     b = dex.get(after) or {}
-    return {
+    f = dex.get(after + "_" + form) if form else None
+    out = {
         "from": before, "fromKr": a.get("kr", before), "fromNum": a.get("num"),
-        "to": after, "toKr": b.get("kr", after), "toNum": b.get("num"),
+        "to": after, "toKr": b.get("kr", after), "toNum": (f or b).get("num"),
         "learned": [dex.move_name(m) for m in learned],
         # 자리가 없어 아직 못 배운 것. 클라이언트가 이걸 보고 물어본다.
         "pending": [dex.move_name(m) for m in pending],
         "pendingIds": list(pending),
     }
+    if f:
+        out.update(toForm=form, toFormKr=f.get("formKr"), toFormNum=f.get("num"), toDexNum=b.get("num"))
+    return out
+
+
+def name_kr(info):
+    """문장에 넣는 새 이름 - 폼이 있으면 '연격의 태세 우라오스' (뒤에 붙는 조사가 이름 끝 글자를 본다)."""
+    return ("%s %s" % (info["toFormKr"], info["toKr"])) if info.get("toFormKr") else info["toKr"]

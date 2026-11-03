@@ -630,7 +630,11 @@
   ],
   [
    "SCROLLOFDARKNESS",
-   14
+   7
+  ],
+  [
+   "SCROLLOFWATERS",
+   7
   ],
   [
    "SEAINCENSE",
@@ -7203,7 +7207,7 @@
   },
   "SCROLLOFDARKNESS": {
    "cat": "stone",
-   "chance": 0.00143,
+   "chance": 0.000715,
    "cost": 5000,
    "effect": {
     "kind": "stone"
@@ -7217,7 +7221,25 @@
    "kr": "악의 족자",
    "rarity": "rare",
    "sell": 2500,
-   "weight": 14
+   "weight": 7
+  },
+  "SCROLLOFWATERS": {
+   "cat": "stone",
+   "chance": 0.000715,
+   "cost": 5000,
+   "effect": {
+    "kind": "stone"
+   },
+   "en": "Scroll of Waters",
+   "evolves": [
+    "치고마"
+   ],
+   "id": "SCROLLOFWATERS",
+   "ident": "scroll-of-waters",
+   "kr": "물의 족자",
+   "rarity": "rare",
+   "sell": 2500,
+   "weight": 7
   },
   "SEAINCENSE": {
    "cat": "held",

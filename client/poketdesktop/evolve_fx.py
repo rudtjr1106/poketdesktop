@@ -478,6 +478,8 @@ class Evolution(object):
             pass
         from_kr = self.info.get("fromKr") or "포켓몬"
         to_kr = self.info.get("toKr") or "새로운 모습"
+        if self.info.get("toFormKr"):
+            to_kr = "%s %s" % (self.info["toFormKr"], to_kr)   # 연격의 태세 우라오스 (2.1.0)
         line = "축하합니다! %s%s %s%s 진화했다!" % (
             from_kr, josa(from_kr, "은"), to_kr, josa(to_kr, "으로"))
         if self.layer and self.alive():
@@ -506,6 +508,14 @@ class Evolution(object):
         to_kr = self.info.get("toKr")
         if self.info.get("toNum"):
             mon["num"] = self.info["toNum"]
+        if self.info.get("toDexNum"):
+            # 진화하면서 폼이 정해졌다 (연격의 태세 우라오스, 2.1.0). toNum 은 그 폼의 도트 번호라 그림 번호
+            # (formNum)로 두고, 도감 번호는 따로 받은 것을 넣는다 - 서버가 내려 주는 모양과 같게.
+            mon["num"] = self.info["toDexNum"]
+            mon["formNum"] = self.info["toNum"]
+            mon["formKr"] = self.info.get("toFormKr")
+            mon["formKey"] = self.info.get("toForm")
+            mon["form"] = self.info.get("toForm")
         # 도감 키도 같이 바꾼다. 번호만 바꿔 두면 다음 동기화 전까지
         # dex.get(mon["species"]) 가 진화 전 종을 돌려줘서, 타입이나
         # 능력치를 물어보는 곳이 엉뚱한 답을 받는다.

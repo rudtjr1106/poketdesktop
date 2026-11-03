@@ -27,6 +27,7 @@ pokemon.form 칸에 폼 열쇠(ORIGIN, SKY …)를 적는다. 지니면 바뀌�
             use    도구를 쓰면 바뀐다 (다시 쓰면 돌아온다 / 고른다)
             battle 배틀 중에만 (특성)
             move   그 기술을 알면 그 모습 (도트만)
+            evo    진화할 때 그 모습으로 정해진다 (물의 족자로 진화한 연격의 태세 우라오스, 2.1.0)
   items / useItem / formMoves   kind 에 따라
   base·types·abil·hidden                 원본 그대로
   walk / dot                              바탕화면 도트 (add_megas 와 같은 뜻)
@@ -102,6 +103,9 @@ FORMS = [
     ("terapagos-terastal", "TERASTAL", "battle", {"ability": "TERASHIFT", "formKr": "테라스탈폼"}),
     # ---- 그 기술을 알면 그 모습 (도트만)
     ("keldeo-resolute", "RESOLUTE", "move", {"move": "SECRETSWORD"}),
+    # ---- 진화할 때 정해진다 (도감 species 의 evo 갈래에 "form" 을 적는다, 2.1.0)
+    # 치고마가 악의 족자를 쓰면 일격의 태세(원래 종), 물의 족자를 쓰면 연격의 태세. 한 번 정하면 못 바꾼다 (본가대로).
+    ("urshifu-rapid-strike", "RAPIDSTRIKE", "evo", {"formKr": "연격의 태세"}),
 ]
 # 걷는 도트: SpriteCollab 에서 이 이름의 폴더를 찾는다 (여러 개면 앞의 것부터).
 COLLAB = {
@@ -123,7 +127,12 @@ COLLAB = {
     "minior-red": ["Red"], "mimikyu-busted": ["Busted"], "castform-sunny": ["Sunny"],
     "castform-rainy": ["Rainy"], "castform-snowy": ["Snowy"], "eiscue-noice": ["Noice"],
     "morpeko-hangry": ["Hangry"], "palafin-hero": ["Hero"], "terapagos-terastal": ["Terastal"],
+    "urshifu-rapid-strike": ["Rapid_Strike"],
 }
+# 레벨 0(진화할 때 배우는 기술)까지 싣는 폼. 다른 폼은 진화로 되는 게 아니라 레벨 0 을 거른다
+# (개굴닌자 · 마이티폼의 레벨 0 은 원래 종의 진화 기술이라 폼 표에 넣으면 안 된다).
+# 연격의 태세는 진화하면서 수류연타를 배운다 - evolution.apply 가 폼 표의 레벨 0 을 본다.
+EVO_MOVES = {"urshifu-rapid-strike"}
 
 
 def rows(name):
@@ -161,9 +170,11 @@ def build(dex):
     # 나머지는 지금처럼 원래 종의 표를 같이 쓴다 (Pokedex.__init__ 이 물려준다).
     sv = next((r["id"] for r in rows("version_groups.csv") if r["identifier"] == "scarlet-violet"), "25")
     move_ident = dict((r["id"], key(r["identifier"])) for r in rows("moves.csv"))
+    keep0 = set(poke[i]["id"] for i in EVO_MOVES if i in poke)
     learn = {}
     for r in rows("pokemon_moves.csv"):
-        if r["version_group_id"] == sv and r["pokemon_move_method_id"] == "1" and int(r["level"] or 0) > 0:
+        if r["version_group_id"] == sv and r["pokemon_move_method_id"] == "1" \
+                and (int(r["level"] or 0) > 0 or r["pokemon_id"] in keep0):
             learn.setdefault(r["pokemon_id"], []).append((int(r["level"]), move_ident.get(r["move_id"])))
     out, notes = [], []
     for ident, fkey, kind, extra in FORMS:
@@ -236,9 +247,9 @@ def main():
         dex = json.load(f)
     forms, notes = build(dex)
     changed = dex.get("forms") != forms
-    print("폼 %d개 (지니기 %d · 원시회귀 %d · 쓰기 %d · 배틀 %d · 기술 %d)" % (
+    print("폼 %d개 (지니기 %d · 원시회귀 %d · 쓰기 %d · 배틀 %d · 기술 %d · 진화 %d)" % (
         len(forms), *[sum(1 for m in forms if m["formKind"] == k)
-                      for k in ("held", "primal", "use", "battle", "move")]))
+                      for k in ("held", "primal", "use", "battle", "move", "evo")]))
     for n in notes:
         print("  -", n)
     if check:

@@ -941,6 +941,22 @@ CREATE TABLE IF NOT EXISTS guild_claim (
     at          TEXT NOT NULL,
     PRIMARY KEY (user_id, day, tier)
 );
+-- 코인 상점 슬롯머신 (2.1.0) 한 판씩. 운영에서 결과 비율이 확률표대로인지 보려고 남긴다.
+-- prize = guild.SLOT_TABLE 의 열쇠. 꾸미기를 다 가져 대신 받은 것은 prize 'deco' 에 item 이 찍힌다.
+CREATE TABLE IF NOT EXISTS guild_slot_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    at          TEXT NOT NULL,
+    cost        INTEGER NOT NULL DEFAULT 0,
+    prize       TEXT NOT NULL,
+    item        TEXT,
+    count       INTEGER NOT NULL DEFAULT 0,
+    deco        TEXT,
+    egg_id      INTEGER,
+    egg_kind    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_guild_slot_log_u ON guild_slot_log(user_id, id);
+CREATE INDEX IF NOT EXISTS idx_guild_slot_log_at ON guild_slot_log(at);
 
 -- 서버가 스스로 기억해야 하는 잡다한 것. 지금은 '어떤 자료 손질까지
 -- 끝냈는가' 를 적는 데 쓴다.

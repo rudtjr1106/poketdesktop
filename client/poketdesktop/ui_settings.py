@@ -413,7 +413,7 @@ class SettingsWindow(object):
     CATCH_CHOICES = (("new", "아직 안 잡은 포켓몬만"),
                      ("always", "항상"),
                      ("off", "끄기 (늘 끝까지 싸운다)"),
-                     ("pick", "고른 포켓몬만"))
+                     ("pick", "안 잡은 포켓몬 + 고른 포켓몬"))
 
     def _catch_row(self, box, s):
         """야생 배틀의 잡기 모드 (desktop_battle 맨 위 설명)."""
@@ -427,7 +427,7 @@ class SettingsWindow(object):
                 activeforeground=U.FG, font=U.FONT_S, anchor="w",
                 highlightthickness=0, bd=0,
                 command=self._set_catch).pack(fill="x", padx=(22, 0))
-        # '고른 포켓몬만' 의 고를 단추와 몇 종 골랐는지 (ui_catch_pick). 다른 것을 골라도 단추는 둔다 -
+        # '안 잡은 포켓몬 + 고른 포켓몬' 의 고를 단추와 몇 종 골랐는지 (ui_catch_pick). 다른 것을 골라도 단추는 둔다 -
         # 미리 골라 두고 나중에 바꿀 수 있게.
         row = tk.Frame(box, bg=U.BG)
         row.pack(fill="x", padx=(44, 0), pady=(2, 2))

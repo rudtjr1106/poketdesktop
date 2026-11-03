@@ -97,11 +97,15 @@ def shop_cols(width):
 
 
 def shop_match(it, q):
-    """찾는 말이 그 도구의 이름에 들어 있나. 띄어쓰기·대소문자는 안 가린다."""
+    """찾는 말이 그 도구의 이름에 들어 있나. 띄어쓰기·대소문자는 안 가린다.
+
+    2.1.0: 묶음 이름(서버의 group - 볼 · 성장 · 진화 · 지닌 도구)으로도 걸러진다. 상점 도구가 100개 가까이로
+    늘어서, '진화' 나 '지닌 도구' 를 적으면 그 묶음만 남는다."""
     q = "".join((q or "").lower().split())
     if not q:
         return True
-    return q in "".join(str(it.get("kr") or "").lower().split()) or q in str(it.get("id") or "").lower()
+    return (q in "".join(str(it.get("kr") or "").lower().split()) or q in str(it.get("id") or "").lower()
+            or q in "".join(str(it.get("group") or "").lower().split()))
 
 
 def span(sec):
@@ -1856,6 +1860,7 @@ class GuildWindow(object):
         s = self.shop or {}
         have = int(s.get("coin") or 0)
         self.h_coin.configure(text="길드 코인 %s개" % format(have, ","))
+        self._gacha_banner(self.content, U.BG)
         head = tk.Frame(self.content, bg=U.BG)
         head.pack(fill="x", padx=16, pady=(12, 0))
         tk.Label(head, text="길드 코인 %s개" % format(have, ","), bg=U.BG, fg=U.ACCENT,
@@ -1982,6 +1987,30 @@ class GuildWindow(object):
         """칸의 폭이 바뀌었다. 한 줄에 놓는 수가 달라질 때만 다시 담는다."""
         if self.alive and self.shop_cards and shop_cols(width) != self._shop_cols:
             self._shop_layout(width)
+
+    def _gacha_banner(self, parent, bg):
+        """코인 상점 맨 위의 랜덤 캡슐 띠 (2.1.0, ui_gacha). 옛 서버라 slot 자료가 없으면 안 깐다."""
+        if not (self.shop or {}).get("slot"):
+            return None
+        from . import ui_gacha
+        return ui_gacha.Banner(parent, self.app, lambda: self.shop, self._after_gacha, bg).pack(
+            fill="x", padx=U.h(16), pady=(U.h(12), 0))
+
+    def _after_gacha(self, coin):
+        """캡슐을 뽑았다 - 코인과 가방이 바뀌었으니 상점을 다시 받는다 ('사기' 뒤와 같다)."""
+        if not self.alive:
+            return
+        self.shop = None
+        if self.mode == "guild":
+            if self.tab == "shop":
+                self._draw_tab()
+        elif self.mode == "coinshop":
+            self.data["coin"] = coin
+            self.draw()
+        try:
+            self.app.request_sync()
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def buy(self, item, n):
         def after(r):

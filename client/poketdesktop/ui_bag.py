@@ -1977,7 +1977,10 @@ def evolve_lines(info):
     제대로 골라진다. 진화하면서 배우는 기술이 있으면 같이 적고, 자리가 없어 못 배운 것도 적는다 -
     잠시 뒤에 무엇을 잊을지 묻는 창이 뜬다.
     """
-    head = natural("%s은(는) %s로(으로) 진화했다!" % (info.get("fromKr", "?"), info.get("toKr", "?")))
+    to_kr = info.get("toKr", "?")
+    if info.get("toFormKr"):
+        to_kr = "%s %s" % (info["toFormKr"], to_kr)        # 진화하면서 정해진 폼 - 연격의 태세 우라오스 (2.1.0)
+    head = natural("%s은(는) %s로(으로) 진화했다!" % (info.get("fromKr", "?"), to_kr))
     learned = info.get("learned") or []
     pending = info.get("pending") or []
     line = ""

@@ -212,7 +212,12 @@ def evo_lines(dex, mon, item_kr=None):
             # 지니게 한 도구는 가방에서 빠져 있다. 서버는 가방에 있는 것만
             # 쓰므로, 본가 버릇대로 지니게 했다면 벗겨야 쓸 수 있다.
             notes.append("지금 지니고 있어 먼저 벗겨야 함")
-        line = "%s → %s" % (what, dex.name(b.get("to")))
+        to_kr = dex.name(b.get("to"))
+        if b.get("form"):
+            # 진화하면서 정해지는 폼 (2.1.0) - 물의 족자 → 우라오스 (연격의 태세)
+            f = dex.get("%s_%s" % (b.get("to"), b["form"])) or {}
+            to_kr = "%s (%s)" % (to_kr, f.get("formKr") or b["form"])
+        line = "%s → %s" % (what, to_kr)
         if notes:
             line += " (%s)" % ", ".join(notes)
         out.append(natural(line))

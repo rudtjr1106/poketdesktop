@@ -46,7 +46,10 @@ KEYS = ("crown_gold", "crown_silver", "crown_bronze", "bow", "flower", "pearls",
         "fx_stars_silver", "fx_stars_bronze", "fx_paw", "fx_petals", "fx_hearts", "fx_glow", "pick_join")
 # 포켓몬이 쓴 모습 (정지 그림): (번호, 장식들)
 LOOKS = (("0025", ("crown_gold",)), ("0133", ("crown_silver",)), ("0004", ("crown_bronze",)),
-         ("0025", ("bow",)), ("0133", ("flower",)), ("0004", ("pearls",)))
+         ("0025", ("bow",)), ("0133", ("flower",)), ("0004", ("pearls",)),
+         # 2.1.0 (길드 슬롯)
+         ("0025", ("shades",)), ("0133", ("heart_shades",)), ("0004", ("flower_crown",)),
+         ("0007", ("star_pin",)), ("0025", ("bowtie",)), ("0007", ("shades",)))
 
 
 # ---------------------------------------------------------------- 그림 시트

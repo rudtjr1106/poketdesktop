@@ -33,10 +33,13 @@ from . import ui_common as U
 CELL = 64                   # 칸 크기 (px, U.h 로 늘린다)
 GAP = 6
 PAD = 18
-ACC = ("crown_gold", "crown_silver", "crown_bronze", "bow", "flower", "pearls")
-FX = ("fx_stars_gold", "fx_stars_silver", "fx_stars_bronze", "fx_paw", "fx_petals", "fx_hearts", "fx_glow")
-EMPTY = ("아직 가진 꾸미기가 없습니다. 시즌 5 길드전 순위 보상 · 참가 보상으로 받습니다 "
-         "(선물함으로 오고, 가방의 '꾸미기' 주머니에 들어갑니다).")
+PER_ROW = 7                 # 한 줄 칸 수 - 2.1.0 에 장식이 11개가 되어 한 줄이면 창이 너무 넓어졌다
+ACC = ("crown_gold", "crown_silver", "crown_bronze", "flower_crown", "bow", "flower", "star_pin", "shades",
+       "heart_shades", "pearls", "bowtie")
+FX = ("fx_stars_gold", "fx_stars_silver", "fx_stars_bronze", "fx_paw", "fx_petals", "fx_hearts", "fx_bubbles",
+      "fx_notes", "fx_snow", "fx_glow")
+EMPTY = ("아직 가진 꾸미기가 없습니다. 길드전 순위 보상 · 참가 보상과 랜덤 캡슐(아주 낮은 확률)로 받습니다 "
+         "(선물함이나 랜덤 캡슐에서 오고, 가방의 '꾸미기' 주머니에 들어갑니다).")
 WHERE = {"rank1": "길드전 1위", "rank2": "길드전 2위", "rank3": "길드전 3위"}
 NOTE = "장식 하나는 한 마리만 씁니다. 다른 포켓몬에 끼우면 먼저 쓰던 포켓몬에서 빠집니다. 다시 누르면 뺍니다."
 
@@ -46,6 +49,8 @@ def where(key):
     got = [WHERE[b] for b in ("rank1", "rank2", "rank3") if key in C.BUNDLES[b]]
     if any(key in C.BUNDLES[b] for b in C.JOIN_CHOICES):
         got.append("길드전 참가 묶음")
+    if key in C.slot_pool():
+        got.append("랜덤 캡슐")
     return " · ".join(got)
 
 
@@ -100,7 +105,7 @@ class DecoWindow(object):
     def _build(self, box):
         """창 안을 짓는다. 만들어 둬야 할 것: head · note · pick_box · desc · status · cells. 창 폭을 돌려준다."""
         cw = box + 8
-        n = max(len(ACC), len(FX))
+        n = min(PER_ROW, max(len(ACC), len(FX)))
         width = n * cw + (n - 1) * GAP + PAD * 2 + 8
         wrap = width - PAD * 2 - 8
         f = tk.Frame(self.win, bg=U.BG)
@@ -154,11 +159,14 @@ class DecoWindow(object):
                 continue
             tk.Label(self.grid, text=title, bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,
                      anchor="w").pack(fill="x", pady=(8, 4))
-            line = tk.Frame(self.grid, bg=U.BG)
-            line.pack(fill="x")
+            line = None
             for i, key in enumerate(group):
+                if i % PER_ROW == 0:
+                    line = tk.Frame(self.grid, bg=U.BG)
+                    line.pack(fill="x", pady=(0 if i == 0 else GAP, 0))
+                last = i % PER_ROW == PER_ROW - 1 or i == len(group) - 1
                 col = tk.Frame(line, bg=U.BG)
-                col.pack(side="left", padx=(0, GAP if i < len(group) - 1 else 0), anchor="n")
+                col.pack(side="left", padx=(0, 0 if last else GAP), anchor="n")
                 cell = tk.Frame(col, bg=tile, width=cw, height=cw, highlightthickness=2,
                                 highlightbackground=tile, cursor="hand2")
                 cell.pack()

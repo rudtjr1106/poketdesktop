@@ -379,6 +379,67 @@ def main():
                                     (uid6,)) is not None)
 
     print()
+    print("=== 진화하면서 폼이 정해진다: 물의 족자 -> 연격의 태세 우라오스 (2.1.0) ===")
+    w = items.get("SCROLLOFWATERS") or {}
+    chk("물의 족자가 있다 - 돌로 쓰고, 상점에서 5,000원, 가방이 치고마를 짚는다",
+        w.get("cat") == "stone" and (w.get("effect") or {}).get("kind") == "stone"
+        and (shop.get("SCROLLOFWATERS") or {}).get("buyable") and items.buy_price("SCROLLOFWATERS") == 5000
+        and "치고마" in (w.get("evolves") or []), w)
+    b = evolution.check_item(d, bare("KUBFU"), "SCROLLOFWATERS", hour=12) or {}
+    chk("치고마 + 물의 족자 -> 우라오스 갈래, 폼 RAPIDSTRIKE", b.get("to") == "URSHIFU"
+        and b.get("form") == "RAPIDSTRIKE", b)
+    b = evolution.check_item(d, bare("KUBFU"), "SCROLLOFDARKNESS", hour=12) or {}
+    chk("치고마 + 악의 족자 -> 우라오스 갈래, 폼 없음 (일격의 태세)", b.get("to") == "URSHIFU"
+        and not b.get("form"), b)
+
+    uid7 = mkuser("evo_kubfu")
+    me7 = {"user": {"id": uid7}}
+    items.bag_add(uid7, "SCROLLOFWATERS", 1)
+    items.bag_add(uid7, "SCROLLOFDARKNESS", 1)
+    rapid = mkmon(uid7, "KUBFU")
+    db.run("UPDATE pokemon SET ability='INNERFOCUS' WHERE id=?", (rapid,))
+    r = R.use(R.UseIn(item="SCROLLOFWATERS", pokemon=rapid, hour=12), me7)
+    row = db.q1("SELECT * FROM pokemon WHERE id=?", (rapid,))
+    mon = db.row_to_mon(row)
+    f = d.form_for(mon) or {}
+    ev = r.get("evolve") or {}
+    chk("물의 족자를 쓰면 종은 우라오스, 폼 칸은 RAPIDSTRIKE", row["species"] == "URSHIFU"
+        and row["form"] == "RAPIDSTRIKE", (row["species"], row["form"]))
+    chk("  지금 폼이 연격의 태세 - 격투/물, 특성 보이지않는주먹", f.get("internal") == "URSHIFU_RAPIDSTRIKE"
+        and f.get("types") == ["FIGHTING", "WATER"] and d.form_ability(mon, f) == "UNSEENFIST",
+        (f.get("internal"), f.get("types"), d.form_ability(mon, f)))
+    from common import battle as B
+    fi = B.Fighter(d, mon)
+    chk("  상세 창 · 배틀에서도 격투/물", d.describe(mon).get("types") == [d.type_name("FIGHTING"), d.type_name("WATER")]
+        and list(fi.types()) == ["FIGHTING", "WATER"], (d.describe(mon).get("types"), fi.types()))
+    mv = json.loads(row["moves"])
+    chk("  진화하면서 수류연타를 배운다 (암흑강타는 아니다)", "SURGINGSTRIKES" in mv and "WICKEDBLOW" not in mv
+        and "수류연타" in ev.get("learned", []), (mv, ev.get("learned")))
+    chk("  알림의 그림 번호는 폼 (10191), 도감 번호는 892", ev.get("toNum") == 10191
+        and ev.get("toDexNum") == 892 and ev.get("toFormKr") == "연격의 태세", ev)
+    chk("  알림 글에 '연격의 태세 우라오스'", "연격의 태세 우라오스" in (r.get("message") or ""), r.get("message"))
+    out = deps.decorate(mon)
+    chk("  내려보내는 포켓몬: num 892 · formNum 10191", out.get("num") == 892 and out.get("formNum") == 10191,
+        (out.get("num"), out.get("formNum")))
+    chk("  물의 족자 하나 썼다, 악의 족자는 그대로", items.bag_count(uid7, "SCROLLOFWATERS") == 0
+        and items.bag_count(uid7, "SCROLLOFDARKNESS") == 1)
+    code = status_of(lambda: R.use(R.UseIn(item="SCROLLOFDARKNESS", pokemon=rapid, hour=12), me7))
+    chk("  연격의 태세에게 악의 족자는 아무 일도 없다 (일격으로 안 바뀐다, 본가대로)", code == 400
+        and db.q1("SELECT form FROM pokemon WHERE id=?", (rapid,))["form"] == "RAPIDSTRIKE", code)
+
+    single = mkmon(uid7, "KUBFU")
+    r = R.use(R.UseIn(item="SCROLLOFDARKNESS", pokemon=single, hour=12), me7)
+    row = db.q1("SELECT * FROM pokemon WHERE id=?", (single,))
+    mon = db.row_to_mon(row)
+    ev = r.get("evolve") or {}
+    mv = json.loads(row["moves"])
+    chk("악의 족자는 그대로 일격의 태세 - 폼 칸 비고, 격투/악, 암흑강타", row["species"] == "URSHIFU"
+        and not row["form"] and d.form_for(mon) is None and (d.get("URSHIFU") or {}).get("types") == ["FIGHTING", "DARK"]
+        and "WICKEDBLOW" in mv and "SURGINGSTRIKES" not in mv, (row["form"], mv))
+    chk("  알림은 예전 그대로 (toNum 892, 폼 칸 없음)", ev.get("toNum") == 892 and "toFormKr" not in ev
+        and "toDexNum" not in ev, ev)
+
+    print()
     print("합계  OK %d   FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0
 
