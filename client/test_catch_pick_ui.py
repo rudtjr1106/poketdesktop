@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""잡기 모드 '고른 포켓몬만' 의 고르는 창 · 설정 줄 (진짜 Tk).
+"""잡기 모드 '안 잡은 포켓몬 + 고른 포켓몬' (2.1.0 전 '고른 포켓몬만') 의 고르는 창 · 설정 줄 (진짜 Tk).
 
     python client/test_catch_pick_ui.py              기본 테마
     POKET_SKIN=dp python client/test_catch_pick_ui.py  DP 테마 (설정 창이 다르다 - 아래 설명 창의 단추)
 
 판단(무엇을 서버에 보내나)은 test_catch_pick.py 가 본다. 여기서는
 
-  1. 설정 창에 '고른 포켓몬만' 과 '고르기…' 가 있고, 누르면 고르는 창이 하나만 뜬다.
+  1. 설정 창에 '안 잡은 포켓몬 + 고른 포켓몬' 과 '고르기…' 가 있고, 누르면 고르는 창이 하나만 뜬다.
   2. 고르는 창: 1025종이어도 줄 위젯은 화면만큼 (U.VirtualList), 찾기(한글 조합 글자도 - trace),
      체크하면 바로 설정 파일에 적고 설정 창의 '고른 포켓몬 N종' 이 바뀐다.
   3. 굴려서 다시 쓰는 줄에 지난 체크가 남지 않는다. '고른 것만 보기' · '모두 풀기'.
@@ -110,7 +110,8 @@ def main():
     settle(root)
     if dp:
         row = next(r for r in sw.rows if r["label"] == "야생 배틀에서 잡기")
-        chk("DP: 잡기 줄에 '고른 포켓몬만'", ("pick", "고른 포켓몬만") in row["choices"])
+        chk("DP: 잡기 줄에 '안 잡은 포켓몬 + 고른 포켓몬'", ("pick", "안 잡은 포켓몬 + 고른 포켓몬") in row["choices"],
+            row["choices"])
         sw._pick_row(sw.rows.index(row))
         settle(root)
         b = sw.btns.get("act:고르기…")
@@ -118,7 +119,7 @@ def main():
             [k for k in sw.btns if isinstance(k, str)])
         chk("DP: 몇 종 골랐는지 적는다", "아직 고른 포켓몬이 없습니다" in row["value"](), row["value"]())
         row["put"]("pick")
-        chk("DP: ◀ ▶ 로 '고른 포켓몬만' 을 고르면 저장한다", config.load_settings()["catchMode"] == "pick")
+        chk("DP: ◀ ▶ 로 '안 잡은 + 고른' 을 고르면 저장한다", config.load_settings()["catchMode"] == "pick")
         skin_row = next((r for r in sw.rows if r.get("action") and r["action"][0] == "다시 켜서 적용"), None)
         if skin_row is not None:
             sw.skin_pick = "__other__"          # 다시 켜서 적용 단추가 보이게
@@ -132,11 +133,12 @@ def main():
             settle(root)
     else:
         seen = texts(sw.win)
-        chk("설정 창에 '고른 포켓몬만' 과 '고르기…'", "고른 포켓몬만" in seen and "고르기…" in seen, seen[:0])
+        chk("설정 창에 '안 잡은 포켓몬 + 고른 포켓몬' 과 '고르기…'",
+            "안 잡은 포켓몬 + 고른 포켓몬" in seen and "고르기…" in seen, [t for t in seen if "포켓몬" in t][:4])
         chk("아직 고른 것이 없다고 적는다", sw.catch_pick_note.cget("text") == "아직 고른 포켓몬이 없습니다")
         sw.catch.set("pick")
         sw._set_catch()
-        chk("'고른 포켓몬만' 을 고르면 저장한다", config.load_settings()["catchMode"] == "pick")
+        chk("'안 잡은 + 고른' 을 고르면 저장한다", config.load_settings()["catchMode"] == "pick")
 
     sw._open_catch_pick()
     settle(root, 10)
