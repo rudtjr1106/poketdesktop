@@ -686,6 +686,7 @@ jobs:
           python test_boosts.py          # 2.1.1: 타입 스프레이 · 버닝 부스터 (풀숲 간격 · 출현)
           python test_rename.py          # 2.1.1: 닉네임 변경권 (규칙 · 한 트랜잭션 · 로그인)
           python test_client_ip.py       # 2.1.1: cf-connecting-ip 는 Cloudflare 가 앞에 있을 때만 믿는다 (IP 위조)
+          python test_account_email.py   # 2.1.1: 마이페이지 이메일 (본인만 보인다, 비우면 지운다)
           python test_move_needs.py      # 기술이 걸린 것(전용 Z · 기술 메가 · 기술 폼 · 기술 진화)을 배울 수 있다 (#277)
           python test_gimmick.py
           python test_season4.py

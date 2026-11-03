@@ -167,6 +167,10 @@ class Api(object):
     def me(self):
         return self._call("GET", "/api/me")
 
+    def set_email(self, email):
+        """마이페이지 이메일 (2.1.1). 빈 글자면 지운다."""
+        return self._call("POST", "/api/mypage/email", body={"email": email})
+
     # ---------------- 포켓몬 ----------------
     def pokemon(self):
         return self._call("GET", "/api/pokemon")["pokemon"]

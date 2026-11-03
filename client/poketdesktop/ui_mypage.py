@@ -24,6 +24,7 @@ from tkinter import ttk
 from common.korean import ago, natural
 
 from . import skins
+from . import ui_box
 from . import ui_common as U
 from .ui_common import run_async
 from .ui_settings import SettingsWindow
@@ -39,6 +40,18 @@ EMPTY = {"notify": "새 알림이 없습니다. 내 글에 댓글이, 내 댓글
                    "그 글을 열어 보면 사라집니다.",
          "posts": "아직 쓴 글이 없습니다.",
          "comments": "아직 단 댓글이 없습니다."}
+
+
+# 이메일 (2.1.1) - 계정 칸 맨 위 줄. 비밀번호를 잊었을 때 운영자가 계정에서 보는 연락처 (확인 메일은 없다)
+EMAIL_BTN = "이메일 등록"
+
+
+def email_text(user):
+    """계정 칸 이메일 줄의 설명."""
+    if user.get("email"):
+        return "등록한 이메일: %s\n비밀번호를 잊었을 때 운영진이 계정을 확인하는 데 씁니다. 다른 사람에게는 보이지 않습니다." \
+            % user["email"]
+    return "이메일을 등록해 두면 비밀번호를 잊었을 때 운영진이 계정을 확인하는 데 씁니다. 다른 사람에게는 보이지 않습니다."
 
 
 def _err(e):
@@ -292,7 +305,8 @@ class MyPageWindow(object):
                 return self.say(_err(err), U.DANGER)
             self.data = r or {}
             self._fill(self.data)
-            self.say("")
+            note, self._note_after = getattr(self, "_note_after", None), None
+            self.say(*(note or ("",)))                  # 다시 읽게 한 일의 결과 글은 남긴다 (이메일 등록)
         run_async(self.root, lambda: api.mypage(), done)
 
     def refresh(self):
@@ -709,14 +723,43 @@ class MyPageWindow(object):
     # 하는 일은 그대로다 - 둘 다 확인 창을 거치고, 탈퇴는 비밀번호까지
     # 묻는다 (app.logout / app.delete_account).
     def account_rows(self):
-        """(설명, 단추 글자, 할 일, 위험한가). 화면과 검사가 같이 쓴다."""
+        """(설명, 단추 글자, 할 일, 위험한가). 화면과 검사가 같이 쓴다.
+        **단추 글자는 늘 같다** - DP 테마가 창을 열 때 단추를 한 번 만들어 둔다 (설명 글만 자료에 따라 바뀐다)."""
         a = self.app
         return [
+            (email_text((self.data or {}).get("user") or {}), EMAIL_BTN, self.edit_email, False),
             ("이 기기에 저장된 로그인을 지우고 로그인 화면으로 돌아갑니다.",
              "로그아웃", a.logout, False),
             ("계정과 가진 포켓몬이 모두 지워집니다. 되돌릴 수 없습니다.",
              "회원탈퇴", a.delete_account, True),
         ]
+
+    def edit_email(self):
+        """이메일 적기 · 바꾸기 · 지우기 (빈 칸으로 확인하면 지운다)."""
+        if getattr(self, "_email_busy", False):
+            return
+        now = ((self.data or {}).get("user") or {}).get("email") or ""
+        email = ui_box.ask_text(self.win, "이메일 등록",
+                                "비밀번호를 잊었을 때 운영진이 계정을 확인하는 데 쓰는 이메일입니다. "
+                                "다른 사람에게는 보이지 않습니다.",
+                                hint="지우려면 칸을 비우고 확인을 누르세요.", initial=now)
+        if email is None or email.strip() == now:
+            return
+        api = self.app.api
+        self._email_busy = True
+        self.say("저장하는 중...", U.FG_FAINT)
+
+        def done(r, err):
+            self._email_busy = False
+            if not self.alive:
+                return
+            if err:
+                return self.say(_err(err), U.DANGER)
+            msg = (r or {}).get("message") or "저장했습니다."
+            self.say(msg, U.GOOD)
+            self._note_after = (msg, U.GOOD)     # 다시 읽어도 이 글이 남게 (load 가 아래 줄을 비운다)
+            self.refresh()
+        run_async(self.root, lambda: api.set_email(email.strip()), done)
 
     def _account(self):
         box = self._section("계정")

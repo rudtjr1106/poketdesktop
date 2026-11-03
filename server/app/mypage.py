@@ -18,8 +18,10 @@
 창을 열 때만 부른다 (폴링하지 않는다).
 """
 import datetime
+import re
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from . import achievements, avatar, board, db, deps, gym, pvp, season
 
@@ -130,9 +132,11 @@ def card(uid, dex, now=None):
 def build(user, dex, now=None):
     uid = user["id"]
     out = card(uid, dex, now)
-    u = db.q1("SELECT money FROM users WHERE id=?", (uid,))
+    u = db.q1("SELECT money, email FROM users WHERE id=?", (uid,))
     out["user"]["admin"] = board.is_admin(user)
     out["user"]["money"] = u["money"]
+    # 등록한 이메일 (2.1.1) - **본인에게만**. card 는 길드원 프로필이 남에게 보여 주므로 거기엔 없다
+    out["user"]["email"] = u["email"] or ""
     # 게시판 활동은 **수와 첫 쪽만** 싣는다. 나머지는 화면이 탭을 누르거나
     # 쪽을 넘길 때 /api/board/mine 으로 받는다 - 활동이 쌓여도 길어지지 않게.
     # 안 본 알림이 있으면 그 탭부터, 없으면 내 글부터 보여 준다.
@@ -152,3 +156,33 @@ def _board(uid, now=None):
 @router.get("/api/mypage")
 def mypage(ctx=Depends(deps.current)):
     return build(ctx["user"], deps.dex())
+
+
+# ---------------------------------------------------------------- 이메일 (2.1.1)
+# 비밀번호를 잊은 사람이 재설정을 부탁할 때 운영자가 계정에서 보고 맞춰 보는 연락처일 뿐이다 (사용자 결정 11/03 -
+# 인증 메일 · 비밀번호 찾기는 만들지 않는다. 찾기는 안내서의 구글 폼). 그래서 확인 없이 자유롭게 적고 지운다.
+# 운영자가 볼 때: deploy/prodq.sh 로 SELECT username, email FROM users WHERE username='닉네임'
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+EMAIL_MAX = 100
+
+
+class EmailIn(BaseModel):
+    email: str = ""
+
+
+def clean_email(raw):
+    """앞뒤 공백을 떼고 소문자로. 빈 글자면 '' (지우기). 모양이 틀리면 HTTPException."""
+    e = (raw or "").strip().lower()
+    if not e:
+        return ""
+    if len(e) > EMAIL_MAX or not EMAIL_RE.match(e):
+        raise HTTPException(400, "이메일 주소가 올바르지 않습니다. (예: trainer@gmail.com)")
+    return e
+
+
+@router.post("/api/mypage/email")
+def set_email(body: EmailIn, ctx=Depends(deps.current)):
+    e = clean_email(body.email)
+    db.run("UPDATE users SET email=? WHERE id=?", (e or None, ctx["user"]["id"]))
+    return {"ok": True, "email": e,
+            "message": ("이메일을 등록했습니다: %s" % e) if e else "등록한 이메일을 지웠습니다."}

@@ -1194,6 +1194,8 @@ MIGRATIONS = [
     ("wild_state", "burn_until", "ALTER TABLE wild_state ADD COLUMN burn_until TEXT"),
     ("wild_state", "lure_type", "ALTER TABLE wild_state ADD COLUMN lure_type TEXT"),
     ("wild_state", "lure_until", "ALTER TABLE wild_state ADD COLUMN lure_until TEXT"),
+    # 마이페이지에 적는 이메일 (2.1.1, mypage.set_email) - 비밀번호를 잊었을 때 운영자가 보는 연락처. 확인 메일은 없다
+    ("users", "email", "ALTER TABLE users ADD COLUMN email TEXT"),
 ]
 
 

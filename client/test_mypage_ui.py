@@ -176,6 +176,50 @@ class FakeApp(object):
         self.account = getattr(self, "account", []) + ["delete"]
 
 
+def email_flow(root, w, app, top):
+    """계정 칸의 '이메일 등록' (2.1.1): 적으면 저장하고 다시 읽어 보여 준다. 취소 · 같은 주소면 안 묻고, 비우면 지운다."""
+    print("\n=== 이메일 등록 (2.1.1) ===")
+    from poketdesktop import ui_box
+    api = app.api
+    api.saved = []
+
+    def set_email(email):
+        api.saved.append(email)
+        api.data["user"]["email"] = email.lower()
+        return {"ok": True, "email": email.lower(),
+                "message": ("이메일을 등록했습니다: %s" % email.lower()) if email else "등록한 이메일을 지웠습니다."}
+    api.set_email = set_email
+    chk("등록 전: 운영진이 계정을 확인하는 데 쓴다고 적혀 있다",
+        any("이메일을 등록해 두면" in x for x in texts(top)))
+    answers = [None, "me@x.com", "me@x.com", ""]
+    initials = []
+    real = ui_box.ask_text
+
+    def ask(parent, title, message, hint="", initial=""):
+        initials.append(initial)
+        return answers.pop(0)
+    ui_box.ask_text = ask
+    try:
+        w.account_btns["이메일 등록"]._release(None)
+        settle(root, 0.1)
+        chk("창을 닫으면 저장하지 않는다", api.saved == [], api.saved)
+        w.account_btns["이메일 등록"]._release(None)
+        wait(root, lambda: "등록한 이메일: me@x.com" in " ".join(texts(top)))
+        chk("적으면 저장하고 다시 읽어 계정 칸에 보여 준다", api.saved == ["me@x.com"]
+            and any("등록한 이메일: me@x.com" in x for x in texts(top)), api.saved)
+        chk("  다시 읽은 뒤에도 결과 글이 남는다", "등록했습니다" in w.status._label.cget("text"),
+            w.status._label.cget("text"))
+        w.account_btns["이메일 등록"]._release(None)
+        settle(root, 0.1)
+        chk("입력 칸에는 지금 주소가 채워져 있고, 같은 주소면 저장하지 않는다",
+            initials[-1] == "me@x.com" and api.saved == ["me@x.com"], (initials, api.saved))
+        w.account_btns["이메일 등록"]._release(None)
+        wait(root, lambda: "이메일을 등록해 두면" in " ".join(texts(top)))
+        chk("비우고 확인하면 지운다", api.saved == ["me@x.com", ""], api.saved)
+    finally:
+        ui_box.ask_text = real
+
+
 def wait(root, cond, sec=6.0):
     end = time.time() + sec
     while time.time() < end and not cond():
@@ -424,8 +468,8 @@ def main():
     print("\n=== 계정 (1.9.2: 트레이 메뉴에서 옮겨 왔다) ===")
     tx = texts(top)
     chk("맨 아래에 '계정' 칸", "계정" in tx and tx.index("계정") > tx.index("시즌 기록"), tx[-12:])
-    chk("로그아웃·회원탈퇴 단추가 있다",
-        sorted(w.account_btns) == ["로그아웃", "회원탈퇴"]
+    chk("이메일 등록·로그아웃·회원탈퇴 단추가 있다",
+        sorted(w.account_btns) == ["로그아웃", "이메일 등록", "회원탈퇴"]
         and all(b.holder.winfo_ismapped() for b in w.account_btns.values()),
         sorted(w.account_btns))
     chk("무슨 일이 일어나는지 적혀 있다",
@@ -437,6 +481,7 @@ def main():
     w.account_btns["회원탈퇴"]._release(None)
     chk("회원탈퇴 단추는 앱의 탈퇴를 부른다 (확인·비밀번호는 거기서 묻는다)",
         app.account == ["logout", "delete"], app.account)
+    email_flow(root, w, app, top)
     from poketdesktop import tray as TRAY
     menu = [it for it in TRAY.TrayBase(app).spec() if it is not TRAY.SEP]
     names = [it.text for it in menu if not callable(it.text)]
