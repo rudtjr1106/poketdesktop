@@ -92,12 +92,16 @@ class RememberAsk(ForgetAsk):
             justify="left")
         self.wallet.pack(anchor="w", pady=(4, 0))
         if any(e.get("free") for e in entries):
-            note = "레벨업 때 자리가 없어 못 배운 기술은 무료입니다."
+            note = "레벨업 때 자리가 없어 아직 기다리는 기술은 무료입니다."
             if any(e.get("form") for e in entries):
-                note = "지금 모습의 기술과 레벨업 때 자리가 없어 못 배운 기술은 무료입니다."
+                note = "지금 모습의 기술과 레벨업 때 자리가 없어 아직 기다리는 기술은 무료입니다."
             tk.Label(f, text=note,
                      bg=U.BG, fg=U.GOOD, font=U.FONT_XS, wraplength=W - 60,
                      justify="left").pack(anchor="w", pady=(2, 0))
+        # 무료 기술이 없어도 적는다 - 버린 기술이 왜 무료가 아닌지 여기서 알 수 있게 (게시판 #420)
+        tk.Label(f, text="기술 배우기 창에서 버린(안 배운) 새 기술은 무료가 아닙니다.",
+                 bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, wraplength=W - 60,
+                 justify="left").pack(anchor="w", pady=(2, 0))
         tk.Frame(f, bg=U.BG, height=U.h(10)).pack(fill="x")
 
         # 단추를 먼저 담는다 (ForgetAsk 와 같은 까닭 - 굴러가는 칸이 자리를

@@ -193,6 +193,15 @@ class ForgetAsk(object):
     def _pick(self, mv):
         self.picked = mv
         self._paint_pick(mv)
+        if getattr(self, "new", None) is None:
+            return                  # 떠올리기 창(RememberAsk)은 제 안내를 따로 단다
+        # 새 기술을 버리면 기다리는 목록에서 빠져 떠올리기가 무료가 아니다 (게시판 #420 dudgns, 2026-11-03 -
+        # 안내에 '자리가 없어 못 배운 기술은 무료' 라고만 적혀 있어서 버린 기술도 무료인 줄 알았다)
+        if mv == self.new:
+            self._hint("새 기술을 안 배웁니다. 나중에 떠올리려면 돈이 듭니다. "
+                       "창을 그냥 닫으면 무료로 남고 다음에 다시 묻습니다.", U.ACCENT)
+        else:
+            self._hint("")
 
     def _paint_pick(self, mv):
         """고른 줄을 밝힌다 (테마가 바꾼다)."""
