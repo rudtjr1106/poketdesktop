@@ -1450,6 +1450,11 @@ def main():
         sh.add_qty(1)
         sh.btn_q[1].invoke()
         chk("개수 - 빠른 개수 10", sh.qty == 10, sh.qty)
+        TBL.settle(root, 0.2)
+        qm, qp, quick, buy = sh.cv.bbox("qm"), sh.cv.bbox("qp"), sh.btn_q[-1].box, sh.btn_buy.box
+        chk("  개수(− ×10 +)는 사기 바로 왼쪽, 빠른 개수는 그 왼쪽 (11/03 제보)",
+            qm and qp and quick and buy and quick[2] < qm[0] < qp[0] < buy[0] and buy[0] - qp[2] <= U.h(20),
+            (quick, qm, qp, buy))
         sh.btn_buy.invoke()
         TBL.wait(root, lambda: any(c[0] == "buy" for c in api.calls if isinstance(c, tuple)), 5)
         chk("사기 - 그 도구 · 그 개수로", ("buy", "POKEBALL", 10) in api.calls, [c for c in api.calls if isinstance(c, tuple)][-2:])

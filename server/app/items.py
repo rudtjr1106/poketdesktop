@@ -87,8 +87,10 @@ def public_list():
             # 지닐 수 있는가. 분류가 아니라 common/held.py 의 목록으로 본다 -
             # 금속코트처럼 돌이면서 지닐 수 있는 것이 있다.
             "holdable": is_holdable(it["id"]),
-            # 지녔을 때 실제 배율 ("불꽃 타입 기술의 위력이 20% 올라간다 (1.2배)")
-            "heldNote": held_note(it["id"]),
+            # 지녔을 때 실제 배율 ("불꽃 타입 기술의 위력이 20% 올라간다 (1.2배)"). 설명과 같으면 안 싣는다 -
+            # 9세대 도구 14종(클리어참 · 화덕의가면 …)은 설명을 이 덧말로 써 두어서 상점 · 가방에 같은 글이
+            # 두 번 나왔다 (11/03 제보)
+            "heldNote": _held_note_unless_desc(it["id"], it.get("desc", "")),
         })
         if (it.get("effect") or {}).get("kind") == "form":
             out[-1]["forms"] = form_targets(it)
@@ -120,6 +122,18 @@ def form_targets(it):
 def held_note(item_id):
     from common import held as H
     return H.effect_note(item_id)
+
+
+def _held_note_unless_desc(item_id, desc):
+    note = held_note(item_id)
+    if note and _flat(note) in _flat(desc or ""):
+        return None
+    return note
+
+
+def _flat(text):
+    """같은 글인지 볼 때: 빈칸 · 끝 마침표를 뺀다."""
+    return "".join((text or "").split()).rstrip(".")
 
 
 def is_holdable(item_id):

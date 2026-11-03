@@ -72,13 +72,22 @@ _MEANING = {}
 
 
 def tone(color):
-    """기본 테마의 뜻 색을 DP 바탕(밝은 칸)에서 읽히는 색으로 바꾼다."""
+    """기본 테마의 뜻 색을 DP 바탕(밝은 칸)에서 읽히는 색으로 바꾼다.
+
+    명패 빛깔(서버 season.FRAMES - 랭킹 · 친구 · 게시판 · 길드에서 이름 · 칭호 · 보상 글자에 쓴다)도 같은 빛의
+    진한 색으로. 어두운 기본 테마에 맞춘 밝은 색이라 흰 판 위에서는 은빛(사천왕 명패)이 옅은 회색으로 안 보였다
+    (11/03 제보 - 소드실드 랭킹 탭의 사천왕 보상 · 사천왕 이름). 금빛은 U.ACCENT 와 같은 색이라 위에서 바뀐다."""
     if not _MEANING:
         _MEANING.update({
             U.GOOD: "#2c8a3c", U.FG_FAINT: DIM, U.FG_DIM: "#606068", U.FG: INK,
             U.DANGER: "#d02828", U.ACCENT: "#c06810", U.ACCENT_TEXT: "#c06810",
             U.INFO: "#2860c0", U.SHINY: "#b88a00", U.PINK: "#c83a78", U.RED: "#d02828",
+            "#c9d1e6": "#56628a",           # 은빛 명패 (사천왕)
+            "#d08a52": "#9a5426",           # 동빛 명패
+            "#b57bff": "#7446c8",           # 마스터볼 명패
         })
+    if isinstance(color, str):
+        color = color.lower() if color.startswith("#") else color
     return _MEANING.get(color, color)
 
 

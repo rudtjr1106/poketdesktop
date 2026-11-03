@@ -9,7 +9,7 @@ DP 의 프렌들리숍처럼 파란 가게 · 소지금 · 분류 메뉴(빨간 
     │ ▶ 전체            ││ ▶ [그림] 이름   귀함   8,000원  4,000원  × 3             │
     │   지닌 도구        │└───────────────────────────────────────────────────────────┘
     │   …               │┌ 보라 설명 띠 (그림 · 이름 · 등급 · 효과 · 덧말) ────────────┐
-    │ 돈 버는 법 한 줄    ││ [− ×01 +] [1][10][99]   사면 ○원 · 팔면 ○원   [사기][팔기] │
+    │ 돈 버는 법 한 줄    ││                 [1][10][99] [− ×01 +] [사기][팔기] │
     └───────────────────┘└ 글상자 ────────────────────────────────────────────────────┘
 
 목록 줄 높이 · 보이는 줄 수는 기본 상점 이상이다 (기본 30 → 같은 30, 바닥을 한 줄로 줄여 줄이 더 보인다).
@@ -329,20 +329,21 @@ class ShopWindow(Scene, Band, SH.ShopWindow):
         buy_x1 = sell_x1 - U.h(8) - bw
         self.btn_sell.layout(sell_x1, y, W - pad, y + bh)
         self.btn_buy.layout(buy_x1, y, sell_x1 - U.h(8), y + bh)
-        # 개수 (− ×01 +) 와 빠른 개수
-        x = x0 + pad
+        # 개수 (− ×01 +) 는 사기 바로 왼쪽, 빠른 개수 [1][10][99] 는 그 왼쪽 - 개수를 바꾸고 곧바로 사게
+        # (11/03 제보 '개수 올리는 것을 사기/팔기 바로 왼쪽으로'. 예전에는 줄 맨 왼쪽이라 손이 오갔다)
         mb = U.h(34)
-        self._qty_button(cv, x, y + U.h(2), mb, bh - U.h(4), "minus", "qm")
         cw = U.h(68)
+        x = buy_x1 - U.h(14) - (mb + U.h(4) + cw + U.h(4) + mb)
+        self._qty_button(cv, x, y + U.h(2), mb, bh - U.h(4), "minus", "qm")
         K.panel(cv, x + mb + U.h(4), y + U.h(2), x + mb + U.h(4) + cw, y + bh - U.h(2), tags=T)
         K.text(cv, x + mb + U.h(4) + cw // 2, y + bh // 2, "× %02d" % self.qty if self.qty < 100 else "× %d" % self.qty,
                font(13), anchor="center", tags=T)
         self._qty_button(cv, x + mb + cw + U.h(8), y + U.h(2), mb, bh - U.h(4), "plus", "qp")
-        x += mb + cw + U.h(8) + mb + U.h(12)
-        for b in self.btn_q:
+        x -= U.h(12)
+        for b in reversed(self.btn_q):
             w = max(U.h(34), b.want_width(U.h(18)))
-            b.layout(x, y + U.h(2), x + w, y + bh - U.h(2))
-            x += w + U.h(6)
+            b.layout(x - w, y + U.h(2), x, y + bh - U.h(2))
+            x -= w + U.h(6)
         # 글상자
         my1 = y + bh + U.h(6)
         self._msg_ids = (None, K.msgbox(cv, x0 + pad, my1, W - pad, H - U.h(6), self.msg[0],

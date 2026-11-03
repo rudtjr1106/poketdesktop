@@ -235,8 +235,8 @@ def item_desc(item):
         # 무슨 일을 하는지 가방에서는 알 길이 없다.
         if item.get("holdable") and item.get("desc"):
             out += "\n\n지니게 하면: " + item["desc"]
-            if item.get("heldNote"):
-                out += "\n" + item["heldNote"]
+            if held_note(item):
+                out += "\n" + held_note(item)
         return out
     if kind == "noevolve":
         return "진화를 막는다. 한 번 더 쓰면 다시 진화할 수 있게 된다."
@@ -247,8 +247,8 @@ def item_desc(item):
         # 본가 설명 그대로 (서버가 items.json 에서 실어 보낸다)
         out = item.get("desc") or "포켓몬에게 지니게 하는 도구다. 배틀에서 효과가 난다."
         # 본가 문장은 "위력이 올라간다" 까지만 있다. 몇 배인지는 서버가 붙여 보낸다.
-        if item.get("heldNote"):
-            out += "\n\n" + item["heldNote"]
+        if held_note(item):
+            out += "\n\n" + held_note(item)
         return out
     if kind == "form":
         return form_desc(item)
@@ -273,6 +273,16 @@ def item_desc(item):
 def form_desc(item):
     """폼 도구 설명: 본가 설명 + 누가 어떤 모습이 되는지 + 쓰면 어떻게 되는지."""
     return (item.get("desc") or "포켓몬에게 쓰면 모습이 바뀐다.") + "\n\n" + form_note(item)
+
+
+def held_note(item):
+    """서버가 붙여 보낸 '지녔을 때 몇 배' 덧말. 설명에 이미 든 글이면 빈 글자 - 9세대 도구 14종(클리어참 ·
+    화덕의가면 …)은 설명을 덧말로 써 두어서 같은 글이 두 번 나왔다 (11/03 제보. 서버도 이제 안 싣는다)."""
+    note = (item or {}).get("heldNote") or ""
+
+    def flat(t):
+        return "".join((t or "").split()).rstrip(".")
+    return "" if not note or flat(note) in flat((item or {}).get("desc")) else note
 
 
 def form_note(item):
