@@ -1190,8 +1190,7 @@ MIGRATIONS = [
     ("guild_war_attack", "coins", "ALTER TABLE guild_war_attack ADD COLUMN coins INTEGER NOT NULL DEFAULT 0"),
     ("guild_war_attack", "def_coins",
      "ALTER TABLE guild_war_attack ADD COLUMN def_coins INTEGER NOT NULL DEFAULT 0"),
-    # 풀숲 부스트 (2.1.1, boosts.py): 버닝 부스터 · 타입 스프레이가 언제까지 켜져 있나
-    ("wild_state", "burn_until", "ALTER TABLE wild_state ADD COLUMN burn_until TEXT"),
+    # 타입 스프레이 (2.1.1, boosts.py): 어느 타입이 언제까지 켜져 있나
     ("wild_state", "lure_type", "ALTER TABLE wild_state ADD COLUMN lure_type TEXT"),
     ("wild_state", "lure_until", "ALTER TABLE wild_state ADD COLUMN lure_until TEXT"),
     # 마이페이지에 적는 이메일 (2.1.1, mypage.set_email) - 비밀번호를 잊었을 때 운영자가 보는 연락처. 확인 메일은 없다

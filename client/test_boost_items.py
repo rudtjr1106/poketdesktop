@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""풀숲 부스트 · 닉네임 변경권 가방 화면 검사 (2.1.1).
+"""타입 스프레이 · 닉네임 변경권 가방 화면 검사 (2.1.1).
 
     python client/test_boost_items.py
     python client/run_as_windows.py client/test_boost_items.py
@@ -7,8 +7,8 @@
 **창을 진짜로 띄운다.** 못 박는 것:
 
   1. 타입 스프레이: 포켓몬을 안 고르고, 쓰기 전에 타입을 묻는다 (스텔라 빼고 열여덟). 켜져 있는 타입에는 남은 시간,
-     설명 끝에는 '지금 켜져 있다'. 창을 닫으면 안 쓴다. 쓰고 나면 풀숲 확인을 다시 건다.
-  2. 버닝 부스터: 묻지 않고 바로 쓴다. 쓰고 나면 풀숲 확인을 다시 건다 (서버가 다음 풀숲을 당겼다).
+     설명 끝에는 '지금 켜져 있다'. 창을 닫으면 안 쓴다. 풀숲 간격은 그대로라 풀숲 확인을 다시 걸지 않는다.
+  2. 스프레이가 거절되면(3시간까지만 쌓인다) 서버 말을 보여 준다. (버닝 부스터는 만들었다가 11/04 에 뺐다)
   3. 닉네임 변경권: 새 닉네임을 묻고 한 번 더 확인한 뒤 쓴다. 바뀌면 앱 · 자동 로그인 세션의 이름도 바뀐다.
      취소 · 같은 이름 · 확인 거절이면 안 쓰고, 서버가 거절하면 이름은 그대로다.
   4. 상점 설명이 '아직 쓸 수 없는 물건' 이 아니다.
@@ -38,7 +38,7 @@ import test_big_lists as BL                                 # noqa: E402
 
 OK = FAIL = 0
 DATA = os.path.join(ROOT, "server", "data")
-IDS = ("TYPESPRAY", "BURNINGBOOST", "RENAMETICKET")
+IDS = ("TYPESPRAY", "RENAMETICKET")
 
 
 def chk(name, cond, got=""):
@@ -115,7 +115,7 @@ def status(w):
 
 def run_spray(root, dex):
     print("=== 타입 스프레이")
-    w, api, app = bag(root, dex, {"burnLeft": 0, "lureLeft": 1500, "lureType": "FIRE"})
+    w, api, app = bag(root, dex, {"lureLeft": 1500, "lureType": "FIRE"})
     w.pick_item("TYPESPRAY")
     BL.settle(root, 0.3)
     note = w.mon_note.cget("text")
@@ -142,14 +142,14 @@ def run_spray(root, dex):
         chk("  다른 타입을 고르면 남은 시간이 사라진다고 미리 말한다", asked and "남은 시간은 사라지고" in asked[-1][1],
             asked[-1][1] if asked else "")
         chk("고른 타입으로, 포켓몬 없이 쓴다", api.uses == [("TYPESPRAY", 0, "WATER", "")], api.uses)
-        chk("  쓰고 나면 풀숲 확인을 다시 건다", app.wild.checks == 1, app.wild.checks)
+        chk("  풀숲 간격은 그대로라 풀숲 확인을 다시 걸지 않는다", app.wild.checks == 0, app.wild.checks)
         chk("  서버 말을 보여 준다", "1시간 동안" in status(w), status(w))
 
         ui_box.ask_choice = lambda *a, **k: None
         w.pick_item("TYPESPRAY")
         w.do_use()
         BL.settle(root, 0.2)
-        chk("창을 닫으면 안 쓴다", len(api.uses) == 1 and app.wild.checks == 1, api.uses)
+        chk("창을 닫으면 안 쓴다", len(api.uses) == 1, api.uses)
     finally:
         ui_box.ask_choice = real
     w.close()
@@ -162,34 +162,21 @@ def run_spray(root, dex):
     w.close()
 
 
-def run_burn(root, dex):
-    print("\n=== 버닝 부스터")
-    w, api, app = bag(root, dex, {"burnLeft": 3700, "lureLeft": 0, "lureType": None})
-    w.pick_item("BURNINGBOOST")
-    BL.settle(root, 0.3)
-    note = w.mon_note.cget("text")
-    chk("설명: 2~3분마다 · 3시간까지 · 지금 남은 시간", "2~3분마다" in note and "3시간까지" in note
-        and "지금 켜져 있다: 1시간 2분 남음" in note, note)
+def run_refuse(root, dex):
+    print("\n=== 스프레이가 거절될 때")
+    w, api, app = bag(root, dex, {"lureLeft": 10200, "lureType": "FIRE"})
+    api.refuse = "이미 2시간 50분 남아 있습니다 (3시간까지만 쌓입니다)."
     real = ui_box.ask_choice
-    asked = []
-    ui_box.ask_choice = lambda *a, **k: asked.append(a) or "FIRE"
+    ui_box.ask_choice = lambda *a, **k: "FIRE"
     try:
+        w.pick_item("TYPESPRAY")
         w.do_use()
         BL.wait(root, lambda: api.uses and w._wait is None)
         BL.settle(root, 0.3)
     finally:
         ui_box.ask_choice = real
-    chk("묻지 않고 포켓몬 없이 쓴다", not asked and api.uses == [("BURNINGBOOST", 0, "", "")], api.uses)
-    chk("  쓰고 나면 풀숲 확인을 다시 건다", app.wild.checks == 1, app.wild.checks)
-
-    api.refuse = "이미 2시간 50분 남아 있습니다 (3시간까지만 쌓입니다)."
-    api.bag["BURNINGBOOST"] = 1
-    w.pick_item("BURNINGBOOST")
-    w.do_use()
-    BL.wait(root, lambda: len(api.uses) == 2 and w._wait is None)
-    BL.settle(root, 0.3)
-    chk("거절되면 이유를 보여 주고 풀숲 확인은 안 건다", "3시간까지만" in status(w) and app.wild.checks == 1,
-        (status(w), app.wild.checks))
+    chk("거절되면 서버 말을 보여 준다", "3시간까지만" in status(w), status(w))
+    chk("  쓰기 단추가 다시 켜진다", w.use_btn.enabled, w.use_btn.label.cget("text"))
     w.close()
 
 
@@ -278,7 +265,7 @@ def main():
     sprite_cache.ensure = lambda api, num, shiny=False: None
     try:
         run_spray(root, dex)
-        run_burn(root, dex)
+        run_refuse(root, dex)
         run_rename(root, dex)
         run_shop()
     finally:

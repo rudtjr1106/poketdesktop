@@ -70,11 +70,11 @@ CAT_COLOR = {"megastone": "#a98bff", "zcrystal": "#ffd23c", "form": "#5fd3c6", "
 # "form" (1.13) 은 폼 도구 - 고르는 도구(로토무카탈로그·운석)는 쓰기 전에 모습을 한 번 더 묻는다.
 # "tmticket" (1.13.1) 은 랭크 시즌 보상인 기술머신 뽑기권 - 타입 확정은 쓰기 전에 타입을 묻는다.
 # "deco" (버전 2) 는 꾸미기 - /api/deco/equip 으로 씌우고 뺀다. "decopick" 은 참가 묶음 선택권 (묶음을 고른다).
-# "lure" · "burn" (2.1.1) 은 타입 스프레이 · 버닝 부스터 (풀숲), "rename" 은 닉네임 변경권.
+# "lure" (2.1.1) 는 타입 스프레이 (풀숲), "rename" 은 닉네임 변경권.
 USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket", "form", "tmticket", "deco", "decopick",
-          "lure", "burn", "rename")
+          "lure", "rename")
 # **대상 포켓몬이 없는 도구.** 고를 것이 없으니 목록을 띄우지 않고 바로 쓴다.
-NO_TARGET = ("ticket", "tmticket", "decopick", "lure", "burn", "rename")
+NO_TARGET = ("ticket", "tmticket", "decopick", "lure", "rename")
 
 ROW_BG = "#10131c"      # 목록 한 줄 바탕
 SEL_BG = "#2b2417"      # 고른 줄
@@ -271,7 +271,7 @@ def item_desc(item):
         # 랜덤 뽑기권은 2.0.2 부터 길드전 결산 보상으로도 받는다 (타입 확정은 랭크 챔피언 것 그대로)
         return out + ("\n\n%s 받는다. 가진 기술머신은 나오지 않는다 - 뽑을 것이 없으면 쓸 수 없고 표는 남는다."
                       % ("랭크 시즌 보상으로만" if eff.get("pickType") else "랭크 시즌 보상과 길드전 보상으로"))
-    if kind in ("lure", "burn"):
+    if kind == "lure":
         out = boost_text(item) + "\n\n" + boost_note(item)
         if item.get("boostNow"):
             out += "\n\n" + item["boostNow"]
@@ -285,7 +285,7 @@ def item_desc(item):
     return "아직 쓸 수 없는 도구다."
 
 
-# ---------------------------------------------------------------- 풀숲 부스트 · 닉네임 변경권 (2.1.1)
+# ---------------------------------------------------------------- 타입 스프레이 · 닉네임 변경권 (2.1.1)
 # 상점(ui_shop.effect_text/effect_note)도 이 글을 쓴다. 3시간 = 서버 boosts.MAX_LEFT_MIN.
 BOOST_MAX_KR = "3시간"
 RENAME_TEXT = "닉네임을 한 번 바꾼다."
@@ -303,21 +303,16 @@ def left_kr(secs):
 
 
 def boost_text(item):
-    """타입 스프레이 · 버닝 부스터가 하는 일 한 줄."""
+    """타입 스프레이가 하는 일 한 줄."""
     eff = (item or {}).get("effect") or {}
     span = left_kr(int(eff.get("minutes") or 60) * 60)
-    if eff.get("kind") == "lure":
-        return "%s 동안 고른 타입의 포켓몬이 풀숲에 훨씬 자주 나온다 (둘에 하나 넘게). 쓸 때 타입을 고른다." % span
-    return "%s 동안 풀숲이 2~3분마다 돋는다 (보통은 5~7분)." % span
+    return "%s 동안 고른 타입의 포켓몬이 풀숲에 훨씬 자주 나온다 (둘에 하나 넘게). 쓸 때 타입을 고른다." % span
 
 
 def boost_note(item):
     """덧말: 겹쳐 쓰면 어떻게 되는지."""
-    if ((item or {}).get("effect") or {}).get("kind") == "lure":
-        return ("같은 타입으로 또 쓰면 남은 시간에 더해진다 (%s까지). 다른 타입을 쓰면 그 타입으로 바뀌고 "
-                "새로 시작한다. 풀숲이 돋는 간격은 그대로다 - 버닝 부스터와 함께 쓸 수 있다." % BOOST_MAX_KR)
-    return ("또 쓰면 남은 시간에 더해진다 (%s까지). 나오는 포켓몬은 그대로다 - 타입 스프레이와 함께 쓸 수 있다."
-            % BOOST_MAX_KR)
+    return ("같은 타입으로 또 쓰면 남은 시간에 더해진다 (%s까지). 다른 타입을 쓰면 그 타입으로 바뀌고 "
+            "새로 시작한다. 풀숲이 돋는 간격은 그대로다." % BOOST_MAX_KR)
 
 
 def type_kr(t):
@@ -326,15 +321,13 @@ def type_kr(t):
 
 
 def mark_boosts(items, boosts):
-    """켜져 있는 풀숲 부스트의 남은 시간을 그 도구에 적어 둔다 (item_desc 가 설명 끝에 붙인다).
-    boosts = 서버 /api/shop 의 {"burnLeft", "lureLeft", "lureType"} (옛 서버면 None)."""
+    """켜져 있는 타입 스프레이의 남은 시간을 그 도구에 적어 둔다 (item_desc 가 설명 끝에 붙인다).
+    boosts = 서버 /api/shop 의 {"lureLeft", "lureType"} (옛 서버면 None)."""
     b = boosts or {}
     for it in items:
         it.pop("boostNow", None)
         kind = (it.get("effect") or {}).get("kind")
-        if kind == "burn" and int(b.get("burnLeft") or 0) > 0:
-            it["boostNow"] = "지금 켜져 있다: %s 남음" % left_kr(b["burnLeft"])
-        elif kind == "lure" and int(b.get("lureLeft") or 0) > 0 and b.get("lureType"):
+        if kind == "lure" and int(b.get("lureLeft") or 0) > 0 and b.get("lureType"):
             it["boostNow"] = "지금 켜져 있다: %s 타입 · %s 남음" % (type_kr(b["lureType"]), left_kr(b["lureLeft"]))
 
 
@@ -721,7 +714,7 @@ class BagWindow(object):
         self._mon_ids = set()
         self._view = []          # 오른쪽 목록에 보이는 포켓몬 - 찾는 말로 거르고 줄 세운 것 (1.13.1)
         self.tm_left = None      # {타입: 아직 없는 기술머신 수} - 타입 확정 뽑기권이 있을 때만 온다 (1.13.1)
-        self.boosts = {}         # 켜져 있는 풀숲 부스트 {"burnLeft", "lureLeft", "lureType"} (2.1.1)
+        self.boosts = {}         # 켜져 있는 타입 스프레이 {"lureLeft", "lureType"} (2.1.1)
         self.deco_worn = {}      # {포켓몬id: {칸: 열쇠}} - 꾸미기 (버전 2, deco_items)
         self.item_sort = "name"  # 도구 목록 순서 (ITEM_SORTS). 다시 불러와도 그대로다 (1.13.4)
 
@@ -1901,11 +1894,6 @@ class BagWindow(object):
         self.say("%s을(를) 쓰는 중..." % it["kr"], U.FG_FAINT)
 
         def done(r, err):
-            if not err and kind in ("lure", "burn"):
-                # 버닝은 서버가 다음 풀숲 시각을 당겼다 - 예전 시각으로 걸어 둔 확인을 다시 건다 (가방을 닫았어도)
-                wild = getattr(self.app, "wild", None)
-                if wild is not None:
-                    wild.check()
             if not self.alive:
                 return
             if err:

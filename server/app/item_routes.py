@@ -107,7 +107,7 @@ def shop(me=Depends(deps.current)):
     if any(bag.get(i, 0) > 0 for i, it in items.catalog().items()
            if (it.get("effect") or {}).get("kind") == "tmticket"):
         out["tmLeft"] = tm_left(u["id"])
-    # 타입 스프레이 · 버닝 부스터가 켜져 있으면 가방 설명에 남은 시간을 적는다 (2.1.1)
+    # 타입 스프레이가 켜져 있으면 가방 설명에 남은 시간을 적는다 (2.1.1)
     out["boosts"] = boosts.state(u["id"])
     return out
 
@@ -251,8 +251,8 @@ def use(body: UseIn, me=Depends(deps.current)):
         return out
 
     # 풀숲 부스트 · 닉네임 변경권 (2.1.1) - 이것도 대상이 없다
-    if kind in ("lure", "burn", "rename"):
-        out = {"lure": _use_lure, "burn": _use_burn, "rename": _use_rename}[kind](uid, it, eff, body)
+    if kind in ("lure", "rename"):
+        out = {"lure": _use_lure, "rename": _use_rename}[kind](uid, it, eff, body)
         out.update(_wallet(uid))
         out["message"] = korean.natural(out.get("message", ""))
         return out
@@ -415,24 +415,6 @@ def _use_lure(uid, it, eff, body):
     kr = types.get(want, {}).get("kr") or want
     return {"ok": True, "won": True, "boosts": boosts.state(uid),
             "message": "앞으로 %s 동안 %s 타입 포켓몬이 풀숲에 훨씬 자주 나타난다!" % (_left_kr(secs), kr)}
-
-
-def _use_burn(uid, it, eff, body):
-    """버닝 부스터 (2.1.1): 풀숲이 2~3분마다 돋는다 (boosts). 이미 잡힌 다음 풀숲 시각도 당긴다."""
-    minutes = int(eff.get("minutes") or 60)
-    s = boosts.state(uid)
-    if not boosts.room(s["burnLeft"], minutes):
-        raise HTTPException(409, "이미 %s 남아 있습니다 (%d시간까지만 쌓입니다)."
-                            % (_left_kr(s["burnLeft"]), boosts.MAX_LEFT_MIN // 60))
-    if not items.bag_take(uid, it["id"], 1):
-        raise HTTPException(400, "%s이(가) 없습니다." % it["kr"])
-    try:
-        secs = boosts.burn(uid, minutes, deps.RNG)
-    except Exception:                                       # noqa: BLE001
-        items.bag_add(uid, it["id"], 1)
-        raise
-    return {"ok": True, "won": True, "boosts": boosts.state(uid),
-            "message": "앞으로 %s 동안 풀숲이 2~3분마다 돋는다!" % _left_kr(secs)}
 
 
 def _use_rename(uid, it, eff, body):

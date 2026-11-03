@@ -170,8 +170,6 @@ EXTRA = [
     },
     # 타입 스프레이 (2.1.1)
     {"id": "TYPESPRAY", "ident": "type-spray", "kr": "타입 스프레이", "en": "Type Spray", "cat": "misc", "cost": 10000, "sell": 0, "desc": "쓸 때 타입을 고르면 1시간 동안 풀숲에서 그 타입의 포켓몬이 훨씬 자주 나타난다 (둘에 하나 넘게). 켜져 있을 때 또 쓰면 시간이 늘어난다 (3시간까지).", "effect": {"kind": "lure", "pickType": True, "minutes": 60}},
-    # 버닝 부스터 (2.1.1)
-    {"id": "BURNINGBOOST", "ident": "burning-boost", "kr": "버닝 부스터", "en": "Burning Boost", "cat": "misc", "cost": 10000, "sell": 0, "desc": "쓰면 1시간 동안 풀숲이 2~3분마다 돋는다 (보통은 5~7분). 켜져 있을 때 또 쓰면 시간이 늘어난다 (3시간까지).", "effect": {"kind": "burn", "minutes": 60}},
     # 닉네임 변경권 (2.1.1)
     {"id": "RENAMETICKET", "ident": "rename-ticket", "kr": "닉네임 변경권", "en": "Rename Ticket", "cat": "misc", "cost": 30000, "sell": 0, "desc": "닉네임을 한 번 바꾼다. 닉네임은 로그인 아이디이기도 해서, 바꾸면 다음 로그인부터 새 닉네임으로 들어온다 (비밀번호는 그대로).", "effect": {"kind": "rename"}},
 ]

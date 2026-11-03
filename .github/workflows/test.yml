@@ -335,8 +335,8 @@ jobs:
       # 1.13.1: 랭크 시즌 보상 - 기술머신 뽑기권(타입 고르기) · 랭킹 탭 보상 표(관장 등록은 글로만)
       - name: 기술머신 뽑기권·랭크 보상 표 화면 (진짜 Tk)
         run: python client/test_reward_tickets.py
-      # 2.1.1: 타입 스프레이(타입 고르기) · 버닝 부스터 · 닉네임 변경권(이름 묻기 · 세션 이름)
-      - name: 풀숲 부스트·닉네임 변경권 가방 화면 (진짜 Tk)
+      # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
+      - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         run: python client/test_boost_items.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
@@ -515,8 +515,8 @@ jobs:
       # 1.13.1: 랭크 시즌 보상 - 기술머신 뽑기권(타입 고르기) · 랭킹 탭 보상 표(관장 등록은 글로만)
       - name: 기술머신 뽑기권·랭크 보상 표 화면 (진짜 Tk)
         run: python client/test_reward_tickets.py
-      # 2.1.1: 타입 스프레이(타입 고르기) · 버닝 부스터 · 닉네임 변경권(이름 묻기 · 세션 이름)
-      - name: 풀숲 부스트·닉네임 변경권 가방 화면 (진짜 Tk)
+      # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
+      - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         run: python client/test_boost_items.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
@@ -683,7 +683,7 @@ jobs:
           python test_forms.py           # 1.13: 폼 도구 (켜고 끄기·고르기·꽃꿀)
           python test_errors.py          # 1.13.1: 서버 오류 기록에 문구·역추적이 남는다
           python test_tm_ticket.py       # 1.13.1: 랭크 보상 - 기술머신 뽑기권
-          python test_boosts.py          # 2.1.1: 타입 스프레이 · 버닝 부스터 (풀숲 간격 · 출현)
+          python test_boosts.py          # 2.1.1: 타입 스프레이 (출현 · 3시간까지 · 풀숲 간격은 그대로)
           python test_rename.py          # 2.1.1: 닉네임 변경권 (규칙 · 한 트랜잭션 · 로그인)
           python test_client_ip.py       # 2.1.1: cf-connecting-ip 는 Cloudflare 가 앞에 있을 때만 믿는다 (IP 위조)
           python test_account_email.py   # 2.1.1: 마이페이지 이메일 (본인만 보인다, 비우면 지운다)

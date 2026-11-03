@@ -168,8 +168,8 @@ def effect_text(it):
         # 적었다. 가방에서는 멀쩡히 쓰이는데 막아 둔 것처럼 보였다.
         return "먹이면 몸 색이 바뀌어 이로치가 된다 (가방에서 포켓몬에게 쓴다)"
 
-    # 풀숲 부스트 · 닉네임 변경권 (2.1.1) - 가방 설명과 같은 글
-    if kind in ("lure", "burn"):
+    # 타입 스프레이 · 닉네임 변경권 (2.1.1) - 가방 설명과 같은 글
+    if kind == "lure":
         from . import ui_bag
         return ui_bag.boost_text(it).rstrip(".")
     if kind == "rename":
@@ -196,7 +196,7 @@ def effect_note(it):
         # 지녔을 때 실제로 몇 배인지 (본가 설명에는 숫자가 없다). 설명과 같은 글이면 빈 글자 (ui_bag.held_note)
         from . import ui_bag
         return ui_bag.held_note(it)
-    if kind in ("lure", "burn"):
+    if kind == "lure":
         from . import ui_bag
         return ui_bag.boost_note(it)
     if kind == "rename":
