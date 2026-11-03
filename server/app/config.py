@@ -66,8 +66,10 @@ MIN_PASSWORD = PIN_DIGITS
 # 데리고 다니는 포켓몬 수. 이 숫자가 곧 바탕화면에 나오는 수이기도 하다.
 # 넘치면 PC 박스로 들어간다.
 MAX_PARTY = _int("POKET_MAX_PARTY", 6)
-# 랜덤 배틀을 한 판 걸고 다음 판을 걸기까지 (초). 1.4.1
-RANDOM_COOLDOWN_SEC = _int("POKET_RANDOM_COOLDOWN_SEC", 30)
+# 랜덤 배틀을 한 판 걸고 다음 판을 걸기까지 (초). 1.4.1 부터 30초였다가 2.1.1 에 없앴다 (사용자 결정 11/04).
+# 0 이면 쿨타임이 없다 (pvp.random_cooldown_left). 다시 켜려면 .env 에 POKET_RANDOM_COOLDOWN_SEC 를 넣는다.
+# 하루 20판(점수판) · 같은 상대 30분(PAIR_COOLDOWN_MIN)은 그대로다.
+RANDOM_COOLDOWN_SEC = _int("POKET_RANDOM_COOLDOWN_SEC", 0)
 MAX_DESKTOP = MAX_PARTY
 
 # PC 박스. 한 박스에 몇 마리, 박스는 몇 개까지.

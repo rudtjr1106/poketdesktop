@@ -199,8 +199,11 @@ def main():
     v5 = pvp.match_view(hi2, r["matchId"])
     chk("  길드원으로 들어온 사람도 같은 이름", v5["foe"].get("guild") == "이름표단", v5["foe"])
 
-    print("\n=== 랜덤 배틀 30초 쿨타임 ===")
-    chk("쿨타임은 30초", config.RANDOM_COOLDOWN_SEC == 30, config.RANDOM_COOLDOWN_SEC)
+    print("\n=== 랜덤 배틀 쿨타임 (2.1.1 부터 기본은 없다 - 켰을 때의 동작은 그대로 본다) ===")
+    chk("기본 쿨타임은 0초 (2.1.1, 사용자 결정)", config.RANDOM_COOLDOWN_SEC == 0, config.RANDOM_COOLDOWN_SEC)
+    chk("  쿨타임이 없으면 방금 걸었어도 바로 다시 건다", pvp.random_cooldown_left(hi) == 0
+        and pvp.can_start(hi, "random") is None, pvp.can_start(hi, "random"))
+    config.RANDOM_COOLDOWN_SEC = 30                         # 아래는 .env 로 다시 켰을 때
     left = pvp.random_cooldown_left(hi)
     chk("방금 랜덤 배틀을 걸었으면 남은 초가 있다", 0 < left <= 30, left)
     why = pvp.can_start(hi, "random")
@@ -217,6 +220,7 @@ def main():
     fs = pvp.fight_status(hi)
     chk("남은 도전 정보에 쿨타임", fs["randomCooldownSec"] == 30
         and fs["randomCooldownLeft"] == 0, fs)
+    config.RANDOM_COOLDOWN_SEC = 0
 
     print("\n=== 랜덤 배틀 뒤처리 — RP ===")
     rs = stat(hi)
