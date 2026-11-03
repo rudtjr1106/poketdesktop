@@ -169,7 +169,7 @@ EXTRA = [
         "effect": {"kind": "tmticket", "pickType": True},
     },
     # 타입 스프레이 (2.1.1)
-    {"id": "TYPESPRAY", "ident": "type-spray", "kr": "타입 스프레이", "en": "Type Spray", "cat": "misc", "cost": 10000, "sell": 0, "desc": "쓸 때 타입을 고르면 1시간 동안 풀숲에서 그 타입의 포켓몬이 훨씬 자주 나타난다 (둘에 하나 넘게). 켜져 있을 때 또 쓰면 시간이 늘어난다 (3시간까지).", "effect": {"kind": "lure", "pickType": true, "minutes": 60}},
+    {"id": "TYPESPRAY", "ident": "type-spray", "kr": "타입 스프레이", "en": "Type Spray", "cat": "misc", "cost": 10000, "sell": 0, "desc": "쓸 때 타입을 고르면 1시간 동안 풀숲에서 그 타입의 포켓몬이 훨씬 자주 나타난다 (둘에 하나 넘게). 켜져 있을 때 또 쓰면 시간이 늘어난다 (3시간까지).", "effect": {"kind": "lure", "pickType": True, "minutes": 60}},
     # 버닝 부스터 (2.1.1)
     {"id": "BURNINGBOOST", "ident": "burning-boost", "kr": "버닝 부스터", "en": "Burning Boost", "cat": "misc", "cost": 10000, "sell": 0, "desc": "쓰면 1시간 동안 풀숲이 2~3분마다 돋는다 (보통은 5~7분). 켜져 있을 때 또 쓰면 시간이 늘어난다 (3시간까지).", "effect": {"kind": "burn", "minutes": 60}},
     # 닉네임 변경권 (2.1.1)
