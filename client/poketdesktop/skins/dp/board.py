@@ -28,7 +28,7 @@ from .rank import chip as _chip, head_band, paint_msg
 
 BAND_LINE = "#1d5e80"
 
-KIND_COLOR = {"notice": "#e07a28", "free": "#3a72cc", "qna": "#2c9a4c", "patch": "#d0508a"}
+KIND_COLOR = {"notice": "#e07a28", "free": "#3a72cc", "qna": "#2c9a4c", "patch": "#d0508a", "ask": "#7a52c8"}
 PIN_BG = "#fff4d8"
 LINK, LINK_HOVER = "#2860c0", "#4a8ae8"
 T = ("head",)
@@ -713,8 +713,14 @@ class BoardWindow(B.BoardWindow):
             cv.tag_bind("wk", "<Enter>", lambda _e: cv.configure(cursor="hand2"))
             cv.tag_bind("wk", "<Leave>", lambda _e: cv.configure(cursor=""))
             if note:
-                K.text(cv, xx + s(4), y + s(15), note, font(9), fill=INK2, anchor="w", width=max(60, ix2 - xx - s(4)),
-                       tags=t)
+                # 단추 옆에 한 줄로 들어가면 옆에, 아니면 단추 아래 줄에 (2.1.0 - 문의/건의 칸이 늘고 말이 길어졌다)
+                if K.tkfont_of(cv, font(9)).measure(note) <= ix2 - xx - s(4):
+                    K.text(cv, xx + s(4), y + s(15), note, font(9), fill=INK2, anchor="w", tags=t)
+                else:
+                    y += s(36)
+                    K.text(cv, ix1 + s(52), y + s(9), note, font(9), fill=INK2, anchor="w",
+                           width=max(60, ix2 - ix1 - s(52)), tags=t)
+                    y -= s(8)
             y += s(42)
         cv.create_text(ix1, y + s(16), text="제목", fill=INK2, font=font(10), anchor="w", tags=t)
         tcount, bcount, tover, bover = self._counts

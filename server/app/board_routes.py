@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """게시판 API (1.8.0).
 
-    GET    /api/board?kind=all|notice|free&page=1   목록 한 쪽
+    GET    /api/board?kind=all|notice|free|qna|patch|ask&page=1   목록 한 쪽 (ask = 문의/건의: 운영진과 쓴 사람만)
     GET    /api/board/{id}                          글과 댓글
     POST   /api/board                               글 쓰기 (공지는 운영자만)
     PUT    /api/board/{id}                          내 글 고치기
@@ -40,7 +40,7 @@ router = APIRouter()
 
 
 class PostIn(BaseModel):
-    kind: str = "free"
+    kind: str = ""                            # 2.1.0: 꼭 고른다 (예전엔 안 보내면 자유)
     title: str = ""
     body: str = ""
     images: Optional[List[int]] = None        # 버전 2. 없으면(옛 앱) 고칠 때 그림을 그대로 둔다
@@ -90,7 +90,7 @@ def notify_seen(ctx=Depends(deps.current)):
 
 @router.post("/api/board")
 def create(body: PostIn, ctx=Depends(deps.current)):
-    pid = _run(board.create, ctx["user"], (body.kind or "free").lower(),
+    pid = _run(board.create, ctx["user"], (body.kind or "").lower(),
                body.title, body.body, images=body.images)
     return board.detail(ctx["user"], pid)
 

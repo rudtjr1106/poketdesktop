@@ -60,13 +60,17 @@ ROW_BG = "#161b28"
 PIN_BG = "#231d10"            # 공지 줄
 REPLY_BG = "#10141e"
 KINDS = [("all", "전체"), ("notice", "공지"), ("free", "자유"), ("qna", "Q&A"),
-         ("patch", "패치노트")]
-KIND_COLOR = {"notice": U.ACCENT, "free": U.INFO, "qna": U.GOOD, "patch": U.PINK}
+         ("ask", "문의/건의"), ("patch", "패치노트")]
+KIND_COLOR = {"notice": U.ACCENT, "free": U.INFO, "qna": U.GOOD, "patch": U.PINK, "ask": "#b48cff"}
+# 문의/건의 (2.1.0): 운영진과 쓴 사람만 본다 (서버가 가린다 - 화면은 알려만 준다)
+ASK_NOTE = "문의 · 건의는 운영진과 쓴 사람만 볼 수 있습니다."
+ASK_NOTE_ADMIN = "문의 · 건의: 운영진이라 모든 사람의 글이 보입니다."
 # 운영자만 올리는 글. 본문의 주소를 누를 수 있다.
 TRUSTED_KINDS = ("notice", "patch")
 LIKE_ON = U.ACCENT            # 내가 누른 좋아요
-# 글을 쓸 때 고르는 종류. 공지는 운영자에게만 보인다.
-WRITE_KINDS = [("free", "자유"), ("qna", "Q&A")]
+# 글을 쓸 때 고르는 종류. 공지는 운영자에게만 보인다. 2.1.0 부터 **미리 골라 두지 않는다** - 자유 칸에
+# 문의 · 건의가 쌓여서 (사용자 결정) 쓰는 사람이 꼭 하나를 고르게 한다.
+WRITE_KINDS = [("free", "자유"), ("qna", "Q&A"), ("ask", "문의/건의")]
 LIMITS = {"title": 40, "body": 2000, "comment": 300}
 
 
@@ -372,12 +376,16 @@ class BoardWindow(object):
         if not pinned and not posts:
             empty = natural(("'%s' 이(가) 들어간 글이 없습니다." % q) if q else (
                 "아직 패치노트가 없습니다." if d.get("kind") == "patch"
+                else "아직 문의 · 건의가 없습니다." if d.get("kind") == "ask" and self.can_notice
+                else "아직 쓴 문의 · 건의가 없습니다. 운영진과 나만 볼 수 있습니다." if d.get("kind") == "ask"
                 else "아직 글이 없습니다. 첫 글을 써 보세요."))
         pages = d.get("pages") or 1
         self._paint_list(pinned, posts, empty, "%d / %d" % (d.get("page") or 1, pages),
                          self.page > 1, self.page < pages,
                          ("찾은 글 %d개" if q else "글 %d개") % (d.get("total") or 0))
         self.say("")
+        if d.get("kind") == "ask":
+            self.say(ASK_NOTE_ADMIN if self.can_notice else ASK_NOTE, U.FG_DIM)
         # 공지를 봤다 - 탭과 트레이의 '새 공지' 표시를 끈다
         seen = [p["id"] for p in pinned] + [p["id"] for p in posts
                                              if p.get("kind") == "notice"]
@@ -841,19 +849,17 @@ class BoardWindow(object):
             pass
 
     def _write_kind(self, post):
-        """쓰는 글의 처음 종류. 고칠 때는 그 글의 종류 그대로다."""
+        """쓰는 글의 처음 종류. 고칠 때는 그 글의 종류 그대로, 새 글은 **아무것도 안 고른 채** (2.1.0 -
+        예전에는 '자유' 가 골라져 있어 문의 · 건의가 자유 칸으로 들어왔다)."""
         if post:
             return post.get("kind") or "free"
-        if self.kind == "notice" and self.can_notice:
-            return "notice"
-        if self.kind == "qna":
-            return "qna"                    # Q&A 를 보다가 쓰면 Q&A 로
-        return "free"
+        return None
 
     def _write_kinds(self):
         """새 글의 종류 칸: ([(열쇠, 이름)], 옆에 붙는 말). 공지는 운영자에게만."""
         kinds = WRITE_KINDS + ([("notice", "공지")] if self.can_notice else [])
-        return kinds, ("공지는 운영자만 쓸 수 있습니다." if self.can_notice else "질문은 Q&A 에 올려 주세요.")
+        return kinds, ("종류를 꼭 골라 주세요. 공지는 운영자만 씁니다." if self.can_notice
+                       else "종류를 꼭 골라 주세요. 문의 · 건의는 운영진과 나만 봅니다.")
 
     def _paint_write(self, post):
         """쓰기 화면 (테마마다 그리는 곳)."""
@@ -884,8 +890,11 @@ class BoardWindow(object):
                      width=5, anchor="w").pack(side="left")
             self.kind_seg = U.Segmented(row, kinds, self.kind_var, self._pick_post_kind)
             self.kind_seg.pack(side="left")
-            tk.Label(row, text=note,
-                     bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left", padx=(10, 0))
+            # 안내는 단추 아래 줄에 (종류가 넷까지 늘어 옆에 두면 창 밖으로 잘린다)
+            row = tk.Frame(form, bg=U.BG)
+            row.pack(fill="x", pady=(4, 0))
+            tk.Label(row, text="", bg=U.BG, font=U.FONT_S, width=5).pack(side="left")
+            tk.Label(row, text=note, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left")
         row = tk.Frame(form, bg=U.BG)
         row.pack(fill="x", pady=(10, 0))
         tk.Label(row, text="제목", bg=U.BG, fg=U.FG_DIM, font=U.FONT_S,
@@ -1070,6 +1079,8 @@ class BoardWindow(object):
     def submit_post(self):
         title = self.title_var.get().strip()
         body = self.text.get("1.0", "end-1c").strip()
+        if not self.edit_id and not self.kind_var:
+            return self.say("글의 종류(자유 · Q&A · 문의/건의)를 골라 주세요.", U.DANGER)
         if not title:
             return self.say("제목을 적어 주세요.", U.DANGER)
         if not body:

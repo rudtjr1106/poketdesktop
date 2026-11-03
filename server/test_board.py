@@ -11,6 +11,7 @@
   6. 지우기는 쓴 사람과 운영자. 답글이 달린 댓글은 자리를 남긴다.
   7. 도배: 글 30초·댓글 5초에 하나.
   8. /api/me 에 가장 최근 공지 번호.
+  9. (2.1.0) 문의/건의는 운영진과 쓴 사람만 본다 - 목록 · 찾기 · 글 · 댓글 · 좋아요 · 그림. 종류는 꼭 고른다.
 """
 import datetime
 import os
@@ -27,6 +28,7 @@ os.environ.pop("POKET_TURSO_URL", None)
 os.environ.pop("POKET_BOARD_ADMINS", None)
 os.environ["POKET_POKEDEX"] = os.path.join(HERE, "data", "pokedex.json")
 os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
+os.environ["POKET_BOARD_IMG_DIR"] = os.path.join(TMP, "img")      # 문의/건의 그림 보기 (서버의 /data 대신)
 
 from fastapi import HTTPException                            # noqa: E402
 
@@ -434,6 +436,7 @@ def main():
 
     t_190(op, a, b)
     t_admins(op, a, fake)
+    t_ask(op, a, b)
 
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
@@ -478,6 +481,62 @@ def t_admins(op, a, fake):
         config.BOARD_ADMINS = real
     chk("목록에서 빼면 다시 보통 사람이다", not board.is_admin(a)
         and raises(PermissionError, board.create, a, "notice", "가짜 공지", "x"))
+
+
+def t_ask(op, a, b):
+    """문의/건의 (2.1.0): 운영진은 다, 쓴 사람은 자기 것만. 남에게는 없는 글처럼."""
+    print("\n=== 문의/건의 (운영진과 쓴 사람만) ===")
+    a, b = mkuser("문의하는웅이"), mkuser("건의하는피카")   # 앞의 검사가 지금 시각으로 쓴 글이 있어 도배에 걸린다
+    day = 86400 * 5
+    ib = board.create(b, "ask", "도감 버그 문의", "파이리가 안 보여요 무지개", now=at(day))
+    ia = board.create(a, "ask", "건의합니다", "무지개 배경 넣어 주세요", now=at(day + 40))
+    fr = board.create(a, "free", "자유 무지개", "같은 말이 든 자유 글", now=at(day + 80))
+
+    def ids(user, kind, q=None):
+        return [x["id"] for x in board.listing(user, kind, 1, now=at(day + 100), q=q)["posts"]]
+    chk("쓴 사람은 문의/건의 칸에서 자기 글만", ids(b, "ask") == [ib] and ids(a, "ask") == [ia],
+        (ids(b, "ask"), ids(a, "ask")))
+    chk("운영진은 다 본다", set(ids(op, "ask")) >= {ia, ib}, ids(op, "ask"))
+    lst = board.listing(b, "ask", 1)
+    chk("  쪽 수 · 전체 수도 내 것만 센다", lst["total"] == 1 and lst["pages"] == 1, lst["total"])
+    chk("'전체' 에는 안 흐른다 (운영진에게도)", ia not in ids(op, "all") and ib not in ids(b, "all"))
+    found = ids(b, "all", "무지개")
+    chk("찾기: 남의 문의/건의는 안 걸린다 (내 것 · 자유 글은 걸린다)", ia not in found and {ib, fr} <= set(found),
+        (found, ia, ib, fr))
+    chk("  운영진의 찾기에는 다 걸린다", {ia, ib, fr} <= set(ids(op, "all", "무지개")))
+    chk("  문의/건의 칸에서 찾아도 내 것만", ids(b, "ask", "무지개") == [ib])
+    chk("남은 글을 못 연다 (없는 글처럼 404)", raises(LookupError, board.detail, a, ib)
+        and status(board_routes.detail, ib, ctx={"user": a}) == 404)
+    p = board.detail(b, ib)
+    chk("쓴 사람은 연다 · 비공개 표시", p["id"] == ib and p["private"] is True and p["kindKr"] == "문의/건의", p)
+    chk("운영진도 연다", board.detail(op, ib)["id"] == ib)
+    chk("남은 댓글 · 좋아요를 못 단다", raises(LookupError, board.comment, a, ib, "엿보기", now=at(day + 200))
+        and raises(LookupError, board.like, a, ib))
+    chk("남이 고치기 · 지우기를 해 봐도 403 이 아니라 404 (있다는 것도 모르게)",
+        raises(LookupError, board.edit, a, ib, "x", "y") and raises(LookupError, board.remove, a, ib)
+        and status(board_routes.remove, ib, ctx={"user": a}) == 404)
+    board.comment(op, ib, "확인했습니다. 다음 판에 고칠게요.", now=at(day + 210))
+    chk("운영진 답글은 쓴 사람에게 알림", any(n["postId"] == ib for n in board.notifications(b["id"])["items"]),
+        board.notifications(b["id"]))
+    board.comment(b, ib, "감사합니다", now=at(day + 220))
+    chk("쓴 사람은 댓글을 이어 단다", board.detail(b, ib)["comments"] == 2)
+    chk("자유 글은 그대로 누구나", board.detail(b, fr)["private"] is False)
+    cur = db.run("INSERT INTO board_image (user_id, post_id, pos, fmt, w, h, bytes, created_at)"
+                 " VALUES (?,?,0,'png',4,4,10,'')", (b["id"], ib))
+    iid = cur.lastrowid
+    chk("붙은 그림도 남은 못 본다", raises(LookupError, board.image_file, a, iid) == "없는 이미지입니다.",
+        raises(LookupError, board.image_file, a, iid))
+    chk("  쓴 사람 · 운영진은 볼 수 있다 (여기선 파일이 없다는 데까지 간다)",
+        raises(LookupError, board.image_file, b, iid) == "이미지 파일이 없습니다."
+        and raises(LookupError, board.image_file, op, iid) == "이미지 파일이 없습니다.",
+        (raises(LookupError, board.image_file, b, iid), raises(Exception, board.image_file, op, iid)))
+    chk("내 활동 수에 내 문의/건의도 든다", board.mine(b["id"])["postCount"] >= 1
+        and ib in [x["id"] for x in board.mine_page(b["id"], "posts", 1)["items"]])
+    print("\n=== 종류는 꼭 고른다 ===")
+    chk("종류 없이 쓰면 400 ('골라 주세요')", "골라" in str(raises(ValueError, board.create, b, "", "제목", "내용")))
+    chk("  HTTP 로 종류를 안 보내도 400 (예전엔 자유)", status(board_routes.create, board_routes.PostIn(
+        title="종류 없음", body="x"), ctx={"user": b}) == 400)
+    chk("  모르는 종류도 400", raises(ValueError, board.create, b, "secret", "제목", "내용"))
 
 
 if __name__ == "__main__":

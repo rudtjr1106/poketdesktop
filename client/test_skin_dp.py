@@ -585,6 +585,7 @@ def board(root):
             (placed, w._attach_frame.winfo_reqheight()))
         w.title_var.set("사진 두 장")
         w.text.insert("1.0", "그림")
+        w._pick_post_kind("free")                                 # 2.1.0: 종류는 꼭 고른다
         w.submit_post()
         TBL.wait(root, lambda: w.view == "post" and w.post and w.post.get("title") == "사진 두 장", 5)
         TBL.wait(root, lambda: len([i for i in w.pcv.find_all() if w.pcv.type(i) == "image"]) == 2, 5)

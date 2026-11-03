@@ -11,6 +11,10 @@
     남이 같은 이름을 쓸 수 없다. 비슷하게 생긴 이름으로 흉내 내는 것은
     화면의 '운영자' 표시로 가린다 - 그 표시는 여기서 붙인다.
   · **자유(free)** · **Q&A(qna)** — 누구나 쓴다.
+  · **문의/건의(ask)** (2.1.0) — 누구나 쓰지만 **운영진과 쓴 사람만 본다**. 자유 칸이 문의 · 건의로
+    도배되어 게시판 취지가 흐려져서 (사용자 결정) 따로 뺐다. 목록 · 찾기 · 글 열기 · 댓글 · 좋아요 ·
+    그림 보기가 모두 같은 규칙(can_see)을 따른다. '전체' 에는 흐르지 않는다. 운영자 댓글은 보통 글처럼
+    쓴 사람에게 알림으로 간다.
   · **패치노트(patch)** — 사람이 쓰지 않는다. 서버가 뜰 때 common/patchnotes
     의 버전마다 글 하나씩을 올린다 (ensure_patch_posts). 같은 버전을 두 번
     올리지 않으려고 ref('patch:1.9.0')를 본다. 댓글과 좋아요는 달 수 있다.
@@ -74,8 +78,10 @@ from . import config, db, season
 
 # 공지는 운영자만 쓴다. 자유와 Q&A(1.8.1)는 누구나 쓴다 - 질문이 자유 글에 섞여
 # 묻히지 않게 따로 둔 칸일 뿐, 규칙은 자유 글과 같다. 패치노트(1.9.0)는 서버가 올린다.
-KINDS = ("notice", "free", "qna", "patch")
-KIND_KR = {"notice": "공지", "free": "자유", "qna": "Q&A", "patch": "패치노트"}
+# 문의/건의(2.1.0)는 운영진과 쓴 사람만 본다 (PRIVATE).
+KINDS = ("notice", "free", "qna", "patch", "ask")
+KIND_KR = {"notice": "공지", "free": "자유", "qna": "Q&A", "patch": "패치노트", "ask": "문의/건의"}
+PRIVATE = ("ask",)
 # '전체' 에 흐르는 글. 공지는 맨 위에 따로 붙고, 패치노트는 자기 칸에만 있다.
 FLOW = ("free", "qna")
 SEARCH_MAX = 30               # 찾는 말 길이
@@ -128,6 +134,23 @@ def is_admin(user):
     name = (user or {}).get("username") if isinstance(user, dict) else \
         (user["username"] if user is not None else None)
     return bool(name) and name in config.BOARD_ADMINS
+
+
+def can_see(user, row, admin=None):
+    """그 글을 볼 수 있나. 문의/건의는 운영진과 쓴 사람만."""
+    if row["kind"] not in PRIVATE:
+        return True
+    if admin is None:
+        admin = is_admin(user)
+    return bool(admin) or row["user_id"] == user["id"]
+
+
+def _private_sql(user, admin):
+    """목록 · 찾기에 붙이는 조건: 운영진이 아니면 남의 문의/건의는 뺀다."""
+    if admin:
+        return "", ()
+    marks = ",".join("?" * len(PRIVATE))
+    return " AND (kind NOT IN (%s) OR user_id=?)" % marks, tuple(PRIVATE) + (user["id"],)
 
 
 def _admin_ids():
@@ -214,6 +237,7 @@ def _post_row(r, authors, uid, admin, now, counts, likes=None):
            "comments": counts.get(r["id"], 0),
            "likes": n_like.get(r["id"], 0), "liked": r["id"] in mine_like,
            "mine": r["user_id"] == uid,
+           "private": r["kind"] in PRIVATE,          # 운영진과 쓴 사람만 보는 글 (화면이 알려 준다)
            # 패치노트는 서버가 올린 글이다. 고치면 다음 판과 모양이 갈린다.
            "canDelete": (r["user_id"] == uid or admin) and not patch,
            "canEdit": r["user_id"] == uid and not patch}
@@ -270,6 +294,8 @@ def listing(user, kind="all", page=1, now=None, q=None):
         args = tuple(FLOW)
     else:
         where, args = "deleted=0 AND kind=?", (kind,)
+    hide, hide_args = _private_sql(user, admin)          # 남의 문의/건의 (찾기 · 문의/건의 칸)
+    where, args = where + hide, args + hide_args
     if q:
         where += " AND (title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\'" \
                  " OR author LIKE ? ESCAPE '\\')"
@@ -315,7 +341,7 @@ def detail(user, pid, now=None):
     admin = is_admin(user)
     now = now or _now()
     r = _post(pid)
-    if not r:
+    if not r or not can_see(user, r, admin):              # 남의 문의/건의는 없는 글처럼
         raise LookupError("없는 글이거나 지워진 글입니다.")
     db.run("DELETE FROM board_notify WHERE user_id=? AND post_id=?", (uid, pid))
     rows = list(db.q("SELECT * FROM board_comment WHERE post_id=? ORDER BY id", (pid,)))
@@ -358,6 +384,8 @@ def detail(user, pid, now=None):
 
 # ---------------------------------------------------------------- 쓰기
 def create(user, kind, title, body, now=None, images=None):
+    if not kind:
+        raise ValueError("글의 종류를 골라 주세요.")      # 2.1.0: 화면이 '자유' 를 미리 골라 두지 않는다
     if kind not in KINDS:
         raise ValueError("글의 종류를 알 수 없습니다.")
     if kind == "patch":
@@ -381,7 +409,7 @@ def create(user, kind, title, body, now=None, images=None):
 def edit(user, pid, title, body, now=None, images=None):
     """images 가 None 이면 그림은 그대로 둔다 (그림 칸을 모르는 옛 앱). 목록이면 그대로 바꾼다 - 빠진 것은 지운다."""
     r = _post(pid)
-    if not r:
+    if not r or not can_see(user, r):                    # 남의 문의/건의는 있다는 것도 모르게 (403 이 아니라 404)
         raise LookupError("없는 글이거나 지워진 글입니다.")
     if r["user_id"] != user["id"]:
         raise PermissionError("내가 쓴 글만 고칠 수 있습니다.")
@@ -399,7 +427,7 @@ def edit(user, pid, title, body, now=None, images=None):
 
 def remove(user, pid):
     r = _post(pid)
-    if not r:
+    if not r or not can_see(user, r):                    # 남의 문의/건의는 있다는 것도 모르게
         raise LookupError("없는 글이거나 지워진 글입니다.")
     if r["user_id"] != user["id"] and not is_admin(user):
         raise PermissionError("내가 쓴 글만 지울 수 있습니다.")
@@ -413,7 +441,8 @@ def remove(user, pid):
 
 def like(user, pid, now=None):
     """좋아요를 누르거나 취소한다. 누른 상태가 됐으면 True."""
-    if not _post(pid):
+    r = _post(pid)
+    if not r or not can_see(user, r):
         raise LookupError("없는 글이거나 지워진 글입니다.")
     uid = user["id"]
     if db.q1("SELECT 1 FROM board_like WHERE post_id=? AND user_id=?", (pid, uid)):
@@ -426,7 +455,7 @@ def like(user, pid, now=None):
 
 def comment(user, pid, body, parent=None, now=None):
     post = _post(pid)
-    if not post:
+    if not post or not can_see(user, post):
         raise LookupError("없는 글이거나 지워진 글입니다.")
     body = clean(body, COMMENT_MAX, "댓글")
     parent_id, target = None, None
@@ -917,15 +946,20 @@ def _attach(uid, pid, ids):
 
 
 def image_file(user, iid):
-    """보여 줄 그림 파일 (경로, MIME). 붙은 글이 살아 있으면 누구나, 아직 안 붙었으면 올린 사람만."""
+    """보여 줄 그림 파일 (경로, MIME). 붙은 글이 살아 있으면 그 글을 볼 수 있는 사람(문의/건의는 운영진과 쓴
+    사람), 아직 안 붙었으면 올린 사람만."""
     r = db.q1("SELECT * FROM board_image WHERE id=?", (int(iid),))
     if not r:
         raise LookupError("없는 이미지입니다.")
     if r["post_id"] is None:
         if r["user_id"] != user["id"] and not is_admin(user):
             raise LookupError("없는 이미지입니다.")
-    elif not _post(r["post_id"]):
-        raise LookupError("지워진 글의 이미지입니다.")
+    else:
+        post = _post(r["post_id"])
+        if not post:
+            raise LookupError("지워진 글의 이미지입니다.")
+        if not can_see(user, post):                       # 남의 문의/건의에 붙은 그림
+            raise LookupError("없는 이미지입니다.")
     path = _img_path(r)
     if not os.path.exists(path):
         raise LookupError("이미지 파일이 없습니다.")

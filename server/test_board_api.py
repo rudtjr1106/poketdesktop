@@ -77,6 +77,21 @@ def main():
     st, r = call("POST", "/api/board", {"kind": "free", "title": "", "body": "x"}, b)
     chk("빈 제목은 400", st == 400, (st, r))
 
+    # 문의/건의 (2.1.0): 운영진과 쓴 사람만. 종류는 꼭 고른다
+    c = login_or_register("문의%d" % tag)
+    st, r = call("POST", "/api/board", {"title": "종류 없음", "body": "x"}, c)
+    chk("종류 없이 쓰면 400", st == 400 and "골라" in r.get("error", ""), (st, r))
+    st, q = call("POST", "/api/board", {"kind": "ask", "title": "문의 %d" % tag, "body": "비밀"}, c)
+    chk("문의/건의 글 (비공개 표시)", st == 200 and q["kind"] == "ask" and q["private"] is True, (st, q))
+    st, r = call("GET", "/api/board/%d" % q["id"], token=b)
+    chk("  남이 열면 404", st == 404, (st, r))
+    st, r = call("GET", "/api/board/%d" % q["id"], token=op)
+    chk("  운영진은 연다", st == 200 and r["id"] == q["id"], st)
+    st, r = call("GET", "/api/board?kind=ask&page=1", token=b)
+    chk("  남의 문의/건의 칸에는 안 보인다", st == 200 and q["id"] not in [x["id"] for x in r["posts"]], (st, r))
+    st, r = call("GET", "/api/board?kind=ask&page=1", token=c)
+    chk("  쓴 사람의 칸에는 보인다", st == 200 and [x["id"] for x in r["posts"]] == [q["id"]], (st, r))
+
     st, lst = call("GET", "/api/board?kind=all&page=1", token=b)
     chk("목록: 공지가 붙박이로, 자유 글이 아래에", st == 200
         and any(x["id"] == n["id"] for x in lst["pinned"])

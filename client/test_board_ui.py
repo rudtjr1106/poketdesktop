@@ -101,7 +101,8 @@ class FakeApi(object):
         who = self.likes.get(p["id"], set())
         out = {"id": p["id"], "kind": p["kind"],
                "kindKr": {"notice": "공지", "free": "자유", "qna": "Q&A",
-                          "patch": "패치노트"}[p["kind"]],
+                          "patch": "패치노트", "ask": "문의/건의"}[p["kind"]],
+               "private": p["kind"] == "ask",
                "title": p["title"], "agoSec": p["ago"], "edited": p["edited"],
                "comments": len([c for c in self.comments
                                 if c["post"] == p["id"] and not c["deleted"]]),
@@ -121,6 +122,8 @@ class FakeApi(object):
             rows = [p for p in self.posts if q or p["kind"] in ("free", "qna")]
         else:
             rows = [p for p in self.posts if p["kind"] == kind]
+        if self.me != ADMIN:          # 서버와 같다: 남의 문의/건의는 운영진만 (2.1.0)
+            rows = [p for p in rows if p["kind"] != "ask" or p["uid"] == self.uid]
         if q:
             rows = [p for p in rows if q in p["title"] or q in p["body"] or q in p["author"]]
         rows = sorted(rows, key=lambda p: -p["id"])
@@ -307,6 +310,7 @@ def t_images(root):
         chk("  쓰기 화면에 눌린 위젯 없음 (사진 줄 · 빼기)", not bad, bad[:3])
         w.title_var.set("사진 글")
         w.text.insert("1.0", "그림 셋")
+        w._pick_post_kind("free")                            # 2.1.0: 종류는 꼭 고른다
         w.submit_post()
         wait(root, lambda: w.view == "post" and w.post and w.post.get("title") == "사진 글")
         call = [c for c in api.calls if c[0] == "write"][-1]
@@ -523,6 +527,40 @@ def seed(api):
     return n1, n2, talk, c1
 
 
+def t_ask(root, top, w, api):
+    """문의/건의 (2.1.0): 칸 · 안내 · 쓰기 · 남의 것은 안 보임 (서버가 가리는 것을 가짜 서버가 흉내 낸다)."""
+    print("\n=== 문의/건의 (2.1.0) ===")
+    other = api.seed_post("ask", "이슬", 3, "남의 문의", "운영진만 봐야 하는 글")
+    w.pick_kind("ask")
+    wait(root, lambda: w.data is not None and w.data.get("kind") == "ask")
+    settle(root)
+    chk("문의/건의 칸: 남의 글은 안 보인다 · 빈 목록 안내", other not in [p["id"] for p in w.data["posts"]]
+        and any("운영진과 나만" in x for x in texts(top)), [x for x in texts(top) if "문의" in x][:3])
+    chk("  위 안내 줄: 운영진과 쓴 사람만", ui_board.ASK_NOTE in w.status._label.cget("text"), w.status._label.cget("text"))
+    w.show_write()
+    settle(root, 0.15)
+    w._pick_post_kind("ask")
+    w.title_var.set("도감 버그 문의")
+    w.text.insert("1.0", "파이리가 안 보여요")
+    w._count_post()
+    w.submit_post()
+    chk("문의/건의로 보낸다", wait(root, lambda: any(c[0] == "write" and c[1] == "ask" for c in api.calls)))
+    wait(root, lambda: w.view == "post" and w.post and w.post["title"] == "도감 버그 문의")
+    settle(root)
+    chk("  올린 글이 열리고 문의/건의 표시", w.post["kind"] == "ask" and "문의/건의" in texts(top), texts(top)[:6])
+    mine = w.post["id"]
+    w.show_list()
+    wait(root, lambda: w.view == "list" and w.data is not None and w.data.get("kind") == "ask"
+         and w.data["total"] == 1)
+    settle(root)
+    chk("  내 문의/건의만 보인다", [p["id"] for p in w.data["posts"]] == [mine], [p["id"] for p in w.data["posts"]])
+    bad = squeezed(top)
+    chk("  눌린 위젯 없음 (칸 여섯 개)", not bad, bad[:3])
+    w.pick_kind("free")
+    wait(root, lambda: w.data is not None and w.data.get("kind") == "free")
+    chk("  자유 칸에는 안 나온다", mine not in [p["id"] for p in w.data["posts"]])
+
+
 def main():
     PLAT.before_tk()
     root = tk.Tk()
@@ -657,10 +695,22 @@ def main():
     w.show_write()
     settle(root, 0.15)
     t = texts(top)
-    chk("공지 고르기가 안 보인다", "공지는 운영자만 쓸 수 있습니다." not in t
-        and list(w.kind_seg.cells) == ["free", "qna"],
+    chk("공지 고르기가 안 보인다", "공지" not in list(dict(w._write_kinds()[0]).values())
+        and list(w.kind_seg.cells) == ["free", "qna", "ask"],
         list(w.kind_seg.cells))
-    chk("  자유·Q&A 중에 고른다 (기본은 자유)", "종류" in t and "Q&A" in t and w.kind_var == "free", t[:12])
+    chk("  자유 · Q&A · 문의/건의 중에 고른다 - 미리 골라 두지 않는다 (2.1.0)",
+        "종류" in t and "문의/건의" in t and w.kind_var is None and w.kind_seg.current is None, (t[:12], w.kind_var))
+    chk("  안내: 꼭 고르기 · 문의/건의는 운영진과 나만", any("꼭 골라" in x and "운영진과 나만" in x for x in t),
+        [x for x in t if "골라" in x])
+    w.title_var.set("종류 안 고른 글")
+    w.text.insert("1.0", "내용")
+    w.submit_post()
+    chk("종류를 안 고르면 안 보낸다", "종류" in w.status._label.cget("text")
+        and not any(c[0] == "write" for c in api.calls), w.status._label.cget("text"))
+    w.title_var.set("")
+    w.text.delete("1.0", "end")
+    w._pick_post_kind("free")
+    chk("  누르면 그 종류가 골라진다", w.kind_var == "free" and w.kind_seg.current == "free")
     w.submit_post()
     chk("빈 제목은 안 보낸다", "제목을 적어 주세요" in w.status._label.cget("text")
         and not any(c[0] == "write" for c in api.calls))
@@ -690,15 +740,16 @@ def main():
     w.show_list()
     wait(root, lambda: w.view == "list")
     settle(root, 0.2)
-    chk("목록 위에 Q&A 가 있다 (1.9.0 부터 패치노트도)",
-        list(w.seg.cells) == ["all", "notice", "free", "qna", "patch"], list(w.seg.cells))
+    chk("목록 위에 Q&A 가 있다 (1.9.0 부터 패치노트도, 2.1.0 부터 문의/건의도)",
+        list(w.seg.cells) == ["all", "notice", "free", "qna", "ask", "patch"], list(w.seg.cells))
     w.pick_kind("qna")
     wait(root, lambda: w.data is not None and w.data.get("kind") == "qna")
     settle(root)
     chk("아직 질문이 없으면 빈 목록", w.data["total"] == 0, w.data["total"])
     w.show_write()
     settle(root, 0.15)
-    chk("Q&A 를 보다가 쓰면 Q&A 가 골라져 있다", w.kind_var == "qna")
+    chk("Q&A 를 보다가 써도 미리 골라 두지 않는다 (2.1.0)", w.kind_var is None)
+    w._pick_post_kind("qna")
     w.title_var.set("메가진화 어떻게 해요?")
     w.text.insert("1.0", "키스톤은 어디서 얻나요")
     w._count_post()
@@ -730,6 +781,7 @@ def main():
         and any(p["kind"] == "free" for p in w.data["posts"]), [p["kind"] for p in w.data["posts"]][:6])
     bad = squeezed(top)
     chk("  눌린 위젯 없음", not bad, bad[:3])
+    t_ask(root, top, w, api)
     t_190(root, top, w, api, app, new_id)
     # 아래 절은 방금 올린 자유 글을 열어 둔 데서 이어진다
     w.open_post(new_id)
