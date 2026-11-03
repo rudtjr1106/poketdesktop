@@ -109,6 +109,67 @@ def shop(me=Depends(deps.current)):
         out["tmLeft"] = tm_left(u["id"])
     # 타입 스프레이가 켜져 있으면 가방 설명에 남은 시간을 적는다 (2.1.1)
     out["boosts"] = boosts.state(u["id"])
+    # 기술머신 뽑기 띠 (2.1.1): 한 번 값 · 아직 없는 기술머신 수 (다 모았으면 띠가 '다 모았다' 를 보인다)
+    price = items.buy_price(TM_DRAW_ITEM)
+    if price > 0:
+        out["tmDraw"] = {"price": price, "counts": list(TM_DRAW_COUNTS), "left": len(_tm_pool(u["id"]))}
+    return out
+
+
+# ---------------------------------------------------------------- 기술머신 뽑기 (2.1.1)
+# 상점에서 돈으로 바로 뽑는다: 한 번 = 랜덤 기술머신 뽑기권 한 장 값 (10,000원), 10번 = 열 장 값 (사용자 결정 11/04).
+# 뽑기권과 같은 규칙 - **아직 없는 기술머신만** 나오고, 한 번에 뽑는 것끼리도 겹치지 않는다. 남은 것이 모자라면
+# 돈을 빼기 전에 거절한다. 돈은 먼저 (조건부로) 빼고, 못 준 만큼은 돌려준다.
+TM_DRAW_ITEM = "RANKTICKETTM"
+TM_DRAW_COUNTS = (1, 10)
+
+
+class TmDrawIn(BaseModel):
+    count: int = 1
+
+
+def _tm_pool(uid):
+    have = tms.owned(uid)
+    return [no for no in sorted(tms.all_tms()) if no not in have]
+
+
+@router.post("/api/shop/tmdraw")
+def tm_draw(body: TmDrawIn, me=Depends(deps.current)):
+    uid = me["user"]["id"]
+    n = int(body.count)                     # (0 을 1 로 읽지 않는다 - 'or 1' 로 했더니 0번에 한 번 값이 빠졌다)
+    if n not in TM_DRAW_COUNTS:
+        raise HTTPException(400, "한 번에 1번이나 10번 뽑을 수 있습니다.")
+    price = items.buy_price(TM_DRAW_ITEM)
+    if price <= 0:
+        raise HTTPException(400, "지금은 기술머신을 뽑을 수 없습니다.")
+    pool = _tm_pool(uid)
+    if not pool:
+        raise HTTPException(400, "기술머신을 이미 다 모아서 뽑을 것이 없습니다.")
+    if len(pool) < n:
+        raise HTTPException(400, "아직 없는 기술머신이 %d개뿐이라 %d번은 뽑을 수 없습니다. 1번씩 뽑아 주세요."
+                            % (len(pool), n))
+    if not items.money_take(uid, price * n):
+        raise HTTPException(400, "돈이 모자랍니다. (%s원 필요)" % format(price * n, ","))
+    got = []
+    try:
+        random.shuffle(pool)
+        for no in pool:
+            if len(got) >= n:
+                break
+            if tms.give(uid, no):           # 그사이 다른 창에서 받은 것은 건너뛴다 (give 가 실제로 넣었는지로 본다)
+                got.append(no)
+    except Exception:                                       # noqa: BLE001
+        items.money_add(uid, price * (n - len(got)))
+        raise
+    if len(got) < n:
+        items.money_add(uid, price * (n - len(got)))
+    if not got:
+        raise HTTPException(400, "기술머신을 이미 다 모아서 뽑을 것이 없습니다.")
+    first = tms.label(got[0])
+    msg = ("%s을(를) 얻었다!" % first) if len(got) == 1 else ("기술머신 %d개를 얻었다! (%s 외)" % (len(got), first))
+    out = {"ok": True, "count": len(got), "spent": price * len(got), "tms": [tms.public(no) for no in got],
+           "tmNew": tms.new_count(uid), "left": len(pool) - len(got), "message": korean.natural(msg)}
+    out.update(_wallet(uid))
     return out
 
 

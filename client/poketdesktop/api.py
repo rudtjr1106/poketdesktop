@@ -564,10 +564,14 @@ class Api(object):
     def guild_buy(self, item, count=1):
         return self._call("POST", "/api/guild/shop/buy", {"item": item, "count": int(count)})
 
-    def guild_slot(self):
-        """랜덤 캡슐 한 번 (2.1.0, 서버 이름은 slot). 결과는 서버가 정한다 - 화면(ui_gacha)은 그 등급의
-        캡슐을 배출하고 열어 보일 뿐이다."""
-        return self._call("POST", "/api/guild/shop/slot", {})
+    def guild_slot(self, count=1):
+        """랜덤 캡슐 (2.1.0, 서버 이름은 slot). 결과는 서버가 정한다 - 화면(ui_gacha)은 그 등급의
+        캡슐을 배출하고 열어 보일 뿐이다. count=10 이면 열 번 (2.1.1, 답에 results)."""
+        return self._call("POST", "/api/guild/shop/slot", {"count": count} if count != 1 else {})
+
+    def shop_tmdraw(self, count=1):
+        """상점 기술머신 뽑기 (2.1.1). 한 번 = 랜덤 기술머신 뽑기권 값, count 는 1 또는 10."""
+        return self._call("POST", "/api/shop/tmdraw", {"count": count})
 
     # 도감 업적 (시즌 3)
     def achievements(self):

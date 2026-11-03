@@ -7,7 +7,8 @@
 뽑기권을 더 받는다 (2026-10-18 사용자 결정). 관장 등록은 도구가 아니다 - 운영자가 구글폼으로 따로
 신청받는다. 못 박는 것:
 
-  1. 도구 둘이 있고 상점 · 드랍 · 되팔기에 없다. 관장 등록권이라는 도구는 없다.
+  1. 도구 둘이 있고 드랍 · 되팔기에 없다. 타입 확정은 상점에도 없고, 랜덤은 2.1.1 부터 상점에서 10,000원에 판다
+     (사용자 결정 11/04 - server/test_draws.py). 관장 등록권이라는 도구는 없다.
   2. 랭킹 화면의 보상 표에 그 자리마다 실린다 (season.rules_public) - 관장 등록은 글로만.
   3. 뽑기권은 **아직 없는 기술머신만** 준다. 타입 확정은 고른 타입에서만.
   4. 뽑을 것이 없거나 타입을 안 골랐거나 없는 타입이면 거절하고 **표는 그대로 남는다.**
@@ -90,8 +91,10 @@ def main():
     for iid, kind in (("RANKTICKETTM", "tmticket"), ("RANKTICKETTMTYPE", "tmticket")):
         it = items.get(iid) or {}
         chk("%s (%s) 이 있다" % (iid, it.get("kr")), (it.get("effect") or {}).get("kind") == kind, it)
-        chk("  상점 · 드랍 · 되팔기에 없다", not it.get("buyable") and not it.get("weight")
-            and items.sell_price(iid) <= 0 and items.buy_price(iid) <= 0, it)
+        sold = iid == "RANKTICKETTM"                       # 2.1.1: 랜덤 뽑기권만 상점에서 10,000원
+        chk("  드랍 · 되팔기에 없다, 상점은 %s" % ("10,000원" if sold else "없음"), not it.get("weight")
+            and items.sell_price(iid) <= 0
+            and (items.buy_price(iid) == 10000 if sold else (not it.get("buyable") and items.buy_price(iid) <= 0)), it)
     chk("타입 확정만 타입을 고른다", items.get("RANKTICKETTMTYPE")["effect"].get("pickType")
         and not items.get("RANKTICKETTM")["effect"].get("pickType"))
     chk("이름은 사용자가 정한 대로",

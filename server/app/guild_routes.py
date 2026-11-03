@@ -25,6 +25,8 @@
 '길드에 바뀐 것이 있나' 를 가리는 값(stamp)을 실어서, 폴링하는 화면은 그 값이 달라질
 때만 전체를 다시 받는다.
 """
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -117,10 +119,14 @@ def buy(body: BuyIn, ctx=Depends(deps.current)):
     return guild.buy(_uid(ctx), body.item, body.count)
 
 
+class SlotIn(BaseModel):
+    count: int = 1          # 1 또는 10 (2.1.1 - 10회 뽑기)
+
+
 @router.post("/api/guild/shop/slot")
-def slot(ctx=Depends(deps.current)):
-    """슬롯머신 한 번 (2.1.0). 몸은 없어도 되고 {} 여도 된다 - 읽지 않는다."""
-    return guild.slot(_uid(ctx))
+def slot(body: Optional[SlotIn] = None, ctx=Depends(deps.current)):
+    """랜덤 캡슐 (2.1.0, 서버 이름은 slot). 몸이 없거나 {} 이면 한 번 (2.1.0 앱), {"count": 10} 이면 열 번."""
+    return guild.slot(_uid(ctx), count=(body.count if body else 1))
 
 
 @router.post("/api/guild/mission/{tier}/claim")

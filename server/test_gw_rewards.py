@@ -219,8 +219,9 @@ def rules_part():
     chk("주는 것은 **랜덤** 뽑기권 (타입 확정은 랭크 챔피언 것으로 남긴다)", GW.TM_TICKET == "RANKTICKETTM"
         and (it.get("effect") or {}).get("kind") == "tmticket" and not it["effect"].get("pickType")
         and it.get("kr") == "랜덤 기술머신 뽑기권", it)
-    chk("  팔 수 없고 상점에 없다 (돈벌이가 안 된다)", items.sell_price(GW.TM_TICKET) <= 0
-        and not it.get("buyable") and it.get("custom") is True, it)
+    # 2.1.1: 상점에서 10,000원에 사게 됐다 (사용자 결정 11/04) - 되팔 수는 없으니 보상이 돈벌이가 되지는 않는다
+    chk("  되팔 수 없다 (돈벌이가 안 된다) · 상점 값은 10,000원", items.sell_price(GW.TM_TICKET) <= 0
+        and items.buy_price(GW.TM_TICKET) == 10000, it)
     with open(os.path.join(ROOT, "docs", "guide", "index.html"), encoding="utf-8") as f:
         guide = f.read()
     rank_txt = "1위 길드 %d장 · 2위 %d장 · 3위 %d장" % (GW.TM_RANK[1], GW.TM_RANK[2], GW.TM_RANK[3])

@@ -65,8 +65,9 @@ class Api(object):
         self.answers = []
         self.calls = 0
 
-    def guild_slot(self):
+    def guild_slot(self, count=1):
         self.calls += 1
+        self.counts = getattr(self, "counts", []) + [count]
         time.sleep(0.05)
         a = self.answers.pop(0)
         if isinstance(a, Exception):
@@ -111,6 +112,47 @@ def answer(prize, tier, coin, **kw):
          "itemKr": None, "count": 0, "deco": None, "decoKr": None, "egg": None, "message": ""}
     r.update(kw)
     return r
+
+
+def multi(root, app):
+    """10회 (2.1.1): 코인 200개, 가장 좋은 등급의 캡슐 하나가 나오고 열면 열 칸 결과 판."""
+    print("\n=== 10회 뽑기")
+    win = G.GachaWindow(app, root, coin=250, odds=ODDS)
+    pump(root, 10, lambda: win.art is not None and win.state == "idle")
+    chk("처음 글에 10번 값", "10번 200 코인" in win.said, win.said)
+    chk("1회 · 10회 단추가 나란히 (10회는 보인다)", win.cv.itemcget(win.btn10_id, "state") != "hidden"
+        and win.cv.coords(win.btn_id)[0] < win.cv.coords(win.btn10_id)[0])
+    res = [answer("lose", "lose", 0)] * 6 + [answer("ball", "common", 0, item="POKEBALL", itemKr="몬스터볼", count=5)] * 2 \
+        + [answer("rare", "rare", 0, item="RARECANDY", itemKr="이상한사탕", count=1),
+           answer("egg", "jackpot", 0, egg={"kind": "legendary", "kr": "전설의 포켓몬 알"})]
+    app.api.answers.append({"ok": True, "count": 10, "results": res, "tier": "jackpot", "coin": 50, "cost": 200,
+                            "message": "10번 뽑았습니다"})
+    n0 = app.api.calls
+    win._ui(win._button10)
+    chk("10회 단추: 코인 200개가 그 자리에서 빠진다", win.state == "coin" and win.coin == 50 and win.n == 10, win.coin)
+    chk("  배출되면 10회 단추는 숨고 열기 단추가 가운데", pump(root, 12, lambda: win.state == "ready")
+        and win.cv.itemcget(win.btn10_id, "state") == "hidden"
+        and abs(win.cv.coords(win.btn_id)[0] - win.art.k(270)) < 2, win.state)
+    chk("  서버에 10번을 묻는다", app.api.calls == n0 + 1 and app.api.counts[-1] == 10, app.api.counts[-1:])
+    chk("  칸마다 그림을 받아 둔다", win.prize_ready and len(win.prize_arts) == 10, len(win.prize_arts))
+    win.open_capsule()
+    chk("  열면 결과 판", pump(root, 6, lambda: win.state == "reveal"), win.state)
+    pump(root, 0.6)
+    chip = win.chip_sizes[-1]
+    chk("  결과 판은 열 칸 (기계 폭 안)", chip.width() <= win.art.k(G.W) and chip.height() >= win.art.k(200),
+        (chip.width(), chip.height()))
+    chk("  등급마다 몇 개인지 (좋은 것부터)", win.said == "대박 1 · 드묾 1 · 흔함 2 · 꽝 6", win.said)
+    shot(win, "gacha_multi.png")
+    win._overlay_click()
+    pump(root, G.CALM_SEC + 0.1)
+    chk("닫으면 다시 쉰다", win.state == "idle")
+    n1 = app.api.calls
+    win._ui(win._button10)
+    chk("코인이 모자라면(50) 10회는 안 돌고 알린다", win.state == "idle" and app.api.calls == n1
+        and "200 코인" in win.said, win.said)
+    imgs = (str(win.cv.itemcget(win.btn10_id, "image")), str(win.btn10_ph[2]))
+    chk("  10회 단추는 못 누름 빛깔", imgs[0] == imgs[1], imgs)
+    win.close()
 
 
 def main():
@@ -285,6 +327,8 @@ def main():
     chk("조금 지나면 유리통을 눌러 돌린다", win.state == "coin", win.state)
     pump(root, 12, lambda: win.state == "ready")
     win.close()
+
+    multi(root, app)
 
     # 7b. 다 보기 전에 닫아도 상점은 다시 받는다 (서버는 이미 코인을 빼고 상품을 줬다) - 한 번만
     for when in ("mix", "answer"):

@@ -28,6 +28,7 @@ from . import item_icons
 from . import skins
 from . import ui_common as U
 from . import ui_loading
+from . import ui_tmdraw
 
 ROW_H = U.h(30)
 CATS_W = 136
@@ -323,6 +324,8 @@ class ShopWindow(object):
         self.bag = {}
         self.money = 0
         self.sell_rate = 0.5
+        self.tm_draw = None      # 기술머신 뽑기 띠 (2.1.1, 서버 /api/shop 의 tmDraw - 옛 서버면 None)
+        self.tm_banner = None
         self._wait = None        # 불러오는 중 표시
         self.cat_btns = {}
         self.sel = None
@@ -349,6 +352,8 @@ class ShopWindow(object):
 
         body = tk.Frame(self.win, bg=U.BG)
         body.pack(fill="both", expand=True)
+        # 기술머신 뽑기 띠 (2.1.1): 머리와 몸통 사이. 상점을 받은 뒤 tmDraw 가 있으면 깐다 (ui_tmdraw)
+        self.tm_banner = ui_tmdraw.Banner(self.win, self, U.BG, before=body)
         self._cats(body)
         self._detail(body)      # 오른쪽을 먼저 잡아야 가운데가 남은 폭을 다 먹는다
         self._list(body)
@@ -659,10 +664,13 @@ class ShopWindow(object):
                           if it.get("cat") != "megastone" and not it.get("custom")]
             self.bag = data.get("bag") or {}
             self.money = int(data.get("money") or 0)
+            self.tm_draw = data.get("tmDraw")
             self.sell_rate = float(data.get("sellRate") or 0.5)
             self._paint_sub("파는 값은 사는 값의 %d%%  ·  도구 %d종"
                             % (round(self.sell_rate * 100), len(self.items)))
             self._paint_money()
+            if self.tm_banner is not None:
+                self.tm_banner.update()
             self._paint_cat_counts()
             self.render(keep=True)
             self.say("무엇을 사시겠습니까?", U.GOOD)
@@ -863,6 +871,8 @@ class ShopWindow(object):
             if isinstance(res.get("bag"), dict):
                 self.bag = res["bag"]
             self._paint_money()
+            if self.tm_banner is not None:
+                self.tm_banner.update()                     # 돈이 바뀌었다 - 뽑기 단추를 켜고 끈다
             self._refresh_counts()
             self.say(res.get("message") or "됐습니다.", U.GOOD)
             # 트레이의 몬스터볼 수를 서버 값과 맞춘다.

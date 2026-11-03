@@ -1066,24 +1066,16 @@ def _slot_give(uid, row, rng, now):
     return item, n, None, None
 
 
-def slot(uid, rng=None, now=None):
-    """슬롯머신 한 번. 코인을 먼저 (조건부로) 빼고, 빠졌을 때만 굴려서 준다.
+SLOT_COUNTS = (1, 10)                   # 한 번에 돌리는 수 (2.1.1 - 10회 뽑기, 코인 200개)
+TIER_ORDER = ("lose", "common", "rare", "epic", "jackpot")
+TIER_KR = {"lose": "꽝", "common": "흔함", "rare": "드묾", "epic": "귀함", "jackpot": "대박"}
 
-    코인은 사람 것이라 길드를 나와도 돌릴 수 있다 (buy 와 같다). 동시에 두 번 눌러도 조건부 UPDATE 라
-    코인이 음수가 되지 않는다. 주다가 터지면 코인을 돌려준다 - 낸 코인만 사라지는 일이 없게.
-    """
-    rng = rng or random.SystemRandom()
-    cur = db.run("UPDATE guild_user SET coin = coin - ? WHERE user_id=? AND coin >= ?",
-                 (SLOT_COST, uid, SLOT_COST))
-    if cur.rowcount <= 0:
-        raise HTTPException(400, "길드 코인이 모자랍니다. (%d개 필요)" % SLOT_COST)
+
+def _slot_one(uid, rng, now):
+    """한 판 굴려서 주고 기록한다 (코인은 부르는 쪽이 이미 뺐다). 화면에 보낼 한 판의 사전."""
     row = slot_roll(rng)
     key, kr, _per, tier, _what, _n = row
-    try:
-        item, n, dk, egg = _slot_give(uid, row, rng, now)
-    except Exception:
-        _coin_add(uid, SLOT_COST)
-        raise
+    item, n, dk, egg = _slot_give(uid, row, rng, now)
     # 운영에서 확률이 표대로 나오는지 볼 수 있게 한 판씩 남긴다.
     db.run("INSERT INTO guild_slot_log (user_id, at, cost, prize, item, count, deco, egg_id, egg_kind)"
            " VALUES (?,?,?,?,?,?,?,?,?)",
@@ -1104,9 +1096,44 @@ def slot(uid, rng=None, now=None):
         msg = "꾸미기를 이미 다 가지고 있어서 대신 %s %d개를 드립니다." % (item_kr, n)
     else:
         msg = "%s %d개가 나왔습니다!" % (item_kr, n)
-    return {"ok": True, "prize": key, "kr": kr, "tier": tier, "item": item, "itemKr": item_kr,
-            "count": n, "deco": dk, "decoKr": deco_kr, "egg": egg_out,
-            "reels": slot_reels(key, rng), "coin": coin(uid), "message": msg}
+    return {"prize": key, "kr": kr, "tier": tier, "item": item, "itemKr": item_kr,
+            "count": n, "deco": dk, "decoKr": deco_kr, "egg": egg_out, "reels": slot_reels(key, rng),
+            "message": msg}
+
+
+def slot(uid, rng=None, now=None, count=1):
+    """슬롯머신(랜덤 캡슐). count 번 (1 또는 10). 코인을 먼저 (조건부로) 한꺼번에 빼고, 빠졌을 때만 굴려서 준다.
+
+    코인은 사람 것이라 길드를 나와도 돌릴 수 있다 (buy 와 같다). 동시에 두 번 눌러도 조건부 UPDATE 라
+    코인이 음수가 되지 않는다. 주다가 터지면 **아직 안 굴린 판의 코인**을 돌려준다 - 낸 코인만 사라지는 일이 없게
+    (이미 준 판은 그대로 - 기록에도 남아 있다).
+
+    한 번이면 예전과 같은 답 (2.1.0 앱). 10번이면 {"results": [한 판 ...], "tier": 가장 좋은 등급, ...}.
+    """
+    rng = rng or random.SystemRandom()
+    count = int(count)
+    if count not in SLOT_COUNTS:
+        raise HTTPException(400, "한 번에 1번이나 10번 돌릴 수 있습니다.")
+    cost = SLOT_COST * count
+    cur = db.run("UPDATE guild_user SET coin = coin - ? WHERE user_id=? AND coin >= ?", (cost, uid, cost))
+    if cur.rowcount <= 0:
+        raise HTTPException(400, "길드 코인이 모자랍니다. (%d개 필요)" % cost)
+    out = []
+    try:
+        for _i in range(count):
+            out.append(_slot_one(uid, rng, now))
+    except Exception:
+        _coin_add(uid, SLOT_COST * (count - len(out)))
+        raise
+    if count == 1:
+        r = dict(out[0])
+        r.update(ok=True, coin=coin(uid))
+        return r
+    best = max(out, key=lambda r: TIER_ORDER.index(r["tier"]) if r["tier"] in TIER_ORDER else 0)["tier"]
+    tally = [(t, sum(1 for r in out if r["tier"] == t)) for t in reversed(TIER_ORDER)]
+    msg = "%d번 뽑았습니다: %s" % (count, " · ".join("%s %d" % (TIER_KR[t], n) for t, n in tally if n))
+    return {"ok": True, "count": count, "results": out, "tier": best, "coin": coin(uid), "cost": cost,
+            "message": msg}
 
 
 # ---------------------------------------------------------------- 길드원 프로필

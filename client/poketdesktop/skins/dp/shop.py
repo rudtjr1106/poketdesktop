@@ -43,6 +43,9 @@ class ShopWindow(Scene, Band, SH.ShopWindow):
         self._shown = []
         self.ROW_H = U.h(31)              # 기본 상점의 줄 높이(30 + 줄 사이 금 1)와 같다
         self._scene_init()
+        # 기술머신 뽑기 띠 (2.1.1, 기본 상점과 같은 것 - ui_tmdraw): 판 위에. 상점을 받은 뒤 tmDraw 가 있으면 깐다
+        from ... import ui_tmdraw
+        self.tm_banner = ui_tmdraw.Banner(self.win, self, self.win["bg"], before=self.cv)
         self.q = tk.StringVar()
         self.find_box = K.entry(self.cv, self.q, width=12)
         self.q.trace_add("write", lambda *_a: self.render())

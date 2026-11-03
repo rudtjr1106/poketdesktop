@@ -338,6 +338,9 @@ jobs:
       # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
       - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         run: python client/test_boost_items.py
+      # 2.1.1: 상점 맨 위 기술머신 뽑기 띠 (1회 · 10회, 기본 테마 + DP 테마) · 결과 창
+      - name: 상점 기술머신 뽑기 띠 (진짜 Tk)
+        run: python client/test_tmdraw_ui.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
         run: python client/test_dual_monitor.py
@@ -518,6 +521,9 @@ jobs:
       # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
       - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         run: python client/test_boost_items.py
+      # 2.1.1: 상점 맨 위 기술머신 뽑기 띠 (1회 · 10회, 기본 테마 + DP 테마) · 결과 창
+      - name: 상점 기술머신 뽑기 띠 (진짜 Tk)
+        run: python client/test_tmdraw_ui.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
         run: python client/test_dual_monitor.py
@@ -687,6 +693,7 @@ jobs:
           python test_rename.py          # 2.1.1: 닉네임 변경권 (규칙 · 한 트랜잭션 · 로그인)
           python test_client_ip.py       # 2.1.1: cf-connecting-ip 는 Cloudflare 가 앞에 있을 때만 믿는다 (IP 위조)
           python test_account_email.py   # 2.1.1: 마이페이지 이메일 (본인만 보인다, 비우면 지운다)
+          python test_draws.py           # 2.1.1: 상점 기술머신 뽑기 · 뽑기권 판매 · 랜덤 캡슐 10회
           python test_move_needs.py      # 기술이 걸린 것(전용 Z · 기술 메가 · 기술 폼 · 기술 진화)을 배울 수 있다 (#277)
           python test_gimmick.py
           python test_season4.py

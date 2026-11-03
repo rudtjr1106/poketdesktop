@@ -137,9 +137,9 @@ EXTRA = [
     # 나오면 표만 날아간 것과 같다). 다 모았으면 쓸 수 없고 표는 남는다.
     {
         "id": "RANKTICKETTM", "ident": "rank-ticket-tm",
-        "custom": True,
+        # 2.1.1: 상점에서 10,000원에 판다 (사용자 결정 11/04) - 상점이 숨기는 custom 표시도 뗐다
         "kr": "랜덤 기술머신 뽑기권", "en": "TM Ticket",
-        "cat": "misc", "cost": 0, "sell": 0, "buyable": False,
+        "cat": "misc", "cost": 10000, "sell": 0,
         "desc": "아직 없는 기술머신 가운데 하나가 무작위로 나오는 표."
                 " 포켓몬을 고르지 않아도 된다.",
         "effect": {"kind": "tmticket"},

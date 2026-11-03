@@ -61,6 +61,8 @@ VECTOR = sys.platform == "darwin"      # 기계를 캔버스 도형으로 (맥) 
 W, H = 540, 600                        # 창 안 캔버스 (논리 px - 화면 배율 s 를 곱한다)
 SS = 2                                 # 두 배로 그려 줄인다 (매끈한 가장자리)
 COST = 20
+MULTI = 10                             # 10회 뽑기 (2.1.1 - 코인 200개, 열 판을 한 번에 연다)
+BTN_W = 230                            # 1회 · 10회 단추 폭 (둘이 나란히, 열기 단추는 가운데 250)
 FRAME_MS = 15                          # 움직이는 동안 (맥은 그리기가 화면 주기에 맞춰져 60fps 가 된다)
 IDLE_MS = 90
 COIN_FLY, COIN_IN, COIN_CLICK = 0.5, 0.2, 0.16
@@ -880,6 +882,73 @@ def prize_chip(s, tier, art_im):
     return im.resize((im.width // S2, im.height // S2), Image.LANCZOS)
 
 
+def prize_label(r):
+    """결과 칸 아래 이름 (10회 결과)."""
+    if r.get("egg"):
+        return r["egg"].get("kr") or "알"
+    if r.get("deco"):
+        return r.get("decoKr") or r["deco"]
+    if r.get("item"):
+        n = int(r.get("count") or 1)
+        return (r.get("itemKr") or r["item"]) + (" x%d" % n if n > 1 else "")
+    return "꽝"
+
+
+def _wrap_two(text, px, width):
+    """칸 폭에 맞게 두 줄까지 나눈다 (글자를 줄이지 않는다 - 넘치면 줄을 바꾼다)."""
+    f = _font(px, False)
+
+    def wide(t):
+        return f.getlength(t)
+    if wide(text) <= width:
+        return [text]
+    words = text.split(" ")
+    if len(words) > 1:
+        for i in range(len(words) - 1, 0, -1):
+            a, b = " ".join(words[:i]), " ".join(words[i:])
+            if wide(a) <= width and wide(b) <= width:
+                return [a, b]
+    for i in range(len(text) - 1, 0, -1):                 # 띄어쓰기로 안 되면 글자 사이에서
+        if wide(text[:i]) <= width:
+            return [text[:i], text[i:]]
+    return [text]
+
+
+def multi_grid(s, results, arts):
+    """10회 결과: 어두운 판에 등급 빛깔 칩 다섯 개씩 두 줄, 칩 아래 이름. arts[i] = 그 칸의 그림 (없으면 None)."""
+    cols = 5
+    rows = (len(results) + cols - 1) // cols
+    cw, ch, pad = int(92 * s), int(128 * s), int(10 * s)
+    w, h = cols * cw + pad * 2, rows * ch + pad * 2
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    r = int(16 * s)
+    ImageDraw.Draw(im).rounded_rectangle((0, 0, w - 1, h - 1), r, fill=(22, 14, 44, 228),
+                                         outline=GOLD[1] + (255,), width=max(2, int(2 * s)))
+    for i, res in enumerate(results):
+        cx, cy = pad + (i % cols) * cw, pad + (i // cols) * ch
+        tier = res.get("tier") or "lose"
+        art = arts[i] if i < len(arts) else None
+        if res.get("egg"):
+            art = _egg(70 * s)
+        chip = prize_chip(s * 0.58, tier, None if tier == "lose" else art)
+        im.alpha_composite(chip, (cx + (cw - chip.width) // 2, cy))
+        col = (200, 196, 222) if tier == "lose" else (255, 255, 255)
+        lines = _wrap_two(prize_label(res), 12 * s, cw - int(6 * s))
+        y = cy + chip.height - int(2 * s)
+        for ln in lines[:2]:
+            t = _text(ln, 12 * s, fill=col, black=False)
+            im.alpha_composite(t, (cx + max(0, (cw - t.width) // 2), y))
+            y += t.height - int(2 * s)
+    return im
+
+
+def tally_text(results):
+    """10회 결과 한 줄: '대박 1 · 귀함 2 · …' (좋은 것부터, 없는 등급은 뺀다)."""
+    kr = (("jackpot", "대박"), ("epic", "귀함"), ("rare", "드묾"), ("common", "흔함"), ("lose", "꽝"))
+    return " · ".join("%s %d" % (k, n) for t, k in kr
+                      for n in [sum(1 for r in results if (r.get("tier") or "lose") == t)] if n)
+
+
 # ---------------------------------------------------------------- 창
 def fit_scale(widget):
     """창 배율 = 글자 크기 배율(U.h) 그대로, 단 화면 작업 영역 높이를 넘지 않게. 글자 '크게' · '아주 크게' 면 맥에서
@@ -921,6 +990,8 @@ class GachaWindow(object):
         self.result = None
         self.err = None
         self.prize_art, self.prize_ready = None, False
+        self.prize_arts = []                               # 10회: 칸마다 그림
+        self.n = 1                                         # 이번 판 수 (1 또는 MULTI)
         self.art = None
         self.parts = []
         self.globe_live = False
@@ -990,10 +1061,16 @@ class GachaWindow(object):
         # 글 · 단추 · 아래 줄
         self.msg_id = cv.create_image(k(270), k(504), anchor="center")
         self.btn_ph = [self._photo("btn%d" % i, im) for i, im in enumerate(self._button_imgs())]
-        self.btn_id = cv.create_image(k(270), k(548), anchor="center", image=self.btn_ph[0])
+        self.btn10_ph = [self._photo("btn10_%d" % i, im) for i, im in enumerate(self._button_imgs(MULTI))]
+        self.btn_id = cv.create_image(k(150), k(548), anchor="center", image=self.btn_ph[0])
         cv.tag_bind(self.btn_id, "<Button-1>", lambda _e: self._ui(self._button))
         cv.tag_bind(self.btn_id, "<Enter>", lambda _e: self._paint_button(True))
         cv.tag_bind(self.btn_id, "<Leave>", lambda _e: self._paint_button(False))
+        # 10회 (2.1.1): 1회 단추 오른쪽. 배출되어 '캡슐 열기' 일 때는 숨고 열기 단추가 가운데로 간다
+        self.btn10_id = cv.create_image(k(390), k(548), anchor="center", image=self.btn10_ph[0])
+        cv.tag_bind(self.btn10_id, "<Button-1>", lambda _e: self._ui(self._button10))
+        cv.tag_bind(self.btn10_id, "<Enter>", lambda _e: self._paint_button(hover10=True))
+        cv.tag_bind(self.btn10_id, "<Leave>", lambda _e: self._paint_button())
         self.coin_lbl = cv.create_image(k(22), k(586), anchor="w")
         self._text_button(k(396), k(586), "확률 보기", self.toggle_odds)
         self._text_button(k(494), k(586), "닫기", self.close)
@@ -1020,7 +1097,8 @@ class GachaWindow(object):
         self._tier_ph = {}
         self.conf_ph = [self._photo("conf%d" % i, im) for i, im in enumerate(art.confetti)]
         self._paint_coin()
-        self._say("손잡이를 돌려 캡슐을 뽑으세요. 한 번 %d 코인 · 꽝도 있어요." % COST, (200, 196, 230), 15)
+        self._say("손잡이를 돌려 캡슐을 뽑으세요. 한 번 %d 코인 · 10번 %d 코인 · 꽝도 있어요."
+                  % (COST, COST * MULTI), (200, 196, 230), 15)
         self.state = "idle"
         self._paint_button()
         self._draw_globe(force=True)
@@ -1028,15 +1106,21 @@ class GachaWindow(object):
         self._late = self._nframe = 0
         self._tick()
 
-    def _button_imgs(self):
-        """단추 네 벌: 돌리기 · 돌리기(올림) · 못 누름 · 열기."""
+    def _button_imgs(self, n=1):
+        """단추: 돌리기 · 돌리기(올림) · 못 누름 (+ 1회 단추만 열기). n = 판 수 (1 · 10회 단추)."""
         out = []
         k = self.art.k
-        for top, bot, txt, label in (((255, 120, 160), (200, 30, 90), (255, 255, 255), "돌리기  ·  %d 코인" % COST),
-                                     ((255, 150, 185), (224, 50, 110), (255, 255, 255), "돌리기  ·  %d 코인" % COST),
-                                     ((120, 116, 140), (70, 66, 90), (200, 196, 214), "돌리기  ·  %d 코인" % COST),
-                                     ((255, 226, 120), (226, 150, 30), (96, 40, 10), "캡슐 열기")):
-            w, h = k(250) * SS, k(50) * SS
+        label = "%d회  ·  %d 코인" % (n, COST * n)
+        rows = [((255, 120, 160), (200, 30, 90), (255, 255, 255), label, BTN_W),
+                ((255, 150, 185), (224, 50, 110), (255, 255, 255), label, BTN_W),
+                ((120, 116, 140), (70, 66, 90), (200, 196, 214), label, BTN_W)]
+        if n == MULTI:      # 10회는 보라 (1회와 눈에 갈리게)
+            rows[0] = ((176, 110, 255), (96, 40, 200), (255, 255, 255), label, BTN_W)
+            rows[1] = ((196, 140, 255), (116, 60, 220), (255, 255, 255), label, BTN_W)
+        else:
+            rows.append(((255, 226, 120), (226, 150, 30), (96, 40, 10), "캡슐 열기", 250))
+        for top, bot, txt, label, bw in rows:
+            w, h = k(bw) * SS, k(50) * SS
             im = Image.new("RGBA", (w, h + 6 * SS), (0, 0, 0, 0))
             sh = Image.new("RGBA", im.size, (0, 0, 0, 0))
             ImageDraw.Draw(sh).rounded_rectangle((0, 6 * SS, w - 1, h + 6 * SS - 1), h // 2, fill=(0, 0, 0, 130))
@@ -1094,42 +1178,54 @@ class GachaWindow(object):
                                                    fill=(255, 214, 110)))
         self.cv.itemconfigure(self.coin_lbl, image=self.ph["coin"])
 
-    def _paint_button(self, hover=False):
+    def _paint_button(self, hover=False, hover10=False):
         if not self.art:
             return
-        if self.state == "ready":
-            idx = 3
-        elif self.state != "idle" or self.coin < COST:
-            idx = 2
-        else:
-            idx = 1 if hover else 0
+        k = self.art.k
+        if self.state == "ready":                          # 열기 단추 하나를 가운데에
+            self.cv.coords(self.btn_id, k(270), k(548))
+            self.cv.itemconfigure(self.btn_id, image=self.btn_ph[3])
+            self.cv.itemconfigure(self.btn10_id, state="hidden")
+            return
+        self.cv.coords(self.btn_id, k(150), k(548))
+        busy = self.state != "idle"
+        idx = 2 if busy or self.coin < COST else (1 if hover else 0)
         self.cv.itemconfigure(self.btn_id, image=self.btn_ph[idx])
+        idx10 = 2 if busy or self.coin < COST * MULTI else (1 if hover10 else 0)
+        self.cv.itemconfigure(self.btn10_id, image=self.btn10_ph[idx10], state="normal")
 
     def _button(self):
         if self.state == "ready":
             return self.open_capsule()
         self._user_spin()
 
-    def _user_spin(self):
+    def _button10(self):
+        if self.state == "idle":
+            self._user_spin(MULTI)
+
+    def _user_spin(self, n=1):
         """사람이 누른 돌리기. 상품 · 확률표를 닫은 직후의 누름은 받지 않는다 - 닫으려고 두 번 누르거나 연타하면
         둘째 누름이 유리통 · 단추에 떨어져 결과도 못 본 채 20 코인이 나갔다 (11/03 검토)."""
         if time.perf_counter() < self._calm_until:
             return
-        self.spin()
+        self.spin(n)
 
     # ---------------- 돌리기
-    def spin(self):
+    def spin(self, n=1):
         if not self.art or self.state != "idle" or not self.alive:
             return
-        if self.coin < COST:
-            return self._say("길드 코인이 모자랍니다 (%d 코인 필요)." % COST, (255, 140, 150), 16)
+        cost = COST * n
+        if self.coin < cost:
+            return self._say("길드 코인이 모자랍니다 (%d 코인 필요)." % cost, (255, 140, 150), 16)
+        self.n = n
         self.state = "coin"
         self.result, self.err = None, None
         self.prize_art, self.prize_ready = None, False
+        self.prize_arts = []
         self.t0 = None                                     # 첫 틱에서 잰다 (쉬는 동안 틱은 90ms 마다라 앞이 잘렸다)
         self._close_odds()
         self.coin_before = self.coin
-        self.coin -= COST                                  # 동전이 떠나는 순간 줄인다 (오류면 되돌린다)
+        self.coin -= cost                                  # 동전이 떠나는 순간 줄인다 (오류면 되돌린다)
         self._notified = False
         self._paint_coin()
         self._paint_button()
@@ -1138,7 +1234,8 @@ class GachaWindow(object):
         k = self.art.k
         self.cv.coords(self.coin_id, k(COIN_PATH[0][0]), k(COIN_PATH[0][1]))   # 처음엔 (0, 0) 에 있었다
         self.cv.itemconfigure(self.coin_id, image=self.coin_ph[0], state="normal")
-        U.run_async(self.root, self.app.api.guild_slot, self._answer)
+        api = self.app.api
+        U.run_async(self.root, (lambda: api.guild_slot(n)) if n != 1 else api.guild_slot, self._answer)
 
     def _answer(self, r, err):
         if not self.alive:
@@ -1156,23 +1253,38 @@ class GachaWindow(object):
         self.coin = int(self.result.get("coin", self.coin))
         if self.state in ("coin", "crank", "mix", "settle"):
             self._paint_coin()
-        # 상품 그림은 지금 받아 둔다 (열 때 기다리지 않게)
-        item = self.result.get("item")
-        deco = self.result.get("deco")
+        # 상품 그림은 지금 받아 둔다 (열 때 기다리지 않게). 10회는 칸마다
         api = self.app.api
+        many = self.result.get("results")
 
-        def work():
-            if deco:
-                return item_icons.pil("deco:%s" % deco)
-            if item:
-                item_icons.raw(api, item)
-                return item_icons.pil(item)
+        def one(res):
+            item, deco = res.get("item"), res.get("deco")
+            try:
+                if deco:
+                    return item_icons.pil("deco:%s" % deco)
+                if item:
+                    item_icons.raw(api, item)
+                    return item_icons.pil(item)
+            except Exception:                              # noqa: BLE001
+                pass
             return None
 
+        def work():
+            if many is not None:
+                return [one(res) for res in many]
+            return one(self.result)
+
         def got(im, _e):
-            self.prize_art = im                            # 못 받았으면 None - 칩만 보인다
+            if many is not None:
+                self.prize_arts = list(im or [])
+            else:
+                self.prize_art = im                        # 못 받았으면 None - 칩만 보인다
             self.prize_ready = True
         U.run_async(self.root, work, got)
+
+    def _many(self):
+        """10회 결과 목록 (1회면 None)."""
+        return (self.result or {}).get("results")
 
     def _tier(self):
         return (self.result or {}).get("tier") or "lose"
@@ -1469,9 +1581,12 @@ class GachaWindow(object):
         self.cv.coords(self.top_id, k(CENTER[0]), k(CENTER[1]))
         self.cv.itemconfigure(self.top_id, image=self.pop_ph[0], state="normal")
         self._shake = None
-        chip = prize_chip(self.s, tier if tier != "lose" else "lose",
-                          None if tier == "lose" else (_egg(70 * self.s) if (self.result or {}).get("egg")
-                                                       else getattr(self, "prize_art", None)))
+        if self._many() is not None:
+            chip = multi_grid(self.s, self._many(), self.prize_arts)
+        else:
+            chip = prize_chip(self.s, tier if tier != "lose" else "lose",
+                              None if tier == "lose" else (_egg(70 * self.s) if (self.result or {}).get("egg")
+                                                           else getattr(self, "prize_art", None)))
         self.chip_sizes = [self._photo("chip%d" % i, chip.resize((max(1, int(chip.width * f)),
                                                                    max(1, int(chip.height * f))), Image.LANCZOS))
                            for i, f in enumerate((0.45, 0.75, 1.1, 1.0))]
@@ -1530,11 +1645,16 @@ class GachaWindow(object):
             self._split = False
             self.state, self.t0 = "reveal", now
             self._rev = None
-            if tier != "lose":                             # 꽝은 칩 없이 잿빛 연기만
+            if tier != "lose" or self._many() is not None:  # 꽝은 칩 없이 잿빛 연기만 (10회는 다 꽝이어도 판)
                 self.cv.itemconfigure(self.chip_id, image=self.chip_sizes[0], state="normal")
                 self.cv.tag_raise(self.chip_id)
             r = self.result or {}
-            if tier == "lose":
+            if self._many() is not None:
+                text = tally_text(self._many())
+                col = (255, 255, 255)
+                glow = {"rare": ((190, 120, 255), 6 * self.s), "epic": ((255, 190, 60), 7 * self.s),
+                        "jackpot": ((255, 90, 140), 9 * self.s)}.get(tier)
+            elif tier == "lose":
                 text, col, glow = "꽝! 다음에는 맞을 거예요.", (210, 206, 226), None
             else:
                 text = self._prize_text(r)
@@ -1543,8 +1663,8 @@ class GachaWindow(object):
                 glow = {"rare": ((190, 120, 255), 6 * self.s), "epic": ((255, 190, 60), 7 * self.s),
                         "jackpot": ((255, 90, 140), 9 * self.s)}.get(tier)
             self.said = natural(text)
-            self.ph["reveal"] = ImageTk.PhotoImage(_text(self.said, (24 if tier == "jackpot" else 21) * self.s,
-                                                         fill=col, glow=glow))
+            px = 19 if self._many() is not None else (24 if tier == "jackpot" else 21)
+            self.ph["reveal"] = ImageTk.PhotoImage(_text(self.said, px * self.s, fill=col, glow=glow))
             self.cv.itemconfigure(self.reveal_id, image=self.ph["reveal"], state="normal")
             self.ph["hint"] = ImageTk.PhotoImage(_text("아무 데나 누르면 닫힙니다", 13 * self.s, fill=(190, 186, 214),
                                                        black=False))
@@ -1557,7 +1677,7 @@ class GachaWindow(object):
     def _tick_reveal(self, now):
         """칩이 튀어나오고 빛살이 천천히 돈다 - 2.5초 뒤에는 멈춰 둔다 (누를 때까지 창을 계속 다시 그리지 않게)."""
         t = now - self.t0
-        if self._tier() == "lose" or t > 2.5:
+        if (self._tier() == "lose" and self._many() is None) or t > 2.5:
             return False
         i = min(3, int(t / 0.07))
         if i != self._rev:
@@ -1590,8 +1710,8 @@ class GachaWindow(object):
         self.state = "idle"
         self._calm_until = time.perf_counter() + CALM_SEC
         self._paint_button()
-        self._say("한 번 더? 한 번 %d 코인." % COST if self.coin >= COST else "코인이 모자랍니다.",
-                  (200, 196, 230), 15)
+        self._say(("한 번 더? 한 번 %d 코인 · 10번 %d 코인." % (COST, COST * MULTI)) if self.coin >= COST
+                  else "코인이 모자랍니다.", (200, 196, 230), 15)
 
     def _prize_text(self, r):
         if r.get("egg"):

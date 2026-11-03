@@ -269,8 +269,10 @@ def item_desc(item):
     if kind == "tmticket":
         out = item.get("desc") or "아직 없는 기술머신 하나가 나온다."
         # 랜덤 뽑기권은 2.0.2 부터 길드전 결산 보상으로도 받는다 (타입 확정은 랭크 챔피언 것 그대로)
+        # 2.1.1: 랜덤 뽑기권은 상점에서도 판다 (10,000원 - 상점 맨 위 '기술머신 뽑기' 로 바로 뽑을 수도 있다)
         return out + ("\n\n%s 받는다. 가진 기술머신은 나오지 않는다 - 뽑을 것이 없으면 쓸 수 없고 표는 남는다."
-                      % ("랭크 시즌 보상으로만" if eff.get("pickType") else "랭크 시즌 보상과 길드전 보상으로"))
+                      % ("랭크 시즌 보상으로만" if eff.get("pickType")
+                         else "상점에서 사거나 랭크 시즌 보상 · 길드전 보상으로"))
     if kind == "lure":
         out = boost_text(item) + "\n\n" + boost_note(item)
         if item.get("boostNow"):
