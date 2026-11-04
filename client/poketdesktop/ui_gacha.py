@@ -954,6 +954,40 @@ def multi_grid(s, results, arts):
     return im
 
 
+HIST_W = 120                           # 오른쪽 위 '최근 기록' 판 폭 - 왼쪽 끝 414 가 유리통 오른쪽(406 + 테)에 안 닿게.
+                                       # 가장 긴 이름('전설의 포켓몬 알')이 76px 이라 넉넉하다
+
+
+def history_image(s, rows):
+    """오른쪽 위 '최근 기록' 판 (2.1.2): 어두운 판에 등급 빛깔 점 · 이름, 새것부터. rows = 서버의 history."""
+    pad, lh = int(8 * s), int(15 * s)
+    w = int(HIST_W * s)
+    head = _text("최근 기록", 11.5 * s, fill=(255, 214, 110))
+    h = pad * 2 + head.height + max(1, len(rows)) * lh
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(im).rounded_rectangle((0, 0, w - 1, h - 1), int(10 * s), fill=(14, 8, 30, 238),
+                                         outline=(120, 100, 180, 200), width=max(1, int(s)))
+    im.alpha_composite(head, (pad, pad - int(2 * s)))
+    y = pad + head.height
+    f = _font(11 * s, False)
+    room = w - pad * 2 - int(10 * s)
+    if not rows:
+        im.alpha_composite(_text("아직 없어요", 11 * s, fill=(170, 166, 196), black=False), (pad, y))
+    for r in rows:
+        tier = r.get("tier") or "lose"
+        col = TIER.get(tier, TIER["lose"])[0]
+        cy = y + lh // 2
+        rr = max(2, int(3 * s))
+        ImageDraw.Draw(im).ellipse((pad, cy - rr, pad + rr * 2, cy + rr), fill=col + (255,))
+        label = r.get("label") or "?"
+        while f.getlength(label) > room and len(label) > 2:   # (칸 폭을 넘는 긴 이름만 끝을 줄인다 - 글자는 안 줄인다)
+            label = label[:-2] + "…"
+        t = _text(label, 11 * s, fill=(176, 172, 200) if tier == "lose" else (240, 238, 250), black=False)
+        im.alpha_composite(t, (pad + int(10 * s), cy - t.height // 2))
+        y += lh
+    return im
+
+
 def tally_text(results):
     """10회 결과 한 줄: '대박 1 · 귀함 2 · …' (좋은 것부터, 없는 등급은 뺀다)."""
     kr = (("jackpot", "대박"), ("epic", "귀함"), ("rare", "드묾"), ("common", "흔함"), ("lose", "꽝"))
@@ -1007,6 +1041,8 @@ class GachaWindow(object):
         self.err = None
         self.prize_art, self.prize_ready = None, False
         self.prize_arts = []                               # 10회: 칸마다 그림
+        self.history = None                                # 오른쪽 위 '최근 기록' (2.1.2, 서버가 준 것 - 옛 서버면 None)
+        self._hist_next = None                             # 뽑은 답의 기록 - 상품을 열어 보인 뒤에 칠한다
         self.n = 1                                         # 이번 판 수 (1 또는 MULTI)
         self.art = None
         self.parts = []
@@ -1093,6 +1129,7 @@ class GachaWindow(object):
         cv.tag_bind(self.btn10_id, "<Enter>", lambda _e: self._paint_button(hover10=True))
         cv.tag_bind(self.btn10_id, "<Leave>", lambda _e: self._paint_button())
         self.coin_lbl = cv.create_image(k(22), k(586), anchor="w")
+        self.hist_id = cv.create_image(k(W - 6), k(10), anchor="ne", state="hidden")   # 최근 기록 (2.1.2)
         self._text_button(k(396), k(586), "확률 보기", self.toggle_odds)
         self._text_button(k(494), k(586), "닫기", self.close)
         self.odds_id = None
@@ -1125,6 +1162,7 @@ class GachaWindow(object):
         self._draw_globe(force=True)
         self.last = time.perf_counter()
         self._late = self._nframe = 0
+        self._load_history()
         self._tick()
 
     def _button_imgs(self, n=1):
@@ -1277,6 +1315,8 @@ class GachaWindow(object):
             return
         self.result = r or {}
         self.coin = int(self.result.get(self._wallet_key(), self.coin))
+        if self.result.get("history") is not None:
+            self._hist_next = self.result["history"]       # 지금 칠하면 맨 위 줄이 열기 전에 상품을 알려 준다
         if self.state in ("coin", "crank", "mix", "settle"):
             self._paint_coin()
         # 상품 그림은 지금 받아 둔다 (열 때 기다리지 않게). 10회는 칸마다
@@ -1307,6 +1347,27 @@ class GachaWindow(object):
                 self.prize_art = im                        # 못 받았으면 None - 칩만 보인다
             self.prize_ready = True
         U.run_async(self.root, work, got)
+
+    # ---------------- 최근 기록 (2.1.2) ----------------
+    def _load_history(self):
+        api = self.app.api
+        fn = getattr(api, "capsule_history", None)
+        if fn is None:
+            return
+
+        def done(r, err):
+            if err or not self.alive:
+                return                                     # 옛 서버 (기록이 없다) - 판을 안 보인다
+            self.history = list((r or {}).get("history") or [])
+            self._paint_history()
+        U.run_async(self.root, fn, done)
+
+    def _paint_history(self):
+        if not self.art or self.history is None:
+            return
+        self.ph["hist"] = ImageTk.PhotoImage(history_image(self.s, self.history[:10]))
+        hidden = self.cv.itemcget(self.hist_id, "state") == "hidden" and self.state in ("open", "reveal")
+        self.cv.itemconfigure(self.hist_id, image=self.ph["hist"], state="hidden" if hidden else "normal")
 
     def _wallet_key(self):
         """답에서 지갑을 읽는 열쇠: 돈 모드는 money (소지금), 코인 모드는 coin."""
@@ -1744,6 +1805,9 @@ class GachaWindow(object):
         self._draw_globe(force=True)
         self.state = "idle"
         self._calm_until = time.perf_counter() + CALM_SEC
+        if self._hist_next is not None:
+            self.history, self._hist_next = self._hist_next, None
+            self._paint_history()
         self._paint_button()
         self._say(("한 번 더? 한 번 %s · 10번 %s." % (self._amt(self.cost), self._amt(self.cost * MULTI)))
                   if self.coin >= self.cost else ("돈이 모자랍니다." if self.money else "코인이 모자랍니다."),

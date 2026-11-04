@@ -181,11 +181,33 @@ def capsule():
     chk("  아직 안 굴린 일곱 판의 코인(140)을 돌려준다", guild.coin(u2) == 140, guild.coin(u2))
 
 
+def history():
+    print("-- 4. 최근 기록 (2.1.2)")
+    uid = mkuser("기록러", 30000)
+    guild._coin_add(uid, 260)
+    chk("처음에는 비어 있다", item_routes.capsule_history(me(uid))["history"] == [])
+    r1, _e = spin(uid, 10)
+    r2, _e = buy_capsule(uid, 1)
+    h = item_routes.capsule_history(me(uid))["history"]
+    chk("최근 10번만, 새것부터 (돈 판이 맨 위)", len(h) == 10 and h[0]["paid"] == "money"
+        and all(x["paid"] == "coin" for x in h[1:]), [x["paid"] for x in h])
+    chk("  뽑기 답에도 같은 기록이 실린다", r2 and r2.get("history") == h and r1 and len(r1["history"]) == 10,
+        r2 and len(r2.get("history") or []))
+    chk("  줄마다 등급 · 이름 (꽝은 '꽝')", all(x["tier"] in guild.TIER_ORDER and x["label"] for x in h)
+        and all(x["label"] == "꽝" for x in h if x["tier"] == "lose"), h[:3])
+    want = r2["itemKr"] or r2.get("decoKr") or (r2.get("egg") or {}).get("kr") or "꽝"
+    chk("  맨 위 줄은 방금 돈으로 뽑은 것", h[0]["label"].startswith(want) or (want == "꽝" and h[0]["label"] == "꽝"),
+        (h[0], want))
+    other = mkuser("남의기록")
+    chk("남의 기록은 안 보인다", item_routes.capsule_history(me(other))["history"] == [])
+
+
 def main():
     db.init()
     ticket()
     capsule()
     money_capsule()
+    history()
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
 

@@ -1106,6 +1106,33 @@ def _slot_one(uid, rng, now, cost=SLOT_COST):
             "message": msg}
 
 
+HISTORY_N = 10                          # 뽑기 기계 오른쪽 위의 '최근 기록' 줄 수 (2.1.2)
+
+
+def slot_history(uid, n=HISTORY_N):
+    """내가 최근 뽑은 랜덤 캡슐 (2.1.2 - 뽑기 기계 오른쪽 위). 새것부터. 코인 판 · 돈 판을 함께 보인다 (cost 로 가른다:
+    코인 판은 20, 돈 판은 10,000). [{"at", "tier", "label", "paid": coin|money}]"""
+    from common import deco as C
+    from . import eggs
+    info = dict((k, (kr, tier)) for k, kr, _p, tier, _g, _n in SLOT_TABLE)
+    out = []
+    for r in db.q("SELECT at, cost, prize, item, count, deco, egg_kind FROM guild_slot_log WHERE user_id=?"
+                  " ORDER BY id DESC LIMIT ?", (uid, int(n))):
+        kr, tier = info.get(r["prize"], (r["prize"], "common"))
+        if r["egg_kind"]:
+            label = eggs.KINDS.get(r["egg_kind"], (kr,))[0]
+        elif r["deco"]:
+            label = C.name(r["deco"])
+        elif r["item"]:
+            cnt = int(r["count"] or 1)
+            label = (items.name_of(r["item"]) or r["item"]) + (" x%d" % cnt if cnt > 1 else "")
+        else:
+            label = "꽝"
+        out.append({"at": r["at"], "tier": tier, "label": label,
+                    "paid": "money" if int(r["cost"] or 0) >= SLOT_WON else "coin"})
+    return out
+
+
 def slot(uid, rng=None, now=None, count=1, pay="coin"):
     """슬롯머신(랜덤 캡슐). count 번 (1 또는 10). 값을 먼저 (조건부로) 한꺼번에 빼고, 빠졌을 때만 굴려서 준다.
     pay="coin" 이면 길드 코인 (한 번 SLOT_COST), "money" 면 돈 (한 번 SLOT_WON - 상점의 랜덤 캡슐, 2.1.1).
@@ -1143,13 +1170,13 @@ def slot(uid, rng=None, now=None, count=1, pay="coin"):
         raise
     if count == 1:
         r = dict(out[0])
-        r.update(ok=True, coin=coin(uid))
+        r.update(ok=True, coin=coin(uid), history=slot_history(uid))
         return r
     best = max(out, key=lambda r: TIER_ORDER.index(r["tier"]) if r["tier"] in TIER_ORDER else 0)["tier"]
     tally = [(t, sum(1 for r in out if r["tier"] == t)) for t in reversed(TIER_ORDER)]
     msg = "%d번 뽑았습니다: %s" % (count, " · ".join("%s %d" % (TIER_KR[t], n) for t, n in tally if n))
     return {"ok": True, "count": count, "results": out, "tier": best, "coin": coin(uid), "cost": cost,
-            "message": msg}
+            "message": msg, "history": slot_history(uid)}
 
 
 # ---------------------------------------------------------------- 길드원 프로필

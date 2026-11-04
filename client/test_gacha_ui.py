@@ -114,6 +114,49 @@ def answer(prize, tier, coin, **kw):
     return r
 
 
+HIST = [{"at": "2026-11-04T05:00:00", "tier": t, "label": l, "paid": "coin"}
+        for t, l in (("rare", "이상한사탕"), ("lose", "꽝"), ("common", "몬스터볼 x5"))]
+
+
+def history(root, app):
+    """오른쪽 위 '최근 기록' (2.1.2): 열면 서버에서 받아 보인다. 뽑은 답의 기록은 상품을 열어 보인 뒤에 칠한다
+    (먼저 칠하면 맨 위 줄이 열기 전에 상품을 알려 준다). 옛 서버(기록 없음)면 판을 안 보인다."""
+    print("\n=== 최근 기록")
+    app.api.capsule_history = lambda: {"history": list(HIST)}
+    win = G.GachaWindow(app, root, coin=100, odds=ODDS)
+    pump(root, 10, lambda: win.art is not None and win.state == "idle" and win.history is not None)
+    chk("열면 서버의 기록을 오른쪽 위에 보인다", win.history == HIST
+        and win.cv.itemcget(win.hist_id, "state") == "normal", win.history)
+    x1, y1, x2, y2 = win.cv.bbox(win.hist_id)
+    chk("  오른쪽 위 (유리통 오른쪽 끝 바깥)", x2 <= win.art.k(G.W) and x1 >= win.art.k(G.GX + G.GR) - 4 and y1 < win.art.k(40),
+        (x1, y1, x2, y2))
+    new = [{"at": "2026-11-04T05:10:00", "tier": "jackpot", "label": "전설의 포켓몬 알", "paid": "coin"}] + HIST
+    app.api.answers.append(answer("egg", "jackpot", 80, egg={"kind": "legendary", "kr": "전설의 포켓몬 알"},
+                                  history=new))
+    win.spin()
+    pump(root, 12, lambda: win.state == "ready")
+    chk("  뽑은 답이 와도 열기 전에는 기록을 안 바꾼다 (상품을 미리 알리지 않게)", win.history == HIST, win.history[:1])
+    win.open_capsule()
+    pump(root, 6, lambda: win.state == "reveal")
+    chk("  여는 동안 기록 판은 숨는다", win.cv.itemcget(win.hist_id, "state") == "hidden")
+    pump(root, 0.5)
+    win._overlay_click()
+    pump(root, 0.2)
+    chk("  닫으면 새 기록 (맨 위가 방금 것)", win.history == new and win.cv.itemcget(win.hist_id, "state") == "normal",
+        win.history[:1])
+    win.close()
+
+    def gone():
+        raise RuntimeError("404")
+    app.api.capsule_history = gone
+    w2 = G.GachaWindow(app, root, coin=100, odds=ODDS)
+    pump(root, 10, lambda: w2.art is not None and w2.state == "idle")
+    pump(root, 0.3)
+    chk("옛 서버(기록 없음)면 판이 없다", w2.history is None and w2.cv.itemcget(w2.hist_id, "state") == "hidden")
+    w2.close()
+    del app.api.capsule_history
+
+
 def multi(root, app):
     """10회 (2.1.1): 코인 200개, 가장 좋은 등급의 캡슐 하나가 나오고 열면 열 칸 결과 판."""
     print("\n=== 10회 뽑기")
@@ -329,6 +372,7 @@ def main():
     win.close()
 
     multi(root, app)
+    history(root, app)
 
     # 7b. 다 보기 전에 닫아도 상점은 다시 받는다 (서버는 이미 코인을 빼고 상품을 줬다) - 한 번만
     for when in ("mix", "answer"):

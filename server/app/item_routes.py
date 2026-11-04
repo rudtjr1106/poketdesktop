@@ -122,6 +122,12 @@ class CapsuleIn(BaseModel):
     count: int = 1
 
 
+@router.get("/api/capsule/history")
+def capsule_history(me=Depends(deps.current)):
+    """내가 최근 뽑은 랜덤 캡슐 10번 (2.1.2 - 뽑기 기계 오른쪽 위, 코인 판 · 돈 판 함께)."""
+    return {"history": guild.slot_history(me["user"]["id"])}
+
+
 @router.post("/api/shop/capsule")
 def capsule(body: CapsuleIn, me=Depends(deps.current)):
     uid = me["user"]["id"]

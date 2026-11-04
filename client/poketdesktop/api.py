@@ -569,6 +569,10 @@ class Api(object):
         캡슐을 배출하고 열어 보일 뿐이다. count=10 이면 열 번 (2.1.1, 답에 results)."""
         return self._call("POST", "/api/guild/shop/slot", {"count": count} if count != 1 else {})
 
+    def capsule_history(self):
+        """내가 최근 뽑은 랜덤 캡슐 10번 (2.1.2 - 뽑기 기계 오른쪽 위). {"history": [...]}"""
+        return self._call("GET", "/api/capsule/history")
+
     def shop_capsule(self, count=1):
         """상점의 랜덤 캡슐 - 돈으로 (2.1.2). count 는 1 또는 10. 답은 guild_slot 과 같은 꼴 + money · bag."""
         return self._call("POST", "/api/shop/capsule", {"count": count})
