@@ -859,9 +859,10 @@ class Pet(object):
             self.redraw()
 
     def update(self, ms):
-        if (self.drive is not None and self.state != "held" and not self.battling
+        drive = getattr(self, "drive", None)        # (Pet.update 를 빌려 쓰는 검사의 가짜 포켓몬에는 없다)
+        if (drive is not None and self.state != "held" and not self.battling
                 and not getattr(self, "evolving", False)):
-            return self.drive.update(self, ms)       # 집중하는 중 (focus_act) - 들림 · 배틀 · 진화 연출 땐 아래로
+            return drive.update(self, ms)            # 집중하는 중 (focus_act) - 들림 · 배틀 · 진화 연출 땐 아래로
         if self.state == "held":
             self.follow_pointer()    # 들고 있으면 커서를 따라간다 (맥)
         self.advance(ms)
