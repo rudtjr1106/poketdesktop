@@ -71,6 +71,14 @@ AREA_PRESETS = [("좁게", 360, 240), ("보통", 520, 360),
                 ("넓게", 760, 520), ("화면 전체", 0, 0)]
 
 
+def focus_label(app):
+    """포켓몬과 집중하기 줄. 남은 시간은 적지 않는다 - 메뉴 글은 동기화 때만 바뀌어서 금방 틀린다."""
+    f = getattr(app, "focus", None)
+    if f is not None and f.active():
+        return "집중 중 · %s" % ((f.view or {}).get("act") or "?")
+    return "포켓몬과 집중하기..."
+
+
 def make_icon_image(size=64):
     """트레이 아이콘 — 컴퓨터 화면 안의 몬스터볼.
 
@@ -208,6 +216,10 @@ class TrayBase(object):
             Item("열기...", lambda: self.call(a.open_box), default=True),
             # 긴급 숨기기 (1.10.3). 단축키를 안 쓰는 사람도 여기서 한 번에 치울 수 있다.
             Item(lambda: stealth_label(a), lambda: self.call(a.toggle_stealth)),
+            # 포켓몬과 집중하기: 시작 창 / 집중 중이면 집중 창 (남은 시간 · 끝내기)
+            Item(lambda: focus_label(a), lambda: self.call(a.open_focus)),
+            # 포켓몬 알림 타이머 (이 PC 에만)
+            Item("알림 맞추기...", lambda: self.call(a.open_alarms)),
             # '바로 가기' 하위 메뉴는 뺐다. 창이 하나로 합쳐진 뒤로는
             # '열기...' 로 들어가서 탭을 고르면 되는데, 메뉴에 같은 것이
             # 일곱 줄 더 있으면 길기만 하다.

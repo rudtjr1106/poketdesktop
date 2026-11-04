@@ -33,7 +33,7 @@ from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
 from . import (achievements, auth, avatar, battle_routes, board, board_routes, boosts, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
-               expedition, item_routes, walkpts,
+               expedition, focus, item_routes, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws, internal_routes,
@@ -61,6 +61,7 @@ app.include_router(guild_ws.router)
 app.include_router(internal_routes.router)        # 관리자 통로 - 서버 안(127.0.0.1)에서만 (2.0.x)
 app.include_router(visit.router)               # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0)
 app.include_router(expedition.router)
+app.include_router(focus.router)                # 포켓몬과 집중하기 (집중 타이머)
 app.include_router(troubles.router)             # 앱이 배틀을 접은 까닭 (1.13.3)
 
 RNG = deps.RNG
@@ -1331,6 +1332,8 @@ def me(ctx=Depends(current)):
         "tmNew": tms.new_count(uid),
         # 타입 스프레이 (2.1.1) 남은 초 (가방 설명은 /api/shop 에 실린 같은 값을 쓴다)
         "boosts": boosts.state(uid),
+        # 포켓몬과 집중하기: 진행 중인 집중 (다른 PC · 다시 켠 앱이 이어 받는다). 쓰지 않는다 - 끊긴 것은 stale 로만
+        "focus": focus.me_card(uid),
         "session":{"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 

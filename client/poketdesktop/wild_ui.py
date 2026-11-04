@@ -455,6 +455,14 @@ class WildController(object):
         v = getattr(self.app, "visit", None)
         return bool(v is not None and getattr(v, "guest", False))
 
+    def _focusing(self):
+        """포켓몬과 집중하는 중인가. 그동안 풀숲은 안 뜬다 (사용자 결정 11/04) - 끝나면 focus_timer 가 start() 를 부른다.
+
+        stop() 만으로는 모자란다: 배틀 · 놀러 가기가 끝날 때나 설정을 바꿀 때 check() 가 다시 불린다.
+        """
+        f = getattr(self.app, "focus", None)
+        return bool(f is not None and f.active())
+
     def set_enabled(self, on):
         """설정이 바뀌었다. 지금 화면에 바로 반영한다.
 
@@ -500,7 +508,7 @@ class WildController(object):
         직접 눌렀는데 아무 일도 안 일어나면 고장으로 보이므로,
         그때는 얼마나 기다려야 하는지 알려준다.
         """
-        if not self.app.api or self._away():
+        if not self.app.api or self._away() or self._focusing():
             return
         if not self.enabled():
             # 껐다. 여기서 예약을 다시 걸지 않는 것이 중요하다 - 걸면
@@ -555,8 +563,8 @@ class WildController(object):
         badge = getattr(self.app, "boost_badge", None)
         if badge is not None and "boosts" in r:
             badge.note(r["boosts"])                        # 타입 스프레이 남은 시간 (2.1.3, 오른쪽 아래 띠)
-        if self._away():
-            return
+        if self._away() or self._focusing():
+            return              # 집중 전에 보낸 확인의 답이 늦게 와도 풀숲을 돋우지 않는다 (독립 검토 #5)
         # 물어본 뒤 답이 오는 사이에 껐을 수 있다. 볼 개수만 챙기고
         # 화면은 건드리지 않는다.
         if not self.enabled():

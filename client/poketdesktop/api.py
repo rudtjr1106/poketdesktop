@@ -238,6 +238,27 @@ class Api(object):
         return self._call("POST", "/api/party/%d/name" % int(no), {"name": name})
 
     # 탐험 파견 (1.10.4). 박스의 포켓몬을 몇 시간 보내 두면 도구를 가져온다.
+    # ---- 포켓몬과 집중하기 (집중 타이머, server/app/focus.py) ----
+    def focus_state(self):
+        """진행 중인 집중 · 오늘 받은 노력치 · 규칙 숫자."""
+        return self._call("GET", "/api/focus")
+
+    def focus_start(self, pid, stat):
+        return self._call("POST", "/api/focus/start", {"pokemon": int(pid), "stat": stat})
+
+    def focus_beat(self):
+        """맥박 (1분마다). 지난 세트를 인정받고, 끊겼으면 끝났다는 답이 온다."""
+        return self._call("POST", "/api/focus/beat", {})
+
+    def focus_stop(self):
+        return self._call("POST", "/api/focus/stop", {})
+
+    def focus_month(self, ym):
+        return self._call("GET", "/api/focus/month?ym=%s" % ym)
+
+    def focus_day(self, d):
+        return self._call("GET", "/api/focus/day?d=%s" % d)
+
     def expedition(self):
         """나가 있는 것들 (남은 초·돌아왔는지)과 칸 수."""
         return self._call("GET", "/api/expedition")

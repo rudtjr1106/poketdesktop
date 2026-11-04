@@ -227,6 +227,8 @@ class Pet(object):
         self.calm_ms = 0             # 안 건드린 시간(ms). 쌓이면 잠든다
         self.sleeping = False        # 자는 중. 자면 돌아다니지 않는다
         self.rest_pose = None        # 서 있을 때 취할 자세 (앉기/눕기)
+        # 포켓몬과 집중하기: 집중하는 동안 움직임을 맡는 것 (focus_act.Activity). None 이면 스스로 돌아다닌다
+        self.drive = None
 
         # 들어서 옮기는 중인가, 어디를 잡았나 (grab 을 보라)
         self.dragging = False
@@ -857,6 +859,9 @@ class Pet(object):
             self.redraw()
 
     def update(self, ms):
+        if (self.drive is not None and self.state != "held" and not self.battling
+                and not getattr(self, "evolving", False)):
+            return self.drive.update(self, ms)       # 집중하는 중 (focus_act) - 들림 · 배틀 · 진화 연출 땐 아래로
         if self.state == "held":
             self.follow_pointer()    # 들고 있으면 커서를 따라간다 (맥)
         self.advance(ms)
@@ -1018,6 +1023,8 @@ class Overlay(object):
         # 포켓몬 알 {알 id: EggPet} (eggs_ui). pets 와 따로 둔다 - 알은 서버의
         # 포켓몬 목록에 없어서 sync() 가 지운다. 걸어다니지도 싸우지도 않는다.
         self.eggs = {}
+        # 포켓몬과 집중하기: 집중하는 동안 이 번호의 도트만 보인다 (set_only). None 이면 모두
+        self.only = None
         # 부화 연출을 이미 보여 준 알. 서버는 seen 을 받을 때까지 그 알을 계속
         # 실어 보내는데, 그때마다 알을 다시 세우면 태어난 뒤에도 알이 남는다.
         self.eggs_done = set()
@@ -1112,11 +1119,13 @@ class Overlay(object):
             if pet:
                 self.pets[pid] = pet
                 added.append(mon)
-                if self.hidden:
-                    try:
-                        pet.win.withdraw()
-                    except Exception:
-                        pass
+                if self.hidden or (self.only is not None and pid != self.only):
+                    for w in (pet.win, pet.name_win):     # 집중 중이면 집중 포켓몬 말고는 숨은 채로 태어난다
+                        try:
+                            if w is not None:
+                                w.withdraw()
+                        except Exception:
+                            pass
         return added
 
     def sync_eggs(self, eggs):
@@ -1151,7 +1160,7 @@ class Overlay(object):
                 config.log("알을 못 세웠습니다: %s" % ex)
                 continue
             self.eggs[eid] = pet
-            if self.hidden:
+            if self.hidden or self.only is not None:      # 집중하는 동안 알도 숨는다
                 try:
                     pet.win.withdraw()
                 except Exception:                          # noqa: BLE001
@@ -1307,6 +1316,7 @@ class Overlay(object):
                 pass
         self.eggs = {}
         self.locked = False
+        self.only = None                # 집중 모드의 '이것만' 도 같이 푼다 (로그아웃 - 독립 검토 #3)
         # 막아 둔 쪽(배틀)도 여기서 같이 끝난다. 로그아웃·종료는 clear()
         # 뒤에 배틀을 닫는데, 그때 푸는 것은 0 아래로 안 내려가서 괜찮다.
         self._names_block = 0
@@ -1319,10 +1329,14 @@ class Overlay(object):
                 p.hide_tip()
                 if getattr(p, "hatching", False):
                     continue
+                if not hidden and self.only is not None:
+                    continue                # 집중 중에는 알이 숨은 채로
                 p.win.withdraw() if hidden else PLAT.show_again(p.win)
             except Exception:                            # noqa: BLE001
                 pass
         for p in list(self.pets.values()):
+            if not hidden and self.only is not None and p.id != self.only:
+                continue                    # 집중 중에는 집중 포켓몬만 되살린다
             for w in (p.win, p.name_win):
                 if not w:
                     continue
@@ -1338,6 +1352,39 @@ class Overlay(object):
         self.place_badges()
         if not hidden:
             self.apply_names()
+
+    def set_only(self, pid):
+        """포켓몬과 집중하기: pid 의 도트만 남기고 나머지 도트 · 이름표 · 알을 감춘다. None 이면 되살린다.
+
+        배틀처럼 바탕화면 전체를 감춰 둔 중(hidden)이면 값만 적는다 - set_hidden(False) 가 되살릴 때 이것을
+        지킨다. 긴급 숨기기 중이면 PLAT.show_again 이 띄우지 않고 '되돌릴 것' 에만 적는다 (stealth).
+        """
+        self.only = pid
+        if self.hidden:
+            return
+        for p in list(self.pets.values()):
+            keep = pid is None or p.id == pid
+            try:
+                p.hide_tip()
+                if keep:
+                    PLAT.show_again(p.win)
+                else:
+                    p.win.withdraw()
+                    if p.name_win is not None:
+                        p.name_win.withdraw()
+                    if getattr(p, "trail", None) is not None:
+                        p.trail.step(0)
+            except Exception:                               # noqa: BLE001
+                pass
+        for e in list(self.eggs.values()):
+            if getattr(e, "hatching", False):
+                continue
+            try:
+                e.hide_tip()
+                e.win.withdraw() if pid is not None else PLAT.show_again(e.win)
+            except Exception:                               # noqa: BLE001
+                pass
+        self.apply_names()
 
     # ---------------- 이름표 켜고 끄기 ----------------
     def names_visible(self):
@@ -1421,6 +1468,8 @@ class Overlay(object):
         """
         if getattr(p, "evolving", False) or p.win.state() == "withdrawn":
             return
+        if getattr(p, "drive", None) is not None:
+            return          # 집중하는 중 - 이름표 자리에 시간표(focus_act.Tag)가 있다
         if p.name_win is None:
             p.make_nameplate()
             return

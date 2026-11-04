@@ -34,6 +34,7 @@
 import datetime
 import math
 
+from common import focus as FOCUS
 from common import legends as L
 from common import pokelogic as P
 
@@ -175,6 +176,27 @@ def _defs():
             "%s 지방에서 평소 만날 수 있는 포켓몬 %d종 잡기 - %s 포켓몬이 풀숲에 "
             "나타나기 시작한다" % (REGION[g], need, what),
             "unlock_%d" % g, need, title)
+    # 포켓몬과 집중하기 (집중 타이머). 인정된 세트만 센다 - 끝내기 전 자투리는 달력 시간에만 (server/app/focus.py)
+    G = "집중"
+    add("focus_1", G, "첫 집중", "포켓몬과 집중 1세트 끝내기", "focus_sets", 1, balls=5)
+    add("focus_10", G, "집중 10세트", "포켓몬과 집중 10세트 끝내기", "focus_sets", 10, balls=10)
+    for n, title in ((50, "꾸준한 트레이너"), (100, "집중의 달인"), (300, "몰입의 경지")):
+        add("focus_%d" % n, G, title, "포켓몬과 집중 %d세트 끝내기" % n, "focus_sets", n, title)
+    add("streak_3", G, "사흘 연속", "3일 연속 집중하기", "focus_streak_best", 3, balls=5)
+    for n, title in ((7, "일주일의 약속"), (30, "한 달의 기적")):
+        add("streak_%d" % n, G, title, "%d일 연속 집중하기" % n, "focus_streak_best", n, title)
+    add("fullday_1", G, "오늘도 완주", "하루에 집중 노력치 40 을 다 받기", "focus_fullday", 1, "오늘도 완주")
+    add("fullday_10", G, "철인", "하루에 집중 노력치 40 을 다 받은 날 10번", "focus_fullday", 10, "철인")
+    for stat, title in (("atk", "헬스 마니아"), ("spa", "공부벌레"), ("spe", "러너스 하이"),
+                        ("hp", "유연한 몸"), ("def", "버티기 장인"), ("spd", "명상가")):
+        act, stat_kr = FOCUS.act_of(stat)
+        add("focus_%s" % stat, G, title, "%s(%s)로 25세트" % (act, stat_kr), "focus_%s" % stat, 25, title)
+    add("hidden_dawn", G, "새벽 공부", "한국 시각 0~5시 사이에 세트 끝내기", "focus_dawn", 1, "새벽 공부",
+        hidden=True)
+    add("hidden_buddy", G, "단짝 공부 친구", "같은 포켓몬과 100세트", "focus_buddy", 100, "단짝 공부 친구",
+        hidden=True)
+    add("hidden_allround", G, "만능 트레이너", "여섯 동작을 모두 한 번 이상", "focus_allround", 6, "만능 트레이너",
+        hidden=True)
     # 숨은 업적 (달성하기 전에는 이름만 가린다)
     add("hidden_midnight", "숨은 업적", "한밤의 만남", "자정(0시)에 포켓몬 잡기",
         "midnight", 1, "한밤의 만남", hidden=True)
@@ -277,6 +299,8 @@ def progress(uid):
     nicks = [(r["nickname"] or "").strip() for r in party]
     out["same_nick"] = 1 if (len(nicks) >= config.MAX_PARTY and nicks[0]
                              and len(set(nicks)) == 1) else 0
+    from . import focus                    # 집중 타이머가 세트를 인정할 때 쌓아 둔 값 (서로 부르므로 여기서)
+    out.update(focus.stats(uid))
     return out
 
 

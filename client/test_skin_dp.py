@@ -125,6 +125,15 @@ class Api(TBL.Api):
         import test_mypage_ui as TM
         return TM.payload()
 
+    def focus_month(self, ym):
+        self.calls.append(("fmonth", ym))
+        return {"ym": ym, "days": {ym + "-15": 200}}
+
+    def focus_day(self, d):
+        self.calls.append(("fday", d))
+        return {"day": d, "rows": [{"time": "12:25", "pokemon": "꼬부기", "stat": "spa", "act": "공부", "minutes": 25,
+                                    "ev": 5, "full": True}]}
+
     def board_mine(self, what="posts", page=1):
         import test_mypage_ui as TM
         self.calls.append(("mine", what, page))
@@ -1504,6 +1513,22 @@ def main():
         TBL.wait(root, lambda: my.data is not None, 10)
         TBL.settle(root, 0.3)
         chk("처음 쪽은 알림", my.b_what == "notify" and my.b_items, my.b_what)
+        # 집중 기록 (집중 타이머): DP 는 쪽을 캔버스에 그린다 - 같은 자료로 달력 칸을 그린다
+        def dp_texts():
+            return [my.cv.itemcget(i, "text") for i in my.cv.find_all() if my.cv.type(i) == "text"]
+        tx = dp_texts()
+        chk("DP 마이페이지에 집중 기록 · 이번 달", any("집중 기록" in t for t in tx) and "2026년 11월" in tx
+            and any("연속 3일" in t for t in tx), [t for t in tx if "집중" in t or "월" in t][:6])
+        chk("DP 달력: 4일 칸에 1:02", "1:02" in tx)
+        my.focus_pick("2026-11-04")
+        TBL.wait(root, lambda: my.f_day == "2026-11-04", 5)
+        TBL.settle(root, 0.2)
+        chk("DP: 날을 누르면 그날 기록", any("공부 · 25분 · +5" in t for t in dp_texts()))
+        my.focus_turn(-1)
+        TBL.wait(root, lambda: my.f_ym == "2026-10", 5)
+        TBL.settle(root, 0.2)
+        chk("DP: ◀ 로 지난달", "2026년 10월" in dp_texts() and "3:20" in dp_texts())
+        chk("DP: ◀ ▶ 단추가 그려져 있다", my.f_prev.box is not None and my.f_next.box is not None)
         my.pick_tab("posts")
         TBL.wait(root, lambda: my.b_what == "posts" and my.b_pages > 1, 5)
         my.turn(1)

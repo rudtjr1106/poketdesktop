@@ -23,7 +23,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from . import achievements, avatar, board, db, deps, gym, pvp, season
+from . import achievements, avatar, board, db, deps, focus, gym, pvp, season
 
 router = APIRouter()
 
@@ -141,6 +141,8 @@ def build(user, dex, now=None):
     # 쪽을 넘길 때 /api/board/mine 으로 받는다 - 활동이 쌓여도 길어지지 않게.
     # 안 본 알림이 있으면 그 탭부터, 없으면 내 글부터 보여 준다.
     out["board"] = _board(uid, now)
+    # 집중 기록 (집중 타이머) - **본인에게만**: 요약과 이번 달 달력. 다른 달은 /api/focus/month
+    out["focus"] = focus.mypage_card(uid, now)
     return out
 
 

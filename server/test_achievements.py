@@ -88,7 +88,8 @@ def main():
     print("=== 목록 ===")
     defs = A.defs()
     keys = [a["key"] for a in defs]
-    chk("업적 50개", len(defs) == 50, len(defs))
+    # 50 + 집중 타이머의 '집중' 갈래 19개 (server/test_focus.py 가 그 갈래를 본다)
+    chk("업적 69개", len(defs) == 69, len(defs))
     chk("열쇠가 겹치지 않는다", len(set(keys)) == len(keys))
     chk("칭호가 season.TITLES 에 올라간다",
         all(A.title_id(a["key"]) in season.TITLES for a in defs if a["title"]))

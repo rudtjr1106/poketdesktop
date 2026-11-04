@@ -98,6 +98,85 @@ def season_line(s):
     return head, " · ".join(bits)
 
 
+# ---------------------------------------------------------------- 집중 기록 (집중 타이머)
+# 서버 mypage 의 focus = {"summary": {...}, "month": {"ym", "days": {날: 분}}}. 다른 달은 /api/focus/month,
+# 날을 누르면 /api/focus/day. 기본 화면과 DP 테마(skins/dp/mypage)가 이 도우미를 같이 쓴다.
+WEEK = "일월화수목금토"
+HEAT = (0, 50, 100, 200)      # 분: 1~49 / 50~99 / 100~199 / 200+ 이 한 단계씩 진하다
+
+
+def hm(minutes):
+    """62 -> '1:02' (달력 칸)."""
+    h, m = divmod(max(0, int(minutes)), 60)
+    return "%d:%02d" % (h, m)
+
+
+def span_text(minutes):
+    """87 -> '1시간 27분', 25 -> '25분'."""
+    h, m = divmod(max(0, int(minutes)), 60)
+    if not h:
+        return "%d분" % m
+    return "%d시간 %d분" % (h, m) if m else "%d시간" % h
+
+
+def shift_ym(ym, delta):
+    y, m = int(ym[:4]), int(ym[5:7]) - 1 + int(delta)
+    y, m = y + m // 12, m % 12
+    return "%04d-%02d" % (y, m + 1)
+
+
+def month_title(ym):
+    return "%d년 %d월" % (int(ym[:4]), int(ym[5:7]))
+
+
+def heat_level(minutes):
+    m = int(minutes or 0)
+    return sum(1 for t in HEAT if m > t) if m > 0 else 0
+
+
+def focus_cells(ym, days):
+    """달력 칸: [{"day", "date", "col", "row", "min", "level"}] (일요일이 0 번째 칸)."""
+    from common import focus as FOCUS
+    first, n = FOCUS.month_grid(ym)
+    out = []
+    for d in range(1, n + 1):
+        i = first + d - 1
+        date = "%s-%02d" % (ym, d)
+        m = int((days or {}).get(date, 0))
+        out.append({"day": d, "date": date, "col": i % 7, "row": i // 7, "min": m, "level": heat_level(m)})
+    return out
+
+
+def cell_text(c):
+    return "%d\n%s" % (c["day"], hm(c["min"])) if c["min"] else str(c["day"])
+
+
+def day_line(r):
+    """그날 기록 한 줄: '12:25 · 꼬부기 · 공부 · 25분 · +5' / 자투리는 '자투리 12분'."""
+    if r.get("full"):
+        tail = "%d분 · +%d" % (int(r.get("minutes", 0)), int(r.get("ev", 0)))
+    else:
+        tail = "자투리 %d분" % int(r.get("minutes", 0))
+    return "%s · %s · %s · %s" % (r.get("time", ""), r.get("pokemon", "?"), r.get("act", "?"), tail)
+
+
+def focus_summary(sm):
+    return "이번 달 %s  ·  전체 %s  ·  연속 %d일 (최고 %d일)  ·  오늘 노력치 %d/%d" % (
+        span_text(sm.get("monthMin", 0)), span_text(sm.get("totalMin", 0)), int(sm.get("streak", 0)),
+        int(sm.get("best", 0)), int(sm.get("todayEv", 0)), int(sm.get("dailyEv", 40)))
+
+
+def blend(a, b, t):
+    """두 빛깔 사이 (t=0 이면 a, 1 이면 b)."""
+    a, b = a.lstrip("#"), b.lstrip("#")
+    ca = [int(a[i:i + 2], 16) for i in (0, 2, 4)]
+    cb = [int(b[i:i + 2], 16) for i in (0, 2, 4)]
+    return "#%02x%02x%02x" % tuple(int(round(x + (y - x) * t)) for x, y in zip(ca, cb))
+
+
+HEAT_MIX = (0.0, 0.3, 0.5, 0.72, 1.0)     # 단계마다 강조색을 얼마나 섞나
+
+
 def tile_items(d):
     """(이름, 값, 덧붙임) 목록. 화면과 검사가 같이 쓴다."""
     c, g, r = d.get("counts") or {}, d.get("gym") or {}, d.get("raid") or {}
@@ -304,6 +383,7 @@ class MyPageWindow(object):
             if err:
                 return self.say(_err(err), U.DANGER)
             self.data = r or {}
+            self._focus_init(self.data)
             self._fill(self.data)
             note, self._note_after = getattr(self, "_note_after", None), None
             self.say(*(note or ("",)))                  # 다시 읽게 한 일의 결과 글은 남긴다 (이메일 등록)
@@ -333,6 +413,7 @@ class MyPageWindow(object):
         self.flows = []
         self._profile(d)
         self._tiles(d)
+        self._focus(d)
         self._titles(d)
         self._seasons(d)
         self._board(d)
@@ -479,6 +560,128 @@ class MyPageWindow(object):
                 fill="x", padx=12)
             tk.Label(t, text=note or " ", bg=TILE, fg=U.FG_FAINT, font=U.FONT_XS,
                      anchor="w").pack(fill="x", padx=12, pady=(0, 9))
+
+    # ---------------- 집중 기록 (집중 타이머) ----------------
+    # 상태: f_ym 보는 달 · f_this 이번 달 · f_days {날: 분} · f_day 고른 날 · f_rows 그날 기록.
+    # 달 넘기기 · 날 고르기는 서버에 따로 묻고, 바뀌면 _focus_changed (기본은 이 칸만 다시, DP 는 쪽 전체를 다시).
+    def _focus_init(self, d):
+        f = (d or {}).get("focus")
+        self.focus_data = f or None
+        self.f_cells = {}
+        self.f_day = None
+        self.f_rows = None
+        self._f_gen = getattr(self, "_f_gen", 0) + 1
+        if f:
+            m = f.get("month") or {}
+            self.f_ym = self.f_this = m.get("ym") or ""
+            self.f_days = dict(m.get("days") or {})
+
+    def focus_can_next(self):
+        return bool(getattr(self, "focus_data", None)) and self.f_ym < self.f_this
+
+    def focus_turn(self, delta):
+        if not getattr(self, "focus_data", None):
+            return
+        ym = shift_ym(self.f_ym, delta)
+        if ym > self.f_this:
+            return
+        self._f_gen += 1
+        gen = self._f_gen
+        api = self.app.api
+
+        def done(r, err):
+            if not self.alive or gen != self._f_gen:
+                return
+            if err:
+                return self.say(_err(err), U.DANGER)
+            self.f_ym = (r or {}).get("ym") or ym
+            self.f_days = dict((r or {}).get("days") or {})
+            self.f_day = self.f_rows = None
+            self._focus_changed()
+        run_async(self.root, lambda: api.focus_month(ym), done)
+
+    def focus_pick(self, date):
+        self._f_gen += 1
+        gen = self._f_gen
+        api = self.app.api
+
+        def done(r, err):
+            if not self.alive or gen != self._f_gen:
+                return
+            if err:
+                return self.say(_err(err), U.DANGER)
+            self.f_day = date
+            self.f_rows = list((r or {}).get("rows") or [])
+            self._focus_changed()
+        run_async(self.root, lambda: api.focus_day(date), done)
+
+    def _focus_changed(self):
+        self._paint_focus()
+
+    def _focus(self, d):
+        self.f_box = None
+        if not getattr(self, "focus_data", None):
+            return
+        self.f_box = self._section("집중 기록", "포켓몬과 집중한 시간")
+        self._paint_focus()
+
+    def _paint_focus(self):
+        box = getattr(self, "f_box", None)
+        if box is None or not self.alive:
+            return
+        for w in box.winfo_children():
+            w.destroy()
+        self.f_cells = {}
+        sm = (self.focus_data or {}).get("summary") or {}
+        lb = tk.Label(box, text=focus_summary(sm), bg=CARD, fg=U.FG_DIM, font=U.FONT_S, anchor="w",
+                      justify="left")
+        lb.pack(fill="x", padx=14, pady=(12, 6))
+        U.wrap_to_width(lb)
+        nav = tk.Frame(box, bg=CARD)
+        nav.pack(fill="x", padx=14)
+        prev = U.ghost_button(nav, "◀", lambda: self.focus_turn(-1), height=26)
+        prev.pack(side="left")
+        tk.Label(nav, text=month_title(self.f_ym), bg=CARD, fg=U.FG, font=U.FONT_B).pack(side="left", padx=10)
+        nxt = U.ghost_button(nav, "▶", lambda: self.focus_turn(1), height=26)
+        nxt.pack(side="left")
+        if not self.focus_can_next():
+            nxt.configure(state="disabled")
+        grid = tk.Frame(box, bg=CARD)
+        grid.pack(fill="x", padx=14, pady=(8, 4))
+        for i, ch in enumerate(WEEK):
+            grid.grid_columnconfigure(i, weight=1, uniform="fday")
+            tk.Label(grid, text=ch, bg=CARD, fg=U.DANGER if i == 0 else U.FG_FAINT, font=U.FONT_XS).grid(
+                row=0, column=i, sticky="ew")
+        import time as _t
+        today = _t.strftime("%Y-%m-%d")
+        for c in focus_cells(self.f_ym, self.f_days):
+            lv = c["level"]
+            bg = blend(TILE, U.ACCENT, HEAT_MIX[lv])
+            fg = U.ACCENT_DARK if lv >= 3 else (U.FG if lv else U.FG_DIM)
+            cell = tk.Label(grid, text=cell_text(c), bg=bg, fg=fg, font=U.FONT_XS, height=2, justify="center",
+                            cursor="hand2", highlightthickness=1,
+                            highlightbackground=U.ACCENT if c["date"] == today else (
+                                U.FG if c["date"] == self.f_day else bg))
+            cell.grid(row=c["row"] + 1, column=c["col"], sticky="nsew", padx=2, pady=2)
+            cell.bind("<Button-1>", lambda _e, dt=c["date"]: self.focus_pick(dt))
+            self.f_cells[c["day"]] = cell
+        if self.f_day:
+            tk.Label(box, text="%d월 %d일" % (int(self.f_day[5:7]), int(self.f_day[8:10])), bg=CARD, fg=U.FG,
+                     font=U.FONT_S, anchor="w").pack(fill="x", padx=14, pady=(6, 2))
+            rows = self.f_rows or []
+            if not rows:
+                tk.Label(box, text="이날은 집중한 기록이 없습니다.", bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS,
+                         anchor="w").pack(fill="x", padx=14)
+            for r in rows:
+                line = tk.Label(box, text=day_line(r), bg=CARD, fg=U.FG_DIM if r.get("full") else U.FG_FAINT,
+                                font=U.FONT_XS, anchor="w", justify="left")
+                line.pack(fill="x", padx=14)
+                U.wrap_to_width(line)
+            tk.Frame(box, bg=CARD, height=U.h(10)).pack(fill="x")
+        else:
+            tk.Label(box, text="날을 누르면 그날 기록이 보여요.", bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS,
+                     anchor="w").pack(fill="x", padx=14, pady=(2, 12))
+        self.root.after_idle(self._reflow)
 
     def _titles(self, d):
         t = d.get("titles") or {}

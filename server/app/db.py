@@ -797,6 +797,38 @@ CREATE TABLE IF NOT EXISTS expedition_mon (
     runs        INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_expedition_mon_user ON expedition_mon(user_id);
+-- 포켓몬과 집중하기 (server/app/focus.py, 규칙은 common/focus.py). 집중 한 번이 한 줄.
+-- state: on = 집중 중 · done = 끝내기를 눌렀다 · lost = 맥박이 끊겨 서버가 끝냈다 (게임 꺼짐 · 컴퓨터 잠듦).
+-- set_at = 지금 세트가 시작된 때 (세트가 인정될 때마다 25분씩 민다) · beat_at = 마지막 맥박.
+CREATE TABLE IF NOT EXISTS focus_run (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pokemon_id  INTEGER NOT NULL,
+    stat        TEXT NOT NULL,
+    started_at  TEXT NOT NULL,
+    set_at      TEXT NOT NULL,
+    beat_at     TEXT NOT NULL,
+    state       TEXT NOT NULL DEFAULT 'on',
+    ended_at    TEXT
+);
+-- 진행 중인 집중은 한 사람에 하나 (두 PC 에서 동시에 시작해도 하나만 들어간다)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_focus_run_on ON focus_run(user_id) WHERE state='on';
+CREATE INDEX IF NOT EXISTS idx_focus_run_user ON focus_run(user_id, id);
+-- 인정된 세트(full=1, minutes=25)와 끝내기 전 자투리(full=0). 달력 · 하루 상한 · 업적이 여기서 센다.
+-- day = 인정된 때의 한국 날짜. ev = 실제로 들어간 노력치.
+CREATE TABLE IF NOT EXISTS focus_set (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    run_id      INTEGER NOT NULL,
+    pokemon_id  INTEGER NOT NULL,
+    stat        TEXT NOT NULL,
+    at          TEXT NOT NULL,
+    day         TEXT NOT NULL,
+    minutes     INTEGER NOT NULL,
+    full        INTEGER NOT NULL,
+    ev          INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_focus_set_user_day ON focus_set(user_id, day);
 -- 캐릭터 (1.10.3). 마이페이지에서 만든다. **그림이 아니라 고른 것(spec)을 적는다** -
 -- 그림은 common/avatar_art 가 그때그때 그린다 (서버도 화면도 같은 코드).
 -- image 는 **직접 그린 도트** (걷기 시트 PNG 의 base64, common/avatar_sheet). 화면이 올리는 길은

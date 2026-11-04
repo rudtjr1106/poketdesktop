@@ -81,6 +81,16 @@ class _FakeEvent(object):
 HOT_MS = 70                   # 긴급 숨기기 단축키가 눌렸는지 묻는 간격
 
 
+# 포켓몬과 집중하기: 집중하는 동안 대전을 걸거나 보지 않는다 (투기장이 바탕화면을 쥔다)
+FOCUS_MATCH_MSG = "포켓몬과 집중하는 중에는 대전을 볼 수 없어요. 집중을 끝낸 뒤에 봐 주세요."
+FOCUS_PVP_MSG = "포켓몬과 집중하는 중에는 대전을 걸 수 없어요. 집중을 끝낸 뒤에 해 주세요."
+
+
+def _focus_on(app):
+    """집중 중인가. App 메서드를 빌려 쓰는 검사의 가짜 앱에는 focus 가 없을 수 있다."""
+    f = getattr(app, "focus", None)
+    return bool(f is not None and f.active())
+
 class App(object):
     def __init__(self):
         self.settings = config.load_settings()
@@ -94,6 +104,8 @@ class App(object):
         self.wild = None
         self.expedition = None     # 탐험 파견의 바탕화면 쪽 (돌아온 보따리, 1.10.4)
         self.visit = None          # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0, visit.Visit)
+        self.focus = None          # 포켓몬과 집중하기 (focus_timer.FocusController)
+        self.alarms = None         # 포켓몬 알림 타이머 (alarm.AlarmController)
         self._syncing = False
         self.hub = None            # 탭 창 하나
         self.box_window = None
@@ -444,6 +456,14 @@ class App(object):
         if self.expedition is None:
             from . import expedition_ui
             self.expedition = expedition_ui.Desk(self)
+        if self.focus is None:
+            from .focus_timer import FocusController
+            self.focus = FocusController(self)
+        if getattr(self, "alarms", None) is None:
+            # 포켓몬 알림 타이머 (이 PC 에만). 켤 때 꺼져 있던 사이 지난 알림을 '놓친 알림' 으로 한 번
+            from .alarm import AlarmController
+            self.alarms = AlarmController(self)
+            self.alarms.start()
         if self.visit is None:
             # 앱이 켜져 있는 동안 늘 붙어 있다 - 붙어 있는 것이 '지금 놀러 올 수 있다' 는 뜻이다 (1.11.0)
             from . import visit as visit_mod
@@ -714,12 +734,18 @@ class App(object):
             if me:
                 self.balls = me.get("balls", self.balls)
                 self.money = me.get("money", self.money)
+                # 포켓몬과 집중하기: 진행 중인 집중을 이어 받는다 (다른 PC · 다시 켠 앱). 아래 알림보다 먼저
+                if "focus" in me and self.focus is not None:
+                    self.focus.note(me.get("focus"))
+                quiet = self.focus_quiet()
                 # 운영자가 보낸 선물. 서버가 /api/me 에서 이미 지급했고
                 # 여기서는 알리기만 한다.
                 self.announce_gifts(me.get("gifts") or [])
                 # 도감 업적 (시즌 3). 선물처럼 연출이 끝난 뒤 한 창에 묶어 알린다.
-                self.announce_achievements(
-                    (me.get("achievements") or {}).get("unseen") or [])
+                # 집중하는 동안은 미룬다 - 서버가 '안 본 것' 으로 남겨 둬서 끝난 뒤 다음 동기화에 온다
+                if not quiet:
+                    self.announce_achievements(
+                        (me.get("achievements") or {}).get("unseen") or [])
                 # 저절로 받은 메가스톤 (시즌 3). 업적과 같은 식으로 알린다.
                 self.announce_bond((me.get("bond") or {}).get("got") or [])
                 # 게시판의 새 공지 (1.8.0). 탭과 트레이 메뉴에 표시만 한다.
@@ -737,7 +763,7 @@ class App(object):
                     self.fight_left = (me.get("fight") or {}).get("left")
                     self.fight_practice = (me.get("fight") or {}).get("practice")
                 # 탐험 파견 (1.10.4): 돌아온 것이 있으면 바탕화면에 보따리를 놓는다
-                if self.expedition is not None and "expedition" in me:
+                if self.expedition is not None and "expedition" in me and not quiet:
                     self.expedition.note(me.get("expedition"))
                 # 타입 스프레이 남은 시간 (2.1.3): 오른쪽 아래 띠
                 if "boosts" in me:
@@ -760,7 +786,10 @@ class App(object):
                     self.bond_stones.apply()
                 if me is not None and "eggs" in me:
                     self.overlay.sync_eggs(me.get("eggs") or [])
-                    self.announce_hatch(me.get("eggs") or [])
+                    if not self.focus_quiet():          # 부화 연출은 집중이 끝난 뒤에
+                        self.announce_hatch(me.get("eggs") or [])
+                if self.focus is not None:
+                    self.focus.on_pets_synced()        # 집중 포켓몬이 빠졌으면 끝낸다 · 새 도트는 숨긴다
                 self._prefetch_anims(mons or [])
                 self.prebuild_deco(list(self.overlay.pets.values()))    # 꾸미기를 바꿨으면 다른 동작을 미리
                 # 배틀 중에 새 도트가 생기면(창에서 바탕화면에 올렸을 때)
@@ -778,6 +807,35 @@ class App(object):
             self.refresh_tray()
         run_async(self.root, work, done)
 
+    def open_alarms(self, pet=None):
+        """포켓몬 알림 타이머 창 (트레이 · 오른쪽 클릭)."""
+        from . import alarm as alarm_mod
+        return alarm_mod.open_alarms(self, pet)
+
+    def open_focus(self, pet=None):
+        """포켓몬과 집중하기 창 (트레이 · 오른쪽 클릭 · 집중 포켓몬 두 번 누르기)."""
+        from . import ui_focus
+        return ui_focus.open_focus(self, pet)
+
+    def close_focus(self):
+        """로그아웃 · 회원탈퇴 · 세션 끊김: 집중 모드(시간표 · 1초 틱 · 맥박)와 집중 창 · 알림 창을 치운다.
+        서버는 부르지 않는다 - 맥박이 끊기면 스스로 닫는다. 알림 목록은 이 PC 것이라 그대로 둔다."""
+        if getattr(self, "focus", None) is not None:
+            self.focus.clear()
+        for name in ("focus_window", "alarm_window"):
+            w = getattr(self, name, None)
+            if w is not None:
+                try:
+                    w.close()
+                except Exception:                           # noqa: BLE001
+                    pass
+            setattr(self, name, None)
+
+    def focus_quiet(self):
+        """포켓몬과 집중하는 중인가 - 그동안 업적 · 탐험 보따리 · 알 부화 알림을 미룬다 (화면이 조용해야 한다)."""
+        f = getattr(self, "focus", None)
+        return bool(f is not None and f.active())
+
     def on_session_lost(self):
         """세션이 만료되거나 계정이 사라졌을 때 다시 로그인 받는다."""
         if self._quitting or self._relogin:
@@ -790,6 +848,7 @@ class App(object):
         # 다시 로그인해도 바탕화면이 영영 빈 채로 있는다. 놀러 가기도 같다 (1.11.0).
         self._stop_visit()
         self.close_arena()
+        self.close_focus()              # 서버는 맥박이 끊기면 스스로 닫는다 - 다시 로그인하면 동기화가 이어 받는다
         if self.wild:
             self.wild.stop()
         if self.expedition:
@@ -1645,6 +1704,8 @@ class App(object):
                     on_done(r, why)
                 except Exception:                           # noqa: BLE001
                     pass
+        if _focus_on(self):
+            return tell(None, FOCUS_PVP_MSG)             # 집중하는 동안은 대전을 걸지 않는다 (독립 검토 #4)
         if getattr(self, "_pvp_busy", False):
             return tell(None, "이미 상대를 찾는 중입니다.")
         if self.match_playing():
@@ -1773,6 +1834,9 @@ class App(object):
         if self.visit is not None and self.visit.guest:
             # 놀러 가 있는 동안 바탕화면은 친구 집이다 - 투기장이 그 위에 판을 펴면 섞인다
             return self.notify("친구 집에 놀러 가 있는 동안에는 대전을 볼 수 없습니다. 돌아온 뒤에 봐 주세요.")
+        if _focus_on(self):
+            # 집중 모드는 고른 포켓몬만 바탕화면에 둔다 - 투기장이 숨긴 도트를 선수로 쓰고 다 되살린다 (독립 검토 #4)
+            return self.notify(FOCUS_MATCH_MSG)
         self._match_loading = True
 
         def work():
@@ -2158,6 +2222,9 @@ class App(object):
         그린다). 예외가 나서 선택이 안 옮겨졌고, tkinter 가 예외를
         삼켜서 '창은 뜨는데 엉뚱한 애가 골라져 있다' 로만 보였다.
         """
+        f = getattr(self, "focus", None)
+        if f is not None and f.active() and getattr(pet, "id", None) == f.pet_id:
+            return self.open_focus(pet)          # 집중하는 포켓몬은 집중 창 (남은 시간 · 끝내기)
         self.open_box()
         w = self.box_window
         if not w:
@@ -2194,6 +2261,11 @@ class App(object):
         # 꾸미기 (버전 2): 내 포켓몬에만 (놀러 온 친구 포켓몬 · 야생은 id 가 0 아래)
         deco = ({"text": "꾸미기...", "command": lambda: self.open_deco(pet)}
                 if (pet.id or 0) > 0 else None)
+        # 포켓몬과 집중하기: '같이 집중하기...' (집중 중이면 집중 포켓몬에 '집중 끝내기...')
+        from . import ui_focus
+        from . import alarm as alarm_mod
+        focus = ui_focus.menu_row(self, pet)
+        alarm_row = alarm_mod.menu_row(self, pet)          # 포켓몬 알림 타이머 '알림 맞추기...'
         if not PLAT.NATIVE_MENU:
             # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
             rows = [
@@ -2210,6 +2282,10 @@ class App(object):
                 rows.append(tint)
             if deco:
                 rows.append(deco)
+            if focus:
+                rows.append(focus)
+            if alarm_row:
+                rows.append(alarm_row)
             rows += [
                 None,
                 {"text": "포켓몬 관리...", "command": self.open_box},
@@ -2239,6 +2315,10 @@ class App(object):
             m.add_command(label=tint["text"], command=tint["command"])
         if deco:
             m.add_command(label=deco["text"], command=deco["command"])
+        if focus:
+            m.add_command(label=focus["text"], command=focus["command"])
+        if alarm_row:
+            m.add_command(label=alarm_row["text"], command=alarm_row["command"])
         m.add_separator()
         m.add_command(label="포켓몬 관리...", command=self.open_box)
         m.add_separator()
@@ -2933,6 +3013,7 @@ class App(object):
         self.guild_id, self.guild_chat, self._guild_dot = None, 0, None
         self.tm_new = 0                        # 다른 계정으로 들어오면 그 계정의 수를 다시 받는다
         self._stop_visit()                     # 놀러 가기를 끝내고 내 도트를 되살린 뒤에 지운다
+        self.close_focus()                     # 집중 모드 · 시간표 · 집중 창 · 알림 창 (독립 검토 #3)
         self.close_arena()
         if self.wild:
             self.wild.stop()

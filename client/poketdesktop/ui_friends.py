@@ -405,6 +405,9 @@ class FriendsWindow(object):
             out.append(("button", "놀러 가기", lambda: self.open_visit(f), "accent"))
         elif f.get("visitBusy"):
             out.append(("label", "친구와 노는 중", U.FG_FAINT, True))
+        elif f.get("visitFocus"):
+            # 포켓몬과 집중하는 중 - 서버가 놀러 가기를 막는다 (집중 타이머)
+            out.append(("label", "집중 중", U.FG_FAINT, True))
         # 실시간 배틀은 **둘 다 켜 있어야** 한다. 접속 중인 친구에게만 띄운다 -
         # 꺼져 있는 친구 옆에 눌러도 거절당할 단추를 두지 않는다.
         if f.get("online"):

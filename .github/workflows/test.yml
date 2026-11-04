@@ -396,6 +396,14 @@ jobs:
       - name: 마이페이지 화면 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/test_mypage_ui.py
+      # 포켓몬과 집중하기 (집중 타이머): 동작 · 시간표 · 집중 모드(고른 포켓몬만 · 풀숲 멈춤 · 맥박 · 끝나는 까닭) · 창 · 메뉴 줄
+      - name: 집중 타이머 화면 (진짜 Tk)
+        if: matrix.shard == 2
+        run: python client/test_focus_ui.py
+      # 포켓몬 알림 타이머: 걸기 · 저장 · 울리기(누를 때까지) · 집중 중엔 집중 포켓몬 · 숨어 있으면 기다림 · 놓친 알림 · 창
+      - name: 알림 타이머 화면 (진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_alarm_ui.py
       # 길드 창 (1.10.0): 찾기·만들기, 채팅 폴링, 자리마다 다른 화면, 눌린 위젯
       - name: 길드 창
         if: matrix.shard == 2
@@ -644,6 +652,8 @@ jobs:
           python test_halloween.py      # 10/31 하루: 고스트 출현 · 이상한사탕 드랍 (KST 날짜)
           # 탐험 파견 (1.10.4): 규칙·보내기·시간·받기(두 번 못 받는다)·나가 있는 동안의 제한·굴리기
           python test_expedition.py
+          # 포켓몬과 집중하기 (집중 타이머): 세트 인정 · 맥박 끊김 · 하루 40 · KST 자정 · 달력 · 업적 · 집중 중 놀러 가기 막기
+          python test_focus.py
           # 시즌 4 (1.12.0): 점수 매칭 / Z링·Z크리스탈 / 시즌 3 -> 4 전환 /
           # 악당 출현 / 길드전
           python test_match_rp.py

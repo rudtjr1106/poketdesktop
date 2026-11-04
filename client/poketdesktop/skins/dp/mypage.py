@@ -12,6 +12,7 @@ v2 (2026-10-25): 카드를 낮게(한 화면에 단락이 더 보이게), 카드
 한 쪽(다섯 줄)씩 따로 받기, 알림 '모두 읽음', 줄을 누르면 게시판의 그 글, 칭호 · 명패 바꾸기, 로그아웃 · 회원탈퇴,
 설정 단추를 누르면 설정 화면.
 """
+import time
 import tkinter as tk
 
 from common.korean import ago, natural
@@ -59,10 +60,14 @@ class MyPageWindow(MP.MyPageWindow):
         self.b_next = K.CButton(self.cv, "▶", lambda: self.turn(1), "gray", font(10))
         self.b_clear = K.CButton(self.cv, "모두 읽음", self.clear_notify, "gray", font(9))
         self.rewards_btn = K.CButton(self.cv, "칭호·명패 바꾸기", self.open_rewards, "blue", font(9))
+        # 집중 기록 (집중 타이머): 달 넘기기 단추와 날 칸 누르기
+        self.f_prev = K.CButton(self.cv, "◀", lambda: self.focus_turn(-1), "gray", font(10))
+        self.f_next = K.CButton(self.cv, "▶", lambda: self.focus_turn(1), "gray", font(10))
+        self.cv.tag_bind("fcell", "<Button-1>", self._focus_click)
         self.account_btns = {}
         for _t, label, fn, danger in self.account_rows():
             self.account_btns[label] = K.CButton(self.cv, label, fn, "red" if danger else "gray", font(10))
-        for tag in ("btab", "bline"):
+        for tag in ("btab", "bline", "fcell"):
             self.cv.tag_bind(tag, "<Enter>", lambda _e: self.cv.configure(cursor="hand2"))
             self.cv.tag_bind(tag, "<Leave>", lambda _e: self.cv.configure(cursor=""))
 
@@ -180,6 +185,8 @@ class MyPageWindow(MP.MyPageWindow):
             return
         y = self._card(cv, d, x1, x2, y)
         y = self._tiles(cv, d, x1, x2, y + U.h(10))
+        if getattr(self, "focus_data", None):
+            y = self._focus_box(cv, d, x1, x2, y + U.h(10))
         y = self._titles(cv, d, x1, x2, y + U.h(10))
         y = self._seasons(cv, d, x1, x2, y + U.h(10))
         y = self._board_box(cv, d, x1, x2, y + U.h(10))
@@ -197,7 +204,8 @@ class MyPageWindow(MP.MyPageWindow):
                 b.draw()
 
     def _all_btns(self):
-        return [self.b_prev, self.b_next, self.b_clear, self.rewards_btn] + list(self.account_btns.values())
+        return ([self.b_prev, self.b_next, self.b_clear, self.rewards_btn, self.f_prev, self.f_next]
+                + list(self.account_btns.values()))
 
     def _wrap(self, cv, x, y, text, spec, fill=INK, width=100):
         t = cv.create_text(x, y, text=K.wrap(cv, text, spec, width), fill=fill, font=spec, anchor="nw")
@@ -301,6 +309,68 @@ class MyPageWindow(MP.MyPageWindow):
                 cv.create_text(tx + cw - U.h(8), ty + th - U.h(7), text=note, fill=INK2, font=font(9), anchor="se")
         rows = -(-len(items) // cols)
         return self._close(cv, x1, x2, top, y + rows * (th + gap) + U.h(4))
+
+    # ---------------- 집중 기록 (집중 타이머) ----------------
+    def _focus_changed(self):
+        self._soon()                    # 쪽 전체를 다시 칠한다 (기본 화면은 그 칸만)
+
+    def _focus_click(self, _e=None):
+        for t in self.cv.gettags("current"):
+            if t.startswith("fd:"):
+                return self.focus_pick(t[3:])
+
+    def _focus_box(self, cv, d, x1, x2, y):
+        """요약 · ◀ 달 ▶ · 일~토 칸 (집중한 시간이 많을수록 진한 파랑) · 고른 날의 기록."""
+        top = y
+        y = self._box(cv, x1, x2, y, "집중 기록")
+        ix, iw = x1 + U.h(16), x2 - x1 - U.h(32)
+        sm = (self.focus_data or {}).get("summary") or {}
+        y = self._wrap(cv, ix, y, MP.focus_summary(sm), font(10), INK2, iw) + U.h(8)
+        bh = U.h(26)
+        bw = max(self.f_prev.want_width(U.h(14)), self.f_next.want_width(U.h(14)))
+        self.f_prev.layout(ix, y, ix + bw, y + bh)
+        title = MP.month_title(self.f_ym)
+        cv.create_text(ix + bw + U.h(12), y + bh // 2, text=title, fill=INK, font=font(11), anchor="w")
+        nx = ix + bw + U.h(24) + K.tkfont_of(cv, font(11)).measure(title)
+        self.f_next.layout(nx, y, nx + bw, y + bh)
+        self.f_next.configure(state="normal" if self.focus_can_next() else "disabled")
+        y += bh + U.h(8)
+        cw = iw / 7.0
+        for i, ch in enumerate(MP.WEEK):
+            cv.create_text(ix + cw * i + cw / 2, y, text=ch, fill="#c02828" if i == 0 else DIM, font=font(9),
+                           anchor="n")
+        y += U.h(18)
+        ch_h, gap = U.h(40), U.h(4)
+        today = time.strftime("%Y-%m-%d")
+        rows = 0
+        for c in MP.focus_cells(self.f_ym, self.f_days):
+            cx1 = ix + c["col"] * cw + gap / 2.0
+            cx2 = cx1 + cw - gap
+            cy1 = y + c["row"] * (ch_h + gap)
+            cy2 = cy1 + ch_h
+            fill = MP.blend(TILE, HEAD, MP.HEAT_MIX[c["level"]])
+            line = CUR if c["date"] == today else (INK if c["date"] == self.f_day else LINE)
+            tags = ("fcell", "fd:" + c["date"])
+            K.rrect(cv, cx1, cy1, cx2, cy2, 5, fill=fill, outline=line, width=1 if line == LINE else 2, tags=tags)
+            fg = WHITE if c["level"] >= 3 else INK
+            cv.create_text(cx1 + U.h(5), cy1 + U.h(3), text=str(c["day"]), fill=fg, font=font(9), anchor="nw",
+                           tags=tags)
+            if c["min"]:
+                cv.create_text((cx1 + cx2) / 2.0, cy2 - U.h(4), text=MP.hm(c["min"]), fill=fg, font=font(9),
+                               anchor="s", tags=tags)
+            rows = max(rows, c["row"] + 1)
+        y += rows * (ch_h + gap) + U.h(4)
+        if self.f_day:
+            y = self._wrap(cv, ix, y, "%d월 %d일" % (int(self.f_day[5:7]), int(self.f_day[8:10])), font(10), INK,
+                           iw) + U.h(2)
+            rows_ = self.f_rows or []
+            if not rows_:
+                y = self._wrap(cv, ix, y, "이날은 집중한 기록이 없습니다.", font(9), DIM, iw)
+            for r in rows_:
+                y = self._wrap(cv, ix, y, MP.day_line(r), font(9), INK2 if r.get("full") else DIM, iw) + U.h(2)
+        else:
+            y = self._wrap(cv, ix, y, "날을 누르면 그날 기록이 보여요.", font(9), DIM, iw)
+        return self._close(cv, x1, x2, top, y + U.h(10))
 
     def _titles(self, cv, d, x1, x2, y):
         t = d.get("titles") or {}

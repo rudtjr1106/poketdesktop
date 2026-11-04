@@ -77,6 +77,10 @@ def payload(titles=3):
         "raid": {"games": 5, "wins": 3, "damage": 12345},
         # 게시판 활동은 수와 **첫 쪽만** 온다 (안 본 알림이 있으면 알림 쪽부터)
         "board": dict(COUNTS, pageSize=5, first=mine_page("notify", 1)),
+        # 집중 기록 (집중 타이머): 요약과 이번 달
+        "focus": {"summary": {"totalMin": 1520, "monthMin": 87, "streak": 3, "best": 5, "todayEv": 10,
+                              "dailyEv": 40},
+                  "month": {"ym": "2026-11", "days": {"2026-11-04": 62, "2026-11-03": 25}}},
     }
 
 
@@ -125,6 +129,16 @@ class FakeApi(object):
             counts.update({"notifyCount": len(notify), "unseen": len(notify)})
         rows = notify if (what == "notify" and notify is not None) else None
         return mine_page(what, page, rows=rows, counts=counts)
+
+    def focus_month(self, ym):
+        self.months = getattr(self, "months", []) + [ym]
+        return {"ym": ym, "days": {ym + "-15": 200}}
+
+    def focus_day(self, d):
+        self.days = getattr(self, "days", []) + [d]
+        return {"day": d, "rows": [
+            {"time": "12:25", "pokemon": "꼬부기", "stat": "spa", "act": "공부", "minutes": 25, "ev": 5, "full": True},
+            {"time": "13:52", "pokemon": "꼬부기", "stat": "spa", "act": "공부", "minutes": 12, "ev": 0, "full": False}]}
 
     def board_notify_seen(self):
         self.cleared = getattr(self, "cleared", 0) + 1
@@ -220,6 +234,37 @@ def email_flow(root, w, app, top):
         ui_box.ask_text = real
 
 
+def focus_part(root, w, app, top):
+    print("\n=== 집중 기록 (집중 타이머) ===")
+    tx = " ".join(texts(top))
+    chk("집중 기록 칸과 요약", "집중 기록" in tx and "연속 3일" in tx and "최고 5일" in tx
+        and "이번 달 1시간 27분" in tx and "오늘 노력치 10/40" in tx, [x for x in texts(top) if "연속" in x])
+    chk("달 이름", "2026년 11월" in tx)
+    chk("11월 4일 칸에 1:02", w.f_cells[4].cget("text") == "4\n1:02", w.f_cells[4].cget("text"))
+    chk("빈 날은 날짜만", w.f_cells[5].cget("text") == "5", w.f_cells[5].cget("text"))
+    chk("일요일부터 (11월 1일은 첫 칸)", w.f_cells[1].grid_info().get("column") in (0, "0"), w.f_cells[1].grid_info())
+    chk("시간이 많은 날이 더 진하다", w.f_cells[4].cget("bg") != w.f_cells[3].cget("bg") != w.f_cells[5].cget("bg"))
+    chk("이번 달보다 뒤로는 못 넘긴다", not w.focus_can_next())
+    w.f_cells[4].event_generate("<Button-1>")
+    wait(root, lambda: getattr(app.api, "days", None) == ["2026-11-04"] and w.f_rows)
+    settle(root, 0.2)
+    tx = " ".join(texts(top))
+    chk("날을 누르면 그날 기록", "공부 · 25분 · +5" in tx and "자투리 12분" in tx, [x for x in texts(top) if "공부" in x])
+    w.focus_turn(-1)
+    wait(root, lambda: getattr(app.api, "months", None) == ["2026-10"] and w.f_ym == "2026-10")
+    settle(root, 0.2)
+    tx = " ".join(texts(top))
+    chk("◀ 로 지난달을 받는다", "2026년 10월" in tx and w.f_cells[15].cget("text") == "15\n3:20", tx[:80])
+    chk("지난달이면 ▶ 로 돌아올 수 있다", w.focus_can_next())
+    chk("달을 넘기면 고른 날이 풀린다", not w.f_day)
+    chk("ym 계산", ui_mypage.shift_ym("2026-01", -1) == "2025-12" and ui_mypage.shift_ym("2026-12", 1) == "2027-01")
+    chk("시간 글", ui_mypage.hm(62) == "1:02" and ui_mypage.span_text(87) == "1시간 27분"
+        and ui_mypage.span_text(25) == "25분")
+    chk("글자가 눌리지 않는다", not squeezed(top), squeezed(top)[:4])
+    w.focus_turn(1)
+    wait(root, lambda: w.f_ym == "2026-11")
+
+
 def wait(root, cond, sec=6.0):
     end = time.time() + sec
     while time.time() < end and not cond():
@@ -304,6 +349,8 @@ def main():
     finally:
         ui_season.RewardsWindow = real_rw
     chk("  누르면 칭호·명패 창, 달면 마이페이지를 다시 받는다", opened == [w.load], opened)
+
+    focus_part(root, w, app, top)
 
     print("\n=== 시즌 기록 ===")
     chk("지금 시즌", ui_mypage.season_line(app.api.data["seasons"][0])
@@ -573,6 +620,16 @@ def main():
     wait(root, lambda: app.api.calls > calls)
     chk("대전이 끝나면 열어 둔 마이페이지를 새로 읽는다", app.api.calls == calls + 1, app.api.calls - calls)
     app.hub = None
+
+    print("\n=== 집중 기록이 없는 옛 서버 ===")
+    w.show_page()
+    d2 = dict(app.api.data)
+    d2.pop("focus", None)
+    app.api.data = d2
+    w.load()
+    wait(root, lambda: w.data is d2)
+    settle(root, 0.3)
+    chk("focus 가 없으면 칸이 없다", not any("집중 기록" in x for x in texts(top)))
 
     w.close()
     chk("닫으면 설정 화면도 치운다", w.settings is None and app.settings_win is None)

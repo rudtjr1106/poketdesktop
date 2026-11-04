@@ -289,6 +289,12 @@ def start(uid, friend, raw_items=None, look=None, now=None):
         raise HTTPException(403, "친구에게만 놀러 갈 수 있습니다.")
     if not online(friend):
         raise HTTPException(409, "친구가 지금 접속해 있지 않습니다.")
+    # 포켓몬과 집중하는 동안에는 놀러 가지도 오지도 못한다 (사용자 결정 11/04 - 집중 화면엔 고른 포켓몬만)
+    from . import focus
+    if focus.focusing(uid):
+        raise HTTPException(409, "포켓몬과 집중하는 중에는 놀러 갈 수 없습니다.")
+    if focus.focusing(friend):
+        raise HTTPException(409, "친구가 지금 포켓몬과 집중하는 중입니다.")
     mon = _lead(uid)
     if not mon:
         raise HTTPException(409, "데리고 다니는 포켓몬이 없습니다.")
