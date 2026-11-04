@@ -8,7 +8,7 @@
 
 name: test
 
-# 사이트(docs/)만 바꾼 푸시는 건너뛴다 - 검사가 앱 · 서버를 보는데 20분 넘게 걸린다. 다른 파일이 하나라도
+# 사이트(docs/)만 바꾼 푸시는 건너뛴다 - 검사가 앱 · 서버를 본다 (2.1.3 부터 갈래를 나눠 6분쯤). 다른 파일이 하나라도
 # 섞이면 그대로 돈다. 안내서의 탐험 확률표(server/test_expedition.py 가 맞대어 봄)만 고친 푸시도 건너뛰니,
 # 표를 손댔으면 Actions 에서 손으로 돌린다 (workflow_dispatch).
 on:
@@ -244,9 +244,15 @@ jobs:
   #
   # 러너에는 화면이 있어서 tkinter 창도 만들어진다. 공개 저장소라 무료다.
   windows:
-    name: 윈도우 전용
+    # **세 갈래로 나눠 동시에 돈다** (2.1.3, 사용자 결정 - CI 가 16분 걸렸다). 갈래는 지난 실행의 단계별 시간으로
+    # 고르게 나눴다 (각 280초쯤). 새 검사를 넣을 때는 시간이 가장 적은 갈래에 if: matrix.shard == N 으로 붙인다.
+    name: 윈도우 전용 (${{ matrix.shard }}/3)
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     # **러너의 콘솔이 cp1252 다.** 검사는 진행 상황을 한글로 찍으므로
     # 그대로 두면 UnicodeEncodeError 로 죽는다. 진짜 윈도우 PC 는
     # 코드페이지가 949 라 멀쩡해서, 여기서만 나는 일이다.
@@ -262,17 +268,22 @@ jobs:
       - name: 준비물
         run: pip install -r client/requirements.txt
       - name: 자동 시작 (레지스트리)
+        if: matrix.shard == 3
         run: python client/test_autostart.py
       - name: 설정 창·트레이 (창을 실제로 만든다)
+        if: matrix.shard == 3
         run: python client/smoke_autostart.py
       # 잡기 모드 '고른 포켓몬만' 의 고르는 창 (1025종 - 보이는 줄만) · 설정 줄. DP 는 설정 창이 달라서 따로 본다.
       - name: 잡기 - 고르는 창 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_catch_pick_ui.py
       - name: 잡기 - 고르는 창 (DP 테마)
+        if: matrix.shard == 2
         env:
           POKET_SKIN: dp
         run: python client/test_catch_pick_ui.py
       - name: 테두리 없는 창이 제자리에 뜨는가
+        if: matrix.shard == 2
         run: |
           python client/smoke_window.py
           python client/test_popup_close.py
@@ -287,121 +298,171 @@ jobs:
       # 배틀 장면이 창 밖으로 잘리고, 트레이너 카드의 '도전하기' 가 통째로
       # 잘려 있었다. 글꼴이 다른 두 OS 에서 다 재 본다.
       - name: 관장 지도·배틀 창 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_gym_ui.py
       # 리눅스 작업에서는 화면이 없어 진짜 Tk 캔버스 확인을 건너뛴다. 여기서 본다.
       - name: 기술 연출 (진짜 Tk 캔버스가 옵션을 다 받는지)
+        if: matrix.shard == 1
         run: python client/test_move_fx.py
       # 레이드 탭·배틀 창·바탕화면 빛기둥. 여섯 명이 한 화면에 들어가는지 본다.
       - name: 레이드 화면 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_raid_ui.py
       - name: 실시간 배틀 화면 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_live_ui.py
       # 배틀 창 크기 (1.10.3): 배틀 창을 끌어서 키우고 줄일 때 장면·도트·글자가 함께 따라가는지,
       # 어느 크기에서도 눌리는 것이 없는지, 판(고르던 칸·재생)이 그대로인지, 바꾼 크기를 기억하는지
       - name: 배틀 창 크기 (끌어서 바꿔 본다)
+        if: matrix.shard == 1
         run: python client/test_battle_zoom.py
       # 긴 목록 (1.10.4): 포켓몬 400마리·도구 306종인 계정의 가방과 상점. 목록이 몇 줄이든 위젯은 화면만큼만
       # 만들고(U.VirtualList), 굴리면 나간 줄을 다시 쓴다. 도구를 써도 목록을 다시 만들지 않는다.
       - name: 가방·상점의 긴 목록 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_big_lists.py
       # 실시간 배틀 연출 (1.10.4): 들어갈 때 '나 VS 상대' 를 한 박자 띄우고 천천히 걷는다,
       # 포켓몬은 몬스터볼에서 나오고(볼 -> 빛 -> 흰 윤곽이 커진다) 붉은 줄기로 돌아간다.
       - name: 실시간 배틀의 진입·볼 연출 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_sendout.py
       # 탐험 파견 (1.10.4): 탐험 탭(칸·갈 곳·시간·보낼 포켓몬), 바탕화면의 보따리, 받은 물건 창,
       # 포켓몬 관리 창의 '탐험 중'.
       - name: 탐험 파견 화면 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_expedition_ui.py
       # 탐험 탭 '누구를' 목록 찾기 · 가나다순 · 레벨순 (가방과 같은 FindBar)
       - name: 탐험 포켓몬 찾기 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_expedition_find.py
       # 도감 업적 (시즌 3). 알림 창·업적 칸·도감 탭 전환·중복 알림 방지.
       - name: 도감 업적 화면 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_achievements_ui.py
       # 메가진화 (시즌 3). 배틀 창의 메가진화 단추(메시지 막대)·관리 창의
       # 유대 미션 칸·바탕화면의 빛나는 돌 표식과 스톤 알림 창.
       - name: 메가진화 단추 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_mega_ui.py
       - name: 유대 미션 칸 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_bond_ui.py
       - name: 빛나는 돌 표식 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_bond_stone.py
       # 1.8.0: 가방 안의 [도구 | 기술머신] 과 게시판 (글·댓글·답글·굴리기)
       - name: 가방 탭 합치기 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_bag_tabs.py
       # 1.13.1: 가방 · 기술머신의 '누구에게' 목록 찾기 · 가나다순 · 레벨순
       - name: 가방·기술머신 포켓몬 찾기 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_mon_find.py
       # 1.13.1: 랭크 시즌 보상 - 기술머신 뽑기권(타입 고르기) · 랭킹 탭 보상 표(관장 등록은 글로만)
       - name: 기술머신 뽑기권·랭크 보상 표 화면 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_reward_tickets.py
       # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
       - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_boost_items.py
       # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
       - name: 상점 랜덤 캡슐 띠 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_shop_capsule_ui.py
+      # 2.1.3 (게시판 #450): 노력치 조정 창 - 막대 · 칸 · 합계 510 · 계획(dry) · 사기 전에 묻기, 박스 단추 · 테마 링크
+      - name: 노력치 조정 창 (진짜 Tk)
+        if: matrix.shard == 2
+        run: python client/test_ev_editor.py
+      # 2.1.3: 타입 스프레이 남은 시간 - 바탕화면 오른쪽 아래 띠 (#445) · 도트가 떠도 포커스를 안 가져간다 (#444)
+      - name: 스프레이 남은 시간 띠 (진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_boost_badge.py
+      - name: 포커스 지키기 (진짜 Tk + 가짜 맨 앞)
+        if: matrix.shard == 1
+        run: python client/test_focus_guard.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_dual_monitor.py
       # 멈춤 감지 (1.13.3): 앱이 멈추면 강제 종료를 묻는다 (맥은 Dock 에 안 떠서 '강제 종료' 창에 안 나온다)
       - name: 멈춤 감지 (진짜로 멈춘 프로세스)
+        if: matrix.shard == 2
         run: python client/test_watchdog.py
       - name: 게시판 화면 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_board_ui.py
       # 1.9.0: 마이페이지 (설정 탭 자리) - 내 기록, 칭호 줄바꿈, 톱니바퀴 = 설정
       - name: 마이페이지 화면 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_mypage_ui.py
       # 길드 창 (1.10.0): 찾기·만들기, 채팅 폴링, 자리마다 다른 화면, 눌린 위젯
       - name: 길드 창
+        if: matrix.shard == 2
         run: python client/test_guild_ui.py
       - name: 캐릭터 만들기 창 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_avatar_ui.py
       - name: 파티 프리셋 줄 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_party_ui.py
       # 긴급 숨기기 (1.10.3): 떠 있는 창을 전부 치웠다 되돌린다. 단축키는 등록과 '눌렸다' 뒤의 길만 본다
       - name: 긴급 숨기기·단축키 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_stealth.py
       # 길드 친선전 (1.10.3): 길드 창의 친선전 칸, 오른쪽 아래 알림, 구경하는 작은 경기장(볼에서 나오기·기술·교체)
       - name: 길드 친선전 화면 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_friendly_ui.py
       # 1.9.1: 포켓몬을 마우스로 들어서 옮기기 (설정 petDrag, 기본 꺼짐)
       - name: 포켓몬 들어서 옮기기 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_pet_drag.py
       # 1.8.0: 메가진화한 모습으로 바탕화면 걷기 + 메가진화 연출 (바탕화면·배틀 창)
       - name: 메가 폼으로 걷기·메가진화 연출 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_mega_walk.py
       # 1.12.1: 색이 다른 야생이 나오면 도트 둘레에서 별이 터진다
       - name: 이로치 야생 반짝임 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_shiny_fx.py
       # 1.13: 가방의 폼 도구 - 모습 고르기 · formNum 그림
       - name: 폼 도구 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_form_items.py
       # 1.8.0: 이로치 색 고르기 - 색조 돌리기·캐시·바탕화면 갈아 입기·고르기 창
       - name: 이로치 색 고르기 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_tint_ui.py
       # 버전 2: 꾸미기 - 걷는 도트에 장식 얹기 · 발자국/별가루 효과 창 · 꾸미기 창(테마 7개)
       - name: 꾸미기 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_deco.py
       # 2.1.0: 꾸미기 자리 - 눈 찾기(선글라스) · 관 · 핀 · 넥타이가 눈을 안 가리고 허공에 안 뜨나 · 새 효과
       - name: 꾸미기 자리
+        if: matrix.shard == 1
         run: python client/test_deco_place.py
       # 2.1.0: 랜덤 캡슐 창 - 동전 · 손잡이 · 섞기 · 배출 · 열기 · 등급 연출 · 오류 · 확률표 · 상점 띠 (진짜 Tk)
       - name: 랜덤 캡슐 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_gacha_ui.py
       # 1.8.1: 잡았을 때의 경험치 - 받은 레벨업·진화를 화면이 다루는지
       - name: 잡았을 때의 경험치
+        if: matrix.shard == 1
         run: python client/test_catch_exp.py
       # 정해 둔 창 높이가 내용보다 작으면 맨 아래 단추가 잘려서, 사용자가
       # 할 수 있는 일이 창 닫기밖에 없어진다. 실제로 두 창이 그랬다.
       - name: 설정·패치노트·새버전 창 높이
+        if: matrix.shard == 2
         run: python client/smoke_new_windows.py
       # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
       # 창을 실제로 띄워 서버 값이 바뀌면 이름표가 따라오는지 본다.
       - name: 이름표가 서버 값을 따라오는가
+        if: matrix.shard == 3
         run: python client/smoke_nameplate.py
       # 시즌 2 화면 (랭킹·랭크 팀·칭호·이로치사탕). 가짜 API 로 진짜 창을 만든다.
       - name: 랭크 시즌 화면
+        if: matrix.shard == 3
         run: |
           python client/smoke_season.py
           python client/test_practice_ui.py   # 하루 20판 뒤 연습판: 단추·머리줄·대전 기록·트레이 (옛 서버면 예전 글)
@@ -410,39 +471,55 @@ jobs:
           python client/smoke_eggs.py
           python client/test_walk_shiny.py
       - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/smoke_box_filter.py
       # 머리글로 줄 세우기(도감 번호·이름·레벨) · 여러 마리 한꺼번에 옮기기 (1.10.6)
       - name: 포켓몬 관리 창의 줄 세우기·여러 마리 옮기기 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_box_multi.py
       # 여러 마리 골라 한 번에 놓아주기: 확인 창(몇 마리·이름·숨은 특성·이로치 경고) · 옛 서버면 한 마리씩
       - name: 포켓몬 관리 창의 여러 마리 놓아주기 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_box_release_many.py
       # 시즌 4 (1.12.0): 배틀 창의 Z기술 단추, 악당 출현(검은 지도·악당 창), 길드전 칸
       - name: Z기술 단추 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/test_gimmick_ui.py
       - name: 악당 출현 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_boss_ui.py
       # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0, 1.12.0 에서 쌓이는 말풍선·키보드 되찾기): 걷기·말풍선·보따리
       - name: 친구 채팅 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_visit_ui.py
       - name: 새 기술머신 표시 (진짜 Tk)
+        if: matrix.shard == 2
         run: python client/test_tm_new.py
       - name: 길드전 칸 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/test_guild_war_ui.py
       # 기술머신 창의 포켓몬 도트가 잘려 있었다 (Label width=3 이 3px 로 읽혔다).
       - name: 기술머신 창 도트·목록 (진짜 Tk)
+        if: matrix.shard == 1
         run: python client/smoke_tms.py
       # 기술 떠올리기(5,000원). '무엇을 버릴까' 창의 '결정' 이 고르기 전에는
       # 아무 반응이 없어서 기술을 못 배운다는 신고가 왔다 - 그것까지 본다.
       - name: 기술 떠올리기 창·포켓몬 관리 단추 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/smoke_remember.py
       - name: 동작 바꿀 때 검은 테두리 (진짜 Tk)
+        if: matrix.shard == 3
         run: python client/smoke_anim_resize.py
 
   mac:
+    # **맥은 맥에만 있는 것과 맥에서 다르게 그리거나 움직이는 것만 돈다** (2.1.3, 사용자 결정 - CI 줄이기). 나머지
+    # 화면 검사는 윈도우 갈래들이 본다 (같은 코드를 두 번 돌리던 것). 남긴 것: 자동 시작 · 입력 · dmg 업데이트 · 트레이,
+    # 테두리 없는 창 자리(창 관리가 다르다) · 랜덤 캡슐(맥은 기계를 도형으로 그린다) · 듀얼 모니터 · 긴급 숨기기 ·
+    # 포커스 지키기(맥 백엔드) · 친구 채팅(키 창) · 들어서 옮기기(마우스 추적) · 멈춤 감지(Dock) · 관장 창과 상점 캡슐 띠
+    # (글꼴이 달라 잘리는지).
     name: 맥 전용
     runs-on: macos-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: "utf-8"
@@ -474,146 +551,30 @@ jobs:
           python client/test_auto_throw.py     # 2.1.1: 잡힐 때까지 계속 던지기 (#425)
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
-      # 레이드 탭·배틀 창·바탕화면 빛기둥. 여섯 명이 한 화면에 들어가는지 본다.
-      - name: 레이드 화면 (진짜 Tk)
-        run: python client/test_raid_ui.py
-      - name: 실시간 배틀 화면 (진짜 Tk)
-        run: python client/test_live_ui.py
-      # 배틀 창 크기 (1.10.3): 배틀 창을 끌어서 키우고 줄일 때 장면·도트·글자가 함께 따라가는지,
-      # 어느 크기에서도 눌리는 것이 없는지, 판(고르던 칸·재생)이 그대로인지, 바꾼 크기를 기억하는지
-      - name: 배틀 창 크기 (끌어서 바꿔 본다)
-        run: python client/test_battle_zoom.py
-      # 긴 목록 (1.10.4): 포켓몬 400마리·도구 306종인 계정의 가방과 상점. 목록이 몇 줄이든 위젯은 화면만큼만
-      # 만들고(U.VirtualList), 굴리면 나간 줄을 다시 쓴다. 도구를 써도 목록을 다시 만들지 않는다.
-      - name: 가방·상점의 긴 목록 (진짜 Tk)
-        run: python client/test_big_lists.py
-      # 실시간 배틀 연출 (1.10.4): 들어갈 때 '나 VS 상대' 를 한 박자 띄우고 천천히 걷는다,
-      # 포켓몬은 몬스터볼에서 나오고(볼 -> 빛 -> 흰 윤곽이 커진다) 붉은 줄기로 돌아간다.
-      - name: 실시간 배틀의 진입·볼 연출 (진짜 Tk)
-        run: python client/test_sendout.py
-      # 탐험 파견 (1.10.4): 탐험 탭(칸·갈 곳·시간·보낼 포켓몬), 바탕화면의 보따리, 받은 물건 창,
-      # 포켓몬 관리 창의 '탐험 중'.
-      - name: 탐험 파견 화면 (진짜 Tk)
-        run: python client/test_expedition_ui.py
-      # 탐험 탭 '누구를' 목록 찾기 · 가나다순 · 레벨순 (가방과 같은 FindBar)
-      - name: 탐험 포켓몬 찾기 (진짜 Tk)
-        run: python client/test_expedition_find.py
-      # 도감 업적 (시즌 3). 알림 창·업적 칸·도감 탭 전환·중복 알림 방지.
-      - name: 도감 업적 화면 (진짜 Tk)
-        run: python client/test_achievements_ui.py
-      # 메가진화 (시즌 3). 배틀 창의 메가진화 단추(메시지 막대)·관리 창의
-      # 유대 미션 칸·바탕화면의 빛나는 돌 표식과 스톤 알림 창.
-      - name: 메가진화 단추 (진짜 Tk)
-        run: python client/test_mega_ui.py
-      - name: 유대 미션 칸 (진짜 Tk)
-        run: python client/test_bond_ui.py
-      - name: 빛나는 돌 표식 (진짜 Tk)
-        run: python client/test_bond_stone.py
-      # 1.8.0: 가방 안의 [도구 | 기술머신] 과 게시판 (글·댓글·답글·굴리기)
-      - name: 가방 탭 합치기 (진짜 Tk)
-        run: python client/test_bag_tabs.py
-      # 1.13.1: 가방 · 기술머신의 '누구에게' 목록 찾기 · 가나다순 · 레벨순
-      - name: 가방·기술머신 포켓몬 찾기 (진짜 Tk)
-        run: python client/test_mon_find.py
-      # 1.13.1: 랭크 시즌 보상 - 기술머신 뽑기권(타입 고르기) · 랭킹 탭 보상 표(관장 등록은 글로만)
-      - name: 기술머신 뽑기권·랭크 보상 표 화면 (진짜 Tk)
-        run: python client/test_reward_tickets.py
-      # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
-      - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
-        run: python client/test_boost_items.py
       # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
       - name: 상점 랜덤 캡슐 띠 (진짜 Tk)
         run: python client/test_shop_capsule_ui.py
+      # 2.1.3 (#444): 도트가 떠도 쓰던 창의 포커스를 안 가져간다 - 맥은 진짜 백엔드(맨 앞 앱)도 읽어 본다
+      - name: 포커스 지키기 (진짜 Tk + 가짜 맨 앞)
+        run: python client/test_focus_guard.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
         run: python client/test_dual_monitor.py
       # 멈춤 감지 (1.13.3): 앱이 멈추면 강제 종료를 묻는다 (맥은 Dock 에 안 떠서 '강제 종료' 창에 안 나온다)
       - name: 멈춤 감지 (진짜로 멈춘 프로세스)
         run: python client/test_watchdog.py
-      - name: 게시판 화면 (진짜 Tk)
-        run: python client/test_board_ui.py
-      # 1.9.0: 마이페이지 (설정 탭 자리) - 내 기록, 칭호 줄바꿈, 톱니바퀴 = 설정
-      - name: 마이페이지 화면 (진짜 Tk)
-        run: python client/test_mypage_ui.py
-      # 길드 창 (1.10.0): 찾기·만들기, 채팅 폴링, 자리마다 다른 화면, 눌린 위젯
-      - name: 길드 창
-        run: python client/test_guild_ui.py
-      - name: 캐릭터 만들기 창 (진짜 Tk)
-        run: python client/test_avatar_ui.py
-      - name: 파티 프리셋 줄 (진짜 Tk)
-        run: python client/test_party_ui.py
       # 긴급 숨기기 (1.10.3): 떠 있는 창을 전부 치웠다 되돌린다. 단축키는 등록과 '눌렸다' 뒤의 길만 본다
       - name: 긴급 숨기기·단축키 (진짜 Tk)
         run: python client/test_stealth.py
-      # 길드 친선전 (1.10.3): 길드 창의 친선전 칸, 오른쪽 아래 알림, 구경하는 작은 경기장(볼에서 나오기·기술·교체)
-      - name: 길드 친선전 화면 (진짜 Tk)
-        run: python client/test_friendly_ui.py
       # 1.9.1: 포켓몬을 마우스로 들어서 옮기기 (설정 petDrag, 기본 꺼짐)
       - name: 포켓몬 들어서 옮기기 (진짜 Tk)
         run: python client/test_pet_drag.py
-      # 1.8.0: 메가진화한 모습으로 바탕화면 걷기 + 메가진화 연출 (바탕화면·배틀 창)
-      - name: 메가 폼으로 걷기·메가진화 연출 (진짜 Tk)
-        run: python client/test_mega_walk.py
-      # 1.12.1: 색이 다른 야생이 나오면 도트 둘레에서 별이 터진다
-      - name: 이로치 야생 반짝임 (진짜 Tk)
-        run: python client/test_shiny_fx.py
-      # 1.13: 가방의 폼 도구 - 모습 고르기 · formNum 그림
-      - name: 폼 도구 (진짜 Tk)
-        run: python client/test_form_items.py
-      # 1.8.0: 이로치 색 고르기 - 색조 돌리기·캐시·바탕화면 갈아 입기·고르기 창
-      - name: 이로치 색 고르기 (진짜 Tk)
-        run: python client/test_tint_ui.py
-      # 버전 2: 꾸미기 - 걷는 도트에 장식 얹기 · 발자국/별가루 효과 창 · 꾸미기 창(테마 7개)
-      - name: 꾸미기 (진짜 Tk)
-        run: python client/test_deco.py
-      # 2.1.0: 꾸미기 자리 - 눈 찾기(선글라스) · 관 · 핀 · 넥타이가 눈을 안 가리고 허공에 안 뜨나 · 새 효과
-      - name: 꾸미기 자리
-        run: python client/test_deco_place.py
       # 2.1.0: 랜덤 캡슐 창 - 동전 · 손잡이 · 섞기 · 배출 · 열기 · 등급 연출 · 오류 · 확률표 · 상점 띠 (진짜 Tk)
       - name: 랜덤 캡슐 (진짜 Tk)
         run: python client/test_gacha_ui.py
-      # 1.8.1: 잡았을 때의 경험치 - 받은 레벨업·진화를 화면이 다루는지
-      - name: 잡았을 때의 경험치
-        run: python client/test_catch_exp.py
-      - name: 설정·패치노트·새버전 창 높이
-        run: python client/smoke_new_windows.py
-      # 레벨이 올라도 바탕화면 이름표는 옛 숫자였다 (1.0.20 에서 고침).
-      # 창을 실제로 띄워 서버 값이 바뀌면 이름표가 따라오는지 본다.
-      - name: 이름표가 서버 값을 따라오는가
-        run: python client/smoke_nameplate.py
-      # 시즌 2 화면 (랭킹·랭크 팀·칭호·이로치사탕). 가짜 API 로 진짜 창을 만든다.
-      - name: 랭크 시즌 화면
-        run: |
-          python client/smoke_season.py
-          python client/test_practice_ui.py   # 하루 20판 뒤 연습판: 단추·머리줄·대전 기록·트레이 (옛 서버면 예전 글)
-          python client/test_held_rank_ui.py  # 시즌 5 같은 지닌 도구 한 마리: 랭크 팀 '도구 겹침'·규칙 카드 (시즌 4·옛 서버면 표시 없음)
-          python client/test_gw_reward_line.py  # 2.0.2: 길드전 보상 글 (새 서버면 꾸미기 · 뽑기권, 옛 서버면 예전 글)
-          python client/smoke_eggs.py
-          python client/test_walk_shiny.py
-      - name: PC 박스 거르기·지닌 도구 칸 (진짜 Tk)
-        run: python client/smoke_box_filter.py
-      # 머리글로 줄 세우기(도감 번호·이름·레벨) · 여러 마리 한꺼번에 옮기기 (1.10.6)
-      - name: 포켓몬 관리 창의 줄 세우기·여러 마리 옮기기 (진짜 Tk)
-        run: python client/test_box_multi.py
-      # 여러 마리 골라 한 번에 놓아주기: 확인 창(몇 마리·이름·숨은 특성·이로치 경고) · 옛 서버면 한 마리씩
-      - name: 포켓몬 관리 창의 여러 마리 놓아주기 (진짜 Tk)
-        run: python client/test_box_release_many.py
-      # 시즌 4 (1.12.0): 배틀 창의 Z기술 단추, 악당 출현(검은 지도·악당 창), 길드전 칸
-      - name: Z기술 단추 (진짜 Tk)
-        run: python client/test_gimmick_ui.py
-      - name: 악당 출현 (진짜 Tk)
-        run: python client/test_boss_ui.py
       # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0, 1.12.0 에서 쌓이는 말풍선·키보드 되찾기): 걷기·말풍선·보따리
       - name: 친구 채팅 (진짜 Tk)
         run: python client/test_visit_ui.py
-      - name: 새 기술머신 표시 (진짜 Tk)
-        run: python client/test_tm_new.py
-      - name: 길드전 칸 (진짜 Tk)
-        run: python client/test_guild_war_ui.py
-      - name: 기술머신 창 도트·목록 (진짜 Tk)
-        run: python client/smoke_tms.py
-      - name: 기술 떠올리기 창·포켓몬 관리 단추 (진짜 Tk)
-        run: python client/smoke_remember.py
       # **검은 테두리 검사(smoke_anim_resize.py)는 여기서 안 돌린다.**
       # 그건 윈도우의 투명색 창(-transparentcolor)이 새로 드러난 자리를
       # 검게 합성하는 것이고, 맥은 platform_mac.py 에 SpriteView 를 따로
@@ -694,6 +655,7 @@ jobs:
           python test_client_ip.py       # 2.1.1: cf-connecting-ip 는 Cloudflare 가 앞에 있을 때만 믿는다 (IP 위조)
           python test_account_email.py   # 2.1.1: 마이페이지 이메일 (본인만 보인다, 비우면 지운다)
           python test_draws.py           # 2.1.1: 상점 기술머신 뽑기 · 뽑기권 판매 · 랜덤 캡슐 10회
+          python test_ev_plan.py         # 2.1.3: 노력치 한 번에 맞추기 (하나씩 쓸 때와 같은 도구 · 값, 한 트랜잭션)
           python test_move_needs.py      # 기술이 걸린 것(전용 Z · 기술 메가 · 기술 폼 · 기술 진화)을 배울 수 있다 (#277)
           python test_gimmick.py
           python test_season4.py
