@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
-"""뽑기 검사 (2.1.1): 상점의 기술머신 뽑기 · 랜덤 기술머신 뽑기권 판매 · 랜덤 캡슐 10회. 서버를 띄우지 않는다.
+"""뽑기 검사 (2.1.1): 랜덤 캡슐 10회 · 상점에서 돈으로 돌리는 랜덤 캡슐. 서버를 띄우지 않는다.
 
     python server/test_draws.py
 
 못 박는 것 (사용자 결정 11/04):
 
-  1. 랜덤 기술머신 뽑기권을 상점에서 10,000원에 판다 (상점이 숨기는 custom 표시가 없다). 되팔기는 0원,
-     길드 코인 상점에는 없다.
-  2. 상점 기술머신 뽑기: 1번 10,000원 · 10번 100,000원. 아직 없는 기술머신만, 10번 안에서도 겹치지 않는다.
-     돈이 모자라거나 · 남은 기술머신이 모자라거나 · 다 모았거나 · 횟수가 1 · 10 이 아니면 거절하고 돈은 그대로.
-     /api/shop 답에 한 번 값과 남은 수가 실린다.
-  3. 랜덤 캡슐 10회: 코인 200개를 한꺼번에 빼고 열 판을 굴려 각각 준다 (기록도 열 줄). 가장 좋은 등급과
+  1. 랜덤 기술머신 뽑기권은 **팔지 않는다** (2.1.0 그대로 - 보상으로만). 돈으로 기술머신을 뽑는 길도 없다.
+     (11/04 '랜덤 뽑기권' 을 기술머신 뽑기권으로 잘못 읽어 5분 동안 팔았다가 서버를 닫고 뺐다)
+  2. 랜덤 캡슐 10회 (길드 코인): 코인 200개를 한꺼번에 빼고 열 판을 굴려 각각 준다 (기록도 열 줄). 가장 좋은 등급과
      등급마다 몇 개인지 말한다. 코인이 모자라면 거절하고 그대로. 한 번은 2.1.0 과 같은 답 모양.
      주다가 터지면 아직 안 굴린 판의 코인을 돌려준다.
+  3. 상점의 랜덤 캡슐 (돈): 한 번 10,000원 · 10번 100,000원, 상품 · 확률은 코인 것과 같다. 코인은 그대로이고
+     돈만 빠진다. 기록의 cost 는 10,000. 모자라면 거절, 터지면 안 굴린 판의 돈을 돌려준다. /api/shop 에 값 · 확률표.
 """
 import datetime
 import os
@@ -32,7 +31,7 @@ os.environ["POKET_HOUSEKEEP"] = "0"
 
 from fastapi import HTTPException                                # noqa: E402
 
-from app import db, guild, item_routes, items, tms               # noqa: E402
+from app import db, guild, item_routes, items                    # noqa: E402
 
 OK = FAIL = 0
 
@@ -60,9 +59,9 @@ def me(uid):
     return {"user": dict(db.q1("SELECT * FROM users WHERE id=?", (uid,)))}
 
 
-def draw(uid, n):
+def buy_capsule(uid, n):
     try:
-        return item_routes.tm_draw(item_routes.TmDrawIn(count=n), me(uid)), None
+        return item_routes.capsule(item_routes.CapsuleIn(count=n), me(uid)), None
     except HTTPException as e:
         return None, (e.status_code, e.detail)
 
@@ -75,59 +74,68 @@ def spin(uid, n, rng=None):
 
 
 def ticket():
-    print("-- 1. 랜덤 기술머신 뽑기권")
+    print("-- 1. 랜덤 기술머신 뽑기권은 팔지 않는다")
     it = items.get("RANKTICKETTM")
-    row = next(r for r in items.public_list() if r["id"] == "RANKTICKETTM")
-    chk("상점 값 10,000원 · 살 수 있다 · 숨김(custom) 아님", items.buy_price("RANKTICKETTM") == 10000
-        and row["buyable"] and not row["custom"], row)
-    chk("  되팔기 0원 · 길드 코인 상점에는 없다", it["sell"] == 0 and guild.coin_price("RANKTICKETTM") == 0)
+    chk("상점 값 없음 · 살 수 없음 · 상점에서 숨김(custom) - 2.1.0 그대로", items.buy_price("RANKTICKETTM") <= 0
+        and it.get("buyable") is False and it.get("custom") is True and it["sell"] == 0, it)
     uid = mkuser("표사기", 25000)
-    r = item_routes.buy(item_routes.BuyIn(item="RANKTICKETTM", count=2), me(uid))
-    chk("  두 장 사면 20,000원이 빠지고 가방에 두 장", items.money(uid) == 5000
-        and items.bag_count(uid, "RANKTICKETTM") == 2, (items.money(uid), r.get("message")))
-
-
-def tm_draw():
-    print("-- 2. 상점 기술머신 뽑기")
-    total = len(tms.all_tms())
-    uid = mkuser("뽑는이", 150000)
+    try:
+        item_routes.buy(item_routes.BuyIn(item="RANKTICKETTM", count=1), me(uid))
+        chk("  사려고 하면 거절", False)
+    except HTTPException as e:
+        chk("  사려고 하면 거절하고 돈은 그대로", e.status_code == 400 and items.money(uid) == 25000, e.detail)
+    chk("돈으로 기술머신을 뽑는 길(/api/shop/tmdraw)은 없다", not hasattr(item_routes, "tm_draw")
+        and not any(getattr(r, "path", "") == "/api/shop/tmdraw" for r in item_routes.router.routes))
     s = item_routes.shop(me(uid))
-    chk("/api/shop 에 한 번 값 · 남은 수", s.get("tmDraw") == {"price": 10000, "counts": [1, 10], "left": total},
-        s.get("tmDraw"))
-    r, err = draw(uid, 1)
-    chk("1번: 10,000원, 아직 없던 기술머신 하나", r and r["count"] == 1 and items.money(uid) == 140000
-        and len(tms.owned(uid)) == 1 and r["money"] == 140000, (r, err))
-    first = set(tms.owned(uid))
-    r, err = draw(uid, 10)
-    got = [t["no"] for t in (r or {}).get("tms", [])]
-    chk("10번: 100,000원, 기술머신 10개", r and r["count"] == 10 and items.money(uid) == 40000
-        and len(tms.owned(uid)) == 11, (err, items.money(uid)))
-    chk("  열 개가 서로 다르고 이미 가진 것은 없다", len(set(got)) == 10 and not (set(got) & first), got)
-    chk("  새 기술머신 점 수 · 말", r and r["tmNew"] == 11 and "10개" in r["message"], r and r["message"])
-    r, err = draw(uid, 10)
-    chk("돈이 모자라면(40,000원) 거절하고 돈 · 기술머신은 그대로", err and "모자랍니다" in err[1]
-        and items.money(uid) == 40000 and len(tms.owned(uid)) == 11, err)
-    for bad in (0, 2, 5, 11):
-        r, err = draw(uid, bad)
-        chk("%d번은 거절" % bad, err and err[0] == 400 and items.money(uid) == 40000, err)
+    chk("  /api/shop 에 tmDraw 가 없다 (2.1.1 앱의 기술머신 뽑기 띠가 숨는다)", "tmDraw" not in s, sorted(s))
 
-    rich = mkuser("거의다", 1000000)
-    every = sorted(tms.all_tms())
-    for no in every[:-3]:
-        tms.give(rich, no)
-    r, err = draw(rich, 10)
-    chk("남은 기술머신이 3개뿐이면 10번은 돈을 빼기 전에 거절", err and "3개뿐" in err[1]
-        and items.money(rich) == 1000000, err)
-    for _ in range(3):
-        draw(rich, 1)
-    r, err = draw(rich, 1)
-    chk("다 모았으면 1번도 거절, 돈은 그대로", err and "다 모아서" in err[1] and items.money(rich) == 970000,
-        (err, items.money(rich)))
-    chk("  /api/shop 의 남은 수 0", item_routes.shop(me(rich))["tmDraw"]["left"] == 0)
+
+def money_capsule():
+    print("-- 3. 상점의 랜덤 캡슐 (돈)")
+    uid = mkuser("돈캡슐", 125000)
+    guild._coin_add(uid, 7)
+    s = item_routes.shop(me(uid))
+    chk("/api/shop 에 값 · 횟수 · 확률표", s.get("capsule", {}).get("price") == 10000
+        and s["capsule"]["counts"] == [1, 10] and s["capsule"]["odds"] == guild.slot_odds(), s.get("capsule"))
+    n0 = db.q1("SELECT COUNT(*) c FROM guild_slot_log WHERE user_id=?", (uid,))["c"]
+    r, err = buy_capsule(uid, 1)
+    chk("1번: 10,000원, 코인은 그대로 (한 판 답 모양 + 지갑)", r and "prize" in r and items.money(uid) == 115000
+        and r["money"] == 115000 and guild.coin(uid) == 7, (err, items.money(uid)))
+    r, err = buy_capsule(uid, 10)
+    chk("10번: 100,000원, 열 판", r and len(r["results"]) == 10 and items.money(uid) == 15000
+        and r["money"] == 15000 and guild.coin(uid) == 7, (err, items.money(uid)))
+    logs = db.q("SELECT cost FROM guild_slot_log WHERE user_id=? ORDER BY rowid", (uid,))[n0:]
+    chk("  기록 열한 줄, cost 는 10,000 (원)", len(logs) == 11 and all(x["cost"] == 10000 for x in logs),
+        [x["cost"] for x in logs][:3])
+    r, err = buy_capsule(uid, 10)
+    chk("돈이 모자라면(15,000원) 거절하고 그대로", err and "100,000원" in err[1] and items.money(uid) == 15000, err)
+    for bad in (0, 3):
+        r, err = buy_capsule(uid, bad)
+        chk("%d번은 거절" % bad, err and err[0] == 400 and items.money(uid) == 15000, err)
+
+    u2 = mkuser("돈터짐", 100000)
+    real = guild._slot_give
+    calls = []
+
+    def boom(uid_, row, rng, now):
+        calls.append(1)
+        if len(calls) == 3:
+            raise RuntimeError("주다가 터짐")
+        return real(uid_, row, rng, now)
+    guild._slot_give = boom
+    try:
+        try:
+            guild.slot(u2, rng=random.Random(2), count=10, pay="money")
+            chk("주다가 터지면 오류", False)
+        except RuntimeError:
+            pass
+    finally:
+        guild._slot_give = real
+    chk("  아직 안 굴린 여덟 판의 돈(80,000원)을 돌려준다", items.money(u2) == 80000, items.money(u2))
 
 
 def capsule():
-    print("-- 3. 랜덤 캡슐 10회")
+    print("-- 2. 랜덤 캡슐 10회 (길드 코인)")
     uid = mkuser("캡슐러")
     guild._coin_add(uid, 230)
     n0 = db.q1("SELECT COUNT(*) c FROM guild_slot_log WHERE user_id=?", (uid,))["c"]
@@ -176,8 +184,8 @@ def capsule():
 def main():
     db.init()
     ticket()
-    tm_draw()
     capsule()
+    money_capsule()
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
 

@@ -990,9 +990,12 @@ def shop(uid):
     r = db.q1("SELECT balls FROM users WHERE id=?", (uid,))
     return {"items": rows, "coin": coin(uid), "bag": items.bag_get(uid, r["balls"] if r else 0),
             "inGuild": member(uid) is not None, "groups": list(SHOP_GROUPS),
-            "slot": {"cost": SLOT_COST,
-                     "odds": [{"key": k, "kr": kr, "pct": per / 10.0, "tier": tier}
-                              for k, kr, per, tier, _g, _n in SLOT_TABLE]}}
+            "slot": {"cost": SLOT_COST, "odds": slot_odds()}}
+
+
+def slot_odds():
+    """확률표 (뽑기 기계의 '확률 보기'). 코인 상점과 돈 상점(item_routes.shop)이 같이 쓴다."""
+    return [{"key": k, "kr": kr, "pct": per / 10.0, "tier": tier} for k, kr, per, tier, _g, _n in SLOT_TABLE]
 
 
 def buy(uid, item_id, count=1):
@@ -1067,19 +1070,21 @@ def _slot_give(uid, row, rng, now):
 
 
 SLOT_COUNTS = (1, 10)                   # 한 번에 돌리는 수 (2.1.1 - 10회 뽑기, 코인 200개)
+SLOT_WON = 10000                        # 상점에서 돈으로 돌릴 때 한 번 값 (2.1.1 사용자 결정 - 10번 100,000원)
 TIER_ORDER = ("lose", "common", "rare", "epic", "jackpot")
 TIER_KR = {"lose": "꽝", "common": "흔함", "rare": "드묾", "epic": "귀함", "jackpot": "대박"}
 
 
-def _slot_one(uid, rng, now):
-    """한 판 굴려서 주고 기록한다 (코인은 부르는 쪽이 이미 뺐다). 화면에 보낼 한 판의 사전."""
+def _slot_one(uid, rng, now, cost=SLOT_COST):
+    """한 판 굴려서 주고 기록한다 (값은 부르는 쪽이 이미 뺐다). 화면에 보낼 한 판의 사전.
+    기록의 cost 는 낸 값이다 - 코인 판은 20(코인), 돈 판은 10,000(원)."""
     row = slot_roll(rng)
     key, kr, _per, tier, _what, _n = row
     item, n, dk, egg = _slot_give(uid, row, rng, now)
     # 운영에서 확률이 표대로 나오는지 볼 수 있게 한 판씩 남긴다.
     db.run("INSERT INTO guild_slot_log (user_id, at, cost, prize, item, count, deco, egg_id, egg_kind)"
            " VALUES (?,?,?,?,?,?,?,?,?)",
-           (uid, _iso(now), SLOT_COST, key, item, n, dk, egg[0] if egg else None,
+           (uid, _iso(now), cost, key, item, n, dk, egg[0] if egg else None,
             egg[1] if egg else None))
     from common import deco as C
     from . import eggs
@@ -1101,8 +1106,9 @@ def _slot_one(uid, rng, now):
             "message": msg}
 
 
-def slot(uid, rng=None, now=None, count=1):
-    """슬롯머신(랜덤 캡슐). count 번 (1 또는 10). 코인을 먼저 (조건부로) 한꺼번에 빼고, 빠졌을 때만 굴려서 준다.
+def slot(uid, rng=None, now=None, count=1, pay="coin"):
+    """슬롯머신(랜덤 캡슐). count 번 (1 또는 10). 값을 먼저 (조건부로) 한꺼번에 빼고, 빠졌을 때만 굴려서 준다.
+    pay="coin" 이면 길드 코인 (한 번 SLOT_COST), "money" 면 돈 (한 번 SLOT_WON - 상점의 랜덤 캡슐, 2.1.1).
 
     코인은 사람 것이라 길드를 나와도 돌릴 수 있다 (buy 와 같다). 동시에 두 번 눌러도 조건부 UPDATE 라
     코인이 음수가 되지 않는다. 주다가 터지면 **아직 안 굴린 판의 코인**을 돌려준다 - 낸 코인만 사라지는 일이 없게
@@ -1114,16 +1120,26 @@ def slot(uid, rng=None, now=None, count=1):
     count = int(count)
     if count not in SLOT_COUNTS:
         raise HTTPException(400, "한 번에 1번이나 10번 돌릴 수 있습니다.")
-    cost = SLOT_COST * count
-    cur = db.run("UPDATE guild_user SET coin = coin - ? WHERE user_id=? AND coin >= ?", (cost, uid, cost))
-    if cur.rowcount <= 0:
-        raise HTTPException(400, "길드 코인이 모자랍니다. (%d개 필요)" % cost)
+    money = pay == "money"
+    each = SLOT_WON if money else SLOT_COST
+    cost = each * count
+    if money:
+        if not items.money_take(uid, cost):
+            raise HTTPException(400, "돈이 모자랍니다. (%s원 필요)" % format(cost, ","))
+    else:
+        cur = db.run("UPDATE guild_user SET coin = coin - ? WHERE user_id=? AND coin >= ?", (cost, uid, cost))
+        if cur.rowcount <= 0:
+            raise HTTPException(400, "길드 코인이 모자랍니다. (%d개 필요)" % cost)
     out = []
     try:
         for _i in range(count):
-            out.append(_slot_one(uid, rng, now))
+            out.append(_slot_one(uid, rng, now, each))
     except Exception:
-        _coin_add(uid, SLOT_COST * (count - len(out)))
+        back = each * (count - len(out))
+        if money:
+            items.money_add(uid, back)
+        else:
+            _coin_add(uid, back)
         raise
     if count == 1:
         r = dict(out[0])

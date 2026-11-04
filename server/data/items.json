@@ -6541,8 +6541,10 @@
    "sell": 0
   },
   "RANKTICKETTM": {
+   "buyable": false,
    "cat": "misc",
-   "cost": 10000,
+   "cost": 0,
+   "custom": true,
    "desc": "아직 없는 기술머신 가운데 하나가 무작위로 나오는 표. 포켓몬을 고르지 않아도 된다.",
    "effect": {
     "kind": "tmticket"
