@@ -26,12 +26,12 @@
 """
 import os
 import sys
-import time
 import tkinter as tk
 
 _ORIG = {}
 _BACKEND = [None]                # 맨 앞을 묻고 돌려주는 쪽 (검사가 가짜를 끼운다)
-_PRESS = [0.0]                   # 우리 창을 마지막으로 누른 때 (time.monotonic) - 그 뒤의 '맨 앞' 은 사용자가 고른 것
+_PRESS = [0]                     # 우리 창을 누른 횟수 - 부른 뒤 늘었으면 그 뒤의 '맨 앞' 은 사용자가 고른 것
+#                                  (시각으로 재면 윈도우 시계가 15.6ms 단위라 같은 때로 찍혀 못 가렸다 - CI 에서 걸림)
 DEFER_MS = 150                   # 맥: 앱 활성화는 이벤트를 돌 때 일어난다 - 이만큼 뒤에 한 번 더 본다
 
 
@@ -101,22 +101,22 @@ def quiet(win, fn):
         before = b.front()
     except Exception:                                       # noqa: BLE001
         return fn()
-    t0 = time.monotonic()
+    seq = _PRESS[0]
     try:
         return fn()
     finally:
-        _check(b, before, t0)
+        _check(b, before, seq)
         if getattr(b, "deferred", False):
             try:
-                win.after(DEFER_MS, lambda: _check(b, before, t0))
+                win.after(DEFER_MS, lambda: _check(b, before, seq))
             except Exception:                               # noqa: BLE001
                 pass
 
 
-def _check(b, before, t0):
+def _check(b, before, seq):
     """부르기 전 맨 앞이 남의 것이었는데 지금 우리 것이면 돌려준다. 그 사이 사용자가 우리 창을 눌렀으면 그대로 둔다."""
     try:
-        if _PRESS[0] > t0:
+        if _PRESS[0] != seq:
             return
         now = b.front()
         if before and now and now != before and not b.ours(before) and b.ours(now):
@@ -126,7 +126,7 @@ def _check(b, before, t0):
 
 
 def _pressed(_e=None):
-    _PRESS[0] = time.monotonic()
+    _PRESS[0] += 1
 
 
 def _topmost_set(args, kw):
