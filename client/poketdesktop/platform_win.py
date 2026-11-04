@@ -37,7 +37,15 @@ def raise_above(win):
 
     튀지 않았으면 아무것도 안 한다. 아직 자리를 안 잡은 창(만들자마자
     부르고 나중에 place 하는 것들)을 엉뚱한 데 붙박지 않으려는 것이다.
+
+    **쓰던 창의 포커스를 가져가지 않게 감싼다** (2.1.3, 게시판 #444). 창을 먼저 띄우고(update_idletasks)
+    '항상 위' 를 거는데, 둘 다 테두리 없는 창을 활성화할 수 있다 - focus_guard 를 보라.
     """
+    from . import focus_guard
+    focus_guard.quiet(win, lambda: _raise_above(win))
+
+
+def _raise_above(win):
     try:
         win.update_idletasks()
         before = (win.winfo_x(), win.winfo_y())

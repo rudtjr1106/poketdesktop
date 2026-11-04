@@ -1066,6 +1066,9 @@ class BagWindow(object):
         self.tm_left = shop.get("tmLeft")
         self.boosts = shop.get("boosts") or {}
         mark_boosts(self.items, self.boosts)
+        badge = getattr(self.app, "boost_badge", None)
+        if badge is not None and "boosts" in shop:
+            badge.note(shop["boosts"])                     # 방금 켠 스프레이도 바로 오른쪽 아래에 (2.1.3)
         self.mons = mons or []
         self._mon_ids = set(m["id"] for m in self.mons)
         self.photos = {}

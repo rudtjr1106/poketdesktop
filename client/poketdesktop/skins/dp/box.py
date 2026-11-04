@@ -1001,7 +1001,29 @@ class BoxWindow(Scene, BX.BoxWindow):
     def _wrap(self, cv, x, y, text, spec, fill=INK, width=100):
         t = cv.create_text(x, y, text=K.wrap(cv, text, spec, width), fill=fill, font=spec, anchor="nw", tags=D)
         b = cv.bbox(t)
-        return b[3] if b else y
+        y2 = b[3] if b else y
+        if self._d and text is self._d.get("evsum"):        # 능력 쪽 맨 아래 노력치 줄 (테마마다 _d_stats 가 그린다)
+            y2 = self._ev_link(cv, x, y2, width)
+        return y2
+
+    def _ev_link(self, cv, x, y, width):
+        """노력치 줄 아래의 '노력치 조정 ›' (2.1.3, 게시판 #450). 누르면 기본 창의 do_evs (ui_evs 창).
+
+        DP 를 이어 쓰는 테마들이 능력 쪽(_d_stats)을 저마다 그리지만 노력치 줄은 모두 이 _wrap 으로 그린다 - 그래서
+        여기 한 군데서 단다 (소드실드는 _wrap 이 따로라 거기서 이것을 부른다). 단추를 새로 만들면 테마마다 모양을
+        입혀야 하므로 글자 링크로: 빛깔은 그 테마 _wrap 의 본문 빛깔, 밑줄 · 손 모양 커서로 누를 수 있음을 알린다.
+        """
+        s = U.h
+        y2 = self._wrap(cv, x, y + s(6), "노력치 조정 ›", font(9), width=width)
+        t = cv.find_all()[-1]                               # 방금 그린 글
+        cv.addtag_withtag("evlink", t)
+        b = cv.bbox(t)
+        if b:
+            cv.create_line(b[0], b[3], b[2], b[3], fill=cv.itemcget(t, "fill"), tags=D + ("evlink",))
+        cv.tag_bind("evlink", "<Button-1>", lambda _e: self.do_evs())
+        cv.tag_bind("evlink", "<Enter>", lambda _e: cv.configure(cursor="hand2"))
+        cv.tag_bind("evlink", "<Leave>", lambda _e: cv.configure(cursor=""))
+        return y2 + 1
 
     def _label(self, cv, x, y, text):
         cv.create_text(x, y, text=text, fill=TAGC, font=font(9), anchor="nw", tags=D)

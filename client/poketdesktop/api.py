@@ -358,6 +358,14 @@ class Api(object):
     def unhold(self, pid):
         return self._call("DELETE", "/api/pokemon/%d/hold" % pid)
 
+    def set_evs(self, pid, evs, buy=False, dry=True, cost=None):
+        """노력치 한 번에 맞추기 (2.1.3, 게시판 #450). evs = {능력: 맞출 값}. dry 면 계획만 (아무것도 안 바뀐다).
+        buy = 모자란 도구를 상점 값에 사서 쓴다, cost = 물어보고 받은 값 (그사이 달라졌으면 서버가 안 쓴다)."""
+        body = {"evs": dict((k, int(v)) for k, v in evs.items()), "buy": bool(buy), "dry": bool(dry)}
+        if cost is not None:
+            body["cost"] = int(cost)
+        return self._call("POST", "/api/pokemon/%d/evs" % int(pid), body)
+
     def add_exp(self, pid, amount):
         return self._call("POST", "/api/pokemon/%d/exp" % pid, {"amount": int(amount)})
 

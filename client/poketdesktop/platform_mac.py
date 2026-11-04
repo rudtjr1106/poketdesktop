@@ -158,7 +158,14 @@ def raise_above(win):
 
     맥에서 `-topmost` 는 **창이 화면에 올라간 뒤에** 걸어야 먹는다.
     Toplevel 을 만들자마자 걸면 조용히 씹히고, 읽어 보면 0 이 나온다.
+
+    쓰던 앱의 포커스를 가져가지 않게 감싼다 (2.1.3, 게시판 #444 - focus_guard, 윈도우와 같은 문지기).
     """
+    from . import focus_guard
+    focus_guard.quiet(win, lambda: _raise_above(win))
+
+
+def _raise_above(win):
     try:
         win.update_idletasks()
         win.attributes("-topmost", True)

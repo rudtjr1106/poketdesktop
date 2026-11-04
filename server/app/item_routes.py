@@ -45,6 +45,13 @@ class SellManyIn(BaseModel):
     lines: list = []      # [{"item": "STARDUST", "count": 3}, ...]
 
 
+class EvsIn(BaseModel):
+    evs: dict = {}        # {능력: 맞출 값} - 안 적은 능력은 그대로 (2.1.3, 게시판 #450)
+    buy: bool = False     # 모자란 도구를 상점 값에 사서 쓴다 (앱이 묻고 나서만 켠다)
+    dry: bool = True      # 계획만 본다 (아무것도 안 바뀐다)
+    cost: int = -1        # 앱이 물어보고 받은 값 (-1 = 안 봄). 그사이 가방이 바뀌어 값이 달라졌으면 쓰지 않는다
+
+
 class UseIn(BaseModel):
     item: str
     pokemon: int = 0
@@ -511,6 +518,181 @@ def _use_ev(uid, it, eff, mon):
     return {"ok": True, "evs": after,
             "message": "%s의 %s 노력치가 %d %s!"
                        % (name, _stat_kr(stat), abs(got), word)}
+
+
+# ---------------------------------------------------------------- 노력치 한 번에 맞추기 (2.1.3, 게시판 #450)
+# 능력마다 맞출 값을 적으면, 지금 도구를 하나씩 쓸 때와 **똑같은 도구 · 똑같은 값**으로 한 번에 맞춘다.
+# 깎아 주는 것도 공짜도 없다 - 모자란 도구는 상점 값 그대로 사서 바로 쓴다 (앱이 묻고 나서만).
+#
+# 능력 하나를 e 에서 t 로 (도구는 items.json 의 효과로 찾는다 - 붙박이 id 없이):
+#   내릴 때  열매(-10)를 t 이하가 될 때까지 (0 아래로는 안 간다), 모자란 만큼 깃털(+1)로 다시 올린다
+#   올릴 때  가진 영양제(+10) → 가진 깃털(+1) 순으로 먼저 쓰고, 남은 만큼만 산다 (10씩은 영양제, 나머지는 깃털)
+#           - 영양제 하나(10,000원) = 깃털 열 개(1,000원 × 10)라 가진 깃털을 먼저 써도 값은 같고 살 것만 준다
+#   내리는 능력을 먼저, 올리는 능력을 나중에 쓴다 - 그래야 도중에 총합 510 을 넘지 않는다 (하나씩 쓸 때 막히는 길이 없다)
+EV_UP, EV_ONE, EV_DOWN = 10, 1, -10
+
+
+def ev_items():
+    """{(능력, 양): 도구 id}. 같은 (능력, 양)이 둘이면 싼 것."""
+    out = {}
+    for iid, it in sorted(items.catalog().items()):
+        eff = it.get("effect") or {}
+        if eff.get("kind") != "ev":
+            continue
+        key = (eff.get("stat"), int(eff.get("amount") or 0))
+        if key not in out or 0 < items.buy_price(iid) < items.buy_price(out[key]):
+            out[key] = iid
+    return out
+
+
+def ev_targets(raw, before):
+    """보내온 {능력: 값} 을 확인해 여섯 능력 전부의 목표로. 안 적은 능력은 지금 값."""
+    if not isinstance(raw, dict) or not raw:
+        raise HTTPException(400, "맞출 노력치를 적어 주세요.")
+    out = dict(before)
+    for k, v in raw.items():
+        s = str(k).strip().lower()
+        if s not in items.STATS:
+            raise HTTPException(400, "그런 능력은 없습니다.")
+        if isinstance(v, bool) or not isinstance(v, int):
+            raise HTTPException(400, "노력치는 정수로 적어 주세요.")
+        if not 0 <= v <= config.EV_STAT_MAX:
+            raise HTTPException(400, "노력치는 능력마다 0~%d 사이입니다." % config.EV_STAT_MAX)
+        out[s] = v
+    total = sum(out.values())
+    if total > config.EV_TOTAL_MAX:
+        raise HTTPException(400, "노력치 총합은 %d까지입니다. (지금 %d)" % (config.EV_TOTAL_MAX, total))
+    return out
+
+
+def ev_plan(before, target, bag):
+    """before -> target 에 쓸 도구들, 쓰는 차례대로. [{item, stat, amount, count, owned, buy}]
+
+    owned = 가방에서 꺼내 쓸 개수, buy = 사서 쓸 개수 (count = owned + buy). 도구 하나는 한 줄에만 나온다
+    (능력마다 도구가 따로이고, 한 능력은 올리거나 내리거나 한쪽뿐이다).
+    """
+    ids = ev_items()
+    downs, ups = [], []
+
+    def line(out, stat, amount, owned, buy):
+        if owned + buy <= 0:
+            return
+        iid = ids.get((stat, amount))
+        if not iid:
+            raise HTTPException(500, "노력치 도구 목록이 맞지 않습니다.")
+        out.append({"item": iid, "stat": stat, "amount": amount,
+                    "count": owned + buy, "owned": owned, "buy": buy})
+
+    def have(stat, amount):
+        return int(bag.get(ids.get((stat, amount)), 0) or 0)
+
+    for s in items.STATS:
+        e, t = int(before.get(s, 0)), int(target.get(s, 0))
+        if t < e:
+            n = (e - t + 9) // 10                      # 열매: t 이하가 될 때까지
+            up = t - max(0, e - 10 * n)                # 0~9: 깃털로 다시 올린다
+            own = min(have(s, EV_DOWN), n)
+            line(downs, s, EV_DOWN, own, n - own)
+            own = min(have(s, EV_ONE), up)
+            line(downs, s, EV_ONE, own, up - own)
+        elif t > e:
+            d = t - e
+            own_v = min(have(s, EV_UP), d // 10)
+            rest = d - 10 * own_v
+            own_w = min(have(s, EV_ONE), rest)
+            rest -= own_w
+            line(ups, s, EV_UP, own_v, rest // 10)
+            line(ups, s, EV_ONE, own_w, rest % 10)
+    return downs + ups
+
+
+def ev_simulate(before, plan):
+    """계획을 **하나씩 쓸 때와 똑같이** (items.add_evs) 돌려 본다. 아무 일도 안 하는 도구가 끼면 None
+    (하나씩 쓰면 '더 올릴 수 없습니다' 로 막히는 길이다)."""
+    cur = items.clamp_evs(before)
+    for ln in plan:
+        for _ in range(ln["count"]):
+            nxt = items.add_evs(cur, {ln["stat"]: ln["amount"]})
+            if nxt[ln["stat"]] == cur[ln["stat"]]:
+                return None
+            cur = nxt
+    return cur
+
+
+@router.post("/api/pokemon/{pid}/evs")
+def set_evs(pid: int, body: EvsIn, me=Depends(deps.current)):
+    """노력치 한 번에 맞추기 (2.1.3, 게시판 #450). dry 면 계획만, 아니면 한 트랜잭션으로 쓴다:
+    모자란 도구 값(돈) · 가방의 도구 · 노력치 - 하나라도 어긋나면 아무것도 안 바뀐다."""
+    uid = me["user"]["id"]
+    row = db.q1("SELECT * FROM pokemon WHERE id=? AND user_id=?", (pid, uid))
+    if not row:
+        raise HTTPException(404, "그런 포켓몬이 없습니다.")
+    mon, raw = db.row_to_mon(row), row["evs"]        # raw: 쓸 때 그사이 바뀌었는지 본다
+    if _in_battle(uid, mon["id"]):
+        raise HTTPException(400, "배틀 중에는 노력치를 바꿀 수 없습니다.")
+    before = items.clamp_evs(mon.get("evs") or {})
+    target = ev_targets(body.evs, before)
+    plan = ev_plan(before, target, items.bag_get(uid))
+    after = ev_simulate(before, plan)
+    if after is None or after != target:
+        raise HTTPException(500, "노력치 계획이 어긋났습니다. 운영자에게 알려 주세요.")
+    cost = 0
+    sellable = True
+    for ln in plan:
+        price = items.buy_price(ln["item"])
+        ln.update(kr=items.name_of(ln["item"]), statKr=_stat_kr(ln["stat"]), price=price)
+        if ln["buy"] and price <= 0:
+            sellable = False
+        cost += price * ln["buy"]
+    used = sum(ln["count"] for ln in plan)
+    owned = sum(ln["owned"] for ln in plan)
+    short = used - owned
+    money = items.money(uid)
+    out = {"ok": True, "dry": bool(body.dry), "before": before, "evs": target, "plan": plan,
+           "count": used, "owned": owned, "buyCount": short, "cost": cost,
+           "buyable": sellable, "affordable": sellable and money >= cost, "money": money}
+    if body.dry:
+        return out
+
+    if not plan:
+        raise HTTPException(400, "바꿀 노력치가 없습니다.")
+    if short and not sellable:
+        raise HTTPException(400, "상점에서 팔지 않는 도구가 모자랍니다.")
+    if short and not body.buy:
+        raise HTTPException(409, "도구가 %d개 모자랍니다. 사서 쓰려면 확인해 주세요. (%s원)" % (short, format(cost, ",")))
+    if body.cost >= 0 and body.cost != cost:
+        raise HTTPException(409, "그사이 가방이 바뀌어 값이 %s원이 되었습니다. 다시 확인해 주세요." % format(cost, ","))
+    if money < cost:
+        raise HTTPException(400, "돈이 모자랍니다. (%s원 필요)" % format(cost, ","))
+    conn = db.connect()
+    try:
+        if cost and conn.execute("UPDATE users SET money = money - ? WHERE id=? AND money >= ?",
+                                 (cost, uid, cost)).rowcount <= 0:
+            raise HTTPException(400, "돈이 모자랍니다. (%s원 필요)" % format(cost, ","))
+        for ln in plan:
+            if ln["owned"] and conn.execute(
+                    "UPDATE bag SET count = count - ? WHERE user_id=? AND item=? AND count >= ?",
+                    (ln["owned"], uid, ln["item"], ln["owned"])).rowcount <= 0:
+                raise HTTPException(409, "그사이 %s이(가) 줄었습니다. 다시 해 주세요." % ln["kr"])
+        # 계획을 짠 뒤 다른 창에서 노력치가 바뀌었으면(하나씩 쓰기 · 배틀) 덮어쓰지 않는다
+        if conn.execute("UPDATE pokemon SET evs=? WHERE id=? AND user_id=? AND evs=?",
+                        (_json(target), mon["id"], uid, raw)).rowcount <= 0:
+            raise HTTPException(409, "그사이 노력치가 바뀌었습니다. 다시 해 주세요.")
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()                                 # 열린 트랜잭션을 남기지 않는다 (쓰기 잠금, db.run 주석)
+        except Exception:                                   # noqa: BLE001
+            pass
+        raise
+    name = mon.get("nickname") or deps.dex().name(mon["species"])
+    msg = "%s의 노력치를 맞췄다! 도구 %d개를 썼다." % (name, used)
+    if short:
+        msg += " (모자란 %d개는 %s원에 샀다)" % (short, format(cost, ","))
+    out.update(_wallet(uid))
+    out["pokemon"] = deps.decorate(_mon(uid, mon["id"]))
+    out["message"] = korean.natural(msg)
+    return out
 
 
 def _use_iv(uid, it, eff, mon, stat):

@@ -552,6 +552,9 @@ class WildController(object):
         tell 이면 사용자가 직접 눌러서 온 응답이라 결과를 말로도 알려준다.
         """
         self.app.balls = r.get("balls", self.app.balls)
+        badge = getattr(self.app, "boost_badge", None)
+        if badge is not None and "boosts" in r:
+            badge.note(r["boosts"])                        # 타입 스프레이 남은 시간 (2.1.3, 오른쪽 아래 띠)
         if self._away():
             return
         # 물어본 뒤 답이 오는 사이에 껐을 수 있다. 볼 개수만 챙기고
@@ -637,7 +640,7 @@ class WildController(object):
 
     # ---------------- 잡힐 때까지 계속 던지기 (2.1.1, 게시판 #425 레드 36세) ----------------
     # 볼 메뉴 맨 위 줄로 켜고 끈다 (설정 autoThrow). 켜 두면 볼을 던졌을 때(메뉴 · 두 번 클릭) 같은 볼로 잡힐 때까지
-    # 이어 던진다. 배틀 밖 야생만이다 - 배틀 안에서는 놓치면 상대가 움직인다. 서버는 여느 던지기와 같다
+    # 이어 던진다. 여기는 배틀 밖 야생이다 - 배틀 중(멈춘 동안)은 desktop_battle 이 같은 설정으로 한다 (2.1.3). 서버는 여느 던지기와 같다
     # (한 번에 하나씩, 놓치면 throws+1 - 타이머볼 배율도 그대로). 멈추는 때: 잡힘 · 오류 · 그 볼이 떨어짐 ·
     # 야생이 사라짐(clear) · 배틀 시작 · 메뉴를 다시 엶 · 설정을 끔 · AUTO_MAX 번. 마스터볼은 이어 던지지 않는다.
     AUTO_MAX = 30

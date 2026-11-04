@@ -14,8 +14,9 @@
 **상점으로 가는 줄은 없다** (1.12.1). 있었을 때는 야생을 앞에 두고(배틀
 중에도) 상점에서 볼을 사 와서 바로 던질 수 있었다.
 
-**맨 위의 '잡힐 때까지 계속 던지기' (2.1.1, 게시판 #425)** 는 배틀 밖 야생에서만 나온다 (auto 를 넘길 때).
-켜고 끄는 줄일 뿐 던지지는 않는다 - 켜 두면 볼을 던졌을 때 같은 볼로 잡힐 때까지 이어 던진다 (wild_ui).
+**맨 위의 '잡힐 때까지 계속 던지기' (2.1.1, 게시판 #425)** 는 auto 를 넘길 때 나온다 - 배틀 밖 야생, 그리고 2.1.3 부터
+배틀 중에도 (게시판 #446). 켜고 끄는 줄일 뿐 던지지는 않는다 - 켜 두면 볼을 던졌을 때 같은 볼로 잡힐 때까지 이어
+던진다 (배틀 밖은 wild_ui, 배틀 중은 멈춘 동안만 desktop_battle).
 """
 
 AUTO_TEXT = "잡힐 때까지 계속 던지기"
@@ -131,7 +132,7 @@ def rows(options, on_pick, auto=None, on_auto=None):
 
 def popup(root, event, options, on_pick, on_close=None, auto=None, on_auto=None):
     """on_close: 메뉴가 닫히면(골랐든 안 골랐든) 한 번 부른다. 배틀이 그동안 멈춘다.
-    auto · on_auto: 맨 위 '잡힐 때까지 계속 던지기' 줄 (배틀 밖 야생만)."""
+    auto · on_auto: 맨 위 '잡힐 때까지 계속 던지기' 줄 (배틀 밖 야생 · 2.1.3 부터 배틀 중에도)."""
     from . import platform_os as PLAT
     if not PLAT.NATIVE_MENU:
         # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.

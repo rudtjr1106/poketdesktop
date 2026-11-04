@@ -450,7 +450,10 @@ class BoxWindow(DPX.BoxWindow):
     def _wrap(self, cv, x, y, text, spec, fill=NAVY, width=100):
         t = cv.create_text(x, y, text=K.wrap(cv, text, spec, width), fill=fill, font=spec, anchor="nw", tags=D)
         b = cv.bbox(t)
-        return b[3] if b else y
+        y2 = b[3] if b else y
+        if self._d and text is self._d.get("evsum"):        # 노력치 줄 아래 '노력치 조정 ›' (2.1.3, 게시판 #450)
+            y2 = self._ev_link(cv, x, y2, width)
+        return y2
 
     def _label(self, cv, x, y, text):
         cv.create_text(x, y, text=text, fill=DIMK, font=font(9), anchor="nw", tags=D)

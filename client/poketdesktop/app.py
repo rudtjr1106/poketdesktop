@@ -150,6 +150,9 @@ class App(object):
         # 메가진화 (시즌 3): 바탕화면의 빛나는 돌과 저절로 받은 스톤 알림
         from .bond_stone import BondStones
         self.bond_stones = BondStones(self)
+        # 타입 스프레이 남은 시간 (2.1.3, 게시판 #445): 바탕화면 오른쪽 아래 띠. 서버가 준 남은 초로 띄우고 끝나면 치운다
+        from .boost_badge import BoostBadge
+        self.boost_badge = BoostBadge(self)
         self._bond_queue = []
         self._bond_known = set()
         self._bond_showing = False
@@ -202,6 +205,10 @@ class App(object):
         PLAT.dpi_aware()
         U.init_fonts(self.root)
         apply_theme(self.root)
+        # 포커스 지키기 (2.1.3, 게시판 #444): 바탕화면의 도트 · 이름표 · 연출 창이 떠도 쓰던 창의 포커스를 안
+        # 가져가게 (윈도우 · 맥 - 다른 데서는 아무것도 안 한다). 긴급 숨기기가 이 위에 문지기를 더 세운다.
+        from . import focus_guard
+        focus_guard.install()
         # 긴급 숨기기 (1.10.3): 떠 있는 것을 전부 치웠다 되돌린다. 단축키는 설정에서 고른
         # 사람에게만 등록한다 (기본은 꺼짐). 트레이 메뉴에는 늘 있다.
         from . import hotkey as HOTKEY
@@ -732,6 +739,9 @@ class App(object):
                 # 탐험 파견 (1.10.4): 돌아온 것이 있으면 바탕화면에 보따리를 놓는다
                 if self.expedition is not None and "expedition" in me:
                     self.expedition.note(me.get("expedition"))
+                # 타입 스프레이 남은 시간 (2.1.3): 오른쪽 아래 띠
+                if "boosts" in me:
+                    self.boost_badge.note(me.get("boosts"))
                 # 레이드 안내(announce_raid)는 1.10.0 에서 끊었다 - 레이드 탭을 뺐으므로
                 # 빛기둥·결과 알림이 없는 탭을 가리키면 안 된다 (ui_hub.TABS 를 보라).
                 # 실시간 배틀. 걸려온 초대·싸우던 판·안 본 결과가 있으면

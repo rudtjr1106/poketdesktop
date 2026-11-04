@@ -846,6 +846,10 @@ class BoxWindow(object):
         sh = tk.Frame(stats, bg="#101623")
         sh.pack(fill="x", padx=11, pady=(9, 6))
         U.marker_label(sh, "능력치", bg="#101623").pack(side="left")
+        # 노력치 조정 (2.1.3, 게시판 #450): 맞출 값을 고르면 도구를 하나씩 쓸 때와 같은 값으로 한 번에 (ui_evs)
+        self.btn_evs = U.ghost_button(sh, "노력치 조정", self.do_evs, height=24)
+        self.btn_evs.pack(side="right")
+        self.btn_evs.configure(state="normal" if self.sel else "disabled")
         # 종족값·개체값·노력치 요약. **머리줄 오른쪽에 붙이면 잘린다** -
         # 한 줄에 다 안 들어가서, 제 줄을 주고 창 폭에 맞춰 접는다.
         self.d_ivsum = tk.Label(stats, text="", bg="#101623", fg=U.GOOD,
@@ -1056,7 +1060,7 @@ class BoxWindow(object):
     def set_buttons(self, on):
         # 떠올리기 단추는 상세 칸에 있어서 바닥보다 나중에 만들어진다.
         rem = getattr(self, "btn_remember", None)
-        for b in (self.btn_party, self.btn_nick, self.btn_release, rem,
+        for b in (self.btn_party, self.btn_nick, self.btn_release, rem, getattr(self, "btn_evs", None),
                   getattr(self, "btn_move", None), getattr(self, "btn_tint", None)):
             if b is not None:
                 b.configure(state="normal" if on else "disabled")
@@ -2767,6 +2771,16 @@ class BoxWindow(object):
             msg = "데리고 다닙니다." if on else "박스로 보냈습니다."
         U.run_async(self.root, lambda: self.app.api.set_desktop(m["id"], on),
                     self._after(msg))
+
+    def do_evs(self):
+        """노력치 조정 창 (2.1.3, 게시판 #450). 맞추고 나면 목록을 다시 받아 상세 칸의 노력치 · 능력치를 맞춘다.
+        테마의 요약 칸 '노력치 조정 ›' 도 이것을 부른다 (skins/dp/box.py)."""
+        m = self.current()
+        if not m or m.get("isEgg"):
+            return
+        from . import ui_evs
+        ui_evs.open_editor(self.app, self.win, m,
+                           on_done=lambda r: self._after(r.get("message") or "노력치를 맞췄습니다.")(r, None))
 
     def do_nickname(self):
         m = self.current()
