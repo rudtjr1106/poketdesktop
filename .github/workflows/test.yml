@@ -338,9 +338,9 @@ jobs:
       # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
       - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         run: python client/test_boost_items.py
-      # 2.1.1: 상점 맨 위 기술머신 뽑기 띠 (1회 · 10회, 기본 테마 + DP 테마) · 결과 창
-      - name: 상점 기술머신 뽑기 띠 (진짜 Tk)
-        run: python client/test_tmdraw_ui.py
+      # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
+      - name: 상점 랜덤 캡슐 띠 (진짜 Tk)
+        run: python client/test_shop_capsule_ui.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
         run: python client/test_dual_monitor.py
@@ -521,9 +521,9 @@ jobs:
       # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
       - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         run: python client/test_boost_items.py
-      # 2.1.1: 상점 맨 위 기술머신 뽑기 띠 (1회 · 10회, 기본 테마 + DP 테마) · 결과 창
-      - name: 상점 기술머신 뽑기 띠 (진짜 Tk)
-        run: python client/test_tmdraw_ui.py
+      # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
+      - name: 상점 랜덤 캡슐 띠 (진짜 Tk)
+        run: python client/test_shop_capsule_ui.py
       # 듀얼 모니터 (#268): 주 화면 왼쪽 모니터에서도 체력바 · 이름표가 보인다, 실시간 배틀 무대는 그 모니터 안
       - name: 듀얼 모니터 이펙트 레이어 (진짜 Tk)
         run: python client/test_dual_monitor.py

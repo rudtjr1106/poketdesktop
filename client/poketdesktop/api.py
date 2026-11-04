@@ -569,9 +569,9 @@ class Api(object):
         캡슐을 배출하고 열어 보일 뿐이다. count=10 이면 열 번 (2.1.1, 답에 results)."""
         return self._call("POST", "/api/guild/shop/slot", {"count": count} if count != 1 else {})
 
-    def shop_tmdraw(self, count=1):
-        """상점 기술머신 뽑기 (2.1.1). 한 번 = 랜덤 기술머신 뽑기권 값, count 는 1 또는 10."""
-        return self._call("POST", "/api/shop/tmdraw", {"count": count})
+    def shop_capsule(self, count=1):
+        """상점의 랜덤 캡슐 - 돈으로 (2.1.2). count 는 1 또는 10. 답은 guild_slot 과 같은 꼴 + money · bag."""
+        return self._call("POST", "/api/shop/capsule", {"count": count})
 
     # 도감 업적 (시즌 3)
     def achievements(self):
