@@ -543,8 +543,10 @@ class BoxWindow(DPB.BoxWindow):
                 cv.create_oval(mx - 6, my - 6, mx + 6, my + 6, fill=PAPER, outline=CELL_LINE)
             if sel:
                 arrow(cv, x1 + s(3), my, s(4))
+            star = None
             if m.get("shiny"):
-                cv.create_text(x1 + 4, y1 + 2, text="★", fill=SHINY, font=font(9), anchor="nw")
+                star = cv.create_text(x1 + 4, y1 + 2, text="★", fill=SHINY, font=font(9), anchor="nw")
+            DPB.mark_hidden(cv, m, x1 + 4, y1 + 2, star, font(8))      # 숨은 특성 ◎ (2.1.3)
             kind = None if m.get("isEgg") else L.kind_of(m.get("num"))
             if kind:
                 cv.create_text(x2 - 3, y1 + 2, text="◆" if kind == "legendary" else "✦", fill=LEGEND,

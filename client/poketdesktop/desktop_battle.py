@@ -427,6 +427,14 @@ class DesktopBattle(object):
             self.ball_opts = result["ballOptions"]
         if b and b.get("over"):
             return self.show_result(result)
+        if (self.holding and not result.get("hold") and getattr(self, "hiding", None)
+                and self.hiding.hidden("foe")):
+            # 멈춘 채 던졌다가 놓쳤는데 그 사이 야생이 구멍파기 · 공중날기로 숨었다. 숨은 동안은 도트 창이
+            # 숨어 있어 볼도 바로 싸우기도 못 누른다 (게시판 #436). 멈춘 것을 풀고(끝까지 싸우기가 아니다)
+            # 다음 턴을 부르면, 서버가 숨은 상대에게 안 닿는 기술로 한 턴을 넘기고 올라온 뒤에 다시 멈추라고 한다
+            self.holding = False
+            self._cancel_hold_jobs()
+            return self.after(TURN_GAP, self.next_turn)
         if result.get("hold") or self.holding:
             # 서버가 멈추라고 했거나, 멈춘 채 던졌다가 놓쳤다
             return self.start_hold(result.get("hold"))

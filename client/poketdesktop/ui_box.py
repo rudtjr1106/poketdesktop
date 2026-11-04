@@ -104,7 +104,7 @@ def _row_sig(mon):
         return ("egg", e.get("kind"), info.get("name"), bool(mon.get("onDesktop")),
                 box_filter.egg_progress(e))
     return (mon.get("num"), mon.get("species"), mon.get("formKey"), info.get("name"),
-            bool(mon.get("shiny")), mon.get("gender"), mon.get("level"),
+            bool(mon.get("shiny")), L.has_hidden(mon), mon.get("gender"), mon.get("level"),
             info.get("nature"), info.get("ivPercent"),
             bool(mon.get("onDesktop")), bool(mon.get("away")))
 
@@ -261,6 +261,8 @@ class Row(object):
 
         dim = U.FG_DIM if self.party else U.FG_FAINT
         name = info.get("name", mon["species"])
+        if L.has_hidden(mon):
+            name = L.HIDDEN_MARK + " " + name             # 숨은 특성 (2.1.3, 게시판 #435) - 이름 바로 앞
         shiny = mon.get("shiny")
         if shiny:
             name = "★ " + name

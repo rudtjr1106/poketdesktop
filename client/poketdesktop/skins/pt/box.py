@@ -376,8 +376,10 @@ class BoxWindow(DPX.BoxWindow):
                 cv.create_image(mx, my, image=ph)
             else:
                 cv.create_oval(mx - 6, my - 6, mx + 6, my + 6, fill=PANEL, outline=LINE2)
+            star = None
             if m.get("shiny"):
-                cv.create_text(x1 + 6, y1 + 4, text="★", fill="#d0a000", font=font(9), anchor="nw")
+                star = cv.create_text(x1 + 6, y1 + 4, text="★", fill="#d0a000", font=font(9), anchor="nw")
+            DPX.mark_hidden(cv, m, x1 + 6, y1 + 4, star, font(8))      # 숨은 특성 ◎ (2.1.3)
             kind = None if m.get("isEgg") else L.kind_of(m.get("num"))
             d = s(9)                                   # 여러 마리 고르기 표시 (오른쪽 위 초록 동그라미)
             if kind:

@@ -374,8 +374,10 @@ class BoxWindow(DPB.BoxWindow):
                 cv.create_oval(mx - 6, my - 6, mx + 6, my + 6, fill=PAPER, outline=LIGHT)
             if sel:
                 gba.cursor(cv, x1 + s(4), my, s(5))
+            star = None
             if m.get("shiny"):
-                cv.create_text(x1 + 5, y1 + 3, text="★", fill="#d0a000", font=font(9), anchor="nw")
+                star = cv.create_text(x1 + 5, y1 + 3, text="★", fill="#d0a000", font=font(9), anchor="nw")
+            DPB.mark_hidden(cv, m, x1 + 5, y1 + 3, star, font(8))      # 숨은 특성 ◎ (2.1.3)
             kind = None if m.get("isEgg") else L.kind_of(m.get("num"))
             if kind:
                 cv.create_text(x2 - 4, y1 + 3, text="◆" if kind == "legendary" else "✦", fill="#a050c0",

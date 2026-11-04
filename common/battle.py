@@ -971,7 +971,8 @@ class Battle(object):
     def spare_plan(self, user, target):
         """잡기 모드. 상대를 쓰러뜨리지 않고 잡기 좋게 만든다.
 
-        (쓸 기술, 멈출 이유) 를 돌려준다. 둘 중 하나만 채워진다.
+        (쓸 기술, 멈출 이유) 를 돌려준다. 둘 중 하나만 채워진다 - 멈출 때인데 상대가 숨어 있으면
+        _spare_pass 가 고른 기술로 한 턴을 넘긴다 (그때는 이유를 지운다, 게시판 #436).
 
             1. 상대가 상태이상이 아니면 잠재우기·마비 기술부터
             2. 체력이 SPARE_LOW 이하면 멈춘다            -> "low"
@@ -1004,15 +1005,48 @@ class Battle(object):
                 if cands:
                     return max(cands)[1], None
         if target.hp <= target.maxhp * SPARE_LOW:
-            return None, "low"
+            return self._hold(pool, user, target, "low")
         best_m = self._spare_hit(pool, user, target, crit=True)
         if best_m is None and target.hp > target.maxhp * SPARE_RISK_ABOVE:
             # 급소까지 막으면 절반쯤에서 멈춰 버린다 (400판 중 185판). 체력이 넉넉하면
             # **급소가 아니면 안 쓰러지는** 기술까지 쓴다. 급소는 1/24 이다.
             best_m = self._spare_hit(pool, user, target, crit=False)
         if best_m is None:
-            return None, "nosafe"
+            return self._hold(pool, user, target, "nosafe")
         return best_m, None
+
+    def _hold(self, pool, user, target, reason):
+        """멈춘다 - 상대가 숨어 있어 한 턴 넘길 수 있으면 (넘길 기술, None)."""
+        m = self._spare_pass(pool, user, target)
+        return (m, None) if m else (None, reason)
+
+    def _spare_pass(self, pool, user, target):
+        """멈출 때인데 상대가 숨어 있다 (구멍파기 · 공중날기 · 다이빙 · 섀도다이브). 숨은 동안은 야생 도트 창이
+        숨어 있어 볼도(오른쪽 클릭) 바로 싸우기도(왼쪽 클릭) 못 누른다. 멈추면 10초 뒤 끝까지 싸우기로 넘어가
+        올라온 상대를 쓰러뜨렸다 (게시판 #436, 땅속의 대왕끼리동).
+
+        그래서 **숨은 상대에게 안 닿는 기술**로 한 턴을 넘긴다 - 반드시 빗나가니 안 쓰러진다. 상대는 올라와서
+        때리고, 다음 턴(드러난 뒤)에 멈춘다. 쓸 기술을 돌려주고, 넘길 수 없으면 None (그때는 멈춘다).
+        """
+        spot = SM.hidden_spot(target)
+        if not spot or (user.ability_on and A.always_hit(user, target)):
+            return None                         # 안 숨었다 · 노가드는 숨어도 맞힌다
+        # 턴 끝에 깎일 몫(화상 · 독 · 씨뿌리기)과 상대가 올라오며 스스로 깎일 몫으로 쓰러지면 넘기지 않는다
+        eot = target.maxhp // 8 if target.status in ("burn", "poison") else 0
+        if target.seeded:
+            eot += target.maxhp // 8
+        if target.hp - self._self_loss(target, user) - eot <= 0:
+            return None
+        for m in pool:
+            md = self.move_of(m)
+            mk = MC.key(md)
+            if not (MC.attacks(md) or A.aims_at_foe(md)) or not SM.hidden_from(target, mk):
+                continue                        # 나에게 쓰는 기술(날씨 · 함정 ...)과 숨어도 닿는 기술(지진 ...)은 뺀다
+            if (mk in AF.SELF_KO or mk in AF.CRASH or mk in AF.DELAYED or mk in AF.ROLLERS
+                    or mk in SM.RAGE_MOVES or mk in SM.CHARGE2 or mk == "UPROAR"):
+                continue                        # 빗나가도 내가 다치거나 · 나중에 맞거나 · 다음 턴까지 묶이는 기술
+            return m
+        return None
 
     def _self_loss(self, f, other):
         """f 가 이번 턴에 **먼저 움직여 스스로 깎을 수 있는** 체력의 최댓값.

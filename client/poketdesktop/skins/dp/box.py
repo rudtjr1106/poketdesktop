@@ -39,6 +39,18 @@ G = ("gscene",)                # 박스 칸 캔버스의 항목
 
 SORTS = [("num", "도감"), ("name", "이름"), ("level", "Lv"), ("bst", "종족값")]
 WALL = ("#7cc06a", "#6cb05c", "#5a9a4c")      # 벽지 (DP 의 '숲' 벽지처럼 초록 격자)
+HIDDEN_FG = "#1f8a8a"           # 숨은 특성 ◎ - 이로치 ★ 금빛 · 전설 ◆ 보라 와 다른 청록
+
+
+def mark_hidden(cv, m, x, y, star, fnt, fill=HIDDEN_FG):
+    """박스 칸 왼쪽 위의 숨은 특성 표식 (2.1.3, 게시판 #435 하늬바람). 이로치 ★(star = 그 글 번호)가 있으면 그 오른쪽.
+    전설 ◆ · 환상 ✦ 은 오른쪽 위다. DP 를 이어 쓰는 테마(BW · 금은 · Pt · 에메랄드 · 소드실드)가 같이 쓴다."""
+    if not L.has_hidden(m):
+        return None
+    bb = cv.bbox(star) if star is not None else None
+    if bb:
+        x = bb[2] + 1
+    return cv.create_text(x, y, text=L.HIDDEN_MARK, fill=fill, font=fnt, anchor="nw")
 
 
 class ArtSlot(object):
@@ -721,8 +733,10 @@ class BoxWindow(Scene, BX.BoxWindow):
                 cv.create_image(mx, my, image=ph)
             else:
                 cv.create_oval(mx - 6, my - 6, mx + 6, my + 6, fill=PANEL, outline=LINE)
+            star = None
             if m.get("shiny"):
-                cv.create_text(x1 + 5, y1 + 3, text="★", fill="#d0a000", font=font(9), anchor="nw")
+                star = cv.create_text(x1 + 5, y1 + 3, text="★", fill="#d0a000", font=font(9), anchor="nw")
+            mark_hidden(cv, m, x1 + 5, y1 + 3, star, font(8))      # 숨은 특성 ◎ (2.1.3)
             kind = None if m.get("isEgg") else L.kind_of(m.get("num"))
             if kind:
                 cv.create_text(x2 - 4, y1 + 3, text="◆" if kind == "legendary" else "✦", fill="#a050c0",

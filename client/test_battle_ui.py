@@ -941,6 +941,46 @@ def t_멈춘_채_던졌다가_놓치면_10초를_새로_센다():
         undo()
 
 
+def t_놓친_뒤_야생이_숨으면_멈추지_않고_넘긴다():
+    """게시판 #436: 멈춘 채 던졌다가 놓쳤는데 야생이 그 턴에 구멍파기로 숨었다. 숨은 동안은 도트 창이 숨어 볼도
+    바로 싸우기도 못 누른다 - 계속 멈춰 있으면 10초 뒤 끝까지 싸우기로 올라온 야생을 쓰러뜨린다. 이제 멈춘 것을
+    풀고(끝까지 싸우기가 아니다) 다음 턴을 부른다 (서버가 숨은 상대에게 안 닿는 기술로 한 턴을 넘긴다)."""
+    class 숨음(object):
+        def __init__(self):
+            self.on = False
+
+        def hidden(self, who):
+            return self.on and who == "foe"
+
+        def apply(self, who):                           # 놓친 볼이 도로 띄운 도트를 다시 숨긴다 (after_ball)
+            pass
+
+    d, menus, undo = 잡기_준비()
+    try:
+        d.hiding = 숨음()
+        d.app.api.move_answers = [{"events": [], "hold": "low", "battle": {"id": 7, "over": False}}]
+        d.next_turn()
+        d.throw_ball(이벤트())
+        pick, on_close = menus[0]
+        on_close()
+        d.hiding.on = True                              # 놓친 볼 뒤 야생이 구멍파기로 들어갔다
+        pick("POKEBALL")
+        chk("놓친 뒤 야생이 숨었으면 멈춘 것을 푼다", not d.holding and not d.finish, (d.holding, d.finish))
+        d.root.advance(700)
+        chk("  10초를 안 기다리고 다음 턴을 잡기 모드로 (finish 아님)", d.app.api.moves[1:] == [("new", False)],
+            d.app.api.moves)
+        d.hiding.on = False
+        d.app.api.move_answers = [{"events": [], "hold": "low", "battle": {"id": 7, "over": False}}]
+        d.root.advance(700)
+        chk("  올라온 뒤 서버가 멈추라면 다시 멈춘다", d.holding and len(d.app.api.moves) == 3, (d.holding, d.app.api.moves))
+        d.app.api.move_answers = []
+        d.hiding.on = True
+        d.turn_done({"hold": "low", "battle": {"id": 7, "over": False}})
+        chk("  서버가 멈추라고 하면 숨어 있어도 멈춘다 (넘길 기술이 없을 때 - 서버를 끝없이 부르지 않게)", d.holding)
+    finally:
+        undo()
+
+
 def t_볼이_흔들리는_동안_왼쪽_클릭은_싸우기가_아니다():
     """게시판 #222: 볼이 날아가거나 흔들리는 동안 '바로 싸우기' 가 먹으면 놓친 뒤에 그대로 쓰러뜨린다."""
     d, _m, undo = 잡기_준비()
@@ -1289,6 +1329,7 @@ def main():
                t_턴마다_잡기_설정을_보낸다, t_멈추라고_하면_10초_기다렸다가_끝까지_싸운다,
                t_왼쪽_클릭하면_바로_싸운다, t_볼_메뉴가_열린_동안은_싸우지_않는다,
                t_바쁠_때_던진_볼은_턴이_끝나고_던진다, t_멈춘_채_던졌다가_놓치면_10초를_새로_센다,
+               t_놓친_뒤_야생이_숨으면_멈추지_않고_넘긴다,
                t_볼이_흔들리는_동안_왼쪽_클릭은_싸우기가_아니다, t_두_번_클릭의_두_번째_뗌은_싸우기가_아니다,
                t_잡으면_끝낸다, t_볼을_기다리던_턴에_판이_끝나면_말없이_버리지_않는다, t_배틀을_접으면_서버에_알린다,
                t_상대_이름표는_두_줄이다,

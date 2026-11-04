@@ -450,7 +450,12 @@ def main():
     # 없어서 안 걸렸다.
     legend = [mon(dex, 150, 90, on=True),          # 뮤츠 - 전설
               mon(dex, 151, 91),                   # 뮤 - 환상
-              mon(dex, 25, 92)]                    # 피카츄 - 아무것도 아님
+              mon(dex, 25, 92),                    # 피카츄 - 아무것도 아님
+              mon(dex, 133, 93),                   # 이브이 - 숨은 특성 (2.1.3)
+              mon(dex, 151, 94)]                   # 뮤 - 숨은 특성이자 이로치이자 환상
+    legend[3]["hiddenAbility"] = True
+    legend[4]["info"]["hiddenAbility"] = True      # (박스 줄은 info 에 실려 온다 - 둘 다 본다)
+    legend[4]["shiny"] = True
     lapp = FakeApp(root, dex, legend)
     lwin = ui_box.BoxWindow(root, lapp)
     wait_for(root, lambda: getattr(lwin, "mons", None))
@@ -463,6 +468,17 @@ def main():
         (names.get(91), kinds.get(91)))
     chk("보통 포켓몬에는 표식이 없다", kinds.get(92) is None and "◆" not in names.get(92, ""),
         (names.get(92), kinds.get(92)))
+    chk("숨은 특성은 이름 바로 앞에 ◎ (2.1.3, 게시판 #435)", names.get(93) == "◎ 이브이", names.get(93))
+    chk("  환상 · 이로치 · 숨은 특성이 겹치면 ✦ ★ ◎ 이름", names.get(94) == "✦ ★ ◎ 뮤", names.get(94))
+    chk("  보통 포켓몬에는 ◎ 가 없다", "◎" not in names.get(92, "") and "◎" not in names.get(90, ""),
+        (names.get(92), names.get(90)))
+    import tkinter.font as tkfont
+    longest = max((sp.get("kr") or "" for sp in dex.species), key=len)
+    wpx = tkfont.Font(root=root, font=U.FONT_S).measure("◆ ★ ◎ " + longest)
+    chk("  표식이 셋이어도 가장 긴 이름(%s)이 이름 칸에 든다" % longest, wpx <= ui_box.COLS[1][2] - 14,
+        (wpx, ui_box.COLS[1][2]))
+    sig = ui_box._row_sig(legend[3])
+    chk("  숨은 특성이 바뀌면 줄을 다시 그린다 (줄 서명)", sig != ui_box._row_sig(dict(legend[3], hiddenAbility=False)), sig)
     lwin.select(92)          # 고른 줄은 글자색이 달라진다 - 피해서 잰다
     settle(root)
     chk("전설·환상 색이 알과 같다",

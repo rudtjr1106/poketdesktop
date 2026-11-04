@@ -153,10 +153,82 @@ def t_실제로_안_쓰러뜨린다(dex):
     chk("멈출 때 상대 체력은 가운데값이 1/3 이하다", mid <= 0.35, round(mid, 2))
 
 
+def t_숨은_상대(dex):
+    """게시판 #436 (니뉴): 야생 대왕끼리동이 구멍파기로 땅속에 들어간 턴에 멈췄다. 숨은 동안은 도트 창이 숨어 있어
+    볼도 바로 싸우기도 못 누르고, 10초 뒤 끝까지 싸우기로 넘어가 올라온 대왕끼리동을 쓰러뜨렸다.
+    이제 멈출 때 상대가 숨어 있으면 **숨은 상대에게 안 닿는 기술**로 한 턴을 넘기고, 올라온 뒤에 멈춘다."""
+    print("-- 숨은 상대 (#436)")
+
+    def setup(my_moves, foe_moves=("DIG",), seed=1, ability_on=True):
+        bt, me, foe = fight(dex, mon(dex, "GOLISOPOD", 67, list(my_moves)), mon(dex, "COPPERAJAH", 54, list(foe_moves)),
+                            seed)
+        me.ability_on = foe.ability_on = ability_on
+        return bt, me, foe
+
+    # 그 판 그대로: 셸블레이드로 깎고 상대가 구멍파기로 들어간다
+    moves = ["RAZORSHELL", "PINMISSILE", "SWORDSDANCE", "LIQUIDATION"]
+    kept = surfaced = held_after = 0
+    for seed in range(40):
+        bt, me, foe = setup(moves, seed=seed)
+        foe.hp = int(foe.maxhp * 0.6)
+        pick, why = bt.spare_plan(me, foe)
+        bt.take_turn(pick)
+        if not foe.cond.get("invuln") or bt.over:
+            continue                                        # 이 판은 구멍파기를 안 썼다 / 끝났다
+        pick, why = bt.spare_plan(me, foe)                  # 서버가 턴 뒤에 '다음에 멈추나' 를 본다
+        if why is not None:
+            chk("숨은 동안은 멈추지 않는다 (seed %d)" % seed, False, (pick, why))
+            continue
+        hp = foe.hp
+        bt.take_turn(pick)
+        kept += foe.alive() and foe.hp == hp
+        surfaced += not foe.cond.get("invuln")
+        held_after += bt.spare_plan(me, foe)[1] is not None
+        if seed == 0:
+            chk("  넘기는 기술은 숨은 상대에게 안 닿는 공격 기술", pick in ("RAZORSHELL", "PINMISSILE", "LIQUIDATION"), pick)
+    chk("숨은 턴에 멈추지 않고 넘긴 판에서 상대가 안 다친다", kept > 10 and kept == surfaced, (kept, surfaced))
+    # (올라온 뒤는 평소 판단이다 - 셸블레이드로 방어가 떨어져 있지 않으면 아직 안전한 기술이 남은 판도 있다)
+    chk("  올라온 뒤에는 (거의) 멈춘다 - 이제 도트가 보여 볼을 던질 수 있다", held_after >= kept * 0.8, (held_after, kept))
+
+    def plan_when_hidden(my_moves, hp=0.2, **kw):
+        bt, me, foe = setup(my_moves, **kw)
+        foe.cond["invuln"] = "dig"
+        foe.cond["charge2"] = {"move": "DIG"}
+        foe.hp = max(1, int(foe.maxhp * hp))
+        return bt.spare_plan(me, foe), bt, me, foe
+
+    p, _bt, _me, _foe = plan_when_hidden(["EARTHQUAKE"])
+    chk("땅속에도 닿는 지진(2배)만 있으면 넘기지 않고 멈춘다", p == (None, "low"), p)
+    p, _bt, _me, _foe = plan_when_hidden(["EARTHQUAKE", "GROWL"])
+    chk("상대에게 쓰는 변화기도 숨은 상대에게는 안 닿는다 - 그걸로 넘긴다", p == ("GROWL", None), p)
+    p, _bt, _me, _foe = plan_when_hidden(["SWORDSDANCE"])
+    chk("나에게 쓰는 기술만 있으면 멈춘다 (날씨 · 함정처럼 턴 끝에 깎을 수 있다)", p == (None, "low"), p)
+    p, _bt, _me, _foe = plan_when_hidden(["HIGHJUMPKICK", "EXPLOSION", "OUTRAGE", "SOLARBEAM"])
+    chk("빗나가면 내가 다치는 · 스스로 쓰러지는 · 묶이는 · 모으는 기술로는 안 넘긴다", p == (None, "low"), p)
+    p, bt, me, foe = plan_when_hidden(["TACKLE"])
+    chk("몸통박치기로 넘긴다", p == ("TACKLE", None), p)
+    me.mon["ability"] = "NOGUARD"
+    me.ability = "NOGUARD"
+    chk("노가드는 숨어도 맞히니 멈춘다", bt.spare_plan(me, foe) == (None, "low"), bt.spare_plan(me, foe))
+    p, bt, me, foe = plan_when_hidden(["TACKLE"], hp=0.05)
+    foe.status = "poison"
+    foe.hp = foe.maxhp // 8
+    chk("턴 끝 독으로 쓰러질 체력이면 넘기지 않고 멈춘다", bt.spare_plan(me, foe) == (None, "low"),
+        bt.spare_plan(me, foe))
+    p, bt, me, foe = plan_when_hidden(["TACKLE"])
+    foe.cond["invuln"] = "vanish"
+    chk("섀도다이브(모습을 감췄다)도 넘긴다", p == ("TACKLE", None) and bt.spare_plan(me, foe) == ("TACKLE", None),
+        bt.spare_plan(me, foe))
+    bt, me, foe = setup(["TACKLE"])
+    foe.hp = foe.maxhp // 5
+    chk("숨지 않았으면 예전처럼 멈춘다", bt.spare_plan(me, foe) == (None, "low"), bt.spare_plan(me, foe))
+
+
 def main():
     dex = load_dex()
     t_고르기(dex)
     t_실제로_안_쓰러뜨린다(dex)
+    t_숨은_상대(dex)
     print()
     print("======================================================")
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))

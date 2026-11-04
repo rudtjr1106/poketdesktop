@@ -60,6 +60,7 @@ import tkinter as tk                                        # noqa: E402
 import smoke_box_filter as SB                               # noqa: E402
 import smoke_tms as ST                                      # noqa: E402
 import test_big_lists as TBL                                # noqa: E402
+from common import legends as L                             # noqa: E402
 from common import pokelogic as P                           # noqa: E402
 from poketdesktop import platform_os as PLAT                # noqa: E402
 from poketdesktop import skins                              # noqa: E402
@@ -1108,6 +1109,8 @@ def main():
     mons += [SB.mon(dex, n, 2000 + i) for i, n in enumerate([1, 4, 7, 133, 143, 150, 151, 248])]
     for m in mons:
         m["level"] = 60
+    mons[7]["hiddenAbility"] = True                     # 숨은 특성 ◎ (2.1.3, 게시판 #435) - 박스 둘째 칸 파이리
+    mons[8].update(hiddenAbility=True, shiny=True)      # 셋째 칸 꼬부기는 이로치이기도 하다 - ◎ 는 ★ 오른쪽
 
     PLAT.before_tk()
     skins.register_fonts()
@@ -1297,6 +1300,13 @@ def main():
         TBL.settle(root, 0.5)
         chk("파티 여섯 · 박스 여덟", len(bx._party_list) == 6 and len(bx._page_mons) == 8,
             (len(bx._party_list), len(bx._page_mons)))
+        gcv = bx.gcv
+        marks = [i for i in gcv.find_all() if gcv.type(i) == "text" and gcv.itemcget(i, "text") == L.HIDDEN_MARK]
+        stars = [gcv.bbox(i) for i in gcv.find_all() if gcv.type(i) == "text" and gcv.itemcget(i, "text") == "★"]
+        chk("숨은 특성 칸 둘에 ◎ (2.1.3)", len(marks) == 2, len(marks))
+        chk("  이로치면 ★ 바로 오른쪽 (겹치지 않는다)", any(
+            sb and gcv.bbox(i) and 0 <= gcv.bbox(i)[0] - sb[2] <= 3 and abs(gcv.bbox(i)[1] - sb[1]) <= 4
+            for i in marks for sb in stars), ([gcv.bbox(i) for i in marks], stars))
         pid = bx._page_mons[3]["id"]
         bx.select(pid)
         TBL.settle(root, 0.3)
