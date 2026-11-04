@@ -118,6 +118,35 @@ HIST = [{"at": "2026-11-04T05:00:00", "tier": t, "label": l, "paid": "coin"}
         for t, l in (("rare", "이상한사탕"), ("lose", "꽝"), ("common", "몬스터볼 x5"))]
 
 
+def stall_after_gc(root, app):
+    """2.1.3: CI 에서 7b 의 첫 창이 30초 넘게 '켜는 중' 이었다 (439b791 부터, 맥 · 윈도우). 바로 앞 기록 검사의 '옛 서버'
+    창이 오류 -> 추적 -> 콜백 -> 창 고리로 남았다가, 다음 창의 그림을 짓는 **작업 스레드의 GC** 로 풀리면서 그림
+    수백 장을 그 스레드에서 지웠다 - mainloop 가 아니면 한 장에 1초씩 막힌다. 닫을 때 그림을 놓으면 막히지 않는다."""
+    import gc
+    print("\n=== 닫힌 창을 작업 스레드의 GC 가 풀 때")
+    w5 = G.GachaWindow(app, root, coin=50, odds=ODDS)
+    pump(root, 30, lambda: w5.art is not None and w5.state == "idle")
+    real = G.Art.__init__
+
+    def art_init(self, *a, **k):
+        gc.collect()                                      # 그 고리를 다음 창의 작업 스레드가 푼다 (CI 에서 그랬다)
+        real(self, *a, **k)
+    gc.disable()
+    try:
+        w5.close()
+        w5._loop = w5                                     # 닫힌 창이 순환 참조로 남았다
+        del w5
+        G.Art.__init__ = art_init
+        t = time.time()
+        w6 = G.GachaWindow(app, root, coin=50, odds=ODDS)
+        ok = pump(root, 20, lambda: w6.art is not None and w6.state == "idle")
+        chk("닫힌 창을 다음 창의 작업 스레드가 GC 로 풀어도 다음 창은 바로 켜진다", ok, (w6.state, round(time.time() - t, 1)))
+        w6.close()
+    finally:
+        G.Art.__init__ = real
+        gc.enable()
+
+
 def history(root, app):
     """오른쪽 위 '최근 기록' (2.1.2): 열면 서버에서 받아 보인다. 뽑은 답의 기록은 상품을 열어 보인 뒤에 칠한다
     (먼저 칠하면 맨 위 줄이 열기 전에 상품을 알려 준다). 옛 서버(기록 없음)면 판을 안 보인다."""
@@ -400,6 +429,9 @@ def main():
     pump(root, 0.2)
     chk("부모 창이 닫혀 같이 부서지면 멈춘다", not w4.alive)
     chk("닫으면 멈춘다", not win.alive)
+    held = [k for k, v in list(vars(w3).items()) + list(vars(w4).items()) + list(vars(win).items()) if G._has_photo(v)]
+    chk("닫히면(부모와 같이 부서져도) 그림(PhotoImage)을 다 놓는다", not held, held)
+    stall_after_gc(root, app)
 
     # 8. 상점 띠
     fr = tk.Toplevel(root)

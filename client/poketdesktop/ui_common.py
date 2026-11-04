@@ -1636,6 +1636,9 @@ def run_async(root, fn, on_done):
         except Exception as e:                   # noqa: BLE001
             item = (on_done, None, e)
         st["q"].put(item)
+        # 오류면 item -> 예외 -> 추적(traceback) -> 이 틀 -> item 으로 고리가 생겨, 답을 받은 창(on_done)까지 GC 를
+        # 기다리게 된다 - GC 가 작업 스레드에서 돌면 그 창의 그림을 그 스레드에서 지우느라 막힌다 (2.1.3, ui_gacha._drop_images)
+        del item
 
     with st["lock"]:
         st["n"] += 1

@@ -1015,6 +1015,17 @@ GLOW = tuple((164 - 140 * t, 0.05 + 0.72 * t ** 1.5) for t in [i / 15.0 for i in
 BACKDROP = (12, 7, 22)                                 # 여는 연출 동안 캔버스 바탕 빛 (기계는 숨긴다)
 
 
+def _has_photo(v, depth=3):
+    """v 가 (목록 · 사전 · 튜플 안에) Tk 그림을 쥐고 있나 - GachaWindow._drop_images."""
+    if isinstance(v, (ImageTk.PhotoImage, tk.PhotoImage)):
+        return True
+    if depth and isinstance(v, dict):
+        return any(_has_photo(x, depth - 1) for x in v.values())
+    if depth and isinstance(v, (list, tuple)):
+        return any(_has_photo(x, depth - 1) for x in v)
+    return False
+
+
 class GachaWindow(object):
     """랜덤 캡슐 창. on_change(coin) = 코인 · 가방이 바뀌었을 때 (상점을 다시 받게).
 
@@ -1907,6 +1918,21 @@ class GachaWindow(object):
         self.parts = []
         if self.result is not None and self.err is None:
             self._notify()                                 # 답은 왔는데 상품을 다 보기 전에 닫았다 (아직이면 _answer 가)
+        self._drop_images()
+
+    def _drop_images(self):
+        """닫을 때 그림을 **지금(Tk 스레드에서)** 놓는다 (2.1.3).
+
+        창은 닫힌 뒤에도 순환 참조로 남을 수 있다 - 답에서 받은 오류(self.err)가 작업 스레드의 추적(traceback)을
+        물고, 그 틀이 이 창의 콜백을 문다. 그러면 창은 GC 가 풀 때 풀리는데, GC 는 **아무 스레드에서나** 돈다.
+        다음 창의 그림을 짓는 작업 스레드에서 돌면 그림 수백 장을 그 스레드에서 지운다 - Tk 는 메인 루프에
+        넘겨 지우므로 mainloop 가 아니면(검사의 update 고리) 한 장에 1초씩 막혀, 다음 창이 몇 분 동안
+        '켜는 중' 이었다 (CI 랜덤 캡슐 검사 7b, 맥 실험: 5장 5.3초). 그림을 쥔 칸을 다 비우면 참조가 0 이 되어
+        여기서 지워진다. 칸 이름을 적어 두지 않고 찾는다 - 캡슐마다 마지막 그림을 기억하는 _cap_drawn 처럼
+        그림을 쥔 칸은 늘어난다."""
+        for name, v in list(vars(self).items()):
+            if _has_photo(v):
+                setattr(self, name, {} if isinstance(v, dict) else [] if isinstance(v, list) else None)
 
     def close(self):
         self._gone()
