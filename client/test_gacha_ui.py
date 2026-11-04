@@ -150,7 +150,7 @@ def history(root, app):
         raise RuntimeError("404")
     app.api.capsule_history = gone
     w2 = G.GachaWindow(app, root, coin=100, odds=ODDS)
-    pump(root, 10, lambda: w2.art is not None and w2.state == "idle")
+    pump(root, 30, lambda: w2.art is not None and w2.state == "idle")   # (그림이 다 지어진 뒤에 닫는다 - CI 는 느리다)
     pump(root, 0.3)
     chk("옛 서버(기록 없음)면 판이 없다", w2.history is None and w2.cv.itemcget(w2.hist_id, "state") == "hidden")
     w2.close()
@@ -378,7 +378,9 @@ def main():
     for when in ("mix", "answer"):
         seen = []
         w3 = G.GachaWindow(app, root, coin=50, odds=ODDS, on_change=seen.append)
-        pump(root, 10, lambda: w3.art is not None and w3.state == "idle")
+        ready = pump(root, 30, lambda: w3.art is not None and w3.state == "idle")
+        if not ready:
+            chk("(%s) 창이 준비된다 (그림 짓기)" % when, False, w3.state)
         app.api.answers.append(answer("ball", "common", 30, item="POKEBALL", itemKr="몬스터볼", count=5))
         w3.spin()
         if when == "mix":
