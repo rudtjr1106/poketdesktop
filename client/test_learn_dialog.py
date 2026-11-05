@@ -85,6 +85,8 @@ def squeezed(win):
             is_canvas = c.winfo_class() == "Canvas"
             skip = is_canvas or inside_canvas or holds_canvas(c)
             try:
+                if not c.winfo_ismapped():
+                    continue                    # 숨긴 것(pack_forget)은 마지막 크기를 들고 있다 - 화면에 없으니 안 센다 (2.2.1)
                 rw, rh = c.winfo_reqwidth(), c.winfo_reqheight()
                 aw, ah = c.winfo_width(), c.winfo_height()
                 # 1x1 은 아직 안 그려진 것이다.

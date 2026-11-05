@@ -284,6 +284,9 @@ jobs:
         run: python client/test_catch_pick_ui.py
       - name: 테두리 없는 창이 제자리에 뜨는가
         if: matrix.shard == 2
+        # 여러 검사를 묶은 단계는 bash 로 - 윈도우 기본(pwsh)은 마지막 검사의 결과만 봐서 앞의 실패가 가려졌다
+        # (2.2.1: 랭크 창 머리줄이 윈도우에서 눌린 것이 이렇게 숨어 있었다). bash 는 첫 실패에서 멈춘다
+        shell: bash
         run: |
           python client/smoke_window.py
           python client/test_popup_close.py
@@ -471,6 +474,9 @@ jobs:
       # 시즌 2 화면 (랭킹·랭크 팀·칭호·이로치사탕). 가짜 API 로 진짜 창을 만든다.
       - name: 랭크 시즌 화면
         if: matrix.shard == 3
+        # 여러 검사를 묶은 단계는 bash 로 - 윈도우 기본(pwsh)은 마지막 검사의 결과만 봐서 앞의 실패가 가려졌다
+        # (2.2.1: 랭크 창 머리줄이 윈도우에서 눌린 것이 이렇게 숨어 있었다). bash 는 첫 실패에서 멈춘다
+        shell: bash
         run: |
           python client/smoke_season.py
           python client/test_practice_ui.py   # 하루 20판 뒤 연습판: 단추·머리줄·대전 기록·트레이 (옛 서버면 예전 글)

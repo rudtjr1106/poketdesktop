@@ -196,10 +196,34 @@ class TmWindow(object):
         self.type_btn = U.ghost_button(bar, "타입: 전체", self._open_type_menu,
                                        height=28)
         self.type_btn.pack(side="right", padx=(0, 8))
-        tk.Label(bar, text="상점에서 살 수 없습니다.",
-                 bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="right",
-                                                               padx=(0, 12))
+        self.shop_note = tk.Label(bar, text="상점에서 살 수 없습니다.",
+                                  bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS)
+        self.shop_note.pack(side="right", padx=(0, 12))
+        self._note_need = None
+        # 배치가 끝난 뒤에 본다 - 머리줄 크기가 바뀌는 순간에는 안쪽 위젯 폭이 아직 옛 값이다
+        later = lambda _e=None: bar.after_idle(lambda: self._fit_shop_note(bar))   # noqa: E731
+        bar.bind("<Configure>", later, add="+")
+        self.shop_note.bind("<Configure>", later, add="+")
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+
+    def _fit_shop_note(self, bar):
+        """머리줄이 모자라면 '상점에서 살 수 없습니다.' 를 숨긴다 (2.2.1). 글자를 '아주 크게' 하고 창이 작으면
+        (윈도우 CI 에서 잼: 188px 이 177px 로) 이 글이 잘렸다 - 글꼴은 줄이지 않는다. 맨 나중에 담겨 자리가
+        모자라면 먼저 눌리므로, 눌린 만큼을 기억했다가 머리줄이 그만큼 넓어지면 다시 보인다."""
+        lbl = getattr(self, "shop_note", None)
+        if lbl is None:
+            return
+        try:
+            w = bar.winfo_width()
+            if self._note_need is None:
+                if lbl.winfo_ismapped() and 1 < lbl.winfo_width() < lbl.winfo_reqwidth():
+                    self._note_need = w + lbl.winfo_reqwidth() - lbl.winfo_width()
+                    lbl.pack_forget()
+            elif w >= self._note_need:
+                self._note_need = None
+                lbl.pack(side="right", padx=(0, 12))
+        except tk.TclError:
+            pass
 
     def _bottom(self):
         f = tk.Frame(self.win, bg=U.BG2, height=U.h(44))

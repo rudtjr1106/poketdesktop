@@ -562,6 +562,23 @@ def find_section(root, win, tms, have):
     chk("  찾기 칸에 글을 칠 자리가 있다 (80px 넘게)", box.entry.winfo_width() >= 80, box.entry.winfo_width())
     chk("  눌린 위젯이 없다", not squeezed(win.win), squeezed(win.win)[:3])
 
+    # 머리줄이 모자라면 '상점에서 살 수 없습니다.' 를 숨기고, 넓어지면 다시 (2.2.1 - 윈도우 · 아주 크게에서 잘렸다)
+    top = win.win.winfo_toplevel()
+    geo = top.geometry()
+    note = win.shop_note
+    chk("머리줄 안내 '상점에서 살 수 없습니다.' 가 보인다 (넉넉한 폭)", note.winfo_ismapped())
+    mins = top.minsize()
+    top.minsize(1, 1)                                   # (창의 최소 크기를 풀어야 머리줄이 모자라진다)
+    top.geometry("560x664")
+    settle(root, 30)
+    chk("  창을 좁히면 잘리지 않고 숨는다 (글자는 그대로)", not note.winfo_ismapped()
+        and not [b for b in squeezed(win.win) if "상점에서" in b[2]], (note.winfo_ismapped(), squeezed(win.win)[:2]))
+    top.geometry(geo)
+    top.minsize(*mins)
+    settle(root, 30)
+    chk("  다시 넓히면 다시 보인다", note.winfo_ismapped() and note.winfo_width() >= note.winfo_reqwidth(),
+        (note.winfo_ismapped(), note.winfo_width(), note.winfo_reqwidth()))
+
     win.pick(have[0])
     wait_for(root, lambda: win._learners is not None)
     picked = win.title_lbl.cget("text")

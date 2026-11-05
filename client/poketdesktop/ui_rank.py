@@ -136,6 +136,10 @@ class RankWindow(object):
 
     # ---------------- 머리 ----------------
     def _header(self):
+        # **위아래 여백을 박지 않는다** (2.2.1). 예전에는 62px 머리줄에 제목 pady=17 · 단추 pady=15 를 줘서, 윈도우
+        # 굵은 글꼴의 제목(34px)과 단추(36px)가 6 · 4px 눌려 잘렸다 (smoke_season '눌린 위젯' - 여러 줄 단계라 CI 에서
+        # 가려져 있었다). 여백 없이 담으면 pack 이 높이 가운데에 놓는다 - 맞을 때는 예전과 같은 자리다. 그래도 모자라면
+        # 머리줄을 내용만큼 키운다 (글자 '아주 크게').
         h = tk.Frame(self.win, bg=U.BG2, height=U.h(62))
         h.pack(fill="x")
         h.pack_propagate(False)
@@ -143,21 +147,24 @@ class RankWindow(object):
         inner.pack(fill="both", expand=True, padx=16)
         self.title = tk.Label(inner, text="랭킹", bg=U.BG2, fg=U.FG,
                               font=(U.FAMILY_BLACK, U.pt(15)))
-        self.title.pack(side="left", pady=17)
+        self.title.pack(side="left")
         self.sub = tk.Label(inner, text="", bg=U.BG2, fg=U.FG_DIM,
                             font=U.FONT_XS)
         self.sub.pack(side="left", padx=(12, 0))
 
         U.ghost_button(inner, "새로고침", self.reload,
-                       height=32).pack(side="right", pady=15)
+                       height=32).pack(side="right")
         # 칭호·명패가 있던 자리 (1.12.1 - 칭호·명패는 마이페이지로). 누르면 랭킹 <-> 대전 기록.
         self.mode_btn = U.ghost_button(inner, "대전 기록", self._toggle_mode, height=32)
-        self.mode_btn.pack(side="right", padx=(0, 8), pady=15)
+        self.mode_btn.pack(side="right", padx=(0, 8))
         U.ghost_button(inner, "랭크 팀", self._team,
-                       height=32).pack(side="right", padx=(0, 8), pady=15)
+                       height=32).pack(side="right", padx=(0, 8))
         self.random_btn = U.ghost_button(inner, self._random_text(), self._random, height=32)
-        self.random_btn.pack(side="right", padx=(0, 8), pady=15)
+        self.random_btn.pack(side="right", padx=(0, 8))
         tk.Frame(self.win, bg=U.LINE2, height=U.h(2)).pack(fill="x")
+        inner.update_idletasks()
+        if inner.winfo_reqheight() + U.h(12) > U.h(62):
+            h.configure(height=inner.winfo_reqheight() + U.h(12))
 
     def _body(self):
         wrap = tk.Frame(self.win, bg=U.BG)
