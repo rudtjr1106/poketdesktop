@@ -764,6 +764,10 @@ class 가짜야생(object):
         self.toggled += 1
         self.app.settings["autoThrow"] = not self.app.settings.get("autoThrow")
 
+    def cycle_auto_max(self):                   # 그 아래 '최대 N개까지' (2.2.1, #460)
+        from poketdesktop import ball_menu
+        self.app.settings["autoThrowMax"] = ball_menu.next_auto_max(ball_menu.auto_max(self.app.settings))
+
 
 class 가짜잡기앱(object):
     def __init__(self, mode="new"):
@@ -1065,6 +1069,88 @@ def t_배틀_중에도_잡힐_때까지_계속_던진다():
         d._do_throw("MASTERBALL")
         d.root.advance(3000)
         chk("마스터볼은 이어 던지지 않는다", d.app.api.balls == ["POKEBALL", "MASTERBALL"], d.app.api.balls)
+    finally:
+        undo()
+
+
+def t_싸우는_중에_던져도_이어_던진다():
+    """게시판 #466 (우가우가, 2.2.1): 계속 던지기를 켜 두고 **싸우는 중에**(멈추기 전에) 던지면 한 번 던지고 다시
+    싸웠다 - 이어 던지기가 '지금 던지세요!' 로 멈춘 동안에만 됐다. 이제 그때부터 싸움을 멈추고 잡힐 때까지 던진다.
+    게시판 #460 (다람): 한 번에 던지는 최대 개수를 볼 메뉴 '최대 N개까지' 로 고른다 (5 · 10 · 20 · 30, 기본 30)."""
+    d, menus, undo = 잡기_준비()
+    try:
+        d.app.settings["autoThrow"] = True
+        d.next_turn()                                    # 멈추지 않은 보통 턴 (서버가 hold 를 안 줬다)
+        chk("싸우는 중이다 (멈추지 않았다)", not d.holding and len(d.app.api.moves) == 1, d.app.api.moves)
+        d.throw_ball(이벤트())
+        pick, on_close, kw = menus[-1]
+        chk("배틀 메뉴에 '최대 N개까지' 줄 (기본 30)", kw.get("limit") == 30 and kw.get("on_limit") is not None, kw)
+        for _ in range(2):
+            kw["on_limit"]()
+        chk("  누를 때마다 5 -> 10 -> 20 -> 30 -> 5 ... (30 에서 두 번 = 10)", d.app.settings.get("autoThrowMax") == 10,
+            d.app.settings.get("autoThrowMax"))
+        d.app.settings["autoThrowMax"] = 5
+        on_close()
+        d.app.api.ball_answers = [{"caught": False, "balls": 30, "events": [{"t": "move", "who": "foe"}],
+                                   "battle": {"id": 7, "over": False}}] * 10
+        moves = len(d.app.api.moves)
+        pick("POKEBALL")
+        chk("싸우는 중에 던지면 그때부터 멈춘다 (끝까지 싸우기도 풀린다)", d.holding and not d.finish, (d.holding, d.finish))
+        d.root.advance(5000)
+        chk("  싸우는 턴 없이 이어 던진다 - 최대 5개에서 멈추고 알린다", d.app.api.balls == ["POKEBALL"] * 5
+            and len(d.app.api.moves) == moves and any("5번 던져" in m for m in d.app.말),
+            (d.app.api.balls, d.app.api.moves[moves:], d.app.말[-2:]))
+        chk("  다 던진 뒤에는 예전처럼 멈춰 기다린다 (10초 뒤 바로 싸우기)", d.holding and d.auto_ball is None)
+    finally:
+        undo()
+
+    # 바쁠 때(턴을 기다리는 중) 던져 둔 볼 - 이어 던지기가 대신 던지고, 줄 서 있던 볼이 바로 싸우기를 막지 않는다
+    d, menus, undo = 잡기_준비()
+    try:
+        d.app.settings["autoThrow"] = True
+        d.busy = True
+        d._do_throw("POKEBALL")
+        chk("기다리는 중에 던지면 줄 세우고 멈춘다", d.pending_ball == "POKEBALL" and d.holding, (d.pending_ball, d.holding))
+        d.busy = False
+        d.app.api.ball_answers = [{"caught": False, "balls": 30, "events": [], "battle": {"id": 7, "over": False}}] * 3
+        d.turn_done({"battle": {"id": 7, "over": False}})
+        d.root.advance(400)
+        chk("  턴이 끝나면 이어 던지기가 그 볼을 던진다 (줄 선 볼은 비운다)", d.app.api.balls[:1] == ["POKEBALL"]
+            and d.pending_ball is None, (d.app.api.balls, d.pending_ball))
+        d.fight_on()
+        d.root.advance(1500)
+        n = len(d.app.api.balls)
+        chk("  왼쪽 클릭(바로 싸우기)이 먹는다 - 멈추고 끝까지 싸운다", not d.holding and d.finish and d.auto_ball is None
+            and d.app.api.moves and d.app.api.moves[-1] == ("new", True), (d.holding, d.finish, d.app.api.moves[-1:]))
+        d.root.advance(2000)
+        chk("  그 뒤로는 안 던진다", len(d.app.api.balls) == n, d.app.api.balls)
+    finally:
+        undo()
+
+    # 계속 던지기 중에 상대가 숨었다가 올라왔다 - 잡기 모드가 꺼져 있어 서버가 멈추라고 하지 않아도 이어 던진다
+    class 숨음(object):
+        def __init__(self):
+            self.on = False
+
+        def hidden(self, who):
+            return self.on and who == "foe"
+
+        def apply(self, who):
+            pass
+    d, menus, undo = 잡기_준비("off")
+    try:
+        d.hiding = 숨음()
+        d.app.settings["autoThrow"] = True
+        d.app.api.ball_answers = [{"caught": False, "balls": 30, "events": [], "battle": {"id": 7, "over": False}}] * 5
+        d.hiding.on = True                              # 놓친 볼 뒤 상대가 땅속으로
+        d._do_throw("POKEBALL")
+        d.root.advance(700)                             # (풀고 TURN_GAP 뒤에 다음 턴)
+        chk("숨으면 멈춘 것을 풀고 한 턴 넘긴다 (잡기 모드 꺼짐)", not d.holding and d.auto_ball == "POKEBALL"
+            and len(d.app.api.moves) >= 1, (d.holding, d.auto_ball, d.app.api.moves))
+        d.hiding.on = False                             # 올라왔다 (서버는 hold 를 안 준다)
+        n = len(d.app.api.balls)
+        d.root.advance(1500)
+        chk("  올라오면 이어 던진다", len(d.app.api.balls) > n and d.holding, (len(d.app.api.balls), n, d.holding))
     finally:
         undo()
 
@@ -1419,6 +1505,7 @@ def main():
                t_바쁠_때_던진_볼은_턴이_끝나고_던진다, t_멈춘_채_던졌다가_놓치면_10초를_새로_센다,
                t_놓친_뒤_야생이_숨으면_멈추지_않고_넘긴다,
                t_배틀_중에도_잡힐_때까지_계속_던진다,
+               t_싸우는_중에_던져도_이어_던진다,
                t_볼이_흔들리는_동안_왼쪽_클릭은_싸우기가_아니다, t_두_번_클릭의_두_번째_뗌은_싸우기가_아니다,
                t_잡으면_끝낸다, t_볼을_기다리던_턴에_판이_끝나면_말없이_버리지_않는다, t_배틀을_접으면_서버에_알린다,
                t_상대_이름표는_두_줄이다,

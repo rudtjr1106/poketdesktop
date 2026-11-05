@@ -46,7 +46,7 @@ CAUGHT_MS = 1500           # 잡은 뒤 '○○을 잡았다!' · '+exp' 를 읽
 HOLD_MS = 10000            # 잡기 모드로 멈췄다가 다시 싸우기까지
 HINT_MS = 2500             # 멈춘 동안 '지금 던지세요' 를 다시 띄우는 간격
 AUTO_GAP_MS = 350          # 잡힐 때까지 계속 던지기 (2.1.3): 놓친 턴을 다 그린 뒤 다음 볼까지
-AUTO_MAX = 30              # 한 판에 이어 던지는 수 (배틀 밖 wild_ui.AUTO_MAX 와 같다)
+# 한 번 이어 던지는 최대 개수는 설정 autoThrowMax (볼 메뉴 '최대 N개까지', 2.2.1 게시판 #460) - ball_menu.auto_max
 
 
 def on_screen(pet):
@@ -437,8 +437,11 @@ class DesktopBattle(object):
             self.holding = False
             self._cancel_hold_jobs()
             return self.after(TURN_GAP, self.next_turn)
-        if result.get("hold") or self.holding:
-            # 서버가 멈추라고 했거나, 멈춘 채 던졌다가 놓쳤다
+        hidden = bool(getattr(self, "hiding", None) and self.hiding.hidden("foe"))
+        armed = bool(getattr(self, "auto_ball", None)) and not hidden
+        if result.get("hold") or self.holding or armed:
+            # 서버가 멈추라고 했거나, 멈춘 채 던졌다가 놓쳤다. armed: 계속 던지기 중에 숨었던 상대가 올라왔다 -
+            # 잡기 모드가 꺼져 있어 서버가 멈추라고 하지 않아도 이어 던진다 (2.2.1, 게시판 #466)
             if self._auto_again():
                 return                          # 잡힐 때까지 계속 던지기 (2.1.3) - 같은 볼을 곧 다시 던진다
             return self.start_hold(result.get("hold"))
@@ -505,10 +508,10 @@ class DesktopBattle(object):
 
     # ---------------- 잡힐 때까지 계속 던지기 (2.1.3, 게시판 #446 우가우가) ----------------
     # 배틀 밖 야생에만 있던 것을 배틀에도 둔다 (설정 autoThrow 하나 - 볼 메뉴 맨 위 줄로 켜고 끈다). '지금 던지세요!' 가
-    # 뜨면 안 잡은 포켓몬인 줄 알고 그때 켜는데, 배틀이 시작된 뒤라 켤 수 없었다. 켜 두고 던지면 **멈춘 동안**(잡기
-    # 모드로 멈췄거나 멈춘 채 던졌다) 놓칠 때마다 10초를 기다리지 않고 같은 볼을 다시 던진다 - 놓치면 상대가 한 번
+    # 뜨면 안 잡은 포켓몬인 줄 알고 그때 켜는데, 배틀이 시작된 뒤라 켤 수 없었다. 켜 두고 던지면 놓칠 때마다 10초를
+    # 기다리지 않고 같은 볼을 다시 던진다 - 싸우는 중에 던졌으면 그때부터 싸움을 멈춘다 (2.2.1, #466). 놓치면 상대가 한 번
     # 움직이는 것은 손으로 던질 때와 같다. 멈추는 때: 잡힘 · 판 끝(내 포켓몬이 쓰러짐 포함) · 왼쪽 클릭이나 10초로 바로
-    # 싸우기 · 메뉴를 다시 엶 · 설정을 끔 · 그 볼이 떨어짐 · AUTO_MAX 번. 상대가 숨으면(구멍파기 …) 기다렸다가 올라와
+    # 싸우기 · 메뉴를 다시 엶 · 설정을 끔 · 그 볼이 떨어짐 · 최대 개수(설정 autoThrowMax). 상대가 숨으면(구멍파기 …) 기다렸다가 올라와
     # 다시 멈출 때 이어 던진다 (멈춘 동안에만 던지므로).
     def _auto_setting(self):
         return bool((getattr(self.app, "settings", None) or {}).get("autoThrow"))
@@ -540,8 +543,8 @@ class DesktopBattle(object):
             why = ""
         elif self._ball_left(ball) <= 0:
             why = "볼이 떨어져 계속 던지기를 멈췄습니다."
-        elif getattr(self, "auto_n", 0) + 1 >= AUTO_MAX:
-            why = "%d번 던져 계속 던지기를 멈췄습니다." % AUTO_MAX
+        elif getattr(self, "auto_n", 0) + 1 >= ball_menu.auto_max(self.app.settings):
+            why = "%d번 던져 계속 던지기를 멈췄습니다." % ball_menu.auto_max(self.app.settings)
         if why is not None:
             self.stop_auto()
             if why:
@@ -549,6 +552,7 @@ class DesktopBattle(object):
             return False
         self.holding = True
         self._cancel_hold_jobs()
+        self.pending_ball = None            # 바쁠 때 던져 둔 같은 볼 - 이어 던지기가 대신 던진다 (안 지우면 바로 싸우기가 막힌다)
         self.auto_job = self.after(AUTO_GAP_MS, self._auto_throw)
         self.app.notify("계속 던지는 중 (%d번째) · 멈추려면 오른쪽 클릭" % (self.auto_n + 2))
         return True
@@ -741,9 +745,12 @@ class DesktopBattle(object):
             try:
                 wild = getattr(self.app, "wild", None)
                 toggle = getattr(wild, "toggle_auto", None)
+                cycle = getattr(wild, "cycle_auto_max", None)       # '최대 N개까지' (2.2.1, 게시판 #460)
                 return ball_menu.popup(self.root, e, opts, self._do_throw,
                                        on_close=lambda: self._safe(self._menu_closed),
-                                       auto=self._auto_setting() if toggle else None, on_auto=toggle)
+                                       auto=self._auto_setting() if toggle else None, on_auto=toggle,
+                                       limit=ball_menu.auto_max(self.app.settings) if (toggle and cycle) else None,
+                                       on_limit=cycle)
             except Exception:
                 self._menu_closed()
                 raise
@@ -759,6 +766,13 @@ class DesktopBattle(object):
             self.stop_auto()
             if self._auto_setting() and ball != ball_menu.MASTER:
                 self.auto_ball, self.auto_n = ball, 0
+                if not self.holding:
+                    # **싸우는 중에 던져도** 그때부터 싸움을 멈추고 잡힐 때까지 던진다 (2.2.1, 게시판 #466 우가우가).
+                    # 예전에는 '지금 던지세요!' 로 멈춘 동안에만 이어 던져서, 싸우다 던지면 한 번 던지고 다시 싸웠다
+                    # (이미 잡은 종 · 잡기 모드를 끈 사람은 멈추는 때가 없다). 끝까지 싸우기도 푼다 - 잡을 생각이다
+                    self.holding = True
+                    self.finish = False
+                    self._cancel_hold_jobs()
         if ball == "POKEBALL" and self.app.balls <= 0:
             return self.app.notify("몬스터볼이 없습니다.")
         if self.busy or self.playing:

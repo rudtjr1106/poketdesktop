@@ -20,6 +20,29 @@
 """
 
 AUTO_TEXT = "잡힐 때까지 계속 던지기"
+# 한 번 이어 던지기에 던지는 최대 개수 (2.2.1, 게시판 #460 다람): 그 줄 바로 아래 '최대 N개까지' 를 누를 때마다 다음 값.
+# 처음 던진 볼까지 센다. 설정 autoThrowMax - 없으면(예전 그대로) 30.
+AUTO_MAX_CHOICES = (5, 10, 20, 30)
+AUTO_MAX_DEFAULT = 30
+
+
+def auto_max(settings):
+    """설정의 최대 개수 (고를 수 있는 값이 아니면 기본 30)."""
+    try:
+        n = int((settings or {}).get("autoThrowMax") or AUTO_MAX_DEFAULT)
+    except (TypeError, ValueError):
+        n = AUTO_MAX_DEFAULT
+    return n if n in AUTO_MAX_CHOICES else AUTO_MAX_DEFAULT
+
+
+def next_auto_max(n):
+    """5 -> 10 -> 20 -> 30 -> 5."""
+    ch = AUTO_MAX_CHOICES
+    return ch[(ch.index(n) + 1) % len(ch)] if n in ch else ch[0]
+
+
+def limit_text(n):
+    return "      최대 %d개까지  (누르면 %d개)" % (n, next_auto_max(n))
 import tkinter as tk
 
 from . import ui_common as U
@@ -40,13 +63,16 @@ def _label(o):
     return left, right
 
 
-def build(root, options, on_pick, auto=None, on_auto=None):
-    """메뉴를 만들어 돌려준다. 띄우는 건 부르는 쪽에서 한다. auto = 계속 던지기가 켜져 있나 (None 이면 그 줄 없음)."""
+def build(root, options, on_pick, auto=None, on_auto=None, limit=None, on_limit=None):
+    """메뉴를 만들어 돌려준다. 띄우는 건 부르는 쪽에서 한다. auto = 계속 던지기가 켜져 있나 (None 이면 그 줄 없음),
+    limit · on_limit = 그 아래 '최대 N개까지' 줄 (2.2.1)."""
     m = tk.Menu(root, tearoff=0, bg=U.BG2, fg=U.FG,
                 activebackground=U.BG4, activeforeground=U.FG,
                 bd=0, font=U.FONT_S)
     if auto is not None and on_auto:
         m.add_command(label=("☑ " if auto else "☐ ") + AUTO_TEXT, command=on_auto)
+        if limit is not None and on_limit:
+            m.add_command(label=limit_text(limit), command=on_limit)
         m.add_separator()
     have = [o for o in options if o["count"] > 0 and o["id"] != MASTER]
     best = next((o for o in have if o.get("best")), None)
@@ -84,7 +110,7 @@ def build(root, options, on_pick, auto=None, on_auto=None):
     return m
 
 
-def rows(options, on_pick, auto=None, on_auto=None):
+def rows(options, on_pick, auto=None, on_auto=None, limit=None, on_limit=None):
     """`build` 와 같은 내용을 ui_common.PopupMenu 가 받는 줄 목록으로.
 
     맥에서는 `tk.Menu` 를 쓸 수 없다. aqua 에서 그것은 NSMenu 이고,
@@ -102,6 +128,8 @@ def rows(options, on_pick, auto=None, on_auto=None):
     out = []
     if auto is not None and on_auto:
         out.append({"text": ("☑ " if auto else "☐ ") + AUTO_TEXT, "command": on_auto})
+        if limit is not None and on_limit:
+            out.append({"text": limit_text(limit), "command": on_limit})
         out.append(None)
     if best:
         out.append({"text": "추천   " + line(*_label(best)), "bold": True,
@@ -130,16 +158,16 @@ def rows(options, on_pick, auto=None, on_auto=None):
     return out
 
 
-def popup(root, event, options, on_pick, on_close=None, auto=None, on_auto=None):
+def popup(root, event, options, on_pick, on_close=None, auto=None, on_auto=None, limit=None, on_limit=None):
     """on_close: 메뉴가 닫히면(골랐든 안 골랐든) 한 번 부른다. 배틀이 그동안 멈춘다.
     auto · on_auto: 맨 위 '잡힐 때까지 계속 던지기' 줄 (배틀 밖 야생 · 2.1.3 부터 배틀 중에도)."""
     from . import platform_os as PLAT
     if not PLAT.NATIVE_MENU:
         # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
-        return U.PopupMenu(root, rows(options, on_pick, auto, on_auto),
+        return U.PopupMenu(root, rows(options, on_pick, auto, on_auto, limit, on_limit),
                            event.x_root, event.y_root, width=290,
                            on_close=on_close)
-    m = build(root, options, on_pick, auto, on_auto)
+    m = build(root, options, on_pick, auto, on_auto, limit, on_limit)
     try:
         # 윈도우의 tk_popup 은 메뉴가 닫힐 때까지 돌아오지 않는다
         m.tk_popup(event.x_root, event.y_root)

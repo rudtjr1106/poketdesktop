@@ -161,6 +161,18 @@ def run():
     chk("  누르면 켜고 끄는 일만 (던지지 않는다)", toggled == [1] and picked == [])
     chk("  켜져 있으면 ☑", ball_menu.rows(OPTS, picked.append, auto=True, on_auto=lambda: 0)[0]["text"].startswith("☑"))
     chk("배틀 안(auto 를 안 넘김)에는 그 줄이 없다", "잡힐 때까지" not in str(ball_menu.rows(OPTS, picked.append)))
+    lim = []
+    rows = ball_menu.rows(OPTS, picked.append, auto=True, on_auto=lambda: 0, limit=10, on_limit=lambda: lim.append(1))
+    chk("'최대 N개까지' 줄이 계속 던지기 줄 바로 아래 (2.2.1, #460)", rows[1]["text"].strip().startswith("최대 10개까지")
+        and "20개" in rows[1]["text"] and rows[2] is None, rows[:3])
+    rows[1]["command"]()
+    chk("  누르면 바꾸는 일만 (던지지 않는다)", lim == [1] and picked == [])
+    chk("  limit 을 안 넘기면 그 줄이 없다", "최대" not in str(ball_menu.rows(OPTS, picked.append, auto=True,
+                                                                     on_auto=lambda: 0)))
+    chk("최대 개수: 기본 30 · 고를 수 있는 값만 · 5 -> 10 -> 20 -> 30 -> 5",
+        ball_menu.auto_max({}) == 30 and ball_menu.auto_max({"autoThrowMax": 7}) == 30
+        and ball_menu.auto_max({"autoThrowMax": "10"}) == 10
+        and [ball_menu.next_auto_max(n) for n in (5, 10, 20, 30)] == [10, 20, 30, 5])
 
     print("\n=== 켜고 끄기")
     app = App([], auto=False)
@@ -220,7 +232,7 @@ def run():
     import poketdesktop.ball_menu as BM
     real_popup = BM.popup
     seen = {}
-    BM.popup = lambda root, e, opts, on_pick, on_close=None, auto=None, on_auto=None: seen.update(auto=auto)
+    BM.popup = lambda root, e, opts, on_pick, on_close=None, auto=None, on_auto=None, **kw: seen.update(auto=auto, **kw)
     try:
         w.throwing = True                                   # 볼이 날아가는 중 (이어 던지는 동안 거의 늘 이렇다)
         w.ball_menu(None)
@@ -230,6 +242,8 @@ def run():
         w.throwing = False
         w.ball_menu(None)
         chk("  멈춘 뒤 다시 열면 메뉴가 뜨고 지금 설정을 넘긴다", seen.get("auto") is True, seen)
+        chk("  '최대 N개까지' 줄도 넘긴다 (지금 값 · 바꾸는 일)", seen.get("limit") == w.AUTO_MAX
+            and seen.get("on_limit") == w.cycle_auto_max, seen)
     finally:
         BM.popup = real_popup
 
@@ -247,6 +261,18 @@ def run():
     app.root.run()
     chk("%d번에서 멈춘다" % w.AUTO_MAX, len(app.api.thrown) == w.AUTO_MAX and "멈췄습니다" in app.notes[-1],
         (len(app.api.thrown), app.notes[-1:]))
+
+    app = App([miss(10, 50)] * 40)
+    app.settings["autoThrowMax"] = 10
+    w = ctl(app, [dict(o, count=50) if o["id"] == "GREATBALL" else o for o in OPTS])
+    w.throw_ball("GREATBALL")
+    app.root.run()
+    chk("최대 10개로 골라 두면 10번에서 멈춘다 (2.2.1, #460)", len(app.api.thrown) == 10 and "10번 던져" in app.notes[-1],
+        (len(app.api.thrown), app.notes[-1:]))
+    w.cycle_auto_max()
+    chk("  메뉴 줄을 누르면 다음 값(20)으로 바꾸고 저장 · 알린다", app.settings["autoThrowMax"] == 20
+        and config.load_settings().get("autoThrowMax") == 20 and "최대 20개" in app.notes[-1],
+        (app.settings.get("autoThrowMax"), app.notes[-1:]))
 
     class Gone(Exception):
         message = "야생 포켓몬이 이미 사라졌습니다."

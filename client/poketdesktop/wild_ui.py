@@ -651,8 +651,19 @@ class WildController(object):
     # 이어 던진다. 여기는 배틀 밖 야생이다 - 배틀 중(멈춘 동안)은 desktop_battle 이 같은 설정으로 한다 (2.1.3). 서버는 여느 던지기와 같다
     # (한 번에 하나씩, 놓치면 throws+1 - 타이머볼 배율도 그대로). 멈추는 때: 잡힘 · 오류 · 그 볼이 떨어짐 ·
     # 야생이 사라짐(clear) · 배틀 시작 · 메뉴를 다시 엶 · 설정을 끔 · AUTO_MAX 번. 마스터볼은 이어 던지지 않는다.
-    AUTO_MAX = 30
     AUTO_GAP_MS = 350
+
+    @property
+    def AUTO_MAX(self):
+        """한 번 이어 던지기의 최대 개수 - 볼 메뉴 '최대 N개까지' 로 고른다 (2.2.1, 게시판 #460). 기본 30."""
+        return ball_menu.auto_max(getattr(self.app, "settings", None))
+
+    def cycle_auto_max(self):
+        """볼 메뉴 '최대 N개까지' 줄: 5 -> 10 -> 20 -> 30 -> 5. 배틀 중 메뉴도 이것을 부른다."""
+        n = ball_menu.next_auto_max(self.AUTO_MAX)
+        self.app.settings["autoThrowMax"] = n
+        config.save_settings(self.app.settings)
+        self.app.notify("잡힐 때까지 계속 던지기: 한 번에 최대 %d개까지 던집니다." % n)
 
     def auto_on(self):
         return bool((getattr(self.app, "settings", None) or {}).get("autoThrow"))
@@ -945,7 +956,8 @@ class WildController(object):
         if not opts:
             return self.throw_ball()          # 목록이 아직이면 예전처럼
         self.hide_hint()
-        ball_menu.popup(self.app.root, e, opts, self.throw_ball, auto=self.auto_on(), on_auto=self.toggle_auto)
+        ball_menu.popup(self.app.root, e, opts, self.throw_ball, auto=self.auto_on(), on_auto=self.toggle_auto,
+                        limit=self.AUTO_MAX, on_limit=self.cycle_auto_max)
 
     def last_ball(self):
         """마지막에 쓴 볼. 없으면 몬스터볼."""
