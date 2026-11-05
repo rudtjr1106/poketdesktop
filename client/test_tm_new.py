@@ -10,8 +10,8 @@
 아직 안 본 기술머신에는 노란 점을 찍는다.
 
   1. 새 것(가진 것 + new) 줄에만 **이름 앞에 노란 점**. 안 가진 줄에는 new 가 와도 안 찍는다.
-  2. 아래 줄에 [새 기술머신 N개]. 누르면 **다음 새 것으로 가서 고른다** - 거르기에 가려져
-     있으면 거르기를 풀고, 목록을 그 줄까지 굴린다.
+  2. 아래 줄에 [새 기술머신 N개]. 누르면 **다음 새 것으로 가서 고른다** - 거르기 · 찾는 말(2.2.1)에
+     가려져 있으면 그것을 풀고, 목록을 그 줄까지 굴린다.
   3. **줄을 누르면 점이 꺼지고 서버에 적는다** (/api/tms/seen). 다 보면 단추가 사라진다.
   4. 서버에 적기 전에 다시 읽어도 **본 줄의 점이 되살지 않는다.**
   5. 새로 받은 것이 생겨 다시 읽으면 점과 단추가 다시 생긴다.
@@ -165,14 +165,16 @@ def check_pane(root):
     win.list_canvas.yview_moveto(0)
     ty = next(t["type"] for t in tms if t["have"] and t["type"] != tms[NEW[1] - 1]["type"])
     win._set_type(ty)
+    win.tm_q.set("펀치")                # 찾는 말로도 가린다 (2.2.1, 게시판 #458)
     ST.settle_list(root, win)
     hidden = NEW[1] not in set(t["no"] for t in win._visible())
-    chk("(타입 거르기로 새 것을 가렸다)", hidden)
+    chk("(타입 거르기 · 찾는 말로 새 것을 가렸다)", hidden and "펀치" not in tms[NEW[1] - 1]["kr"])
     win.fresh_btn.command()            # [새 기술머신 1개] 를 누른다
     ST.settle_list(root, win)
     root.update_idletasks()
     chk("그 기술머신을 고른다", win.no == NEW[1], win.no)
     chk("  가렸던 거르기를 푼다", win.f_type is None and win.f_cat is None, (win.f_type, win.f_cat))
+    chk("  찾는 말도 지운다 (2.2.1)", win.tm_q.get() == "" and win.tm_find.entry.get() == "", win.tm_q.get())
     chk("  목록이 그 줄까지 굴러가 보인다", in_view(win, NEW[1]))
     chk("  오른쪽에 그 기술머신이 뜬다", win.title_lbl.cget("text") == win._cur()["label"])
     chk("다 봤으면 단추가 사라진다", not btn_shown(win))

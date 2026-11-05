@@ -2,7 +2,8 @@
 """에메랄드 테마 - 가방의 기술머신 칸. 도구 칸과 같은 시안 A 의 틀(bag.GBABag)에 그린다.
 
     머리 띠 '◀ 기술머신 ▶' · 가운데 위 창 (한 줄 안내 · 새로고침) · 오른쪽 위 창 '가진 기술머신  12/358'
-    목록 창    [가진 것만][전부] / [타입: 전체][분류: 전체] (줄 세우기 칸) + 기술머신 줄 (고른 줄은 연노랑 + 빨간 ▶)
+    목록 창    기술 찾기 [   ] (2.2.1) / [가진 것만][전부] / [타입: 전체][분류: 전체] (줄 세우기 칸)
+               + 기술머신 줄 (고른 줄은 연노랑 + 빨간 ▶)
     설명 창    타입 꼬리표 · 기술 이름 · 분류 · 위력 · 설명
     누구에게   '배울 수 있는 포켓몬' 줄 + 빨간 큰 단추 '가르치기'
 
@@ -81,6 +82,10 @@ class TmWindow(GBABag, DPT.TmWindow):
         _c1, _c2, top = self._em_layout(cv.winfo_width(), LH)
         ix1, iy1, ix2, iy2 = self._list_frame(cv, x0, x1, top, LH)
         th = s(26)
+        # 기술 찾기 줄 (2.2.1, 게시판 #458) - 도구 칸의 '찾기 [   ]' 줄과 같은 모양, 거르기 칸 위에
+        ex = self._find_label(cv, ix1, iy1 + th // 2)
+        self._place("tfind", self.tm_find, ex, iy1, ix2 - ex, th)
+        iy1 += th + s(6)
         self._tabs(cv, ix1, iy1, th, [("have", "가진 것만"), ("all", "전부")],
                    "have" if self.only_have else "all", "flt",
                    lambda k: (k == "have") != self.only_have and self._toggle_filter(), span=ix2)
@@ -95,7 +100,7 @@ class TmWindow(GBABag, DPT.TmWindow):
         else:
             self._hide("tms")
             K.text(cv, (ix1 + ix2) // 2, ly1 + s(40),
-                   "아직 하나도 없습니다.\n포켓몬을 잡으면 가끔 나옵니다." if self.only_have else "보일 기술머신이 없습니다.",
+                   self._list_note(),
                    font(11), anchor="n", justify="center", width=ix2 - ix1 - 20, tags=T)
 
     def _draw_tm_row(self, cv, t, x, y, w, h, tags, hover=None):

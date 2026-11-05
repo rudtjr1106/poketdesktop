@@ -510,6 +510,10 @@ jobs:
       - name: 기술머신 창 도트·목록 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/smoke_tms.py
+      # 기술머신 '기술 찾기' 칸 (2.2.1, 게시판 #458) - 기본 + DP 계열 여섯, 보통 글자와 아주 크게
+      - name: 기술머신 기술 찾기 칸 (진짜 Tk, 테마 일곱)
+        if: matrix.shard == 3
+        run: python client/test_tm_find.py
       # 기술 떠올리기(5,000원). '무엇을 버릴까' 창의 '결정' 이 고르기 전에는
       # 아무 반응이 없어서 기술을 못 배운다는 신고가 왔다 - 그것까지 본다.
       - name: 기술 떠올리기 창·포켓몬 관리 단추 (진짜 Tk)

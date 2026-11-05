@@ -10,7 +10,8 @@ v2: 358줄이나 되는 목록이 5줄만 보이던 것을 고쳤다 - 오른쪽
 도구 칸과 같다 (scene.mid_column - 창 폭을 따라 늘고 준다). 좁은 올리브 칸의 줄 바꾸기는 scene.Plates 가 한다.
 
 동작은 기본 기술머신 칸(ui_tms.TmWindow)의 것을 그대로 쓴다 - 서버에서 받기, 가진 것만 · 타입 · 분류로
-거르기, 새 기술머신 점, 배울 포켓몬 묻기, 가르치기(기술이 넷이면 무엇을 잊을지 묻기).
+거르기, 기술 이름으로 찾기(2.2.1, 목록 위 '기술 찾기' 칸 - 칸만 여기서 만들어 놓는다), 새 기술머신 점,
+배울 포켓몬 묻기, 가르치기(기술이 넷이면 무엇을 잊을지 묻기).
 """
 import tkinter as tk
 
@@ -39,6 +40,9 @@ class TmWindow(Scene, PocketDial, Plates, Band, TM.TmWindow):
         self._plates_init(self._arrange_mons)
         self.tms_vl = K.VList(self.cv, "#ffffff", self._draw_tm_row)
         self.tms_vl.on_click = self._click_tm
+        # 기술 찾기 칸 (2.2.1, 게시판 #458) - 가방 도구 칸의 찾기 칸과 같은 것. 말(tm_q)은 기본 창이 듣는다.
+        # 물려받는 테마는 이 칸을 제 빛깔로 바꾸고(또는 갈아 끼우고) 목록 위 제자리에 놓는다 (열쇠 "tfind").
+        self.tm_find = K.entry(self.cv, self.tm_q, width=10)
         # 기본 창의 동작 코드가 configure(text=) 로 글씨를 바꾸는 자리들 - 판이 그 글을 그린다
         self.filter_btn = Slot("가진 것만", self._soon)
         self.type_btn = Slot("타입: 전체", self._soon)
@@ -64,6 +68,21 @@ class TmWindow(Scene, PocketDial, Plates, Band, TM.TmWindow):
         self._tm_rows = list(self._visible())
         self.tms_vl.set([(self.ROW_H, t) for t in self._tm_rows], keep=True)
         self._soon()
+
+    def _list_top(self):
+        """찾는 말이 바뀌면 목록은 맨 위부터 (2.2.1)."""
+        self.tms_vl.cv.yview_moveto(0)
+        self.tms_vl.refresh()
+
+    def _list_note(self):
+        """목록이 비었을 때 그 자리에 적을 말 - 찾는 말에 맞는 것이 없으면 그렇다고 (2.2.1, 게시판 #458)."""
+        return self._nomatch_note() or ("아직 하나도 없습니다.\n포켓몬을 잡으면 가끔 나옵니다." if self.only_have
+                                        else "보일 기술머신이 없습니다.")
+
+    def _find_label(self, cv, x, ym, fill=INK):
+        """목록 위 '기술 찾기' 글을 그리고 입력칸을 놓을 x 를 돌려준다 (글 폭을 재서 - 글자를 키워도 안 겹친다)."""
+        K.text(cv, x, ym, "기술 찾기", font(10), fill=fill, anchor="w", tags=T)
+        return x + K.tkfont_of(cv, font(10)).measure("기술 찾기") + U.h(10)
 
     def _mark(self, n):
         self.tms_vl.refresh()
@@ -251,6 +270,10 @@ class TmWindow(Scene, PocketDial, Plates, Band, TM.TmWindow):
     def _paint_tm_list(self, cv, x0, x1, LH):
         ix1, iy1, ix2, iy2 = list_box(self, cv, x0, x1, LH)
         th = U.h(26)
+        # 기술 찾기 줄 (2.2.1, 게시판 #458) - 가방 도구 칸의 '찾기 [   ]' 와 같은 모양, 거르기 탭 위에
+        ex = self._find_label(cv, ix1, iy1 + th // 2)
+        self._place("tfind", self.tm_find, ex, iy1, ix2 - ex, th)
+        iy1 += th + U.h(4)
         self._tabs(cv, ix1, iy1, th, [("have", "가진 것만"), ("all", "전부")],
                    "have" if self.only_have else "all", "flt",
                    lambda k: (k == "have") != self.only_have and self._toggle_filter())
@@ -263,6 +286,5 @@ class TmWindow(Scene, PocketDial, Plates, Band, TM.TmWindow):
             self._place("tms", self.tms_vl.frame, ix1, ly1, ix2 - ix1, iy2 - ly1)
         else:
             self._hide("tms")
-            K.text(cv, (ix1 + ix2) // 2, ly1 + U.h(40),
-                   "아직 하나도 없습니다.\n포켓몬을 잡으면 가끔 나옵니다." if self.only_have else "보일 기술머신이 없습니다.",
+            K.text(cv, (ix1 + ix2) // 2, ly1 + U.h(40), self._list_note(),
                    font(11), anchor="n", justify="center", width=ix2 - ix1 - 20, tags=T)

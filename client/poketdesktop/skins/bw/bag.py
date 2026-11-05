@@ -107,7 +107,9 @@ class BWBag(object):
 
     def _bw_restyle(self):
         """DP 가 만든 입력칸 · 목록 바탕을 시안 것으로 (찾기 칸은 밑줄만 - 시안 .find)."""
-        for box, bg in ((getattr(self, "item_find", None), PANEL), (self.find.box, CARD)):
+        # 기술머신 칸의 기술 찾기 칸(tm_find, 2.2.1)도 도구 칸 찾기 칸과 같게
+        for box, bg in ((getattr(self, "item_find", None), PANEL), (getattr(self, "tm_find", None), PANEL),
+                        (self.find.box, CARD)):
             if box is None:
                 continue
             try:
@@ -283,11 +285,11 @@ class BWBag(object):
         self._hand(tag)
         return out
 
-    def _find_row(self, cv, key, entry, x1, y, x2, h):
-        """시안 .find: '찾기' + 밑줄만 있는 입력칸."""
+    def _find_row(self, cv, key, entry, x1, y, x2, h, label="찾기:"):
+        """시안 .find: '찾기' + 밑줄만 있는 입력칸. label - 기술머신 칸은 '기술 찾기:' (2.2.1)."""
         s = U.h
-        cv.create_text(x1 + s(2), y + h // 2, text="찾기:", fill=DIMT, font=font(10), anchor="w", tags=T)
-        ex = x1 + K.tkfont_of(cv, font(10)).measure("찾기:") + s(10)
+        cv.create_text(x1 + s(2), y + h // 2, text=label, fill=DIMT, font=font(10), anchor="w", tags=T)
+        ex = x1 + K.tkfont_of(cv, font(10)).measure(label) + s(10)
         self._place(key, entry, ex, y, x2 - ex, h - s(3))
         cv.create_line(x1, y + h, x2, y + h, fill=LINE, tags=T)
 

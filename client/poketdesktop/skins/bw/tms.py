@@ -2,8 +2,8 @@
 """블랙·화이트 테마 - 가방의 기술머신 칸.
 
 도구 칸(bag.py)과 같은 시안 H 의 판(BWBag)이다: 위 줄의 동그란 주머니 단추('기술 머신' 이 하늘빛 고리),
-왼쪽 어두운 판에 거르기 알약 · 기술머신 목록, 오른쪽 위 설명 판(고리 안에 타입 꼬리표), 그 밑 배울 포켓몬 카드,
-오른쪽 아래 하늘빛 '가르치기'. 동작은 DP 기술머신 칸(skins/dp/tms.py) 그대로다.
+왼쪽 어두운 판에 기술 찾기 칸(2.2.1) · 거르기 알약 · 기술머신 목록, 오른쪽 위 설명 판(고리 안에 타입 꼬리표),
+그 밑 배울 포켓몬 카드, 오른쪽 아래 하늘빛 '가르치기'. 동작은 DP 기술머신 칸(skins/dp/tms.py) 그대로다.
 """
 from common.korean import natural
 
@@ -61,6 +61,10 @@ class TmWindow(BWBag, DPT.TmWindow):
     # ---------------- 왼쪽 목록 판 ----------------
     def _bw_list(self, cv, ix1, iy1, ix2, iy2):
         s = U.h
+        # 기술 찾기 (2.2.1, 게시판 #458) - 도구 칸과 같은 '찾기:' + 밑줄 칸, 거르기 알약 위에
+        fh = s(28)
+        self._find_row(cv, "tfind", self.tm_find, ix1, iy1, ix2, fh, label="기술 찾기:")
+        iy1 += fh + s(10)
         th = s(26)
         self._tabs(cv, ix1, iy1, th, [("have", "가진 것만"), ("all", "전부")],
                    "have" if self.only_have else "all", "flt",
@@ -76,7 +80,7 @@ class TmWindow(BWBag, DPT.TmWindow):
         else:
             self._hide("tms")
             K.text(cv, (ix1 + ix2) // 2, ly1 + s(40),
-                   "아직 하나도 없습니다.\n포켓몬을 잡으면 가끔 나옵니다." if self.only_have else "보일 기술머신이 없습니다.",
+                   self._list_note(),
                    font(11), fill=DIMT, anchor="n", justify="center", width=ix2 - ix1 - 20, tags=T)
 
     # ---------------- 목록 한 줄 (시안 .ln) ----------------

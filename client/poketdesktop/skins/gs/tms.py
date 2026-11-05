@@ -3,7 +3,8 @@
 
     왼쪽 위     ◀ 기술머신 ▶ · 둥근 칸에 타입 꼬리표 · 기술 이름 · 타입 · 분류 · 위력…
     왼쪽 아래   배울 수 있는 포켓몬 (이미 배운 것은 흐리게)
-    가운데      큰 상자: [가진 것만][전부] · [타입][분류] 칩 · 가진 수 / 기술머신 줄 (▶ · 번호 · 이름 · 타입 · 분류)
+    가운데      큰 상자: 기술 찾기 밑줄 칸 (2.2.1) / [가진 것만][전부] · [타입][분류] 칩 · 가진 수 /
+                기술머신 줄 (▶ · 번호 · 이름 · 타입 · 분류)
     아래        넓은 상자: 기술 설명 / 오른쪽 메뉴 '▶ 가르치기' · (새 기술머신 N개)
 
 동작은 DP 기술머신 칸(skins/dp/tms.py → ui_tms.TmWindow) 그대로다 - 그리는 것만 바꾼다.
@@ -15,7 +16,7 @@ from ..dp import kit as K
 from ..dp import tms as DPT
 from ..dp.scene import T
 from . import BROWN, DIM, HOV, INK, INK2
-from ._gbc import GSBag, arrow, as_gs, chips, paper_list
+from ._gbc import GSBag, arrow, as_gs, chips, entry, paper_list
 
 CAT_COLOR = {"physical": "#c0501c", "special": "#2860c0", "status": "#6a5a44"}
 
@@ -24,6 +25,7 @@ class TmWindow(GSBag, DPT.TmWindow):
 
     def _build(self):
         DPT.TmWindow._build(self)
+        entry(self.tm_find)                 # 기술 찾기 (2.2.1) - 도구 칸 찾기 칸처럼 밑줄 하나
         paper_list(self.tms_vl)
         as_gs(self.use_btn, "menu", primary=True)
         self.use_btn.spec = font(12)
@@ -68,11 +70,16 @@ class TmWindow(GSBag, DPT.TmWindow):
         return title, desc or sub, (sub if desc else "")
 
     def _gs_mid(self, cv, x1, y1, x2, y2):
-        """큰 상자: [가진 것만][전부] [타입][분류] · 가진 수 / 기술머신 목록."""
+        """큰 상자: 기술 찾기 / [가진 것만][전부] [타입][분류] · 가진 수 / 기술머신 목록."""
         ix1, iy1, ix2, iy2 = self._gs_list_frame(cv, x1, y1, x2, y2)
         lx1, lx2 = ix1 + U.h(10), ix2 - U.h(8)
+        # 기술 찾기 (2.2.1, 게시판 #458) - 도구 칸의 '찾기 ____' 줄과 같은 자리 · 같은 모양
+        th = U.h(26)
+        y = iy1 + U.h(6)
+        ex = self._find_label(cv, lx1, y + th // 2, fill=INK)
+        self._place("tfind", self.tm_find, ex, y, lx2 - ex, th)
+        y += th + U.h(8)
         ch = U.h(24)
-        y = iy1 + U.h(8)
         flt = [("have", "가진 것만"), ("all", "전부")]
         got = chips(cv, lx1, y, ch, flt, "have" if self.only_have else "all", "flt",
                     lambda k: (k == "have") != self.only_have and self._toggle_filter(), hand=self._hand)
@@ -96,7 +103,7 @@ class TmWindow(GSBag, DPT.TmWindow):
         else:
             self._hide("tms")
             K.text(cv, (lx1 + lx2) // 2, ly1 + U.h(40),
-                   "아직 하나도 없습니다.\n포켓몬을 잡으면 가끔 나옵니다." if self.only_have else "보일 기술머신이 없습니다.",
+                   self._list_note(),
                    font(11), fill=INK2, anchor="n", justify="center", width=lx2 - lx1 - 20, tags=T)
 
     # ---------------- 목록 한 줄 ----------------

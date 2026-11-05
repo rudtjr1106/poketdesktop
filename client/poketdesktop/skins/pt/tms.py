@@ -2,8 +2,8 @@
 """플라티나 테마 - 가방의 기술머신 칸.
 
 도구 칸과 같은 시안의 틀(bag.PtBag)이다 - 머리 띠 '기술머신' · 가진 수 캡슐, 왼쪽 세로 주머니(기술머신이 하늘색),
-가운데 판의 고르기 줄(가진 것만 | 전부) · 타입 · 분류 캡슐과 흰 캡슐 줄 목록, 오른쪽 보라 머리 설명 판과
-'배울 수 있는 포켓몬' 판, 아래 주황 캡슐 '가르치기'. 새로 받은 기술머신 단추는 머리 띠에.
+가운데 판의 기술 찾기 캡슐(2.2.1) · 고르기 줄(가진 것만 | 전부) · 타입 · 분류 캡슐과 흰 캡슐 줄 목록,
+오른쪽 보라 머리 설명 판과 '배울 수 있는 포켓몬' 판, 아래 주황 캡슐 '가르치기'. 새로 받은 기술머신 단추는 머리 띠에.
 
 동작은 DP 기술머신 칸(skins/dp/tms.py) → 기본 기술머신 칸(ui_tms.TmWindow) 그대로다.
 """
@@ -24,6 +24,7 @@ class TmWindow(PtBag, DPT.TmWindow):
 
     def _build(self):
         DPT.TmWindow._build(self)
+        self.tm_find = P.Entry(self.cv, self.tm_q, width=10)     # 기술 찾기 (2.2.1) - 도구 칸 찾기와 같은 흰 캡슐 칸
         self._pt_init()
         self._list_bg(self.tms_vl)
         self.ROW_H = U.h(30)
@@ -56,6 +57,9 @@ class TmWindow(PtBag, DPT.TmWindow):
     def _paint_mid(self, cv, ix1, iy1, ix2, iy2):
         s = U.h
         th = s(30)
+        # 기술 찾기 (2.2.1, 게시판 #458) - 도구 칸처럼 흰 캡슐 안에 흐린 '기술 찾기', 고르기 줄 위에 한 줄
+        P.entry_capsule(self, cv, "tfind", self.tm_find, ix1, iy1, ix2 - ix1, th, label="기술 찾기")
+        iy1 += th + s(6)
         flt = [("have", "가진 것만"), ("all", "전부")]
         f10 = K.tkfont_of(cv, font(10))
         need = max(f10.measure(self.type_btn.text), f10.measure(self.cat_btn.text)) + s(44)
@@ -88,7 +92,7 @@ class TmWindow(PtBag, DPT.TmWindow):
         else:
             self._hide("tms")
             K.text(cv, (ix1 + ix2) // 2, ly1 + s(40),
-                   "아직 하나도 없습니다.\n포켓몬을 잡으면 가끔 나옵니다." if self.only_have else "보일 기술머신이 없습니다.",
+                   self._list_note(),
                    font(11), fill=DIM, anchor="n", justify="center", width=ix2 - ix1 - 20, tags=T)
 
     def _draw_tm_row(self, cv, t, x, y, w, h, tags, hover=None):

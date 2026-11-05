@@ -20,6 +20,12 @@
 적는다 - /api/tms/seen). 358줄에서 점을 찾아 굴리지 않게, 아래 줄의 [새 기술머신 N개] 를
 누르면 다음 새 것으로 가서 골라 준다. 가방 탭·[기술머신] 의 점은 app.note_tms 가 칠한다.
 
+## 기술 이름으로 찾기 (2.2.1, 게시판 #458)
+
+기술 이름은 생각나는데 번호를 몰라 358줄을 훑어야 했다. 목록 위 '기술 찾기' 칸에 적으면
+이름(한글 · 영어)이나 번호가 맞는 줄만 남는다 (matches). 가방의 도구 찾기와 같은 칸 · 같은
+방식이고, 가진 것만 · 타입 · 분류와 같이 걸린다. 화면 테마(skins/)도 같은 말(tm_q)을 쓴다.
+
 ## 빨리 그리기
 
 줄은 358개를 **한 번 만들어 두고** '가진 것만/전부' 는 담았다 뺐다만
@@ -35,6 +41,7 @@ from common import tint as T
 from common.korean import natural
 
 from . import sprite_cache, sprites
+from . import box_filter
 from . import skins
 from . import ui_common as U
 from . import ui_loading
@@ -67,6 +74,30 @@ TYPE_KR = {
 # 한쪽만 고쳐지는 날이 온다.
 CAT_KR = MT.CAT_KR
 
+# 찾는 말 앞에 붙여도 번호로 읽는 머리 ('기술머신24' · 'TM24', 빈칸 · 대소문자는 _norm 이 지운다)
+NO_PREFIX = ("기술머신", "tm")
+
+
+def matches(t, query):
+    """기술머신 t 가 찾는 말에 맞나 (2.2.1, 게시판 #458).
+
+    빈칸을 빼고 대소문자 없이 **한글 이름 · 영어 이름**(t["move"] - 'EARTHQUAKE' 는 'earth quake' 로도
+    찾는다)에 들어 있으면 맞다. 숫자만 적으면 그 번호도 맞다 ('24' · '024' · 'TM24' · '기술머신24').
+    번호는 **딱 맞을 때만** - '24' 가 124 · 240~249 까지 걸리면 번호로 찾는 뜻이 없다."""
+    q = box_filter._norm(query)
+    if not q:
+        return True
+    num = q
+    for pre in NO_PREFIX:
+        if num.startswith(pre):
+            num = num[len(pre):]
+            break
+    if not num:
+        return True                        # '기술머신' · 'tm' 만 적었다 - 아직 거를 것이 없다
+    if num.isdecimal() and int(num) == t.get("no"):
+        return True
+    return any(q in box_filter._norm(s) for s in (t.get("kr"), t.get("move")) if s)
+
 
 @skins.skinnable
 class TmWindow(object):
@@ -91,7 +122,7 @@ class TmWindow(object):
         self._wait = None        # 불러오는 중 표시
         self._list_job = None    # 왼쪽 줄을 나눠 만드는 일
         self._list_key = None    # 지금 만들어 둔 줄이 어떤 목록인지
-        self._build_have = True  # 줄을 만들기 시작할 때의 '가진 것만'
+        self._build_vis = set()  # 줄을 만들기 시작할 때 보일 줄 (거르기 · 찾는 말까지 건 것)
         self._packed = set()     # 지금 담겨(pack) 있는 줄 번호
         self._show_job = None    # 새로 보일 줄을 나눠 담는 일
         self._empty = None       # '아직 하나도 없습니다'
@@ -109,6 +140,10 @@ class TmWindow(object):
                            highlightbackground=U.LINE2)
         if not U.is_embedded(self.win):
             U.install_wheel(self.win)
+        # 기술 찾기 (2.2.1, 게시판 #458). 칸은 _build 가 (테마는 제 모양으로) 만들고, 말은 여기 하나다.
+        # trace 로 듣는다 - 한글 조합 중인 글자를 놓치지 않게 (가방 찾기와 같다).
+        self.tm_q = tk.StringVar(self.win)
+        self.tm_q.trace_add("write", lambda *_a: self._query_changed())
 
         self._build()
         self.reload()
@@ -193,6 +228,14 @@ class TmWindow(object):
         left = tk.Frame(body, bg=U.BG, width=LIST_W)
         left.pack(side="left", fill="y")
         left.pack_propagate(False)
+        # 기술 찾기 (2.2.1, 게시판 #458) - 가방 '가진 도구' 위의 찾기 줄과 같은 칸. 오른쪽 '포켓몬 찾기' 와
+        # 헷갈리지 않게 '기술 찾기' 라고 적는다.
+        row = tk.Frame(left, bg=U.BG)
+        row.pack(fill="x", padx=10, pady=(8, 6))
+        tk.Label(row, text="기술 찾기", bg=U.BG, fg=U.FG_DIM, font=U.FONT_XS).pack(side="left")
+        self.tm_find = U.entry(row, self.tm_q, width=10)
+        self.tm_find.pack(side="left", fill="x", expand=True, padx=(8, 0))
+        tk.Frame(left, bg=U.LINE, height=U.h(1)).pack(fill="x")
         self.list_canvas, self.list_inner = _scroller(left, U.BG)
 
     def _detail_pane(self, body):
@@ -285,16 +328,47 @@ class TmWindow(object):
         self._show_rows()
 
     def _visible(self):
-        out = []
-        for t in self.tms:
-            if self.only_have and not t.get("have"):
-                continue
-            if self.f_type and t.get("type") != self.f_type:
-                continue
-            if self.f_cat and t.get("cat") != self.f_cat:
-                continue
-            out.append(t)
-        return out
+        q = self.tm_q.get()
+        return [t for t in self.tms if self._passes(t, q, self.only_have)]
+
+    def _passes(self, t, q, only_have):
+        """t 가 지금의 거르기(가진 것만 · 타입 · 분류)와 찾는 말 q 를 다 통과하나."""
+        if only_have and not t.get("have"):
+            return False
+        if self.f_type and t.get("type") != self.f_type:
+            return False
+        if self.f_cat and t.get("cat") != self.f_cat:
+            return False
+        return matches(t, q)
+
+    # ---------------- 기술 이름으로 찾기 (2.2.1, 게시판 #458) ----------------
+    def _query_changed(self):
+        """찾는 말이 바뀌었다. 거르기와 같이 줄을 담았다 뺐다만 하고, 목록은 맨 위부터 (가방과 같다).
+
+        고른 기술머신은 가려져도 그대로 둔다 - 타입 · 분류로 가렸을 때와 같다. 오른쪽 설명과 '가르치기' 는
+        그 기술머신으로 남고, 찾는 말을 지우면 고른 줄이 칠해진 채 돌아온다."""
+        if not self.alive:
+            return
+        self._show_rows()
+        self._list_top()
+
+    def _list_top(self):
+        try:
+            self.list_canvas.yview_moveto(0)
+        except tk.TclError:
+            pass
+
+    def _nomatch_note(self):
+        """찾는 말에 맞는 기술머신이 없을 때 목록 자리에 적을 말. 찾는 말이 없으면 None.
+
+        '가진 것만' 에 가려졌으면 그렇다고 적는다 - 안 가진 기술머신을 찾고 '없다' 만 보면 그런 기술머신이
+        아예 없는 줄 안다."""
+        q = self.tm_q.get().strip()
+        if not box_filter._norm(q):
+            return None
+        if self.only_have and any(self._passes(t, q, False) for t in self.tms):
+            return "'%s' 에 맞는 기술머신을 아직 안 가졌다.\n'전부' 를 누르면 안 가진 것도 보인다." % q
+        return "'%s' 에 맞는 기술머신이 없다." % q
 
     # ---------------- 타입·분류로 거르기 ----------------
     def _menu(self, btn, rows):
@@ -388,15 +462,17 @@ class TmWindow(object):
         # 담을지 말지는 **만들기 시작할 때의 거르기**로 정한다. 만드는 중에
         # 거르기를 바꾸면 남은 줄이 새 기준으로 끝에 붙어서 순서가 섞인다.
         # 바뀐 거르기는 _show_rows 가 다 만든 뒤에 맞춘다.
-        self._build_have = self.only_have
+        # 타입 · 분류 · 찾는 말에 가려진 줄도 (담지 않고) 만들어 둔다 - 예전에는 '가진 것만' 만 보고
+        # 나머지를 rest 로 돌려서, 거르기를 건 채 다시 그리면 가려진 가진 줄은 아예 안 만들어졌다 (2.2.1).
         vis = self._visible()
-        rest = [t for t in self.tms if not (t.get("have") or not self.only_have)]
+        self._build_vis = set(t["no"] for t in vis)
+        rest = [t for t in self.tms if t["no"] not in self._build_vis]
         if not vis:
             self._show_empty(True)
         self._list_job = U.Chunked(self.win, vis + rest, self._row)
 
     def _wanted(self, t):
-        return bool(t.get("have")) or not self._build_have
+        return t["no"] in self._build_vis
 
     def _row(self, t):
         have = bool(t.get("have"))
@@ -485,9 +561,11 @@ class TmWindow(object):
         if on:
             if self._empty is None:
                 self._empty = tk.Label(
-                    self.list_inner,
-                    text="아직 하나도 없습니다.\n포켓몬을 잡으면 가끔 나옵니다.",
-                    bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S, justify="left")
+                    self.list_inner, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S,
+                    justify="left", wraplength=LIST_W - 50)
+            # 찾는 말에 맞는 것이 없으면 그렇다고 (2.2.1, 게시판 #458). 긴 말은 칸 폭에서 접는다.
+            self._empty.configure(text=self._nomatch_note()
+                                  or "아직 하나도 없습니다.\n포켓몬을 잡으면 가끔 나옵니다.")
             self._empty.pack(anchor="w", padx=16, pady=16)
         elif self._empty is not None:
             self._empty.pack_forget()
@@ -548,15 +626,16 @@ class TmWindow(object):
         U.run_async(self.root, lambda: api.tms_seen([n]), lambda _r, _e: None)
 
     def next_fresh(self):
-        """다음 새 기술머신으로 가서 고른다. 거르기에 가려져 있으면 거르기를 푼다."""
+        """다음 새 기술머신으로 가서 고른다. 거르기 · 찾는 말에 가려져 있으면 그것을 푼다."""
         if not self.fresh:
             return
         n = min(self.fresh)
-        if self.f_type or self.f_cat:
+        if self.f_type or self.f_cat or self.tm_q.get():
             vis = set(t["no"] for t in self._visible())
             if n not in vis:
                 self._set_type(None)
                 self._set_cat(None)
+                self.tm_q.set("")           # 찾는 말도 지운다 (2.2.1, 게시판 #458)
         self.pick(n)
         self._scroll_to(n)
 

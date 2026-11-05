@@ -19,6 +19,9 @@
   4. 나눠 만드는 중에 거르기를 바꾸거나 아직 없는 줄을 골라도 맞다.
   5. 불러오는 동안 표시가 있고, 첫 화면이 그려진 뒤에 걷힌다.
   6. 가르친 뒤 다시 불러와도 줄을 새로 안 만든다.
+  7. 기술 이름으로 찾기 (2.2.1, 게시판 #458): 목록 위 '기술 찾기' 칸에 적으면 이름(한글 · 영어) ·
+     번호가 맞는 줄만 남고, 가진 것만 · 타입 · 분류와 같이 걸린다. 맞는 것이 없으면 그렇다고 적고,
+     지우면 목록이 돌아온다. 고른 기술머신은 가려져도 그대로다.
 
 걸린 시간은 적어만 둔다. CI 러너는 느리고 들쭉날쭉해서 기준으로 못 쓴다.
 """
@@ -514,6 +517,8 @@ def run(root, app, api, tms, have, learners, sprite_gate):
         and ("learners", target) not in api.calls[n0:], api.calls[n0:])
     api.net = None
 
+    find_section(root, win, tms, have)
+
     print("\n=== 닫기")
     win.pick(have[1])
     win.close()
@@ -525,6 +530,105 @@ def run(root, app, api, tms, have, learners, sprite_gate):
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))
     print("======================================================")
     return 1 if FAIL else 0
+
+
+def find_section(root, win, tms, have):
+    """기술 이름으로 찾기 (2.2.1, 게시판 #458). 지진(149)은 안 가진 것이다 (가진 것은 10의 배수)."""
+    from test_learn_dialog import squeezed
+
+    print("\n=== 기술 이름으로 찾기 (2.2.1, 게시판 #458)")
+    quake = next(t["no"] for t in tms if t["kr"] == "지진")
+    every = [t["no"] for t in tms]
+    q = win.tm_q
+
+    def put(text):
+        """진짜 입력칸에 친다 (StringVar 를 바로 바꾸지 않고)."""
+        e = win.tm_find.entry
+        e.delete(0, "end")
+        e.insert(0, text)
+        settle_list(root, win)
+        return packed_rows(win)
+
+    def empty_text():
+        lb = win._empty
+        return str(lb.cget("text")) if lb is not None and lb.winfo_ismapped() else ""
+
+    settle(root)
+    box, lc = win.tm_find, win.list_canvas
+    chk("'기술 찾기' 칸이 목록 바로 위에 있다",
+        box.winfo_ismapped() and box.winfo_rooty() + box.winfo_height() <= lc.winfo_rooty()
+        and abs(box.master.winfo_rootx() - lc.winfo_rootx()) <= 20,
+        (box.master.winfo_rootx(), box.winfo_rooty(), box.winfo_height(), lc.winfo_rootx(), lc.winfo_rooty()))
+    chk("  찾기 칸에 글을 칠 자리가 있다 (80px 넘게)", box.entry.winfo_width() >= 80, box.entry.winfo_width())
+    chk("  눌린 위젯이 없다", not squeezed(win.win), squeezed(win.win)[:3])
+
+    win.pick(have[0])
+    wait_for(root, lambda: win._learners is not None)
+    picked = win.title_lbl.cget("text")
+    chk("(가진 것만 · 거르기 없음에서 시작)", win.only_have and not win.f_type and not win.f_cat
+        and packed_rows(win) == have)
+    chk("가진 것만: 안 가진 지진은 안 나온다", put("지진") == [], packed_rows(win))
+    chk("  '아직 안 가졌다 · 전부를 누르면' 이라고 적는다",
+        "'지진'" in empty_text() and "안 가졌다" in empty_text() and "전부" in empty_text(), empty_text())
+    chk("  고른 기술머신은 가려져도 그대로", win.no == have[0] and win.title_lbl.cget("text") == picked,
+        (win.no, win.title_lbl.cget("text")))
+    win._toggle_filter()
+    settle_list(root, win)
+    chk("전부: '지진' 은 지진 한 줄", packed_rows(win) == [quake], packed_rows(win))
+    chk("  안내는 걷힌다", not empty_text(), empty_text())
+    win._set_type("GROUND")
+    settle_list(root, win)
+    chk("타입(땅)과 같이 건다", packed_rows(win) == [quake], packed_rows(win))
+    win._set_type("FIRE")
+    settle_list(root, win)
+    chk("  타입(불꽃)이면 맞는 것이 없다", packed_rows(win) == [], packed_rows(win))
+    chk("  '맞는 기술머신이 없다' (전부라 안 가진 말은 없다)",
+        "'지진' 에 맞는 기술머신이 없다." in empty_text() and "안 가졌다" not in empty_text(), empty_text())
+    win._set_type(None)
+    settle_list(root, win)
+    for text in ("earth quake", "EARTHQUAKE", "149", "TM149", "기술머신 149", "지 진"):
+        chk("'%s' 도 지진" % text, put(text) == [quake], packed_rows(win))
+    chk("번호는 딱 맞는 것만 ('24' 가 124 · 240 을 안 건다)", put("24") == [24], packed_rows(win))
+    punch = [t["no"] for t in tms if "펀치" in t["kr"]]
+    chk("이름 일부 ('펀치' %d줄, 번호 순서)" % len(punch), len(punch) > 1 and put("펀치") == punch,
+        packed_rows(win))
+    win._set_type("ELECTRIC")
+    win._set_cat("physical")
+    settle_list(root, win)
+    zap = [t["no"] for t in tms if t["no"] in punch and t["type"] == "ELECTRIC" and t["cat"] == "physical"]
+    chk("  타입(전기) + 분류(물리)와 같이 건다 (번개펀치)", zap and packed_rows(win) == zap, packed_rows(win))
+    win._set_type(None)
+    win._set_cat(None)
+    settle_list(root, win)
+    t1 = time.perf_counter()
+    got = put("")
+    print("  지우고 358줄 다시 담기까지 %.0f ms" % ms(t1))
+    chk("지우면 목록이 돌아온다 (전부 358줄 순서대로)", got == every, len(got))
+    chk("  고른 줄이 칠해진 채", win.rows[have[0]][0].cget("bg") == U.ACCENT_SOFT)
+
+    # 굴려 둔 채 찾으면 맨 위부터 (줄이 몇 개 안 남았는데 빈 곳을 보고 있지 않게)
+    lc.yview_moveto(1.0)
+    root.update()
+    put("펀치")
+    chk("찾는 말이 바뀌면 목록은 맨 위부터", lc.yview()[0] == 0.0, lc.yview())
+
+    # 찾는 말을 건 채 줄을 새로 만들어도 (다시 불러왔는데 목록이 바뀌었다) 가려진 줄까지 다 만든다
+    put("지진")
+    win._list_key = None
+    win._paint_list()
+    settle_list(root, win)
+    chk("찾는 말을 건 채 다시 만들어도 358줄을 다 만든다", len(win.rows) == len(tms)
+        and packed_rows(win) == [quake], (len(win.rows), packed_rows(win)))
+    win._toggle_filter()                     # 가진 것만
+    win._set_type("NORMAL")
+    win._list_key = None
+    win._paint_list()
+    settle_list(root, win)
+    chk("  거르기까지 건 채 다시 만들어도 다 만든다", len(win.rows) == len(tms), len(win.rows))
+    win._set_type(None)
+    got = put("")
+    chk("  다 풀면 가진 것만 그대로", got == have, len(got))
+    chk("  찾는 말이 비었다", q.get() == "")
 
 
 if __name__ == "__main__":

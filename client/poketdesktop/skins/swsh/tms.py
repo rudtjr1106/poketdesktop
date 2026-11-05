@@ -2,7 +2,8 @@
 """소드·실드 테마 - 가방의 기술머신 칸. 도구 칸과 같은 시안 판 (_bagscene.SwScene - '기술머신' 알약이 켜진 채,
 머리 남색 판의 둘째 줄은 '기술머신 · 상점에서 살 수 없다').
 
-    왼쪽 판    (가진 것만 | 전부) 알약 · (타입 ▾)(분류 ▾) 알약 / 목록 - 번호 · 이름 · 타입 꼬리표 · 분류,
+    왼쪽 판    기술 찾기 칸 (2.2.1) / (가진 것만 | 전부) 알약 · (타입 ▾)(분류 ▾) 알약 /
+               목록 - 번호 · 이름 · 타입 꼬리표 · 분류,
                고른 줄은 남색 바탕 + 흰 글씨 + 왼쪽 분홍 띠, 새로 받은 것은 노란 점
     오른쪽 위  남색 칸에 타입 빛깔 원 · 기술머신 이름 · 분홍 꼬리표 (타입 · 분류 · 위력 …) · 설명
     오른쪽     배울 수 있는 포켓몬 (이미 배운 것은 회색)
@@ -26,14 +27,20 @@ class TmWindow(SwScene, DPT.TmWindow):
     def _build(self):
         DPT.TmWindow._build(self)
         self._sw_restyle()
+        S.flat_entry(self.tm_find)          # 기술 찾기 (2.2.1) - 도구 칸 찾기 칸과 같은 빛깔
         S.paper_list(self.tms_vl)
         S.restyle(self.use_btn, "go")
         S.restyle(self.fresh_btn, "red")
 
     # ---------------- 왼쪽 판 ----------------
     def _sw_list(self, cv, x1, y1, x2, y2):
-        """(가진 것만 | 전부) + (타입 ▾)(분류 ▾) 알약 (자리가 되면 한 줄) / 개수 줄 / 목록."""
+        """기술 찾기 칸 / (가진 것만 | 전부) + (타입 ▾)(분류 ▾) 알약 (자리가 되면 한 줄) / 개수 줄 / 목록."""
         s = U.h
+        # 기술 찾기 (2.2.1, 게시판 #458) - 도구 칸의 찾기 칸(.find)과 같은 모양, 알약 줄 위에 한 줄
+        fh = s(30)
+        ex = S.field(cv, x1, y1, x2, y1 + fh, "기술 찾기:", tags=T)
+        self._place("tfind", self.tm_find, ex, y1 + s(5), max(s(50), x2 - s(12) - ex), fh - s(10))
+        y1 += fh + s(6)
         th = s(28)
         f10 = K.tkfont_of(cv, font(10))
         drops = [(key, text + " ▾") for key, text in (("type", self.type_btn.text), ("cat", self.cat_btn.text))]
@@ -71,7 +78,7 @@ class TmWindow(SwScene, DPT.TmWindow):
         else:
             self._hide("tms")
             K.text(cv, (x1 + x2) // 2, y + s(40),
-                   "아직 하나도 없습니다.\n포켓몬을 잡으면 가끔 나옵니다." if self.only_have else "보일 기술머신이 없습니다.",
+                   self._list_note(),
                    font(11), anchor="n", justify="center", width=x2 - x1 - 20, tags=T)
 
     def _draw_tm_row(self, cv, t, x, y, w, h, tags, hover=None):
