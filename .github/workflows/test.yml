@@ -536,7 +536,9 @@ jobs:
     # 포커스 지키기(맥 백엔드) · 친구 채팅(키 창) · 들어서 옮기기(마우스 추적) · 멈춤 감지(Dock) · 관장 창과 상점 캡슐 띠
     # (글꼴이 달라 잘리는지).
     name: 맥 전용
-    runs-on: macos-latest
+    # macos-14 로 박아 둔다 (2.2.1) - 11/04 Actions 장애 뒤 macos-latest 잡이 기계를 못 받고 15분 만에 취소되기를
+    # 거듭했다 (릴리스 맥 빌드와 같은 일, release.yml 846d770). e613584 의 검사도 그렇게 취소됐다.
+    runs-on: macos-14
     timeout-minutes: 12
     env:
       PYTHONUTF8: "1"
