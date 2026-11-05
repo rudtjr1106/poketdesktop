@@ -119,7 +119,8 @@ jobs:
     name: 맥 빌드
     needs: check
     # macos-14 부터 애플 실리콘이다. 우리 번들도 arm64 다.
-    runs-on: macos-latest
+    # 이름을 박아 둔다 (2.2.0): 11/04 GitHub Actions 장애 뒤 macos-latest 잡이 기계를 못 받고 15분 만에 취소되기를 거듭했다.
+    runs-on: macos-14
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: "utf-8"
