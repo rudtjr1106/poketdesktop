@@ -1937,8 +1937,13 @@ def _cooldown():
 def _wild_public(row, reveal):
     """풀숲 상태에서는 어떤 포켓몬인지 알려주지 않는다."""
     mon = json.loads(row["data"])
+    # 남은 초 (2.2.1, 게시판 #472 나리나리): 앱이 expiresAt 에서 **제 컴퓨터 시계**를 빼서 셌더니, PC 시계가 1분만
+    # 빨라도(야생은 60초) 남은 시간이 0 아래가 되어 풀숲이 1초 만에 사라졌다. 서버 시계로 센 값을 같이 준다.
+    exp = auth.parse_iso(row["expires_at"])
+    left = (exp - datetime.datetime.now(datetime.timezone.utc)).total_seconds() if exp else None
     out = {"id": row["id"], "state": row["state"], "throws": row["throws"],
            "expiresAt": row["expires_at"], "createdAt": row["created_at"],
+           "expiresIn": max(0, int(left)) if left is not None else None,
            # 이벤트 포켓몬이 숨어 있으면 풀숲에 꽃이 핀다.
            #
            # **종은 여전히 안 알려준다.** 참/거짓 하나뿐이라 "뭔가 특별한

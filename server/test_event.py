@@ -139,6 +139,8 @@ def main():
     g = grass()
     chk("이제 풀숲이 돋는다", bool(g), g)
     chk("꽃이 폈다", g.get("bloom") is True, g.get("bloom"))
+    chk("남은 초를 서버 시계로 준다 (2.2.1, #472 - PC 시계가 틀려도 앱이 맞게 센다)",
+        isinstance(g.get("expiresIn"), int) and 0 < g["expiresIn"] <= 3600, g.get("expiresIn"))
     chk("**종은 안 알려준다**", not g.get("pokemon"), g.get("pokemon"))
 
     rv = call("POST", "/api/wild/%d/reveal" % g["id"])

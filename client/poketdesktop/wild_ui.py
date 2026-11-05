@@ -599,25 +599,37 @@ class WildController(object):
             self.show_wild(w["pokemon"])
         self.set_ball_options(r.get("ballOptions"))
 
-        self.arm_expiry(w.get("expiresAt"))
+        self.arm_expiry(w.get("expiresAt"), w.get("expiresIn"))
         self.schedule(POLL_SAFETY)
 
-    def arm_expiry(self, expires_at):
-        """서버가 정한 만료 시각에 맞춰 스스로 정리한다."""
+    def arm_expiry(self, expires_at, expires_in=None):
+        """서버가 정한 만료 시각에 맞춰 스스로 정리한다.
+
+        **서버가 센 남은 초(expires_in)를 먼저 쓴다** (2.2.1, 게시판 #472 나리나리). expiresAt 에서 이 컴퓨터의 시계를
+        빼면, PC 시계가 1분만 빨라도(야생은 60초) 남은 시간이 0 아래가 되어 풀숲이 돋자마자 1초 만에 사라졌다.
+        옛 서버(남은 초를 안 줌)면 예전처럼 시각으로 센다."""
         if self._expire_job:
             try:
                 self.app.root.after_cancel(self._expire_job)
             except Exception:
                 pass
             self._expire_job = None
-        if not expires_at:
-            return
-        import datetime
-        try:
-            dt = datetime.datetime.fromisoformat(expires_at)
-        except ValueError:
-            return
-        left = (dt - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+        if expires_in is not None:
+            try:
+                left = float(expires_in)
+            except (TypeError, ValueError):
+                left = None
+        else:
+            left = None
+        if left is None:
+            if not expires_at:
+                return
+            import datetime
+            try:
+                dt = datetime.datetime.fromisoformat(expires_at)
+            except ValueError:
+                return
+            left = (dt - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
         self._expire_job = self.app.root.after(
             int(max(1.0, left + 1) * 1000), self.on_expired)
 
@@ -896,7 +908,7 @@ class WildController(object):
                     self.app.overlay.walks[walk_cache.key(
                         mon.get("num"), mon.get("shiny"))] = (sheet, meta)
                 self.show_wild(mon)
-                self.arm_expiry(w.get("expiresAt"))
+                self.arm_expiry(w.get("expiresAt"), w.get("expiresIn"))
 
         def work():
             r = self.app.api.wild_reveal(wid)

@@ -174,6 +174,20 @@ def run():
         and ball_menu.auto_max({"autoThrowMax": "10"}) == 10
         and [ball_menu.next_auto_max(n) for n in (5, 10, 20, 30)] == [10, 20, 30, 5])
 
+    print("\n=== 풀숲이 사라지는 때 (2.2.1, 게시판 #472)")
+    app = App([], auto=False)
+    w = ctl(app, OPTS)
+    past = "2000-01-01T00:00:00+00:00"                  # PC 시계가 빨라서 서버의 만료 시각이 이미 지난 것처럼 보인다
+    w._expire_job = None                                # (ctl 은 야생 화면을 필요한 만큼만 만든다)
+    w.arm_expiry(past, 45)
+    ms = [m for m, f in app.root.jobs if f == w.on_expired]
+    chk("서버가 센 남은 초(45)를 쓴다 - PC 시계가 빨라도 1초 만에 사라지지 않는다", ms == [46000], ms)
+    w.arm_expiry(past)
+    ms = [m for m, f in app.root.jobs if f == w.on_expired]
+    chk("  옛 서버(남은 초 없음)면 예전처럼 시각으로 (지났으면 1초)", ms == [1000], ms)
+    w.arm_expiry(None)
+    chk("  지우면 예약이 없다", not [m for m, f in app.root.jobs if f == w.on_expired])
+
     print("\n=== 켜고 끄기")
     app = App([], auto=False)
     w = ctl(app, OPTS)
