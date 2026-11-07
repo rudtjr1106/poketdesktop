@@ -53,7 +53,9 @@ from .ui_common import run_async
 LEFT_W = 300                 # 탐험 칸
 MID_W = 304                  # 어디로 · 얼마나
 CARD_H = U.h(96)             # 탐험 칸 하나. 창을 가장 낮게(620) 줄여도 셋이 다 들어가는 높이다
-PLACE_H = U.h(30)            # 갈 곳 한 줄 (이름 + 맞는 타입 셋)
+# 갈 곳 한 줄 (이름 + 맞는 타입 셋). 곳이 일곱(광산, 11/07)이 되어 가장 낮은 창(980x620)에서 가운데 단이 35px 넘쳤다 -
+# 글자는 그대로 두고 줄 높이(30 -> 27)와 줄 사이(4 -> 3), '② 얼마나' 위 여백(10 -> 7)을 줄여 다시 한 화면에 든다.
+PLACE_H = U.h(27)
 ROW_H = U.h(44)              # '누구를' 의 한 줄 (이름·레벨 / 타입 두 줄)
 THUMB = 40
 PANEL = "#101623"
@@ -309,6 +311,18 @@ def grow_text(g):
     return "탐험 Lv.%d" % lv + (" ● %d점" % free if free else "")
 
 
+def place_head(p):
+    """고른 곳 아래 글상자의 머리 (테마도 같이 쓴다). 광산은 물건이 아니라 골드라 '가져오는 것'."""
+    return ("%s에서 가져오는 것" if (p or {}).get("gold") else "%s에서 잘 나오는 것") % (p or {}).get("kr", "")
+
+
+def haul_text(o):
+    """나가 있는 칸에 적을 가져올 것: '물건 N개' (광산은 '골드 N원' - 서버가 주머니 덤까지 셈해 준다)."""
+    if o.get("gold"):
+        return "골드 %s원" % format(int(o["gold"]), ",")
+    return "물건 %s개" % o.get("items", "?")
+
+
 @skins.skinnable
 class ExpeditionWindow(object):
 
@@ -488,7 +502,7 @@ class ExpeditionWindow(object):
                                   ("Lv.%s" % mon.get("level", "?"), U.FG_DIM, U.FONT_XS, 6)], {"fill": "x"})
         flow(text, avail, PANEL, [("%s · %s시간" % (o.get("placeKr") or "", o.get("hours")), U.FG_DIM, U.FONT_XS, 0),
                                   (o.get("gradeKr") or "", GRADE_COLOR.get(o.get("grade"), U.FG_DIM), U.FONT_XS, 8),
-                                  ("물건 %s개" % o.get("items", "?"), U.FG_FAINT, U.FONT_XS, 8)],
+                                  (haul_text(o), U.FG_FAINT, U.FONT_XS, 8)],
              {"fill": "x", "pady": (2, 0)})
 
         foot = tk.Frame(card, bg=PANEL)
@@ -577,7 +591,7 @@ class ExpeditionWindow(object):
         for p in X.PLACES:
             card = tk.Frame(mid, bg=PANEL, height=PLACE_H, highlightthickness=2, highlightbackground=U.LINE,
                             cursor="hand2")
-            card.pack(fill="x", padx=14, pady=(0, 4))
+            card.pack(fill="x", padx=14, pady=(0, 3))
             card.pack_propagate(False)
             name = tk.Label(card, text=p["kr"], bg=PANEL, fg=U.FG, font=U.FONT_B, anchor="w")
             name.place(x=10, rely=0.5, anchor="w")
@@ -602,7 +616,7 @@ class ExpeditionWindow(object):
         U.wrap_to_width(self.place_hint)
 
         row = tk.Frame(mid, bg=U.BG)
-        row.pack(fill="x", padx=14, pady=(10, 0))
+        row.pack(fill="x", padx=14, pady=(7, 0))
         lbl = tk.Label(row, text="② 얼마나", bg=U.BG, fg=U.FG, font=U.FONT_B)
         lbl.pack(side="left")
         self.hours_seg = U.Segmented(row, [(h, "%d시간" % h) for h in X.HOURS], self.hours, self.set_hours)
@@ -647,7 +661,7 @@ class ExpeditionWindow(object):
         wrap = tk.Frame(right, bg=U.BG)
         wrap.pack(fill="both", expand=True, padx=14, pady=(0, 8))
         # 찾기·줄 세우기 - 가방·기술머신과 같은 칸(이 단은 좁아 두 줄). 곳·시간을 바꿔도 찾는 말과 순서는 그대로다.
-        self.find = ui_monfind.FindBar(wrap, U.BG, self._find_changed, stacked=True)
+        self.find = ui_monfind.FindBar(wrap, U.BG, self._find_changed, stacked=True, extra=self.find_extra())
         self.find.frame.pack(fill="x", pady=(8, 6))
         self.vl = U.VirtualList(wrap, {"mon": (ROW_H, lambda p: PickRow(p, self))}, bg=U.BG)
         self.vl.pack(fill="both", expand=True)
@@ -663,7 +677,7 @@ class ExpeditionWindow(object):
             name.configure(bg=bg, fg=U.ACCENT_TEXT if on else U.FG)
             chips.configure(bg=bg)
         p = X.place(self.place) or {}
-        self.place_head.configure(text="%s에서 잘 나오는 것" % p.get("kr", ""))
+        self.place_head.configure(text=place_head(p))
         self.place_hint.configure(text=p.get("hint", ""))
 
     def _paint_hours(self):
@@ -671,7 +685,11 @@ class ExpeditionWindow(object):
         self.hours_note.configure(text=self.hours_text())
 
     def hours_text(self):
-        """고른 시간에 가져올 물건 수."""
+        """고른 시간에 가져올 물건 수 (광산은 골드 범위)."""
+        if X.is_gold(self.place):
+            lo = X.gold_for(self.hours, X.GRADES[0], place_id=self.place)
+            hi = X.gold_for(self.hours, X.GRADES[-1], place_id=self.place)
+            return "골드 %s ~ %s원을 가져옵니다 (성공도에 따라)" % (format(lo, ","), format(hi, ","))
         row = X.ITEMS.get(self.hours) or (0, 0, 0)
         return ("물건 %d ~ %d개를 가져옵니다 (성공도에 따라)" % (row[0], row[-1])
                 if row[0] != row[-1] else "물건 %d개를 가져옵니다" % row[0])
@@ -681,6 +699,7 @@ class ExpeditionWindow(object):
             return
         self.place = place_id
         self._paint_place()
+        self._paint_hours()           # 광산이면 시간 줄이 물건 수 대신 골드 범위다
         # 곳이 바뀌면 잘할 차례가 달라진다. 그곳에서 가장 잘할 포켓몬(맨 위)을 다시 골라 둔다 -
         # 고르던 포켓몬을 그대로 두면 다시 선 목록의 저 아래로 내려가 안 보인다.
         self.pick = None
@@ -695,6 +714,14 @@ class ExpeditionWindow(object):
     def shown(self):
         """지금 화면에 걸친 줄 [(포켓몬 id, 줄)] (검사가 본다)."""
         return [(r.data[0]["id"], r) for _i, r in self.vl.shown() if r.data is not None]
+
+    def find_extra(self):
+        """이 탭에만 있는 줄 세우기: 탐험 레벨순 (11/07 사용자 요청). 탐험 레벨이 높은 것부터, 같으면 경험치가
+        많은 것부터, 그래도 같으면 기본 차례(잘할 차례) 그대로. 테마의 찾기 줄도 이것을 받는다."""
+        def key(mon):
+            g = self.growth_of(mon["id"])
+            return (-int(g.get("level") or 0), -int(g.get("xp") or 0))
+        return (("xlv", "탐험 레벨순", key),)
 
     # ---- 쉬기와 성장 (1.10.5)
     def growth_of(self, pid):
@@ -823,6 +850,13 @@ class ExpeditionWindow(object):
             return grow + ("%s — %s" % (name, why), U.FG_FAINT, False)
         stats = g.get("stats") or {}
         took = X.duration(self.hours, stats.get("speed", 0))
+        if X.is_gold(self.place):
+            # 광산: 골드만 (주머니가 골드를 늘린다 - 눈썰미 · 호기심 · 친화력은 광산에서 아무 일도 안 한다)
+            gold = X.gold_for(self.hours, grade, stats.get("haul", 0), self.place)
+            extra = ("\n주머니 골드 +%d%%" % round(100 * X.HAUL_PER * stats["haul"])) if stats.get("haul") else ""
+            return grow + ("%s Lv.%s → %s · %s\n예상 %s · 골드 %s원%s"
+                           % (name, mon.get("level", "?"), p.get("kr", ""), X.time_text(took), X.GRADE_KR.get(grade, ""),
+                              format(gold, ","), extra), U.FG, not self.busy)
         n = X.item_count(self.hours, grade)
         # 성장치로 붙는 덤은 셋째 줄에 따로 적는다 (없으면 두 줄이다)
         extra = []

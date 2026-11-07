@@ -113,10 +113,14 @@ def _view(uid, r, now):
     # 걸리는 시간은 보낼 때 정해졌다 (발걸음만큼 짧다) - 적어 둔 두 시각에서 읽는다
     began = _parse(r["started_at"])
     total = max(1, int((ends - began).total_seconds()) if began else int(r["hours"]) * 3600)
+    gold = X.is_gold(r["place"])
+    # 광산은 물건 대신 골드 (주머니 덤까지 - 나가 있는 동안에는 성장치를 못 바꾸니 받을 때와 같다)
+    haul = _stats(_grow_row(uid, r["pokemon_id"]))["haul"] if gold else 0
     return {"id": r["id"], "pokemon": _mon_view(uid, r["pokemon_id"]), "place": r["place"],
             "placeKr": (X.place(r["place"]) or {}).get("kr", r["place"]),
             "hours": r["hours"], "grade": r["grade"], "gradeKr": X.GRADE_KR.get(r["grade"], ""),
-            "score": r["score"], "items": X.item_count(r["hours"], r["grade"]),
+            "score": r["score"], "items": 0 if gold else X.item_count(r["hours"], r["grade"]),
+            "gold": X.gold_for(r["hours"], r["grade"], haul, r["place"]),
             "startedAt": r["started_at"], "endsAt": r["ends_at"],
             "left": max(0, left), "total": total, "ready": left <= 0}
 
@@ -481,21 +485,26 @@ def _claim_row(uid, r, now, rng):
     if not getattr(cur, "rowcount", 1):
         return None
     stats = _stats(_grow_row(uid, r["pokemon_id"]))
-    loot, tm, bonus = roll_more(rng, uid, r["place"], r["hours"], r["grade"], stats)
-    for it in loot:
-        items.bag_add(uid, it["id"], it["count"])
-    tm_pub = None
-    if tm is not None and tms.give(uid, tm):
-        tm_pub = tms.public(tm)
-    friend, full = _friend(rng, uid, r["place"], stats, now)      # 친화력: 그곳의 포켓몬을 데려온다
+    loot, tm_pub, bonus, friend, full, gold = [], None, 0, None, False, 0
+    if X.is_gold(r["place"]):
+        # 광산: 골드만 (물건 · 기술머신 · 포켓몬은 굴리지도 않는다). 주머니만 골드를 늘린다.
+        gold = X.gold_for(r["hours"], r["grade"], stats["haul"], r["place"])
+        items.money_add(uid, gold)
+    else:
+        loot, tm, bonus = roll_more(rng, uid, r["place"], r["hours"], r["grade"], stats)
+        for it in loot:
+            items.bag_add(uid, it["id"], it["count"])
+        if tm is not None and tms.give(uid, tm):
+            tm_pub = tms.public(tm)
+        friend, full = _friend(rng, uid, r["place"], stats, now)      # 친화력: 그곳의 포켓몬을 데려온다
     db.run("UPDATE expedition SET loot=? WHERE id=?",
-           (json.dumps({"items": loot, "tm": tm_pub, "friend": friend}, ensure_ascii=False), r["id"]))
+           (json.dumps({"items": loot, "tm": tm_pub, "friend": friend, "gold": gold}, ensure_ascii=False), r["id"]))
     grown = _came_back(uid, r, now)                       # 경험치를 주고 쉬게 한다 (1.10.5)
     view = _view(uid, r, now)
     return {"id": r["id"], "pokemon": view["pokemon"], "place": r["place"], "placeKr": view["placeKr"],
             "hours": r["hours"], "grade": r["grade"], "gradeKr": view["gradeKr"],
             "items": loot, "tm": tm_pub, "bonus": bonus, "growth": grown,
-            "friend": friend, "friendFull": full}
+            "friend": friend, "friendFull": full, "gold": gold}
 
 
 def _trim(uid):
@@ -532,8 +541,11 @@ def claim(uid, eid=None, now=None, rng=None):
     if got:
         n = sum(sum(i["count"] for i in g["items"]) + (1 if g["tm"] else 0) for g in got)
         friends = sum(1 for g in got if g.get("friend"))
-        out["message"] = "탐험에서 돌아왔습니다! 물건 %d개를 받았습니다." % n + (
+        gold = sum(g.get("gold") or 0 for g in got)
+        took = ([("물건 %d개" % n)] if n or not gold else []) + (["골드 %s원" % format(gold, ",")] if gold else [])
+        out["message"] = "탐험에서 돌아왔습니다! %s을(를) 받았습니다." % "와(과) ".join(took) + (
             " 포켓몬 %d마리를 데려왔습니다." % friends if friends else "")
+        out["message"] = korean.natural(out["message"])
     else:
         out["message"] = "아직 돌아온 포켓몬이 없습니다."
     return out

@@ -675,7 +675,38 @@ def expedition(root, dex):
     w.find.pick_sort("")
     TBL.settle(root, 0.3)
     chk("  지우면 다 돌아온다", len(w.vl.rows) >= 10 and not w._empty and w.pick is not None, (len(w.vl.rows), w.pick))
+    # 탐험 레벨순 (11/07) - 기본 탭과 같은 줄 세우기를 판이 탭으로 그린다
+    lead = w.vl.rows[6][1][0]["id"]
+    api.grow[lead] = {"xp": 2800, "stats": dict((k, 0) for k in X_stats()), "rest_until": 0, "runs": 1}
+    w.apply(api.expedition())
+    w.find.pick_sort("xlv")
+    TBL.settle(root, 0.3)
+    chk("찾기: 탐험 레벨순 탭이 있고, 누르면 탐험 레벨이 높은 것이 맨 위", bool(w.cv.find_withtag("msrt_xlv"))
+        and w.vl.rows[0][1][0]["id"] == lead, (bool(w.cv.find_withtag("msrt_xlv")), w.vl.rows[0][1][0]["id"], lead))
+    w.find.pick_sort("")
+    # 광산 (11/07): 골드만 - 일곱째 카드, '가져오는 것', 시간 줄은 골드 범위, 요약도 골드
+    w.set_place("mine")
+    w.set_hours(8)
+    TBL.settle(root, 0.4)
+    tx = cv_texts(w.cv)
+    chk("광산: 카드 · '광산에서 가져오는 것' · 골드 범위 · 요약의 골드", "광산" in tx and "광산에서 가져오는 것" in tx
+        and w.hours_text() in tx and w.hours_text().startswith("골드 ") and "골드" in w._summary[0], (w.hours_text(), w._summary))
+    # 가장 낮은 허브 창에서도 '② 얼마나' 와 그 아래 글(시간 줄)이 판 안에 든다 (곳이 일곱이 되어 한 줄 내려갔다)
+    top = w.win.winfo_toplevel()
+    for geo in ("1040x700", "980x%d" % (620 - U.h(30))):
+        top.geometry(geo)
+        TBL.settle(root, 0.5)
+        note = [i for i in w.cv.find_all() if w.cv.type(i) == "text" and w.cv.itemcget(i, "text") == w.hours_text()]
+        hb = w.cv.find_withtag("hr_8")
+        low = max([w.cv.bbox(i)[3] for i in note] + [w.cv.bbox(hb[0])[3] if hb else 10 ** 6])
+        chk("  %s: 시간 탭과 시간 줄이 판 안 (아래 끝 %d / 판 %d)" % (geo, low, w.cv.winfo_height()),
+            bool(note) and bool(hb) and low <= w.cv.winfo_height(), (low, w.cv.winfo_height()))
     w.close()
+
+
+def X_stats():
+    from common import expedition as X
+    return X.STATS
 
 
 def X_place_types(pid):

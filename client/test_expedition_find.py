@@ -88,8 +88,9 @@ def main():
     base = UE.candidates(api.pokemon(), dex, w.place)
 
     print("=== 줄 세우기")
-    chk("찾기 칸과 [기본 | 가나다순 | 레벨순] 이 있다",
-        [c.cget("text") for c in bar.seg.cells.values()] == ["기본", "가나다순", "레벨순"])
+    chk("찾기 칸과 [기본 | 가나다순 | 레벨순 | 탐험 레벨순] 이 있다 (탐험 레벨순은 탐험 탭에만)",
+        [c.cget("text") for c in bar.seg.cells.values()] == ["기본", "가나다순", "레벨순", "탐험 레벨순"],
+        [c.cget("text") for c in bar.seg.cells.values()])
     chk("  처음엔 잘할 차례 그대로 (예전과 같다)", ids(w) == [m["id"] for m, _p, _g in base] and len(base) == 40, ids(w)[:4])
     bar.pick_sort("name")
     TE.rest(root, 0.2)
@@ -102,6 +103,27 @@ def main():
     chk("레벨순 (높은 것부터)", lv == sorted(lv, reverse=True) and len(lv) == 40, lv[:5])
     chk("  누른 칸이 칠해진다", bar.seg.current == "level")
     chk("  고른 포켓몬은 보이는 것 중에 있다", w.pick in ids(w), w.pick)
+    # 탐험 레벨순 (11/07 사용자 요청): 탐험 레벨이 높은 것부터, 같으면 경험치가 많은 것부터, 그래도 같으면 기본 차례
+    xp = {base[5][0]["id"]: 2800, base[9][0]["id"]: 640, base[2][0]["id"]: 700, base[30][0]["id"]: 100}
+    for pid, x in xp.items():
+        api.grow[pid] = {"xp": x, "stats": dict((k, 0) for k in X.STATS), "rest_until": 0, "runs": 1}
+    w.apply(api.expedition())
+    TE.rest(root, 0.2)
+    bar.pick_sort("xlv")
+    TE.rest(root, 0.2)
+    want = [base[5][0]["id"], base[2][0]["id"], base[9][0]["id"], base[30][0]["id"]]
+    rest_ids = [i for i in ids(w) if i not in xp]
+    default = [m["id"] for m, _p, _g in UE.candidates(api.pokemon(), dex, w.place,
+                                                       dict((str(k), {"xp": v}) for k, v in xp.items()))]
+    chk("탐험 레벨순: 탐험 레벨 높은 것부터 (Lv.10 · Lv.4(700) · Lv.4(640) · Lv.1), 나머지는 기본 차례",
+        ids(w)[:4] == want and rest_ids == [i for i in default if i not in xp] and len(ids(w)) == 40, ids(w)[:5])
+    chk("  누른 칸이 칠해지고 줄에 탐험 레벨이 보인다", bar.seg.current == "xlv"
+        and w.shown()[0][1].grow.cget("text").startswith("탐험 Lv.10"), w.shown()[0][1].grow.cget("text"))
+    for pid in xp:
+        del api.grow[pid]
+    w.apply(api.expedition())
+    bar.pick_sort("level")
+    TE.rest(root, 0.2)
 
     print("\n=== 찾기")
     bar.pick_sort("")

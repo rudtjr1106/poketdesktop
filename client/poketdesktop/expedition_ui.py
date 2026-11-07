@@ -27,8 +27,10 @@ from .ui_common import run_async
 PANEL = "#101623"
 GRADE_COLOR = {"great": U.ACCENT, "good": U.GOOD, "normal": U.FG_DIM}
 # 'held' = 지닌 도구 (아주 드물게 나온다 - common/expedition.HELD). 눈에 띄게 금빛으로 적는다.
-TIER_COLOR = {"common": U.FG_DIM, "uncommon": U.GOOD, "rare": U.INFO, "epic": "#c08bff", "held": U.ACCENT}
-TIER_KR = {"common": "평범", "uncommon": "쓸만", "rare": "희귀", "epic": "특별", "held": "지닌 도구"}
+TIER_COLOR = {"common": U.FG_DIM, "uncommon": U.GOOD, "rare": U.INFO, "epic": "#c08bff", "held": U.ACCENT,
+              "gold": U.ACCENT}
+# 'gold' = 광산에서 가져온 골드 (11/07). 보따리의 한 줄로 적는다 - 받은 창(기본 · 테마)이 같은 줄을 그린다.
+TIER_KR = {"common": "평범", "uncommon": "쓸만", "rare": "희귀", "epic": "특별", "held": "지닌 도구", "gold": "골드"}
 LOOT_W = 440
 RECHECK_PAD = 2            # 돌아올 시각보다 이만큼(초) 뒤에 물어본다 (시계가 조금 어긋나도 돌아와 있게)
 
@@ -288,6 +290,8 @@ def loot_lines(claimed):
         mon = g.get("pokemon") or {}
         head = "%s · %s %s시간" % (mon.get("name") or "?", g.get("placeKr") or "", g.get("hours") or "?")
         rows = []
+        if g.get("gold"):
+            rows.append((None, "골드 %s원" % format(int(g["gold"]), ","), 1, "gold"))
         for it in g.get("items") or []:
             n = int(it.get("count") or 1)
             rows.append((it.get("id"), it.get("kr") or it.get("id") or "?", n, it.get("tier") or "common"))
@@ -370,9 +374,21 @@ def _mon_thumb(win, app, label, mon, keep, tag, size=30):
 
 def loot_summary(lines, claimed):
     """창 머리에 적을 한 줄: '물건 N개를 가져왔습니다.' (+ ' 포켓몬 M마리를 데려왔습니다.'). 화면(기본 · 테마)이 같이 쓴다."""
-    total = sum(n for _h, _g, _k, rows in lines for _i, _t, n, _tier in rows)
+    total = sum(n for _h, _g, _k, rows in lines for _i, _t, n, tier in rows if tier != "gold")
+    gold = sum(int((g or {}).get("gold") or 0) for g in claimed)
     friends = sum(1 for g in claimed if isinstance((g or {}).get("friend"), dict))
-    return "물건 %d개를 가져왔습니다." % total + (" 포켓몬 %d마리를 데려왔습니다." % friends if friends else "")
+    took = (["물건 %d개" % total] if total or not gold else []) + (["골드 %s원" % format(gold, ",")] if gold else [])
+    return natural("%s을(를) 가져왔습니다." % "와(과) ".join(took)) + (
+        " 포켓몬 %d마리를 데려왔습니다." % friends if friends else "")
+
+
+def loot_foot(claimed):
+    """받은 창 바닥의 한 줄 (기본 · 테마). 물건은 가방으로, 광산의 골드는 바로 들어온다."""
+    gold = any((g or {}).get("gold") for g in claimed or [])
+    things = any((g or {}).get("items") or (g or {}).get("tm") for g in claimed or [])
+    if gold and not things:
+        return "골드는 바로 들어왔습니다."
+    return "물건은 가방에 넣어 두었습니다." if gold else "가방에 넣어 두었습니다."
 
 
 def loot_max_height(win):
@@ -402,7 +418,7 @@ def show_loot(parent, app, claimed):
     foot = tk.Frame(f, bg=U.BG)
     foot.pack(fill="x", pady=(14, 0), side="bottom")
     U.PushButton(foot, "확인", win.destroy, height=34, font=U.FONT_B).pack(side="right")
-    tk.Label(foot, text="가방에 넣어 두었습니다.", bg=U.BG, fg=U.FG_DIM, font=U.FONT_S).pack(side="left")
+    tk.Label(foot, text=loot_foot(claimed), bg=U.BG, fg=U.FG_DIM, font=U.FONT_S).pack(side="left")
 
     inner, cv = ui_box.scroll_body(f)
     tag = 0

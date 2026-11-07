@@ -21,13 +21,29 @@ from . import box_filter
 from . import ui_common as U
 
 
+def sort_choices(extra=()):
+    """줄 세우기 칸에 놓을 것 [(열쇠, 이름)]: 늘 있는 셋 + 그 창에만 있는 것 (테마의 찾기 줄도 같이 쓴다)."""
+    return tuple(box_filter.PICK_SORTS) + tuple((k, lb) for k, lb, _fn in extra)
+
+
+def sorted_view(mons, dex, query, sort, extra=None):
+    """찾는 말로 거르고 sort 로 줄 세운 새 목록. extra 의 줄 세우기는 그 키로 (같으면 받은 차례 그대로)."""
+    fn = (extra or {}).get(sort)
+    if fn is None:
+        return box_filter.pick_view(mons or [], dex, query, sort)
+    return sorted(box_filter.pick_view(mons or [], dex, query, ""), key=fn)
+
+
 class FindBar(object):
 
-    def __init__(self, parent, bg, on_change, stacked=False):
+    def __init__(self, parent, bg, on_change, stacked=False, extra=()):
         """stacked = [기본|가나다순|레벨순] 을 찾기 줄 아래 오른쪽 줄로 내린다. 가방·기술머신처럼 넓은 칸은
-        한 줄이면 되지만, 탐험 탭의 '누구를' 단은 좁아서(가장 좁게 줄이면 340px 남짓) 한 줄에 안 든다."""
+        한 줄이면 되지만, 탐험 탭의 '누구를' 단은 좁아서(가장 좁게 줄이면 340px 남짓) 한 줄에 안 든다.
+        extra = 그 창에만 있는 줄 세우기 ((열쇠, 이름, 포켓몬 -> 정렬 키), ...) - 탐험 탭의 '탐험 레벨순' (11/07)."""
         self.on_change = on_change
         self.sort = ""
+        self.extra = dict((k, fn) for k, _lb, fn in extra)
+        self.sorts = sort_choices(extra)
         self.frame = tk.Frame(parent, bg=bg)
         top = tk.Frame(self.frame, bg=bg) if stacked else self.frame
         if stacked:
@@ -44,7 +60,7 @@ class FindBar(object):
         row = tk.Frame(self.frame, bg=bg) if stacked else self.frame
         if stacked:
             row.pack(fill="x", pady=(6, 0))
-        self.seg = U.Segmented(row, box_filter.PICK_SORTS, "", self.pick_sort)
+        self.seg = U.Segmented(row, self.sorts, "", self.pick_sort)
         self.seg.pack(side="right")
         self.q.trace_add("write", lambda *_a: self._changed())
 
@@ -65,7 +81,7 @@ class FindBar(object):
 
     def view(self, mons, dex):
         """찾는 말로 거르고 고른 순서로 줄 세운 새 목록. '몇 마리' 도 여기서 고친다."""
-        out = box_filter.pick_view(mons or [], dex, self.q.get(), self.sort)
+        out = sorted_view(mons, dex, self.q.get(), self.sort, self.extra)
         try:
             self.count.configure(text=("%d마리" % len(out)) if self.searching() else "")
         except tk.TclError:

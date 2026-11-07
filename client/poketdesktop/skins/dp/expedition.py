@@ -22,7 +22,7 @@ from PIL import ImageTk
 from common import expedition as X
 from common import tint as T
 
-from ... import box_filter, sprite_cache, sprites
+from ... import sprite_cache, sprites
 from ... import ui_common as U
 from ... import ui_expedition as E
 from ...ui_common import run_async
@@ -146,7 +146,7 @@ class ExpeditionWindow(E.ExpeditionWindow):
         s = U.h
         cv = self.cv
         # 찾기·줄 세우기 (기본 탭과 같은 말). 칸은 진짜 입력칸이고 줄 세우기 탭은 판이 그린다.
-        self.find = Find(self, cv, self._find_changed)
+        self.find = Find(self, cv, self._find_changed, extra=self.find_extra())     # 탐험 레벨순 (11/07)
         self.vl = K.VList(cv, WHITE, self._draw_row)
         self.vl.on_click = lambda data, *_a: self.pick_mon(data[0]["id"])
         self.send_btn = K.CButton(cv, "보내기", self.do_send, "red", font(12))
@@ -227,8 +227,7 @@ class ExpeditionWindow(E.ExpeditionWindow):
                              fill=LCD_INK, font=font(11), anchor="w", tags=T_)
         cv.create_text(cv.bbox(nid)[2] + s(6), y1 + s(20), text="Lv.%s" % mon.get("level", "?"), fill=LCD_DIM,
                        font=font(8), anchor="w", tags=T_)
-        line = "%s · %s시간 · %s · 물건 %s개" % (o.get("placeKr") or "", o.get("hours"), o.get("gradeKr") or "",
-                                            o.get("items", "?"))
+        line = "%s · %s시간 · %s · %s" % (o.get("placeKr") or "", o.get("hours"), o.get("gradeKr") or "", E.haul_text(o))
         cv.create_text(tx, y1 + s(40), text=line, fill=LCD_INK, font=font(8), anchor="w", width=x2 - tx - s(10),
                        tags=T_)
         fy = y2 - s(22)
@@ -299,7 +298,7 @@ class ExpeditionWindow(E.ExpeditionWindow):
         th = K.text_height(cv, hint, font(9), rx - lx - s(24))
         bh = s(22) + th + s(10)
         K.panel(cv, lx, y, rx, y + bh, strong=True, tags=T_)
-        cv.create_text(lx + s(12), y + s(14), text="%s에서 잘 나오는 것" % p.get("kr", ""), fill=INK2, font=font(8),
+        cv.create_text(lx + s(12), y + s(14), text=E.place_head(p), fill=INK2, font=font(8),
                        anchor="w", tags=T_)
         K.text(cv, lx + s(12), y + s(24), hint, font(9), fill=ORANGE, anchor="nw", width=rx - lx - s(24), tags=T_)
         y += bh + s(14)
@@ -342,7 +341,7 @@ class ExpeditionWindow(E.ExpeditionWindow):
         cv.create_text(lx, fy + fh // 2, text="포켓몬 찾기", fill=INK2, font=font(9), anchor="w", tags=T_)
         label_w = K.tkfont_of(cv, font(9)).measure("포켓몬 찾기")
         ex = lx + label_w + s(10)
-        sorts = [(k or "base", lb) for k, lb in box_filter.PICK_SORTS]
+        sorts = [(k or "base", lb) for k, lb in self.find.sorts]
         f10 = K.tkfont_of(cv, font(10))
         tabs_w = sum(f10.measure(lb) + 2 * s(10) for _k, lb in sorts)
         cnt_w = s(52) if self.find.count else 0

@@ -107,16 +107,33 @@ def main_():
     cat = items.catalog()
 
     print("=== 규칙 ===")
-    types = [t for p in X.PLACES for t in p["types"]]
+    types = [t for p in X.ITEM_PLACES for t in p["types"]]
     all_types = set(t for sp in dex.species for t in sp.get("types", []))
-    chk("갈 곳이 여섯, 타입 열여덟이 한 곳씩 맞는다", len(X.PLACES) == 6 and len(types) == 18 == len(set(types))
-        and set(types) == all_types, sorted(all_types - set(types)))
+    chk("물건을 가져오는 곳이 여섯, 타입 열여덟이 한 곳씩 맞는다 (+ 골드만 가져오는 광산)",
+        len(X.ITEM_PLACES) == 6 and len(types) == 18 == len(set(types)) and set(types) == all_types
+        and len(X.PLACES) == 7 and [p["id"] for p in X.PLACES if X.is_gold(p["id"])] == ["mine"],
+        sorted(all_types - set(types)))
     loot_ids = [i for t in X.LOOT for i, _w in X.LOOT[t]]
-    special_ids = [i for p in X.PLACES for t, ids in p["special"].items() for i in ids]
+    special_ids = [i for p in X.ITEM_PLACES for t, ids in p["special"].items() for i in ids]
     missing = [i for i in loot_ids + special_ids if i not in cat]
     chk("탐험에서 나오는 것(전용 표 %d종 + 특산물)이 전부 있는 도구다" % len(set(loot_ids)), not missing
         and set(X.LOOT) == set(X.TIERS) - {"held"} and all(X.LOOT[t] for t in X.LOOT)
-        and all(set(p["special"]) <= set(X.LOOT) for p in X.PLACES), missing)
+        and all(set(p["special"]) <= set(X.LOOT) for p in X.ITEM_PLACES), missing)
+    # 광산 (사용자 결정 11/07: '오직 골드만', 8시간 대성공 4,000원, 강철 · 땅 · 바위, 성장치는 발걸음 · 주머니만)
+    mine = X.place("mine") or {}
+    chk("광산 = 강철 · 땅 · 바위, 골드만 가져온다 (특산물 · 기술머신 없음)", mine.get("kr") == "광산"
+        and mine.get("types") == ["STEEL", "GROUND", "ROCK"] and X.is_gold("mine") and not X.is_gold("cave")
+        and not mine.get("special") and X.tm_chance(8, "great", "mine", lore=10) == 0, mine)
+    chk("골드 = 8시간 대성공 4,000원, 시간에 비례, 성공 80% · 보통 60%",
+        [[X.gold_for(h, g) for g in X.GRADES] for h in X.HOURS] == [[600, 800, 1000], [1200, 1600, 2000], [2400, 3200, 4000]],
+        [[X.gold_for(h, g) for g in X.GRADES] for h in X.HOURS])
+    chk("  주머니 1점에 골드 +3%, 10점이면 +30% (8시간 대성공 5,200원)",
+        X.gold_for(8, "great", haul=1) == 4120 and X.gold_for(8, "great", haul=10) == 5200
+        and X.gold_for(2, "normal", haul=10) == 780, (X.gold_for(8, "great", haul=1), X.gold_for(8, "great", haul=10)))
+    chk("  물건 곳에서는 골드가 0", X.gold_for(8, "great", place_id="cave") == 0 and X.gold_for(8, "great", place_id="mine") == 4000)
+    chk("  성공도는 다른 곳처럼 레벨과 타입 (Lv.75 강철이면 대성공, Lv.100 이어도 안 맞으면 성공)",
+        X.grade_of(75, ["STEEL"], "mine") == "great" and X.grade_of(100, ["WATER"], "mine") == "good"
+        and X.grade_of(30, ["GROUND", "ROCK"], "mine") == "good")
     # **돈벌이가 되면 안 된다** (사용자 결정): 지닌 도구·팔기만 하는 물건은 안 나오고, 비싼 것도 없다.
     pricey = [(i, cat[i]["sell"]) for i in set(loot_ids + special_ids)
               if cat[i]["sell"] > 5000 or cat[i]["cat"] == "held" or (cat[i].get("effect") or {}).get("kind") == "sell"
@@ -504,7 +521,7 @@ def main_():
     frng = random.Random(77)
     seen_sp = {}
     bad = []
-    for place in [p_["id"] for p_ in X.PLACES]:
+    for place in [p_["id"] for p_ in X.ITEM_PLACES]:
         good = set(X.place(place)["types"])
         got_sp = set()
         for _i in range(150):
@@ -631,7 +648,7 @@ def main_():
         one_run = X.item_count(h, g_) * item_worth(place, h, g_, st_.get("luck", 0)) * (1 + X.haul_chance(st_.get("haul", 0)))
         return X.SLOTS * 86400.0 / X.duration(h, st_.get("speed", 0)) * one_run
 
-    places = [p_["id"] for p_ in X.PLACES]
+    places = [p_["id"] for p_ in X.ITEM_PLACES]       # 광산(골드)은 아래 '광산' 에서 따로 본다
     base_day = max(per_day(p_, 8, "great", {}) for p_ in places)
     chk("기대값으로 셈한 하루 최대가 굴려서 잰 값과 같다 (%.0f원어치)" % base_day, abs(base_day - best * 9) < best * 9 * 0.08,
         (base_day, best * 9))
@@ -692,7 +709,7 @@ def main_():
     counts = "".join("<tr><td>%d시간</td>%s</tr>" % (h, "".join('<td class="n">%d개</td>' % X.item_count(h, g) for g in X.GRADES))
                      for h in X.HOURS)
     chk("가져오는 물건의 수", counts in "".join(ln.strip() for ln in sec.splitlines()), counts)
-    names = [cat[i]["kr"] for p in X.PLACES for t, ids in p["special"].items() for i in ids if t != "common"]
+    names = [cat[i]["kr"] for p in X.ITEM_PLACES for t, ids in p["special"].items() for i in ids if t != "common"]
     chk("특산물이 전부 적혀 있고, 특산물 확률도 같다", all(nm in sec for nm in names) and pct(X.SPECIAL_RATE) + " 확률로 특산물" in sec,
         [nm for nm in names if nm not in sec])
     hw = float(sum(w for _i, w in pools["held"]))
@@ -716,6 +733,52 @@ def main_():
     bad = [h for h in X.HOURS if '<tr><td>%d시간</td>%s</tr>' % (h, "".join(
         '<td class="n">%s</td>' % X.time_text(X.duration(h, n)) for n in (0, 2, 4, 6, 8, 10))) not in sec]
     chk("발걸음을 찍었을 때 걸리는 시간 세 줄", not bad, bad)
+    gold_rows = "".join("<tr><td>%d시간</td>%s</tr>" % (h, "".join('<td class="n">%s원</td>' % format(X.gold_for(h, g), ",")
+                                                                   for g in X.GRADES)) for h in X.HOURS)
+    chk("광산에서 가져오는 골드 세 줄 · 광산 줄 · 주머니 덤", gold_rows in "".join(ln.strip() for ln in sec.splitlines())
+        and "<tr><td>광산</td><td>강철 · 땅 · 바위</td>" in sec
+        and "골드 +%s%%" % num(100 * X.HAUL_PER) in sec, gold_rows)
+
+    print("\n=== 광산: 골드만 가져온다 ===")
+    guid = mkuser("광부")
+    agg = mkmon(guid, "AGGRON", 80)                  # 강철 · 바위 = 둘 다 맞는다 -> 대성공
+    rows_before = db.q1("SELECT money FROM users WHERE id=?", (guid,))["money"]
+    # 다 키운 포켓몬: 주머니 4 · 친화력 6 (친화력 · 호기심 · 눈썰미는 광산에서 아무 일도 안 한다)
+    db.run("INSERT INTO expedition_mon (pokemon_id, user_id, xp, haul, charm, runs) VALUES (?,?,?,?,?,1)",
+           (agg, guid, X.XP_MAX, 4, 6))
+    sent = E.send(guid, agg, "mine", 8, T0)
+    o = sent["out"][0]
+    chk("광산으로 보낼 수 있다 (나가 있는 칸에 물건 대신 골드를 적는다)", sent["ok"] and o["place"] == "mine"
+        and o["placeKr"] == "광산" and o["grade"] == "great" and o["items"] == 0 and o["gold"] == 4480, o)
+
+    class Always(random.Random):
+        """주사위가 늘 0 - 물건 곳이었다면 기술머신 · 친화력이 반드시 나왔을 굴림."""
+        def random(self):
+            return 0.0
+    bag0 = bag(guid)
+    got = E.claim(guid, o["id"], later(hours=8), rng=Always(1))
+    c = got["claimed"][0]
+    money_after = db.q1("SELECT money FROM users WHERE id=?", (guid,))["money"]
+    chk("**받으면 골드만 들어온다** (8시간 대성공 4,000 + 주머니 4점 12% = 4,480원)", c["gold"] == 4480
+        and money_after - rows_before == 4480 and got["money"] == money_after, (c.get("gold"), money_after - rows_before))
+    chk("  물건 · 기술머신 · 포켓몬은 없다 (주사위가 다 나와도)", c["items"] == [] and c["tm"] is None and c["friend"] is None
+        and not c.get("friendFull") and bag(guid) == bag0
+        and db.q1("SELECT COUNT(*) n FROM pokemon WHERE user_id=?", (guid,))["n"] == 1, c)
+    chk("  알림 글: 골드를 받았다", "4,480원" in got["message"] and "물건" not in got["message"], got["message"])
+    chk("  탐험 경험치와 쉬는 시간은 다른 곳과 같다", c["growth"]["rest"] == 24 * 3600 and c["growth"]["xp"] == 0, c["growth"])
+    rec = db.q1("SELECT loot FROM expedition WHERE id=?", (o["id"],))["loot"]
+    chk("  받은 기록에 골드가 남는다", '"gold": 4480' in rec, rec)
+    pika2 = mkmon(guid, "PIKACHU", 30)
+    o2 = E.send(guid, pika2, "mine", 2, later(hours=9))["out"][0]
+    got2 = E.claim(guid, o2["id"], later(hours=11), rng=random.Random(5))
+    chk("  타입이 안 맞는 Lv.30 은 보통 = 2시간 600원 (성장치가 없으면 덤도 없다)", o2["grade"] == "normal"
+        and got2["claimed"][0]["gold"] == 600, (o2["grade"], got2["claimed"][0].get("gold")))
+    mixed = mkmon(guid, "VENUSAUR", 80)
+    E.send(guid, mixed, "forest", 2, later(hours=40))
+    o3 = E.send(guid, pika2, "mine", 2, later(hours=40))["out"][-1]
+    got3 = E.claim(guid, None, later(hours=43), rng=random.Random(9))
+    chk("  물건 곳과 같이 받으면 알림에 둘 다 적는다", "물건" in got3["message"] and "600원" in got3["message"]
+        and o3["place"] == "mine", got3["message"])
     bad = [h for h in X.HOURS if '<tr><td>%d시간</td>%s</tr>' % (h, "".join(
         '<td class="n">%d</td>' % X.xp_for(h, g_) for g_ in X.GRADES)) not in sec]
     chk("탐험 경험치 세 줄", not bad, bad)
