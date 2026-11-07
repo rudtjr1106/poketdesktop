@@ -42,7 +42,7 @@ ROW = 34                             # 도구 한 줄 (기본 화면과 같은 �
 
 # 꼬리표 빛깔 (옅은 바탕 + 같은 빛의 진한 글씨로 칠한다)
 TIER_CHIP = {"common": "#8a8e96", "uncommon": "#3f9a3f", "rare": "#3a70d0", "epic": "#8a58c8",
-             "held": "#e08a20", "tm": "#d0742a"}
+             "held": "#e08a20", "tm": "#d0742a", "gold": "#e0a020"}
 GRADE_CHIP = {"great": "#e07a28", "good": "#3f9a3f", "normal": "#7c8494"}
 EGG_CHIP = {"legendary": "#e0a020", "mythical": "#9a68d8"}
 LEVEL_CHIP, SHINY_CHIP, ON_CHIP, BOX_CHIP = "#3a72cc", "#d8a020", "#4ca83a", "#e07a28"
@@ -457,7 +457,7 @@ def show_loot(parent, app, claimed):
 
     # 바닥 줄(안내 + 확인)을 먼저 잡는다 - 굴러가는 칸이 높이를 다 먹어 단추가 밀려나지 않게
     foot = _canvas(f, width, s(36), side="bottom", fill="x", pady=(s(10), 0))
-    foot.create_text(0, s(18), text="가방에 넣어 두었습니다.", fill=MUTED, font=font(10), anchor="w")
+    foot.create_text(0, s(18), text=XU.loot_foot(claimed), fill=MUTED, font=font(10), anchor="w")
     b, _w = _button(foot, "확인", win.destroy, width, s(1))
     win.buttons = (b,)
 

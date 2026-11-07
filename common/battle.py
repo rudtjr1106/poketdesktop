@@ -46,6 +46,11 @@ STAT_KR = {"atk": "공격", "def": "방어", "spa": "특수공격", "spd": "특�
 
 # 우리가 실제로 처리하는 상태이상. 나머지는 무시한다(효과 없음).
 HANDLED_STATUS = ("burn", "paralysis", "poison", "sleep", "freeze")
+# 그 타입이면 안 걸리는 상태이상 (독은 강철도 - _ail_type_immune)
+TYPE_STATUS_IMMUNE = {"burn": "FIRE", "poison": "POISON", "paralysis": "ELECTRIC", "freeze": "ICE"}
+# 변화기인데 타입 상성을 보는 것 (본가) - 땅 타입에게 전기자석파는 효과가 없다 (2026-11-07 사용자 결정, 게시판 #480.
+# 예전에는 마비가 걸렸다). 겨냥표적을 지니면 맞는다 (type_eff).
+TYPE_CHECKED_STATUS = ("THUNDERWAVE",)
 
 # 연속기 횟수 분포 (2~5회 기술의 본가 확률)
 MULTI_HIT = [2, 2, 2, 3, 3, 3, 4, 5]
@@ -94,6 +99,10 @@ SPARE_RISK_ABOVE = 0.4
 SPARE_STATUS = ("sleep", "paralysis")
 # 쓰면 스스로 최대 체력의 절반을 깎는 변화기 (잡기 모드가 상대의 남을 체력을 셀 때 본다)
 SELF_HALF = ("BELLYDRUM", "FILLETAWAY")
+
+# 잡기 모드에서 상대가 구멍파기 · 공중날기 ... 로 숨은 턴: 기술을 쓰지 않고 올라오기를 지켜본다 (spare_plan 이
+# 고르고 take_turn 이 받는다, 게시판 #436 · #478). 진짜 기술이 아니라 PP · 기술 칸에는 없다.
+WAIT = "_WAIT"
 
 # 쓸 기술이 하나도 없을 때 쓰는 몸부림.
 # 이게 없으면 양쪽 다 PP 가 떨어졌을 때 아무도 못 때려서 배틀이 안 끝난다.
@@ -852,6 +861,8 @@ class Battle(object):
     def move_name(self, key):
         if key == STRUGGLE:
             return STRUGGLE_MOVE["kr"]
+        if key == WAIT:
+            return "지켜보기"
         return self.dex.move_name(key)
 
     def usable(self, f):
@@ -972,7 +983,7 @@ class Battle(object):
         """잡기 모드. 상대를 쓰러뜨리지 않고 잡기 좋게 만든다.
 
         (쓸 기술, 멈출 이유) 를 돌려준다. 둘 중 하나만 채워진다 - 멈출 때인데 상대가 숨어 있으면
-        _spare_pass 가 고른 기술로 한 턴을 넘긴다 (그때는 이유를 지운다, 게시판 #436).
+        그 턴은 지켜본다 (WAIT, _spare_pass - 그때는 이유를 지운다, 게시판 #436 · #478).
 
             1. 상대가 상태이상이 아니면 잠재우기·마비 기술부터
             2. 체력이 SPARE_LOW 이하면 멈춘다            -> "low"
@@ -987,7 +998,7 @@ class Battle(object):
         if user.held:
             pool = H.lock_pool(user, pool)
         if pool == [STRUGGLE]:
-            return None, "nosafe"
+            return self._hold(user, target, "nosafe")
         if not target.status:
             types = target.types() if target.ability_on else ((target.species or {}).get("types") or [])
             for ail in SPARE_STATUS:
@@ -998,6 +1009,8 @@ class Battle(object):
                         continue
                     if ail == "paralysis" and "ELECTRIC" in types:
                         continue
+                    if AF.powder_immune(md, user, target) or self.status_type_blocked(md, user, target):
+                        continue                # 풀에게 저리가루 · 수면가루, 땅에게 전기자석파는 안 통한다 (#480)
                     if target.ability_on and (A.would_block(user, target, md)
                                               or A.status_blocked(target, ail, user)):
                         continue
@@ -1005,48 +1018,39 @@ class Battle(object):
                 if cands:
                     return max(cands)[1], None
         if target.hp <= target.maxhp * SPARE_LOW:
-            return self._hold(pool, user, target, "low")
+            return self._hold(user, target, "low")
         best_m = self._spare_hit(pool, user, target, crit=True)
         if best_m is None and target.hp > target.maxhp * SPARE_RISK_ABOVE:
             # 급소까지 막으면 절반쯤에서 멈춰 버린다 (400판 중 185판). 체력이 넉넉하면
             # **급소가 아니면 안 쓰러지는** 기술까지 쓴다. 급소는 1/24 이다.
             best_m = self._spare_hit(pool, user, target, crit=False)
         if best_m is None:
-            return self._hold(pool, user, target, "nosafe")
+            return self._hold(user, target, "nosafe")
         return best_m, None
 
-    def _hold(self, pool, user, target, reason):
-        """멈춘다 - 상대가 숨어 있어 한 턴 넘길 수 있으면 (넘길 기술, None)."""
-        m = self._spare_pass(pool, user, target)
-        return (m, None) if m else (None, reason)
+    def _hold(self, user, target, reason):
+        """멈춘다 - 상대가 숨어 있어 그 턴을 지켜볼 수 있으면 (WAIT, None)."""
+        return (WAIT, None) if self._spare_pass(user, target) else (None, reason)
 
-    def _spare_pass(self, pool, user, target):
+    def _spare_pass(self, user, target):
         """멈출 때인데 상대가 숨어 있다 (구멍파기 · 공중날기 · 다이빙 · 섀도다이브). 숨은 동안은 야생 도트 창이
         숨어 있어 볼도(오른쪽 클릭) 바로 싸우기도(왼쪽 클릭) 못 누른다. 멈추면 10초 뒤 끝까지 싸우기로 넘어가
         올라온 상대를 쓰러뜨렸다 (게시판 #436, 땅속의 대왕끼리동).
 
-        그래서 **숨은 상대에게 안 닿는 기술**로 한 턴을 넘긴다 - 반드시 빗나가니 안 쓰러진다. 상대는 올라와서
-        때리고, 다음 턴(드러난 뒤)에 멈춘다. 쓸 기술을 돌려주고, 넘길 수 없으면 None (그때는 멈춘다).
+        그래서 그 턴은 **기술을 쓰지 않고 지켜본다** (WAIT). 상대는 올라와서 때리고, 다음 턴(드러난 뒤)에 멈춘다.
+        처음 고침(11/04)은 '숨은 상대에게 안 닿는 기술' 로 넘겼는데, 기술은 턴 처음에 고르므로 **상대가 더 빠르면
+        먼저 올라온 상대를 그 기술이 맞혀** 쓰러뜨렸다 (게시판 #478, 갑주무사 대 한카리아스). 지켜보면 순서와 상관없고,
+        지진만 가졌거나 노가드라 넘길 기술이 없어 숨은 채 멈추던 판도 없어진다. 지켜볼 수 있으면 True.
         """
-        spot = SM.hidden_spot(target)
-        if not spot or (user.ability_on and A.always_hit(user, target)):
-            return None                         # 안 숨었다 · 노가드는 숨어도 맞힌다
+        if not SM.hidden_spot(target):
+            return False                        # 안 숨었다 - 도트가 보이니 멈추면 된다
+        if SM.locked_move(user):
+            return False                        # 역린 · 2턴 기술에 묶였다 - 엔진이 그 기술로 바꿔 쓰니 지켜볼 수 없다
         # 턴 끝에 깎일 몫(화상 · 독 · 씨뿌리기)과 상대가 올라오며 스스로 깎일 몫으로 쓰러지면 넘기지 않는다
         eot = target.maxhp // 8 if target.status in ("burn", "poison") else 0
         if target.seeded:
             eot += target.maxhp // 8
-        if target.hp - self._self_loss(target, user) - eot <= 0:
-            return None
-        for m in pool:
-            md = self.move_of(m)
-            mk = MC.key(md)
-            if not (MC.attacks(md) or A.aims_at_foe(md)) or not SM.hidden_from(target, mk):
-                continue                        # 나에게 쓰는 기술(날씨 · 함정 ...)과 숨어도 닿는 기술(지진 ...)은 뺀다
-            if (mk in AF.SELF_KO or mk in AF.CRASH or mk in AF.DELAYED or mk in AF.ROLLERS
-                    or mk in SM.RAGE_MOVES or mk in SM.CHARGE2 or mk == "UPROAR"):
-                continue                        # 빗나가도 내가 다치거나 · 나중에 맞거나 · 다음 턴까지 묶이는 기술
-            return m
-        return None
+        return target.hp - self._self_loss(target, user) - eot > 0
 
     def _self_loss(self, f, other):
         """f 가 이번 턴에 **먼저 움직여 스스로 깎을 수 있는** 체력의 최댓값.
@@ -1123,6 +1127,10 @@ class Battle(object):
         target = target or self.me
         useful = False
         mk = MC.key(md)
+        if target is not user and A.aims_at_foe(md) and (
+                AF.powder_immune(md, user, target) or self.status_type_blocked(md, user, target)
+                or (target.ability_on and A.would_block(user, target, md))):
+            return 0.0                      # 기술째 안 통한다: 풀에게 가루 기술, 땅에게 전기자석파, 특성이 막는다 (#480)
         who = "me" if user is self.me else "foe"
         v = AF.status_value(self, mk, md, user, target, max(1.0, best_dmg))
         if v is None:
@@ -1142,7 +1150,9 @@ class Battle(object):
         if ail in HANDLED_STATUS:
             if target.status:               # 이미 상태이상이면 소용없다
                 return 0.0
-            useful = True
+            # 타입 · 특성 · 필드로 안 걸리면 이 몫은 없다 - 다른 효과(거미줄의 스피드 떨어뜨리기 ...)만 센다 (#480)
+            if not self.ail_blocked(target, ail, user):
+                useful = True
         # **누구한테 걸리는지는 도감이 정한다.** 예전에는 "올려주는
         # 기술이면 자기 자신" 으로 짐작했는데, 그러면 재주넘기(SWAGGER)
         # 처럼 **상대의** 공격을 올려 주는 기술을 "내 공격이 오른다" 로
@@ -1356,6 +1366,12 @@ class Battle(object):
         self.mega_step({"me": bool(mega)}, ev)
         foe_move = self.choose_ai()
 
+        watch = my_move == WAIT
+        if watch:
+            # 잡기 모드: 이 턴은 숨은 상대가 올라오기를 지켜본다 (spare_plan, 게시판 #478). 순서 · 잠금 셈은 쓸 수 있는
+            # 첫 기술로 그대로 하고, _do_use 가 움직일 수 있는지 본 뒤에 그 기술을 쓰지 않는다 (PP 도 안 든다).
+            self.me.cond["watch"] = True
+            my_move = self.usable(self.me)[0]
         if my_move != STRUGGLE and (my_move not in self.me.pp
                                     or self.me.pp.get(my_move, 0) <= 0):
             my_move = self.usable(self.me)[0]
@@ -1384,6 +1400,8 @@ class Battle(object):
             if not user.alive() or not target.alive():
                 continue
             self._use(who, user, target, key, ev)
+        if watch:
+            self.me.cond.pop("watch", None)   # 잠들었거나 풀죽어 _do_use 까지 못 갔어도 이 턴으로 끝
 
         if not self.over:
             self._end_of_turn(ev)
@@ -1676,6 +1694,10 @@ class Battle(object):
         if not called and not instructed:
             if not self._can_move(who, user, ev, key):
                 return
+            if user.cond.pop("watch", None):
+                # 잡기 모드의 지켜보기 (Battle.WAIT, 게시판 #478) - 잠듦 · 마비 · 혼란은 위에서 평소대로 봤다
+                ev.append({"t": "msg", "who": who, "text": "%s 은(는) 상대가 나타나기를 기다리고 있다!" % user.name})
+                return
             why = SM.restricted(self, user, key)
             if why:
                 ev.append({"t": "msg", "who": who, "text": why})
@@ -1806,6 +1828,11 @@ class Battle(object):
         # ---- 가루·포자 기술은 풀 타입에게 안 통한다 (6세대부터. 방진 특성은 abilities 가 본다) ----
         # 매직미러로 튕겨 돌아온 것도 마찬가지라 bounced 를 안 가린다.
         if AF.powder_immune(move, user, target):
+            ev.append({"t": "immune", "who": who,
+                       "text": "%s 에게는 효과가 없는 것 같다..." % target.name})
+            return
+        # ---- 상성을 보는 변화기: 땅 타입에게 전기자석파 (본가, 2026-11-07 게시판 #480) ----
+        if not bounced and self.status_type_blocked(move, user, target):
             ev.append({"t": "immune", "who": who,
                        "text": "%s 에게는 효과가 없는 것 같다..." % target.name})
             return
@@ -2103,7 +2130,16 @@ class Battle(object):
                 chance = -1
             if chance == 0 or (chance > 0 and self.rng.uniform(0, 100) < chance * sec_mult):
                 # 누가 걸었는지 늘 넘긴다 - 신비의부적은 특성이 꺼진 판(야생·예전 PvP)에서도 막는다
+                n0, had = len(ev), target.status
                 self._apply_status(target, ail, ev, source=user, by_move=True)
+                if (not MC.attacks(move) and not move.get("stat") and len(ev) == n0 and target.status == had):
+                    # 상태이상만 거는 변화기가 아무 일도 못 했는데 조용히 끝나면 '무효인데 썼다' 로만 보인다 (게시판 #480).
+                    # 특성이 막았으면 _apply_status 가 이미 말했다 (len(ev) 가 늘었다)
+                    if not had and self._ail_type_immune(target, "poison" if ail == "bad-poison" else ail, user):
+                        ev.append({"t": "immune", "who": who,
+                                   "text": "%s 에게는 효과가 없는 것 같다..." % target.name})
+                    else:
+                        self._fail(who, ev)         # 이미 상태이상 · 신비의부적 · 미스트필드 ...
 
         # 풀죽음
         fl = move.get("flinch") or 0
@@ -2448,6 +2484,45 @@ class Battle(object):
     def status_kr(self, ail):
         return STATUS_KR.get(ail, ail)
 
+    def ail_blocked(self, f, ail, source=None):
+        """이 상태이상이 지금 f 에게 **안 걸리는가** - _apply_status 가 막는 길 그대로, 메시지 · 부작용 없이.
+
+        AI 가 변화기 값을 셀 때 쓴다 (_status_score, 게시판 #480 - 독 타입에게 맹독, 불꽃 타입에게 도깨비불을
+        '쓸 만하다' 로 셌다). 막는 길을 바꾸면 둘 다 바꾼다 - test_trainer_battle 의 t_무효_변화기 가 엔진과 맞대어 본다.
+        """
+        if f.status:
+            return True
+        if ail == "bad-poison":
+            ail = "poison"
+        if self._ail_type_immune(f, ail, source):
+            return True
+        who = "me" if f is self.me else "foe"
+        if source is not None and source is not f and SM.blocked_by_guard(self, f, who, source, [], quiet=True):
+            return True
+        if ail == "sleep" and SM.terrain(f) == "electric" and SM.grounded(f):
+            return True
+        if SM.terrain(f) == "misty" and SM.grounded(f):
+            return True
+        if f.ability_on and A.has(f, "LEAFGUARD") and SM.weather(f) == "sun":
+            return True
+        return bool(f.ability_on and A.status_blocked(f, ail, source))
+
+    def _ail_type_immune(self, f, ail, source=None):
+        """타입 때문에 안 걸리는가 (불꽃-화상 · 독/강철-독 · 전기-마비 · 얼음-얼음, 부식은 독 · 강철에게도 독을 건다)."""
+        types = f.types() if f.ability_on else ((f.species or {}).get("types") or [])
+        if ail == "poison" and source is not None and A.can_poison_types(source):
+            return False
+        return TYPE_STATUS_IMMUNE.get(ail) in types or (ail == "poison" and "STEEL" in types)
+
+    def status_type_blocked(self, move, user, target):
+        """상성을 보는 변화기(전기자석파)가 타입 때문에 안 통하는가 - _do_use 가 '효과가 없는 것 같다' 로 끝내고,
+        AI(_status_score · spare_plan)는 쓸모없는 수로 본다."""
+        if MC.key(move) not in TYPE_CHECKED_STATUS or target is user:
+            return False
+        abil = user.ability_on or target.ability_on
+        mtype = A.move_type(user, move) if abil else move.get("type")
+        return type_eff(self.dex, move, mtype, user, target, abil) == 0
+
     def _apply_status(self, f, ail, ev, source=None, by_move=False):
         """by_move: 기술이 건 상태이상인가 (독조종은 기술로 건 독에만 붙는다 -
         독압정·독사슬·독수 같은 것으로 건 독에는 혼란이 따라오지 않는다)."""
@@ -2459,14 +2534,8 @@ class Battle(object):
         bad = ail == "bad-poison"
         if bad:
             ail = "poison"
-        types = f.types() if f.ability_on else ((f.species or {}).get("types") or [])
-        # 타입에 따라 안 걸리는 상태이상
-        immune = {"burn": "FIRE", "poison": "POISON", "paralysis": "ELECTRIC",
-                  "freeze": "ICE"}
-        corrode = ail == "poison" and source is not None and A.can_poison_types(source)
-        if immune.get(ail) in types and not corrode:
-            return
-        if ail == "poison" and "STEEL" in types and not corrode:
+        # 타입에 따라 안 걸리는 상태이상. **막는 길을 바꾸면 ail_blocked 도 같이** (AI 가 그것으로 변화기 값을 센다)
+        if self._ail_type_immune(f, ail, source):
             return
         who = "me" if f is self.me else "foe"
         if source is not None and source is not f and SM.blocked_by_guard(self, f, who, source, ev, quiet=True):

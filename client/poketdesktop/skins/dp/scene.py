@@ -16,6 +16,7 @@ import tkinter as tk
 from ... import box_filter
 from ... import ui_bag as B
 from ... import ui_common as U
+from ... import ui_monfind
 from . import (BALL_BTN, BALL_RED, BALL_WHITE, BEZEL, BROWN, BTN_IN, BTN_INK, BTN_LINE, BTN_TAN, CELL,
                CELL_INK, CUR, CYAN1, CYAN2, DIM, INK, LIST_FRAME, LIST_IN, MSG_FRAME, MSG_ST1, MSG_ST2,
                MSG_ST_LINE, OLIVE1, OLIVE2, PLATE_BOT, PLATE_GOOD_BOT, PLATE_GOOD_TOP, PLATE_HOVER_BOT,
@@ -62,11 +63,13 @@ class Slot(object):
 class Find(object):
     """'누구에게' 목록의 찾기 · 줄 세우기 (ui_monfind.FindBar 와 같은 말을 받는다). 그림은 판이 그린다."""
 
-    def __init__(self, win, parent, on_change):
+    def __init__(self, win, parent, on_change, extra=()):
         self.win = win
         self.on_change = on_change
         self.sort = ""
         self.count = ""
+        self.extra = dict((k, fn) for k, _lb, fn in extra)        # 그 창에만 있는 줄 세우기 (ui_monfind.FindBar 와 같다)
+        self.sorts = ui_monfind.sort_choices(extra)
         self.q = tk.StringVar()
         self.box = K.entry(parent, self.q, width=10)
         self.q.trace_add("write", lambda *_a: on_change())
@@ -83,7 +86,7 @@ class Find(object):
         self.win._soon()
 
     def view(self, mons, dex):
-        out = box_filter.pick_view(mons or [], dex, self.q.get(), self.sort)
+        out = ui_monfind.sorted_view(mons, dex, self.q.get(), self.sort, self.extra)
         self.count = ("%d마리" % len(out)) if self.searching() else ""
         return out
 

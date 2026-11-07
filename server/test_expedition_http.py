@@ -68,8 +68,9 @@ def main():
     call("POST", "/api/pokemon/%d/desktop" % pid, {"on": False})
     st, r = call("POST", "/api/expedition/send", {"pokemon": pid, "place": "forest", "hours": 2})
     one = (r.get("out") or [{}])[0]
-    want = {"id", "pokemon", "place", "placeKr", "hours", "grade", "gradeKr", "score", "items", "startedAt", "endsAt",
-            "left", "total", "ready"}
+    # gold = 광산이 가져올 골드 (2.2.2 - 물건 곳은 0)
+    want = {"id", "pokemon", "place", "placeKr", "hours", "grade", "gradeKr", "score", "items", "gold", "startedAt",
+            "endsAt", "left", "total", "ready"}
     chk("보냈다: 화면이 읽는 칸이 다 있다", st == 200 and r.get("ok") and set(one) == want and r["free"] == 2
         and r["nextIn"] == one["left"] and "message" in r, (st, sorted(set(one) ^ want), r.get("message")))
     mon = one.get("pokemon") or {}
@@ -104,7 +105,7 @@ def main():
         st, got = call("POST", "/api/expedition/claim", {})
         cl = (got.get("claimed") or [{}])[0]
         want = {"id", "pokemon", "place", "placeKr", "hours", "grade", "gradeKr", "items", "tm", "bonus", "growth",
-                "friend", "friendFull"}
+                "friend", "friendFull", "gold"}
         chk("전부 받기: 화면이 읽는 칸이 다 있다", st == 200 and got.get("ok") and len(got["claimed"]) == 1 and set(cl) == want
             and got["free"] == 3 and got["out"] == [] and set(got) >= {"bag", "money", "balls", "message"},
             (st, sorted(set(cl) ^ want)))
@@ -165,6 +166,23 @@ def main():
             and sum(g["stats"].values()) == 0, (st, r3.get("money"), g))
         st, r3 = call("POST", "/api/expedition/reset", {"pokemon": pid})
         chk("  되돌릴 것이 없으면 409 (돈은 그대로)", st == 409, (st, r3))
+
+        # ---- 광산 (2.2.2): 골드만
+        st, r4 = call("POST", "/api/expedition/send", {"pokemon": pid, "place": "mine", "hours": 2})
+        o4 = (r4.get("out") or [{}])[0]
+        chk("광산으로 보낸다: 나가 있는 칸에 골드 (물건 0)", st == 200 and o4.get("placeKr") == "광산" and o4.get("items") == 0
+            and o4.get("gold") == {"normal": 600, "good": 800, "great": 1000}.get(o4.get("grade")), (st, o4))
+        conn = sqlite3.connect(DB, timeout=30)
+        conn.execute("UPDATE expedition SET ends_at='2020-01-01T00:00:00+00:00' WHERE id=?", (o4.get("id"),))
+        conn.commit()
+        conn.close()
+        st, bagme = call("GET", "/api/me")
+        st, got4 = call("POST", "/api/expedition/claim", {})
+        c4 = (got4.get("claimed") or [{}])[0]
+        chk("  받으면 골드만 (돈이 그만큼 늘고 물건 · 기술머신 · 포켓몬은 없다)", st == 200 and c4.get("gold") == o4.get("gold")
+            and c4.get("items") == [] and c4.get("tm") is None and c4.get("friend") is None
+            and got4.get("money") == 500 + o4.get("gold", 0) and got4.get("bag") == (bagme.get("bag") or {})
+            and "골드" in got4.get("message", ""), (st, c4.get("gold"), got4.get("money"), got4.get("message")))
 
     st, r = call("POST", "/api/expedition/send", {"pokemon": pid, "place": "ruins", "hours": 8})
     eid = r["out"][0]["id"] if st == 200 else 0

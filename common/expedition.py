@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""탐험 파견 (1.10.4) — 박스의 포켓몬을 몇 시간 보내 두면 도구를 가져온다.
+"""탐험 파견 (1.10.4) — 박스의 포켓몬을 몇 시간 보내 두면 도구를 가져온다 (광산은 골드만 - GOLD_PER_HOUR).
 
 서버와 화면이 같이 쓰는 **규칙**만 여기 둔다 (어디로, 얼마나, 누가 잘하나, 몇 개를 가져오나).
 무엇이 나올지 굴리는 것은 서버가 한다 (server/app/expedition.py).
@@ -142,12 +142,44 @@ PLACES = [
     {"id": "ruins", "kr": "유적", "types": ["PSYCHIC", "GHOST", "DARK"], "tm": 1.6,
      "hint": "기술머신 · 영계의천 · 업그레이드",
      "special": {"rare": ["REAPERCLOTH", "DUBIOUSDISC", "UPGRADE", "SCROLLOFDARKNESS"]}},
+    # 광산 (사용자 결정, 2026-11-07: '오직 골드만 수급할 수 있는 테마'). 물건 · 기술머신 · 포켓몬은 없다 (GOLD).
+    # 타입은 다른 곳과 겹친다 (열여덟 타입이 한 곳씩인 것은 물건 곳 여섯 - ITEM_PLACES).
+    {"id": "mine", "kr": "광산", "types": ["STEEL", "GROUND", "ROCK"], "tm": 0.0, "gold": True,
+     "hint": "골드만 가져옵니다 · 주머니 1점마다 골드 +3%",
+     "special": {}},
 ]
 _BY_ID = dict((p["id"], p) for p in PLACES)
+ITEM_PLACES = [p for p in PLACES if not p.get("gold")]
+
+# 광산이 가져오는 골드 (사용자 결정 11/07: 8시간 대성공 4,000원, 시간에 비례, 보통 · 성공은 대성공의 60% · 80%).
+# 성장치는 발걸음(시간)과 주머니(골드 +HAUL_PER/점)만 든다. 눈썰미 · 호기심 · 친화력은 광산에서 아무 일도 안 한다.
+#
+#         2시간     4시간     8시간
+#   보통    600   1,200   2,400
+#   성공    800   1,600   3,200
+#   대성공 1,000   2,000   4,000      (주머니 10점이면 x1.3 -> 8시간 대성공 5,200)
+#
+# 다녀오면 24시간 쉬므로 세 마리가 하루 한 번씩 8시간 대성공이면 하루 12,000원, 다 키운 포켓몬 여럿이 칸 셋을
+# 쉬지 않고 돌면 하루 최대 36,000원(주머니 10점이면 46,800원)이다.
+GOLD_PER_HOUR = 500
+GOLD_GRADE = {"normal": 0.6, "good": 0.8, "great": 1.0}
 
 
 def place(place_id):
     return _BY_ID.get(place_id)
+
+
+def is_gold(place_id):
+    """골드만 가져오는 곳인가 (광산)."""
+    return bool((place(place_id) or {}).get("gold"))
+
+
+def gold_for(hours, grade_id, haul=0, place_id="mine"):
+    """그곳에서 가져오는 골드 (물건 곳이면 0). haul = 그 포켓몬의 주머니 (1점에 +3%)."""
+    if not is_gold(place_id):
+        return 0
+    base = GOLD_PER_HOUR * int(hours) * GOLD_GRADE.get(grade_id, GOLD_GRADE["normal"])
+    return int(round(base * (1.0 + HAUL_PER * _stat(haul))))
 
 
 def matches(types, place_id):

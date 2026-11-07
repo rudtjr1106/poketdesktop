@@ -542,7 +542,8 @@ jobs:
     name: 맥 전용
     # macos-14 로 박아 둔다 (2.2.1) - 11/04 Actions 장애 뒤 macos-latest 잡이 기계를 못 받고 15분 만에 취소되기를
     # 거듭했다 (릴리스 맥 빌드와 같은 일, release.yml 846d770). e613584 의 검사도 그렇게 취소됐다.
-    runs-on: macos-14
+    # 11/07: macos-14 를 GitHub 가 더는 안 받는다 ('macos-14-arm64-us-default' is not supported, 잡이 0초에 취소) -> macos-15.
+    runs-on: macos-15
     timeout-minutes: 12
     env:
       PYTHONUTF8: "1"

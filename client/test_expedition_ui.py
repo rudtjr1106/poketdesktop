@@ -140,8 +140,9 @@ class FakeApi(SB.FakeApi):
                                            "tint": None, "types": list(sp["types"])},
                 "place": o["place"], "placeKr": X.place(o["place"])["kr"], "hours": o["hours"],
                 "grade": o["grade"], "gradeKr": X.GRADE_KR[o["grade"]], "score": o["score"],
-                "items": X.item_count(o["hours"], o["grade"]), "left": max(0, left), "total": o["took"],
-                "ready": left <= 0}
+                "items": 0 if X.is_gold(o["place"]) else X.item_count(o["hours"], o["grade"]),
+                "gold": X.gold_for(o["hours"], o["grade"], self._grow_row(o["pid"])["stats"]["haul"], o["place"]),
+                "left": max(0, left), "total": o["took"], "ready": left <= 0}
 
     def _grow_view(self, pid):
         g = self.grow.get(pid) or {"xp": 0, "stats": dict((k, 0) for k in X.STATS), "rest_until": 0, "runs": 0}
@@ -211,7 +212,10 @@ class FakeApi(SB.FakeApi):
                 continue
             v = self._view(o)
             self.out.remove(o)
-            for it in self.loot:
+            gold = v["gold"]                     # 광산: 골드만 (물건 · 기술머신 · 포켓몬 없음 - 서버와 같다)
+            loot = [] if gold else self.loot
+            self.money += gold
+            for it in loot:
                 self.bag[it["id"]] = self.bag.get(it["id"], 0) + it["count"]
             # 경험치를 주고 쉬게 한다 (돌아온 때부터 24시간)
             g = self._grow_row(o["pid"])
@@ -222,7 +226,9 @@ class FakeApi(SB.FakeApi):
             g["rest_until"] = o["ends"] + X.REST_HOURS * 3600
             gv = self._grow_view(o["pid"])
             friend, full = None, False
-            if self.friend_next == "full":
+            if gold:
+                pass
+            elif self.friend_next == "full":
                 full = True
             elif self.friend_next:
                 # 서버처럼: 새 포켓몬이 박스에 들어가고, 받은 답에 실린다
@@ -238,11 +244,11 @@ class FakeApi(SB.FakeApi):
             self.friend_next = None
             got.append({"id": o["id"], "pokemon": v["pokemon"], "place": o["place"], "placeKr": v["placeKr"],
                         "hours": o["hours"], "grade": o["grade"], "gradeKr": v["gradeKr"],
-                        "items": [dict(i) for i in self.loot], "tm": dict(self.tm) if o["place"] == "ruins" else None,
+                        "items": [dict(i) for i in loot], "tm": dict(self.tm) if o["place"] == "ruins" else None,
                         "bonus": 0, "growth": {"xp": gain, "levelBefore": lv0, "level": gv["level"], "into": gv["into"],
                                                "need": gv["need"], "free": gv["free"], "rest": gv["rest"]},
-                        "friend": friend, "friendFull": full})
-        return dict(self.expedition(), ok=True, claimed=got, bag=dict(self.bag), money=0, balls=5,
+                        "friend": friend, "friendFull": full, "gold": gold})
+        return dict(self.expedition(), ok=True, claimed=got, bag=dict(self.bag), money=self.money, balls=5,
                     message="탐험에서 돌아왔습니다!" if got else "아직 돌아온 포켓몬이 없습니다.")
 
     def expedition_recall(self, eid):
@@ -1004,6 +1010,8 @@ def main():
     del api.grow[lead["id"]]
     w.apply(api.expedition())
 
+    t_mine(root, dex, errors)
+
     print("\n=== 포켓몬 관리 창 ===")
     box_app = SB.FakeApp(root, dex, api.pokemon())
     bw = ui_box.BoxWindow(root, box_app)
@@ -1037,6 +1045,117 @@ def main():
     root.destroy()
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
+
+
+def t_mine(root, dex, errors):
+    """광산 (2026-11-07 사용자 결정: 골드만, 8시간 대성공 4,000원, 강철 · 땅 · 바위, 성장치는 발걸음 · 주머니만).
+    고르면 '가져오는 것' 칸 · 시간 줄 · 보내기 요약이 물건 대신 골드를 적고, 나가 있는 칸 · 받은 창도 골드다."""
+    from poketdesktop import expedition_ui as XU
+    from poketdesktop import ui_expedition as UE
+    print("\n=== 광산: 골드만 ===")
+    rng_text = lambda h: "골드 %s ~ %s원을 가져옵니다 (성공도에 따라)" % (                         # noqa: E731
+        format(X.gold_for(h, "normal"), ","), format(X.gold_for(h, "great"), ","))
+    claimed = [{"pokemon": {"name": "보스로라"}, "placeKr": "광산", "hours": 8, "grade": "great", "gradeKr": "대성공",
+                "items": [], "tm": None, "gold": 4480}]
+    lines = XU.loot_lines(claimed)
+    chk("받은 것을 글로: 골드 한 줄 (물건 대신)", lines == [("보스로라 · 광산 8시간", "great", "대성공",
+                                                   [(None, "골드 4,480원", 1, "gold")])], lines)
+    chk("  머리 글 · 바닥 글도 골드", XU.loot_summary(lines, claimed) == "골드 4,480원을 가져왔습니다."
+        and XU.loot_foot(claimed) == "골드는 바로 들어왔습니다." and XU.TIER_KR["gold"] == "골드",
+        (XU.loot_summary(lines, claimed), XU.loot_foot(claimed)))
+    both = claimed + [{"pokemon": {"name": "이상해꽃"}, "placeKr": "숲", "hours": 2, "grade": "normal", "gradeKr": "보통",
+                       "items": [{"id": "ORANBERRY", "kr": "오랭열매", "count": 2, "tier": "common"}], "tm": None, "gold": 0}]
+    chk("  물건과 같이 받으면 둘 다", XU.loot_summary(XU.loot_lines(both), both) == "물건 2개와 골드 4,480원을 가져왔습니다."
+        and XU.loot_foot(both) == "물건은 가방에 넣어 두었습니다.", XU.loot_summary(XU.loot_lines(both), both))
+
+    api = FakeApi(dex, 40)
+    app = FakeApp(root, api, dex)
+    app.expedition = XU.Desk(app)
+    w = UE.ExpeditionWindow(app)
+    top = w.win.winfo_toplevel()
+    top.deiconify()
+    top.geometry("1020x664")
+    pump(root, lambda: w.state is not None and w._wait is None and w.vl.shown())
+    w.set_place("mine")
+    w.set_hours(8)
+    rest(root, 0.3)
+    tx = texts(w.win)
+    chk("광산 카드 (강철 · 땅 · 바위) 를 고르면 '광산에서 가져오는 것' 에 골드만이라고 적는다",
+        "광산" in tx and "광산에서 가져오는 것" in tx and X.place("mine")["hint"] in tx, [t for t in tx if "광산" in t])
+    chk("  시간 줄: 물건 수 대신 골드 범위 (8시간 %s)" % rng_text(8), w.hours_note.cget("text") == rng_text(8),
+        w.hours_note.cget("text"))
+    w.set_hours(2)
+    rest(root, 0.1)
+    chk("  시간을 바꾸면 골드 범위도 바뀐다", w.hours_note.cget("text") == rng_text(2), w.hours_note.cget("text"))
+    w.set_place("forest")
+    rest(root, 0.1)
+    chk("  다른 곳으로 돌아가면 다시 물건 수", w.hours_note.cget("text") == w.hours_text() and "물건" in w.hours_note.cget("text"),
+        w.hours_note.cget("text"))
+    w.set_place("mine")
+    w.set_hours(8)
+    rest(root, 0.2)
+    top.geometry("980x%d" % (620 - U.h(30)))
+    rest(root, 0.5)
+    seg = w.hours_seg.frame
+    cv = w.mid_col.inner.master
+    seg_bottom = seg.winfo_rooty() + seg.winfo_height() - cv.winfo_rooty()
+    chk("**가장 낮은 창에서도 곳 일곱 아래의 '② 얼마나' 시간 칸이 굴리지 않고 다 보인다** (%d / %d)"
+        % (seg_bottom, cv.winfo_height()), seg_bottom <= cv.winfo_height() and not squeezed(w.body), (seg_bottom, cv.winfo_height()))
+    top.geometry("1020x664")
+    rest(root, 0.4)
+    mon, _p, grade = w._picked()
+    gold = X.gold_for(8, grade)
+    s = w.summary.cget("text")
+    chk("보내기 요약: 예상 성공도와 골드 (물건 · 포켓몬 확률은 안 적는다)", "골드 %s원" % format(gold, ",") in s and "물건" not in s
+        and "광산" in s, s)
+    api.grow[mon["id"]] = {"xp": X.XP_MAX, "stats": dict(dict((k, 0) for k in X.STATS), haul=4, charm=6),
+                           "rest_until": 0, "runs": 3}
+    w.apply(api.expedition())
+    rest(root, 0.2)
+    s = w.summary.cget("text")
+    more = X.gold_for(8, grade, haul=4)
+    chk("  주머니를 찍었으면 덤까지 센 골드와 '주머니 골드 +12%%' (친화력은 광산에서 안 적는다) — %s원" % format(more, ","),
+        "골드 %s원" % format(more, ",") in s and "주머니 골드 +12%" in s and "데려올" not in s and "하나 더" not in s, s)
+    w.do_send()
+    pump(root, lambda: len(api.out) == 1)
+    rest(root, 0.3)
+    tx = texts(w.win)
+    chk("나가 있는 칸: '물건 N개' 대신 '골드 N원'", any("골드 %s원" % format(more, ",") in t for t in tx)
+        and not any(t.startswith("물건 ") for t in tx if "개" in t), [t for t in tx if "골드" in t or "물건" in t][:4])
+    shown = {}
+    real_show = XU.show_loot
+
+    def fake_show(parent, app_, got):
+        shown["got"] = got
+    XU.show_loot = fake_show
+    try:
+        api.now += 8 * 3600 + 5
+        w.claim(api.out[0]["id"])
+        pump(root, lambda: "got" in shown)
+        rest(root, 0.2)
+    finally:
+        XU.show_loot = real_show
+    g = (shown.get("got") or [{}])[0]
+    chk("받으면 골드만 (물건 · 기술머신 · 포켓몬 없음) - 받은 창에 넘긴다", g.get("gold") == more and g.get("items") == []
+        and not g.get("friend") and api.money == more, (g.get("gold"), g.get("items"), api.money))
+    real_wait = root.wait_window
+    got = {}
+
+    def no_wait(win):
+        root.update()
+        rest(root, 0.3)
+        got["texts"] = texts(win)
+        win.destroy()
+    root.wait_window = no_wait
+    try:
+        XU.show_loot(root, app, [g])
+    finally:
+        root.wait_window = real_wait
+    chk("  받은 창: '골드 N원을 가져왔습니다' · 골드 줄 · '골드는 바로 들어왔습니다'",
+        "골드 %s원을 가져왔습니다." % format(more, ",") in got["texts"] and "골드 %s원" % format(more, ",") in got["texts"]
+        and "골드는 바로 들어왔습니다." in got["texts"] and "아무것도 못 찾았다..." not in got["texts"], got.get("texts"))
+    w.close()
+    chk("광산 대목 동안 오류 없음", not errors, errors[:2])
 
 
 def _walk(w):
