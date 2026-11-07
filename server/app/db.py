@@ -829,6 +829,65 @@ CREATE TABLE IF NOT EXISTS focus_set (
     ev          INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_focus_set_user_day ON focus_set(user_id, day);
+-- 포스크탑 올림픽 (server/app/olympics.py, 규칙은 common/olympics.py). 신청 한 번이 한 줄.
+-- day = 경기 날(KST). 신청 때 포켓몬 모습(species · num · look · shiny · tint · name · ability)을 적어 둔다 -
+-- 그 뒤에 진화하거나 놓아줘도 경기 · 기록은 신청한 모습 그대로다.
+-- seed 부터는 그날 14:00 경기에서 채운다 (record = 최고 기록, NULL 이면 다 파울 · detail = 시기 · 몫 JSON).
+CREATE TABLE IF NOT EXISTS olympic_entry (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    day         TEXT NOT NULL,
+    event       TEXT NOT NULL,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pokemon_id  INTEGER NOT NULL,
+    species     TEXT NOT NULL,
+    num         INTEGER NOT NULL DEFAULT 0,
+    look        INTEGER,
+    shiny       INTEGER NOT NULL DEFAULT 0,
+    tint        TEXT,
+    name        TEXT NOT NULL,
+    ability     TEXT,
+    tactic      TEXT NOT NULL,
+    entered_at  TEXT NOT NULL,
+    seed        INTEGER,
+    record      REAL,
+    detail      TEXT,
+    heat        INTEGER,
+    lane        INTEGER,
+    rank        INTEGER,
+    UNIQUE (day, event, user_id),
+    UNIQUE (day, user_id, pokemon_id)
+);
+CREATE INDEX IF NOT EXISTS idx_olympic_entry_user ON olympic_entry(user_id, day);
+CREATE INDEX IF NOT EXISTS idx_olympic_entry_ev ON olympic_entry(event, day, heat);
+-- 경기를 치른 날. 이 줄이 생기는 것과 그날 결과를 적는 것이 한 트랜잭션이다 (두 번 돌지 않는다).
+CREATE TABLE IF NOT EXISTS olympic_day (
+    day     TEXT PRIMARY KEY,
+    ran_at  TEXT NOT NULL,
+    n       INTEGER NOT NULL DEFAULT 0
+);
+-- 최종 순위 (폐막 정산). 이 줄을 먼저 넣은 쪽만 볼을 준다 - 정산을 두 번 돌려도 한 번.
+CREATE TABLE IF NOT EXISTS olympic_final (
+    event       TEXT NOT NULL,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rank        INTEGER NOT NULL,
+    entry_id    INTEGER NOT NULL,
+    pokemon_id  INTEGER NOT NULL,
+    record      REAL,
+    at          TEXT NOT NULL,
+    PRIMARY KEY (event, user_id)
+);
+-- 포켓몬 리본 (올림픽에서 처음 생긴 기능). kind: oly_gold · oly_silver · oly_bronze · oly_final · oly_species ·
+-- oly_join. event 는 종목 열쇠 (참가 리본은 ''). 포켓몬을 놓아주면 같이 지워진다.
+CREATE TABLE IF NOT EXISTS pokemon_ribbon (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    pokemon_id  INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind        TEXT NOT NULL,
+    event       TEXT NOT NULL DEFAULT '',
+    at          TEXT NOT NULL,
+    UNIQUE (pokemon_id, kind, event)
+);
+CREATE INDEX IF NOT EXISTS idx_pokemon_ribbon_user ON pokemon_ribbon(user_id);
 -- 캐릭터 (1.10.3). 마이페이지에서 만든다. **그림이 아니라 고른 것(spec)을 적는다** -
 -- 그림은 common/avatar_art 가 그때그때 그린다 (서버도 화면도 같은 코드).
 -- image 는 **직접 그린 도트** (걷기 시트 PNG 의 base64, common/avatar_sheet). 화면이 올리는 길은

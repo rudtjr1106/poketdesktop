@@ -197,6 +197,13 @@ def _defs():
         hidden=True)
     add("hidden_allround", G, "만능 트레이너", "여섯 동작을 모두 한 번 이상", "focus_allround", 6, "만능 트레이너",
         hidden=True)
+    # 포스크탑 올림픽 (server/app/olympics.py). 2시 경기를 치른 신청만 센다. 메달 칭호는 폐막 정산이 따로 준다.
+    G = "올림픽"
+    add("oly_first", G, "첫 출전", "포스크탑 올림픽 경기에 한 번 나가기", "oly_entries", 1, balls=5)
+    add("oly_all7", G, "만능 선수", "올림픽 7종목에 모두 나가기", "oly_events", 7, "만능 선수")
+    add("oly_days7", G, "개근상", "올림픽 경기 날 7번 모두 나가기", "oly_days", 7, "올림픽 개근상")
+    add("oly_species", G, "종족 챔피언", "올림픽 한 종목에서 그 종 가운데 1위 하기 (그 종 출전자 3명 이상)",
+        "oly_species", 1, "종족 챔피언")
     # 숨은 업적 (달성하기 전에는 이름만 가린다)
     add("hidden_midnight", "숨은 업적", "한밤의 만남", "자정(0시)에 포켓몬 잡기",
         "midnight", 1, "한밤의 만남", hidden=True)
@@ -301,6 +308,8 @@ def progress(uid):
                              and len(set(nicks)) == 1) else 0
     from . import focus                    # 집중 타이머가 세트를 인정할 때 쌓아 둔 값 (서로 부르므로 여기서)
     out.update(focus.stats(uid))
+    from . import olympics                 # 올림픽 출전 · 종족 1위 리본 (서로 부르므로 여기서)
+    out.update(olympics.stats(uid))
     return out
 
 
@@ -509,6 +518,10 @@ def titles(uid):
             c["value"] = min(int(prog.get(a["stat"], 0)), a["target"])
             c["target"] = a["target"]
         out.append(c)
+    from . import olympics                 # 올림픽 메달 칭호 (폐막 정산이 준다)
+    for tid, group, how, is_open in olympics.title_rows():
+        out.append({"id": tid, "name": season.TITLES.get(tid, tid), "group": group,
+                    "how": how, "owned": tid in own, "open": is_open})
     for tid, group, how, is_open in _season_titles():
         out.append({"id": tid, "name": season.TITLES.get(tid, tid), "group": group,
                     "how": how, "owned": tid in own, "open": is_open})

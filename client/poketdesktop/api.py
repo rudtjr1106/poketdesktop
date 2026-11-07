@@ -259,6 +259,30 @@ class Api(object):
     def focus_day(self, d):
         return self._call("GET", "/api/focus/day?d=%s" % d)
 
+    # ---- 포스크탑 올림픽 (server/app/olympics.py, 규칙은 common/olympics.py) ----
+    def olympics(self):
+        """일정 · 응원 타입 · 지친 포켓몬 · 내 신청 · 내 기록 · (끝났으면) 메달."""
+        return self._call("GET", "/api/olympics")
+
+    def olympics_candidates(self, event):
+        return self._call("GET", "/api/olympics/candidates?event=%s" % event)
+
+    def olympics_enter(self, event, pid, tactic):
+        return self._call("POST", "/api/olympics/enter", {"event": event, "pokemon": int(pid), "tactic": tactic})
+
+    def olympics_cancel(self, event):
+        return self._call("POST", "/api/olympics/cancel", {"event": event})
+
+    def olympics_live(self):
+        """그날 2시 경기와 내 조 각본 (앱이 바탕화면에서 중계한다)."""
+        return self._call("GET", "/api/olympics/live")
+
+    def olympics_heat(self, entry_id):
+        return self._call("GET", "/api/olympics/heat?id=%d" % int(entry_id))
+
+    def olympics_board(self, event, day=None):
+        return self._call("GET", "/api/olympics/board?event=%s%s" % (event, "&day=%s" % day if day else ""))
+
     def expedition(self):
         """나가 있는 것들 (남은 초·돌아왔는지)과 칸 수."""
         return self._call("GET", "/api/expedition")

@@ -115,6 +115,19 @@ EGG_SUB = {"legendary": "전설의 포켓몬이 들어 있는 알",
            "mythical": "환상의 포켓몬이 들어 있는 알"}
 
 
+RIBBON_ORDER = ("oly_gold", "oly_silver", "oly_bronze", "oly_species", "oly_final", "oly_join")
+
+
+def ribbon_text(m):
+    """상세 칸 둘째 줄에 붙일 리본 (포스크탑 올림픽에서 처음 생겼다). 없으면 ''. 짧게 - 가장 귀한 것 하나와 개수."""
+    rib = list(m.get("ribbons") or [])
+    if not rib:
+        return ""
+    rib.sort(key=lambda r: RIBBON_ORDER.index(r["kind"]) if r.get("kind") in RIBBON_ORDER else 99)
+    top = rib[0].get("name") or "리본"
+    return "리본 %d개 · %s" % (len(rib), top) if len(rib) > 1 else top
+
+
 def _egg_color(kind):
     from . import eggs_ui
     return eggs_ui.EGG_COLOR.get(kind, U.ACCENT)
@@ -733,7 +746,7 @@ class BoxWindow(object):
         self.d_lv.pack(side="right")
 
         self.d_sub = tk.Label(p, text="", bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS,
-                              anchor="w", justify="left")
+                              anchor="w", justify="left", wraplength=DETAIL_W - 40)
         self.d_sub.pack(fill="x", pady=(3, 0))
         self.d_types = tk.Frame(p, bg=U.BG2)
         self.d_types.pack(anchor="w", pady=(8, 0))
@@ -2303,6 +2316,7 @@ class BoxWindow(object):
             bits.append(m["formKr"])
         if m.get("shiny"):
             bits.append("★ 색이 다른 개체")
+        bits.append(ribbon_text(m))                 # 리본 (포스크탑 올림픽)
         self.d_sub.configure(text="  ·  ".join(x for x in bits if x.strip()))
 
         for w in self.d_types.winfo_children():

@@ -793,6 +793,7 @@ class BoxWindow(Scene, BX.BoxWindow):
             bits.append(m["formKr"])
         if m.get("shiny"):
             bits.append("★ 색이 다른 개체")
+        bits.append(BX.ribbon_text(m))              # 리본 (포스크탑 올림픽)
         chips = [(dex.type_name(t), U.TYPE_COLOR.get(t, "#a0a0a8")) for t in (sp or {}).get("types", [])] if dex else []
         kind_ = L.kind_of(m.get("num"))
         if kind_:

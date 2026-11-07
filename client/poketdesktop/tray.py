@@ -79,6 +79,14 @@ def focus_label(app):
     return "포켓몬과 집중하기..."
 
 
+def olympics_items(tray, app):
+    """포스크탑 올림픽 줄 (신청 받는 중 · 경기 중 · 끝난 뒤 기록실에만). 글은 메뉴를 열 때마다 다시 묻는다."""
+    o = getattr(app, "olympics", None)
+    if o is None or not o.on():
+        return []
+    return [Item(lambda: o.label(), lambda: tray.call(app.open_olympics))]
+
+
 def make_icon_image(size=64):
     """트레이 아이콘 — 컴퓨터 화면 안의 몬스터볼.
 
@@ -220,6 +228,7 @@ class TrayBase(object):
             Item(lambda: focus_label(a), lambda: self.call(a.open_focus)),
             # 포켓몬 알림 타이머 (이 PC 에만)
             Item("알림 맞추기...", lambda: self.call(a.open_alarms)),
+        ] + olympics_items(self, a) + [
             # '바로 가기' 하위 메뉴는 뺐다. 창이 하나로 합쳐진 뒤로는
             # '열기...' 로 들어가서 탭을 고르면 되는데, 메뉴에 같은 것이
             # 일곱 줄 더 있으면 길기만 하다.
