@@ -693,6 +693,77 @@ def t_길드전_헛수(dex):
         (back.war_left, back.war_sent))
 
 
+def t_무효_변화기(dex):
+    """게시판 #480 (slovena, 11/06): '변화기는 상대한테 아예 무효여도 쓰나?' - 변화기 점수(_status_score)가 타입 · 특성 ·
+    필드로 **안 걸리는** 상태이상을 몰라서, 독 · 강철에게 맹독, 불꽃에게 도깨비불, 풀에게 가루 기술도 '쓸 만하다' 로 셌다.
+    그래서 헛수 감점(_wasted)도 안 붙어, 공격이 잘 안 먹히는 히드런 앞에서 200판 중 16판 맹독 · 도깨비불을 골랐다.
+    판정은 엔진(_apply_status · status_type_blocked)이 하는 그대로 본다. 땅 타입에게 전기자석파는 11/07 부터 본가처럼
+    효과가 없다 (그 전에는 걸렸다)."""
+    print("-- 안 통하는 변화기 (#480)")
+
+    def applied(move, target, ab=None, user="MEW", user_ab=None, on=True):
+        """엔진에서 이 기술로 상태이상이 걸리는가 (씨앗 10개 중 한 번이라도) · 그 판의 ail_blocked.
+        on: 특성을 켠 판 (랭크 · 길드전 · 관장처럼). 끄면 야생 기본 판."""
+        got, blocked = False, None
+        for s in range(10):
+            a = B.Fighter(dex, mon(dex, user, 50, user_ab, [move], iv=31))
+            t = B.Fighter(dex, mon(dex, target, 50, ab, ["SPLASH"], iv=31))
+            a.ability_on = t.ability_on = on
+            bt = B.Battle(dex, a, t, random.Random(s))
+            if blocked is None:
+                md = bt.move_of(move)
+                blocked = bt.ail_blocked(t, md.get("ail"), a) or bt.status_type_blocked(md, a, t)
+            bt.take_turn(move)
+            got = got or bool(t.status)
+        return got, blocked
+
+    for move, target, ab, user, user_ab in (("TOXIC", "MUK", "STENCH", "MEW", None),
+                                            ("TOXIC", "SKARMORY", "STURDY", "MEW", None),
+                                            ("TOXIC", "SNORLAX", "THICKFAT", "MEW", None),
+                                            ("TOXIC", "SNORLAX", "IMMUNITY", "MEW", None),
+                                            ("TOXIC", "MUK", "STENCH", "SALAZZLE", "CORROSION"),
+                                            ("WILLOWISP", "ARCANINE", "INTIMIDATE", "MEW", None),
+                                            ("WILLOWISP", "SNORLAX", "THICKFAT", "MEW", None),
+                                            ("THUNDERWAVE", "PIKACHU", "STATIC", "MEW", None),
+                                            ("THUNDERWAVE", "GARCHOMP", "ROUGHSKIN", "MEW", None),
+                                            ("THUNDERWAVE", "PERSIAN", "LIMBER", "MEW", None),
+                                            ("HYPNOSIS", "SNORLAX", "THICKFAT", "MEW", None)):
+        for on in (True, False):
+            got, blocked = applied(move, target, ab, user, user_ab, on)
+            chk("%s %s -> %s(%s) 특성 %s: 엔진 %s · ail_blocked %s"
+                % (user, move, target, ab, "켬" if on else "끔", "걸림" if got else "안 걸림", blocked),
+                blocked == (not got), (got, blocked))
+    chk("  (특성을 켜면 면역은 맹독을, 유연은 마비를 막고 부식은 독 타입에게도 건다)",
+        applied("TOXIC", "SNORLAX", "IMMUNITY")[0] is False and applied("THUNDERWAVE", "PERSIAN", "LIMBER")[0] is False
+        and applied("TOXIC", "MUK", "STENCH", "SALAZZLE", "CORROSION")[0] is True)
+
+    def score(ai_sp, move, person_sp, ab=None):
+        tb = war_tb(dex, [mon(dex, ai_sp, 50, None, [move, "TACKLE"], iv=31)], [mon(dex, person_sp, 50, ab, iv=31)])
+        bt = tb.bt
+        return bt._status_score(bt.move_of(move), bt.best_damage(tb.foe, tb.me), tb.foe, tb.me), tb
+
+    for ai_sp, move, person_sp, ab in (("GENGAR", "TOXIC", "MUK", "STENCH"), ("GENGAR", "WILLOWISP", "ARCANINE", None),
+                                       ("BRELOOM", "SPORE", "VENUSAUR", None), ("VILEPLUME", "STUNSPORE", "VENUSAUR", None),
+                                       ("GENGAR", "TOXIC", "SKARMORY", None), ("GENGAR", "THUNDERWAVE", "GARCHOMP", None)):
+        sc, tb = score(ai_sp, move, person_sp, ab)
+        chk("%s 의 %s -> %s 는 점수 0 (안 걸린다)" % (ai_sp, move, person_sp), sc == 0, sc)
+        chk("  그래서 헛수다", tb._wasted(move))
+    for ai_sp, move, person_sp in (("GENGAR", "TOXIC", "SNORLAX"), ("GENGAR", "THUNDERWAVE", "SNORLAX"),
+                                   ("ARIADOS", "TOXICTHREAD", "MUK")):
+        sc, tb = score(ai_sp, move, person_sp)
+        chk("%s 의 %s -> %s 는 쓸 만하다 (걸리거나 · 다른 효과가 남는다)" % (ai_sp, move, person_sp), sc > 0, sc)
+
+    picks = {}
+    for s in range(100):
+        tb = war_tb(dex, [mon(dex, "CLEFABLE", 50, None, ["TOXIC", "WILLOWISP", "THUNDERWAVE", "MOONBLAST"], iv=31),
+                          mon(dex, "SNORLAX", 50, iv=31, seed=2)],
+                    [mon(dex, "HEATRAN", 50, iv=31), mon(dex, "GYARADOS", 50, iv=31, seed=3)], seed=s)
+        _sw, mv = tb._war_choice_v2()
+        picks[mv] = picks.get(mv, 0) + 1
+    bad = picks.get("TOXIC", 0) + picks.get("WILLOWISP", 0)
+    chk("히드런(독 · 화상이 안 걸림) 앞에서 맹독 · 도깨비불을 고르지 않는다 (예전 200판 중 16판)", bad == 0, picks)
+
+
 def t_관장_AI(dex, gyms):
     """관장 (ai="gym", 2026-11-02): 길드전 방어 AI 의 셈을 얕게 쓴다. 레벨이 낮으면 가끔 셈 없이 (_gym_slip)."""
     print("\n=== 관장 AI (셈하는 관장) ===")
@@ -1123,6 +1194,7 @@ def main():
     t_길드전_평가(dex)
     t_길드전_평가_pe(dex)
     t_길드전_헛수(dex)
+    t_무효_변화기(dex)
     t_관장_AI(dex, gyms)
     t_길드전_셈(dex, gyms)
     t_턴_끝(dex)

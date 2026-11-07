@@ -883,11 +883,59 @@ def t_무작위(dex):
     chk("유저 배틀: 같은 시드면 같은 로그", nondet == 0, nondet)
 
 
+def t_효과없음(dex):
+    """게시판 #480 (11/07 사용자 결정): 안 통하는 상태이상 변화기는 '효과가 없는 것 같다...' 를 띄운다 (예전엔 기술 이름만
+    뜨고 조용히 끝나 '무효인데 썼다' 로만 보였다). 땅 타입에게 전기자석파는 본가처럼 효과가 없다 (예전엔 마비가 걸렸다).
+    이미 상태이상이면 '하지만 실패했다!', 특성이 막으면 특성 문구 하나만. 다른 효과가 있는 기술(독거미줄)은 그 효과를 낸다."""
+    print("-- 효과 없는 상태이상 변화기 (#480)")
+    no = "효과가 없는 것 같다"
+
+    def go(move, target, ab=None, user="MEW", user_ab=None, held=None, on=False, status=None):
+        bt, me, foe = fight(dex, mon(dex, user, 50, [move], ability=user_ab),
+                            mon(dex, target, 50, ["SPLASH"], ability=ab, held=held), abilities=on)
+        if status:
+            foe.status = status
+        ev = use(bt, "me", move)
+        return foe, texts(ev)
+
+    for on in (False, True):
+        tag = " (특성 %s)" % ("켬" if on else "끔")
+        foe, t = go("THUNDERWAVE", "GARCHOMP", "ROUGHSKIN", on=on)
+        chk("땅 타입 한카리아스에게 전기자석파는 효과가 없다" + tag, foe.status is None and no in t, (foe.status, t))
+        foe, t = go("THUNDERWAVE", "GLISCOR", "HYPERCUTTER", on=on)
+        chk("  땅 · 비행 글라이온도" + tag, foe.status is None and no in t, (foe.status, t))
+        foe, t = go("THUNDERWAVE", "SNORLAX", "THICKFAT", on=on)
+        chk("  땅이 아니면 마비된다" + tag, foe.status == "paralysis" and no not in t, (foe.status, t))
+        foe, t = go("TOXIC", "MUK", "STENCH", on=on)
+        chk("독 타입에게 맹독은 '효과가 없는 것 같다'" + tag, foe.status is None and no in t, (foe.status, t))
+        foe, t = go("TOXIC", "SKARMORY", "STURDY", on=on)
+        chk("  강철 타입도" + tag, foe.status is None and no in t, (foe.status, t))
+        foe, t = go("WILLOWISP", "ARCANINE", "INTIMIDATE", on=on)
+        chk("불꽃 타입에게 도깨비불도" + tag, foe.status is None and no in t, (foe.status, t))
+        foe, t = go("THUNDERWAVE", "PIKACHU", "STATIC", on=on)
+        chk("전기 타입에게 전기자석파도" + tag, foe.status is None and no in t, (foe.status, t))
+        foe, t = go("TOXIC", "SNORLAX", "THICKFAT", on=on, status="burn")
+        chk("이미 상태이상이면 '하지만 실패했다!'" + tag, foe.status == "burn" and "실패했다" in t and no not in t,
+            (foe.status, t))
+        foe, t = go("TOXICTHREAD", "MUK", "STENCH", on=on)
+        chk("독거미줄은 독 타입에게도 스피드를 떨어뜨린다 (효과 없음 문구 없이)" + tag,
+            foe.status is None and foe.stages.get("spe") == -1 and no not in t, (foe.status, foe.stages.get("spe"), t))
+        foe, t = go("NUZZLE", "PIKACHU", "STATIC", on=on)
+        chk("공격 기술의 부가효과(볼부비부비 마비)가 안 걸려도 문구는 없다" + tag, no not in t, t)
+    foe, t = go("THUNDERWAVE", "GARCHOMP", "ROUGHSKIN", held="RINGTARGET")
+    chk("겨냥표적을 지닌 한카리아스는 전기자석파에 마비된다", foe.status == "paralysis", (foe.status, t))
+    foe, t = go("TOXIC", "SNORLAX", "IMMUNITY", on=True)
+    chk("특성(면역)이 막으면 특성 문구 하나만", foe.status is None and "되지 않는다" in t and no not in t
+        and "실패했다" not in t, t)
+    foe, t = go("TOXIC", "MUK", "STENCH", user="SALAZZLE", user_ab="CORROSION", on=True)
+    chk("부식은 독 타입도 맹독에 걸린다", foe.status == "poison" and no not in t, (foe.status, t))
+
+
 def main():
     dex = load_dex()
     for fn in (t_빠진것, t_혼란, t_방어, t_와이드가드, t_제한, t_시간차, t_헤롱헤롱과_잠김, t_특성과_타입, t_능력, t_회복,
                t_상대를_회복, t_길동무와_튕기기, t_부르기, t_도구, t_날씨, t_필드와_방, t_진영, t_압정과_교체, t_싱글에서_실패,
-               t_저장, t_AI, t_무작위):
+               t_저장, t_AI, t_무작위, t_효과없음):
         fn(dex)
     print()
     print("======================================================")
