@@ -129,7 +129,7 @@ class StopPlate(object):
     있을 때만 온다 - 마우스를 올리면 포커스를 가져온다 (남의 창에서 타이핑하는 중에 뺏지 않는다).
     """
 
-    def __init__(self, root, rect, work, on_stop):
+    def __init__(self, root, rect, work, on_stop, label="대전 다시 보기"):
         self.root = root
         self.on_stop = on_stop
         self.alive = True
@@ -138,7 +138,7 @@ class StopPlate(object):
         win.configure(bg=U.LINE2)
         row = tk.Frame(win, bg=U.BG)
         row.pack(padx=1, pady=1)
-        tk.Label(row, text="대전 다시 보기", bg=U.BG, fg=U.FG, font=U.FONT_S
+        tk.Label(row, text=label, bg=U.BG, fg=U.FG, font=U.FONT_S
                  ).pack(side="left", padx=(8, 4), pady=3)
         self.x = tk.Label(row, text="×", bg=U.BG, fg=U.FG_DIM, font=U.FONT_B,
                           cursor="hand2", padx=5)

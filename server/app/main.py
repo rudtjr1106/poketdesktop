@@ -32,8 +32,8 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
-from . import (achievements, auth, avatar, battle_routes, board, board_routes, boosts, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
-               expedition, focus, item_routes, walkpts,
+from . import (achievements, airraid, auth, avatar, battle_routes, board, board_routes, boosts, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
+               expedition, focus, item_routes, olympics, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws, internal_routes,
@@ -62,6 +62,8 @@ app.include_router(internal_routes.router)        # 관리자 통로 - 서버 �
 app.include_router(visit.router)               # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0)
 app.include_router(expedition.router)
 app.include_router(focus.router)                # 포켓몬과 집중하기 (집중 타이머)
+app.include_router(olympics.router)             # 포스크탑 올림픽 (평일 14:00 다 같이 경기)
+app.include_router(airraid.router)              # 공습 (2.3.0 - 하루 한 번 낙하산 무리와 각개전투)
 app.include_router(troubles.router)             # 앱이 배틀을 접은 까닭 (1.13.3)
 
 RNG = deps.RNG
@@ -1334,8 +1336,22 @@ def me(ctx=Depends(current)):
         "boosts": boosts.state(uid),
         # 포켓몬과 집중하기: 진행 중인 집중 (다른 PC · 다시 켠 앱이 이어 받는다). 쓰지 않는다 - 끊긴 것은 stale 로만
         "focus": focus.me_card(uid),
+        # 포스크탑 올림픽: 다음 경기까지 남은 초 · 내 신청 수. 앱이 2시 중계를 예약한다. 기간 밖이면 None (질의 없음).
+        # 2시가 지난 뒤 처음 오는 요청이 그날 경기를 치른다 (olympics.ensure_ran - 한 번만)
+        "olympics": olympics.me_card(uid),
+        # 공습 (2.3.0): 오늘 공습까지 남은 초 · 했나. 앱이 그 시각에 공습을 연다
+        "airraid": _airraid_card(uid),
         "session":{"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
+
+
+def _airraid_card(uid):
+    """공습 카드. 여기서 터지면 모든 사람의 동기화가 멈춘다 - 실패하면 없는 것으로."""
+    try:
+        return airraid.me_card(uid)
+    except Exception as e:                                  # noqa: BLE001
+        print("[airraid] 카드 실패 %s: %r" % (uid, e))
+        return None
 
 
 class EggDesktopIn(BaseModel):
@@ -1419,6 +1435,12 @@ def list_pokemon(ctx=Depends(current)):
         for m in mons:
             if m["id"] in away:
                 m["away"] = True
+    # 리본 (포스크탑 올림픽에서 처음 생겼다). 관리 창 상세가 한 줄로 그린다. 없는 포켓몬은 칸이 없다.
+    rib = olympics.ribbons_of(uid)
+    if rib:
+        for m in mons:
+            if m["id"] in rib:
+                m["ribbons"] = rib[m["id"]]
     return {"pokemon": mons,
             "eggs": eggs.box_list(uid),
             "boxes": {"size": config.BOX_SIZE, "count": config.BOX_COUNT,

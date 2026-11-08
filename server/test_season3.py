@@ -114,8 +114,8 @@ def main():
     chk("  빛나는 돌·받을 것·알릴 것 없음",
         bond.get("ready") == [] and bond.get("claim") == [] and bond.get("got") == [], bond)
     st, ach = call("GET", "/api/achievements", token=token)
-    # 50 + 집중 타이머의 '집중' 갈래 19개 (server/test_focus.py 가 그 갈래를 본다)
-    chk("업적 목록 69개", st == 200 and ach.get("total") == 69 and len(ach["achievements"]) == 69,
+    # 50 + 집중 타이머의 '집중' 갈래 19개 (server/test_focus.py 가 그 갈래를 본다) + 올림픽 4개 (server/test_olympics.py)
+    chk("업적 목록 73개", st == 200 and ach.get("total") == 73 and len(ach["achievements"]) == 73,
         (st, ach.get("total")))
     hidden = [a for a in ach["achievements"] if a.get("name") == "???"]
     chk("숨은 업적은 가려져 있다", len(hidden) >= 4, len(hidden))

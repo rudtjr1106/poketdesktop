@@ -145,6 +145,9 @@ jobs:
       # 여럿이 보스 하나를 때리는 판. 턴 끝이 사람 수만큼 겹치면 안 된다.
       - name: 레이드 (엔진)
         run: python common/test_raid_battle.py
+      # 2.3.0 공습: 뽑기(파티 + 2~3 · 파티 크기별 레벨 차) · 이긴 쪽이 다음 상대 · 같은 시드 = 같은 판 · 끌어내기 기술
+      - name: 공습 (엔진)
+        run: python common/test_airraid.py
       # 양쪽 다 사람인 1:1. 한쪽만 골라서는 턴이 안 돌아야 하고, 쓰러진
       # 쪽만 다음을 골라야 한다.
       - name: 실시간 배틀 (엔진)
@@ -407,6 +410,14 @@ jobs:
       - name: 알림 타이머 화면 (진짜 Tk)
         if: matrix.shard == 3
         run: python client/test_alarm_ui.py
+      # 포스크탑 올림픽: 바탕화면 중계(달리기형 · 시기형) · 2시 예약 · 집중 중 건너뛰기 · 올림픽 창 · 신청 · 순위표
+      - name: 올림픽 화면 (진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_olympics_ui.py
+      # 2.3.0 공습: 낙하산 · 동시 전투 · 적이 걸어온다 · 정리 · 예약 · 막힘 (풀숲 · 집중 · 놀러 가기 · 올림픽)
+      - name: 공습 화면 (진짜 Tk)
+        if: matrix.shard == 2
+        run: python client/test_airraid_ui.py
       # 길드 창 (1.10.0): 찾기·만들기, 채팅 폴링, 자리마다 다른 화면, 눌린 위젯
       - name: 길드 창
         if: matrix.shard == 2
@@ -667,6 +678,10 @@ jobs:
           python test_expedition.py
           # 포켓몬과 집중하기 (집중 타이머): 세트 인정 · 맥박 끊김 · 하루 40 · KST 자정 · 달력 · 업적 · 집중 중 놀러 가기 막기
           python test_focus.py
+          # 포스크탑 올림픽: 공식(노력치·개체값 무관) · 신청 · 14:00 경기 한 번 · 조 · 순위표 공개 · 폐막 정산 한 번
+          python test_olympics.py
+          python test_olympics_rounds.py # 2.3.0: 종목마다 실제 올림픽 라운드 (참가 수로 조 배정 · 진출 · 결승)
+          python test_airraid.py         # 2.3.0 공습: 그날 시각 · 하루 한 번 · 보상 한 번 · 카드 · 정리
           # 시즌 4 (1.12.0): 점수 매칭 / Z링·Z크리스탈 / 시즌 3 -> 4 전환 /
           # 악당 출현 / 길드전
           python test_match_rp.py

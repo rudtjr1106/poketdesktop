@@ -82,10 +82,12 @@ DROP_MS = 380                # 보따리가 머리 위에서 떨어지는 시간
 # 바탕화면에서 싸우는 동안에는 못 간다 (Visit.busy)
 CANT_GO = {"battle": "배틀 중에는 놀러 갈 수 없습니다.",
            "pvp": "대전 상대를 찾는 중에는 놀러 갈 수 없습니다.",
-           "spectate": "친선전을 구경하는 동안에는 놀러 갈 수 없습니다."}
+           "spectate": "친선전을 구경하는 동안에는 놀러 갈 수 없습니다.",
+           "raid": "공습을 막는 동안에는 놀러 갈 수 없습니다."}
 GAVE_UP = {"battle": "배틀이 시작돼서 놀러 가지 않았습니다.",
            "pvp": "대전 상대를 찾는 중이라 놀러 가지 않았습니다.",
-           "spectate": "친선전을 구경하는 중이라 놀러 가지 않았습니다."}
+           "spectate": "친선전을 구경하는 중이라 놀러 가지 않았습니다.",
+           "raid": "공습을 막는 중이라 놀러 가지 않았습니다."}
 # 자세마다 쓸 동작 (그 종에 있는 것 중 앞에서부터)
 POSES = {"sleep": ("Sleep", "EventSleep", "Laying"), "sit": ("Sit", "Idle"),
          "lie": ("Laying", "Sleep", "Sit"), "faint": ("Laying", "Sleep")}
@@ -927,6 +929,9 @@ class Visit(object):
         fr = getattr(app, "friendly", None)
         if fr is not None and fr.watching():
             return "spectate"
+        r = getattr(app, "airraid", None)
+        if r is not None and r.busy():
+            return "raid"                       # 공습 장면이 바탕화면을 쥐고 있다 (2.3.0, 독립 검토)
         return None
 
     def can_go(self):

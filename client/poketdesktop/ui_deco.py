@@ -35,10 +35,10 @@ GAP = 6
 PAD = 18
 PER_ROW = 7                 # 한 줄 칸 수 - 2.1.0 에 장식이 11개가 되어 한 줄이면 창이 너무 넓어졌다
 ACC = ("crown_gold", "crown_silver", "crown_bronze", "flower_crown", "bow", "flower", "star_pin", "shades",
-       "heart_shades", "pearls", "bowtie")
+       "heart_shades", "pearls", "bowtie", "medal_gold", "medal_silver", "medal_bronze")
 FX = ("fx_stars_gold", "fx_stars_silver", "fx_stars_bronze", "fx_paw", "fx_petals", "fx_hearts", "fx_bubbles",
       "fx_notes", "fx_snow", "fx_glow")
-EMPTY = ("아직 가진 꾸미기가 없습니다. 길드전 순위 보상 · 참가 보상과 랜덤 캡슐(아주 낮은 확률)로 받습니다 "
+EMPTY = ("아직 가진 꾸미기가 없습니다. 길드전 순위 보상 · 참가 보상, 올림픽 메달, 랜덤 캡슐(아주 낮은 확률)로 받습니다 "
          "(선물함이나 랜덤 캡슐에서 오고, 가방의 '꾸미기' 주머니에 들어갑니다).")
 WHERE = {"rank1": "길드전 1위", "rank2": "길드전 2위", "rank3": "길드전 3위"}
 NOTE = "장식 하나는 한 마리만 씁니다. 다른 포켓몬에 끼우면 먼저 쓰던 포켓몬에서 빠집니다. 다시 누르면 뺍니다."
@@ -49,6 +49,9 @@ def where(key):
     got = [WHERE[b] for b in ("rank1", "rank2", "rank3") if key in C.BUNDLES[b]]
     if any(key in C.BUNDLES[b] for b in C.JOIN_CHOICES):
         got.append("길드전 참가 묶음")
+    medal = {"medal_gold": "올림픽 1위", "medal_silver": "올림픽 2위", "medal_bronze": "올림픽 3위"}.get(key)
+    if medal:
+        got.append(medal)
     if key in C.slot_pool():
         got.append("랜덤 캡슐")
     return " · ".join(got)

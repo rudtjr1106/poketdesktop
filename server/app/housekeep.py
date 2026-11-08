@@ -104,6 +104,11 @@ def _loop():
             pvp.prune()                 # 버전 2: 연습판 대전 로그는 2일 뒤 (전에는 서버가 뜰 때만 치웠다)
         except Exception as e:                              # noqa: BLE001
             print("[housekeep] 대전 로그 정리 실패: %r" % (e,))
+        try:
+            from . import airraid
+            airraid.prune()             # 공습 각본 (2.3.0) - 7일 뒤
+        except Exception as e:                              # noqa: BLE001
+            print("[housekeep] 공습 기록 정리 실패: %r" % (e,))
         time.sleep(PERIOD)
 
 
