@@ -606,7 +606,7 @@ def live_part(root, ov, app):
     OC.OlympicsController._play = spy
     OS.time = FastTime(30)
     o.note({"phase": "live", "nextDay": O.DAYS[0], "event": "sprint", "startsIn": -130, "endIn": 300})
-    pump(root, lambda: played, 4)
+    pump(root, lambda: played, 15)                   # CI 윈도우 러너는 느리다 - 4초로는 결승 중계 전에 끊겼다 (2.3.0 CI)
     chk("켰을 때 경기 중이면 바로 받는다", ("live",) in app.api.calls)
     chk("지나간 예선은 다시 보기로, 결승은 그 직전에 받아 중계", [p[1] for p in played] == ["결승"]
         and ("show", 2) in app.api.calls and len(o.missed) == 1, (played, app.api.calls[-3:], len(o.missed)))
