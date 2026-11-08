@@ -1205,7 +1205,7 @@ def main():
         chk("메뉴로 탭을 옮긴다 (도감)", hub.current == "dex" and "dex" in hub.panes, hub.current)
         # 탭 묶음 (2026-10-25): 위 탭은 묶음 여섯 개, 여럿 든 묶음만 하위 탭 줄
         TBL.settle(root, 0.2)
-        chk("위 탭은 묶음 여섯 개 (도구 그림 + 이름)", list(hub._boxes) == [g[0] for g in ui_hub.GROUPS]
+        chk("위 탭은 묶음 일곱 개 (도구 그림 + 이름 - 11/08 이벤트)", list(hub._boxes) == [g[0] for g in ui_hub.GROUPS]
             and len(hub.bar.find_withtag("all")) > 0, list(hub._boxes))
         chk("  '포켓몬' 묶음만 보이고 그 안의 도감 칸만 붙는다", hub.gframes["pokemon"].winfo_ismapped()
             and not hub.gframes["bag"].winfo_manager() and hub.frames["dex"].winfo_ismapped()

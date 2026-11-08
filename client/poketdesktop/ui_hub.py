@@ -12,7 +12,7 @@
 서버를 여섯 번 두드리고 도트도 그만큼 받는다. 대부분은 한두 탭만 본다.
 
 **탭은 묶음으로 나눈다 (2026-10-25).** 탭이 열한 개로 한 줄이라 너무 많았다 (사용자). 위 탭은
-묶음 여섯 개(GROUPS), 탭이 여럿 든 묶음은 그 안에 얇은 하위 탭 줄을 둔다. 바깥에서 부르는 말은
+묶음 일곱 개(GROUPS - 11/08 '이벤트' 를 더함), 탭이 여럿 든 묶음은 그 안에 얇은 하위 탭 줄을 둔다. 바깥에서 부르는 말은
 그대로 탭 열쇠다 - show("guild") 는 '커뮤니티' 묶음의 '길드' 하위 탭으로 간다.
 """
 import tkinter as tk
@@ -25,6 +25,7 @@ from .ui_board import BoardWindow
 from .ui_box import BoxWindow
 from .ui_dex import DexWindow
 from .ui_expedition import ExpeditionWindow
+from .ui_olympics import OlympicsPane
 from .ui_friends import FriendsWindow
 from .ui_guild import GuildWindow
 from .ui_gym import GymWindow
@@ -66,6 +67,8 @@ TABS = [
     ("board", "게시판", BoardWindow, False),
     # 설정은 마이페이지 머리줄의 톱니바퀴 안으로 들어갔다 (1.9.0)
     ("my", "마이페이지", MyPageWindow, False),
+    # 이벤트 (11/08 사용자 '이벤트탭을 신설해서 참여할 수 있게') - 포스크탑 올림픽. 다음 이벤트도 이 묶음에
+    ("olympics", "올림픽", OlympicsPane, False),
 ]
 
 # 위 탭(묶음): (열쇠, 이름, [탭 열쇠 ...]). 기본 · 화면 테마 허브가 같이 쓴다. 탭이 하나뿐인 묶음은
@@ -76,6 +79,7 @@ GROUPS = [
     ("shop", "상점", ["shop"]),
     ("adventure", "모험", ["gym", "expedition", "rank"]),
     ("community", "커뮤니티", ["friends", "guild", "board"]),
+    ("event", "이벤트", ["olympics"]),
     ("my", "마이페이지", ["my"]),
 ]
 GROUP_OF = dict((k, g) for g, _label, keys in GROUPS for k in keys)     # 탭 열쇠 -> 묶음 열쇠

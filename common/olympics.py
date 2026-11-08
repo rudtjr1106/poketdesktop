@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 """포스크탑 올림픽 — 규칙 (서버와 앱이 같이 읽는다).
 
-평일 7번(11/16~11/24), **매일 오후 2시(KST)에 다 같이 경기한다** (사용자 결정 11/06). 그 전까지 종목마다 포켓몬과
-작전을 신청해 두면 2시에 서버가 그날 경기를 한꺼번에 치르고, 앱은 내 포켓몬이 뛰는 조를 바탕화면에서 중계한다.
-종목마다 일주일 최고 기록으로 최종 순위를 매기고 1~3위가 메달이다.
+평일 7번(11/16~11/24), **하루 한 종목, 오후 2시(KST)에 그 종목의 예선부터 결승까지 다 치른다** (사용자 결정 11/06 ·
+11/08). 11/15 부터 종목마다 포켓몬과 작전을 신청해 두면 그 종목 날 2시에 서버가 실제 올림픽처럼 참가 수에 맞춰 라운드 ·
+조를 배정해 한꺼번에 치르고(common/olympics_rounds.py), 앱은 내 포켓몬이 뛰는 조와 결승을 바탕화면에서 중계한다.
+메달은 그날 결승 순위다.
 
 ## 기록 = 기본값 x (1 + 아래를 더한 것) - 노력치 · 개체값 · 레벨 · 성격 · 도구 · 이로치는 안 본다
 
     적성        ±5%   그 종목 능력의 종족값이 1025종 가운데 몇 번째인지(백분위) - 극단적으로 높아도 이득이 거의 없다
     체형        ±4%   몸무게가 그 종목의 알맞은 무게에 가까울수록 (log 거리)
-    특기 타입    +5%   특기 특성 +3%   싫어하는 타입 -3% (수영의 불꽃 · 바위 · 땅)
-    오늘의 응원  +5%   경기 날마다 두 타입 (CHEER)
-    지침        0~-5%  앞 경기 날 그 종목 출전자 중 그 종의 몫이 5% 이상이면 -5%, 적으면 몫에 비례
+    특기 타입    +5%   특기 특성 +3%   싫어하는 타입 -3% (지금은 쓰는 종목이 없다)
+    오늘의 응원  +5%   종목마다 두 타입 (CHEER - 그 종목 특기 타입과 안 겹친다)
+    지침        0~-5%  그 종목 신청자 중 같은 종의 몫이 5% 이상이면 -5%, 적으면 몫에 비례 (2시에 확정)
     작전        안정: 운 표준편차 6% · 실수 5%   승부수: +3% · 운 11% · 실수 15%
     운          최대 ±20% 로 자른다. 실수는 달리기형 -8% · 시기형 파울(그 시기 기록 없음)
 
-설계: design-notes/2026-11-05-olympics.md · 계획: design-notes/2026-11-06-olympics-plan.md
+설계: design-notes/2026-11-05-olympics.md · 2026-11-08-olympics-rounds.md (하루 한 종목 · 라운드)
 """
 import bisect
 import datetime
@@ -42,18 +43,20 @@ EVENTS = (
      "kg0": 30, "width": 1.5, "types": ("ELECTRIC", "FIRE"),
      "abil": ("RUNAWAY", "QUICKFEET", "SPEEDBOOST", "UNBURDEN"), "dislike": (),
      "base": 13.0, "low": True, "tries": 1},
-    {"key": "swim", "kr": "수영 50m", "short": "수영", "stats": ("spe", "hp"), "statKr": "스피드 · 체력",
-     "kg0": 40, "width": 1.5, "types": ("WATER",),
-     "abil": ("SWIFTSWIM", "WATERVEIL", "HYDRATION"), "dislike": ("FIRE", "ROCK", "GROUND"),
-     "base": 30.0, "low": True, "tries": 1},
+    # 봅슬레이 (11/07, 수영 대신): 한 대씩 내려오는 단독 주행 (TRIALS). 무거울수록 · 밀기 출발(공격 · 스피드)
+    {"key": "bobsled", "kr": "봅슬레이", "short": "봅슬레이", "stats": ("atk", "spe"), "statKr": "공격 · 스피드",
+     "kg0": 150, "width": 1.6, "types": ("STEEL", "ICE"),
+     "abil": ("HEAVYMETAL", "SNOWCLOAK", "SOLIDROCK"), "dislike": (),
+     "base": 50.0, "low": True, "tries": 1},
     {"key": "pole", "kr": "장대높이뛰기", "short": "장대", "stats": ("atk", "spe"), "statKr": "공격 · 스피드",
      "kg0": 10, "width": 1.2, "types": ("FIGHTING", "BUG"),
      "abil": ("LIMBER",), "dislike": (),
      "base": 5.0, "low": False, "tries": 3},
-    {"key": "lift", "kr": "역도", "short": "역도", "stats": ("atk", "def"), "statKr": "공격 · 방어",
-     "kg0": 200, "width": 1.6, "types": ("STEEL", "ROCK"),
-     "abil": ("HUGEPOWER", "PUREPOWER", "GUTS", "HYPERCUTTER"), "dislike": (),
-     "base": 150.0, "low": False, "tries": 3},
+    # 양궁 (11/07, 역도 대신): 화살 세 발 점수의 합 (sum). 특기 = 고스트 · 악 (모크나이퍼), 눈 · 겨냥 특성
+    {"key": "archery", "kr": "양궁", "short": "양궁", "stats": ("spa", "spd"), "statKr": "특공 · 특방",
+     "kg0": 50, "width": 2.2, "types": ("GHOST", "DARK"),
+     "abil": ("KEENEYE", "COMPOUNDEYES", "SNIPER", "LONGREACH"), "dislike": (),
+     "base": 10.0, "low": False, "tries": 3, "sum": True},
     {"key": "discus", "kr": "원반던지기", "short": "원반", "stats": ("atkspa",), "statKr": "공격 · 특공 중 높은 쪽",
      "kg0": 60, "width": 1.4, "types": ("PSYCHIC", "GROUND"),
      "abil": ("HUSTLE", "STEELWORKER", "TECHNICIAN"), "dislike": (),
@@ -69,17 +72,22 @@ EVENTS = (
 )
 EV = dict((e["key"], e) for e in EVENTS)
 KEYS = tuple(e["key"] for e in EVENTS)
-RACES = ("sprint", "swim", "marathon")          # 8마리가 같이 달린다 (나머지는 차례로 세 번씩 시기)
+RACES = ("sprint", "marathon")                  # 8마리가 같이 달린다
+TRIALS = ("bobsled",)                           # 한 마리씩 한 번 (시간) - 나머지는 차례로 세 번씩 시기
 
-# 그날 경기 시각부터 몇 초 뒤에 그 종목 중계를 시작하나. 그 종목 결과는 다음 종목이 시작할 때(마지막은 END) 공개한다.
-PROGRAM = (("sprint", 20), ("swim", 100), ("pole", 190), ("lift", 290), ("discus", 380), ("ski", 480),
-           ("marathon", 580))
-OFFSET = dict(PROGRAM)
-END = 720                   # 프로그램 끝 (마라톤 중계 ~2분 + 결과)
+# 하루 한 종목 (11/08 사용자 "하루 한 종목", "예선~결승을 하루에 다"): 경기 날 차례 = 종목 차례.
+EVENT_DAY = dict(zip(KEYS, DAYS))
+DAY_EVENT = dict((d, e) for e, d in EVENT_DAY.items())
+# 그날 중계가 끝나는 때(14:00 부터 초)를 아직 모를 때 쓰는 값. 실제 값은 그날 경기를 치를 때 서버가 정한다
+# (라운드 수에 따라 다르다 - common/olympics_rounds.program). 넉넉히 잡아 '중계 중' 을 일찍 끝내지 않는다.
+DEFAULT_END = 900
 
-# 오늘의 응원 타입 (경기 날 차례대로). 특기 종목이 없는 독 · 고스트 · 드래곤 · 악 · 페어리가 한 번씩 나온다.
-CHEER = (("GHOST", "FIRE"), ("FAIRY", "WATER"), ("DRAGON", "ELECTRIC"), ("POISON", "GRASS"),
-         ("DARK", "ICE"), ("NORMAL", "ROCK"), ("FIGHTING", "PSYCHIC"))
+# 오늘의 응원 타입 (종목마다). 짝 일곱 개는 1차 그대로이고, **그날 종목의 특기 타입과 겹치지 않게** 차례만 맞췄다
+# (11/08 검토 - 예전 차례면 100m 날 응원 '불꽃' 이 100m 특기 '불꽃' 과 겹쳐 불꽃 타입만 +10%).
+# 특기 종목이 없는 독 · 고스트 · 드래곤 · 악 · 페어리가 한 번씩 나온다.
+CHEER = {"sprint": ("FAIRY", "WATER"), "bobsled": ("GHOST", "FIRE"), "pole": ("DRAGON", "ELECTRIC"),
+         "archery": ("POISON", "GRASS"), "discus": ("DARK", "ICE"), "ski": ("NORMAL", "ROCK"),
+         "marathon": ("FIGHTING", "PSYCHIC")}
 
 # ---------------------------------------------------------------- 공식 숫자
 APT, BODY, TYPE_B, ABIL_B, DISLIKE, CHEER_B = 0.05, 0.04, 0.05, 0.03, 0.03, 0.05
@@ -92,6 +100,18 @@ HEAT = 8                    # 한 조
 
 # 메달 · 입상 (최종 순위)
 MEDALS = ((1, "gold", "금메달"), (2, "silver", "은메달"), (3, "bronze", "동메달"))
+# 1~3위 상: 목에 거는 메달 꾸미기(common/deco.py) + 그 종목 칭호. 칭호는 '금메달' 같은 이름이 아니라 종목 특징에 맞는
+# 이름 (사용자 11/08 - '스키점프는 영화 Butterfly 같은 것'). 종목마다 하나, 1~3위가 같이 받는다
+MEDAL_DECO = {1: "medal_gold", 2: "medal_silver", 3: "medal_bronze"}
+TITLE = {
+    "sprint": "라이트닝 볼트",        # 우사인 볼트의 별명
+    "bobsled": "쿨 러닝",             # 자메이카 봅슬레이 팀 영화
+    "pole": "날개 없는 새",           # 장대로 나는 '인간새' 부브카
+    "archery": "신궁",                # 한국 양궁 선수들을 부르는 말
+    "discus": "원반 던지는 사람",     # 미론의 조각상
+    "ski": "Butterfly",               # 영화 '국가대표' 의 노래
+    "marathon": "백만불짜리 다리",    # 영화 '말아톤' 의 대사
+}
 FINAL_TO = 8                # 4~8위 = 결선 진출
 SPECIES_MIN = 3             # 종족 1위 리본은 그 종 출전자가 이만큼 이상일 때
 
@@ -113,29 +133,25 @@ def start_at(day):
     return datetime.datetime(d.year, d.month, d.day, h, m, tzinfo=KST).astimezone(UTC)
 
 
-def end_at(day):
-    return start_at(day) + datetime.timedelta(seconds=END)
+def end_at(day, end=None):
+    """그 경기 날 중계가 끝나는 때. end = 14:00 부터 초 (서버가 그날 경기를 치를 때 정한 값), 모르면 DEFAULT_END."""
+    return start_at(day) + datetime.timedelta(seconds=int(end if end is not None else DEFAULT_END))
 
 
-def open_at(day):
-    """그 경기 날 신청을 받기 시작하는 때. 첫 날은 OPEN 00:00 KST, 그 뒤는 앞 경기 날 중계가 끝난 때."""
-    i = DAYS.index(day)
-    if i == 0:
-        d = _date(OPEN)
-        return datetime.datetime(d.year, d.month, d.day, tzinfo=KST).astimezone(UTC)
-    return end_at(DAYS[i - 1])
+def open_at(day=None):
+    """신청을 받기 시작하는 때 = OPEN 00:00 KST. 일곱 종목 모두 같다 (하루 한 종목 - 11/08)."""
+    d = _date(OPEN)
+    return datetime.datetime(d.year, d.month, d.day, tzinfo=KST).astimezone(UTC)
 
 
-def release_at(day, event):
-    """그 종목 결과(순위표)를 여는 때 = 다음 종목 중계가 시작할 때 (마지막은 프로그램 끝)."""
-    keys = [k for k, _o in PROGRAM]
-    i = keys.index(event)
-    off = PROGRAM[i + 1][1] if i + 1 < len(PROGRAM) else END
-    return start_at(day) + datetime.timedelta(seconds=off)
+def day_of(event):
+    """그 종목의 경기 날."""
+    return EVENT_DAY.get(event)
 
 
-def show_at(day, event):
-    return start_at(day) + datetime.timedelta(seconds=OFFSET[event])
+def event_of(day):
+    """그 경기 날의 종목 (경기 날이 아니면 None)."""
+    return DAY_EVENT.get(day)
 
 
 def _aware(t):
@@ -144,20 +160,29 @@ def _aware(t):
     return t if t.tzinfo else t.replace(tzinfo=UTC)
 
 
-def entry_day(now=None):
-    """지금 신청을 받는 경기 날. 없으면 None (개막 전 · 경기 중 · 끝난 뒤)."""
-    now = _aware(now)
-    for d in DAYS:
-        if open_at(d) <= now < start_at(d):
-            return d
-    return None
+def _end(day, ends):
+    return end_at(day, (ends or {}).get(day))
 
 
-def live_day(now=None):
-    """지금 중계 중인 경기 날 (14:00 ~ 프로그램 끝)."""
+def entry_open(event, now=None):
+    """그 종목 신청을 지금 받나 - OPEN 00:00 부터 그 종목 날 14:00 전까지 (바꾸기 · 취소도 같다)."""
+    day = day_of(event)
+    if not day:
+        return False
+    now = _aware(now)
+    return open_at() <= now < start_at(day)
+
+
+def open_events(now=None):
+    """지금 신청을 받는 종목들 (차례대로)."""
+    return [e for e in KEYS if entry_open(e, now)]
+
+
+def live_day(now=None, ends=None):
+    """지금 중계 중인 경기 날 (14:00 ~ 그날 end). ends = {날: 14:00 부터 초} (모르면 DEFAULT_END)."""
     now = _aware(now)
     for d in DAYS:
-        if start_at(d) <= now < end_at(d):
+        if start_at(d) <= now < _end(d, ends):
             return d
     return None
 
@@ -168,33 +193,32 @@ def ran_days(now=None):
     return [d for d in DAYS if start_at(d) <= now]
 
 
-def next_day(now=None):
+def next_day(now=None, ends=None):
     """아직 끝나지 않은 첫 경기 날 (신청 중이거나 중계 중). 다 끝났으면 None."""
     now = _aware(now)
     for d in DAYS:
-        if now < end_at(d):
+        if now < _end(d, ends):
             return d
     return None
 
 
-def phase(now=None):
-    """before(신청 전) · entry(신청 중) · live(중계 중) · done(다 끝남, 기록실) · closed(올림픽 창 닫음)."""
+def phase(now=None, ends=None):
+    """before(신청 전) · entry(신청 중) · live(중계 중) · done(다 끝남, 기록실) · closed(올림픽 탭 기록도 닫음)."""
     now = _aware(now)
-    if not DAYS or now < open_at(DAYS[0]):
+    if not DAYS or now < open_at():
         return "before"
-    if live_day(now):
+    if live_day(now, ends):
         return "live"
-    if entry_day(now):
+    if open_events(now):
         return "entry"
-    last = end_at(DAYS[-1])
-    if now >= last + datetime.timedelta(days=ARCHIVE_DAYS):
+    if now >= _end(DAYS[-1], ends) + datetime.timedelta(days=ARCHIVE_DAYS):
         return "closed"
     return "done"
 
 
-def finished(now=None):
-    """마지막 경기 날 프로그램이 끝났나 (메달 확정)."""
-    return bool(DAYS) and _aware(now) >= end_at(DAYS[-1])
+def finished(now=None, ends=None):
+    """마지막 경기 날 중계가 끝났나."""
+    return bool(DAYS) and _aware(now) >= _end(DAYS[-1], ends)
 
 
 def at_text(at=None):
@@ -210,10 +234,8 @@ def day_no(day):
 
 
 def cheer_of(day):
-    """그날의 응원 타입 둘."""
-    if day not in DAYS:
-        return ()
-    return CHEER[DAYS.index(day) % len(CHEER)]
+    """그날의 응원 타입 둘 (그날 종목의 것)."""
+    return CHEER.get(event_of(day), ())
 
 
 def prev_day(day):
@@ -249,7 +271,7 @@ def body_mod(event, kg):
 
 
 def fatigue_map(counts):
-    """{종: 깎는 몫}. counts = 앞 경기 날 그 종목 출전자의 {종: 수}."""
+    """{종: 깎는 몫}. counts = 그 종목 신청자의 {종: 수}."""
     tot = float(sum(counts.values()))
     if tot <= 0:
         return {}
@@ -299,8 +321,23 @@ def tries(event, m, tactic, rng):
     return out
 
 
+# 양궁 화살 하나: 점수(r)가 ARROW_TOP 이상이면 10점, 그 아래로 ARROW_RING 만큼 내려갈 때마다 한 링씩 (1점까지).
+# ARROW_X 이상이면 10점 가운데의 X (같은 합이면 X 가 많은 쪽이 앞 - 기록 = 합 + X 수 x 0.01).
+ARROW_TOP, ARROW_RING, ARROW_X = 1.12, 0.05, 1.15
+
+
+def arrow_points(r):
+    """화살 하나의 점수 (1~10)."""
+    return max(1, min(10, 10 - int(math.floor(max(0.0, ARROW_TOP - float(r)) / ARROW_RING))))
+
+
+def archery_total(tries):
+    """양궁 기록 = 세 발 점수 합 + X 수 x 0.01 (빗나감 M 은 0점)."""
+    return round(sum((t.get("v") or 0) for t in tries) + 0.01 * sum(1 for t in tries if t.get("x")), 2)
+
+
 def record_of(event, r):
-    """점수 -> 기록 (반올림까지 마친 수). None 이면 None."""
+    """점수 -> 기록 (반올림까지 마친 수). None 이면 None. 양궁은 화살 하나의 점수."""
     if r is None:
         return None
     e = EV[event]
@@ -309,8 +346,8 @@ def record_of(event, r):
         return int(round(e["base"] / r))
     if e["low"]:
         return round(e["base"] / r, 2)
-    if event == "lift":
-        return int(round(e["base"] * r))
+    if event == "archery":
+        return arrow_points(r)
     if event == "ski":
         return round(e["base"] * r * 2) / 2.0
     return round(e["base"] * r, 2)
@@ -344,8 +381,10 @@ def text(event, rec):
         return "%d:%02d:%02d" % (s // 3600, s % 3600 // 60, s % 60)
     if EV[event]["low"]:
         return "%.2f초" % rec
-    if event == "lift":
-        return "%dkg" % int(rec)
+    if event == "archery":
+        pts = int(rec + 1e-6)
+        x = int(round((rec - pts) * 100))
+        return "%d점" % pts + (" (X %d)" % x if x else "")
     if event == "ski":
         return "%.1fm" % rec
     return "%.2fm" % rec
@@ -363,8 +402,11 @@ def play(event, sp, ability, tactic, pct, cheer=(), fatigue=0.0, seed=None):
         row = {"v": record_of(event, t["r"]), "slip": bool(t["slip"])}
         if "at" in t:
             row["at"] = t["at"]
+        if event == "archery" and t["r"] is not None and t["r"] >= ARROW_X:
+            row["x"] = True                     # 10점 가운데 X
         out_t.append(row)
-    return {"record": best_of(event, [t["v"] for t in out_t]), "tries": out_t,
+    rec = archery_total(out_t) if EV[event].get("sum") else best_of(event, [t["v"] for t in out_t])
+    return {"record": rec, "tries": out_t,
             "mods": dict((k, round(v, 4)) for k, v in m.items()), "seed": seed}
 
 

@@ -518,7 +518,7 @@ def titles(uid):
             c["value"] = min(int(prog.get(a["stat"], 0)), a["target"])
             c["target"] = a["target"]
         out.append(c)
-    from . import olympics                 # 올림픽 메달 칭호 (폐막 정산이 준다)
+    from . import olympics                 # 올림픽 종목 칭호 (종목 정산이 1~3위에게 준다)
     for tid, group, how, is_open in olympics.title_rows():
         out.append({"id": tid, "name": season.TITLES.get(tid, tid), "group": group,
                     "how": how, "owned": tid in own, "open": is_open})

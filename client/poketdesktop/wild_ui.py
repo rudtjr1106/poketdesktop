@@ -464,7 +464,10 @@ class WildController(object):
         if f is not None and f.active():
             return True
         o = getattr(self.app, "olympics", None)          # 포스크탑 올림픽 중계 중에도 풀숲은 쉰다
-        return bool(o is not None and o.busy())
+        if o is not None and o.busy():
+            return True
+        r = getattr(self.app, "airraid", None)           # 공습을 막는 동안도 (2.3.0)
+        return bool(r is not None and r.busy())
 
     def set_enabled(self, on):
         """설정이 바뀌었다. 지금 화면에 바로 반영한다.

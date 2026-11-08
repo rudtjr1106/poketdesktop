@@ -52,7 +52,8 @@ CROWNS = {"crown_gold": "gold", "crown_silver": "silver", "crown_bronze": "bronz
 HEADS = ("flower_crown",)                # 왕관 자리에 얹지만 반짝이지 않는 것
 HAIR = ("bow", "flower", "star_pin")
 FACE = ("shades", "heart_shades")
-NECK = ("pearls", "bowtie")
+MEDALS = {"medal_gold": "gold", "medal_silver": "silver", "medal_bronze": "bronze"}     # 올림픽 (2.3.0)
+NECK = ("pearls", "bowtie") + tuple(MEDALS)
 # 방향 -> SpriteCollab 행 번호의 뜻 (sprites 의 방향 상수와 상관없이 '어느 쪽을 보나' 만 쓴다)
 FRONT = ("down", "downleft", "downright")
 BACK = ("up", "upleft", "upright")
@@ -434,7 +435,13 @@ def _diff(a, b):
     return sum(ImageChops.difference(a, b).tobytes())
 
 
-def shifts(cells, box, search=SEARCH):
+def _mask(im):
+    """칠한 곳만 (255) - 메달은 가슴 테두리를 따라간다. 붐볼처럼 얼굴 무늬가 몸과 따로 움직이는 도트에서 무늬를
+    따라가면 메달이 몸 밖으로 밀려났다 (0101 앞: 몸 3칸 · 메달 4칸)."""
+    return im.split()[3].point(lambda v: 255 if v >= 128 else 0)
+
+
+def shifts(cells, box, search=SEARCH, lum=True):
     """첫 칸의 box(원래 칸 좌표)를 다른 칸에서 찾아 이동량 [(dx, dy)] 을 준다 (첫 칸은 (0, 0)).
 
     **화면 스레드에서도 불린다** (처음 보는 동작) - 가볍게: 지난 칸의 이동량이 그대로 맞으면 바로 쓰고, 아니면 두 칸
@@ -443,11 +450,12 @@ def shifts(cells, box, search=SEARCH):
     x0, y0, x1, y1 = box
     if x1 <= x0 or y1 <= y0:
         return [(0, 0)] * len(cells)
-    ref = _gray(cells[0]).crop(box)
+    look = _gray if lum else _mask
+    ref = look(cells[0]).crop(box)
     out = [(0, 0)]
     prev = (0, 0)
     for im in cells[1:]:
-        g = _gray(im)
+        g = look(im)
         seen = {}
 
         def score(dx, dy):
@@ -476,9 +484,193 @@ def _head_box(sp):
     return (max(0, span[0] // S - 1), max(0, sp.top // S - 1), span[1] // S + 2, sp.hy // S + 2)
 
 
+# ---------------------------------------------------------------- 올림픽 메달 (2.3.0)
+MEDAL_NEED = 0.9            # 메달 칠한 칸이 이만큼 넘게 몸 위에 - 허공 · 발치에 매달리지 않게
+GUESS_CHIN = 0.55           # 위치 점이 없을 때 턱 = 그림 꼭대기에서 몸 높이의 이만큼 아래
+MEDAL_DROP = 6              # 메달 위 = 끈 끝(턱 아래)에서 이만큼 아래 (메달 그림 칸 - 진주 목걸이 · 처음 메달과 같은 깊이)
+STRAP_NEED = 0.85           # 끈도 몸 위에 (두 끝이 목 양옆에 붙는다)
+
+
+def _alpha(big):
+    W, H = big.size
+    return big.split()[3].tobytes(), W, H
+
+
+def _dots(it, a):
+    """그림의 칠한 칸 가운데 점들 - 화면에서 그림 한 칸 = a 촘촘한 칸."""
+    return [((u + 0.5) * a, (v + 0.5) * a) for v in range(it.height) for u in range(it.width)
+            if it.getpixel((u, v))[3]]
+
+
+def _hit(al, x, y):
+    a, W, H = al
+    x, y = int(x), int(y)
+    return 0 <= x < W and 0 <= y < H and a[y * W + x] > 0
+
+
+def _seg_on(al, p, q, n=8):
+    """선분 p-q 위 점들 가운데 몸 위에 있는 몫."""
+    pts = [(p[0] + (q[0] - p[0]) * i / float(n), p[1] + (q[1] - p[1]) * i / float(n)) for i in range(n + 1)]
+    return sum(1 for x, y in pts if _hit(al, x, y)) / float(len(pts))
+
+
+def _covers_at(it, xy, eyes, a, r=1):
+    """_covers 와 같되 그림 한 칸 = a 촘촘한 칸 (화면 크기로 잰다)."""
+    for (ex, ey) in eyes:
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                u, v = int((ex + dx - xy[0]) // a), int((ey + dy - xy[1]) // a)
+                if 0 <= u < it.width and 0 <= v < it.height and it.getpixel((u, v))[3]:
+                    return True
+    return False
+
+
+def _medal_place(big, sp, eyes, face, metal, a=1.0, guessed=False):
+    """메달과 끈 -> ([(끈, x, y), (메달, x, y)], 걸을 때 이동량을 잴 상자(원래 칸)).
+
+    모양은 목걸이 그대로 (진주 목걸이 · 처음 메달과 같은 자리): **끈 두 끝은 목 양옆, 턱 바로 아래 줄**에서 넓고 얕은
+    V 로 내려와 가슴의 메달에 모인다 (옆모습은 뒷목에서 한 줄). 끈이 턱 위 얼굴로 올라가면 빨간 입처럼 보인다
+    (11/08 사용자 '더 이상하다').
+
+    메달: 끈 끝에서 DROP 만큼 아래가 처음 자리. **화면에 실제로 그려질 크기(a)로** 재서 97%(안 되면 90%) 넘게 몸 위에
+    얹히고 눈을 안 가리는 가장 가까운 자리 - 몸이 짧으면 턱 쪽(위)으로 먼저 올린다. 메달 그림 한 칸 = a 촘촘한 칸
+    (큰 도트를 줄여 그려도 장식은 1픽셀 아래로 안 줄어 커진다)."""
+    al = _alpha(big)
+    abytes, W, H = al
+    it = ART.medal(metal)
+    w, h = it.width * a, it.height * a
+    offs = [(int(u), int(v)) for u, v in _dots(it, a)]           # 자리가 정수라 floor(x + u) = x + floor(u)
+    f = 0 if face in FRONT else (1 if face in FACE_RIGHT else -1)
+    nx, ny, half = sp.neck()
+    ax = nx if f == 0 else sp.hx + (sp.cx - sp.hx) * 0.35       # 옆: 턱에서 몸 쪽으로 조금
+    ey = max([y for _x, y in eyes] or [sp.top])
+    chin = sp.hy
+    bb = big.getbbox()
+    if guessed and bb:                    # 위치 점이 없어 머리 점이 어림(그림 위 40%) - 그 둘레에서 찾은 '눈' 도 귀 끝 ·
+        chin = max(chin, bb[1] + (bb[3] - bb[1]) * GUESS_CHIN)   # 이마이기 일쑤라 턱은 몸 높이로 (피카츄 · 잠만보 · 루카리오)
+    end_y = int(round(chin + 1))                                 # 끈 두 끝 높이 = 턱 바로 아래 (목)
+    x00, y00 = int(round(ax - w / 2.0)), int(max(end_y + MEDAL_DROP * a, ey + 4))
+    cands = []
+    for dy in range(-14, 21):
+        for dx in range(-14, 15):
+            back = (dx * f < 0) if f else True
+            cost = (-dy if dy < 0 else 1.5 * dy) + abs(dx) * (1.0 if back else 2.0)   # 몸이 짧으면 위(턱 쪽)로 먼저
+            cands.append((cost, x00 + dx, y00 + dy))
+    cands.sort()
+    seen = {}
+
+    def on_at(x, y):
+        got = seen.get((x, y))
+        if got is None:
+            hit = 0
+            for u, v in offs:
+                X, Y = x + u, y + v
+                if 0 <= X < W and 0 <= Y < H and abytes[Y * W + X]:
+                    hit += 1
+            got = seen[(x, y)] = hit / float(len(offs))
+        return got
+
+    def first(need, gap):
+        for cost, x, y in cands:
+            if eyes and any(x - gap <= ex <= x + w + gap and y - gap <= ey_ <= y + h + gap for ex, ey_ in eyes):
+                continue
+            if on_at(x, y) >= need:
+                return cost, x, y
+        return None
+    # 거의 다(97%) 몸 위인 자리가 '90% 자리' 보다 조금(4칸)만 멀면 그쪽 - 가장자리에서 삐져나온 메달이 안 보이게
+    pick = None
+    for gap in (2, 0):                    # 눈과 두 칸 띄워서 -> 안 되면(붐볼처럼 눈 아래가 좁다) 눈 사이 · 옆도
+        p90, p97 = first(MEDAL_NEED, gap), first(0.97, gap)
+        if p90:
+            pick = p97 if p97 and p97[0] <= p90[0] + 4 else p90
+            break
+    if pick is None:                      # 어디도 90% 가 안 된다 - 가장 많이 얹히는 자리
+        pick = max(((on_at(x, y), -cost, x, y) for cost, x, y in cands
+                    if not (eyes and any(x <= ex <= x + w and y <= ey_ <= y + h for ex, ey_ in eyes))),
+                   default=(0, 0, x00, y00))[1:]
+    x, y = pick[1], pick[2]
+    hx_, hy_ = int(round(x + w / 2.0)), y                        # 고리 = 메달 위 가운데
+    # 끈: 두 끝은 목 양옆(턱 바로 아래 줄)에 붙박고, 목 폭에서 시작해 몸 위 · 눈을 안 가리는 데까지 좁힌다
+    ty = min(end_y, hy_ - 2)              # 메달이 턱까지 올라온 몸(붐볼)은 끈이 거의 수평
+    mid = nx if f == 0 and abs(hx_ - nx) <= half / 2.0 else hx_
+    # 반폭은 목 폭까지 - 다만 메달이 끈 끝 가까이 올라온 몸(가는 다리 · 짧은 가슴)은 높이의 2.5배까지만 (넓고 납작한
+    # 끈은 허리띠처럼 보인다)
+    s_hi = max(w / 2.0 + 2 * a, min(half, 2.5 * max(0, hy_ - ty)))
+    spick = None
+    for down in (0, 1, 2):
+        sp_ = s_hi
+        while sp_ >= w / 2.0 + a * 0.5 - 1e-9:
+            if f == 0:
+                fe = [(mid - sp_, ty + down), (mid + sp_, ty + down)]
+            else:
+                fe = [(hx_ - f * sp_, ty + down)]
+            on = min(_seg_on(al, e, (hx_, hy_ + a)) for e in fe)
+            rel = [(int(round((e[0] - hx_) / a)), int(round((e[1] - hy_) / a))) for e in fe]
+            pts = (rel[0], (0, 0), rel[1]) if f == 0 else (rel[0], (0, 0))
+            st, sx, sy = ART.strap(pts)
+            ok = on >= STRAP_NEED and all(_hit(al, *e) for e in fe) and not _covers_at(
+                st, (hx_ + sx * a, hy_ + sy * a), eyes, a)
+            if spick is None or (ok, on, sp_) > (spick[0], spick[1], spick[2]):
+                spick = (ok, on, sp_, st, sx, sy)
+            if ok:
+                break
+            sp_ -= 1
+        if spick and spick[0]:
+            break
+    _ok, _on, _sp, st, sx, sy = spick
+    draws = [(st, int(round(hx_ + sx * a)), int(round(hy_ + sy * a))), (it, x, y)]
+    x0 = min(hx_ + sx * a, hx_ - w / 2.0)
+    x1 = max(hx_ + (sx + st.width) * a, hx_ + w / 2.0)
+    y0b, y1 = hy_ + sy * a, hy_ + h
+    for yy in range(int(y0b), int(y1) + 1, S):  # 걸을 때 이동량은 그 줄들의 몸 폭 전체로 잰다 - 테두리가 붙잡아
+        run = _run(big, hx_, yy)                # 표정(눈 · 입)만 바뀐 프레임에서 메달이 옆으로 튀지 않게
+        if run:
+            x0, x1 = min(x0, run[0]), max(x1, run[1] + 1)
+    cw, ch = big.width // S, big.height // S
+    box = (max(0, int(x0 // S) - 1), max(0, int(y0b // S) - 1), min(cw, int(x1 // S) + 2), min(ch, int(y1 // S) + 2))
+    return draws, box
+
+
+def _medal_follow(cells, medal, a, box, hsh):
+    """걸을 때 메달 이동량 (촘촘한 칸, 프레임마다).
+
+    1. 메달 둘레 몸 테두리(칠한 곳)를 첫 프레임과 맞댄 이동량 - 붐볼처럼 얼굴 무늬가 몸과 따로 움직여도 몸을 따른다
+    2. 그게 머리 이동량과 2칸 넘게 다르면 머리를 따른다 - 끈은 목에 걸렸으니 머리에서 멀리 못 간다 (다리 · 꼬리가
+       테두리를 바꾼 프레임에서 메달이 6칸씩 튀던 것)
+    3. 그래도 그 프레임에서 메달이 90% 아래로 몸 위면 가장 가까운(아래 · 옆 먼저) 몸 위 자리로 조금 옮긴다"""
+    it, x, y = medal
+    offs = [(int(u), int(v)) for u, v in _dots(it, a)]
+    msh = shifts(cells, box, lum=False)
+    msh = [m if abs(m[0] - h[0]) <= 2 and abs(m[1] - h[1]) <= 2 else h for m, h in zip(msh, hsh)]
+    near = sorted(((abs(dx) + (1.5 * -dy if dy < 0 else dy), dx, dy) for dx in range(-12, 13) for dy in range(-12, 11)))
+    out = []
+    for c, m in zip(cells, msh):
+        abytes, W, H = _alpha(c.resize((c.width * S, c.height * S), Image.NEAREST))
+        bx, by = x + m[0] * S, y + m[1] * S
+
+        def on(px, py):
+            hit = 0
+            for u, v in offs:
+                X, Y = px + u, py + v
+                if 0 <= X < W and 0 <= Y < H and abytes[Y * W + X]:
+                    hit += 1
+            return hit / float(len(offs))
+        got = (m[0] * S, m[1] * S)
+        if on(bx, by) < MEDAL_NEED:
+            for _cost, dx, dy in near:
+                if on(bx + dx, by + dy) >= MEDAL_NEED:
+                    got = (got[0] + dx, got[1] + dy)
+                    break
+        out.append(got)
+    return out
+
+
 # ---------------------------------------------------------------- 한 방향
-def plan(cells, heads, centers, face, items):
-    """한 방향의 원래 칸들 -> 프레임마다 그릴 것 [[(그림, 촘촘x, 촘촘y)] ...] 과 왕관 자리 [(x, y, 폭) 또는 None]."""
+def plan(cells, heads, centers, face, items, apx=1.0):
+    """한 방향의 원래 칸들 -> 프레임마다 그릴 것 [[(그림, 촘촘x, 촘촘y)] ...] 과 왕관 자리 [(x, y, 폭) 또는 None].
+
+    apx = 장식 그림 한 칸이 화면에서 차지하는 촘촘한 칸 수 (decorate 가 배율로 셈 - 큰 도트를 줄여 그리면 1 보다 크다).
+    지금은 메달만 이 값으로 잰다 (끈 두 끝이 몸에 붙어야 해서)."""
     n = len(cells)
     if not n or not items:
         return [[] for _ in range(n)], [None] * n
@@ -556,15 +748,25 @@ def plan(cells, heads, centers, face, items):
         if eyes:
             top = max(top, max(y for _x, y in eyes) + 3)    # 눈 아래로
         neck_draws.append((it, ) + _body_fit(big, it, (nx - it.width // 2, top), sp.cx))
+    medal_draws, medal_box = [], None
+    for k in items:
+        if k in MEDALS and face not in BACK:
+            medal_draws, medal_box = _medal_place(big, sp, eyes, face, MEDALS[k], apx,
+                                                  guessed=not (heads and heads[0]))
     if neck_draws and n > 1:
         nx, ny, half = sp.neck()
         box = (max(0, (nx - half) // S - 1), max(0, (ny - 4) // S), (nx + half) // S + 2, (ny + 7) // S + 1)
         nsh = shifts(cells, box)
+    moff = [(0, 0)] * n
+    if medal_draws and n > 1:
+        moff = _medal_follow(cells, medal_draws[-1], apx, medal_box, hsh)
     frames, crowns = [], []
     for i in range(n):
         hx, hy = hsh[i][0] * S, hsh[i][1] * S
         nx_, ny_ = nsh[i][0] * S, nsh[i][1] * S
+        mx_, my_ = moff[i]
         frames.append([(im, x + nx_, y + ny_) for im, x, y in neck_draws]
+                      + [(im, x + mx_, y + my_) for im, x, y in medal_draws]
                       + [(im, x + hx, y + hy) for im, x, y in head_draws])
         crowns.append((crown_at[0] + hx, crown_at[1] + hy, crown_at[2]) if crown_at else None)
     return frames, crowns
@@ -590,9 +792,10 @@ def decorate(frames, cuts, faces, points, crop, scale, items):
     hi_x = hi_y = 0
     ow = max(f.width for fs in frames.values() for f in fs)
     oh = max(f.height for fs in frames.values() for f in fs)
+    apx = k * float(S) / scale if scale else 1.0             # 그림 한 칸 = 화면에서 촘촘한 칸 몇 개
     for d, fs in frames.items():
         heads, centers = points.get(d) or (None, None)
-        draws, crowns = plan(cuts[d], heads, centers, faces[d], items)
+        draws, crowns = plan(cuts[d], heads, centers, faces[d], items, apx)
         out, glints = [], []
         for i, dr in enumerate(draws):
             row = []

@@ -100,6 +100,15 @@ def _oly_on(app):
     o = getattr(app, "olympics", None)
     return bool(o is not None and o.busy())
 
+
+# 공습 (2.3.0): 바탕화면에서 공습을 막는 동안도 대전을 걸거나 보지 않는다 (공습 장면이 바탕화면을 쥔다)
+RAID_MSG = "공습을 막는 중이에요. 끝난 뒤에 해 주세요."
+
+
+def _raid_on(app):
+    r = getattr(app, "airraid", None)
+    return bool(r is not None and r.busy())
+
 class App(object):
     def __init__(self):
         self.settings = config.load_settings()
@@ -116,6 +125,7 @@ class App(object):
         self.focus = None          # 포켓몬과 집중하기 (focus_timer.FocusController)
         self.olympics = None       # 포스크탑 올림픽 (olympics.OlympicsController - 평일 14:00 중계)
         self.olympics_window = None
+        self.airraid = None        # 공습 (airraid.AirRaidController - 하루 한 번)
         self.alarms = None         # 포켓몬 알림 타이머 (alarm.AlarmController)
         self._syncing = False
         self.hub = None            # 탭 창 하나
@@ -473,6 +483,9 @@ class App(object):
         if getattr(self, "olympics", None) is None:
             from .olympics import OlympicsController
             self.olympics = OlympicsController(self)
+        if getattr(self, "airraid", None) is None:
+            from .airraid import AirRaidController
+            self.airraid = AirRaidController(self)
         if getattr(self, "alarms", None) is None:
             # 포켓몬 알림 타이머 (이 PC 에만). 켤 때 꺼져 있던 사이 지난 알림을 '놓친 알림' 으로 한 번
             from .alarm import AlarmController
@@ -754,6 +767,9 @@ class App(object):
                 # 포스크탑 올림픽: 2시 중계를 예약한다 (켰을 때 경기 중이면 남은 종목부터). 옛 서버는 칸이 없다
                 if "olympics" in me and getattr(self, "olympics", None) is not None:
                     self.olympics.note(me.get("olympics"))
+                # 공습 (2.3.0): 그날 시각을 예약한다. 옛 서버는 칸이 없다
+                if me.get("airraid") and getattr(self, "airraid", None) is not None:
+                    self.airraid.note(me.get("airraid"))
                 quiet = self.focus_quiet()
                 # 운영자가 보낸 선물. 서버가 /api/me 에서 이미 지급했고
                 # 여기서는 알리기만 한다.
@@ -840,10 +856,13 @@ class App(object):
         return ui_olympics.open_olympics(self, pet)
 
     def close_olympics(self):
-        """로그아웃 · 세션 끊김: 올림픽 중계 · 예약 · 창을 치운다."""
+        """로그아웃 · 세션 끊김: 올림픽 중계 · 예약 · 창을 치운다. 공습(2.3.0) 예약 · 장면도 같이."""
         o = getattr(self, "olympics", None)
         if o is not None:
             o.clear()
+        r = getattr(self, "airraid", None)
+        if r is not None:
+            r.clear()
         w = getattr(self, "olympics_window", None)
         if w is not None:
             try:
@@ -870,7 +889,7 @@ class App(object):
         """포켓몬과 집중하는 중인가 - 그동안 업적 · 탐험 보따리 · 알 부화 알림을 미룬다 (화면이 조용해야 한다).
         포스크탑 올림픽 중계 중에도 같다 (업적 창이 경기 한가운데 뜨던 것 - 데모 11/06)."""
         f = getattr(self, "focus", None)
-        return bool(f is not None and f.active()) or _oly_on(self)
+        return bool(f is not None and f.active()) or _oly_on(self) or _raid_on(self)
 
     def on_session_lost(self):
         """세션이 만료되거나 계정이 사라졌을 때 다시 로그인 받는다."""
@@ -1745,6 +1764,8 @@ class App(object):
             return tell(None, FOCUS_PVP_MSG)             # 집중하는 동안은 대전을 걸지 않는다 (독립 검토 #4)
         if _oly_on(self):
             return tell(None, OLY_MSG)
+        if _raid_on(self):
+            return tell(None, RAID_MSG)
         if getattr(self, "_pvp_busy", False):
             return tell(None, "이미 상대를 찾는 중입니다.")
         if self.match_playing():
@@ -1878,6 +1899,8 @@ class App(object):
             return self.notify(FOCUS_MATCH_MSG)
         if _oly_on(self):
             return self.notify(OLY_MSG)
+        if _raid_on(self):
+            return self.notify(RAID_MSG)
         self._match_loading = True
 
         def work():

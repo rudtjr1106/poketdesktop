@@ -217,7 +217,8 @@ def main():
         and not tabs.holders["tms"].winfo_ismapped())
 
     print("\n=== 탭 묶음 (2026-10-25) ===")
-    chk("위 탭은 묶음 여섯 개", [g[1] for g in ui_hub.GROUPS] == ["포켓몬", "가방", "상점", "모험", "커뮤니티", "마이페이지"]
+    chk("위 탭은 묶음 일곱 개 (11/08 이벤트)", [g[1] for g in ui_hub.GROUPS]
+        == ["포켓몬", "가방", "상점", "모험", "커뮤니티", "이벤트", "마이페이지"]
         and [hub.nb.tab(i, "text").strip() for i in range(hub.nb.index("end"))]
         == [g[1] for g in ui_hub.GROUPS], [hub.nb.tab(i, "text") for i in range(hub.nb.index("end"))])
     chk("  탭 열쇠는 모두 묶음 하나에 든다", sorted(ui_hub.GROUP_OF) == sorted(keys)

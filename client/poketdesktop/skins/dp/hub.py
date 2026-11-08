@@ -18,7 +18,7 @@ from . import kit as K
 from . import poke_icons
 
 ICON = {"pokemon": "poke-ball", "bag": "loot-sack", "shop": "coin-case", "adventure": "town-map",
-        "community": "pal-pad", "my": "member-card"}
+        "community": "pal-pad", "event": "point-card", "my": "member-card"}
 BAR_H = 40          # 묶음 탭 줄 (하위 탭 줄이 생겨 몸 높이를 아끼려고 46 에서 줄였다 - 글씨는 그대로)
 SUB_H = 28          # 하위 탭 줄
 DOT = "#ff3b3b"

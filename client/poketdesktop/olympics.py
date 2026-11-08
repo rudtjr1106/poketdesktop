@@ -3,17 +3,19 @@
 
     o = OlympicsController(app)
     o.note(me["olympics"])      동기화마다: 다음 경기까지 남은 초로 2시 중계를 예약한다 (켰을 때 중계 중이면 바로)
-    o.replay(entry_id, done)    올림픽 창의 '다시 보기' / '경기 보기'
+    o.replay(event, rnd, heat, done)   이벤트 탭의 '다시 보기' (종목 · 라운드 · 조)
     o.busy()                    중계 중인가 (그동안 풀숲 · 집중 시작 · 대전을 막는다)
     o.clear()                   로그아웃 · 세션 끊김
 
 규칙은 common/olympics.py, 서버는 server/app/olympics.py, 중계는 olympics_show.py, 창은 ui_olympics.py.
 
-## 2시 (사용자 결정 11/06)
+## 2시 (하루 한 종목 · 라운드, 11/08 사용자 결정)
 
-평일 경기 날 14:00 이 되면 /api/olympics/live 를 부른다 - 서버가 그날 경기를 치르고 내 조 각본을 준다. 종목마다 정해진
-때(프로그램: 100m 0:20 · 수영 1:40 …)에 그 조를 중계한다. 시각은 서버가 센 '몇 초 뒤' 로 받는다 - PC 시계가 틀려도 맞다.
-앱이 2시에 꺼져 있었으면 켰을 때 남은 종목부터 중계하고, 지나간 것은 말풍선으로 '다시 보기' 를 알린다.
+경기 날 14:00 이 되면 /api/olympics/live 를 부른다 - 서버가 그날 종목의 모든 라운드를 치르고 시각표와 첫 라운드 내 조
+각본을 준다. 라운드마다 정해진 때에 중계한다. 두 번째 라운드부터는 그 라운드 중계 직전에 /api/olympics/show 로 '내가 볼
+조' 를 받는다 (내가 뛴 조, 떨어졌으면 결승) - 미리 받으면 다음 라운드 진출이 앞 중계보다 먼저 드러난다. 시각은 서버가 센
+'몇 초 뒤' 로 받는다 - PC 시계가 틀려도 맞다. 앱이 2시에 꺼져 있었으면 켰을 때 남은 라운드부터 중계하고, 지나간 것은
+말풍선으로 '다시 보기' 를 알린다. 각본은 olympics_script.legacy 로 중계가 그리는 꼴로 바꿔 넘긴다.
 
 ## 겹칠 때
 
@@ -30,6 +32,7 @@ from .ui_common import run_async
 
 ANIMS = ("Idle", "Hop", "Hurt")      # 선수 도트가 쓰는 동작 (걷기 말고)
 LATE_SEC = 25                        # 중계 시작이 이만큼 지났으면 놓친 것 (다시 보기로)
+FETCH_AHEAD = 9                      # 둘째 라운드부터: 중계 이만큼 전에 '내가 볼 조' 를 받는다 (도트 받기 틈)
 READY_WAIT_MS = 9000                 # 도트를 받는 동안 중계를 이만큼까지 기다린다
 RETRY_MS = 20000
 CARD_MS = 15000
@@ -41,6 +44,7 @@ SKIP_MSG = {
     "visit": "놀러 가 있는 중이라",
     "stealth": "숨겨 둔 중이라",
     "pvp": "대전을 준비하는 중이라",
+    "raid": "공습을 막는 중이라",
 }
 
 
@@ -82,8 +86,10 @@ class OlympicsController(object):
         if ph == "live":
             return "포스크탑 올림픽 · 경기 중!"
         if ph == "entry":
-            n = c.get("entries") or 0
-            return "포스크탑 올림픽 (신청 %d/%d)..." % (n, len(O.KEYS))
+            ev = c.get("event")
+            if ev in O.EV:
+                return "포스크탑 올림픽 · 다음 %s%s..." % (O.EV[ev]["kr"], "" if c.get("entered") else " (신청 전)")
+            return "포스크탑 올림픽..."
         if ph == "done":
             return "포스크탑 올림픽 · 결과..."
         return "포스크탑 올림픽..."
@@ -106,6 +112,9 @@ class OlympicsController(object):
         v = getattr(app, "visit", None)
         if v is not None and getattr(v, "active", False):
             return "visit"
+        r = getattr(app, "airraid", None)
+        if r is not None and r.busy():
+            return "raid"                        # 공습 장면이 바탕화면을 쥐고 있다 (2.3.0)
         try:
             from . import stealth
             if stealth.active():
@@ -115,8 +124,19 @@ class OlympicsController(object):
         return None
 
     # ---------------------------------------------------------------- 동기화
+    def on_air(self, margin=180):
+        """그날 중계 시간인가 (2시 margin 초 전 ~ 그날 중계 끝). 공습(2.3.0)이 이때는 열리지 않는다 - 라운드
+        사이에 끼면 다음 라운드 중계가 '공습 중이라 건너뜀' 이 된다."""
+        c = self.card or {}
+        starts, end = c.get("startsIn"), c.get("endIn")
+        if starts is None:
+            return False
+        gone = time.monotonic() - getattr(self, "_card_t", time.monotonic())
+        return starts - gone <= margin and (end or 0) - gone > 0
+
     def note(self, card):
         self.card = card
+        self._card_t = time.monotonic()
         if not card:
             return
         ph = card.get("phase")
@@ -177,30 +197,77 @@ class OlympicsController(object):
         run_async(self.root, lambda: self.app.api.olympics_live(), back)
 
     def _schedule(self, r):
+        """그날 라운드들을 시각대로 예약한다. 첫 라운드는 받은 각본으로, 둘째부터는 그 직전에 받는다."""
+        from .olympics_script import legacy
         self.live = r
-        heats = r.get("heats") or []
-        prog = dict((p["event"], p) for p in r.get("program") or [])
-        ready = {"ok": not heats}               # 이 경기 날 선수 도트를 다 받았나 (조마다 같이 쓴다)
-        if heats:
-            self._fetch(heats, lambda: ready.update(ok=True))
+        prog = r.get("program") or []
+        first = r.get("first")
         late = []
-        for h in heats:
-            show_in = (prog.get(h["event"]) or {}).get("showIn", 0)
-            if show_in < -LATE_SEC:
-                late.append(h)
-            else:
-                self._after(max(0, show_in) * 1000, (lambda hh: lambda: self._due(hh, ready))(h))
+        shows = 0
+        for p in prog:
+            show_in = p.get("showIn", 0)
+            if p.get("round") == 1:
+                if not first:
+                    continue
+                try:
+                    h = legacy(first)
+                except Exception as e:                              # noqa: BLE001  (이상한 각본 - 뒤 라운드는 그대로)
+                    config.log("올림픽 첫 라운드 각본을 못 읽음: %s" % e)
+                    continue
+                shows += 1
+                if show_in < -LATE_SEC:
+                    late.append(h)
+                    continue
+                ready = {"ok": False}
+                self._fetch([h], lambda ready=ready: ready.update(ok=True))
+                self._after(max(0, show_in) * 1000, (lambda hh, rd: lambda: self._due(hh, rd))(h, ready))
+            elif r.get("entered"):
+                if show_in < -LATE_SEC:
+                    late.append({"round": p.get("round"), "event": r.get("event")})
+                    continue
+                self._after(max(0, show_in - FETCH_AHEAD) * 1000,
+                            (lambda pp: lambda: self._fetch_round(pp))(dict(p, at=time.time() + show_in)))
         self.missed += late
-        n = len(heats)
         if r.get("elapsed", 0) < 90:
-            if n:
-                self._tell("%s! 포스크탑 올림픽 %d일째 - 오늘 내 포켓몬이 %d종목에 나가요!"
-                           % (O.at_text(), r.get("dayNo") or 1, n))
+            kr = r.get("kr") or "올림픽"
+            if r.get("entered"):
+                self._tell("%s! 포스크탑 올림픽 %d일째 %s - 내 포켓몬이 나가요!" % (O.at_text(), r.get("dayNo") or 1, kr))
             else:
-                self._tell("%s! 포스크탑 올림픽 %d일째 경기가 시작됐어요." % (O.at_text(), r.get("dayNo") or 1))
+                self._tell("%s! 포스크탑 올림픽 %d일째 %s 경기가 시작됐어요." % (O.at_text(), r.get("dayNo") or 1, kr))
         if late:
-            self._tell("지나간 경기 %d개는 올림픽 창에서 다시 볼 수 있어요." % len(late))
+            self._tell("지나간 라운드는 이벤트 탭에서 다시 볼 수 있어요.")
         self._refresh_tray()
+
+    def _fetch_round(self, p, tries=2):
+        """둘째 라운드부터: 그 라운드에 내가 볼 조를 받아 도트를 준비하고 제때 중계한다. 없으면(떨어졌고 메달 라운드도
+        아님) 조용히 넘어간다. **받기가 실패하면 한 번 더**(결승 직전엔 신청자 모두가 같은 초에 부른다), 그래도 안 되면
+        놓친 것으로 두고 다시 보기를 알린다 - 조용히 버리면 결승 중계를 소리 없이 놓친다 (독립 검토 11/08)."""
+        from .olympics_script import legacy
+        gen = self._gen
+
+        def lost(why):
+            config.log("올림픽 %s라운드 받기 실패: %s" % (p.get("round"), why))
+            self.missed.append({"round": p.get("round")})
+            self._tell("%s라운드 중계를 받지 못했어요. 이벤트 탭에서 다시 볼 수 있어요." % p.get("round"))
+
+        def back(r, err):
+            if gen != self._gen:
+                return
+            if err:
+                if tries > 1:
+                    return self._after(2000, lambda: gen == self._gen and self._fetch_round(p, tries - 1))
+                return lost(err)
+            if not (r or {}).get("script"):
+                return
+            try:
+                h = legacy(r["script"])
+            except Exception as e:                                  # noqa: BLE001
+                return lost(e)
+            ready = {"ok": False}
+            self._fetch([h], lambda: ready.update(ok=True))
+            wait = max(0.0, p["at"] - time.time())
+            self._after(wait * 1000, lambda: self._due(h, ready))
+        run_async(self.root, lambda: self.app.api.olympics_show(p["round"]), back)
 
     def _due(self, heat, ready=None):
         why = self.blocked()
@@ -273,7 +340,10 @@ class OlympicsController(object):
         self._refresh_tray()
 
     # ---------------------------------------------------------------- 다시 보기
-    def replay(self, entry_id, done=None):
+    def replay(self, event, rnd, heat_no, done=None):
+        """이벤트 탭의 '다시 보기': 그 종목 · 라운드 · 조."""
+        from .olympics_script import legacy
+
         def tell(r, err):
             if done is not None:
                 try:
@@ -288,9 +358,16 @@ class OlympicsController(object):
         self._prep = True                       # 각본을 받는 동안에도 바쁨 (두 번 눌러도 하나)
         gen = self._gen
 
-        def back(h, err):
+        def back(script, err):
             if gen != self._gen:
                 return
+            h = None
+            if not err:
+                try:
+                    h = legacy(script)
+                except Exception as e:                              # noqa: BLE001  (바쁨에 갇히지 않게 - 독립 검토)
+                    config.log("올림픽 다시 보기 각본을 못 읽음: %s" % e)
+                    err = "이 경기를 열 수 없어요."
             if err:
                 self._prep = False
                 tell(None, getattr(err, "message", None) or str(err))
@@ -299,7 +376,7 @@ class OlympicsController(object):
             self._fetch([h], lambda: ready.update(ok=True))
             self._play(h, replay=True, ready=ready)
             tell(h, None)
-        run_async(self.root, lambda: self.app.api.olympics_heat(entry_id), back)
+        run_async(self.root, lambda: self.app.api.olympics_heat(event, rnd, heat_no), back)
 
     # ---------------------------------------------------------------- 남의 도트 받기
     def _fetch(self, heats, done):
@@ -366,15 +443,17 @@ class OlympicsController(object):
     def _notice_entry(self, card):
         day = card.get("nextDay")
         s = self.app.settings
-        if s.get(NOTICE_KEY) == day or (card.get("entries") or 0) >= len(O.KEYS):
+        if s.get(NOTICE_KEY) == day or card.get("entered"):
             return
         s[NOTICE_KEY] = day
         try:
             config.save_settings(s)
         except Exception:                                   # noqa: BLE001
             pass
-        self._tell("포스크탑 올림픽 %d일째 신청을 받고 있어요! %s %s에 다 같이 경기해요. (트레이 → 포스크탑 올림픽)"
-                   % (card.get("dayNo") or 1, "%s월 %s일" % (int(day[5:7]), int(day[8:10])), O.at_text()), 9000)
+        ev = card.get("event")
+        self._tell("포스크탑 올림픽 %d일째는 %s! %s %s에 예선부터 결승까지 치러요. (허브 → 이벤트)"
+                   % (card.get("dayNo") or 1, O.EV[ev]["kr"] if ev in O.EV else "",
+                      "%s월 %s일" % (int(day[5:7]), int(day[8:10])), O.at_text()), 9000)
 
     def _notice_medals(self, card):
         s = self.app.settings
@@ -385,7 +464,7 @@ class OlympicsController(object):
             config.save_settings(s)
         except Exception:                                   # noqa: BLE001
             pass
-        self._tell("포스크탑 올림픽이 끝났어요! 메달 %d개를 땄어요. 올림픽 창에서 확인해 보세요." % card["medals"], 9000)
+        self._tell("포스크탑 올림픽이 끝났어요! 메달 %d개를 땄어요. 이벤트 탭에서 확인해 보세요." % card["medals"], 9000)
 
     def _card(self, heat, result):
         try:

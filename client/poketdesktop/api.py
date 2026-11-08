@@ -274,14 +274,28 @@ class Api(object):
         return self._call("POST", "/api/olympics/cancel", {"event": event})
 
     def olympics_live(self):
-        """그날 2시 경기와 내 조 각본 (앱이 바탕화면에서 중계한다)."""
+        """그날 종목의 시각표와 첫 라운드 내 조 각본 (앱이 바탕화면에서 중계한다)."""
         return self._call("GET", "/api/olympics/live")
 
-    def olympics_heat(self, entry_id):
-        return self._call("GET", "/api/olympics/heat?id=%d" % int(entry_id))
+    def olympics_show(self, rnd):
+        """그 라운드에 내가 볼 조 각본 {script} (내 조 · 아니면 결승, 없으면 None) - 그 라운드 중계 직전부터 준다."""
+        return self._call("GET", "/api/olympics/show?round=%d" % int(rnd))
 
-    def olympics_board(self, event, day=None):
-        return self._call("GET", "/api/olympics/board?event=%s%s" % (event, "&day=%s" % day if day else ""))
+    def olympics_heat(self, event, rnd, heat):
+        """다시 보기: 그 종목 · 라운드 · 조의 각본."""
+        return self._call("GET", "/api/olympics/heat?event=%s&round=%d&heat=%d" % (event, int(rnd), int(heat)))
+
+    def olympics_board(self, event):
+        """라운드별 결과(공개된 것) · 최종 순위(그날 중계가 끝난 뒤)."""
+        return self._call("GET", "/api/olympics/board?event=%s" % event)
+
+    # ---- 공습 (2.3.0, server/app/airraid.py) ----
+    def airraid_state(self):
+        return self._call("GET", "/api/airraid")
+
+    def airraid_start(self, hour=-1):
+        """그날 공습을 시작한다 - 결과 · 보상은 서버가 정한다. {events, ids, result, reward, exp, already}."""
+        return self._call("POST", "/api/airraid/start", {"hour": int(hour)})
 
     def expedition(self):
         """나가 있는 것들 (남은 초·돌아왔는지)과 칸 수."""

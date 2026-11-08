@@ -11,7 +11,8 @@
 
 돈으로 바꿀 수 없다 (상점 · 판매 없음). 얻는 길은 선물함(kind 'deco') - 길드전 순위 보상이 넣는다
 (+ 버전 2 가 뜰 때 모두에게 한 번 발자국 - server/app/migrations.py 0340) - 과 2.1.0 의 랜덤 캡슐
-(아주 낮은 확률, 왕관 · 순위 효과는 안 나옴 - server/app/guild.py 의 SLOT_TABLE)뿐이다.
+(아주 낮은 확률, 왕관 · 순위 효과는 안 나옴 - server/app/guild.py 의 SLOT_TABLE), 그리고 2.3.0 올림픽 1~3위 메달
+(목 칸 - 정산이 선물함으로 넣는다)뿐이다.
 """
 
 SLOTS = ("head", "hair", "face", "neck", "trail", "aura")
@@ -40,10 +41,14 @@ DECOS = {
     "fx_bubbles": {"kr": "비눗방울", "slot": "trail", "desc": "걸을 때 몸 뒤로 비눗방울이 둥실 떠오른다."},
     "fx_notes": {"kr": "음표", "slot": "trail", "desc": "걸을 때 머리 위로 알록달록한 음표가 흘러간다."},
     "fx_snow": {"kr": "눈송이", "slot": "trail", "desc": "걸을 때 몸 둘레로 눈송이가 사르르 내린다."},
+    # 2.3.0 - 포스크탑 올림픽 1~3위 (server/app/olympics.py 정산이 선물함으로 넣는다)
+    "medal_gold": {"kr": "금메달", "slot": "neck", "desc": "포스크탑 올림픽 시상대에서 받은 금메달. 빨간 끈으로 목에 건다."},
+    "medal_silver": {"kr": "은메달", "slot": "neck", "desc": "포스크탑 올림픽 시상대에서 받은 은메달. 빨간 끈으로 목에 건다."},
+    "medal_bronze": {"kr": "동메달", "slot": "neck", "desc": "포스크탑 올림픽 시상대에서 받은 동메달. 빨간 끈으로 목에 건다."},
 }
 # 랜덤 캡슐(서버 이름은 slot)에서 나올 수 있는 것 - 왕관과 순위 효과는 길드전 순위 상으로만 남긴다 (사용자 결정)
 RANK_ONLY = ("crown_gold", "crown_silver", "crown_bronze", "fx_stars_gold", "fx_stars_silver", "fx_stars_bronze",
-             "fx_glow")
+             "fx_glow", "medal_gold", "medal_silver", "medal_bronze")       # 메달은 올림픽 1~3위만
 
 
 def slot_pool():

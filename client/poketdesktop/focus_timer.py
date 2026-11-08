@@ -127,6 +127,9 @@ class FocusController(object):
         o = getattr(app, "olympics", None)
         if o is not None and o.busy():
             return tell(None, "올림픽 경기 중계가 끝난 뒤에 시작할 수 있어요.")
+        r = getattr(app, "airraid", None)
+        if r is not None and r.busy():
+            return tell(None, "공습을 막은 뒤에 시작할 수 있어요.")
 
         def back(r, err):
             if err:

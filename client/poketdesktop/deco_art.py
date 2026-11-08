@@ -163,6 +163,27 @@ BOWTIE = [
 ]
 BOWTIE_PAL = {"o": (90, 10, 24, 255), "R": (226, 44, 64, 255), "D": (170, 24, 44, 255), "W": (255, 170, 176, 255),
               "K": (200, 30, 50, 255)}
+# 올림픽 메달 (9 x 10, 2.3.0) - 맨 윗줄 고리를 빨간 끈(strap)에 걸어 가슴에 단다. 가운데 + = 새긴 무늬, 왼쪽 위 = 빛
+MEDAL = [
+    "...oDo...",
+    "..ooooo..",
+    ".oLLMMMo.",
+    "oLLMMMMDo",
+    "oLMMDMMDo",
+    "oMMDDDMDo",
+    "oMMMDMMDo",
+    "oMMMMMDDo",
+    ".oMMMDDo.",
+    "..ooooo..",
+]
+MEDAL_TONES = {
+    "gold": {"o": (150, 92, 10, 255), "L": (255, 248, 196, 255), "M": (255, 206, 52, 255), "D": (214, 146, 22, 255)},
+    "silver": {"o": (84, 90, 108, 255), "L": (255, 255, 255, 255), "M": (206, 212, 226, 255),
+               "D": (150, 158, 176, 255)},
+    "bronze": {"o": (104, 52, 22, 255), "L": (255, 210, 168, 255), "M": (214, 130, 74, 255), "D": (166, 90, 44, 255)},
+}
+STRAP = (222, 40, 60, 255)
+STRAP_DARK = (130, 14, 32, 255)
 # 선글라스 렌즈 한 알 - 윗테(선글라스) · 다리는 glasses 가 긋는다. EYE_ROW = 렌즈 안에서 눈이 오는 줄
 LENS = {
     "shades": (["oLLLLLLo", "oKWKKKKo", "oKKKKKKo", ".oKKKKo.", "..oooo.."],
@@ -345,6 +366,37 @@ def bowtie():
 
 
 @functools.lru_cache(maxsize=None)
+def medal(metal="gold"):
+    return grid(MEDAL, MEDAL_TONES[metal])
+
+
+@functools.lru_cache(maxsize=512)
+def strap(pts):
+    """메달 끈: pts(메달 고리 = (0, 0) 기준 점들)를 잇는 두 칸 너비 빨간 끈 + 아래 그림자 한 칸.
+    (그림, 그림 왼쪽 위의 x, y - 같은 기준)."""
+    from PIL import ImageDraw
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+    x0, y0 = min(xs) - 2, min(ys) - 2
+    im = Image.new("RGBA", (max(xs) - x0 + 3, max(ys) - y0 + 4), T)
+    d = ImageDraw.Draw(im)
+    rel = [(x - x0, y - y0) for x, y in pts]
+    d.line([(x, y + 1) for x, y in rel], fill=STRAP_DARK, width=2)
+    d.line(rel, fill=STRAP, width=2)
+    return im, x0, y0
+
+
+def medal_icon(metal="gold"):
+    """꾸미기 창 칸 그림: V 자 끈에 건 메달."""
+    m = medal(metal)
+    st, sx, sy = strap(((-5, -7), (0, 0), (5, -7)))
+    im = Image.new("RGBA", (max(st.width, m.width), st.height + m.height), T)
+    ox, oy = -sx, -sy                             # 고리 자리
+    im.alpha_composite(st, (0, 0))
+    im.alpha_composite(m, (ox - m.width // 2, oy))
+    return im
+
+
+@functools.lru_cache(maxsize=None)
 def bubble(size):
     return grid(BUBBLE.get(size) or BUBBLE[5], BUBBLE_PAL)
 
@@ -427,6 +479,8 @@ def icon(key):
         return im
     if key in LENS:
         return glasses(key, 11)[0]
+    if key.startswith("medal_"):
+        return medal_icon(key[len("medal_"):])
     if key == "fx_bubbles":
         im = Image.new("RGBA", (14, 13), T)
         im.alpha_composite(bubble(9), (0, 4))
