@@ -1352,6 +1352,17 @@ def main():
         TBL.settle(root, 0.3)
         chk("칸을 고르면 요약이 그 포켓몬", bx.sel == pid and bx._d and bx._d["m"]["id"] == pid)
         chk("요약에 기술 넷", len(bx._d["moves"]) <= 4)
+        # 게시판 #483 한가한하루: 종족값 · 개체값이 '능력' 쪽에 가지 않아도 칩 줄에 보인다 - 판 안, 다른 글자와 안 겹친다
+        dcv = bx.dcv
+        texts = [i for i in dcv.find_all() if dcv.type(i) == "text"]
+        quick = [i for i in texts if dcv.itemcget(i, "text") == bx._d.get("quick")]
+        qb = dcv.bbox(quick[0]) if quick else None
+        hit = [dcv.itemcget(i, "text") for i in texts if quick and i != quick[0] and dcv.bbox(i)
+               and not (dcv.bbox(i)[2] <= qb[0] or qb[2] <= dcv.bbox(i)[0]
+                        or dcv.bbox(i)[3] <= qb[1] or qb[3] <= dcv.bbox(i)[1])]
+        chk("요약 첫 쪽(%s)에 '%s' 한 줄 (#483)" % (bx._dpage, bx._d.get("quick")),
+            bx._dpage == "info" and len(quick) == 1 and qb[0] >= 0 and qb[2] <= dcv.winfo_width() and not hit,
+            (bx._dpage, len(quick), qb, dcv.winfo_width(), hit))
         bx._page(1)
         TBL.settle(root, 0.2)
         chk("다음 박스는 비어 있다", bx.box_no == 1 and not bx._page_mons, (bx.box_no, len(bx._page_mons)))

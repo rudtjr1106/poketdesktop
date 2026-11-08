@@ -463,6 +463,7 @@ class BoxWindow(DPB.BoxWindow):
                            anchor="center", tags=D)
             cx += cw + s(5)
         if d.get("chips"):
+            y += DPB.quick_stats(cv, d, cx + s(1), y, x1 + s(4), x2 - s(4), s(22), font(9), GREEN_OK, D, s(6))
             y += s(30)
         if d.get("egg"):
             y = self._d_egg(cv, d, x1, x2, y)

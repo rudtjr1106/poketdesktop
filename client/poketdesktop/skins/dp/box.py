@@ -53,6 +53,21 @@ def mark_hidden(cv, m, x, y, star, fnt, fill=HIDDEN_FG):
     return cv.create_text(x, y, text=L.HIDDEN_MARK, fill=fill, font=fnt, anchor="nw")
 
 
+def quick_stats(cv, d, after, y, x1, x2, h, spec, fill, tags, gap):
+    """타입 칩 줄의 빈자리에 '종족값 N · 개체값 N/186' (게시판 #483 한가한하루 - 테마에서는 '능력' 쪽으로 넘겨야만 보였다).
+
+    after = 마지막 칩 뒤의 x. 그 줄 오른쪽 끝(x2)에 들어가면 거기에, 모자라면 다음 줄 왼쪽(x1)에 둔다.
+    다음 줄로 내렸으면 더 쓴 높이를, 아니면 0 을 돌려준다. 알이면 아무것도 안 그린다. DP 를 이어 쓰는 테마가 같이 쓴다."""
+    text = d.get("quick")
+    if not text or d.get("egg"):
+        return 0
+    if after + K.tkfont_of(cv, spec).measure(text) <= x2:
+        cv.create_text(x2, y + h // 2, text=text, fill=fill, font=spec, anchor="e", tags=tags)
+        return 0
+    cv.create_text(x1, y + h + gap + h // 2, text=text, fill=fill, font=spec, anchor="w", tags=tags)
+    return h + gap
+
+
 class ArtSlot(object):
     """요약 칸의 도트 자리. 기본 창의 도트 코드(load_art · play_anim)가 Label 처럼 configure 를 부른다."""
 
@@ -837,6 +852,7 @@ class BoxWindow(Scene, BX.BoxWindow):
             rows.append((label, int(stats.get(k, 0)), iv, bool(hyper.get(k)), mx))
         bst = sum((sp or {}).get("base", {}).get(k, 0) for k in ("hp", "atk", "def", "spa", "spd", "spe"))
         ivsum = "종족값 %d  ·  개체값 %d / 186" % (bst, info.get("ivTotal", 0))
+        quick = "종족값 %d · 개체값 %d/186" % (bst, info.get("ivTotal", 0))         # 칩 줄에 늘 보이는 것 (#483)
         if any(hyper.values()):
             ivsum += "   (✦ 병뚜껑으로 31 로 쳐줌)"
         gotev = [(lab, int(evs.get(k, 0))) for k, lab in BX.STAT_ROWS if evs.get(k)]
@@ -868,7 +884,7 @@ class BoxWindow(Scene, BX.BoxWindow):
                  nature_note=natural(info.get("natureNote") or "알려진 설명이 없습니다."),
                  held=held, held_text=((m.get("heldKr") or held) + ("\n" + m["heldDesc"] if m.get("heldDesc") else ""))
                  if held else "없음. 가방의 도구를 지니게 하면 배틀에서 효과가 납니다.",
-                 exp=exp, friend=friend, evo=lines, rows=rows, ivsum=ivsum, evsum=evsum, moves=moves,
+                 exp=exp, friend=friend, evo=lines, rows=rows, ivsum=ivsum, quick=quick, evsum=evsum, moves=moves,
                  pending=natural("배우려던 기술: %s  ·  기술 떠올리기에서 무료로 배울 수 있습니다." % ", ".join(pending))
                  if pending else "")
         self.btn_unhold.configure(state="normal" if held else "disabled")
@@ -971,6 +987,7 @@ class BoxWindow(Scene, BX.BoxWindow):
             cv.create_text(cx + cw // 2, y + s(11), text=label, fill=K.look_of(col)[3], font=font(9),
                            anchor="center", tags=D)
             cx += cw + s(5)
+        y += quick_stats(cv, d, cx + s(1), y, x1 + s(4), x2 - s(4), s(22), font(9), "#2c8a3c", D, s(6))
         y += s(30)
         if d.get("egg"):
             y = self._d_egg(cv, d, x1, x2, y)

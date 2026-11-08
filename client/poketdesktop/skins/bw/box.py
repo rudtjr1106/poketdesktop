@@ -479,6 +479,7 @@ class BoxWindow(DPX.BoxWindow):
             cv.create_text(cx_ + cw // 2, y + s(11), text=label, fill=K.look_of(col)[3], font=font(9),
                            anchor="center", tags=D)
             cx_ += cw + s(5)
+        y += DPX.quick_stats(cv, d, cx_ + s(1), y, x1 + s(4), x2 - s(4), s(22), font(9), GOOD, D, s(6))
         y += s(32)
         if d.get("egg"):
             y = self._d_egg(cv, d, x1, x2, y)

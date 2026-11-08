@@ -487,6 +487,8 @@ class BoxWindow(DPX.BoxWindow):
             chips.append((cx, ty, cw, label, col))
             cx += cw + s(5)
         if chips:
+            # 종족값 · 개체값 (#483): 마지막 칩 줄 오른쪽, 모자라면 다음 줄 - 보라 머리 안이라 흰 글씨
+            ty += DPX.quick_stats(cv, d, cx + s(1), chips[-1][1], tx1, tx2, ch, font(9), "#efeaff", D, s(4))
             ty += ch
         hh = max(s(118), ty + s(10) - y)
         # 판을 먼저 깔고 (뒤로 내린다) 그 위에 글

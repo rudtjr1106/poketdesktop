@@ -636,6 +636,7 @@ class BoxWindow(DPB.BoxWindow):
         cx = x1 + s(4)
         for label, col in d.get("chips") or []:
             cx += _square_chip(cv, cx, y, label, col, font(9), s(22), D) + s(5)
+        y += DPB.quick_stats(cv, d, cx + s(1), y, x1 + s(4), x2 - s(4), s(22), font(9), CHECK, D, s(6))
         y += s(30)
         if d.get("egg"):
             y = self._d_egg(cv, d, x1, x2, y)
