@@ -65,10 +65,11 @@ TABS = [
     # app.sync 의 announce_raid 도 같이 되살린다 - 화면(ui_raid*.py)은 그대로 있다.
     ("rank", "랭킹", RankWindow, False),
     ("board", "게시판", BoardWindow, False),
+    # 이벤트 (11/08 사용자 '이벤트탭을 신설해서 참여할 수 있게') - 포스크탑 올림픽. 다음 이벤트도 이 묶음에.
+    # 마이페이지 앞에 둔다 - 묶음 차례(커뮤니티 · 이벤트 · 마이페이지)와 같게, 마이페이지는 늘 맨 끝 (test_mypage_ui)
+    ("olympics", "올림픽", OlympicsPane, False),
     # 설정은 마이페이지 머리줄의 톱니바퀴 안으로 들어갔다 (1.9.0)
     ("my", "마이페이지", MyPageWindow, False),
-    # 이벤트 (11/08 사용자 '이벤트탭을 신설해서 참여할 수 있게') - 포스크탑 올림픽. 다음 이벤트도 이 묶음에
-    ("olympics", "올림픽", OlympicsPane, False),
 ]
 
 # 위 탭(묶음): (열쇠, 이름, [탭 열쇠 ...]). 기본 · 화면 테마 허브가 같이 쓴다. 탭이 하나뿐인 묶음은
