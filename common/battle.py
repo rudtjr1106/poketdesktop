@@ -298,6 +298,11 @@ class Fighter(object):
         """
         if self.mega or not self._dex:
             return None
+        # **지가르데는 퍼펙트폼일 때만 메가진화한다** (11/09, 게시판 #497 하늬바람). 50%폼 그대로 지가르데나이트로
+        # 바로 메가진화해 처음부터 메가지가르데로 싸웠다. 퍼펙트폼은 파워컨스트럭트가 체력 절반 이하에서 만든다
+        # (abilities 'complete') - 오라브레이크 지가르데는 퍼펙트폼이 못 되니 메가진화도 못 한다.
+        if self.mon.get("species") == "ZYGARDE" and not self.ab.get("complete"):
+            return None
         forms = (getattr(self._dex, "mega_of", None) or {}).get(self.mon.get("species")) or []
         if not forms:
             return None

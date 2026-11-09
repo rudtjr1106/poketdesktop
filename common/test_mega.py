@@ -208,8 +208,32 @@ def main():
         ("니힐레이저", "DRAGON", "special", 200), nl)
     zy = mon("ZYGARDE", "ZYGARDITE", ("COREENFORCER", "EARTHQUAKE"))
 
-    def zduel(foe, seed=3):
-        return duel(mon("ZYGARDE", "ZYGARDITE", ("COREENFORCER", "EARTHQUAKE")), foe, seed=seed)
+    def zduel(foe, seed=3, complete=True):
+        bt_, a_, b_ = duel(mon("ZYGARDE", "ZYGARDITE", ("COREENFORCER", "EARTHQUAKE")), foe, seed=seed)
+        if complete:
+            a_.ab["complete"] = True            # 퍼펙트폼 - 지가르데는 퍼펙트폼일 때만 메가진화한다 (11/09)
+        return bt_, a_, b_
+
+    print("-- 지가르데는 퍼펙트폼일 때만 메가진화 (11/09, 게시판 #497)")
+    bt0, a0, _b0 = zduel(mon("CLEFABLE", moves=("SPLASH",)), complete=False)
+    chk("50%폼(오라브레이크)은 지가르데나이트 + 키스톤이어도 메가진화 못 한다", bt0.can_mega("me") is None,
+        bt0.can_mega("me"))
+    bt0.take_turn("EARTHQUAKE", mega=True)
+    chk("  메가진화를 골라도 안 된다", a0.mega is None, a0.mega)
+    pz = mon("ZYGARDE", "ZYGARDITE", ("COREENFORCER", "EARTHQUAKE"))
+    pz["ability"] = "POWERCONSTRUCT"
+    bt1, a1, _b1 = duel(pz, mon("CLEFABLE", moves=("SPLASH",)))
+    chk("파워컨스트럭트라도 체력이 넉넉하면(아직 50%폼) 못 한다", a1.ability == "POWERCONSTRUCT"
+        and bt1.can_mega("me") is None, (a1.ability, bt1.can_mega("me")))
+    a1.hp = a1.maxhp // 2
+    bt1.take_turn("EARTHQUAKE", mega=True)
+    chk("  체력 절반 이하로 턴이 끝나면 퍼펙트폼 - 그 턴에는 아직 메가진화 안 됨", a1.ab.get("complete") and a1.mega is None,
+        (a1.ab.get("complete"), a1.mega))
+    chk("  퍼펙트폼이 된 뒤에는 메가진화할 수 있다", (bt1.can_mega("me") or {}).get("internal") == "ZYGARDE_MEGA",
+        bt1.can_mega("me"))
+    bt1.take_turn("EARTHQUAKE", mega=True)
+    chk("  메가지가르데가 된다", a1.mega == "ZYGARDE_MEGA", a1.mega)
+
     btz, az, bz = zduel(mon("CLEFABLE", moves=("SPLASH",)))
     hp0 = bz.hp
     ev = btz.take_turn("COREENFORCER", mega=False)
