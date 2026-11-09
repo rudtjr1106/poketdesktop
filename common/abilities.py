@@ -1343,7 +1343,31 @@ def end_of_turn(bt, f, who, ev):
             ev.append({"t": "chip", "who": fwho, "damage": d, "hp": foe.hp,
                        "maxhp": foe.maxhp,
                        "text": "%s 은(는) 악몽에 시달리고 있다!" % foe.name})
+    if not on(f):
+        zygarde_complete(bt, f, who, ev)    # 특성이 꺼져 있어도 지가르데나이트면 (아래 _end_of_turn 은 안 돈다)
     return _end_of_turn(bt, f, who, ev)
+
+
+ZYGARDITE = "ZYGARDITE"
+
+
+def zygarde_complete(bt, f, who, ev):
+    """지가르데가 퍼펙트폼이 될 때면 바꾼다 - 50%폼이 체력 절반 이하로 턴을 마치면.
+
+    스웜체인지 (1.13): 원래는 **파워컨스트럭트** 지가르데만 (썬문 규칙). 11/09 (게시판 #497): 메가지가르데는 퍼펙트폼
+    에서만 메가진화하게 바꾸면서 **레전드 Z-A 처럼 지가르데나이트를 지닌 지가르데는 특성과 상관없이** 퍼펙트폼이 된다
+    (Z-A 에는 특성이 없어 모든 50%폼이 체력 절반 이하에서 퍼펙트폼이 된다 - 사용자 결정 '지가르데나이트를 든 것만').
+    오라브레이크 지가르데도 지가르데나이트만 들면 체력을 절반까지 버틴 뒤 메가진화할 수 있다."""
+    if (f.mon or {}).get("species") != "ZYGARDE" or f.ab.get("complete") or not f.alive() \
+            or getattr(f, "mega", None) or f.hp * 2 > f.maxhp:
+        return
+    stone = getattr(f, "_held", None) == ZYGARDITE
+    if not stone and not (on(f) and f.ability == "POWERCONSTRUCT"):
+        return
+    f.ab["complete"] = True
+    ev.append({"t": "msg", "who": who, "text": "%s 에게 셀이 모여든다!" % f.name})
+    if not on(f):
+        update_form(bt, f, who, ev)         # (특성이 켜져 있으면 _end_of_turn 이 곧 부른다)
 
 
 def _end_of_turn(bt, f, who, ev):
@@ -1390,10 +1414,7 @@ def _end_of_turn(bt, f, who, ev):
         if look:
             e["look"], e["label"] = look, ("배고픈 모양!" if hangry else "배부른 모양!")
         ev.append(e)
-    if a == "POWERCONSTRUCT" and (f.mon or {}).get("species") == "ZYGARDE" and not f.ab.get("complete") \
-            and f.alive() and f.hp * 2 <= f.maxhp:
-        f.ab["complete"] = True                 # 스웜체인지 (1.13): 퍼펙트폼이 된다
-        ev.append({"t": "msg", "who": who, "text": "%s 에게 셀이 모여든다!" % f.name})
+    zygarde_complete(bt, f, who, ev)
     update_form(bt, f, who, ev)             # 달마모드·리밋실드·어군은 턴 끝에 모습이 바뀐다
     if st.get("slow", 0) > 0:
         st["slow"] -= 1
@@ -1440,6 +1461,8 @@ def want_form(bt, f):
     if sp == "MELOETTA":
         # 옛노래로 오가는 모습은 특성과 상관없다 (특성을 끈 배틀에서도 바뀐다)
         return "pirouette" if (f.cond or {}).get("pirouette") and not getattr(f, "mega", None) else None
+    if sp == "ZYGARDE" and (getattr(f, "ab", None) or {}).get("complete") and not getattr(f, "mega", None):
+        return "complete"                   # 퍼펙트폼은 특성과 상관없이 (지가르데나이트로도 된다, 11/09 - zygarde_complete)
     if not getattr(f, "ability_on", False) or getattr(f, "mega", None):
         return None
     a = f.ability

@@ -2622,6 +2622,8 @@ class Battle(object):
                 H.end_of_turn(self, f, who, ev)     # 먹다남은음식, 맹독구슬 ...
             if f.ability_on:
                 A.end_of_turn(self, f, who, ev)     # 가속, 탈피, 변덕쟁이 ...
+            else:
+                A.zygarde_complete(self, f, who, ev)   # 특성을 끈 배틀도 지가르데나이트면 퍼펙트폼 (Z-A, 11/09)
         AF.end_turn(self, ev, sides, field)         # 소금절이·시럽봄·미래예지
         SM.end_turn_post(self, ev, sides, field)
         self._check_faint(ev)

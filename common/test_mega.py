@@ -220,6 +220,25 @@ def main():
         bt0.can_mega("me"))
     bt0.take_turn("EARTHQUAKE", mega=True)
     chk("  메가진화를 골라도 안 된다", a0.mega is None, a0.mega)
+    # 레전드 Z-A 처럼 지가르데나이트를 들면 특성과 상관없이 체력 절반 이하에서 퍼펙트폼 (11/09 사용자 결정)
+    a0.hp = a0.maxhp // 2
+    mx = a0.maxhp
+    bt0.take_turn("EARTHQUAKE", mega=True)
+    chk("  오라브레이크라도 지가르데나이트를 들고 체력 절반 이하로 턴이 끝나면 퍼펙트폼 (Z-A)",
+        a0.ability == "AURABREAK" and a0.ab.get("complete") and a0.cond.get("form") == "complete" and a0.maxhp > mx,
+        (a0.ability, a0.ab.get("complete"), a0.cond.get("form"), mx, a0.maxhp))
+    bt0.take_turn("EARTHQUAKE", mega=True)
+    chk("  그다음 턴에 메가지가르데", a0.mega == "ZYGARDE_MEGA", a0.mega)
+    btn, an, _bn = duel(mon("ZYGARDE", None, ("EARTHQUAKE",)), mon("CLEFABLE", moves=("SPLASH",)))
+    an.hp = an.maxhp // 2
+    btn.take_turn("EARTHQUAKE")
+    chk("  지가르데나이트가 없는 오라브레이크 지가르데는 예전처럼 퍼펙트폼이 안 된다", not an.ab.get("complete"),
+        an.ab.get("complete"))
+    bto, ao, _bo = duel(mon("ZYGARDE", "ZYGARDITE", ("EARTHQUAKE",)), mon("CLEFABLE", moves=("SPLASH",)), abil=False)
+    ao.hp = ao.maxhp // 2
+    bto.take_turn("EARTHQUAKE")
+    chk("  특성을 끈 배틀에서도 지가르데나이트면 퍼펙트폼 (Z-A 에는 특성이 없다)", ao.ab.get("complete")
+        and ao.cond.get("form") == "complete", (ao.ab.get("complete"), ao.cond.get("form")))
     pz = mon("ZYGARDE", "ZYGARDITE", ("COREENFORCER", "EARTHQUAKE"))
     pz["ability"] = "POWERCONSTRUCT"
     bt1, a1, _b1 = duel(pz, mon("CLEFABLE", moves=("SPLASH",)))
