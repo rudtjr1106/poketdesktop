@@ -187,7 +187,12 @@ def dex_part():
         # 냐오닉스는 암수 메가가 다르다. 성별이 안 적힌 폼은 수컷 것이다.
         m["gender"] = form.get("megaGender") or "M"
         mine = DEX.mega_for(m)
-        theirs = B.Fighter(DEX, m).mega_target()
+        f = B.Fighter(DEX, m)
+        if form["megaOf"] == "ZYGARDE":
+            # 지가르데는 배틀에서 퍼펙트폼이 된 뒤에만 메가진화한다 (11/09, 게시판 #497) - 배틀 안의 상태라
+            # 도감 규칙(바탕화면 메가 걷기)은 모른다. 배틀 쪽은 퍼펙트폼이 된 것으로 놓고 견준다.
+            f.ab["complete"] = True
+        theirs = f.mega_target()
         if mine is not form or theirs is not form:
             bad.append((form["internal"], mine and mine["internal"],
                         theirs and theirs["internal"]))
