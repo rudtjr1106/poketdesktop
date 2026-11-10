@@ -227,8 +227,24 @@ def main():
     chk("  오라브레이크라도 지가르데나이트를 들고 체력 절반 이하로 턴이 끝나면 퍼펙트폼 (Z-A)",
         a0.ability == "AURABREAK" and a0.ab.get("complete") and a0.cond.get("form") == "complete" and a0.maxhp > mx,
         (a0.ability, a0.ab.get("complete"), a0.cond.get("form"), mx, a0.maxhp))
-    bt0.take_turn("EARTHQUAKE", mega=True)
+    ev0 = bt0.take_turn("EARTHQUAKE", mega=True)
     chk("  그다음 턴에 메가지가르데", a0.mega == "ZYGARDE_MEGA", a0.mega)
+    # 퍼펙트폼 자국(cond form·look)이 남아 기술을 쓰면 '원래 모습으로 변했다' + 50%폼 도트로 돌아갔다 (11/10 사용자 제보)
+    ev0 += bt0.take_turn("EARTHQUAKE")
+    back = [e.get("text") for e in ev0 if e.get("form") == "base" or "원래 모습" in str(e.get("text"))]
+    chk("  메가진화한 뒤 기술을 써도 원래 모습으로 안 돌아간다", not back and a0.mega == "ZYGARDE_MEGA", back)
+    chk("  퍼펙트폼 자국(form·look)은 메가진화로 지워진다 - 판 상태 번호가 메가 도트", a0.cond.get("form") is None
+        and a0.cond.get("look") is None, (a0.cond.get("form"), a0.cond.get("look")))
+    chk("  능력치는 메가지가르데의 것 (퍼펙트폼 것이 아니다)", a0.stat("atk", stages=False) == int(a0.base["atk"]
+        * B.H.stat_mult(a0, "atk")) and a0.form_stats() is None, (a0.stat("atk", stages=False), a0.base))
+    for kr, cls in (("관장", TB.TrainerBattle), ("실시간", LB.LiveBattle), ("레이드", RB.RaidBattle)):
+        host = cls.__new__(cls)
+        host.dex = DEX
+        d0 = json.loads(json.dumps(cls._dump_fighter(a0)))
+        d0["vol"].setdefault("cond", {}).update(form="complete", look=718)    # 고치기 전에 저장된 판
+        back0 = host._load_fighter(d0)
+        chk("  %s: 고치기 전 판을 불러와도 퍼펙트폼 자국이 지워진다" % kr, back0.mega == "ZYGARDE_MEGA"
+            and back0.cond.get("form") is None and back0.cond.get("look") is None, back0.cond)
     btn, an, _bn = duel(mon("ZYGARDE", None, ("EARTHQUAKE",)), mon("CLEFABLE", moves=("SPLASH",)))
     an.hp = an.maxhp // 2
     btn.take_turn("EARTHQUAKE")

@@ -275,6 +275,8 @@ class Fighter(object):
             if form:
                 self.mega_evolve(form)       # 변신보다 먼저 - 변신은 그 위에 입힌다
         self.cond = dict(d.get("cond") or {})
+        if self.mega:
+            self._drop_form()                # 고치기 전에 저장된 판 (메가지가르데에 퍼펙트폼 자국이 남았다)
         SM.reapply(self)                     # 변신·파워트릭처럼 능력치를 바꿔 둔 것
 
     def clear_volatile(self):
@@ -342,6 +344,7 @@ class Fighter(object):
             self.ability = "".join(c for c in str(form["abil"][0]).upper() if c.isalnum())
         self.types_override = None
         self.mega = form["internal"]
+        self._drop_form()
         if not self.mon.get("nickname"):
             self.name = form["kr"]
         for old, new in (AF.MEGA_MOVES.get(form["internal"]) or {}).items():
@@ -361,6 +364,17 @@ class Fighter(object):
                     self.cond[k] = new
                 elif isinstance(v, dict) and v.get("move") == old:
                     self.cond[k] = dict(v, move=new)
+
+    def _drop_form(self):
+        """폼(퍼펙트폼 ...)에서 메가진화하면 그 폼은 끝난다 - 자국(cond form·look)을 지운다.
+
+        남겨 두면 기술을 쓸 때마다 update_form 이 (메가라 바랄 폼이 없으니) '원래 모습으로 변했다' 며
+        50%폼 도트로 되돌리고, 판 상태 번호(cond look)도 메가가 아닌 퍼펙트폼 도트를 보냈다
+        (11/10 메가지가르데 제보 - 퍼펙트폼일 때만 메가진화하게 바꾼 26bdb5d 뒤로 생겼다).
+        변신(cond look 만 있고 form 은 없다)은 건드리지 않는다.
+        """
+        if self.cond.pop("form", None):
+            self.cond.pop("look", None)
 
     def form_spec(self):
         """지금 취한 폼의 자료 (abilities.FORMS 의 한 줄). 원래 모습이면 None."""
