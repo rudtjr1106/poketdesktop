@@ -380,6 +380,15 @@ def mouse_buttons_down():
     return 0
 
 
+def foreground_title():
+    """맨 앞 창의 제목 (아르케 2.4.0 '브라우저 단서 찾기'). 못 읽는 곳은 None.
+
+    윈도우만 읽는다 (platform_win). 맥은 남의 창 제목을 읽으려면 '화면 기록' 권한을 띄워야 해서
+    하지 않는다 - 같은 열쇠를 일지 칸에 적으면 된다.
+    """
+    return None
+
+
 def missing_requirement():
     """없어서 못 도는 것이 있으면 사람에게 보여줄 한 줄. 없으면 None."""
     return None

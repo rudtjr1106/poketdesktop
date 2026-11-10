@@ -7,7 +7,7 @@
     GET  /api/gym/sprite/{key}         트레이너 도트
     POST /api/gym/{region}/start       도전 시작
     GET  /api/gym/battle               진행 중인 판
-    POST /api/gym/battle/{bid}/act     한 턴 (기술 / 교체 / 기권)
+    POST /api/gym/battle/{bid}/act     한 턴 (기술 / 교체 / 기권 · 아르케 판만 볼)
 
 ## 서버가 판정한다
 
@@ -31,14 +31,15 @@ from pydantic import BaseModel
 
 from common import trainer_battle as TB
 
-from . import auth, battle_routes, boss, config, db, deps, gimmick, guild_war, gym, items, mega, pvp, watchers
+from . import arche, auth, battle_routes, boss, config, db, deps, gimmick, guild_war, gym, items, mega, pvp, watchers
 
 router = APIRouter()
 
 
 class ActIn(BaseModel):
-    kind: str                    # move / switch / forfeit
+    kind: str                    # move / switch / forfeit · ball (아르케 판만, 2.4.0)
     move: str = ""
+    ball: str = ""               # kind=ball 일 때 던질 볼 (도구 id)
     mega: bool = False           # 이 턴에 메가진화 (시즌 3)
     z: bool = False              # 고른 기술을 Z기술로 (시즌 4)
     slot: int = -1
@@ -98,8 +99,8 @@ def overview(ctx=Depends(deps.current)):
         done += row["today"]
         regions.append(row)
     act = _active(uid)
-    if act and guild_war.is_war(act["region"]):
-        act = None                                    # 길드전 판은 길드 창에서 이어서 한다
+    if act and (guild_war.is_war(act["region"]) or arche.is_arche(act["region"])):
+        act = None                                    # 길드전 판은 길드 창, 아르케 판은 일지 창에서 이어서 한다
     return {"regions": regions, "cleared": len(mine), "total": len(g["regions"]),
             "today": done, "resetIn": gym.reset_in(),
             "tiers": g["tiers"], "digest": g.get("digest"), "mapDigest": gym.korea_map()[1],
@@ -157,6 +158,8 @@ def start(region: str, ctx=Depends(deps.current)):
                 other = {"name": "악당"}          # 악당 창에서 이어서 한다
             elif guild_war.is_war(old["region"]):
                 other = {"name": "길드전 상대"}    # 길드 창의 길드전 칸에서 이어서 한다
+            elif arche.is_arche(old["region"]):
+                other = {"name": "아르케의 전설"}  # 일지 창에서 이어서 한다 (2.4.0)
             raise HTTPException(409, "%s 과(와)의 승부가 아직 끝나지 않았습니다."
                                 % (other.get("name") or "다른 트레이너"))
         tb = TB.TrainerBattle.load(deps.dex(), json.loads(old["data"]))
@@ -208,6 +211,12 @@ def act(bid: int, body: ActIn, ctx=Depends(deps.current)):
     d = deps.dex()
     tb = TB.TrainerBattle.load(d, json.loads(row["data"]))
     kind = (body.kind or "").lower()
+    if kind == "ball":
+        # 볼은 아르케 판에만 (2.4.0). 잡기 · 놓친 턴 · 저장은 arche.throw_ball 이 한다.
+        if not arche.is_arche(row["region"]):
+            raise HTTPException(409, "이 승부에서는 볼을 던질 수 없습니다.")
+        hour = body.hour if 0 <= body.hour <= 23 else None
+        return arche.throw_ball(uid, ctx["user"], row, tb, body.ball or "POKEBALL", hour)
     if kind not in ("move", "switch", "forfeit"):
         raise HTTPException(400, "무엇을 할지 알 수 없습니다.")
     kos_before = len(tb.kos)
@@ -239,8 +248,9 @@ def act(bid: int, body: ActIn, ctx=Depends(deps.current)):
     extra = {}
     hour = body.hour if 0 <= body.hour <= 23 else None
     exp = []
-    # 쓰러뜨릴 때마다 경험치. 그 순간 나와 있던 포켓몬이 받는다 (길드전은 경험치가 없다).
-    for ko in ([] if war else tb.kos[kos_before:]):
+    # 쓰러뜨릴 때마다 경험치. 그 순간 나와 있던 포켓몬이 받는다 (길드전 · 아르케 전설은 경험치가 없다 -
+    # 아르케는 이벤트 끝까지 몇 번이든 다시 도전할 수 있어 경험치 밭이 된다. 받는 것은 잡은 전설 + 칭호).
+    for ko in ([] if (war or arche.is_arche(row["region"])) else tb.kos[kos_before:]):
         mine = tb.me_team[ko["by"]]
         pid = mine.mon.get("id")
         if pid:
@@ -254,6 +264,9 @@ def act(bid: int, body: ActIn, ctx=Depends(deps.current)):
         extra["reward"] = guild_war.on_end(uid, row, tb, events)
     elif war:
         guild_war.spectate_turn(uid, row, tb, events)     # 구경하는 길드원에게 이번 턴을 민다
+    elif tb.over and arche.is_arche(row["region"]):
+        # 아르케의 전설 (2.4.0). 그 판만 끝 - 이벤트 끝까지 다시 도전한다. 관장 기록 · 상금은 없다.
+        extra["reward"] = arche.on_end(uid, row, tb)
     elif tb.over and tb.result == "won" and boss.is_boss(row["region"]):
         # 악당·전설 (시즌 4). 관장 기록에는 안 남는다 - 진행·상금·알은 boss 가 준다.
         extra["reward"] = boss.on_win(uid, row["region"], row["trainer"], tb.trainer.get("level") or 1)

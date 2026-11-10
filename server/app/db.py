@@ -887,6 +887,71 @@ CREATE TABLE IF NOT EXISTS airraid (
     created_at  TEXT NOT NULL,
     UNIQUE (user_id, day)
 );
+-- 아르케의 여섯 봉인 (2.4.0, arche.py · 규칙은 common/arche.py). 수수께끼 내용 · 정답은 DB 에도 없다 (비공개 secrets.json).
+-- 의식을 마친 장 (한 사람 · 한 장에 한 줄). first = 그 장에서 가장 먼저 마친 사람 (한 장에 한 줄만 1).
+CREATE TABLE IF NOT EXISTS arche_progress (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chapter     INTEGER NOT NULL,
+    ritual_at   TEXT NOT NULL,
+    first       INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, chapter)
+);
+CREATE INDEX IF NOT EXISTS idx_arche_progress_ch ON arche_progress(chapter, ritual_at);
+-- 증명한 열쇠 (말). via = type (일지에 적음) / title (브라우저 창 제목).
+CREATE TABLE IF NOT EXISTS arche_key (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chapter     INTEGER NOT NULL,
+    key         TEXT NOT NULL,
+    via         TEXT NOT NULL,
+    at          TEXT NOT NULL,
+    PRIMARY KEY (user_id, chapter, key)
+);
+-- 열쇠를 적어 본 시도 (시간당 한도를 센다). 한 시간 지난 것은 그 사람이 다음에 적을 때 지운다.
+CREATE TABLE IF NOT EXISTS arche_try (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_arche_try_user ON arche_try(user_id, at);
+-- 같은 IP 의 여러 계정이 합쳐서 넣은 열쇠 (부계정으로 마구 넣기 막기 - 플레이테스트 11/09)
+CREATE TABLE IF NOT EXISTS arche_try_ip (
+    ip          TEXT NOT NULL,
+    at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_arche_try_ip ON arche_try_ip(ip, at);
+-- 장의 전설 자리. state: met = 판을 연 적이 있다 · caught = 잡았다 (그 자리는 끝). 한 자리를 두 번 못 잡는다.
+CREATE TABLE IF NOT EXISTS arche_mon (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chapter     INTEGER NOT NULL,
+    slot        INTEGER NOT NULL,
+    species     TEXT NOT NULL,
+    state       TEXT NOT NULL DEFAULT 'met',
+    pokemon_id  INTEGER,
+    shiny       INTEGER NOT NULL DEFAULT 0,
+    caught_at   TEXT,
+    PRIMARY KEY (user_id, chapter, slot)
+);
+-- 가방에서 열쇠 아이템을 쓴 때 (의식 조건 itemUsed). 이틀 지난 것은 쓸 때 지운다.
+CREATE TABLE IF NOT EXISTS arche_use (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item        TEXT NOT NULL,
+    at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_arche_use_user ON arche_use(user_id, item, at);
+-- 장 선물 (열쇠 아이템)을 준 기록 - 한 사람 · 한 장에 한 번.
+CREATE TABLE IF NOT EXISTS arche_gift (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chapter     INTEGER NOT NULL,
+    at          TEXT NOT NULL,
+    PRIMARY KEY (user_id, chapter)
+);
+-- 놀러 가기 기록 (visit.start, 2.4.0 - 의식 조건 visitMutual '서로 놀러 가기'). 하루 지난 것은 넣을 때 지운다.
+CREATE TABLE IF NOT EXISTS visit_log (
+    guest       INTEGER NOT NULL,
+    host        INTEGER NOT NULL,
+    at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visit_log_guest ON visit_log(guest, at);
+CREATE INDEX IF NOT EXISTS idx_visit_log_at ON visit_log(at);
 CREATE TABLE IF NOT EXISTS olympic_slot (
     event       TEXT NOT NULL,
     entry_id    INTEGER NOT NULL,

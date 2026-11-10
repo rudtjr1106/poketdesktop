@@ -302,6 +302,7 @@ class SettingsWindow(object):
         self.drag = tk.BooleanVar(value=bool(s.get("petDrag", False)))
         self.fr_note = tk.BooleanVar(value=bool(s.get("friendlyNotify", True)))
         self.fr_auto = tk.BooleanVar(value=bool(s.get("friendlyAuto", False)))
+        self.arche_title = tk.BooleanVar(value=bool(s.get("archeTitle", True)))
         # **알림은 셋만 띄운다** - 새 버전, 친구 요청, 게시판 댓글(1.9.0). 게임 안에서
         # 벌어지는 일(잡았다, 레벨이 올랐다)은 이걸 켜도 안 띄운다.
         # 바탕화면에서 눈으로 보이는 것으로 충분하고, 그런 것까지 화면
@@ -335,7 +336,12 @@ class SettingsWindow(object):
                  "(채팅에 카드가 놓입니다).", self._toggle_plain),
                 (self.fr_auto, "길드 친선전 바로 관전하기", "friendlyAuto",
                  "길드 친선전이 열리면 묻지 않고 바탕화면에서 바로 관전합니다.",
-                 self._toggle_plain)):
+                 self._toggle_plain),
+                # 아르케의 여섯 봉인 (2.4.0). 윈도우에서만 돈다 (맥은 일지에 적는다).
+                (self.arche_title, "브라우저 단서 찾기 (아르케)", "archeTitle",
+                 "아르케 이벤트 동안, 윈도우에서 맨 앞에 있는 창의 제목만 3초마다 확인해 이벤트 단서와 "
+                 "맞는지 봅니다. 주소 · 방문 기록 · 페이지 내용은 읽지 않고, 제목은 저장하거나 보내지 "
+                 "않습니다 (단서와 맞을 때만 그 말을 서버에 보냅니다).", self._toggle_plain)):
             c = tk.Checkbutton(
                 box, text=label, variable=var, bg=U.BG, fg=U.FG,
                 selectcolor=U.INK, activebackground=U.BG,

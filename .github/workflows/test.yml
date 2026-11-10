@@ -148,6 +148,14 @@ jobs:
       # 2.3.0 공습: 뽑기(파티 + 2~3 · 파티 크기별 레벨 차) · 이긴 쪽이 다음 상대 · 같은 시드 = 같은 판 · 끌어내기 기술
       - name: 공습 (엔진)
         run: python common/test_airraid.py
+      # 2.4.0 아르케의 여섯 봉인: 장 일정 · 후보 67종 · 사람별 전설 · 말 정규화 · 창 제목 조각 · 제목 해시
+      - name: 아르케 (규칙)
+        run: |
+          python common/test_arche.py
+          python tools/build_arche_icons.py --check     # 열쇠 아이템 아이콘이 arche_art 그림과 같다
+      # 창 제목 읽기 (가짜 제목 함수): 맞을 때만 서버로 · 같은 제목 한 번 · 설정 끔 · 해시 없으면 안 읽음
+      - name: 아르케 창 제목
+        run: python client/test_arche_title.py
       # 양쪽 다 사람인 1:1. 한쪽만 골라서는 턴이 안 돌아야 하고, 쓰러진
       # 쪽만 다음을 골라야 한다.
       - name: 실시간 배틀 (엔진)
@@ -340,7 +348,11 @@ jobs:
       # 포켓몬 관리 창의 '탐험 중'.
       - name: 탐험 파견 화면 (진짜 Tk)
         if: matrix.shard == 3
-        run: python client/test_expedition_ui.py
+        shell: bash         # 여러 줄 · 환경값 앞붙임 - pwsh 는 앞 줄 실패를 놓친다
+        run: |
+          python client/test_expedition_ui.py
+          # 아르케 이벤트 동안 (2.4.0): 곳이 여덟 (아르케 발굴지) 이어도 가장 낮은 창에 '② 얼마나' 가 다 보인다
+          POKET_ARCHE_START=2026-11-08 python client/test_expedition_ui.py
       # 탐험 탭 '누구를' 목록 찾기 · 가나다순 · 레벨순 (가방과 같은 FindBar)
       - name: 탐험 포켓몬 찾기 (진짜 Tk)
         if: matrix.shard == 1
@@ -422,6 +434,21 @@ jobs:
       - name: 공습 화면 (진짜 Tk)
         if: matrix.shard == 2
         run: python client/test_airraid_ui.py
+      # 2.4.0 아르케: 장소 그림 · 입장 장면 · 발굴 일지 · 컨트롤러 (폴링 · 현상 · 의식 → 입장 · 열쇠 · 제목 감시)
+      - name: 아르케 일지 (진짜 Tk)
+        if: matrix.shard == 1
+        run: python client/test_arche_ui.py
+      # 바탕화면 현상 (안농 · 유물 · 별 · 물방울 · 모래 · 떨림) · 정리 · 멈춤 감시 · 진짜 ctypes 창 제목
+      - name: 아르케 바탕화면 현상 (진짜 Tk)
+        if: matrix.shard == 2
+        shell: bash         # 여러 줄 · 환경값 앞붙임 - pwsh 는 앞 줄 실패를 놓친다
+        run: |
+          python client/test_arche_desktop_ui.py
+          python client/test_arche_title.py
+      # 전설 배틀 창: 배경 · 입장 장면 · 볼 던지기 (놓침 · 잡음 · 더 안쪽으로) · 도망치기
+      - name: 아르케 전설 배틀 (진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_arche_battle_ui.py
       # 길드 창 (1.10.0): 찾기·만들기, 채팅 폴링, 자리마다 다른 화면, 눌린 위젯
       - name: 길드 창
         if: matrix.shard == 2
@@ -686,6 +713,9 @@ jobs:
           python test_olympics.py
           python test_olympics_rounds.py # 2.3.0: 종목마다 실제 올림픽 라운드 (참가 수로 조 배정 · 진출 · 결승)
           python test_airraid.py         # 2.3.0 공습: 그날 시각 · 하루 한 번 · 보상 한 번 · 카드 · 정리
+          # 2.4.0 아르케의 여섯 봉인: 비공개 데이터 없음 · 장 경계 · 열쇠 · 의식 조건 · 현상 창 · 게시글 · 전설 배틀 (볼)
+          python test_arche.py
+          python test_arche_battle.py
           # 시즌 4 (1.12.0): 점수 매칭 / Z링·Z크리스탈 / 시즌 3 -> 4 전환 /
           # 악당 출현 / 길드전
           python test_match_rp.py

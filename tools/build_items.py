@@ -172,6 +172,15 @@ EXTRA = [
     {"id": "TYPESPRAY", "ident": "type-spray", "kr": "타입 스프레이", "en": "Type Spray", "cat": "misc", "cost": 10000, "sell": 0, "desc": "쓸 때 타입을 고르면 1시간 동안 풀숲에서 그 타입의 포켓몬이 훨씬 자주 나타난다 (둘에 하나 넘게). 켜져 있을 때 또 쓰면 시간이 늘어난다 (3시간까지).", "effect": {"kind": "lure", "pickType": True, "minutes": 60}},
     # 닉네임 변경권 (2.1.1)
     {"id": "RENAMETICKET", "ident": "rename-ticket", "kr": "닉네임 변경권", "en": "Rename Ticket", "cat": "misc", "cost": 30000, "sell": 0, "desc": "닉네임을 한 번 바꾼다. 닉네임은 로그인 아이디이기도 해서, 바꾸면 다음 로그인부터 새 닉네임으로 들어온다 (비밀번호는 그대로).", "effect": {"kind": "rename"}},
+    # 아르케의 여섯 봉인 (2.4.0) 열쇠 아이템. 장마다 선물로 받는다 (arche.give_gift). 상점 · 드랍 · 판매 없음.
+    # **설명은 단서가 아니다** - 장이 열리면 서버가 비공개 자료의 설명으로 덮는다 (items.public_list -> arche.item_desc).
+    # 가방에서 '쓰기' 를 누르면 꺼내 들기만 한다 (없어지지 않는다 - 의식 조건 itemUsed). 아이콘은 tools/build_arche_icons.py.
+    {"id": "ARCHESTONE", "ident": "arche-stone", "custom": True, "kr": "아르케 돌판", "en": "Arche Tablet", "cat": "misc", "cost": 0, "sell": 0, "buyable": False, "desc": "고고학자가 보내온 깨진 돌판. 낯선 글자가 새겨져 있다.", "effect": {"kind": "arche"}},
+    {"id": "ARCHESHELL", "ident": "arche-shell", "custom": True, "kr": "아르케 조개 비석", "en": "Arche Shell", "cat": "misc", "cost": 0, "sell": 0, "buyable": False, "desc": "조개껍데기 모양의 작은 비석. 바다 냄새가 난다.", "effect": {"kind": "arche"}},
+    {"id": "ARCHESTAR", "ident": "arche-star", "custom": True, "kr": "아르케 별 조각", "en": "Arche Star", "cat": "misc", "cost": 0, "sell": 0, "buyable": False, "desc": "희미하게 빛나는 별 모양의 조각.", "effect": {"kind": "arche"}},
+    {"id": "ARCHESAND", "ident": "arche-sand", "custom": True, "kr": "아르케 모래시계", "en": "Arche Hourglass", "cat": "misc", "cost": 0, "sell": 0, "buyable": False, "desc": "아주 오래된 모래시계. 안의 모래가 반짝인다.", "effect": {"kind": "arche"}},
+    {"id": "ARCHECROWN", "ident": "arche-crown", "custom": True, "kr": "아르케 왕관 조각", "en": "Arche Crown", "cat": "misc", "cost": 0, "sell": 0, "buyable": False, "desc": "부서진 왕관의 한 조각.", "effect": {"kind": "arche"}},
+    {"id": "ARCHELAMP", "ident": "arche-lamp", "custom": True, "kr": "아르케 등불", "en": "Arche Lamp", "cat": "misc", "cost": 0, "sell": 0, "buyable": False, "desc": "꺼지지 않는 작은 등불.", "effect": {"kind": "arche"}},
 ]
 
 

@@ -318,7 +318,18 @@ def start(uid, friend, raw_items=None, look=None, now=None):
         _of[uid] = _of[friend] = v["id"]
     push(friend, {"t": "visit", "visit": view(v, friend)})
     push(uid, {"t": "visit", "visit": view(v, uid)})
+    log_visit(uid, friend, now)
     return view(v, uid)
+
+
+def log_visit(guest, host, now=None):
+    """놀러 간 기록 한 줄 (2.4.0 - 아르케 의식 조건 '서로 놀러 가기'). 하루 지난 것은 여기서 지운다. 터져도 놀러 가기는 된다."""
+    try:
+        t = now or _now()
+        db.run("DELETE FROM visit_log WHERE at < ?", (_iso(t - datetime.timedelta(days=1)),))
+        db.run("INSERT INTO visit_log (guest, host, at) VALUES (?,?,?)", (int(guest), int(host), _iso(t)))
+    except Exception as e:                                  # noqa: BLE001
+        print("[visit] 기록 실패 %s -> %s: %r" % (guest, host, e))
 
 
 def _push_bundles(v):
