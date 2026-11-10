@@ -48,6 +48,8 @@ class DexWindow(Scene, DX.DexWindow):
     def _build(self):
         self._sel = None
         self._big = {}             # 번호 -> 큰 도트
+        self._big_src = {}         # 번호 -> 큰 도트의 원본 (PIL) - 무대가 줄면 여기서 줄인다
+        self._big_small = {}       # (번호, 폭, 높이) -> 무대에 맞춰 줄인 큰 도트 (도감 글 자리로 무대가 줄 때)
         self._big_busy = set()
         self._cols = 1
         self.ROW_H = U.h(30)
@@ -158,6 +160,7 @@ class DexWindow(Scene, DX.DexWindow):
                 return
             try:
                 self._big[n] = ImageTk.PhotoImage(img)
+                self._big_src[n] = img
             except Exception:                               # noqa: BLE001
                 return
             if n == self._sel:
@@ -304,10 +307,21 @@ class DexWindow(Scene, DX.DexWindow):
         n = sp["num"]
         got, seen = n in self.caught, n in self.seen
         cx = (x1 + x2) // 2
+        fw = x2 - x1 - 8                             # 도감 글 폭 (아래 '잡았다' 의 tw 와 따로)
+        # 도감 글 (게시판 #496, 11/10) - 본가처럼 잡은 종만 (DX.flavor_text). 글이 들어갈 자리가 모자라면 도트 무대를
+        # 줄인다 (글자는 안 줄인다). 그래도 모자라면(아주 작은 창) 들어가는 줄까지만 쓰고 '…'.
+        flavor = DX.flavor_text(sp, got) if seen else None
+        fh = K.text_height(cv, flavor, font(10), fw) if flavor else 0
+        under = U.h(10 + 22 + 32)                    # 번호 줄 · 이름
+        if seen:
+            under += (U.h(24) if sp.get("kind") else 0) + U.h(32) \
+                + (U.h(24) if (sp.get("height") or sp.get("kg")) else 0) + U.h(24)     # 분류 · 타입 · 키 · 세대
         # 도트 무대 (흰 칸 - v2: 격자 무늬 없이)
         sh = min(U.h(180), (y2 - y1) // 2)
+        if flavor:
+            sh = max(U.h(80), min(sh, (y2 - y1) - under - fh - U.h(6)))
         K.rrect(cv, x1, y1, x2, y1 + sh, 6, fill=STAGE, outline=STAGE_LINE, width=1, tags=T)
-        img = self._big.get(n) if seen else None
+        img = self._big_fit(n, x2 - x1 - U.h(8), sh - U.h(8)) if seen else None
         if img is not None:
             cv.create_image(cx, y1 + sh // 2, image=img, tags=T)
         else:
@@ -351,3 +365,36 @@ class DexWindow(Scene, DX.DexWindow):
             y += U.h(24)
         cv.create_text(x1 + 4, y, text="%d세대" % int(sp.get("gen") or 0), fill=INK2, font=font(10), anchor="nw",
                        tags=T)
+        y += U.h(24)
+        if flavor and y2 - y >= K.text_height(cv, "가", font(10), fw):
+            has = got and sp.get("flavor")
+            K.text(cv, x1 + 4, y, self._fit_lines(cv, flavor, fw, y2 - y), font(10), fill=INK if has else DIM,
+                   tags=T, width=fw)
+
+    def _big_fit(self, n, w, h):
+        """큰 도트가 무대(w x h)보다 크면 무대에 맞게 줄인 것 - 도감 글 자리로 무대가 줄면 도트가 무대 밖으로 나왔다.
+        줄인 것도 들고 있는다 (그림을 놓치면 캔버스에서 사라진다)."""
+        img, src = self._big.get(n), self._big_src.get(n)
+        if img is None or src is None or (src.width <= w and src.height <= h):
+            return img
+        k = min(w / float(src.width), h / float(src.height))
+        size = (max(1, int(src.width * k)), max(1, int(src.height * k)))
+        small = self._big_small.get((n,) + size)
+        if small is None:
+            small = ImageTk.PhotoImage(src.resize(size, Image.NEAREST))
+            self._big_small = {(n,) + size: small}          # 고른 종 하나 · 그 크기 하나만 들고 있는다
+        return small
+
+    @staticmethod
+    def _fit_lines(cv, s, width, room):
+        """room 높이에 들어가는 줄까지만 (넘치면 마지막 줄 끝에 '…'). 다 들어가면 그대로."""
+        lines = K.wrap(cv, s, font(10), width).split("\n")
+        one = max(1, K.text_height(cv, "가", font(10), width))
+        keep = max(1, int(room // one))
+        if len(lines) <= keep:
+            return s
+        last = lines[keep - 1]
+        f = K.tkfont_of(cv, font(10))
+        while last and f.measure(last + "…") > width:
+            last = last[:-1]
+        return "\n".join(lines[:keep - 1] + [last + "…"])

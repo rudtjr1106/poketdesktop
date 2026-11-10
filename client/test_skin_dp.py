@@ -1540,6 +1540,24 @@ def main():
         dx.qv.set("")
         dx.pick(25)
         chk("줄을 누르면 그 종", dx._sel == 25)
+        # 도감 글 (게시판 #496, 11/10): 잡은 종은 본가 도감 글을, 본 것만이면 '잡으면 볼 수 있다' 를 왼쪽 화면에.
+        # 글은 왼쪽 화면 안에 - 자리가 모자라면 도트 무대가 줄고 글자는 안 줄어든다.
+        TBL.settle(root, 0.2)
+
+        def flavor_box(word):
+            ids = [i for i in dx.cv.find_withtag("scene") if dx.cv.type(i) == "text"
+                   and word in " ".join(dx.cv.itemcget(i, "text").split())]
+            return dx.cv.bbox(ids[0]) if ids else None
+        pika = (dex.get(25) or {}).get("flavor") or ""
+        b = flavor_box(pika[:8])
+        list_box = dx.cv.coords(dx._wins["list"]) if dx._wins.get("list") else None
+        chk("  잡은 종은 왼쪽 화면에 도감 글 (피카츄)", bool(pika) and b is not None, (pika[:20], b))
+        chk("    화면 아래 · 오른쪽 목록을 안 넘는다", b is not None and list_box is not None
+            and b[3] <= dx.cv.winfo_height() - U.h(12) and b[2] <= list_box[0], (b, list_box, dx.cv.winfo_height()))
+        dx.pick(3)
+        TBL.settle(root, 0.2)
+        chk("  본 것만이면 '잡으면 도감 설명을 볼 수 있다'", 3 not in dx.caught and flavor_box("잡으면 도감 설명") is not None)
+        dx.pick(25)
         dx.toggle_achievements()
         TBL.settle(root, 0.3)
         chk("업적 칸을 열면 몸이 빠진다", not dx.cv.winfo_manager() and dx.ach_btn.text == "도감으로", dx.ach_btn.text)

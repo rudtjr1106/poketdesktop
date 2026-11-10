@@ -31,6 +31,58 @@ GENS = [(0, "전체"), (1, "1세대"), (2, "2세대"), (3, "3세대"), (4, "4세
 
 MODES = [("all", "전부"), ("caught", "잡은 것"), ("miss", "아직")]
 
+# 칸을 누르면 뜨는 도감 글 창 (게시판 #496, 11/10)
+ENTRY_W = 440
+ART = U.h(120)                  # 도트 칸 (정사각형 - 도트가 늦게 와도 창 크기가 안 바뀐다)
+
+
+def flavor_text(sp, caught):
+    """도감 글 창의 설명. 본가처럼 **잡아야** 보인다 (본 것만이면 분류 · 타입까지).
+
+    글은 tools/add_flavor.py 가 넣은 본가 도감 글이다. 한국어 글은 898번(소드 · 실드)까지뿐이라 그 뒤는 없다고 적는다.
+    """
+    if not caught:
+        return "잡으면 도감 설명을 볼 수 있다."
+    return sp.get("flavor") or "아직 이 포켓몬의 도감 설명이 없다."
+
+
+def keep_all(widget, s, spec, width):
+    """**띄어쓰기에서** 줄을 바꾼 글 (keep-all). Tk 라벨은 한글을 아무 글자에서나 끊어서 '사냥한/다.' 가 된다.
+    한 낱말이 폭보다 길면 그 낱말만 글자로 끊는다 (DP 테마의 kit.wrap 과 같다)."""
+    import tkinter.font as tkfont
+    f = tkfont.Font(root=widget, font=spec)
+    out = []
+    for para in str(s or "").split("\n"):
+        line = ""
+        for word in para.split(" "):
+            cand = word if not line else line + " " + word
+            if f.measure(cand) <= width:
+                line = cand
+                continue
+            if line:
+                out.append(line)
+            while f.measure(word) > width and len(word) > 1:
+                k = len(word)
+                while k > 1 and f.measure(word[:k]) > width:
+                    k -= 1
+                out.append(word[:k])
+                word = word[k:]
+            line = word
+        out.append(line)
+    return "\n".join(out)
+
+
+def entry_bits(sp):
+    """'키 0.4m  ·  몸무게 6kg  ·  1세대'."""
+    bits = []
+    if sp.get("height"):
+        bits.append("키 %gm" % sp["height"])
+    if sp.get("kg"):
+        bits.append("몸무게 %gkg" % sp["kg"])
+    if sp.get("gen"):
+        bits.append("%d세대" % int(sp["gen"]))
+    return "  ·  ".join(bits)
+
 
 def _norm(s):
     """비교용. 빈칸을 없애고 소문자로 (한글은 그대로다)."""
@@ -76,6 +128,7 @@ class DexWindow(object):
         self.pending = set()       # 받는 중인 번호
         self.cols = COLS
         self.busy = False
+        self._entry = None         # 열려 있는 도감 글 창 (하나만)
 
         # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
         self.win = U.panel(parent, self.root, "포스크탑 — 도감",
@@ -176,6 +229,7 @@ class DexWindow(object):
         U.scrollable(self.cv, 120,
                      lambda: self.root.after_idle(self.fetch_visible))
         self.cv.bind("<Motion>", self._on_hover)
+        self.cv.bind("<Button-1>", self._on_click)      # 칸을 누르면 도감 글 (게시판 #496)
 
     def _on_wheel(self, e):
         self.cv.yview_scroll(U.wheel_units(e.delta, 120), "units")
@@ -370,8 +424,133 @@ class DexWindow(object):
                        PAD + (i // self.cols) * ch)
 
     # ---------------- 마우스 ----------------
+    def _num_at(self, e):
+        """마우스 아래 칸의 도감 번호. 칸 사이 틈이나 칸이 없는 자리면 None."""
+        try:
+            x, y = self.cv.canvasx(e.x) - PAD, self.cv.canvasy(e.y) - PAD
+        except tk.TclError:
+            return None
+        cw, ch = CELL_W + PAD, CELL_H + PAD
+        if x < 0 or y < 0 or x % cw > CELL_W or y % ch > CELL_H:
+            return None
+        c, r = int(x // cw), int(y // ch)
+        i = r * self.cols + c
+        if c >= self.cols or not 0 <= i < len(self.rows):
+            return None
+        return self.rows[i]["num"]
+
     def _on_hover(self, e):
-        pass
+        """본 적 있는 칸 위에서는 손 모양 - 누르면 도감 글이 열린다."""
+        n = self._num_at(e)
+        try:
+            self.cv.configure(cursor="hand2" if n is not None and n in self.seen else "")
+        except tk.TclError:
+            pass
+
+    def _on_click(self, e):
+        n = self._num_at(e)
+        if n is not None and n in self.seen:
+            self.open_entry(n)
+
+    # ---------------- 도감 글 창 (게시판 #496) ----------------
+    def open_entry(self, n):
+        """그 포켓몬의 도감 글 창. 본 적 있는 종만 열린다 (본 적 없으면 None). 한 번에 하나 - 다른 칸을 누르면 갈아 끼운다.
+
+        도트 · 번호 · 이름 · 분류 · 타입 · 키 · 몸무게 · 세대, 그리고 본가 도감 글 (잡은 종만 - flavor_text).
+        """
+        dex = self.app.dex
+        sp = dex.get(int(n)) if dex else None
+        if sp is None or n not in self.seen:
+            return None
+        self._close_entry()
+        from .ui_box import _shell, fit
+        got = n in self.caught
+        win, body = _shell(self.win, "도감 No.%04d" % n, ENTRY_W, U.h(300))
+        self._entry = win
+        win.bind("<Escape>", lambda _e: self._close_entry())
+        win.bind("<Destroy>", lambda e: e.widget is win and self._entry_gone(win), add="+")
+        U.ghost_button(body, "닫기", self._close_entry, height=32).pack(side="bottom", anchor="e", pady=(14, 0))
+        top = tk.Frame(body, bg=U.BG)
+        top.pack(fill="x")
+        art = tk.Frame(top, bg=U.INK, width=ART, height=ART, highlightthickness=1, highlightbackground=U.LINE)
+        art.pack(side="left", anchor="n")
+        art.pack_propagate(False)
+        win.entry_pic = tk.Label(art, bg=U.INK, bd=0, text="...", fg=U.FG_FAINT, font=U.FONT_S)
+        win.entry_pic.place(relx=0.5, rely=0.5, anchor="center")
+        info = tk.Frame(top, bg=U.BG)
+        info.pack(side="left", fill="both", expand=True, padx=(14, 0))
+        head = tk.Frame(info, bg=U.BG)
+        head.pack(anchor="w", fill="x")
+        tk.Label(head, text="No.%04d" % n, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS).pack(side="left")
+        tk.Label(head, text="잡았다" if got else "본 적 있다", bg=U.BG, fg=U.ACCENT if got else U.FG_DIM,
+                 font=U.FONT_XS).pack(side="right")
+        tk.Label(info, text=sp.get("kr") or sp["internal"], bg=U.BG, fg=U.FG,
+                 font=(U.FAMILY_BLACK, U.pt(15)), anchor="w").pack(anchor="w")
+        if sp.get("kind"):
+            tk.Label(info, text=sp["kind"], bg=U.BG, fg=U.FG_DIM, font=U.FONT_S).pack(anchor="w")
+        chips = tk.Frame(info, bg=U.BG)
+        chips.pack(anchor="w", pady=(8, 0))
+        for t in sp.get("types") or []:
+            U.type_chip(chips, dex.type_name(t), t, small=False).pack(side="left", padx=(0, 6))
+        bits = entry_bits(sp)
+        if bits:
+            tk.Label(info, text=bits, bg=U.BG, fg=U.FG_DIM, font=U.FONT_XS, anchor="w").pack(anchor="w", pady=(8, 0))
+        tk.Frame(body, bg=U.LINE, height=U.h(1)).pack(fill="x", pady=(14, 12))
+        has = got and sp.get("flavor")
+        # 접는 폭: 창 테두리 2x2 + 몸 여백 18x2 + 라벨 자신의 여백 (윈도우 글꼴이 조금 넓다). 띄어쓰기에서 미리 접고,
+        # wraplength 는 그래도 넘칠 때의 울타리다.
+        spec = U.FONT if has else U.FONT_S
+        wrap_w = ENTRY_W - 4 - 36 - 8
+        win.entry_text = tk.Label(body, text=keep_all(win, flavor_text(sp, got), spec, wrap_w), bg=U.BG,
+                                  fg=U.FG if has else U.FG_FAINT, font=spec, justify="left", anchor="w",
+                                  wraplength=wrap_w)
+        win.entry_text.pack(fill="x")
+        fit(win)
+        self._entry_art(win, n)
+        return win
+
+    def _entry_art(self, win, n):
+        """도트를 받아 칸에 맞게 키운다 (도트라 NEAREST, 정수 배는 아니어도 3배까지)."""
+        api = self.app.api
+        size = ART - U.h(12)
+
+        def work():
+            path = sprite_cache.ensure(api, n, False)
+            if not path:
+                return None
+            im = Image.open(path)
+            im.seek(0)
+            im = im.convert("RGBA")
+            bb = im.getbbox()
+            if bb:
+                im = im.crop(bb)
+            k = min(3.0, size / float(max(im.size)))
+            return im.resize((max(1, int(im.width * k)), max(1, int(im.height * k))), Image.NEAREST)
+
+        def done(img, err):
+            if self._entry is not win or err or img is None:
+                return
+            try:
+                win.entry_photo = ImageTk.PhotoImage(img)
+                win.entry_pic.configure(image=win.entry_photo, text="")
+            except tk.TclError:
+                win.entry_photo = None
+        run_async(self.root, work, done)
+
+    def _entry_gone(self, win):
+        # 그림은 여기(주 스레드)서 놓는다 - 작업 스레드의 GC 가 닫힌 창의 PhotoImage 를 치우면 멈춘다 (2.2.1)
+        win.entry_photo = None
+        if self._entry is win:
+            self._entry = None
+
+    def _close_entry(self):
+        win, self._entry = self._entry, None
+        if win is None:
+            return
+        try:
+            win.destroy()
+        except tk.TclError:
+            pass
 
     # ---------------- 끝 ----------------
     # ---------------- 업적 ----------------
@@ -425,6 +604,7 @@ class DexWindow(object):
             pass
 
     def close(self):
+        self._close_entry()
         try:
             self.win.destroy()
         except Exception:                                   # noqa: BLE001

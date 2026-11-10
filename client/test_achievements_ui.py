@@ -128,6 +128,72 @@ def close_toplevels(root):
                 pass
 
 
+def entry_dialog(root, real_dex, DexApi, FakeApp):
+    """도감 칸을 누르면 그 포켓몬의 도감 글 창 (게시판 #496, 11/10).
+
+    잡은 종은 본가 도감 글, 본 것만이면 '잡으면 볼 수 있다', 한국어 글이 없는 종(899번부터)은 '아직 없다'.
+    본 적 없는 칸은 안 열린다. 한 번에 한 창. 창은 내용만큼이고 눌린 위젯이 없다.
+    """
+    from poketdesktop import ui_dex
+    print("\n=== 도감 칸을 누르면 도감 글 (게시판 #496) ===")
+
+    class Api(DexApi):
+        def dexbook(self):
+            return {"seen": [1, 25, 906], "caught": [25, 906], "gens": {}, "total": 1025}
+    app = FakeApp(root)
+    app.api = Api()
+    app.dex = real_dex
+    dw = ui_dex.DexWindow(app)
+    pump(root, lambda: len(dw.rows) > 900 and dw.seen)
+    root.update()
+
+    def click(n):
+        """칸 n 의 가운데를 진짜로 누른다 (굴려서 보이게 한 뒤)."""
+        i = next(k for k, sp in enumerate(dw.rows) if sp["num"] == n)
+        cw, ch = ui_dex.CELL_W + ui_dex.PAD, ui_dex.CELL_H + ui_dex.PAD
+        x = ui_dex.PAD + (i % dw.cols) * cw + ui_dex.CELL_W // 2
+        y = ui_dex.PAD + (i // dw.cols) * ch + ui_dex.CELL_H // 2
+        total = float(dw.cv.bbox("all")[3] if dw.cv.bbox("all") else 1)
+        dw.cv.yview_moveto(max(0.0, (y - 40) / total))
+        root.update()
+        dw.cv.event_generate("<Button-1>", x=x, y=int(y - dw.cv.canvasy(0)))
+        root.update()
+        return dw._entry
+
+    def body_text(win):
+        return " ".join(" ".join(texts(win)).split())
+
+    pika = real_dex.get(25)["flavor"]
+    w = click(25)
+    chk("잡은 칸(피카츄)을 누르면 도감 글 창", w is not None and w.winfo_exists())
+    if w is None:
+        dw.close()
+        return
+    t = body_text(w)
+    chk("  번호 · 이름 · 분류 · 타입 · 키 · 몸무게 · 세대", all(s in t for s in ("No.0025", "피카츄", "쥐포켓몬", "전기",
+                                                                     "키 0.4m", "몸무게 6kg", "1세대")), t[:160])
+    chk("  본가 도감 글 (소드)", " ".join(pika.split()) in t, (pika, t[-120:]))
+    lab = w.entry_text
+    chk("  글은 창 폭 안에서 접힌다", lab.winfo_x() + lab.winfo_width() <= lab.master.winfo_width() + 1
+        and lab.winfo_reqwidth() <= lab.master.winfo_width() + 1, (lab.winfo_reqwidth(), lab.master.winfo_width()))
+    chk("  창은 내용만큼 (모자라지도 남지도 않는다)", abs(w.winfo_height() - w.winfo_reqheight()) <= 2,
+        (w.winfo_height(), w.winfo_reqheight()))
+    chk("  눌린 위젯이 없다", not squeezed(w), squeezed(w)[:3])
+    w2 = click(906)
+    chk("한국어 도감 글이 없는 종(906)은 '아직 없다' - 창은 하나만", "아직 이 포켓몬의 도감 설명이 없다" in body_text(w2)
+        and not w.winfo_exists() and w2.winfo_exists(), body_text(w2)[-60:])
+    w3 = click(1)
+    chk("본 것만(이상해씨)이면 '잡으면 볼 수 있다' - 글은 안 보인다", "잡으면 도감 설명을 볼 수 있다" in body_text(w3)
+        and (real_dex.get(1)["flavor"][:8] not in body_text(w3)), body_text(w3)[-60:])
+    dw._close_entry()
+    root.update()
+    chk("본 적 없는 칸(파이리)은 안 열린다", click(4) is None)
+    w4 = click(25)
+    dw.close()
+    root.update()
+    chk("도감을 닫으면 도감 글 창도 닫힌다", not w4.winfo_exists())
+
+
 def main():
     PLAT.before_tk()
     root = tk.Tk()
@@ -256,6 +322,7 @@ def main():
             and not Q(pika, "5") and not Q(pika, "125") and not Q(pika, "꼬부기") and not Q({"kr": None, "num": 0}, "x"))
         dq.close()                                  # (아래 휠 검사가 화면의 그 자리를 본다 - 창을 남기지 않는다)
         root.update()
+        entry_dialog(root, real_dex, DexApi, FakeApp)
 
         # ---- 칭호 목록 (1.8.1): 칭호마다 얻는 조건 ----
         print("\n=== 도감 탭의 칭호 목록 ===")
