@@ -274,15 +274,34 @@ class ArcheBattleWindow(GymBattleWindow):
 
     # ---------------- 명령 칸 ----------------
     def _commands(self):
-        GymBattleWindow._commands(self)
-        right = self.hint.master
-        anchor = self.switch_btn.holder              # 교체 · 기권 위에 둔다 (줄인 창에서는 둘을 담은 줄 위)
-        while anchor.master is not right:
-            anchor = anchor.master
-        self.ball_btn = U.PushButton(right, "볼 던지기", self.open_ball_menu,
-                                     height=34 if self.zoom < 1.0 else 40)
-        self.ball_btn.pack(fill="x", pady=(Z.px(6), 0), before=anchor)
-        self.forfeit_btn.configure(text="도망치기")
+        """관장 창의 명령 칸과 같은 짜임에 '볼 던지기' 한 줄을 더한다. 볼 단추가 한 줄을 더 먹으므로 **'교체 · 도망치기' 는
+        창 크기와 상관없이 한 줄에 나란히** (Z.share_row 로 반씩) - 윈도우 글꼴에서 아래 기술 설명 칸이 눌렸고, 줄인 창에서는
+        나중에 글자를 '도망치기' 로 바꾸며 반씩 나눈 폭이 풀려 두 단추가 눌렸다 (CI 11/11). 글자는 처음부터 '도망치기'."""
+        self.cmd = tk.Frame(self.win, bg=U.BG)
+        self.cmd.pack(fill="both", expand=True, padx=12, pady=(8, 10))
+        right = tk.Frame(self.cmd, bg=U.BG, width=U.h(200))         # 오른쪽 칸을 먼저 담는다 (관장 창과 같은 까닭)
+        right.pack(side="right", fill="y", padx=(12, 0))
+        right.pack_propagate(False)
+        self.left = tk.Frame(self.cmd, bg=U.BG)
+        self.left.pack(side="left", fill="both", expand=True)
+        self.turn_lbl = tk.Label(right, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w")
+        self.turn_lbl.pack(fill="x")
+        small = self.zoom < 1.0
+        self.ball_btn = U.PushButton(right, "볼 던지기", self.open_ball_menu, height=34 if small else 40)
+        self.ball_btn.pack(fill="x", pady=(Z.px(6), 0))
+        row = tk.Frame(right, bg=U.BG)
+        row.pack(fill="x", pady=(Z.px(6), 0))
+        self.switch_btn = U.ghost_button(row, "포켓몬 교체", self.open_switch, height=34)
+        self.switch_btn.pack(side="left", fill="x", expand=True, padx=(0, 3))
+        self.forfeit_btn = U.PushButton(row, "도망치기", self.forfeit, fill=U.DANGER_BG, fg=U.DANGER,
+                                        shadow="#1a1013", hover="#3a2028", height=34,
+                                        border=U.DANGER_LINE, font=U.FONT_S)
+        self.forfeit_btn.pack(side="left", fill="x", expand=True, padx=(3, 0))
+        Z.share_row(self.switch_btn, self.forfeit_btn)
+        self.hint = tk.Label(right, text="", bg=U.BG, fg=U.FG_DIM, font=U.FONT_XS,
+                             anchor="nw", justify="left")
+        self.hint.pack(fill="both", expand=True, pady=(Z.px(10), 0))
+        U.wrap_to_width(self.hint)
 
     def _clear_commands(self):
         GymBattleWindow._clear_commands(self)
