@@ -126,6 +126,7 @@ class App(object):
         self.olympics = None       # 포스크탑 올림픽 (olympics.OlympicsController - 평일 14:00 중계)
         self.olympics_window = None
         self.airraid = None        # 공습 (airraid.AirRaidController - 하루 한 번)
+        self.arche = None          # 아르케의 여섯 봉인 (arche.ArcheController - 시즌 6 이벤트, 2.4.0)
         self.alarms = None         # 포켓몬 알림 타이머 (alarm.AlarmController)
         self._syncing = False
         self.hub = None            # 탭 창 하나
@@ -486,6 +487,9 @@ class App(object):
         if getattr(self, "airraid", None) is None:
             from .airraid import AirRaidController
             self.airraid = AirRaidController(self)
+        if getattr(self, "arche", None) is None:
+            from .arche import ArcheController
+            self.arche = ArcheController(self)
         if getattr(self, "alarms", None) is None:
             # 포켓몬 알림 타이머 (이 PC 에만). 켤 때 꺼져 있던 사이 지난 알림을 '놓친 알림' 으로 한 번
             from .alarm import AlarmController
@@ -770,6 +774,9 @@ class App(object):
                 # 공습 (2.3.0): 그날 시각을 예약한다. 옛 서버는 칸이 없다
                 if me.get("airraid") and getattr(self, "airraid", None) is not None:
                     self.airraid.note(me.get("airraid"))
+                # 아르케의 여섯 봉인 (2.4.0): 기간이면 일지 폴링을 켠다. 옛 서버는 칸이 없다
+                if "arche" in me and getattr(self, "arche", None) is not None:
+                    self.arche.note(me.get("arche"))
                 quiet = self.focus_quiet()
                 # 운영자가 보낸 선물. 서버가 /api/me 에서 이미 지급했고
                 # 여기서는 알리기만 한다.
@@ -855,6 +862,11 @@ class App(object):
         from . import ui_olympics
         return ui_olympics.open_olympics(self, pet)
 
+    def open_arche(self, pet=None):
+        """아르케의 발굴 일지 (트레이 · 오른쪽 클릭 · 허브 탭)."""
+        a = getattr(self, "arche", None)
+        return a.open_window() if a is not None else None
+
     def close_olympics(self):
         """로그아웃 · 세션 끊김: 올림픽 중계 · 예약 · 창을 치운다. 공습(2.3.0) 예약 · 장면도 같이."""
         o = getattr(self, "olympics", None)
@@ -863,6 +875,9 @@ class App(object):
         r = getattr(self, "airraid", None)
         if r is not None:
             r.clear()
+        a = getattr(self, "arche", None)          # 아르케 (2.4.0): 폴링 · 현상 · 일지 · 전설 창
+        if a is not None:
+            a.clear()
         w = getattr(self, "olympics_window", None)
         if w is not None:
             try:
@@ -2332,6 +2347,8 @@ class App(object):
         alarm_row = alarm_mod.menu_row(self, pet)          # 포켓몬 알림 타이머 '알림 맞추기...'
         from . import ui_olympics
         oly = ui_olympics.menu_row(self, pet)              # 포스크탑 올림픽 '올림픽에 출전...' (기간 밖이면 없다)
+        from . import ui_arche
+        arche_row = ui_arche.menu_row(self, pet)           # 아르케의 일지 (2.4.0, 기간 밖이면 없다)
         if not PLAT.NATIVE_MENU:
             # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
             rows = [
@@ -2354,6 +2371,8 @@ class App(object):
                 rows.append(alarm_row)
             if oly:
                 rows.append(oly)
+            if arche_row:
+                rows.append(arche_row)
             rows += [
                 None,
                 {"text": "포켓몬 관리...", "command": self.open_box},
@@ -2389,6 +2408,8 @@ class App(object):
             m.add_command(label=alarm_row["text"], command=alarm_row["command"])
         if oly:
             m.add_command(label=oly["text"], command=oly["command"])
+        if arche_row:
+            m.add_command(label=arche_row["text"], command=arche_row["command"])
         m.add_separator()
         m.add_command(label="포켓몬 관리...", command=self.open_box)
         m.add_separator()

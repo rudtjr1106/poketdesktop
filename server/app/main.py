@@ -32,7 +32,7 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
-from . import (achievements, airraid, auth, avatar, battle_routes, board, board_routes, boosts, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
+from . import (achievements, airraid, arche, arche_routes, auth, avatar, battle_routes, board, board_routes, boosts, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
                expedition, focus, item_routes, olympics, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
@@ -64,6 +64,7 @@ app.include_router(expedition.router)
 app.include_router(focus.router)                # 포켓몬과 집중하기 (집중 타이머)
 app.include_router(olympics.router)             # 포스크탑 올림픽 (평일 14:00 다 같이 경기)
 app.include_router(airraid.router)              # 공습 (2.3.0 - 하루 한 번 낙하산 무리와 각개전투)
+app.include_router(arche_routes.router)         # 아르케의 여섯 봉인 (2.4.0 - 시즌 6 이벤트)
 app.include_router(troubles.router)             # 앱이 배틀을 접은 까닭 (1.13.3)
 
 RNG = deps.RNG
@@ -1272,6 +1273,7 @@ def me(ctx=Depends(current)):
     # **선물을 먼저 지급하고 지갑을 읽는다.** 순서를 바꾸면 "5000원을
     # 받았습니다" 라고 알리면서 화면의 소지금은 받기 전 값이 된다 -
     # 다음 sync 까지 90초 동안 어긋나 있다.
+    _arche_gift(uid)                    # 아르케 장 선물을 선물함에 넣는다 (2.4.0) - 바로 아래에서 같이 받는다
     gifts = items.gift_claim(uid)
     if gifts:
         fresh = db.q1("SELECT balls, money FROM users WHERE id=?", (uid,))
@@ -1341,6 +1343,8 @@ def me(ctx=Depends(current)):
         "olympics": olympics.me_card(uid),
         # 공습 (2.3.0): 오늘 공습까지 남은 초 · 했나. 앱이 그 시각에 공습을 연다
         "airraid": _airraid_card(uid),
+        # 아르케의 여섯 봉인 (2.4.0): 이벤트 일주일 전 ~ 끝난 하루 뒤에만. 앱이 이걸 보고 60초 폴링(/api/arche)을 켠다
+        "arche": _arche_card(uid),
         "session":{"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 
@@ -1352,6 +1356,22 @@ def _airraid_card(uid):
     except Exception as e:                                  # noqa: BLE001
         print("[airraid] 카드 실패 %s: %r" % (uid, e))
         return None
+
+
+def _arche_card(uid):
+    """아르케 카드. 공습 카드와 같다 - 여기서 터지면 모든 사람의 동기화가 멈춘다, 실패하면 없는 것으로."""
+    try:
+        return arche.me_card(uid)
+    except Exception as e:                                  # noqa: BLE001
+        print("[arche] 카드 실패 %s: %r" % (uid, e))
+        return None
+
+
+def _arche_gift(uid):
+    try:
+        arche.give_gift(uid)
+    except Exception as e:                                  # noqa: BLE001
+        print("[arche] 장 선물 실패 %s: %r" % (uid, e))
 
 
 class EggDesktopIn(BaseModel):

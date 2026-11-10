@@ -74,6 +74,9 @@ class AirRaidController(object):
             return "evolve"                      # 진화 · 메가 연출 중인 도트를 빼앗지 않는다
         if getattr(app.overlay, "hidden", False):
             return "hidden"
+        a = getattr(app, "arche", None)
+        if a is not None and hasattr(a, "busy") and a.busy():
+            return "arche"                       # 아르케 현상(안농이 걷는 중) · 전설 배틀 창 (2.4.0)
         try:
             from . import stealth
             if stealth.active():

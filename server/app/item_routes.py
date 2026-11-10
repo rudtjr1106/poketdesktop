@@ -281,6 +281,13 @@ def use(body: UseIn, me=Depends(deps.current)):
         out["message"] = korean.natural(out.get("message", ""))
         return out
 
+    # 아르케 열쇠 아이템 (2.4.0) - 대상이 없고 없어지지 않는다. 쓴 때를 적고 의식을 본다 (조건 itemUsed)
+    if kind == "arche":
+        from . import arche
+        out = arche.use_item(uid, it["id"])
+        out.update(_wallet(uid))
+        return out
+
     # 풀숲 부스트 · 닉네임 변경권 (2.1.1) - 이것도 대상이 없다
     if kind in ("lure", "rename"):
         out = {"lure": _use_lure, "rename": _use_rename}[kind](uid, it, eff, body)

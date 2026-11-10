@@ -62,6 +62,7 @@ OLD_SERVERS = (
 )
 
 DEFAULTS = {
+    "archeTitle": True,          # 아르케 (2.4.0): 이벤트 동안 윈도우 맨 앞 창 제목에서 단서 표식만 찾는다 (저장 · 전송 안 함)
     "server": SERVER,
     # --- 화면 ---
     "targetHeight": 48,      # 어떤 포켓몬이든 이 높이에 맞춰 크기를 통일한다

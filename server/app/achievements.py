@@ -522,6 +522,10 @@ def titles(uid):
     for tid, group, how, is_open in olympics.title_rows():
         out.append({"id": tid, "name": season.TITLES.get(tid, tid), "group": group,
                     "how": how, "owned": tid in own, "open": is_open})
+    from . import arche                    # 아르케의 여섯 봉인 (2.4.0): 첫 발견자 · 여섯 봉인의 증인
+    for tid, group, how, is_open in arche.title_rows():
+        out.append({"id": tid, "name": season.TITLES.get(tid, tid), "group": group,
+                    "how": how, "owned": tid in own, "open": is_open})
     for tid, group, how, is_open in _season_titles():
         out.append({"id": tid, "name": season.TITLES.get(tid, tid), "group": group,
                     "how": how, "owned": tid in own, "open": is_open})

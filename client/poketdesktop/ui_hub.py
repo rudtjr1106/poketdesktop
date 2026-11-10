@@ -26,6 +26,7 @@ from .ui_box import BoxWindow
 from .ui_dex import DexWindow
 from .ui_expedition import ExpeditionWindow
 from .ui_olympics import OlympicsPane
+from .ui_arche import ArchePane
 from .ui_friends import FriendsWindow
 from .ui_guild import GuildWindow
 from .ui_gym import GymWindow
@@ -67,6 +68,7 @@ TABS = [
     ("board", "게시판", BoardWindow, False),
     # 이벤트 (11/08 사용자 '이벤트탭을 신설해서 참여할 수 있게') - 포스크탑 올림픽. 다음 이벤트도 이 묶음에.
     # 마이페이지 앞에 둔다 - 묶음 차례(커뮤니티 · 이벤트 · 마이페이지)와 같게, 마이페이지는 늘 맨 끝 (test_mypage_ui)
+    ("arche", "아르케", ArchePane, False),        # 아르케의 여섯 봉인 (시즌 6, 2.4.0) - 요약 + 일지 펼치기
     ("olympics", "올림픽", OlympicsPane, False),
     # 설정은 마이페이지 머리줄의 톱니바퀴 안으로 들어갔다 (1.9.0)
     ("my", "마이페이지", MyPageWindow, False),
@@ -80,7 +82,7 @@ GROUPS = [
     ("shop", "상점", ["shop"]),
     ("adventure", "모험", ["gym", "expedition", "rank"]),
     ("community", "커뮤니티", ["friends", "guild", "board"]),
-    ("event", "이벤트", ["olympics"]),
+    ("event", "이벤트", ["arche", "olympics"]),
     ("my", "마이페이지", ["my"]),
 ]
 GROUP_OF = dict((k, g) for g, _label, keys in GROUPS for k in keys)     # 탭 열쇠 -> 묶음 열쇠

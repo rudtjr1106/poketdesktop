@@ -1091,6 +1091,96 @@
    "sell": 500,
    "weight": 100
   },
+  "ARCHECROWN": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "custom": true,
+   "desc": "부서진 왕관의 한 조각.",
+   "effect": {
+    "kind": "arche"
+   },
+   "en": "Arche Crown",
+   "id": "ARCHECROWN",
+   "ident": "arche-crown",
+   "kr": "아르케 왕관 조각",
+   "sell": 0
+  },
+  "ARCHELAMP": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "custom": true,
+   "desc": "꺼지지 않는 작은 등불.",
+   "effect": {
+    "kind": "arche"
+   },
+   "en": "Arche Lamp",
+   "id": "ARCHELAMP",
+   "ident": "arche-lamp",
+   "kr": "아르케 등불",
+   "sell": 0
+  },
+  "ARCHESAND": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "custom": true,
+   "desc": "아주 오래된 모래시계. 안의 모래가 반짝인다.",
+   "effect": {
+    "kind": "arche"
+   },
+   "en": "Arche Hourglass",
+   "id": "ARCHESAND",
+   "ident": "arche-sand",
+   "kr": "아르케 모래시계",
+   "sell": 0
+  },
+  "ARCHESHELL": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "custom": true,
+   "desc": "조개껍데기 모양의 작은 비석. 바다 냄새가 난다.",
+   "effect": {
+    "kind": "arche"
+   },
+   "en": "Arche Shell",
+   "id": "ARCHESHELL",
+   "ident": "arche-shell",
+   "kr": "아르케 조개 비석",
+   "sell": 0
+  },
+  "ARCHESTAR": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "custom": true,
+   "desc": "희미하게 빛나는 별 모양의 조각.",
+   "effect": {
+    "kind": "arche"
+   },
+   "en": "Arche Star",
+   "id": "ARCHESTAR",
+   "ident": "arche-star",
+   "kr": "아르케 별 조각",
+   "sell": 0
+  },
+  "ARCHESTONE": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "custom": true,
+   "desc": "고고학자가 보내온 깨진 돌판. 낯선 글자가 새겨져 있다.",
+   "effect": {
+    "kind": "arche"
+   },
+   "en": "Arche Tablet",
+   "id": "ARCHESTONE",
+   "ident": "arche-stone",
+   "kr": "아르케 돌판",
+   "sell": 0
+  },
   "ASPEARBERRY": {
    "cat": "held",
    "chance": 0.010217,
