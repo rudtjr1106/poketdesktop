@@ -19,6 +19,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
 from common.ability_kr import DESC as HAND                  # noqa: E402
+from common.ability_kr import OVERRIDE                      # noqa: E402
 from common.move_kr import DESC as MOVE_HAND                # noqa: E402
 
 DEX = os.environ.get("POKET_POKEDEX",
@@ -84,6 +85,10 @@ def main():
     chk("문장이 마침표로 끝난다",
         all(v.rstrip().endswith(".") for v in HAND.values()),
         [k for k, v in HAND.items() if not v.rstrip().endswith(".")][:5])
+    # 이 게임에서 효과가 본가 설명과 다른 특성 - 도감을 다시 만들어도 이 설명이어야 한다 (#504 발광, 11/10)
+    off = [k for k, v in OVERRIDE.items() if (ab.get(k) or {}).get("desc") != v]
+    chk("효과가 본가와 다른 특성 %d개는 도감 설명이 이 게임의 것 (발광: 야생과 만나기 쉬워진다 X)" % len(OVERRIDE),
+        not off and "만나기" not in (ab.get("ILLUMINATE") or {}).get("desc", ""), off)
 
     print("\n=== 기술 ===")
     mnoname = [k for k, v in mv.items() if not hangul(v.get("kr"))]

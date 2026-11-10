@@ -23,6 +23,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 from common.ability_kr import DESC as ABILITY_KR  # noqa: E402
+from common.ability_kr import OVERRIDE as ABILITY_OVERRIDE  # noqa: E402
 from common.move_kr import DESC as MOVE_KR  # noqa: E402
 
 CSV_BASE = "https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv"
@@ -340,6 +341,8 @@ def build():
             got = ABILITY_KR.get(key) or got
         elif not got:
             got = ABILITY_KR.get(key)
+        # 이 게임에서 효과가 본가 설명과 다른 특성 (발광 - common/ability_kr.OVERRIDE)
+        got = ABILITY_OVERRIDE.get(key) or got
         if got:
             d["desc"] = got
         abil_out[ident] = d
