@@ -120,6 +120,10 @@ MET_PENALTY = 30
 # 랜덤 배틀 상대를 고를 때는 최근에 붙은 사람을 이만큼 건너뛴다.
 # 직접 지목하는 쪽(PAIR_COOLDOWN_MIN)보다 길게 본다 - 후보가 서른 명
 # 넘게 있는데도 이레 동안 같은 사람과 열아홉 번 붙은 짝이 있었다.
+#
+# **한국 시각 자정에 새로 센다** (11/10 사용자 결정). 하루 20판이 자정에 풀리는데 3시간은 그대로 이어져서,
+# 밤에 그날 몫 20판으로 RP 가 가까운 사람을 다 만난 사람이 자정에 바로 20판을 더 치면 그들이 모두 빠져
+# '전체' 띠에서 RP 1,300점 넘게 낮은 상대만 스무 번 만났다 (11/09 0시, 3분에 +464).
 RANDOM_REPEAT_MIN = 180
 # 이 안에 만난 적이 없는 사람을 먼저 고른다.
 FRESH_WINDOW_MIN = 60 * 24
@@ -151,6 +155,12 @@ KST = datetime.timezone(datetime.timedelta(hours=9))
 
 def _today():
     return _now().astimezone(KST).strftime("%Y-%m-%d")
+
+
+def _day_start():
+    """오늘(한국 날짜)이 시작된 때 = 한국 시각 자정. ended_at 과 문자열로 견주므로 UTC 로 돌려준다."""
+    k = _now().astimezone(KST)
+    return k.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(datetime.timezone.utc)
 
 
 # ---------------------------------------------------------------- 로그
@@ -798,14 +808,19 @@ def _all_teams():
     return dict((uid, restrict(mons)[0]) for uid, mons in teams.items())
 
 
-def _last_met(uid, minutes, practice=True):
+def _last_met(uid, minutes, practice=True, today_only=False):
     """그 시간 안에 붙은 상대 -> 마지막으로 붙은 시각.
 
     practice=False 면 연습판(하루 20판 뒤) 줄은 안 본다. 상대 고르기의 '오래 안 만난 사람부터'
     (3시간 건너뛰기 · 하루 감점)는 점수판끼리의 일이다 - 밤에 연습판으로 여러 명을 만났다고
     다음 날 아침 점수판에서 RP 가 가까운 사람들을 건너뛰면 안 된다.
+
+    today_only 면 오늘(한국 날짜) 판만 본다 - 3시간 건너뛰기가 자정에 새로 시작한다 (RANDOM_REPEAT_MIN).
     """
-    cut = _iso(_now() - datetime.timedelta(minutes=minutes))
+    since = _now() - datetime.timedelta(minutes=minutes)
+    if today_only:
+        since = max(since, _day_start())
+    cut = _iso(since)
     rows = db.q("SELECT foe_id, MAX(ended_at) last FROM battle_record"
                 " WHERE user_id=? AND ended_at > ? AND foe_id IS NOT NULL"
                 + ("" if practice else " AND practice=0") +
@@ -813,12 +828,13 @@ def _last_met(uid, minutes, practice=True):
     return dict((r["foe_id"], r["last"]) for r in rows)
 
 
-def _recent_foes(uid, minutes=PAIR_COOLDOWN_MIN, practice=True):
+def _recent_foes(uid, minutes=PAIR_COOLDOWN_MIN, practice=True, today_only=False):
     """최근에 붙은 사람들. 연달아 같은 사람을 때리지 않게.
 
     같은 상대 30분 쿨타임(기본값)은 **연습판도 센다** - 점수가 없어도 한 사람을 몰아 치지 못하게.
+    자정에도 안 풀린다 (몰아 치기를 막는 것이라 23시 59분과 0시에 같은 사람을 치면 안 된다).
     """
-    return set(_last_met(uid, minutes, practice))
+    return set(_last_met(uid, minutes, practice, today_only))
 
 
 def _blocked_ids(uid):
@@ -854,9 +870,9 @@ def find_opponent(uid, rng=None):
     mine = teams.get(uid)
     if not mine or not rank_ready(mine)[0]:
         return None
-    # 3시간 건너뛰기는 점수판만 본다 (_last_met). 그래도 30분 안에 만난 사람은 연습판이라도 뺀다 -
-    # 안 빼면 골라 놓고 can_fight 의 같은 상대 쿨타임에 걸려 '30분에 한 번' 으로 끝난다.
-    skip = (_recent_foes(uid, RANDOM_REPEAT_MIN, practice=False) | _recent_foes(uid)
+    # 3시간 건너뛰기는 점수판만, 그리고 오늘(자정부터) 판만 본다 (_last_met). 그래도 30분 안에 만난 사람은
+    # 연습판이라도 뺀다 - 안 빼면 골라 놓고 can_fight 의 같은 상대 쿨타임에 걸려 '30분에 한 번' 으로 끝난다.
+    skip = (_recent_foes(uid, RANDOM_REPEAT_MIN, practice=False, today_only=True) | _recent_foes(uid)
             | _blocked_ids(uid))
     skip.add(uid)
 

@@ -14,7 +14,9 @@
   4. 그대로인 것: 받는 쪽 마릿수, 방금 붙은 사람·차단한 사람 제외.
   5. **RP 띠가 배치보다 먼저다** (10/17). 같은 띠 안에서만 배치를 마친 사람끼리 먼저 붙인다 -
      배치가 같은 사람을 찾느라 RP 가 먼 상대를 고르지 않는다.
+  6. **3시간 건너뛰기는 한국 시각 자정에 새로 센다** (11/10). 같은 상대 30분 쿨타임은 자정에도 그대로다.
 """
+import datetime
 import os
 import random
 import sys
@@ -81,6 +83,9 @@ def main():
     # 이 검사는 전력을 '같은 종 여섯 마리' 로 맞춘다. 같은 종은 한 팀에 한 마리(10/22)라 그대로 두면 한 마리만
     # 나가서 랭크전 조건에 못 든다 - 여기서만 그 상한을 푼다 (같은 종 규칙은 test_legend_limit 가 본다).
     pvp.SAME_SPECIES_MAX = 6
+    # 3시간 건너뛰기가 자정에 새로 세므로, 검사를 0~3시에 돌리면 '1시간 전' 이 어제가 된다 - 오후 3시로 묶는다
+    real_now = pvp._now
+    pvp._now = lambda: datetime.datetime(2026, 11, 10, 15, 0, tzinfo=pvp.KST).astimezone(datetime.timezone.utc)
 
     print("=== 띠 ===")
     chk("RP 띠는 ±50, ±100, ±200, 전체 순", pvp.RP_BANDS == (50, 100, 200, None), pvp.RP_BANDS)
@@ -128,7 +133,7 @@ def main():
     chk("  RP 가 거의 같은 둘(10점 안)은 번갈아 나온다 (같은 얼굴만 나오지 않게)", got == {r4, r10}, got)
 
     def met_hours_ago(foe, hours):
-        at = pvp._iso(pvp._now() - __import__("datetime").timedelta(hours=hours))
+        at = pvp._iso(pvp._now() - datetime.timedelta(hours=hours))
         db.run("INSERT INTO battle_record (user_id, foe_id, foe_name, kind, result, ended_at, started)"
                " VALUES (?,?,?,?,?,?,1)", (me, foe, "x", "random", "win", at))
     met_hours_ago(r4, 5)
@@ -141,6 +146,43 @@ def main():
     met_hours_ago(r4, 1)                                  # 3시간 안에 붙은 사람은 아예 안 고른다 (그대로)
     got = set(picks(me, 40))
     chk("  3시간 안에 붙은 사람은 RP 가 가까워도 안 고른다", got == {r10}, got)
+    db.run("DELETE FROM battle_record")
+
+    print("\n=== 3시간 건너뛰기는 한국 시각 자정에 새로 센다 (11/10) ===")
+    # 11/09 0시: 밤에 그날 몫 20판으로 RP 가 가까운 사람을 다 만난 사람이 자정에 20판을 더 치자, 그들이 모두
+    # 3시간 건너뛰기에 걸려 RP 가 1,300점 넘게 낮은 사람만 스무 번 만났다.
+    wipe()
+    me = mkuser("mm_me", rp=1700)
+    near = mkuser("mm_near", rp=1720)
+    far = mkuser("mm_far", rp=300)
+
+    def kst(day, h, m):
+        return datetime.datetime(2026, 11, day, h, m, tzinfo=pvp.KST).astimezone(datetime.timezone.utc)
+
+    def met_at(foe, t, practice=0):
+        db.run("INSERT INTO battle_record (user_id, foe_id, foe_name, kind, result, ended_at, started, practice)"
+               " VALUES (?,?,?,?,?,?,1,?)", (me, foe, "x", "random", "win", pvp._iso(t), practice))
+
+    met_at(near, kst(8, 23, 10))
+    pvp._now = lambda: kst(8, 23, 50)
+    got = set(picks(me, 8))
+    chk("자정 전(23:50)에는 40분 전(23:10)에 만난 사람을 뺀다", got == {far}, got)
+    pvp._now = lambda: kst(9, 0, 1)
+    got = set(picks(me, 8))
+    chk("**자정이 지나면(0:01) 어제 밤에 만난 RP 가까운 사람을 다시 고른다**", got == {near}, got)
+    met_at(near, kst(9, 0, 1))
+    pvp._now = lambda: kst(9, 0, 40)
+    got = set(picks(me, 8))
+    chk("  오늘 만난 사람은 그대로 3시간 동안 안 고른다 (0:01 에 만났으면 0:40 에도)", got == {far}, got)
+    db.run("DELETE FROM battle_record")
+    met_at(near, kst(8, 23, 55))
+    pvp._now = lambda: kst(9, 0, 5)
+    got = set(picks(me, 8))
+    chk("같은 상대 30분 쿨타임은 자정에도 그대로 (23:55 에 만난 사람은 0:05 에 안 고른다)", got == {far}, got)
+    pvp._now = lambda: kst(9, 0, 30)
+    got = set(picks(me, 8))
+    chk("  30분이 지나면(0:30) 다시 고른다", got == {near}, got)
+    pvp._now = lambda: datetime.datetime(2026, 11, 10, 15, 0, tzinfo=pvp.KST).astimezone(datetime.timezone.utc)
     db.run("DELETE FROM battle_record")
 
     print("\n=== RP 가 같으면 전력이 가까운 사람 ===")
@@ -194,6 +236,7 @@ def main():
     wipe()
     me = mkuser("mm_me", rp=200)
     chk("아무도 없으면 None", pvp.find_opponent(me) is None)
+    pvp._now = real_now
 
     print("\n" + "=" * 54)
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))
