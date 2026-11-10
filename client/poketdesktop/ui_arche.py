@@ -802,15 +802,24 @@ class ArchePane(object):
         self.on_shown()
 
 
-def menu_row(app, pet):
+def _ctl(app):
+    """앱의 아르케 컨트롤러 - 없거나 진짜가 아니면 None (App 메서드를 빌려 쓰는 검사의 가짜 앱은 아무 이름에나 함수를 준다 -
+    CI test_deco 11/11, 올림픽 메뉴 줄과 같은 까닭)."""
     ctl = getattr(app, "arche", None)
+    if ctl is None or not callable(getattr(ctl, "on", None)) or not callable(getattr(ctl, "open_window", None)):
+        return None
+    return ctl
+
+
+def menu_row(app, pet):
+    ctl = _ctl(app)
     if ctl is None or not ctl.on() or (getattr(pet, "id", 0) or 0) <= 0:
         return None
     return {"text": "아르케의 일지...", "command": lambda: ctl.open_window()}
 
 
 def open_journal(app):
-    ctl = getattr(app, "arche", None)
+    ctl = _ctl(app)
     if ctl is None:
         return None
     return ctl.open_window()
