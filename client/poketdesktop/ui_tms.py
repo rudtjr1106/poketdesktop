@@ -566,6 +566,10 @@ class TmWindow(object):
                 adds.append((n, prev))
             prev = n
         self._show_empty(not want)
+        # 스크롤 영역을 줄어든 목록에 맞춘다 (영역이 줄면 Tk 가 보던 자리를 그 안으로 당겨 온다). 아래로 굴린 채
+        # 거르면 목록 틀이 통째로 보는 자리 위로 올라가 화면에서 내려지고 크기도 안 바뀌어서 <Configure> 가 안 온다 -
+        # 그래서 기다리지 않고 부른다. 안 그러면 빈 칸만 보이고 그 뒤로 거르기를 바꿔도 계속 빈 화면이었다 (11/09 게시판 #500).
+        self.list_canvas.scroll_fit.schedule()
         if adds:
             self._show_job = U.Chunked(
                 self.win, adds, lambda a: self._pack_row(a[0], a[1], first_kept))

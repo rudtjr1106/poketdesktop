@@ -192,6 +192,18 @@ def packed_rows(win):
             if str(s) in by_frame]
 
 
+def on_screen(win):
+    """목록 칸에 실제로 걸쳐 보이는 기술머신 번호 (굴린 자리 기준)."""
+    lc = win.list_canvas
+    top, h = lc.canvasy(0), lc.winfo_height()
+    out = []
+    for n in packed_rows(win):
+        f = win.rows[n][0]
+        if f.winfo_y() + f.winfo_height() > top and f.winfo_y() < top + h:
+            out.append(n)
+    return out
+
+
 def main():
     PLAT.before_tk()
     root = tk.Tk()
@@ -315,6 +327,28 @@ def run(root, app, api, tms, have, learners, sprite_gate):
     win._set_cat(None)
     settle_list(root, win)
     chk("되돌리면 가진 것만", packed_rows(win) == have, len(packed_rows(win)))
+
+    # 아래로 굴린 채 거르면, 목록은 짧아졌는데 보던 자리가 그대로 남아 빈 칸만 보였다. 그 뒤로 거르기를 바꿔도
+    # 계속 빈 화면 (11/09 게시판 #500). 테마(K.VList)는 원래 괜찮았고 기본 창(ScrollFit)만 그랬다.
+    win._toggle_filter()                     # 전부
+    settle_list(root, win)
+    win.list_canvas.yview_moveto(0.6)
+    settle(root)
+    chk("(전부를 아래로 굴렸다 - 보이는 줄 %d)" % len(on_screen(win)), on_screen(win), on_screen(win))
+    for label, fn in (("타입으로 거르면", lambda: win._set_type(ty)),
+                      ("분류까지 걸면", lambda: win._set_cat("status")),
+                      ("타입을 풀면", lambda: win._set_type(None)),
+                      ("분류도 풀면", lambda: win._set_cat(None))):
+        fn()
+        settle_list(root, win)
+        settle(root)
+        seen = on_screen(win)
+        chk("  굴린 채 %s 줄이 보인다 (%d줄 중 %d줄)" % (label, len(packed_rows(win)), len(seen)),
+            seen and len(seen) >= min(len(packed_rows(win)), 5), (len(seen), len(packed_rows(win))))
+    win._toggle_filter()                     # 가진 것만으로 되돌린다
+    settle_list(root, win)
+    win.list_canvas.yview_moveto(0)
+    settle(root)
 
     print("\n=== 나눠 만드는 중에")
     win._list_key = None
