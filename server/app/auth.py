@@ -41,6 +41,10 @@ def hash_password(password, salt=None, iterations=None):
 
 
 def verify_password(password, pw_hash, salt, iterations):
+    if not pw_hash or not salt:
+        # 비밀번호가 없는 계정 (아르케 게시판 계정 - 운영 DB 에서는 빈 값이 NULL 로 남는다). 어떤 비밀번호도 안 맞는다 -
+        # 전에는 pbkdf2 가 salt=None 에 터져 로그인이 500 이 났다 (11/11 운영 확인).
+        return False
     h = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
     return hmac.compare_digest(h, pw_hash)
 

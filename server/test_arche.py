@@ -432,6 +432,8 @@ def t_게시글():
         and posts[0]["author"] == "시험고고학자" and posts[0]["title"] == "시험 일지 1", posts[0]["title"] if posts else None)
     chk("NPC 는 로그인할 수 없다 (빈 해시)", not auth.verify_password("", npc["pw_hash"], npc["pw_salt"], npc["pw_iter"])
         and not auth.verify_password("0000", npc["pw_hash"], npc["pw_salt"], npc["pw_iter"]))
+    chk("비밀번호 칸이 NULL 이어도 (운영 DB) 틀린 비밀번호로 끝난다 - 터지지 않는다",
+        not auth.verify_password("0000", None, None, 1) and not auth.verify_password("", b"", b"", 1))
     chk("NPC 는 운영자가 아니다 (지우기 · 공지 못 함)", not __import__("app.board", fromlist=["x"]).is_admin(dict(npc)))
     chk("본문은 일지 첫 글", "첫 일지 글" in posts[0]["body"], posts[0]["body"])
     img = db.q("SELECT * FROM board_image WHERE post_id=?", (posts[0]["id"],))
