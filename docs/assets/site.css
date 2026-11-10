@@ -23,6 +23,8 @@
   --plate-bg: #11141c; --plate-line: #2a3040; --plate-fg: #ffc043;
   --t-monster: #e5484d; --t-super: #3b82f6; --t-hyper: #f5b301; --t-master: #8b5cf6;
   --t-elite: #12a594; --t-champ: #ffc043;
+  /* 타입 상성표의 2배 · 0.5배 · 0배 칸 (글자 대비 4.5 이상) */
+  --e2-bg: #1e5a37; --e2-fg: #a6f5bd; --eh-bg: #5a2530; --eh-fg: #ffc2c2; --e0-bg: #05070b; --e0-fg: #f2f4fb;
   --display: "Bagel Fat One", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -39,6 +41,7 @@
     --line: #dde1ee; --line2: #c2c8dd;
     --fg: #171b29; --dim: #4a5470; --faint: #68718e;
     --gold-text: #875500; --grass: #1c8a44; --warn: #c03030; --warn-bg: #fdecec;
+    --e2-bg: #c6ecd2; --e2-fg: #0b5227; --eh-bg: #fbd6d6; --eh-fg: #8a1a1a; --e0-bg: #262b38; --e0-fg: #ffffff;
   }
 }
 :root[data-theme="light"] {
@@ -47,6 +50,7 @@
   --line: #dde1ee; --line2: #c2c8dd;
   --fg: #171b29; --dim: #4a5470; --faint: #68718e;
   --gold-text: #875500; --grass: #1c8a44; --warn: #c03030; --warn-bg: #fdecec;
+  --e2-bg: #c6ecd2; --e2-fg: #0b5227; --eh-bg: #fbd6d6; --eh-fg: #8a1a1a; --e0-bg: #262b38; --e0-fg: #ffffff;
 }
 
 * { box-sizing: border-box; }
@@ -252,6 +256,30 @@ td:first-child { font-weight: 600; white-space: nowrap; }
 .chip.hyper { background: var(--t-hyper); color: #1d1600; } .chip.master { background: var(--t-master); }
 .chip.elite { background: var(--t-elite); } .chip.champ { background: var(--t-champ); color: #2a1f08; }
 
+/* 타입 상성표 (tools/make_site_types.py 가 만든다). 19칸이라 좁은 화면에서는 표 상자(.tbl) 안에서만 옆으로 굴러가고,
+   왼쪽의 기술 타입 열은 붙어 있다 - 그래서 칸 사이 선이 칸과 같이 움직이게 separate 로 긋는다.
+   2배 · 0.5배 · 0배는 색과 글자(2 · 0.5 · 0) 둘 다로 가른다. 빈칸이 1배. 머리의 색 띠는 게임의 타입 색이다 (style="--tc:…") */
+.types-chart { border-collapse: separate; border-spacing: 0; }
+.types-chart th, .types-chart td { padding: 0; text-align: center; vertical-align: middle; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+.types-chart tr > :last-child { border-right: 0; }
+.types-chart tbody tr:last-child > * { border-bottom: 0; }
+.types-chart thead th { min-width: 2.9rem; padding: 0.45rem 0.35rem 0.55rem; font-size: 0.85rem; letter-spacing: 0; color: var(--fg); box-shadow: inset 0 -3px 0 var(--tc, transparent); }
+.types-chart th[scope="row"], .types-chart th.corner { position: sticky; left: 0; background: var(--ink); text-align: left; }
+.types-chart th[scope="row"] { padding: 0.3rem 0.8rem 0.3rem 0.95rem; font-size: 0.9rem; font-weight: 700; letter-spacing: 0; color: var(--fg); white-space: nowrap; box-shadow: inset 4px 0 0 var(--tc, transparent); }
+.types-chart th.corner { padding: 0.35rem 0.65rem; color: var(--faint); line-height: 1.45; box-shadow: none; }
+.types-chart th.corner span { display: block; }
+.types-chart th.corner span:first-child { text-align: right; }
+.types-chart td { height: 2.3rem; font-family: var(--mono); font-weight: 600; }
+.types-chart tbody tr:hover > th { color: var(--gold-text); }
+.types-chart td.e2, .eff.e2 { background: var(--e2-bg); color: var(--e2-fg); }
+.types-chart td.eh, .eff.eh { background: var(--eh-bg); color: var(--eh-fg); }
+.types-chart td.e0, .eff.e0 { background: var(--e0-bg); color: var(--e0-fg); }
+.eff-key { display: flex; flex-wrap: wrap; gap: 0.45rem 1.4rem; color: var(--dim); }
+.eff-key span { display: inline-flex; align-items: center; gap: 0.5rem; }
+.eff { display: inline-grid; place-items: center; flex: none; width: 2.1rem; height: 1.75rem; border: 1px solid var(--line2); border-radius: var(--r-s);
+  font-family: var(--mono); font-weight: 600; line-height: 1; color: var(--fg); background: var(--panel); }
+.types-hint { display: none; color: var(--faint); font-size: 0.92rem; }
+
 .note { padding: 0.8rem 1rem; border-radius: var(--r); border: 1px solid var(--line2); background: var(--panel); font-size: 0.95rem; }
 .note b:first-child { color: var(--gold-text); }
 
@@ -357,6 +385,7 @@ details .a strong { color: var(--fg); }
   .find { flex: none; padding-bottom: 0; }
   .guide section { scroll-margin-top: 11rem; }
   th, td { padding: 0.5rem 0.65rem; }
+  .types-hint { display: block; }
   .deco-looks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .deco-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .deco-sets { grid-template-columns: repeat(2, minmax(0, 1fr)); }

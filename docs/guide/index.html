@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../assets/site.css?v=5">
+<link rel="stylesheet" href="../assets/site.css?v=6">
 <script src="https://unpkg.com/@phosphor-icons/web@2.1.1" defer></script>
 </head>
 <body>
@@ -33,6 +33,7 @@
       <a href="#expedition">탐험</a>
       <a href="#gym">관장</a>
       <a href="#battle">배틀</a>
+      <a href="#types">타입 상성</a>
       <a href="#rank">랭크</a>
       <a href="#mega">메가진화</a>
       <a href="#guild">길드</a>
@@ -613,7 +614,7 @@
       <h3>자동 배틀에서 기술은 이렇게 고릅니다</h3>
       <p>친구 배틀과 바탕화면의 야생 배틀에서는 포켓몬이 스스로 기술을 고릅니다. 양쪽 모두 같은 방식입니다. <strong>랜덤(랭크) 배틀은 시즌 5 부터 다릅니다</strong> - 아래 상자를 보세요.</p>
       <ol>
-        <li>지금 상대에게 실제로 들어갈 데미지를 기술마다 계산합니다. 타입 상성, 자속, 능력치, 명중률이 다 들어갑니다.</li>
+        <li>지금 상대에게 실제로 들어갈 데미지를 기술마다 계산합니다. <a href="#types">타입 상성</a>, 자속, 능력치, 명중률이 다 들어갑니다.</li>
         <li>가장 아픈 기술을 씁니다. 한 번에 쓰러뜨릴 수 있는 기술이 있으면 그것이 먼저입니다.</li>
         <li>손해가 따르는 기술은 점수를 낮춰 봅니다. 다음 턴을 쉬는 기술(파괴광선, 시간의포효)은 0.6배, 나중에 터지는 기술(미래예지)은 0.5배이고, 반동기는 내 체력이 깎이는 만큼 낮아집니다.</li>
         <li>상대 특성에 막히는 기술(부유에게 땅 기술)은 거의 쓰지 않습니다.</li>
@@ -663,6 +664,70 @@
     <div class="blk">
       <h3>배틀 창의 크기</h3>
       <p>관장·레이드·실시간 배틀 창은 다른 창처럼 가장자리를 끌어서 키우고 줄일 수 있습니다. 창을 키우면 장면과 포켓몬, 글자가 함께 커집니다. 바꾼 크기는 기억해서 다음 배틀도 그 크기로 뜹니다. 설정의 '배틀 창 크기' 에서 기본 크기로 되돌립니다.</p>
+    </div>
+    <div class="grass" aria-hidden="true"></div>
+  </section>
+
+  <!-- ============================================================ 타입 상성 -->
+  <section id="types">
+    <div class="sec-head">
+      <h2>어떤 기술이 누구에게 잘 듣나</h2>
+      <p class="lead">기술의 타입과 맞는 포켓몬의 타입 사이의 상성으로 데미지 배율이 정해집니다. 아래 표는 게임이 배틀에서 실제로 쓰는 값입니다.</p>
+    </div>
+
+    <!-- make_site_types: 시작. tools/make_site_types.py 가 server/data/pokedex.json 의 types 로 만든다 - 끝 표시까지 손으로 고치지 말 것 -->
+    <div class="blk">
+      <h3>표 읽는 법</h3>
+      <p>상성표에서 왼쪽 줄은 <b>기술의 타입</b>, 위 칸은 <b>맞는 포켓몬의 타입</b>입니다. <b>불꽃</b> 줄을 따라가다 <b>풀</b> 칸에서 만나는 2 는 불꽃 기술이 풀 포켓몬에게 2배로 들어간다는 뜻입니다. 빈칸은 1배입니다.</p>
+      <p class="eff-key">
+        <span><b class="eff e2">2</b>2배 · 효과가 굉장했다</span>
+        <span><b class="eff eh">0.5</b>0.5배 · 효과가 별로인 듯하다</span>
+        <span><b class="eff e0">0</b>0배 · 효과가 없는 것 같다</span>
+        <span><b class="eff"></b>빈칸 · 1배</span>
+      </p>
+    </div>
+
+    <div class="blk wide">
+      <h3>18타입 상성표</h3>
+      <p class="types-hint">좁은 화면에서는 표를 옆으로 밀어서 봅니다. 왼쪽의 기술 타입 줄은 그대로 붙어 있습니다.</p>
+      <div class="tbl"><table class="types-chart" aria-label="타입 상성표. 줄은 기술의 타입, 칸은 맞는 포켓몬의 타입">
+        <thead><tr><th class="corner" scope="col"><span>맞는 쪽 →</span><span>기술 ↓</span></th><th scope="col" style="--tc:#9099a1">노말</th><th scope="col" style="--tc:#ff9d55">불꽃</th><th scope="col" style="--tc:#5090d6">물</th><th scope="col" style="--tc:#f4d23c">전기</th><th scope="col" style="--tc:#63bc5a">풀</th><th scope="col" style="--tc:#73cec0">얼음</th><th scope="col" style="--tc:#ce4069">격투</th><th scope="col" style="--tc:#aa6bc8">독</th><th scope="col" style="--tc:#d97845">땅</th><th scope="col" style="--tc:#8fa9de">비행</th><th scope="col" style="--tc:#fa7179">에스퍼</th><th scope="col" style="--tc:#90c12c">벌레</th><th scope="col" style="--tc:#c5b78c">바위</th><th scope="col" style="--tc:#5269ac">고스트</th><th scope="col" style="--tc:#0b6dc3">드래곤</th><th scope="col" style="--tc:#5a5465">악</th><th scope="col" style="--tc:#5a8ea1">강철</th><th scope="col" style="--tc:#ec8fe6">페어리</th></tr></thead>
+        <tbody>
+          <tr><th scope="row" style="--tc:#9099a1">노말</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="eh" title="노말 기술 → 바위: 0.5배">0.5</td><td class="e0" title="노말 기술 → 고스트: 0배">0</td><td></td><td></td><td class="eh" title="노말 기술 → 강철: 0.5배">0.5</td><td></td></tr>
+          <tr><th scope="row" style="--tc:#ff9d55">불꽃</th><td></td><td class="eh" title="불꽃 기술 → 불꽃: 0.5배">0.5</td><td class="eh" title="불꽃 기술 → 물: 0.5배">0.5</td><td></td><td class="e2" title="불꽃 기술 → 풀: 2배">2</td><td class="e2" title="불꽃 기술 → 얼음: 2배">2</td><td></td><td></td><td></td><td></td><td></td><td class="e2" title="불꽃 기술 → 벌레: 2배">2</td><td class="eh" title="불꽃 기술 → 바위: 0.5배">0.5</td><td></td><td class="eh" title="불꽃 기술 → 드래곤: 0.5배">0.5</td><td></td><td class="e2" title="불꽃 기술 → 강철: 2배">2</td><td></td></tr>
+          <tr><th scope="row" style="--tc:#5090d6">물</th><td></td><td class="e2" title="물 기술 → 불꽃: 2배">2</td><td class="eh" title="물 기술 → 물: 0.5배">0.5</td><td></td><td class="eh" title="물 기술 → 풀: 0.5배">0.5</td><td></td><td></td><td></td><td class="e2" title="물 기술 → 땅: 2배">2</td><td></td><td></td><td></td><td class="e2" title="물 기술 → 바위: 2배">2</td><td></td><td class="eh" title="물 기술 → 드래곤: 0.5배">0.5</td><td></td><td></td><td></td></tr>
+          <tr><th scope="row" style="--tc:#f4d23c">전기</th><td></td><td></td><td class="e2" title="전기 기술 → 물: 2배">2</td><td class="eh" title="전기 기술 → 전기: 0.5배">0.5</td><td class="eh" title="전기 기술 → 풀: 0.5배">0.5</td><td></td><td></td><td></td><td class="e0" title="전기 기술 → 땅: 0배">0</td><td class="e2" title="전기 기술 → 비행: 2배">2</td><td></td><td></td><td></td><td></td><td class="eh" title="전기 기술 → 드래곤: 0.5배">0.5</td><td></td><td></td><td></td></tr>
+          <tr><th scope="row" style="--tc:#63bc5a">풀</th><td></td><td class="eh" title="풀 기술 → 불꽃: 0.5배">0.5</td><td class="e2" title="풀 기술 → 물: 2배">2</td><td></td><td class="eh" title="풀 기술 → 풀: 0.5배">0.5</td><td></td><td></td><td class="eh" title="풀 기술 → 독: 0.5배">0.5</td><td class="e2" title="풀 기술 → 땅: 2배">2</td><td class="eh" title="풀 기술 → 비행: 0.5배">0.5</td><td></td><td class="eh" title="풀 기술 → 벌레: 0.5배">0.5</td><td class="e2" title="풀 기술 → 바위: 2배">2</td><td></td><td class="eh" title="풀 기술 → 드래곤: 0.5배">0.5</td><td></td><td class="eh" title="풀 기술 → 강철: 0.5배">0.5</td><td></td></tr>
+          <tr><th scope="row" style="--tc:#73cec0">얼음</th><td></td><td class="eh" title="얼음 기술 → 불꽃: 0.5배">0.5</td><td class="eh" title="얼음 기술 → 물: 0.5배">0.5</td><td></td><td class="e2" title="얼음 기술 → 풀: 2배">2</td><td class="eh" title="얼음 기술 → 얼음: 0.5배">0.5</td><td></td><td></td><td class="e2" title="얼음 기술 → 땅: 2배">2</td><td class="e2" title="얼음 기술 → 비행: 2배">2</td><td></td><td></td><td></td><td></td><td class="e2" title="얼음 기술 → 드래곤: 2배">2</td><td></td><td class="eh" title="얼음 기술 → 강철: 0.5배">0.5</td><td></td></tr>
+          <tr><th scope="row" style="--tc:#ce4069">격투</th><td class="e2" title="격투 기술 → 노말: 2배">2</td><td></td><td></td><td></td><td></td><td class="e2" title="격투 기술 → 얼음: 2배">2</td><td></td><td class="eh" title="격투 기술 → 독: 0.5배">0.5</td><td></td><td class="eh" title="격투 기술 → 비행: 0.5배">0.5</td><td class="eh" title="격투 기술 → 에스퍼: 0.5배">0.5</td><td class="eh" title="격투 기술 → 벌레: 0.5배">0.5</td><td class="e2" title="격투 기술 → 바위: 2배">2</td><td class="e0" title="격투 기술 → 고스트: 0배">0</td><td></td><td class="e2" title="격투 기술 → 악: 2배">2</td><td class="e2" title="격투 기술 → 강철: 2배">2</td><td class="eh" title="격투 기술 → 페어리: 0.5배">0.5</td></tr>
+          <tr><th scope="row" style="--tc:#aa6bc8">독</th><td></td><td></td><td></td><td></td><td class="e2" title="독 기술 → 풀: 2배">2</td><td></td><td></td><td class="eh" title="독 기술 → 독: 0.5배">0.5</td><td class="eh" title="독 기술 → 땅: 0.5배">0.5</td><td></td><td></td><td></td><td class="eh" title="독 기술 → 바위: 0.5배">0.5</td><td class="eh" title="독 기술 → 고스트: 0.5배">0.5</td><td></td><td></td><td class="e0" title="독 기술 → 강철: 0배">0</td><td class="e2" title="독 기술 → 페어리: 2배">2</td></tr>
+          <tr><th scope="row" style="--tc:#d97845">땅</th><td></td><td class="e2" title="땅 기술 → 불꽃: 2배">2</td><td></td><td class="e2" title="땅 기술 → 전기: 2배">2</td><td class="eh" title="땅 기술 → 풀: 0.5배">0.5</td><td></td><td></td><td class="e2" title="땅 기술 → 독: 2배">2</td><td></td><td class="e0" title="땅 기술 → 비행: 0배">0</td><td></td><td class="eh" title="땅 기술 → 벌레: 0.5배">0.5</td><td class="e2" title="땅 기술 → 바위: 2배">2</td><td></td><td></td><td></td><td class="e2" title="땅 기술 → 강철: 2배">2</td><td></td></tr>
+          <tr><th scope="row" style="--tc:#8fa9de">비행</th><td></td><td></td><td></td><td class="eh" title="비행 기술 → 전기: 0.5배">0.5</td><td class="e2" title="비행 기술 → 풀: 2배">2</td><td></td><td class="e2" title="비행 기술 → 격투: 2배">2</td><td></td><td></td><td></td><td></td><td class="e2" title="비행 기술 → 벌레: 2배">2</td><td class="eh" title="비행 기술 → 바위: 0.5배">0.5</td><td></td><td></td><td></td><td class="eh" title="비행 기술 → 강철: 0.5배">0.5</td><td></td></tr>
+          <tr><th scope="row" style="--tc:#fa7179">에스퍼</th><td></td><td></td><td></td><td></td><td></td><td></td><td class="e2" title="에스퍼 기술 → 격투: 2배">2</td><td class="e2" title="에스퍼 기술 → 독: 2배">2</td><td></td><td></td><td class="eh" title="에스퍼 기술 → 에스퍼: 0.5배">0.5</td><td></td><td></td><td></td><td></td><td class="e0" title="에스퍼 기술 → 악: 0배">0</td><td class="eh" title="에스퍼 기술 → 강철: 0.5배">0.5</td><td></td></tr>
+          <tr><th scope="row" style="--tc:#90c12c">벌레</th><td></td><td class="eh" title="벌레 기술 → 불꽃: 0.5배">0.5</td><td></td><td></td><td class="e2" title="벌레 기술 → 풀: 2배">2</td><td></td><td class="eh" title="벌레 기술 → 격투: 0.5배">0.5</td><td class="eh" title="벌레 기술 → 독: 0.5배">0.5</td><td></td><td class="eh" title="벌레 기술 → 비행: 0.5배">0.5</td><td class="e2" title="벌레 기술 → 에스퍼: 2배">2</td><td></td><td></td><td class="eh" title="벌레 기술 → 고스트: 0.5배">0.5</td><td></td><td class="e2" title="벌레 기술 → 악: 2배">2</td><td class="eh" title="벌레 기술 → 강철: 0.5배">0.5</td><td class="eh" title="벌레 기술 → 페어리: 0.5배">0.5</td></tr>
+          <tr><th scope="row" style="--tc:#c5b78c">바위</th><td></td><td class="e2" title="바위 기술 → 불꽃: 2배">2</td><td></td><td></td><td></td><td class="e2" title="바위 기술 → 얼음: 2배">2</td><td class="eh" title="바위 기술 → 격투: 0.5배">0.5</td><td></td><td class="eh" title="바위 기술 → 땅: 0.5배">0.5</td><td class="e2" title="바위 기술 → 비행: 2배">2</td><td></td><td class="e2" title="바위 기술 → 벌레: 2배">2</td><td></td><td></td><td></td><td></td><td class="eh" title="바위 기술 → 강철: 0.5배">0.5</td><td></td></tr>
+          <tr><th scope="row" style="--tc:#5269ac">고스트</th><td class="e0" title="고스트 기술 → 노말: 0배">0</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="e2" title="고스트 기술 → 에스퍼: 2배">2</td><td></td><td></td><td class="e2" title="고스트 기술 → 고스트: 2배">2</td><td></td><td class="eh" title="고스트 기술 → 악: 0.5배">0.5</td><td></td><td></td></tr>
+          <tr><th scope="row" style="--tc:#0b6dc3">드래곤</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="e2" title="드래곤 기술 → 드래곤: 2배">2</td><td></td><td class="eh" title="드래곤 기술 → 강철: 0.5배">0.5</td><td class="e0" title="드래곤 기술 → 페어리: 0배">0</td></tr>
+          <tr><th scope="row" style="--tc:#5a5465">악</th><td></td><td></td><td></td><td></td><td></td><td></td><td class="eh" title="악 기술 → 격투: 0.5배">0.5</td><td></td><td></td><td></td><td class="e2" title="악 기술 → 에스퍼: 2배">2</td><td></td><td></td><td class="e2" title="악 기술 → 고스트: 2배">2</td><td></td><td class="eh" title="악 기술 → 악: 0.5배">0.5</td><td></td><td class="eh" title="악 기술 → 페어리: 0.5배">0.5</td></tr>
+          <tr><th scope="row" style="--tc:#5a8ea1">강철</th><td></td><td class="eh" title="강철 기술 → 불꽃: 0.5배">0.5</td><td class="eh" title="강철 기술 → 물: 0.5배">0.5</td><td class="eh" title="강철 기술 → 전기: 0.5배">0.5</td><td></td><td class="e2" title="강철 기술 → 얼음: 2배">2</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="e2" title="강철 기술 → 바위: 2배">2</td><td></td><td></td><td></td><td class="eh" title="강철 기술 → 강철: 0.5배">0.5</td><td class="e2" title="강철 기술 → 페어리: 2배">2</td></tr>
+          <tr><th scope="row" style="--tc:#ec8fe6">페어리</th><td></td><td class="eh" title="페어리 기술 → 불꽃: 0.5배">0.5</td><td></td><td></td><td></td><td></td><td class="e2" title="페어리 기술 → 격투: 2배">2</td><td class="eh" title="페어리 기술 → 독: 0.5배">0.5</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="e2" title="페어리 기술 → 드래곤: 2배">2</td><td class="e2" title="페어리 기술 → 악: 2배">2</td><td class="eh" title="페어리 기술 → 강철: 0.5배">0.5</td><td></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="blk">
+      <h3>타입이 둘이면 곱합니다</h3>
+      <p>타입이 둘인 포켓몬에게는 두 칸의 배율을 곱한 만큼 들어갑니다. 그래서 4배와 0.25배도 나오고, 한쪽이 0 이면 다른 쪽이 2 여도 0배입니다.</p>
+      <ul>
+        <li>얼음 기술 → 망나뇽 (드래곤 · 비행): 2 × 2 = <b>4배</b></li>
+        <li>풀 기술 → 갸라도스 (물 · 비행): 2 × 0.5 = <b>1배</b></li>
+        <li>전기 기술 → 대짱이 (물 · 땅): 2 × 0 = <b>0배</b></li>
+      </ul>
+    </div>
+    <!-- make_site_types: 끝 -->
+
+    <div class="blk">
+      <p class="note"><b>표와 다르게 들어가는 때</b> 특성 · 지닌 도구 · 기술 몇 가지는 상성을 바꿉니다. 부유 특성이거나 풍선을 지닌 포켓몬은 땅 기술을 안 맞고, 저수(물) · 축전(전기) · 타오르는불꽃(불꽃) · 초식(풀) 특성은 그 타입 기술에 데미지를 받지 않습니다. 배짱 · 심안 특성이면 노말 · 격투 기술이 고스트에게 맞고, 겨냥표적을 지니면 타입 때문에 안 맞던 기술도 맞습니다. 프리즈드라이는 물 칸을 2 로 세고, 사우전드애로는 비행 타입과 떠 있는 포켓몬에게도 맞습니다.</p>
     </div>
     <div class="grass" aria-hidden="true"></div>
   </section>

@@ -182,6 +182,10 @@ jobs:
       - name: 릴리스 본문이 패치노트와 같은가
         run: python tools/make_release_notes.py --check
 
+      # 안내서의 타입 상성표(tools/make_site_types.py 가 만든다)가 pokedex.json 의 상성 그대로인가 (#503)
+      - name: 안내서 타입 상성표가 pokedex.json 과 같은가
+        run: python server/test_site_types.py
+
       - name: 문법
         run: |
           python - <<'EOF'
