@@ -1284,9 +1284,7 @@ class TrainerBattle(object):
         return [i for i, f in enumerate(self.me_team) if f.alive() and i != self.mi]
 
     def act(self, kind, value=None, mega=False, z=False):
-        """kind: 'move' (value=기술) / 'switch' (value=자리) / 'forfeit' / 'pass'
-
-        pass: 내 쪽은 아무것도 안 하고 상대만 움직인다 (2.4.0 아르케 - 볼을 던져 놓친 턴). 턴 끝 처리는 그대로 돈다.
+        """kind: 'move' (value=기술) / 'switch' (value=자리) / 'forfeit'
 
         mega: 이 턴에 메가진화한다 (기술을 고를 때만. 교체하면서는 못 한다).
         z: 고른 기술을 Z기술로 쓴다 (시즌 4, 기술을 고를 때만).
@@ -1367,8 +1365,6 @@ class TrainerBattle(object):
             self._switch("me", value, ev)
             if not self.me.alive():
                 self.bt._check_faint(ev)
-        elif kind == "pass":
-            pass                                # 볼을 던졌다 - 이 턴에 내 포켓몬은 아무것도 안 한다
         else:
             me = self.me
             me_move = value

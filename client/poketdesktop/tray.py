@@ -87,14 +87,6 @@ def olympics_items(tray, app):
     return [Item(lambda: o.label(), lambda: tray.call(app.open_olympics))]
 
 
-def arche_items(tray, app):
-    """아르케의 여섯 봉인 (2.4.0): 이벤트 기간에만 '아르케의 일지'. 글은 메뉴를 열 때마다 다시 묻는다."""
-    a = getattr(app, "arche", None)
-    if a is None or not a.on():
-        return []
-    return [Item(lambda: a.label(), lambda: tray.call(app.open_arche))]
-
-
 def make_icon_image(size=64):
     """트레이 아이콘 — 컴퓨터 화면 안의 몬스터볼.
 
@@ -236,7 +228,7 @@ class TrayBase(object):
             Item(lambda: focus_label(a), lambda: self.call(a.open_focus)),
             # 포켓몬 알림 타이머 (이 PC 에만)
             Item("알림 맞추기...", lambda: self.call(a.open_alarms)),
-        ] + olympics_items(self, a) + arche_items(self, a) + [
+        ] + olympics_items(self, a) + [
             # '바로 가기' 하위 메뉴는 뺐다. 창이 하나로 합쳐진 뒤로는
             # '열기...' 로 들어가서 탭을 고르면 되는데, 메뉴에 같은 것이
             # 일곱 줄 더 있으면 길기만 하다.

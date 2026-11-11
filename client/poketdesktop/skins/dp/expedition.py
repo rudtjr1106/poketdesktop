@@ -274,9 +274,7 @@ class ExpeditionWindow(E.ExpeditionWindow):
         dex = self.app.dex
         y = s(34)
         ph = E.PLACE_H              # (이미 U.h 로 잰 값 - 한 번 더 s() 하면 줄이 커져 '② 얼마나' 가 밀려 잘렸다)
-        places = X.places()                # 기간 한정 곳 (아르케 발굴지, 2.4.0) 은 그 동안만
-        gap = s(2) if len(places) > len(X.PLACES) else s(4)       # 여덟이면 틈만 좁힌다 (글자는 그대로)
-        for p in places:
+        for p in X.PLACES:
             on = p["id"] == self.place
             tag = "pl_" + p["id"]
             tg = T_ + ("place", tag)
@@ -290,7 +288,7 @@ class ExpeditionWindow(E.ExpeditionWindow):
                 name = dex.type_name(t) if dex is not None else t
                 xx = _chip(cv, xx, y + ph // 2, name, U.TYPE_COLOR.get(t, "#9aa2ae"), tg) + s(4)
             cv.tag_bind(tag, "<Button-1>", lambda _e, k=p["id"]: self.set_place(k))
-            y += ph + gap
+            y += ph + s(4)
         cv.tag_bind("place", "<Enter>", lambda _e: cv.configure(cursor="hand2"))
         cv.tag_bind("place", "<Leave>", lambda _e: cv.configure(cursor=""))
         # 그곳에서 잘 나오는 것 (흰 글상자)

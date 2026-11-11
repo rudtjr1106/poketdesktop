@@ -72,9 +72,9 @@ CAT_COLOR = {"megastone": "#a98bff", "zcrystal": "#ffd23c", "form": "#5fd3c6", "
 # "deco" (버전 2) 는 꾸미기 - /api/deco/equip 으로 씌우고 뺀다. "decopick" 은 참가 묶음 선택권 (묶음을 고른다).
 # "lure" (2.1.1) 는 타입 스프레이 (풀숲), "rename" 은 닉네임 변경권.
 USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket", "form", "tmticket", "deco", "decopick",
-          "lure", "rename", "arche")
+          "lure", "rename")
 # **대상 포켓몬이 없는 도구.** 고를 것이 없으니 목록을 띄우지 않고 바로 쓴다.
-NO_TARGET = ("ticket", "tmticket", "decopick", "lure", "rename", "arche")
+NO_TARGET = ("ticket", "tmticket", "decopick", "lure", "rename")
 
 ROW_BG = "#10131c"      # 목록 한 줄 바탕
 SEL_BG = "#2b2417"      # 고른 줄
@@ -278,9 +278,6 @@ def item_desc(item):
         return out
     if kind == "rename":
         return RENAME_TEXT + "\n\n" + RENAME_NOTE
-    if kind == "arche":
-        # 아르케의 여섯 봉인 (2.4.0): 설명은 서버가 비공개 일지에서 채운다 (desc). '쓰기' 는 쓴 시각을 남길 뿐이다.
-        return (item.get("desc") or "고대 아르케 왕국의 유물이다.") + "\n\n아르케의 발굴품. 쓰면 무언가에 쓰일지도 모른다."
     if kind == "ball":
         return "야생 포켓몬을 만났을 때 던지는 볼이다. 가방에서는 쓸 수 없다."
     if kind == "sell":
@@ -1916,8 +1913,6 @@ class BagWindow(object):
             self._pending = (r.get("message") or "도구를 썼다.", color)
             self.reload()
             self.app.request_sync()          # 알 칸이 바뀐다
-            if kind == "arche" and getattr(self.app, "arche", None) is not None:
-                self.app.arche.check()       # 아르케: 열쇠 아이템을 쓴 것이 의식의 일부일 수 있다
             if r.get("tmNew") is not None:   # 기술머신 뽑기권 - [기술머신] 의 노란 점과 목록
                 note = getattr(self.app, "note_tms", None)
                 if note is not None:

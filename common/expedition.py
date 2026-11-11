@@ -148,15 +148,7 @@ PLACES = [
      "hint": "골드만 가져옵니다 · 주머니 1점마다 골드 +3%",
      "special": {}},
 ]
-# 기간 한정 곳 (2.4.0). **PLACES 에 넣지 않는다** - 늘 있는 곳 일곱(물건 곳 여섯 + 광산)을 세는 화면 · 검사가 있다.
-# 화면은 places(now) 로 그때 갈 수 있는 곳을 받는다. event 가 그 곳을 여는 이벤트다 (place_open).
-# '아르케 발굴지' (아르케의 여섯 봉인, 시즌 6): 물건은 다른 물건 곳과 같은 표 (특산물 · 기술머신 없음 - 돈벌이가 아니다).
-# 돌아오면 서버가 그 시각의 '발굴 보고서' 한 줄을 붙인다 (server/app/arche.dig_report - 내용은 비공개 자료에만).
-EVENT_PLACES = [
-    {"id": "arche", "kr": "아르케 발굴지", "types": ["ROCK", "GROUND", "PSYCHIC"], "tm": 0.0, "event": "arche",
-     "hint": "이벤트 동안만 · 돌아오면 발굴 보고서 한 줄", "special": {}},
-]
-_BY_ID = dict((p["id"], p) for p in PLACES + EVENT_PLACES)
+_BY_ID = dict((p["id"], p) for p in PLACES)
 ITEM_PLACES = [p for p in PLACES if not p.get("gold")]
 
 # 광산이 가져오는 골드 (사용자 결정 11/07: 8시간 대성공 4,000원, 시간에 비례, 보통 · 성공은 대성공의 60% · 80%).
@@ -175,25 +167,6 @@ GOLD_GRADE = {"normal": 0.6, "good": 0.8, "great": 1.0}
 
 def place(place_id):
     return _BY_ID.get(place_id)
-
-
-def place_open(place_id, now=None):
-    """지금 그곳에 보낼 수 있나. 늘 있는 곳은 늘 참, 기간 한정 곳은 그 이벤트 동안만. 모르는 곳은 거짓."""
-    p = place(place_id)
-    if p is None:
-        return False
-    if p.get("event") == "arche":
-        import datetime
-        from . import arche
-        now = now or datetime.datetime.now(datetime.timezone.utc)
-        lo, hi = arche.event_window()
-        return lo <= now < hi
-    return True
-
-
-def places(now=None):
-    """지금 갈 수 있는 곳 전부 (늘 있는 곳 + 열려 있는 기간 한정 곳)."""
-    return PLACES + [p for p in EVENT_PLACES if place_open(p["id"], now)]
 
 
 def is_gold(place_id):

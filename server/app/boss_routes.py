@@ -29,9 +29,6 @@ def start(ctx=Depends(deps.current)):
     old = gym_routes._active(uid)
     if old:
         if not boss.is_boss(old["region"]):
-            from . import arche
-            if arche.is_arche(old["region"]):          # 아르케 (2.4.0): 발굴 일지에서 이어서 한다
-                raise HTTPException(409, "아르케의 전설과의 승부가 아직 끝나지 않았습니다. 발굴 일지에서 이어서 하세요.")
             raise HTTPException(409, "관장과의 승부가 아직 끝나지 않았습니다. 그 승부부터 마쳐 주세요.")
         tb = TB.TrainerBattle.load(deps.dex(), json.loads(old["data"]))
         return gym_routes._out(old, tb, extra={"resumed": True})

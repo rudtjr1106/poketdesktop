@@ -1180,30 +1180,6 @@ def t_턴_끝(dex):
     chk("상대에게 다음 포켓몬이 있으면 쓰러뜨린 턴에도 턴 끝 (화염구슬)", tb.me.status == "burn", tb.me.status)
 
 
-def t_넘기기(dex):
-    """act("pass") (2.4.0 아르케 - 볼을 던져 놓친 턴): 내 쪽은 아무것도 안 하고 상대만 움직인다. 턴 끝 처리(독)는 돈다."""
-    print("-- 넘기기 (볼을 놓친 턴)")
-    me = mon(dex, "BLISSEY", 60, moves=["POUND"])
-    t = {"name": "검사", "wild": True, "team": [mon(dex, "RATTATA", 20, moves=["TACKLE"], seed=2)]}
-    tb = TB.TrainerBattle(dex, [me], t, random.Random(5))
-    tb.start()
-    tb.me.status = "poison"
-    hp0, foe_hp0, turn0 = tb.me.hp, tb.foe.hp, tb.turn
-    ev = tb.act("pass")
-    used = [e for e in ev if e.get("t") == "move"]
-    chk("넘기기: 상대만 기술을 쓴다 · 턴이 하나 간다", [e.get("who") for e in used] == ["foe"] and tb.turn == turn0 + 1,
-        ([e.get("who") for e in used], tb.turn))
-    chk("넘기기: 내 체력은 맞은 만큼 + 독만큼 준다 · 상대 체력은 그대로", tb.me.hp < hp0 and tb.foe.hp == foe_hp0
-        and any("독" in (e.get("text") or "") for e in ev), texts(ev))
-    tb.need_switch = True
-    try:
-        tb.act("pass")
-        ok = False
-    except ValueError:
-        ok = True
-    chk("넘기기: 교체를 골라야 할 때는 안 된다", ok)
-
-
 def main():
     dex = load_dex()
     with open(os.path.join(ROOT, "server", "data", "gyms.json"), encoding="utf-8") as f:
@@ -1222,7 +1198,6 @@ def main():
     t_관장_AI(dex, gyms)
     t_길드전_셈(dex, gyms)
     t_턴_끝(dex)
-    t_넘기기(dex)
     print()
     print("======================================================")
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))

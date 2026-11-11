@@ -322,48 +322,6 @@ def ime_composition():
         return ""
 
 
-_TITLE = None
-
-
-def _title_fns():
-    """맨 앞 창 제목을 읽는 함수들 (한 번만 만든다). 핸들이 64비트라 타입을 정해 둔다 - 안 정하면 잘린다."""
-    global _TITLE
-    if _TITLE is None:
-        from ctypes import wintypes
-        u = ctypes.WinDLL("user32")
-        u.GetForegroundWindow.restype = wintypes.HWND
-        u.GetForegroundWindow.argtypes = []
-        u.GetWindowTextLengthW.restype = ctypes.c_int
-        u.GetWindowTextLengthW.argtypes = [wintypes.HWND]
-        u.GetWindowTextW.restype = ctypes.c_int
-        u.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
-        _TITLE = u
-    return _TITLE
-
-
-def foreground_title():
-    """맨 앞 창의 제목 하나 (아르케 2.4.0 '브라우저 단서 찾기'). 없거나 못 읽으면 None.
-
-    **제목만 읽는다** - 주소 · 방문 기록 · 페이지 내용 · 다른 창은 보지 않는다. 서명 · 관리자 권한도 필요 없다
-    (GetWindowTextW 는 보통 권한으로 남의 창 제목을 준다). 읽은 제목을 저장하거나 보내는 일은 여기서 하지 않는다 -
-    arche_title.TitleWatch 가 맞는 말일 때만 알린다.
-    """
-    try:
-        u = _title_fns()
-        hwnd = u.GetForegroundWindow()
-        if not hwnd:
-            return None
-        n = u.GetWindowTextLengthW(hwnd)
-        if n <= 0:
-            return None
-        n = min(int(n), 1024)                               # 아주 긴 제목은 앞만 (맞을 말은 짧다)
-        buf = ctypes.create_unicode_buffer(n + 1)
-        got = u.GetWindowTextW(hwnd, buf, n + 1)
-        return buf.value[:got] if got > 0 else None
-    except Exception:                                       # noqa: BLE001
-        return None
-
-
 def dpi_aware():
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(1)

@@ -94,21 +94,8 @@ def public_list():
         })
         if (it.get("effect") or {}).get("kind") == "form":
             out[-1]["forms"] = form_targets(it)
-        elif (it.get("effect") or {}).get("kind") == "arche":
-            out[-1]["desc"] = _arche_desc(it["id"]) or out[-1]["desc"]
     out.sort(key=lambda x: (x["cat"], x["cost"], x["kr"]))
     return out
-
-
-def _arche_desc(item_id):
-    """아르케 열쇠 아이템 (2.4.0) 의 설명 - 설명이 곧 단서라 비공개 자료(arche.item_desc)에서 덮는다.
-    items.json 에는 단서가 아닌 기본 설명만 있다. 없거나 터지면 None (기본 설명 그대로)."""
-    try:
-        from . import arche
-        return arche.item_desc(item_id)
-    except Exception as e:                                   # noqa: BLE001
-        print("[items] 아르케 설명 실패 %s: %r" % (item_id, e))
-        return None
 
 
 def form_targets(it):

@@ -297,28 +297,6 @@ class Api(object):
         """그날 공습을 시작한다 - 결과 · 보상은 서버가 정한다. {events, ids, result, reward, exp, already}."""
         return self._call("POST", "/api/airraid/start", {"hour": int(hour)})
 
-    # ---- 아르케의 여섯 봉인 (2.4.0, server/app/arche.py) ----
-    def arche_state(self):
-        """장 · 일지 · 의식 · 전설 자리 · 지금 일어날 현상 (design-notes/2026-11-09-arche-plan.md 의 state)."""
-        return self._call("GET", "/api/arche")
-
-    def arche_key(self, chapter, text, via="type"):
-        """떠오른 말 (via: type = 일지에 적음 / title = 브라우저 창 제목). {ok, key?, state}. 너무 많이 넣으면 429."""
-        return self._call("POST", "/api/arche/key", {"chapter": int(chapter), "text": text, "via": via})
-
-    def arche_check(self):
-        """의식을 지금 다시 본다 (열쇠 아이템을 썼거나 집중 세트가 끝난 직후). state 를 돌려준다."""
-        return self._call("POST", "/api/arche/check", {})
-
-    def arche_battle(self, chapter, slot):
-        """전설과의 판을 연다 (하던 판이면 이어서). 관장 판과 같은 꼴 + {place, legend}."""
-        return self._call("POST", "/api/arche/battle", {"chapter": int(chapter), "slot": int(slot)})
-
-    def arche_ball(self, bid, ball, hour=-1):
-        """전설에게 볼을 던진다. {caught, shakes, message, events?, pokemon?, where?, battle}."""
-        return self._call("POST", "/api/gym/battle/%d/act" % int(bid),
-                          {"kind": "ball", "ball": ball or "POKEBALL", "hour": int(hour)})
-
     def expedition(self):
         """나가 있는 것들 (남은 초·돌아왔는지)과 칸 수."""
         return self._call("GET", "/api/expedition")
