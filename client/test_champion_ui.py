@@ -258,7 +258,7 @@ def main():
     bb = gw.cv.bbox("dokdo")
     chk("  지도 칸 안에 들어간다", bb and bb[0] >= 0 and bb[2] <= gw.cv.winfo_width() and bb[3] <= gw.cv.winfo_height(),
         (bb, gw.cv.winfo_width(), gw.cv.winfo_height()))
-    tf = gw._fit([sd["rings"] for sd in gw.map["sido"]] + [[[ui_gym.DOKDO_AT]]])
+    tf = gw.nation_fit()
     dx, dy = tf(ui_gym.DOKDO_AT)
     ul = [tf(p) for p in gw._sgg["47940"]["rings"][0]]           # 울릉도
     land = [i for i in items if gw.cv.type(i) == "polygon"]

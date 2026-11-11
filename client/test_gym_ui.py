@@ -264,7 +264,7 @@ def main():
 
     pump(root, lambda: gw._redraw_job is None, 3)
     root.update()
-    tf = gw._fit([sd["rings"] for sd in kmap["sido"]])
+    tf = gw.nation_fit()                     # 그리는 쪽과 같은 맞춤 (독도까지 넣는다 - 챔피언리그)
     small = [sd for sd in kmap["sido"] if sd["code"] in ("11", "30", "36", "26", "27", "31")]
     hit = {sd["name"]: topmost_tag(*tf(sd["center"])) for sd in small}
     chk("전국: 서울·대전·세종·부산·대구·울산 한가운데를 누르면 그곳이 잡힌다",

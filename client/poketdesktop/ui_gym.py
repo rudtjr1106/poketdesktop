@@ -823,8 +823,7 @@ class GymWindow(object):
 
     def _draw_nation(self):
         cv = self.cv
-        # 독도까지 들어가게 맞춘다 - 울릉도에서 동남쪽으로 87km 라 시·도 경계만으로 맞추면 틀 밖이다
-        tf = self._fit([sd["rings"] for sd in self.map["sido"]] + [[[DOKDO_AT]]])
+        tf = self.nation_fit()
         stats = self._sido_stats()
         # **넓은 곳부터 그린다.** 고리는 바깥선뿐이라 경기도 도형이 서울을 통째로
         # 덮는다. 목록 순서대로 그렸더니 서울 위에 경기가 올라가 서울을 누를 수가 없었다.
@@ -924,6 +923,11 @@ class GymWindow(object):
         if fn is not None:
             return fn(self.win.winfo_toplevel())
         return None
+
+    def nation_fit(self):
+        """전국 지도의 좌표 -> 캔버스 자리. **독도까지 들어가게** 맞춘다 - 울릉도에서 동남쪽으로 87km 라 시·도 경계만으로
+        맞추면 틀 밖이다. 지도에서 자리를 셈하는 곳(검사 포함)은 전부 이것을 쓴다."""
+        return self._fit([sd["rings"] for sd in self.map["sido"]] + [[[DOKDO_AT]]])
 
     def _sido_fill(self, won, total):
         """전국 지도의 시·도 빛깔: 이긴 곳이 많을수록 진한 금색 (테마가 바꾼다)."""
