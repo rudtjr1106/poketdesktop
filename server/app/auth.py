@@ -56,6 +56,15 @@ def check_username(name):
                                                 config.MAX_USERNAME)
     if not USERNAME_RE.match(name):
         return None, "닉네임에는 한글, 영문, 숫자와 _ - . 만 쓸 수 있습니다."
+    if "고고학자" in name.replace(" ", ""):
+        # 게시판의 고고학자 계정(아르케 - 2.5.0)을 흉내 내지 못하게. 그 계정은 서버가 직접 만든다.
+        return None, "그 이름은 쓸 수 없습니다."
+    try:
+        from . import traveler_posts                         # 비공개 자료에 적힌 게시판 계정 이름 (나그네 · 고고학자)
+        if traveler_posts.reserved_name(name):
+            return None, "그 이름은 쓸 수 없습니다."
+    except Exception:                                        # noqa: BLE001
+        pass
     if "  " in name:
         return None, "닉네임에 공백을 이어서 쓸 수 없습니다."
     return name, None

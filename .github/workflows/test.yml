@@ -680,6 +680,8 @@ jobs:
           python test_friendly.py
           # 챔피언리그 (독도): 관장 256곳 자격 · 상대 찾기 · 직접 도전 · 몇전 몇승 몇패 · 승리 순위 · 하루 3판 · 구경
           python test_champion.py
+          # 나그네 예약 글 (2.4.0 - 아르케 본체는 2.5.0): 때가 된 나그네 글만 한 번씩 · 계정 로그인 불가 · 이름 막기
+          python test_traveler_posts.py
           # 끝난 야생 배틀이 '배틀 중' 으로 남지 않는다 (1.10.4, 게시판 #174 퀵볼)
           python test_stale_battle.py
           python test_troubles.py       # 1.13.3: 야생 배틀이 앱에서 끊긴 것을 서버가 남긴다 (trouble 표, 앱 알림)

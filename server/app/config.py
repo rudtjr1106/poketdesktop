@@ -179,6 +179,9 @@ VILLAINS_PATH = os.environ.get("POKET_VILLAINS", os.path.join(ROOT, "data", "vil
 # 게시판 이미지 (버전 2). DB 에 넣지 않고 파일로 둔다 - DB 가 커지면 백업이 무거워진다 (10/28 3GB 사고).
 # 운영은 /data 볼륨(DB · 도트 캐시와 같은 곳)에 남는다.
 BOARD_IMG_DIR = os.environ.get("POKET_BOARD_IMG_DIR", "/data/board_img")
+# 아르케의 여섯 봉인 비공개 자료 - secrets.json · pages/ · img/. **저장소 밖, 운영 볼륨에만** 둔다 (수수께끼 · 정답).
+# 2.4.0 은 여기서 나그네 예약 글만 읽는다 (traveler_posts.py). 이벤트 본체는 2.5.0 (arche 갈래).
+ARCHE_DIR = os.environ.get("POKET_ARCHE_DIR", "/data/arche")
 TRAINER_SPRITE_DIR = os.environ.get("POKET_TRAINER_SPRITES",
                                     os.path.join(ROOT, "data", "trainer_sprites"))
 # 처음 이기면 레벨 x 50원 (Lv.20 1,000원 ~ Lv.100 5,000원). 원작 상금 느낌.

@@ -37,7 +37,7 @@ from . import (achievements, airraid, auth, avatar, battle_routes, board, board_
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws, internal_routes,
-               boss_routes, gym_routes, social_routes, tm_routes, tms, troubles, visit, walk)
+               boss_routes, gym_routes, social_routes, tm_routes, tms, traveler_posts, troubles, visit, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
@@ -1256,6 +1256,8 @@ def delete_account(body: DeleteIn, ctx=Depends(current)):
 def me(ctx=Depends(current)):
     u = ctx["user"]
     uid = u["id"]
+    # 나그네 예약 글 (2.4.0): 게시판을 아무도 안 여는 동안에도 때가 되면 올라가게 (프로세스 안에서 30초에 한 번만 본다)
+    traveler_posts.ensure()
     # 두 숫자를 한 번에 센다. Turso 는 원격이라 왕복 한 번이 100ms 다 -
     # 나눠 물어볼 이유가 없다.
     st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
