@@ -90,6 +90,7 @@ class SettingsWindow(ST.SettingsWindow):
         self.drag = tk.BooleanVar(value=bool(s.get("petDrag", False)))
         self.fr_note = tk.BooleanVar(value=bool(s.get("friendlyNotify", True)))
         self.fr_auto = tk.BooleanVar(value=bool(s.get("friendlyAuto", False)))
+        self.cl_note = tk.BooleanVar(value=bool(s.get("championNotify", True)))
         self.catch = tk.StringVar(value=config.catch_mode(s))
         from ... import hotkey as HOTKEY
         self.boss = tk.StringVar(value=HOTKEY.clean(s.get("bossKey"))) if HOTKEY.supported() else None
@@ -158,7 +159,10 @@ class SettingsWindow(ST.SettingsWindow):
                  "길드원이 친선전 상대를 구하거나 친선전이 열리면 화면 오른쪽 아래에 잠깐 알립니다. 길드 채팅을 보고 "
                  "있을 때는 띄우지 않습니다 (채팅에 카드가 놓입니다).", self._toggle_plain),
                 (self.fr_auto, "길드 친선전 바로 관전하기", "friendlyAuto",
-                 "길드 친선전이 열리면 묻지 않고 바탕화면에서 바로 관전합니다.", self._toggle_plain)):
+                 "길드 친선전이 열리면 묻지 않고 바탕화면에서 바로 관전합니다.", self._toggle_plain),
+                (self.cl_note, "독도 챔피언리그 알림", "championNotify",
+                 "관장을 전부 이긴 참가자가 독도에서 상대를 기다리면 화면 오른쪽 아래에 잠깐 알립니다 ([도전] 을 누르면 "
+                 "바로 붙습니다). 독도 창을 보고 있거나 배틀 · 구경 중일 때는 띄우지 않습니다.", self._toggle_plain)):
             self._flag(label, note, var, key, how)
         self.rows.append({"kind": "choice", "label": "야생 배틀에서 잡기",
                           "note": "체력을 조금 남기고 멈춰서 볼을 던질 틈을 줍니다. 10초 안에 안 던지거나 야생 포켓몬을 "

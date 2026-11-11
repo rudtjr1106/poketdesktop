@@ -126,7 +126,8 @@ class LiveBattleWindow(Z.Resizable):
         # 처음 크기: 지난번에 끌어 놓은 크기(없으면 기본 크기). 배율도 여기서 잡힌다.
         ww, wh, gx, gy = self.zoom_open()
         self.win = tk.Toplevel(self.root)
-        U.style_window(self.win, "실시간 배틀 — %s" % (data.get("foeName") or ""),
+        U.style_window(self.win, "%s — %s" % ("챔피언리그 · 독도" if data.get("kind") == "champion" else "실시간 배틀",
+                                             data.get("foeName") or ""),
                        ww, wh)
         self.win.geometry("%dx%d+%d+%d" % (ww, wh, gx, gy))
         U.apply_theme(self.win)

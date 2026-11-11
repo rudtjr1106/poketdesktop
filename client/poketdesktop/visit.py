@@ -890,6 +890,11 @@ class Visit(object):
             elif t == "end":
                 if self.v is not None and (ev.get("id") in (None, self.v.get("id"))):
                     self.leave(ev.get("text"), returned=ev.get("returned"))
+            elif t == "champion":
+                # 챔피언리그 - 독도 (이 소켓이 앱이 켜져 있는 동안 늘 붙어 있어서 같이 쓴다). 놀러 가 있든 아니든
+                fn = getattr(self.app, "on_champion", None)
+                if fn is not None:
+                    fn(ev)
             elif not self.active:
                 return
             elif t == "party" and self.guest:

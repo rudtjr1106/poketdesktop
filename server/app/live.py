@@ -76,6 +76,14 @@ def get(mid):
     return db.q1("SELECT * FROM live_match WHERE id=?", (mid,))
 
 
+def kind_of(row):
+    """어떤 판인가: 'live'(친구 · 길드) / 'champion'(챔피언리그 - 독도). 칸이 없는 옛 DB 는 live."""
+    try:
+        return (row["kind"] if "kind" in row.keys() else None) or "live"
+    except (KeyError, IndexError, TypeError):
+        return "live"
+
+
 def side_of(row, uid):
     """이 사람이 a 인가 b 인가. 참가자가 아니면 None."""
     if row["a_id"] == uid:
@@ -210,8 +218,23 @@ def accept(uid, mid, now=None):
     return get(mid)
 
 
-def open_direct(a, b, now=None):
-    """초대·수락을 거치지 않고 둘 사이에 바로 판을 연다 (길드 친선전: '상대 구함' 을 누가 받았다).
+def invite_kind(uid, other, kind, now=None):
+    """친구 · 길드 조건 없이 초대 줄만 놓는다 (챔피언리그의 직접 도전 - 참가 자격은 champion.py 가 본다).
+
+    수락 · 거절 · 진행은 보통 초대와 같다 (answer -> accept). 부르는 쪽이 둘 다 다른 판이 없는지 봤어야 한다.
+    """
+    expire_old(now)
+    cur = db.run(
+        "INSERT INTO live_match (a_id, b_id, a_name, b_name, state, rev,"
+        " events, turn, created_at, updated_at, kind)"
+        " VALUES (?,?,?,?,'invited',0,'[]',0,?,?,?)",
+        (uid, other, _name(uid), _name(other), _iso(now), _iso(now), kind))
+    return get(cur.lastrowid)
+
+
+def open_direct(a, b, now=None, kind="live"):
+    """초대·수락을 거치지 않고 둘 사이에 바로 판을 연다 (길드 친선전: '상대 구함' 을 누가 받았다 ·
+    챔피언리그: 기다리던 두 사람이 만났다 - kind='champion').
 
     친구가 아니어도 된다 - 같은 길드에서 한쪽이 상대를 구했고 다른 쪽이 받았다. 나머지 조건은
     초대와 같다 (서로 막지 않았고, 둘 다 다른 판이 없고, 둘 다 팀이 있다). 안 되면 ValueError.
@@ -227,9 +250,9 @@ def open_direct(a, b, now=None):
         raise ValueError("둘 다 데리고 다니는 포켓몬이 있어야 합니다.")
     cur = db.run(
         "INSERT INTO live_match (a_id, b_id, a_name, b_name, state, rev,"
-        " events, turn, created_at, updated_at)"
-        " VALUES (?,?,?,?,'invited',0,'[]',0,?,?)",
-        (a, b, _name(a), _name(b), _iso(now), _iso(now)))
+        " events, turn, created_at, updated_at, kind)"
+        " VALUES (?,?,?,?,'invited',0,'[]',0,?,?,?)",
+        (a, b, _name(a), _name(b), _iso(now), _iso(now), kind))
     return accept(b, cur.lastrowid, now)
 
 
@@ -389,7 +412,8 @@ def public(row, uid, now=None):
            "turn": row["turn"], "me": who, "mine": row["a_id"] == uid,
            "foeId": row["%s_id" % foe], "foeName": row["%s_name" % foe],
            "level": config.LIVE_LEVEL, "turnSec": config.LIVE_TURN_SEC,
-           "inviteSec": config.LIVE_INVITE_SEC}
+           "inviteSec": config.LIVE_INVITE_SEC,
+           "kind": kind_of(row)}                           # champion = 챔피언리그 (독도)
     if row["state"] == "invited":
         out["inviteLeft"] = max(0, int((
             datetime.datetime.fromisoformat(_add(row["created_at"],
@@ -497,6 +521,7 @@ def me_card(uid, now=None):
         return out if out["unseen"] else None
     out["id"] = row["id"]
     out["state"] = row["state"]
+    out["kind"] = kind_of(row)
     out["foeName"] = row["b_name"] if row["a_id"] == uid else row["a_name"]
     # 걸려온 초대인가 (내가 답해야 하는가)
     out["invited"] = row["state"] == "invited" and row["b_id"] == uid

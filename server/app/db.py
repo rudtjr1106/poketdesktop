@@ -691,6 +691,13 @@ CREATE TABLE IF NOT EXISTS live_match (
 CREATE INDEX IF NOT EXISTS idx_live_a ON live_match(a_id, state);
 CREATE INDEX IF NOT EXISTS idx_live_b ON live_match(b_id, state);
 
+-- 챔피언리그 (독도, champion.py) 참가 자격. 관장 256곳을 처음 다 이긴 순간 한 줄 - 그 뒤로는 관장이 바뀌어
+-- 이긴 곳이 255곳이 되어도 빠지지 않는다 (관장을 바꾸면 migrations 가 그 지역 기록을 지운다).
+CREATE TABLE IF NOT EXISTS champion_member (
+    user_id      INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    qualified_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS server_error (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     at      TEXT NOT NULL,
@@ -1315,6 +1322,8 @@ MIGRATIONS = [
     ("wild_state", "lure_until", "ALTER TABLE wild_state ADD COLUMN lure_until TEXT"),
     # 마이페이지에 적는 이메일 (2.1.1, mypage.set_email) - 비밀번호를 잊었을 때 운영자가 보는 연락처. 확인 메일은 없다
     ("users", "email", "ALTER TABLE users ADD COLUMN email TEXT"),
+    # 챔피언리그 (독도, champion.py): 이 실시간 배틀이 어떤 판인가 - 'live'(친구 · 길드) / 'champion'(독도)
+    ("live_match", "kind", "ALTER TABLE live_match ADD COLUMN kind TEXT NOT NULL DEFAULT 'live'"),
 ]
 
 

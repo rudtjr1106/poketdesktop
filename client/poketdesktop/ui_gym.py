@@ -89,6 +89,9 @@ CLEAR = "#ffc043"
 BOSS_FILL = "#0b0d13"        # 악당이 차지한 시·도 (시즌 4). 지도의 다른 어떤 색보다 어둡다
 BOSS_LINE = "#e5484d"
 TODAY = U.GOOD               # 오늘 보상을 받은 곳 (지도의 체크, 목록의 글)
+# 독도 (챔피언리그). 지도 자료에는 없다 (작은 섬은 빠졌다). 실제 자리 - 동경 131.865 · 북위 37.242 (서도와 동도 사이)
+# 를 지도 자료와 같은 투영(x = 경도 x cos 36도, y = -위도)으로 둔다.
+DOKDO_AT = (131.865 * math.cos(math.radians(36)), -37.242)
 
 
 def side_px():
@@ -323,6 +326,7 @@ class GymWindow(object):
         self._loaded_at = 0.0        # 마지막으로 불러온 때 (탭을 다시 고르면 오래된 것은 다시 불러온다)
         self._sgg = {}               # 시·군·구 코드 -> 지도 자료
         self.boss = {}               # 악당 출현 (시즌 4): 서버 개요의 "boss" 칸
+        self.champion = {}           # 챔피언리그 - 독도: 서버 개요의 "champion" 칸 ({member, open, opens})
         self.boss_win = None
 
         self.MAP = dict(self.MAP)
@@ -577,6 +581,7 @@ class GymWindow(object):
             self.source.configure(text="지도: 통계청 SGIS · vuski/admdongkor")
             self._fit_status()
             self.boss = self.data.get("boss") or {}
+            self.champion = self.data.get("champion") or {}
             # 자정에는 '오늘 완료' 가 풀리고, 밤 11시에는 악당이 떠난다 - 먼저 오는 때에 다시 불러온다.
             # 악당이 아직 안 나왔으면 나올 때가 되었는지도 본다 (boss_watch_in). 몰려서 묻지 않게 조금씩 흩는다.
             waits = [self.data.get("resetIn")]
@@ -602,6 +607,10 @@ class GymWindow(object):
             elif self.boss_sido():
                 self.say("%s 에 %s 이(가) 나타났다! 검게 물든 곳을 누르세요."
                          % (self.boss.get("sidoName") or "", self.boss.get("team") or "악당"), U.DANGER)
+            elif self.champion.get("member"):
+                self.say("관장을 모두 이겼다! 전국 지도의 독도를 누르면 챔피언리그에 나갈 수 있습니다%s."
+                         % ("" if self.champion.get("open") else " (%s부터)" % (self.champion.get("opens") or "")),
+                         U.ACCENT)
 
         run_async(self.root, work, done)
 
@@ -814,7 +823,8 @@ class GymWindow(object):
 
     def _draw_nation(self):
         cv = self.cv
-        tf = self._fit([sd["rings"] for sd in self.map["sido"]])
+        # 독도까지 들어가게 맞춘다 - 울릉도에서 동남쪽으로 87km 라 시·도 경계만으로 맞추면 틀 밖이다
+        tf = self._fit([sd["rings"] for sd in self.map["sido"]] + [[[DOKDO_AT]]])
         stats = self._sido_stats()
         # **넓은 곳부터 그린다.** 고리는 바깥선뿐이라 경기도 도형이 서울을 통째로
         # 덮는다. 목록 순서대로 그렸더니 서울 위에 경기가 올라가 서울을 누를 수가 없었다.
@@ -870,6 +880,50 @@ class GymWindow(object):
             for t in (t1, t2):
                 cv.tag_bind(t, "<ButtonRelease-1>", lambda _e, c=sd["code"]: self._click_sido(c))
                 cv.tag_bind(t, "<Enter>", lambda _e, c=sd["code"]: self._hover_sido(c, True))
+        self._draw_dokdo(tf, f1, f2)
+
+    # ---------------- 독도 - 챔피언리그 ----------------
+    def _draw_dokdo(self, tf, f_name, f_sub):
+        """독도를 실제 자리(DOKDO_AT)에 그린다. 지도 자료에는 없다 (작은 섬은 빠졌다).
+
+        섬 둘(서도 · 동도)은 화면 크기로 그린다 - 실제 크기로는 점 하나도 안 된다 (두 섬 사이는 0.5px 남짓).
+        이름은 섬 아래에 쓰되, 칸이 좁아 오른쪽 끝에 걸리면 글만 왼쪽으로 비킨다 (섬은 제자리). 관장을 전부 이겨
+        참가자가 되면 금빛이다. 누르면 독도 창(ui_champion)이 뜬다.
+        """
+        cv = self.cv
+        cx, cy = tf(DOKDO_AT)
+        u = max(1.0, float(U.h(1)))
+        member = bool((self.champion or {}).get("member"))
+        lh1, lh2 = f_name.metrics("linespace"), f_sub.metrics("linespace")
+        half = max(f_name.measure("독도"), f_sub.measure("챔피언리그")) / 2.0 + 3 * u
+        lx = min(cx, max(100, cv.winfo_width()) - half)                # 좁은 칸에서 글이 오른쪽 끝에 잘리지 않게
+        base = cy + 4 * u                  # 섬 밑동 (섬은 실제 자리를 가운데로 위로 솟는다)
+        tag = "dokdo"
+        fill = CLEAR if member else self.MAP["sido"]
+        west = ((-8, 0), (-7, -5), (-4.5, -10), (-2.5, -6), (-1, 0))     # 서도 - 높고 뾰족하다
+        east = ((1.5, 0), (2.5, -4), (5, -7), (7.5, -3.5), (8.5, 0))    # 동도
+        for shape in (west, east):
+            cv.create_polygon([v for x, y in shape for v in (cx + x * u, base + y * u)], fill=fill,
+                              outline=self.MAP["edge"], width=1, tags=(tag, "map"))
+        top = base + 3 * u
+        cv.create_text(lx, top + lh1 / 2.0, text="독도", fill=self.MAP["label"], font=f_name, tags=(tag, "label", "map"))
+        cv.create_text(lx, top + lh1 + lh2 / 2.0, text="챔피언리그", font=f_sub, tags=(tag, "label", "map"),
+                       fill=CLEAR if member else self.MAP["label_sub"])
+        cv.tag_raise(tag)
+        cv.tag_bind(tag, "<ButtonRelease-1>", lambda _e: self._click_dokdo())
+        cv.tag_bind(tag, "<Enter>", lambda _e: cv.configure(cursor="hand2"))
+        cv.tag_bind(tag, "<Leave>", lambda _e: cv.configure(cursor=""))
+
+    def _click_dokdo(self):
+        if not self._dragged:
+            self.open_league()
+
+    def open_league(self):
+        """독도 창 (챔피언리그). 관장 창 위에 띄운다."""
+        fn = getattr(self.app, "open_league", None)
+        if fn is not None:
+            return fn(self.win.winfo_toplevel())
+        return None
 
     def _sido_fill(self, won, total):
         """전국 지도의 시·도 빛깔: 이긴 곳이 많을수록 진한 금색 (테마가 바꾼다)."""

@@ -284,6 +284,8 @@ def on_live(row):
     """실시간 배틀의 판이 바뀌었다 (live.listeners). 길드원끼리의 판이면 길드원에게 민다."""
     if not row:
         return
+    if live.kind_of(row) == "champion":
+        return                               # 챔피언리그(독도) 판은 길드 친선전 카드로 내지 않는다 - 독도 창에서 본다
     mid, state = row["id"], row["state"]
     started = False
     with _lock:                              # (보고 넣는 것을 한 번에 - 두 사람의 요청이 겹쳐도 카드는 하나다)

@@ -56,6 +56,12 @@ def count(key, now=None):
         return len(_clean(str(key), _now(now)))
 
 
+def who(key, now=None):
+    """지금 그 판을 보는 사람들 (챔피언리그는 판이 넘어갈 때마다 이 사람들에게 민다)."""
+    with _lock:
+        return list(_clean(str(key), _now(now)))
+
+
 def drop(key):
     """판이 끝났다 - 센 것을 버린다."""
     with _lock:

@@ -302,6 +302,7 @@ class SettingsWindow(object):
         self.drag = tk.BooleanVar(value=bool(s.get("petDrag", False)))
         self.fr_note = tk.BooleanVar(value=bool(s.get("friendlyNotify", True)))
         self.fr_auto = tk.BooleanVar(value=bool(s.get("friendlyAuto", False)))
+        self.cl_note = tk.BooleanVar(value=bool(s.get("championNotify", True)))
         # **알림은 셋만 띄운다** - 새 버전, 친구 요청, 게시판 댓글(1.9.0). 게임 안에서
         # 벌어지는 일(잡았다, 레벨이 올랐다)은 이걸 켜도 안 띄운다.
         # 바탕화면에서 눈으로 보이는 것으로 충분하고, 그런 것까지 화면
@@ -335,7 +336,11 @@ class SettingsWindow(object):
                  "(채팅에 카드가 놓입니다).", self._toggle_plain),
                 (self.fr_auto, "길드 친선전 바로 관전하기", "friendlyAuto",
                  "길드 친선전이 열리면 묻지 않고 바탕화면에서 바로 관전합니다.",
-                 self._toggle_plain)):
+                 self._toggle_plain),
+                # 챔피언리그 - 독도 (관장 256곳을 다 이긴 사람끼리). 리그 자체는 관장 지도의 독도에서 한다.
+                (self.cl_note, "독도 챔피언리그 알림", "championNotify",
+                 "관장을 전부 이긴 참가자가 독도에서 상대를 기다리면 화면 오른쪽 아래에 잠깐 알립니다 ([도전] 을 누르면 "
+                 "바로 붙습니다). 독도 창을 보고 있거나 배틀 · 구경 중일 때는 띄우지 않습니다.", self._toggle_plain)):
             c = tk.Checkbutton(
                 box, text=label, variable=var, bg=U.BG, fg=U.FG,
                 selectcolor=U.INK, activebackground=U.BG,

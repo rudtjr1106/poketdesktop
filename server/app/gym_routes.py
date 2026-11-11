@@ -31,7 +31,7 @@ from pydantic import BaseModel
 
 from common import trainer_battle as TB
 
-from . import auth, battle_routes, boss, config, db, deps, gimmick, guild_war, gym, items, mega, pvp, watchers
+from . import auth, battle_routes, boss, champion, config, db, deps, gimmick, guild_war, gym, items, mega, pvp, watchers
 
 router = APIRouter()
 
@@ -106,7 +106,9 @@ def overview(ctx=Depends(deps.current)):
             "source": g.get("source"), "active": ({"id": act["id"], "region": act["region"]}
                                                   if act else None),
             # 악당 출현 (시즌 4). 나타난 시·도를 지도가 검게 칠한다. 아직이면 {"active": False}.
-            "boss": boss.brief(uid)}
+            "boss": boss.brief(uid),
+            # 챔피언리그 (독도). 참가자면 지도의 독도가 금빛이다
+            "champion": champion.brief(uid)}
 
 
 @router.get("/api/gym/map")

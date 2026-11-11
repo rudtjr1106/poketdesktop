@@ -140,6 +140,7 @@ class App(object):
         self.friends_win = None
         self.guild_window = None
         self.friendly = None          # 길드 친선전의 지금 모습과 오른쪽 아래의 창 (ui_spectate.Friendly)
+        self.league = None            # 챔피언리그 - 독도의 알림 · 구경 · 창 (ui_champion.League)
         # 길드 채팅 표시 (1.10.1). 남이 쓴 가장 최근 줄의 번호 - 본 데(settings.guildChatSeen)
         # 보다 뒤면 길드 탭에 점을 찍는다. 길드 탭이 떠 있지 않은 동안에는 여기서 웹소켓을
         # 하나 붙여 바로 안다 (guild_sock). 못 붙으면 동기화(90초)에 실려 오는 번호로 안다.
@@ -1584,10 +1585,12 @@ class App(object):
         try:
             from .ui_box import confirm
             PLAT.activate()
-            ok = confirm(self.root, "실시간 배틀",
-                         "%s 님이 실시간 배틀을 신청했습니다.\n"
+            league = match.get("kind") == "champion"
+            ok = confirm(self.root, "챔피언리그 · 독도" if league else "실시간 배틀",
+                         "%s 님이 %s 신청했습니다.\n"
                          "수락하면 바로 시작합니다. 양쪽 포켓몬은 모두 Lv.%d 로 "
                          "맞춰집니다." % (match.get("foeName") or "친구",
+                                          "독도에서 챔피언리그 배틀을" if league else "실시간 배틀을",
                                           match.get("level") or 50),
                          danger=False, ok_text="수락")
         except Exception:                                   # noqa: BLE001
@@ -1612,6 +1615,34 @@ class App(object):
             if ok and isinstance(r, dict) and r.get("state") == "fighting":
                 self.open_live_battle(r)
         run_async(self.root, lambda: self.api.live_answer(mid, ok), done)
+
+    # ---------------- 챔피언리그 - 독도 ----------------
+    # 관장 256곳을 다 이긴 사람끼리의 실시간 배틀. 판은 위의 실시간 배틀 그대로이고, 상대를 찾는 일 ·
+    # 알림 · 구경 · 창은 ui_champion.League 가 한다. 알림은 놀러 가기 소켓으로 온다 (visit.Visit.on_event).
+    def league_ctl(self):
+        if self.league is None:
+            from .ui_champion import League
+            self.league = League(self)
+        return self.league
+
+    def on_champion(self, ev):
+        """놀러 가기 소켓으로 온 리그 알림 ({"t": "champion", "s": wait / ask / match})."""
+        try:
+            return self.league_ctl().on_event(ev)
+        except Exception as e:                              # noqa: BLE001
+            config.log("챔피언리그 알림 오류: %s" % e)
+
+    def open_league(self, parent=None):
+        """독도 창을 띄운다 (관장 지도의 독도를 누르면)."""
+        return self.league_ctl().open_window(parent)
+
+    def close_league(self):
+        lg, self.league = self.league, None
+        if lg is not None:
+            try:
+                lg.close()
+            except Exception:                               # noqa: BLE001
+                pass
 
     def open_live_battle(self, match):
         """실시간 배틀 창을 띄운다 (이미 떠 있으면 앞으로)."""
@@ -3080,6 +3111,7 @@ class App(object):
     def _restart_login(self):
         self._stop_guild_sock()
         self.guild_friendly(False)
+        self.close_league()
         self.guild_id, self.guild_chat, self._guild_dot = None, 0, None
         self.tm_new = 0                        # 다른 계정으로 들어오면 그 계정의 수를 다시 받는다
         self._stop_visit()                     # 놀러 가기를 끝내고 내 도트를 되살린 뒤에 지운다
@@ -3172,6 +3204,7 @@ class App(object):
             pass
         self._stop_guild_sock()
         self.guild_friendly(False)
+        self.close_league()
         self._stop_visit()
         if self._update_job is not None:
             try:

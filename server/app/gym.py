@@ -123,6 +123,11 @@ def record_win(uid, t, turns, now):
         db.run("INSERT INTO gym_clear (user_id, region, trainer, wins, best_turns, first_at,"
                " last_at, paid_on) VALUES (?,?,?,1,?,?,?,?)",
                (uid, region, t["id"], turns, now, now, today))
+        try:
+            from . import champion           # 마지막 곳을 이겼으면 챔피언리그(독도) 참가자로 적는다
+            champion.qualify(uid)
+        except Exception:                                   # noqa: BLE001
+            pass                             # 적지 못했어도 독도 창을 열 때 다시 본다
         return t["level"] * config.GYM_PRIZE_PER_LEVEL, True
     best = min(row["best_turns"] or turns, turns)
     pay = 0

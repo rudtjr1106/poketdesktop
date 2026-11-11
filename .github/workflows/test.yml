@@ -517,6 +517,10 @@ jobs:
       - name: 악당 출현 (진짜 Tk)
         if: matrix.shard == 3
         run: python client/test_boss_ui.py
+      # 챔피언리그 - 독도: 관장 전국 지도의 독도 · 독도 창(순위 · 상대 찾기 · 도전) · 알림 · 구경
+      - name: 챔피언리그 독도 (진짜 Tk)
+        if: matrix.shard == 1
+        run: python client/test_champion_ui.py
       # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0, 1.12.0 에서 쌓이는 말풍선·키보드 되찾기): 걷기·말풍선·보따리
       - name: 친구 채팅 (진짜 Tk)
         if: matrix.shard == 3
@@ -587,6 +591,8 @@ jobs:
           python client/test_auto_throw.py     # 2.1.1: 잡힐 때까지 계속 던지기 (#425)
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
+      - name: 챔피언리그 독도 (진짜 Tk)
+        run: python client/test_champion_ui.py
       # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
       - name: 상점 랜덤 캡슐 띠 (진짜 Tk)
         run: python client/test_shop_capsule_ui.py
@@ -672,6 +678,8 @@ jobs:
           python test_party.py
           # 길드 친선전 (1.10.3): 상대 구함·받기·동시 세 판·구경용 모습이 길드원에게 나가는지
           python test_friendly.py
+          # 챔피언리그 (독도): 관장 256곳 자격 · 상대 찾기 · 직접 도전 · 몇전 몇승 몇패 · 승리 순위 · 하루 3판 · 구경
+          python test_champion.py
           # 끝난 야생 배틀이 '배틀 중' 으로 남지 않는다 (1.10.4, 게시판 #174 퀵볼)
           python test_stale_battle.py
           python test_troubles.py       # 1.13.3: 야생 배틀이 앱에서 끊긴 것을 서버가 남긴다 (trouble 표, 앱 알림)

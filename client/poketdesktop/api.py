@@ -884,6 +884,27 @@ class Api(object):
     def live_seen(self):
         return self._call("POST", "/api/live/seen", {})
 
+    # ---------------- 챔피언리그 - 독도 (관장 256곳을 다 이긴 사람끼리 실시간 배틀) ----------------
+    def champion(self):
+        """지금 모습: 자격 · 여는 때 · 내 전적 · 기다리는 사람 · 접속 중인 참가자 · 진행 중인 판 · 순위 · 최근 판."""
+        return self._call("GET", "/api/champion")
+
+    def champion_seek(self, on=True):
+        """[상대 찾기] 켜기 / 끄기. 짝이 나면 응답의 match 에 판이 실린다."""
+        return self._call("POST", "/api/champion/seek", {"on": bool(on)})
+
+    def champion_challenge(self, uid):
+        """접속 중인 참가자에게 도전한다. {match} - 상대가 기다리던 사람이면 바로 fighting."""
+        return self._call("POST", "/api/champion/challenge/%d" % int(uid), {})
+
+    def champion_fight(self, mid):
+        """구경용 판 모습 (참가자만)."""
+        return self._call("GET", "/api/champion/fight/%d" % int(mid))
+
+    def champion_watch(self, mid, on=True):
+        """그 판을 관전한다 / 아직 본다 / 그만 본다 (싸우는 사람에게 '관전 N명' 이 간다). {id, n}"""
+        return self._call("POST", "/api/champion/watch", {"id": int(mid), "on": bool(on)})
+
     # ---------------- 게시판 (1.8.0) ----------------
     # 창을 열었을 때만 부른다. 새 공지가 있는지는 /api/me 에 실려 온다.
     def board(self, kind="all", page=1, q=""):

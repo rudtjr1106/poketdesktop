@@ -145,6 +145,8 @@ DEFAULTS = {
     # friendlyAuto 를 켜면 알림 없이 경기장이 바로 뜬다 (기본은 꺼짐 - 불쑥 뜨면 방해가 된다).
     "friendlyNotify": True,
     "friendlyAuto": False,
+    # 챔피언리그 - 독도: 다른 참가자가 독도에서 상대를 기다리면 오른쪽 아래에 알린다 (ui_champion.League)
+    "championNotify": True,
     # 배틀 창(관장·레이드·실시간)을 끌어서 바꿔 둔 크기 (1.10.3, battle_zoom). {종류: [폭, 높이]}.
     # 비어 있으면 기본 크기로 뜬다. 종류 = gym · live · raid.
     "battleSize": {},

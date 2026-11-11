@@ -366,3 +366,10 @@ LIVE_TURN_SEC = _int("POKET_LIVE_TURN_SEC", 30)  # 한 턴 고르는 시간
 LIVE_INVITE_SEC = _int("POKET_LIVE_INVITE_SEC", 180)
 LIVE_TTL = _int("POKET_LIVE_TTL", 900)           # 아무도 안 돌아오면 판을 접는다
 LIVE_MAX_TURNS = _int("POKET_LIVE_MAX_TURNS", 150)
+
+# 챔피언리그 (독도, champion.py): 관장 256곳을 다 이긴 사람끼리 실시간 배틀. 이 시각부터 열린다 (한국 시각 ISO).
+# 그 전에는 창에 '열리는 때' 만 보이고 기다리기 · 도전이 막힌다. 2.4.0 과 함께 바로 연다 (11/11 사용자 - 아르케는 2.5.0)
+# - 옛 앱에는 독도가 없으니 서버를 먼저 올려도 아무도 못 들어온다. 날을 잡아 열려면 POKET_CHAMPION_START 를 준다.
+CHAMPION_START = os.environ.get("POKET_CHAMPION_START", "2026-11-11T00:00:00+09:00")
+CHAMPION_WAIT_SEC = _int("POKET_CHAMPION_WAIT_SEC", 600)   # [상대 찾기] 를 켜 두면 이만큼 기다린다
+CHAMPION_NOTIFY_SEC = _int("POKET_CHAMPION_NOTIFY_SEC", 60)  # 이만큼 기다려도 상대가 없으면 다른 참가자에게 알린다

@@ -32,7 +32,7 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
-from . import (achievements, airraid, auth, avatar, battle_routes, board, board_routes, boosts, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
+from . import (achievements, airraid, auth, avatar, battle_routes, board, board_routes, boosts, champion, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
                expedition, focus, item_routes, olympics, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
@@ -64,6 +64,7 @@ app.include_router(expedition.router)
 app.include_router(focus.router)                # 포켓몬과 집중하기 (집중 타이머)
 app.include_router(olympics.router)             # 포스크탑 올림픽 (평일 14:00 다 같이 경기)
 app.include_router(airraid.router)              # 공습 (2.3.0 - 하루 한 번 낙하산 무리와 각개전투)
+app.include_router(champion.router)             # 챔피언리그 - 독도 (관장 256곳을 다 이긴 사람끼리 실시간 배틀)
 app.include_router(troubles.router)             # 앱이 배틀을 접은 까닭 (1.13.3)
 
 RNG = deps.RNG
