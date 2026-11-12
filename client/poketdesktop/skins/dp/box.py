@@ -388,13 +388,25 @@ class BoxWindow(Scene, BX.BoxWindow):
         self._soon()
         if keep and keep in self.rows:
             self.select(keep)
-        elif ids:
+        elif ids and not self._keep_empty:          # 놓아준 뒤에는 저절로 고르지 않는다 (#512, 기본 창과 같다)
             self.select(ids[0])
 
     def select(self, pid):
         BX.BoxWindow.select(self, pid)
         self._paint_grid()
         self._soon()
+
+    def clear_selection(self):
+        BX.BoxWindow.clear_selection(self)
+        self._paint_grid()
+        self._soon()
+
+    def _clear_detail(self):
+        """요약 칸을 비운다 - _paint_detail 이 '포켓몬을 고르세요' 를 그린다."""
+        self.d_art.configure(image="", text="")
+        self._d = None
+        self._move_pick = None
+        self._repaint_detail(top=True)
 
     def _menu(self, btn, rows, below=False):
         """드롭다운 - 그 단추(판 위의 자리) 아래에."""

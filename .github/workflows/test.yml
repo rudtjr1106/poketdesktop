@@ -510,6 +510,10 @@ jobs:
       - name: 포켓몬 관리 창의 여러 마리 놓아주기 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/test_box_release_many.py
+      # 놓아준 뒤에는 아무것도 고르지 않는다 (게시판 #512 - 파티 첫 칸이 저절로 골라져 메인 포켓몬이 놓아졌다)
+      - name: 놓아준 뒤 저절로 고르지 않기 (진짜 Tk)
+        if: matrix.shard == 2
+        run: python client/test_box_release_select.py
       # 시즌 4 (1.12.0): 배틀 창의 Z기술 단추, 악당 출현(검은 지도·악당 창), 길드전 칸
       - name: Z기술 단추 (진짜 Tk)
         if: matrix.shard == 1

@@ -491,6 +491,8 @@ class BoxWindow(object):
         self._sep_on = False     # 'PC 박스' 머리가 담겨 있나
         self._wait = None        # 불러오는 중 표시
         self.sel = None
+        # 놓아준 뒤에는 아무것도 고르지 않은 채 둔다 (게시판 #512) - 사용자가 직접 누를 때까지. clear_selection 참고
+        self._keep_empty = False
         # 끌어서 옮기기 상태. Row 가 이 세 가지를 부른다.
         self._drag = None
         self._line = None
@@ -1685,6 +1687,10 @@ class BoxWindow(object):
                     why = failed[0].get("reason") or ""
                     msg = "%s %s" % (msg, why) if why and why not in msg else msg
                 self._note = (msg, U.INFO if failed else U.GOOD)
+            # 놓아준 것을 고른 채면 아무것도 안 고른 모습으로 (#512 - 다시 불러온 뒤 파티 첫 칸이 저절로 골라지지 않게).
+            # 오류로 끝났으면 어느 것이 놓아졌는지 모르니 보낸 것 중 하나였으면 비운다.
+            if self.sel is not None and self.sel in (set(ids) if err else gone):
+                self.clear_selection()
             # 놓아준 것만 고름에서 뺀다. 막힌 것은 남겨 두어 무엇이 남았는지 보이게.
             self.checked = set(i for i in self.checked if i not in gone)
             self._last_check = None
@@ -1859,7 +1865,7 @@ class BoxWindow(object):
         shown = want["party"] + want["box"]
         if keep and keep in wanted:
             self.select(keep)
-        elif shown:
+        elif shown and not self._keep_empty:
             self.select(shown[0])
 
     def _view_lists(self):
@@ -2130,6 +2136,7 @@ class BoxWindow(object):
         return next((m for m in self.mons if m["id"] == self.sel), None)
 
     def select(self, pid):
+        self._keep_empty = False
         if pid not in self.rows and self._reveal(pid):
             return
         self._ensure_built(pid)
@@ -2827,8 +2834,44 @@ class BoxWindow(object):
         if not confirm_release(self.win, self.app, m):
             return
         name = m["info"]["name"]
-        U.run_async(self.root, lambda: self.app.api.release(m["id"]),
-                    self._after("%s 을(를) 보내주었습니다." % name))
+        after = self._after("%s 을(를) 보내주었습니다." % name)
+
+        def done(r, err):
+            # 놓아준 포켓몬을 고른 채면 아무것도 안 고른 모습으로 (그사이 다른 것을 눌렀으면 그대로 둔다)
+            if not err and self.sel == m["id"]:
+                self.clear_selection()
+            after(r, err)
+        U.run_async(self.root, lambda: self.app.api.release(m["id"]), done)
+
+    def clear_selection(self):
+        """아무것도 고르지 않은 모습으로 둔다 - 놓아준 뒤에 쓴다 (게시판 #512).
+
+        예전에는 고른 포켓몬이 목록에서 없어지면 _show 가 **맨 앞 줄(파티 첫 칸)을 저절로 골랐다.** 한 마리씩
+        놓아주다 렉으로 '불러오는 중' 덮개가 다음 클릭을 먹으면, 다음 것을 골랐다고 믿고 [놓아주기]·[확인] 을
+        같은 박자로 눌러 파티 첫 칸(메인 포켓몬)이 놓아졌다. 이제는 사용자가 다시 누를 때까지 아무것도 고르지
+        않는다 - 단추가 꺼져 있어 잘못 눌러도 아무 일이 없다. 다음 select 가 _keep_empty 를 푼다.
+        """
+        prev, self.sel = self.sel, None
+        self._keep_empty = True
+        r = self.rows.get(prev)
+        if r is not None:
+            r.set_selected(False)
+        self.set_buttons(False)
+        self.stop_anim()
+        self._art_gen += 1                          # 늦게 온 도트 답은 버린다
+        self._clear_detail()
+
+    def _clear_detail(self):
+        """상세 칸을 창을 처음 열었을 때처럼 ('포켓몬을 고르세요'). 테마는 자기 칸을 비우게 바꿔 쓴다."""
+        self.d_num.configure(text="")
+        self.d_art.configure(image="", text="포켓몬을 고르세요", fg=U.FG_FAINT)
+        for w in (self.d_name, self.d_gender, self.d_lv, self.d_sub):
+            w.configure(text="")
+        for w in self.d_types.winfo_children():
+            w.destroy()
+        for f in (self._d_mon, self._d_egg):        # 특성 ~ 기술 · 알 칸 (다시 고르면 show_detail 이 담는다)
+            if f.winfo_manager():
+                f.pack_forget()
 
     def _fit_note(self, e):
         """설명 폭을 라벨의 진짜 폭에 맞춘다 (지닌 도구 칸과 같은 이유)."""
