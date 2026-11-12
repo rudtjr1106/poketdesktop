@@ -27,7 +27,8 @@
 밀려오는 것이 없으면 스스로 물어 온다 (POLL_MS).
 
 **길드전 공격도 같은 카드로 구경한다** (시즌 4). 길드원이 다른 길드의 칸을 치면 채팅에 '길드전 공격' 카드가
-놓인다 (판 번호는 'w' + 관장 배틀 번호, 카드에 war = 칸 이름·상대 길드·승수).
+놓인다 (판 번호는 'w' + 관장 배틀 번호, 카드에 war = 칸 이름·상대 길드·승수). 시즌 7 부터의 1:1 맞대결은
+war = {"mode": "match", "name": 방어자, "guild": 그 길드} 이고, 끝난 판은 승수 대신 별(★★☆)을 적는다.
 
 **관전 N명.** 구경을 시작하고 그만둘 때, 보는 동안에는 PING_MS 마다 서버에 알린다. 서버가 센 수를
 {"t": "watchers"} 로 밀어 주면 싸우는 사람의 배틀 창(실시간·관장식)에 '관전 N명' 을 적는다 (draw_watchers).
@@ -108,9 +109,31 @@ def is_war(fight_or_card):
     return x.get("kind") == "guildwar" or bool(x.get("war")) or str(x.get("id") or x.get("mid") or "").startswith("w")
 
 
-def war_tail(war, result):
-    """끝난 길드전 공격 카드의 꼬리글."""
+def star_text(n, top=3):
+    """별 수 -> '★★☆' (1:1 맞대결, 시즌 7~)."""
+    try:
+        n = max(0, min(top, int(n or 0)))
+    except (TypeError, ValueError):
+        n = 0
+    return "★" * n + "☆" * (top - n)
+
+
+def war_where(war):
+    """길드전 공격 카드의 '어디' - 지도전은 칸 이름, 1:1 맞대결은 상대 길드 ([길드])."""
     war = war or {}
+    if war.get("mode") == "match":
+        return "[%s]" % war["guild"] if war.get("guild") else ""
+    return war.get("name") or ""
+
+
+def war_tail(war, result):
+    """끝난 길드전 공격 카드의 꼬리글. 1:1 맞대결(war.mode == 'match')은 별로 적는다."""
+    war = war or {}
+    if war.get("mode") == "match":
+        if war.get("stars") is not None:
+            return star_text(war["stars"])
+        # 별이 안 실려 왔다 (옛 카드) - 이겼는지만 적는다
+        return {"a": "승리", "draw": "무승부"}.get(result, "막혔다")
     if war.get("took"):
         return "점령!"
     if result == "a":
@@ -205,7 +228,7 @@ def chat_card(card, line, view, me, watching=None):
         text = "%s  vs  %s" % ((f.get("a") or {}).get("name") or an, (f.get("b") or {}).get("name") or bn)
         if war:
             text = "%s  →  %s  ·  %s" % ((f.get("a") or {}).get("name") or an, (f.get("b") or {}).get("name") or bn,
-                                        war.get("name") or "")
+                                        war_where(war))
         if me is not None and me in players(f):
             return out("진행 중", "fight", text, "내 배틀", "mine")
         if watching is not None and watching == f.get("id"):
@@ -220,7 +243,7 @@ def chat_card(card, line, view, me, watching=None):
     if card.get("s") in ("fight", "over"):
         r = card.get("result") if card.get("s") == "over" else None
         if war:
-            text = "%s  →  %s  ·  %s" % (an, bn, war.get("name") or "")
+            text = "%s  →  %s  ·  %s" % (an, bn, war_where(war))
             return out("끝", "done", text + ("   ·   %s" % war_tail(war, r) if card.get("s") == "over" else ""))
         tail = {"a": "%s 님 승리" % an, "b": "%s 님 승리" % bn, "draw": "무승부"}.get(r)
         return out("끝", "done", "%s  vs  %s" % (an, bn) + ("   ·   %s" % tail if tail else ""))

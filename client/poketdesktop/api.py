@@ -706,9 +706,20 @@ class Api(object):
         """칸 하나: 지키는 쪽과 방어팀 미리보기(남의 칸은 앞 몇 마리만), 우리 승수, 칠 수 있는지."""
         return self._call("GET", "/api/guild/war/tile/%s" % region)
 
-    def guild_war_attack(self, region):
-        """칸 하나에 승부를 건다. 관장 배틀 판이 열린다 (gym_start 와 같은 꼴 - 관장 배틀 창이 그대로 한다)."""
-        return self._call("POST", "/api/guild/war/attack", {"region": str(region)}, timeout=RAID_TIMEOUT)
+    def guild_war_match(self):
+        """1:1 맞대결 (시즌 7~): 우리 판의 별 · 상대 출전 명단(앞 3마리 · 받은 최고 별 · 칠 수 있는지) · 우리 명단.
+        조커로 가려진 상대는 이름이 '???' 이고 userId 가 음수(명단 안의 자리 표시)다 - 그대로 열쇠로 쓴다."""
+        return self._call("GET", "/api/guild/war/match")
+
+    def guild_war_attack(self, region=None, target=None):
+        """승부를 건다. 관장 배틀 판이 열린다 (gym_start 와 같은 꼴 - 관장 배틀 창이 그대로 한다).
+        지도전은 칸(region), 1:1 맞대결은 상대 길드원(target = match 의 userId, 가려진 조커면 음수 그대로)."""
+        body = {"target": int(target)} if target is not None else {"region": str(region)}
+        return self._call("POST", "/api/guild/war/attack", body, timeout=RAID_TIMEOUT)
+
+    def guild_war_roster(self, out):
+        """길드장 (1:1 · 전략 기간 · 인원 상한에 걸린 판): 이번 판에 빠질 길드원. 길드전 모습(state)을 돌려준다."""
+        return self._call("POST", "/api/guild/war/roster", {"out": [int(u) for u in out or ()]})
 
     def guild_war_attacks(self, plan):
         """길드장: 공격 횟수 나누기 {사람: 횟수}."""
@@ -719,8 +730,12 @@ class Api(object):
         """길드장: 길드원을 우리 칸에 배치한다."""
         return self._call("POST", "/api/guild/war/guard", {"region": str(region), "userId": int(uid)})
 
-    def guild_war_joker(self, region, on=True):
-        """길드장: 그 칸을 지키는 길드원을 조커로 숨기거나 푼다 (시즌 5). 그 칸의 모습(tile)을 돌려준다."""
+    def guild_war_joker(self, region=None, on=True, user_id=None):
+        """길드장: 길드원을 조커로 숨기거나 푼다.
+        지도전(시즌 5~6)은 그 칸(region)을 지키는 사람 - 그 칸의 모습(tile)을 돌려준다.
+        1:1 맞대결(시즌 7~)은 그 사람(user_id) - 길드전 모습(state)을 돌려준다."""
+        if user_id is not None:
+            return self._call("POST", "/api/guild/war/joker", {"userId": int(user_id), "on": bool(on)})
         return self._call("POST", "/api/guild/war/joker", {"region": str(region), "on": bool(on)})
 
     def guild_war_log(self):

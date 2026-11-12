@@ -36,6 +36,15 @@ class WarTab(GW.WarTab):
         sb = K.Scroll(self.right, self.cv, BASE_BG)
         sb.pack(side="right", fill="y", before=self.cv)
         self.cv.configure(yscrollcommand=sb.set)
+        # 1:1 맞대결 판 (시즌 7~): 지도 자리에 끼는 판의 바탕 · 굴림 막대도 DP 것으로
+        for w in (self.board, self.score_box, self.list_head, self.barea, self.bcv, self.binner):
+            w.configure(bg=BASE_BG)
+        for ch in self.barea.winfo_children():
+            if isinstance(ch, ttk.Scrollbar):
+                ch.destroy()
+        bsb = K.Scroll(self.barea, self.bcv, BASE_BG)
+        bsb.pack(side="right", fill="y", before=self.bcv)
+        self.bcv.configure(yscrollcommand=bsb.set)
 
     def _layout(self, wide):
         was = self.wide
@@ -44,10 +53,10 @@ class WarTab(GW.WarTab):
             self.right.configure(width=self._side_w())      # (보통 크기에서는 U.h(SIDE_W) 그대로)
             self.left.pack_configure(padx=(0, U.h(8)))
 
-    def _card(self, title=None):
-        """흰 판 한 겹 (가는 테). 제목은 파란 꼬리표."""
+    def _card(self, title=None, parent=None):
+        """흰 판 한 겹 (가는 테). 제목은 파란 꼬리표. parent 를 안 주면 오른쪽 굴리는 칸에 (맞대결 판의 별 판은 왼쪽)."""
         s = U.h
-        c = tk.Frame(self.inner, bg=WHITE, highlightthickness=1, highlightbackground=GLINE,
+        c = tk.Frame(parent or self.inner, bg=WHITE, highlightthickness=1, highlightbackground=GLINE,
                      highlightcolor=GLINE, bd=0)
         c.pack(fill="x", pady=(0, s(8)))
         if title:

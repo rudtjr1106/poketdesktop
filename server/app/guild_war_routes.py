@@ -11,11 +11,17 @@
     POST   /api/guild/war/guard           길드장: 길드원을 우리 칸에 배치 {region, userId}
     POST   /api/guild/war/joker           길드장: 그 칸을 지키는 길드원을 조커로 숨기기·풀기 {region, on} (시즌 5)
     GET    /api/guild/war/log             내 길드가 낀 판들
+
+시즌 7 부터 1:1 맞대결 (guild_war_match.py) - map · tile · attacks · guard 는 409, 대신:
+    GET    /api/guild/war/match           맞대결 판: 칠 상대 명단 · 우리 명단 · 두 성적
+    POST   /api/guild/war/attack          {target: 사람} (가려진 조커는 음수 자리 표시)
+    POST   /api/guild/war/roster          길드장: 출전 상한에 걸리면 쉴 사람 {out: [...]}
+    POST   /api/guild/war/joker           길드장: {userId, on}
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from . import deps, guild_war
+from . import deps, guild_war, guild_war_match
 
 router = APIRouter()
 
@@ -27,6 +33,7 @@ class TeamIn(BaseModel):
 
 class AttackIn(BaseModel):
     region: str = ""
+    target: int = 0             # 1:1 맞대결 (시즌 7 부터): 칠 사람 (가려진 조커는 음수 자리 표시)
 
 
 class PlanIn(BaseModel):
@@ -40,7 +47,12 @@ class GuardIn(BaseModel):
 
 class JokerIn(BaseModel):
     region: str = ""
+    userId: int = 0             # 1:1 맞대결: 숨길 길드원
     on: bool = True
+
+
+class RosterIn(BaseModel):
+    out: list = []              # 1:1 맞대결: 이번 판에 쉴 길드원
 
 
 def _uid(ctx):
@@ -85,7 +97,27 @@ def tile(region: str, ctx=Depends(deps.current)):
 
 @router.post("/api/guild/war/attack")
 def attack(body: AttackIn, ctx=Depends(deps.current)):
+    if guild_war.match_mode():
+        return guild_war_match.attack(_uid(ctx), body.target)
     return guild_war.attack(_uid(ctx), (body.region or "")[:16])
+
+
+@router.get("/api/guild/war/match")
+def match(ctx=Depends(deps.current)):
+    """1:1 맞대결 판 (시즌 7 부터): 칠 상대 명단 · 우리 명단 · 두 성적."""
+    if not guild_war.match_mode():
+        raise HTTPException(409, "이번 시즌 길드전은 지도전입니다.")
+    return guild_war_match.match_view(_uid(ctx))
+
+
+@router.post("/api/guild/war/roster")
+def roster(body: RosterIn, ctx=Depends(deps.current)):
+    if not guild_war.match_mode():
+        raise HTTPException(409, "이번 시즌 길드전은 지도전입니다.")
+    if len(body.out or []) > 60:
+        raise HTTPException(400, "한 번에 너무 많이 보냈습니다.")
+    guild_war_match.set_roster(_uid(ctx), body.out)
+    return guild_war.state(_uid(ctx))
 
 
 @router.post("/api/guild/war/attacks")
@@ -104,6 +136,9 @@ def guard(body: GuardIn, ctx=Depends(deps.current)):
 
 @router.post("/api/guild/war/joker")
 def joker(body: JokerIn, ctx=Depends(deps.current)):
+    if guild_war.match_mode():
+        guild_war_match.set_joker(_uid(ctx), body.userId, bool(body.on))
+        return guild_war.state(_uid(ctx))
     guild_war.set_joker(_uid(ctx), (body.region or "")[:16], bool(body.on))
     return guild_war.tile_view(_uid(ctx), (body.region or "")[:16])
 

@@ -93,6 +93,7 @@ WAR_DAYS = 6                 # 전쟁: 정해 둔 것은 못 바꾼다
 SETTLE_DAYS = 1              # 결산 (끝난 첫날). 시즌 2주 = 3 + 4 + 6 + 1
 MIN_MEMBERS = 5              # 이만큼은 있어야 신청할 수 있다
 TOTAL_ATTACKS = 30           # 길드 하나의 공격 수 합 = 길드 하나가 받는 공격 수 상한
+MATCH_FROM = 7               # 이 시즌부터 지도전 대신 1:1 맞대결 (guild_war_match.py, 2026-11-12 사용자 결정)
 RING_ROWS = 5                # 원형 지도: 길드마다 부채꼴 하나 = 줄 5개(바깥 -> 안) x 칸 3개
 RING_COLS = 3
 # 명단을 고정하던 요청이 이만큼 지나도 안 끝났으면(서버가 그사이 죽었다) 그 표시는 낡은 것으로 보고 다시 고정한다
@@ -179,6 +180,21 @@ def phase(now=None):
     if now < ends_at():
         return "war", ends_at()
     return "done", None
+
+
+def match_mode(s=None):
+    """이 시즌 길드전이 1:1 맞대결인가 (시즌 7 부터). 시즌 번호에 묶는다 - 시즌 중에 규칙이 안 바뀐다."""
+    return (s or season.SEASON) >= MATCH_FROM
+
+
+def _gm():
+    from . import guild_war_match
+    return guild_war_match
+
+
+def _no_map():
+    if match_mode():
+        raise HTTPException(409, _gm().ONLY)
 
 
 def quota(n):
@@ -581,10 +597,11 @@ def _lock_all(s, now=None):
     if busy:
         return True
     try:
-        _deal(s, now)                         # 명단이 다 고정됐으니 지도를 나눈다
+        # 명단이 다 고정됐으니 지도를 나눈다 (시즌 7 부터는 상대를 정한다)
+        (_gm().lock if match_mode(s) else _deal)(s, now)
     except Exception as err:                                  # noqa: BLE001
         from . import errors
-        errors.record("GWAR", "guild_war._deal", err)
+        errors.record("GWAR", "guild_war._deal" if not match_mode(s) else "guild_war_match.lock", err)
         return True                           # 표시를 안 적었으니 다음 요청이 다시 나눈다 (같은 줄이 들어간다)
     _mark("gw:%d:locked" % s, _iso(now))      # 다 끝났다 - 이제부터는 위에서 바로 돌아간다
     return True
@@ -610,7 +627,7 @@ def _lock_guild(s, gid, now=None):
             guild._say(gid, "길드전 전략 기간이 시작됐지만 싸울 수 있는 길드원이 %d명이 안 되어 이번에는 "
                        "나가지 못합니다." % MIN_MEMBERS, now)
         return
-    counts = quota(len(people))
+    counts = [_gm().EACH] * len(people) if match_mode(s) else quota(len(people))
     for (uid, d_team, a_team), n in zip(people, counts):
         # used·attacks 는 다시 고정하게 되더라도 건드리지 않는다 (이미 쓴 횟수가 0 으로 돌아가면 안 된다)
         db.run("INSERT INTO guild_war_team (season, user_id, guild_id, name, def_team, atk_team,"
@@ -621,6 +638,11 @@ def _lock_guild(s, gid, now=None):
                " ELSE excluded.attacks END, locked=1, updated_at=excluded.updated_at",
                (s, uid, gid, guild._name_of(uid), json.dumps(d_team), json.dumps(a_team), n, _iso(now)))
     db.run("UPDATE guild_war_entry SET locked=1 WHERE season=? AND guild_id=?", (s, gid))
+    if match_mode(s):
+        guild._say(gid, "길드전 전략 기간이 시작됐습니다! 명단이 고정됐습니다 (%d명). 곧 맞대결 상대가 정해집니다. "
+                   "전쟁이 시작되기 전까지 길드원은 팀을 고칠 수 있습니다." % len(people), now)
+        guild._changed(gid)
+        return
     guild._say(gid, "길드전 전략 기간이 시작됐습니다! 지도가 나뉘고 명단이 고정됐습니다. 전쟁이 시작되기 전까지 "
                "길드장은 공격 횟수(길드 합쳐 %d번, 지금은 한 사람 %s번)와 지킬 칸을 정하고, 길드원은 팀을 "
                "고칠 수 있습니다. 전쟁이 시작되면 바꿀 수 없습니다."
@@ -826,7 +848,8 @@ def joker_count(gid, s=None):
 
 def set_joker(uid, region, on, now=None):
     """길드장이 그 칸을 지키는 길드원을 조커로 숨기거나 푼다 (전략 기간에만, 길드마다 JOKER_MAX 명).
-    조커는 사람에 붙는다 - 나중에 그 사람을 다른 칸으로 옮겨도 그대로다."""
+    조커는 사람에 붙는다 - 나중에 그 사람을 다른 칸으로 옮겨도 그대로다. (1:1 시즌은 guild_war_match.set_joker)"""
+    _no_map()
     if not v5():
         raise HTTPException(409, "조커는 시즌 5 부터입니다.")
     m = guild._need_manager(uid)
@@ -916,6 +939,7 @@ def _earned(s, uid):
 def set_attacks(uid, plan, now=None):
     """길드장이 공격 횟수를 나눈다 (전략 기간에만). plan = {사람: 횟수}. 한 사람 최소 1번(이미 쓴 것보다
     적게는 안 된다), 길드 합 TOTAL_ATTACKS 까지. 안 적은 사람은 그대로 둔다."""
+    _no_map()
     m = guild._need_manager(uid)
     if phase(now)[0] != "plan":
         raise HTTPException(409, "공격 횟수는 전략 기간에만 나눌 수 있습니다. 전쟁이 시작되면 바꿀 수 없습니다.")
@@ -957,6 +981,7 @@ def place(uid, member, region, now=None):
     """길드장이 길드원 한 사람을 그 칸으로 옮긴다 (전략 기간에만). 그 칸에 다른 사람이 있으면 자리를
     맞바꾸고, AI 수비대 칸이면 원래 칸이 AI 수비대 칸이 된다. **공격받은 적 있는 칸은 못 건드린다**
     (전략 기간에는 공격이 없으니 걸릴 일이 없지만, 판이 남아 있는 칸을 지키려고 그대로 둔다)."""
+    _no_map()
     m = guild._need_manager(uid)
     if phase(now)[0] != "plan":
         raise HTTPException(409, "지키는 칸은 전략 기간에만 바꿀 수 있습니다. 전쟁이 시작되면 바꿀 수 없습니다.")
@@ -1039,7 +1064,9 @@ def attack(uid, region, now=None):
     """그 칸에 승부를 건다. 공격권 하나를 쓰고 관장 배틀 판을 연다 (끝나면 on_end).
 
     돌려주는 것은 관장 배틀의 시작(gym_routes.start)과 같은 꼴이라 관장 배틀 창이 그대로 연다.
+    (1:1 시즌은 guild_war_match.attack - 사람을 친다)
     """
+    _no_map()
     _lock(now)
     expire(now)
     if phase(now)[0] != "war":
@@ -1119,6 +1146,9 @@ def _finish(a, res, turns=0, now=None):
 
 def on_end(uid, row, tb, events=None, now=None):
     """관장 배틀 창에서 길드전 판이 끝났다 (gym_routes.act 가 부른다). 결과 창에 적을 줄을 돌려준다."""
+    p = parse(row["region"])
+    if p and match_mode(p[0]):
+        return _gm().on_end(uid, row, tb, events, now)
     a = db.q1("SELECT * FROM guild_war_attack WHERE battle_id=?", (row["id"],))
     if not a or a["atk_user"] != uid:
         return None
@@ -1178,7 +1208,10 @@ def expire(now=None, everything=False):
     # 판은 끝났는데 기록이 '진행 중' 인 것 (시간이 지났거나 관장 쪽에서 접힌 것) -> 진 것
     for a in db.q("SELECT a.* FROM guild_war_attack a JOIN gym_battle b ON b.id = a.battle_id"
                   " WHERE a.result='pending' AND b.state='done'"):
-        b = db.q1("SELECT result, turn FROM gym_battle WHERE id=?", (a["battle_id"],))
+        b = db.q1("SELECT result, turn, data FROM gym_battle WHERE id=?", (a["battle_id"],))
+        if match_mode(a["season"]):
+            _gm().end_expired(a, b, now)
+            continue
         res = RESULT_OF.get(b["result"], "lose")
         wrote, took = _finish(a, res, b["turn"], now)
         if wrote:
@@ -1261,11 +1294,14 @@ def spectate_turn(uid, row, tb, events):
         a = db.q1("SELECT * FROM guild_war_attack WHERE battle_id=?", (row["id"],))
         if not a:
             return
-        t = tile(a["region"], a["season"])
         gname = (entry(a["def_guild"], a["season"]) or {"name": "?"})["name"]
         names = _names(a["atk_name"], "[%s] %s" % (gname, a["def_name"]), a["atk_user"], a["def_user"])
-        war = {"region": a["region"], "name": t["name"] if t else a["region"], "guild": gname,
-               "wins": _wins(a["season"], a["region"], a["atk_guild"]), "need": WINS_TO_TAKE}
+        if match_mode(a["season"]):
+            war = {"mode": "match", "target": a["def_user"], "name": a["def_name"], "guild": gname}
+        else:
+            t = tile(a["region"], a["season"])
+            war = {"region": a["region"], "name": t["name"] if t else a["region"], "guild": gname,
+                   "wins": _wins(a["season"], a["region"], a["atk_guild"]), "need": WINS_TO_TAKE}
         friendly.watch_feed(a["atk_guild"], fight_id(row["id"]),
                             spectate(tb, row["id"], names, events, (row["rev"] or 0) + 1, war))
     except Exception as err:                                  # noqa: BLE001
@@ -1273,12 +1309,14 @@ def spectate_turn(uid, row, tb, events):
         errors.record("GWAR", "guild_war.spectate_turn", err)
 
 
-def _watch_end(a, tb, events, rev, res, took, wins, text):
-    """공격이 끝났다 - 마지막 모습을 밀고 카드를 결과로 고친다 (tb 가 없으면 시간이 지나 접힌 것이다)."""
+def _watch_end(a, tb, events, rev, res, took, wins, text, extra=None):
+    """공격이 끝났다 - 마지막 모습을 밀고 카드를 결과로 고친다 (tb 가 없으면 시간이 지나 접힌 것이다).
+    extra = 1:1 맞대결 판의 별 (guild_war_match) - 카드의 war 에 얹는다."""
     try:
         fid = fight_id(a["battle_id"])
         result = {"win": "a", "draw": "draw"}.get(res, "b")
         more = {"took": bool(took), "wins": wins, "result": res}
+        more.update(extra or {})
         if tb is not None:
             gname = (entry(a["def_guild"], a["season"]) or {"name": "?"})["name"]
             fight = spectate(tb, a["battle_id"], _names(a["atk_name"], "[%s] %s" % (gname, a["def_name"]),
@@ -1295,11 +1333,13 @@ def _watch_end(a, tb, events, rev, res, took, wins, text):
 
 # ---------------------------------------------------------------- 점수와 순위
 def scores(s=None):
-    """순위표. 가진 칸 -> 방어 성공 수 -> 공격 승리 수 -> 먼저 닿은 길드.
+    """순위표. 가진 칸 -> 방어 성공 수 -> 공격 승리 수 -> 먼저 닿은 길드. (1:1 시즌은 guild_war_match.scores)
 
     color 는 지도에 칠할 색 번호다 - 신청한 차례라 전쟁 내내 안 바뀐다 (순위가 바뀌어도 색은 그대로).
     """
     s = s or season.SEASON
+    if match_mode(s):
+        return _gm().scores(s)
     rows = dict((e["guild_id"], {"guildId": e["guild_id"], "name": e["name"], "color": i, "score": 0,
                                  "tiles": 0, "taken": 0, "lost": 0, "wins": 0, "defends": 0, "attacks": 0,
                                  "received": 0, "last": ""})
@@ -1347,6 +1387,8 @@ def settle(now=None):
     """
     _lock(now)
     s = season.SEASON
+    if match_mode(s):
+        return _gm().settle(now)
     if phase(now)[0] != "done" or _meta("gw:%d:settled" % s):
         return False
     expire(now, everything=True)
@@ -1431,7 +1473,8 @@ def tm_count(uid, gid, rank, s):
     wins = int(r["n"] or 0) if r else 0
     if not wins:
         return 0, 0
-    return TM_RANK.get(rank, 0), (TM_ACTIVE if wins >= TM_ACTIVE_WINS else 0)
+    need = _gm().TM_ACTIVE_WINS if match_mode(s) else TM_ACTIVE_WINS     # 1:1 은 공격이 2번뿐 - 2번 다 이김
+    return TM_RANK.get(rank, 0), (TM_ACTIVE if wins >= need else 0)
 
 
 def _tm_reward(uid, gid, rank, s, gname, now=None):
@@ -1448,7 +1491,8 @@ def _tm_reward(uid, gid, rank, s, gname, now=None):
     if by_rank:
         bits.append("%d위 보상 %d장" % (rank, by_rank))
     if active:
-        bits.append("활약 보상(공격 %d승 이상) %d장" % (TM_ACTIVE_WINS, active))
+        need = _gm().TM_ACTIVE_WINS if match_mode(s) else TM_ACTIVE_WINS
+        bits.append("활약 보상(공격 %d승 이상) %d장" % (need, active))
     msg = ("시즌 %d 길드전 [%s] - 랜덤 기술머신 뽑기권 %d장 (%s). 가방에서 쓰면 아직 없는 기술머신 하나가 나옵니다."
            % (s, gname, n, " · ".join(bits)))
     db.run("INSERT INTO gift (user_id, kind, item_id, count, title, message, created_at) VALUES (?,?,?,?,?,?,?)",
@@ -1456,14 +1500,15 @@ def _tm_reward(uid, gid, rank, s, gname, now=None):
     return n
 
 
-def tm_text(rank):
-    """결산 채팅에 붙일 뽑기권 한 마디 (시즌 5)."""
+def tm_text(rank, need=None):
+    """결산 채팅에 붙일 뽑기권 한 마디 (시즌 5). need = 활약 몫의 승수 (1:1 은 2)."""
+    need = need or TM_ACTIVE_WINS
     if TM_RANK.get(rank):
         return (" 공격에서 이긴 길드원에게는 랜덤 기술머신 뽑기권 %d장도 드립니다. %d번 이상 이긴 길드원은 활약 보상으로 "
-                "%d장 더 받습니다." % (TM_RANK[rank], TM_ACTIVE_WINS, TM_ACTIVE))
+                "%d장 더 받습니다." % (TM_RANK[rank], need, TM_ACTIVE))
     # 순위 몫이 없는 길드 - '더' 가 아니다
     return (" 공격에서 %d번 이상 이긴 길드원은 활약 보상으로 랜덤 기술머신 뽑기권 %d장을 받습니다."
-            % (TM_ACTIVE_WINS, TM_ACTIVE))
+            % (need, TM_ACTIVE))
 
 
 # ---------------------------------------------------------------- 보여주기
@@ -1487,6 +1532,7 @@ def tile_view(uid, region, now=None):
     **남의 칸이면 방어팀의 앞 SHOWN 마리만 싣는다.** 가려진 포켓몬의 종·레벨은 이 응답 어디에도 없다.
     길드장에게는 우리 칸의 지키는 사람을 바꿀 수 있는지와 길드원 목록을 더 준다.
     """
+    _no_map()
     _lock(now)
     expire(now)
     s = season.SEASON
@@ -1547,6 +1593,7 @@ def map_view(uid, now=None, have=None):
     cells 의 값: {"codes": [...], "g": 주인, "name": 이름, "me": 내가 지키면 1, "ai": AI 수비대면 1,
     "taken": 넘어간 칸이면 1, "wins": 우리 길드가 쌓은 승수(있으면)}. 방어팀은 싣지 않는다 (누르면 tile_view).
     """
+    _no_map()
     now = now or _now()
     _lock(now)
     expire(now)
@@ -1618,7 +1665,7 @@ def state(uid, now=None):
     if v5():
         out["jokerMax"] = JOKER_MAX           # 길드가 없어도 규칙 칸에 적는다
     if not m:
-        return out
+        return _gm().state_extra(uid, out, now) if match_mode(s) else out
     gid = m["guild_id"]
     e = entry(gid, s)
     members = guild._count(gid)
@@ -1663,7 +1710,7 @@ def state(uid, now=None):
             for x, r in zip(out["mates"], rows):
                 x["joker"] = bool(r["joker"])
         out["received"] = _received(s, gid)
-    return out
+    return _gm().state_extra(uid, out, now) if match_mode(s) else out
 
 
 # 옛 화면(1.13.1 까지)은 길드 정보의 war.phase 가 apply·war·done 일 때만 '길드전' 칸을 냈다 - 'plan' 을 빠뜨려서
@@ -1716,4 +1763,6 @@ def log(uid, limit=40):
                     "result": a["result"], "took": bool(a["took"]),
                     "good": None if a["result"] == "pending" else (win if ours else not win),
                     "at": a["created_at"]})
+        if match_mode(s):
+            _gm().log_row(a, out[-1])
     return out

@@ -1020,6 +1020,17 @@ CREATE INDEX IF NOT EXISTS idx_gw_attack_def ON guild_war_attack(season, def_gui
 CREATE INDEX IF NOT EXISTS idx_gw_attack_atk ON guild_war_attack(season, atk_guild);
 CREATE INDEX IF NOT EXISTS idx_gw_attack_region ON guild_war_attack(season, region);
 CREATE INDEX IF NOT EXISTS idx_gw_attack_battle ON guild_war_attack(battle_id);
+-- 시즌 7 부터 1:1 맞대결 (guild_war_match.py): 길드마다 칠 길드 · 나를 칠 길드. 1:1 이면 둘이 같고(kind 'pair'),
+-- 홀수라 세 길드를 묶었으면 A->B->C->A 로 다르다(kind 'tri'). cap = 그 판의 출전 상한 (없으면 NULL).
+CREATE TABLE IF NOT EXISTS guild_war_pair (
+    season       INTEGER NOT NULL,
+    guild_id     INTEGER NOT NULL,
+    target_guild INTEGER NOT NULL,
+    from_guild   INTEGER NOT NULL,
+    kind         TEXT NOT NULL DEFAULT 'pair',
+    cap          INTEGER,
+    PRIMARY KEY (season, guild_id)
+);
 
 -- 승인이 필요한 길드에 넣어 둔 가입 신청
 CREATE TABLE IF NOT EXISTS guild_request (
@@ -1317,6 +1328,12 @@ MIGRATIONS = [
     ("guild_war_attack", "coins", "ALTER TABLE guild_war_attack ADD COLUMN coins INTEGER NOT NULL DEFAULT 0"),
     ("guild_war_attack", "def_coins",
      "ALTER TABLE guild_war_attack ADD COLUMN def_coins INTEGER NOT NULL DEFAULT 0"),
+    # 시즌 7 길드전 1:1 맞대결 (guild_war_match.py): 출전 상한에 걸려 쉬는 사람 · 판마다 별 · 쓰러뜨린 수 · 방어팀 마릿수.
+    # 옛 행은 0 / NULL = 지도전 판
+    ("guild_war_team", "bench", "ALTER TABLE guild_war_team ADD COLUMN bench INTEGER NOT NULL DEFAULT 0"),
+    ("guild_war_attack", "stars", "ALTER TABLE guild_war_attack ADD COLUMN stars INTEGER"),
+    ("guild_war_attack", "kos", "ALTER TABLE guild_war_attack ADD COLUMN kos INTEGER"),
+    ("guild_war_attack", "def_size", "ALTER TABLE guild_war_attack ADD COLUMN def_size INTEGER"),
     # 타입 스프레이 (2.1.1, boosts.py): 어느 타입이 언제까지 켜져 있나
     ("wild_state", "lure_type", "ALTER TABLE wild_state ADD COLUMN lure_type TEXT"),
     ("wild_state", "lure_until", "ALTER TABLE wild_state ADD COLUMN lure_until TEXT"),

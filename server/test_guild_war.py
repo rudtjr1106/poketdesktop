@@ -158,6 +158,9 @@ def fight(uid, region, win=True):
 
 def main():
     db.init()
+    # 지도전 규칙(시즌 4 ~ 6) 그대로 본다 - 시즌 7 부터는 1:1 맞대결(guild_war_match)이라 지도 길이 409 로 막힌다.
+    # 1:1 은 test_guild_war_match 가 본다.
+    season.SEASON = 5
 
     print("=== 일정 ===")
     # 시즌마다 시작한 날부터 센다 (시즌 4 는 10/17, 시즌 5 는 11/1).
