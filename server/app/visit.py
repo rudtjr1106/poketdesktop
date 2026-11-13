@@ -43,10 +43,17 @@ visitable). 놀러 가기는 POST /api/visit/start 로 하고, 그 뒤의 파티
                   {"t": "act", "act": "dance", "pet": 12}  동작 (ACTS)
                   {"t": "look", "look": 10006}      손님: 보낸 포켓몬의 모습 (메가진화한 모습으로 걷기)
                   "ping"                            -> "pong"
-    서버 -> 화면   {"t": "hello"}                    붙었다
+    서버 -> 화면   {"t": "hello", "push": [...], "latest": "2.5.1"}   붙었다. push = 이 서버가 밀어 주는 것
+                                                    (앱은 여기 있는 것만 폴링을 멈춘다), latest = 깃허브의 최신 앱 판
                   {"t": "visit", "visit": {...}}    연결됐다 (role 이 host / guest)
                   {"t": "party"/"say"/"act"/"look", ...}  상대가 보낸 것 (from = host / guest)
                   {"t": "end", "by", "text"}        끝났다
+
+이 소켓이 앱이 켜져 있는 동안 늘 붙어 있어서 놀러 가기 말고 다른 알림도 같이 싣는다:
+
+                  {"t": "champion", "s": ...}       챔피언리그 - 독도 (champion.py)
+                  {"t": "live", "s": ..., "id": 판}   실시간 배틀 초대가 왔다 · 받았다 · 거절했다 (live._poke)
+                  {"t": "update", "v": "2.5.1"}     새 앱 판이 나왔다 (release_watch)
 
 끊기면 GRACE 초를 기다렸다가 끝낸다 (프로그램을 다시 켜는 사이에 끝나지 않게). 서버를 다시 올리면
 놀러 간 것은 전부 끝난다 (적어 두지 않는다 - 옮긴 도구는 이미 옮겼다).
@@ -188,6 +195,36 @@ def push(uid, payload):
                 asyncio.run_coroutine_threadsafe(_send(c, text), loop)
         except RuntimeError:
             pass
+
+
+def push_all(payload):
+    """붙어 있는 모든 화면으로 보낸다 (새 앱 버전 알림 - release_watch). 보낸 사람 수."""
+    loop = _loop
+    if loop is None or loop.is_closed():
+        return 0
+    with _lock:
+        uids = list(_conns)
+    for uid in uids:
+        push(uid, payload)
+    return len(uids)
+
+
+# 이 서버가 소켓으로 밀어 주는 것 (hello 에 싣는다). 앱은 여기 있는 것만 폴링을 멈춘다 - 옛 서버에 붙으면
+# 목록이 없으므로 예전처럼 묻는다.
+PUSHES = ("live",)
+
+
+def _hello(uid):
+    """붙자마자 보내는 첫 줄. 새 앱 버전을 알고 있으면 같이 싣는다 - 알릴 때 끊겨 있던 앱도 다시 붙으면 안다."""
+    out = {"t": "hello", "userId": uid, "push": list(PUSHES)}
+    try:
+        from . import release_watch
+        latest = release_watch.latest()
+    except Exception:                                       # noqa: BLE001
+        latest = None
+    if latest:
+        out["latest"] = latest
+    return out
 
 
 # ---------------------------------------------------------------- 놀러 가기
@@ -616,7 +653,7 @@ async def visit_socket(ws: WebSocket):
     if not _add(c):
         return await ws.close(code=4429)
     try:
-        await ws.send_text(json.dumps({"t": "hello", "userId": uid}))
+        await ws.send_text(json.dumps(_hello(uid)))
         v = _visit_of(uid)
         if v:
             await ws.send_text(json.dumps({"t": "visit", "visit": view(v, uid)}, ensure_ascii=False))

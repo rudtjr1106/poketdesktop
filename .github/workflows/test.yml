@@ -530,6 +530,10 @@ jobs:
       - name: 친구 채팅 (진짜 Tk)
         if: matrix.shard == 3
         run: python client/test_visit_ui.py
+      # 2.5.0: 실시간 배틀 초대 · 새 앱 판 알림을 놀러 가기 소켓으로 받는다 (친구 탭이 4초마다 묻지 않는다)
+      - name: 소켓 알림 - 실시간 배틀 초대 · 새 판
+        if: matrix.shard == 3
+        run: python client/test_live_push_ui.py
       - name: 새 기술머신 표시 (진짜 Tk)
         if: matrix.shard == 2
         run: python client/test_tm_new.py
@@ -643,6 +647,9 @@ jobs:
       # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0, 1.12.0 에서 쌓이는 말풍선·키보드 되찾기): 걷기·말풍선·보따리
       - name: 친구 채팅 (진짜 Tk)
         run: python client/test_visit_ui.py
+      # 2.5.0: 실시간 배틀 초대 · 새 앱 판 알림을 놀러 가기 소켓으로 받는다
+      - name: 소켓 알림 - 실시간 배틀 초대 · 새 판
+        run: python client/test_live_push_ui.py
       # **검은 테두리 검사(smoke_anim_resize.py)는 여기서 안 돌린다.**
       # 그건 윈도우의 투명색 창(-transparentcolor)이 새로 드러난 자리를
       # 검게 합성하는 것이고, 맥은 platform_mac.py 에 SpriteView 를 따로
@@ -681,6 +688,8 @@ jobs:
           python test_sprite_fix.py
           python test_raid.py
           python test_live.py
+          # 새 앱 판 알림 (2.5.0): 깃허브 최신 릴리스가 바뀔 때만 소켓으로 민다 (가짜 깃허브)
+          python test_release_watch.py
           python test_boxes.py
           # 여러 마리 놓아주기: 한 마리씩 따로 보고 막힌 것(탐험·배틀 중·남의 것)은 까닭과 함께
           python test_release_many.py
@@ -844,6 +853,8 @@ jobs:
           # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0): 진짜 웹소켓으로 둘이 붙어서 - 1:1, 두고 오기 하루 5개,
           # 자리·말·동작·메가 주고받기, 끊기면 끝. 가방에 도구를 넣는 데만 DB 를 쓴다.
           python server/test_visit.py http://127.0.0.1:8788 /tmp/poket-test.db
+          # 실시간 배틀 초대가 놀러 가기 소켓으로 온다 (2.5.0): 걸기 · 거절 · 거두기 · 받기가 그 사람에게만
+          python server/test_live_push.py http://127.0.0.1:8788
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

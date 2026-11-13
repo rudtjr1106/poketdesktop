@@ -89,6 +89,10 @@ def _startup():
     db.init()
     migrations.run()
     internal_routes.make_key()          # 관리자 통로의 열쇠 - 뜰 때마다 새로 (2.0.x)
+    # 새 앱 판이 나오면 붙어 있는 앱에 소켓으로 바로 알린다 (release_watch) - 운영 서버에서만
+    if config.RELEASE_WATCH:
+        from . import release_watch
+        release_watch.start()
     # 길드 미션 보상은 저절로 들어온다 (1.10.3). 이 판으로 바뀌기 전에 오늘 이미 넘어 있던
     # 단계를 한 번 챙긴다 - 그 뒤로는 미션을 끝낼 때마다 guild.note 가 준다. 몇 번을 불러도
     # 같은 보상은 한 번만 나간다.

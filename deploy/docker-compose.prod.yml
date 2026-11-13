@@ -32,6 +32,8 @@ services:
       # 도트를 미리 받아두지 않는다. 여기는 디스크가 남아 있어서 한 번 받은
       # 것은 계속 쓰인다 - 처음에 900장을 몰아 받을 이유가 없다.
       POKET_WARM_SPRITES: "0"
+      # 새 앱 판이 나오면 붙어 있는 앱에 소켓으로 바로 알린다 (깃허브 최신 릴리스를 2분마다 본다, release_watch)
+      POKET_RELEASE_WATCH: "1"
       # /api/errors 로 역추적을 볼 때 쓰는 열쇠. .env 에 넣는다.
       # 비어 있으면 그 경로는 아예 없는 것처럼 군다.
       POKET_ADMIN_KEY: ${POKET_ADMIN_KEY:-}

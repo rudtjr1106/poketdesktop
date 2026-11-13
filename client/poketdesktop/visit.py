@@ -98,6 +98,13 @@ class VisitSocket(guild_ws.GuildSocket):
     NAME = "visit-ws"
     GIVE_UP = (4401, 4429)
 
+    def _opened(self, ev):
+        """hello 의 push(이 서버가 밀어 주는 것) · latest(최신 앱 판)도 넘긴다 (2.5.0). 옛 서버는 둘 다 없다."""
+        out = guild_ws.GuildSocket._opened(self, ev)
+        out["push"] = ev.get("push") or []
+        out["latest"] = ev.get("latest")
+        return out
+
 
 def make_socket(app, on_event):
     """이 앱의 서버에 붙는 놀러 가기 소켓. 붙을 수 없으면 None (라이브러리가 없거나 시험용 앱)."""
@@ -895,6 +902,21 @@ class Visit(object):
                 fn = getattr(self.app, "on_champion", None)
                 if fn is not None:
                     fn(ev)
+            elif t == "open":
+                # 붙었다 (다시 붙은 것도). 이 서버가 무엇을 밀어 주는지 · 최신 앱 판 (2.5.0)
+                fn = getattr(self.app, "on_socket_open", None)
+                if fn is not None:
+                    fn(ev)
+            elif t == "live":
+                # 실시간 배틀 초대가 왔다 · 받았다 · 거절했다 - 앱이 /api/live 를 한 번 묻는다 (2.5.0)
+                fn = getattr(self.app, "on_live_push", None)
+                if fn is not None:
+                    fn(ev)
+            elif t == "update":
+                # 새 앱 판이 나왔다 (2.5.0)
+                fn = getattr(self.app, "on_update_hint", None)
+                if fn is not None:
+                    fn(ev.get("v"))
             elif not self.active:
                 return
             elif t == "party" and self.guest:

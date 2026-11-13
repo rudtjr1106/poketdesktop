@@ -219,6 +219,9 @@ class App(object):
         self._live_job = None
         self._live_asking = False
         self._live_told = None
+        # 서버가 놀러 가기 소켓으로 밀어 주는 것 (hello 의 push, 2.5.0). 여기 든 것은 폴링하지 않는다.
+        self._pushes = set()
+        self._update_hint_job = None
         self._quitting = False
         self._relogin = False
         self._sync_job = None
@@ -1491,9 +1494,9 @@ class App(object):
         self.raid_window = self._tab("raid")
 
     # ---------------- 실시간 배틀 ----------------
-    # 친구끼리 **둘 다 켜 있을 때만** 하는 1:1. 초대를 알아차리는 가장 늦은
-    # 때가 다음 동기화(90초)라, 초대는 그보다 넉넉히 살아 있다(서버의
-    # LIVE_INVITE_SEC). 친구 탭을 열어 두면 거기서 자주 물어본다.
+    # 친구끼리 **둘 다 켜 있을 때만** 하는 1:1. 초대는 놀러 가기 소켓으로 바로 온다 (2.5.0,
+    # on_live_push). 소켓이 끊겨 있으면 알아차리는 가장 늦은 때가 다음 동기화(90초)라, 초대는
+    # 그보다 넉넉히 살아 있다(서버의 LIVE_INVITE_SEC). 소켓이 없으면 친구 탭이 자주 물어본다.
     def live_invite(self, uid, name="", on_err=None):
         """친구에게 실시간 배틀을 건다. on_err(까닭) - 막혔을 때 그 까닭을 띄울 곳 (친구 탭)."""
         if self.live_battle:
@@ -1540,6 +1543,28 @@ class App(object):
             except Exception:                               # noqa: BLE001
                 pass
         self._live_job = self.root.after(max(1000, ms), self.check_live)
+
+    # 초대는 소켓으로 온다 (2.5.0). 예전에는 친구 탭을 열어 둔 사람마다 4초에 한 번씩 /api/live 를 물었고
+    # (거의 언제나 '없음'), 그게 서버가 하는 일의 3분의 1이 넘었다. 이제 서버가 초대·수락·거절이 생길 때
+    # 그 사람에게 {"t": "live"} 를 밀고, 앱은 그때만 묻는다. 소켓이 끊겨 있거나 옛 서버면 예전처럼 묻는다.
+    def on_socket_open(self, ev):
+        """놀러 가기 소켓이 붙었다 (다시 붙은 것도). 서버가 무엇을 밀어 주는지 적고, 끊겨 있던 사이에
+        놓친 초대를 한 번 챙기고, 최신 앱 판을 본다."""
+        self._pushes = set((ev or {}).get("push") or [])
+        if "live" in self._pushes:
+            self.check_live()
+        self.on_update_hint((ev or {}).get("latest"))
+
+    def live_pushed(self):
+        """실시간 배틀 초대가 소켓으로 오나 (붙어 있고, 서버가 밀어 준다고 했다). 아니면 물어봐야 한다."""
+        if "live" not in self._pushes:
+            return False
+        sock = getattr(self.visit, "sock", None) if self.visit is not None else None
+        return bool(sock is not None and getattr(sock, "connected", False))
+
+    def on_live_push(self, ev=None):
+        """서버가 '실시간 배틀이 바뀌었다' 고 알렸다 - 한 번 물어서 그대로 띄운다."""
+        self.check_live()
 
     def check_live(self):
         """지금 내 실시간 배틀 상태를 한 번 물어본다."""
@@ -2851,6 +2876,32 @@ class App(object):
     def _update_tick(self):
         self._look_for_update()
         self._schedule_update_check()
+
+    # 새 판이 나오면 서버가 소켓으로 바로 알린다 (2.5.0, 서버의 release_watch). 한 시간마다 하는 확인은
+    # 그대로 둔다 - 소켓이 끊겨 있거나 옛 서버일 때 받쳐 준다.
+    UPDATE_HINT_SPREAD_MS = 20000
+
+    def on_update_hint(self, ver):
+        """서버가 알려 준 최신 판. 내 판보다 새것이면 늘 하던 확인(깃허브)을 바로 한다.
+
+        서버의 말은 '확인해 보라' 는 신호일 뿐이다 - 받을 파일은 깃허브에서 직접 찾는다 (updater). 붙어 있는
+        사람이 모두 같은 순간에 깃허브를 두드리지 않게 저마다 조금씩(최대 UPDATE_HINT_SPREAD_MS) 늦춘다.
+        '나중에' 를 고른 판이면 다시 묻지 않는다 (_look_for_update 가 본다).
+        """
+        if not ver or self._quitting or self._update_hint_job is not None:
+            return False
+        if not updater.is_frozen() or not updater.supported():
+            return False            # 개발 중(파이썬)에는 건드리지 않는다
+        if not updater.newer(ver, VERSION):
+            return False
+        if ver == (self.settings.get("updateSkipped") or ""):
+            return False
+
+        def go():
+            self._update_hint_job = None
+            self._look_for_update()
+        self._update_hint_job = self.root.after(random.randint(0, self.UPDATE_HINT_SPREAD_MS), go)
+        return True
 
     def _look_for_update(self):
         """깃허브에 새 판이 있는지 물어본다. 있으면 물어보는 창까지.

@@ -365,10 +365,17 @@ LIVE_LEVEL = _int("POKET_LIVE_LEVEL", 50)        # 양쪽 다 이 레벨로 맞�
 LIVE_TURN_SEC = _int("POKET_LIVE_TURN_SEC", 30)  # 한 턴 고르는 시간
 # 초대가 살아 있는 시간. **90초보다 넉넉해야 한다** - 상대가 초대를 알게
 # 되는 가장 늦은 때가 다음 동기화(syncSeconds, 기본 90초)이기 때문이다.
-# 친구 탭을 열어 두고 있으면 그 자리에서 바로 뜬다.
+# 놀러 가기 소켓에 붙어 있으면 그 자리에서 바로 뜬다 (live._poke, 2.5.0).
 LIVE_INVITE_SEC = _int("POKET_LIVE_INVITE_SEC", 180)
 LIVE_TTL = _int("POKET_LIVE_TTL", 900)           # 아무도 안 돌아오면 판을 접는다
 LIVE_MAX_TURNS = _int("POKET_LIVE_MAX_TURNS", 150)
+
+# 새 앱 판이 나오면 붙어 있는 앱에 소켓으로 바로 알린다 (release_watch). 깃허브의 최신 릴리스를 이 초마다 본다
+# (로그인 없이 시간당 60번이고 304 도 세므로 2분 - release_watch.MIN_SEC 밑으로는 안 내려간다).
+# **운영 서버에서만 켠다** (deploy/docker-compose.prod.yml) - 검사 서버가 깃허브를 두드리지 않게.
+RELEASE_WATCH = _bool("POKET_RELEASE_WATCH", False)
+RELEASE_WATCH_SEC = _int("POKET_RELEASE_WATCH_SEC", 120)
+RELEASE_REPO = os.environ.get("POKET_RELEASE_REPO", "rudtjr1106/poketdesktop")
 
 # 챔피언리그 (독도, champion.py): 관장 256곳을 다 이긴 사람끼리 실시간 배틀. 이 시각부터 열린다 (한국 시각 ISO).
 # 그 전에는 창에 '열리는 때' 만 보이고 기다리기 · 도전이 막힌다. 2.4.0 과 함께 바로 연다 (11/11 사용자 - 아르케는 2.5.0)

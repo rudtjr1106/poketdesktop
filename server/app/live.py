@@ -58,6 +58,27 @@ def _emit(mid):
             pass
 
 
+def _poke(uid, s, mid):
+    """그 사람 앱에 '실시간 배틀이 바뀌었다' 를 민다 (놀러 가기 소켓 - 앱이 켜져 있는 동안 늘 붙어 있다).
+
+    판 자체는 싣지 않는다. 받은 앱은 GET /api/live 를 한 번 물어 그 답대로 띄운다 - 그래서 앱이 판을
+    읽는 길은 하나뿐이다. 예전에는 친구 탭을 열어 둔 사람마다 4초에 한 번씩 물었다 (거의 언제나 '없음').
+
+        ask       초대가 왔다 (받는 사람)
+        open      받았다 - 판이 열렸다 (건 사람)
+        declined  거절했다 (건 사람)
+        gone      건 사람이 거둬들였다 (받는 사람)
+
+    못 가도 판은 그대로다 - 소켓이 잠깐 끊겨 있었으면 앱이 다시 붙을 때 한 번 묻고, 그것도 놓치면
+    90초 동기화(/api/me 의 live)가 받친다 (config.LIVE_INVITE_SEC 가 그보다 넉넉한 까닭).
+    """
+    try:
+        from . import visit
+        visit.push(uid, {"t": "live", "s": s, "id": mid})
+    except Exception:                                       # noqa: BLE001
+        pass                                 # 알림이 못 갔다고 판이 깨지면 안 된다
+
+
 def _now(now=None):
     return now or datetime.datetime.now(datetime.timezone.utc)
 
@@ -173,6 +194,7 @@ def invite(uid, other, now=None):
         " events, turn, created_at, updated_at)"
         " VALUES (?,?,?,?,'invited',0,'[]',0,?,?)",
         (uid, other, _name(uid), _name(other), _iso(now), _iso(now)))
+    _poke(other, "ask", cur.lastrowid)
     return get(cur.lastrowid)
 
 
@@ -271,11 +293,20 @@ def answer(uid, mid, ok, now=None):
         why = pvp.held_why(pvp.ranked_team(uid), "랭크 팀" if pvp.team_ids(uid) else "바탕화면 파티")
         if why:
             raise ValueError(why)
-        return accept(uid, mid, now)
+        out = accept(uid, mid, now)
+        # 건 사람에게 '판이 열렸다'. 챔피언리그 판은 champion.py 가 따로 알린다 (s=match).
+        if out and out["state"] == "fighting" and kind_of(row) == "live":
+            _poke(row["a_id"], "open", mid)
+        return out
     what = "cancelled" if row["a_id"] == uid else "declined"
-    db.run("UPDATE live_match SET state='done', result=?, updated_at=?,"
-           " a_seen=1, b_seen=1 WHERE id=? AND state='invited'",
-           (what, _iso(now), mid))
+    cur = db.run("UPDATE live_match SET state='done', result=?, updated_at=?,"
+                 " a_seen=1, b_seen=1 WHERE id=? AND state='invited'",
+                 (what, _iso(now), mid))
+    if getattr(cur, "rowcount", 1) and kind_of(row) == "live":
+        if what == "cancelled":
+            _poke(row["b_id"], "gone", mid)
+        else:
+            _poke(row["a_id"], "declined", mid)
     return get(mid)
 
 

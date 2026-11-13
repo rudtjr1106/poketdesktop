@@ -143,11 +143,17 @@ class FriendsWindow(object):
 
         평소에는 90초마다 도는 동기화가 알려 주는데, 실시간 배틀은 상대가
         기다리고 있어서 그때까지 두면 늦다. 창을 닫으면 멈춘다.
+
+        **초대가 소켓으로 오면 묻지 않는다** (2.5.0, app.live_pushed). 서버가 초대·수락·거절이 생길 때
+        밀어 주고 앱이 그때 묻는다. 그때는 여기서는 걸어 둔 초대가 바뀌었나만 보고 다시 그린다.
+        소켓이 끊겼거나 옛 서버면 예전처럼 4초마다 묻는다.
         """
         if not self.alive:
             return
         try:
-            self.app.check_live()
+            pushed = getattr(self.app, "live_pushed", None)
+            if pushed is None or not pushed():
+                self.app.check_live()
         except Exception:                                   # noqa: BLE001
             pass
         # 걸어 둔 초대가 생기거나 사라졌을 때만 다시 그린다. 매번 그리면
