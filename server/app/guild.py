@@ -118,6 +118,13 @@ SHOP_HELD = ("LIFEORB", "CHOICESCARF", "CHOICEBAND", "CHOICESPECS", "FOCUSSASH",
 # 상점 화면의 묶음 (차례대로). 앱이 group 글을 머리글로 쓴다.
 SHOP_GROUPS = ("볼", "성장", "진화", "지닌 도구")
 BUY_MAX = 99
+# 길드 전용 상품 (시즌 7 부터, 2026-11-12 사용자 - design-notes/2026-11-12-guild-war-rewards.md): 돈 상점에 없는 것을
+# 코인으로, **시즌마다 한 사람이 살 수 있는 수가 있다** (guild_buy). 길드 미션 코인이 길드전 코인보다 훨씬 많아서
+# 수를 안 묶으면 전용 상품이 미션 보상이 된다. 되팔면 손해여야 한다 (금색병뚜껑은 팔면 5,000원 < 200코인 = 50,000원어치).
+# (도구, 코인, 시즌마다 수). 랜덤 기술머신 뽑기권은 넣지 않는다 (사용자).
+SHOP_EXCLUSIVE = (("MASTERBALL", 600, 1), ("GOLDBOTTLECAP", 200, 2))
+EXCLUSIVE_FROM = 7
+EXCLUSIVE_GROUP = "길드 전용"
 
 # 슬롯머신 (2.1.0). 한 번에 SLOT_COST 코인, 하루 횟수 제한 없음 (사용자 결정).
 # **앱 화면은 캡슐 뽑기 기계 '랜덤 캡슐'이다** (client/poketdesktop/ui_gacha.py - 처음 슬롯머신으로 만들었다가 사용자가 바꾸라고
@@ -959,8 +966,26 @@ def claim(uid, tier, now=None):
 
 
 # ---------------------------------------------------------------- 코인 상점
+def exclusive(item_id):
+    """길드 전용 상품이면 (코인, 시즌마다 수), 아니면 None. 시즌 7 전에는 없다 (시즌 중에 상점을 안 바꾼다)."""
+    if season.SEASON < EXCLUSIVE_FROM:
+        return None
+    for iid, price, limit in SHOP_EXCLUSIVE:
+        if iid == item_id:
+            return price, limit
+    return None
+
+
+def bought(uid, item_id, s=None):
+    r = db.q1("SELECT n FROM guild_buy WHERE season=? AND user_id=? AND item_id=?", (s or season.SEASON, uid, item_id))
+    return int(r["n"]) if r else 0
+
+
 def coin_price(item_id):
     """그 물건의 코인 값. 코인 상점에 없는 것이면 0."""
+    ex = exclusive(item_id)
+    if ex:
+        return ex[0]
     it = items.get(item_id)
     if not it or items.buy_price(it["id"]) <= 0:
         return 0
@@ -983,13 +1008,26 @@ def _group(it):
 def shop(uid):
     rows = []
     for it in items.public_list():
+        if exclusive(it["id"]):
+            continue                          # 길드 전용 상품은 아래 '길드 전용' 묶음에만 (두 번 나오면 남은 수 없이 팔린다)
         price = coin_price(it["id"])
         if price:
             rows.append(dict(it, coin=price, group=_group(it)))
     rows.sort(key=lambda x: (SHOP_GROUPS.index(x["group"]), x["coin"], x["kr"]))
+    groups = list(SHOP_GROUPS)
+    if season.SEASON >= EXCLUSIVE_FROM:
+        # 길드 전용은 맨 앞에. limit = 시즌마다 수, left = 이번 시즌에 더 살 수 있는 수
+        pub = dict((it["id"], it) for it in items.public_list())
+        ex = []
+        for iid, price, limit in SHOP_EXCLUSIVE:
+            if iid in pub:
+                ex.append(dict(pub[iid], coin=price, group=EXCLUSIVE_GROUP, exclusive=True, limit=limit,
+                               left=max(0, limit - bought(uid, iid))))
+        rows = ex + rows
+        groups = [EXCLUSIVE_GROUP] + groups
     r = db.q1("SELECT balls FROM users WHERE id=?", (uid,))
     return {"items": rows, "coin": coin(uid), "bag": items.bag_get(uid, r["balls"] if r else 0),
-            "inGuild": member(uid) is not None, "groups": list(SHOP_GROUPS),
+            "inGuild": member(uid) is not None, "groups": groups,
             "slot": {"cost": SLOT_COST, "odds": slot_odds()}}
 
 
@@ -1006,9 +1044,30 @@ def buy(uid, item_id, count=1):
         raise HTTPException(404, "코인 상점에 없는 물건입니다.")
     n = max(1, min(BUY_MAX, int(count or 1)))
     total = price * n
-    cur = db.run("UPDATE guild_user SET coin = coin - ? WHERE user_id=? AND coin >= ?",
-                 (total, uid, total))
+    ex = exclusive(it["id"])
+    s = season.SEASON
+    if ex:
+        # 시즌마다 수: 늘리는 문장 안에서 한도를 본다 (두 창에서 같이 사도 못 넘는다). 코인이 모자라면 되돌린다
+        limit = ex[1]
+        if n > limit:
+            raise HTTPException(409, "%s 은(는) 시즌마다 %d개까지 살 수 있습니다." % (it["kr"], limit))
+        cur = db.run("INSERT INTO guild_buy (season, user_id, item_id, n) VALUES (?,?,?,?)"
+                     " ON CONFLICT(season, user_id, item_id) DO UPDATE SET n = guild_buy.n + excluded.n"
+                     " WHERE guild_buy.n + excluded.n <= ?", (s, uid, it["id"], n, limit))
+        if getattr(cur, "rowcount", 1) <= 0:
+            raise HTTPException(409, "%s 은(는) 이번 시즌에 %d개까지 살 수 있습니다 (이미 %d개). 다음 시즌에 다시 살 수 있습니다."
+                                % (it["kr"], limit, bought(uid, it["id"], s)))
+    def undo():
+        if ex:
+            db.run("UPDATE guild_buy SET n = n - ? WHERE season=? AND user_id=? AND item_id=?", (n, s, uid, it["id"]))
+    try:
+        cur = db.run("UPDATE guild_user SET coin = coin - ? WHERE user_id=? AND coin >= ?",
+                     (total, uid, total))
+    except Exception:
+        undo()                                # 코인 빼기가 터져도 이번 시즌 산 수를 되돌린다 (11/12 검토)
+        raise
     if cur.rowcount <= 0:
+        undo()
         raise HTTPException(400, "길드 코인이 모자랍니다. (%d개 필요)" % total)
     items.bag_add(uid, it["id"], n)
     return {"ok": True, "spent": total, "coin": coin(uid),

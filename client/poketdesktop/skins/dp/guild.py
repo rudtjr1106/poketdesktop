@@ -922,12 +922,36 @@ class GuildWindow(G.GuildWindow):
             K.text(cv, (x1 + x2) // 2, y + s(30), ("'%s' (이)가 들어간 도구가 없습니다." % q.strip()) if q.strip()
                    else "살 수 있는 도구가 없습니다.", font(10), fill=INK2, anchor="n")
             return y + s(80)
+        ex = [it for it in shown if G.shop_exclusive(it)]
+        if not any(G.shop_exclusive(it) for it in sh.get("items") or []):
+            return self._shop_block(cv, shown, x1, x2, y, have, bag) + s(12)       # 옛 서버 · 시즌 6: 예전 그대로
+        # 길드 전용 묶음 (시즌 7~): 맨 앞에 머리글 + 판, 그 아래 나머지 도구 머리글 + 판
+        rest = [it for it in shown if not G.shop_exclusive(it)]
+        if ex:
+            y = section(cv, x1, x2, y, ex[0].get("group") or G.SHOP_EX_GROUP)
+            K.text(cv, x1, y - s(4), G.SHOP_EX_NOTE, font(9), fill=INK2, anchor="nw", width=x2 - x1)
+            y += K.text_height(cv, G.SHOP_EX_NOTE, font(9), x2 - x1) + s(2)
+            y = self._shop_block(cv, ex, x1, x2, y, have, bag)
+        if rest:
+            if ex:
+                y += s(14)
+            y = section(cv, x1, x2, y, G.shop_rest_title(sh))
+            y = self._shop_block(cv, rest, x1, x2, y, have, bag)
+        return y + s(12)
+
+    def _shop_block(self, cv, items, x1, x2, y, have, bag):
+        """코인 상점 판 한 장 (도구 한 줄씩). 판 바닥의 y.
+
+        길드 전용 상품은 사기 단추가 '1개 사기' 하나 (남은 수를 넘지 않게)이고, 이름 아래에 '이번 시즌 1 / 2개 남음'
+        (다 샀으면 다음 시즌에 다시) 을 적는다."""
+        s = U.h
         f10 = K.tkfont_of(cv, font(10))
         f9 = K.tkfont_of(cv, font(9))
         # 단추 자리 (줄마다 같다) - 글은 남은 폭에 맞추고, 설명은 줄을 바꿔 다 보인다 (줄 높이가 그만큼 는다)
-        bws = [f10.measure("%d개 사기" % n) + s(22) for n in (10, 1)]
+        counts = sorted(set(n for it in items for n in G.shop_counts(it)), reverse=True)
+        bws = [f10.measure("%d개 사기" % n) + s(22) for n in counts]
         tx = x1 + s(64)
-        room = x2 - s(14) - sum(bws) - s(6) * 2 - tx - s(8)
+        room = x2 - s(14) - sum(bws) - s(6) * len(bws) - tx - s(8)
 
         def note_of(it):
             return natural(it.get("note") or it.get("heldNote") or it.get("desc") or "")
@@ -938,19 +962,25 @@ class GuildWindow(G.GuildWindow):
                     + f10.measure("코인 %d" % int(it.get("coin") or 0))
                     + ((f9.measure("가진 것 %d" % owned) + s(10)) if owned else 0))
         # 이름 · 값이 단추 옆에 안 들어가면 (글자가 클 때) 단추를 줄 아래로 내리고 글은 줄 폭을 다 쓴다
-        low = any(head_w(it) > room for it in shown)
+        low = any(head_w(it) > room for it in items)
         if low:
             room = x2 - s(14) - tx
         bh = (s(30) + s(8)) if low else 0
+
+        def left_h(it):              # 전용 상품의 남은 수 줄 (이름 아래)
+            if not G.shop_exclusive(it):
+                return 0
+            return K.text_height(cv, G.shop_left_text(it), font(9), room) + s(4)
+
+        def body_h(it):
+            return left_h(it) + (K.text_height(cv, note_of(it), font(9), room) if note_of(it) else 0)
         if low:                    # 글 줄 + 단추 줄 (단추가 글 옆에 없으니 보통 줄의 최소 높이는 안 쓴다)
-            hts = [max(s(66), s(32) + (K.text_height(cv, note_of(it), font(9), room) if note_of(it) else 0)
-                       + s(8) + bh) for it in shown]
+            hts = [max(s(66), s(32) + body_h(it) + s(8) + bh) for it in items]
         else:
-            hts = [max(s(66), s(32) + (K.text_height(cv, note_of(it), font(9), room) if note_of(it) else 0) + s(12))
-                   for it in shown]
+            hts = [max(s(66), s(32) + body_h(it) + s(12)) for it in items]
         card(cv, x1, y, x2, y + sum(hts) + s(8))
         yy = y + s(4)
-        for i, it in enumerate(shown):
+        for i, it in enumerate(items):
             iid = it["id"]
             rh = hts[i]
             price = int(it.get("coin") or 0)
@@ -961,9 +991,9 @@ class GuildWindow(G.GuildWindow):
                 cv.create_image(x1 + s(34), yy + (rh - bh) // 2, image=ph)
             bx = x2 - s(14)
             by = (yy + rh - s(8) - s(15)) if low else (yy + rh // 2)
-            for n in (10, 1):
+            for n in sorted(G.shop_counts(it), reverse=True):
                 b = button(cv, bx, by, "%d개 사기" % n, (lambda n=n, iid=iid: self.buy(iid, n)), "blue",
-                           enabled=have >= price * n, h=s(30))
+                           enabled=G.shop_can_buy(it, n, have), h=s(30))
                 self.shop_btns[(iid, n)] = b
                 bx -= b.w + s(6)
             price_t = "코인 %d" % price
@@ -976,11 +1006,16 @@ class GuildWindow(G.GuildWindow):
                                  fill="#c06810" if have >= price else "#d02828", font=font(10), anchor="w")
             if owned:
                 cv.create_text(cv.bbox(pid)[2] + s(10), yy + s(19), text=own_t, fill=INK2, font=font(9), anchor="w")
+            ny = yy + s(32)
+            if G.shop_exclusive(it):
+                K.text(cv, tx, ny, G.shop_left_text(it), font(9), fill="#2c8a3c" if G.shop_left(it) else INK2,
+                       anchor="nw", width=room)
+                ny += left_h(it)
             note = note_of(it)
             if note:
-                K.text(cv, tx, yy + s(32), note, font(9), fill=INK2, anchor="nw", width=room)
+                K.text(cv, tx, ny, note, font(9), fill=INK2, anchor="nw", width=room)
             yy += rh
-        return y + sum(hts) + s(20)
+        return y + sum(hts) + s(8)
 
     # ---------------- 다른 길드 · 길드 찾기
     def _finder(self, parent, title="길드 찾기"):

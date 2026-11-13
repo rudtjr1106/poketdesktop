@@ -38,7 +38,16 @@
            '우리를 치는 길드' 두 줄), 앞서는 쪽 · 결과. 아래에 상대 출전 명단 한 줄씩 (이름 · 방어팀 앞 3마리 ·
            받은 최고 별 · 조커는 '???' · 내가 이미 쳤는지). 줄을 누르면 오른쪽 '고른 상대' 에 미리보기 + [공격].
     오른쪽 내 남은 공격(●● / ●○ / ○○) · 고른 상대 · (길드장 · 전략) 출전 명단 고르기 · 우리 명단(남은 공격 · 얻은 별 ·
-           막아 낸 것, 길드장은 조커 지정) · 순위 · 내 팀 · 기록(별) · 별 규칙 · 보상 · 규칙.
+           막아 낸 것, 길드장은 조커 지정) · 이번 시즌 맞대결 · 내 팀 · 기록(별) · 별 규칙 · 보상 · 규칙.
+
+  · 보상은 **길드 코인만** (설계 design-notes/2026-11-12-guild-war-rewards.md). 순위 · 금관 같은 꾸미기 · 칭호 ·
+    기술머신 뽑기권이 없다 - 서버가 rewards [] · tmActive None · ranking [] 을 싣고, 코인 규칙은 coinRules 로 온다
+    (판마다 별 코인 · 조커 · 막기 · 한 시즌 상한, 결산 이김 / 비김 / 짐). 보상 칸은 그것을 표로, 내 contrib.earned 와 함께.
+  · 순위 칸 자리에 **이번 시즌 맞대결** (서버 matches): 짝(삼각형은 셋)마다 한 덩어리, 우리 판이 맨 위(서버 차례).
+    길드마다 별 % · 쓰러뜨린 비율 · 승패 (final 이 아니면 '앞섬' - 지금까지의 별로 본 것). 줄 세우는 순위는 없다.
+  · 끝나면(done) 맨 위에 결산 칸: 우리 판 결과와 받은 결산 코인 (coinRules.result[결과], 공격을 한 번이라도 했으면).
+  · 공격 창을 닫으면 그 판의 별과 코인 줄(서버 reward.lines 의 '길드 코인 ...')을 길드 창 알림 줄에 띄운다 -
+    관장 배틀 창의 결과 칸은 이긴 판에만 서버 줄을 적어서, 지고도 ★ 을 얻은 판의 코인이 안 보였다.
 
   · 상대 명단은 `/api/guild/war/match` 한 번에 다 온다 (줄을 눌러도 서버에 안 묻는다). 조커로 가려진 상대는 이름이
     '???' 이고 userId 가 음수(자리 표시)다 - 그 값을 그대로 열쇠로 쓰고 공격할 때도 그대로 보낸다.
@@ -142,35 +151,94 @@ def match_rule_line(st):
     return out
 
 
+COIN_RULES = {"stars": [20, 40, 60], "joker": 20, "defend": 20, "max": 300,       # 서버가 coinRules 를 안 실으면
+              "result": {"win": 100, "draw": 60, "lose": 30}}
+RESULT_WORD = (("win", "이김"), ("draw", "비김"), ("lose", "짐"))
+
+
+def coin_rules(st):
+    """1:1 맞대결의 코인 규칙 (서버 coinRules, 빠진 칸은 설계값으로)."""
+    c = dict(COIN_RULES)
+    got = (st or {}).get("coinRules")
+    if isinstance(got, dict):
+        c.update((k, v) for k, v in got.items() if v is not None)
+    return c
+
+
+def earned_of(st):
+    """이번 시즌에 판마다 받은 길드 코인 (contrib.earned)."""
+    try:
+        return int(((st or {}).get("contrib") or {}).get("earned") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def earned_text(st):
+    """'이번 시즌 40 / 300개' - 판마다 받는 코인이 상한까지 얼마나 찼나."""
+    return "이번 시즌 %d / %d개" % (earned_of(st), int(coin_rules(st).get("max") or 0))
+
+
 def match_reward_lines(st):
-    """1:1 맞대결의 보상 안내 (줄마다)."""
-    out = ["보상은 한 번이라도 공격한 출전 길드원이 받습니다."]
-    for r in st.get("rewards") or []:
-        if r.get("rank"):
-            who = "%d위" % r["rank"]
-        elif r.get("result") == "win":
-            who = "그 밖에 이긴 길드"
-        else:
-            who = "비기거나 진 길드" if r.get("result") == "other" else "그 밖"
-        one = "%s: 길드 코인 %d" % (who, r.get("coins") or 0)
-        if r.get("deco"):
-            one += " · %s" % r["deco"]
-        if r.get("tm"):
-            one += " · 뽑기권 %d장" % r["tm"]
-        out.append(one)
-    if st.get("title"):
-        out.append("1위 길드에는 칭호 '%s'" % st["title"])
-    act = st.get("tmActive") or {}
-    if act:
-        wins, each = int(act.get("wins") or 2), int(st.get("each") or 2)
-        out.append("활약 보상: 공격 %s 이기면 순위와 상관없이 랜덤 기술머신 뽑기권 %d장 (순위 몫이 있으면 거기에 더)"
-                   % ("%d번을 다" % wins if wins >= each else "에서 %d번" % wins, int(act.get("count") or 1)))
-    c = st.get("contrib")
-    if c:
-        out.append("기여 보상(판이 끝나면 바로): 공격에서 이기면 %d · 조커를 이기면 %d · 내 방어팀이 상대를 다 쓰러뜨려 "
-                   "막으면 %d (기권 · 시간 초과는 없음, 한 시즌 %d개까지, 지금 %d개)"
-                   % (c["win"], c["win"] + c["joker"], c["defend"], c["max"], c.get("earned", 0)))
+    """1:1 맞대결의 보상 안내 (줄마다) - 보상은 길드 코인만 (시즌 7, 순위 보상이 없다)."""
+    c = coin_rules(st)
+    stars = list(c.get("stars") or [])[:3]
+    res = c.get("result") or {}
+    out = ["보상은 길드 코인만입니다 (순위 · 꾸미기 · 칭호 · 뽑기권은 없습니다)."]
+    if len(stars) == 3:
+        out.append("공격 한 판이 끝나면 공격한 사람에게 ★ %d · ★★ %d · ★★★ %d개, 조커를 이기면 +%d개. 공격을 막아 내면 "
+                   "(공격팀을 다 쓰러뜨림) 지킨 사람에게 %d개. 판마다 받는 코인은 한 사람 한 시즌 %d개까지 (%s)."
+                   % (stars[0], stars[1], stars[2], int(c.get("joker") or 0), int(c.get("defend") or 0),
+                      int(c.get("max") or 0), earned_text(st)))
+    out.append("결산: 한 번이라도 공격한 길드원에게 우리 길드의 맞대결 결과로 %s개 (상한 밖)."
+               % " · ".join("%s %d" % (kr, int(res.get(k) or 0)) for k, kr in RESULT_WORD))
     return out
+
+
+def match_result_text(res, final, plan=False):
+    """맞대결 목록의 승패 글과 빛깔. 전쟁 중(final 아님)에는 지금까지의 별로 본 앞섬 · 뒤짐."""
+    if plan or res not in ("win", "lose", "draw"):
+        return "-", U.FG_FAINT
+    if final:
+        return {"win": ("승", U.GOOD), "lose": ("패", U.DANGER), "draw": ("비김", U.FG)}[res]
+    return {"win": ("앞섬", U.GOOD), "lose": ("뒤짐", U.DANGER), "draw": ("같음", U.FG_DIM)}[res]
+
+
+def match_cycle(guilds):
+    """삼각형의 도는 차례 '[A] → [B] → [C] → [A]' (vs = 그 길드가 칠 길드). 못 이으면 빈 글."""
+    by = dict((g.get("name"), g) for g in guilds or [])
+    if len(by) < 3:
+        return ""
+    start = (guilds[0] or {}).get("name")
+    path, cur = [start], start
+    for _i in range(len(by)):
+        cur = (by.get(cur) or {}).get("vs")
+        if cur not in by:
+            return ""
+        path.append(cur)
+        if cur == start:
+            break
+    if path[-1] != start or len(path) != len(by) + 1:
+        return ""
+    return " → ".join("[%s]" % x for x in path)
+
+
+def match_end_line(reward):
+    """1:1 공격 창을 닫은 뒤 길드 창에 띄울 한 줄 ('★★☆  길드 코인 40개 - 이번 시즌 80 / 300개.').
+
+    코인 글은 서버 결과 줄(reward.lines 의 '길드 코인 ...')을 그대로 쓴다. 지도전 · 끝나지 않은 판이면 None."""
+    war = (reward or {}).get("war") or {}
+    if war.get("mode") != "match" or war.get("stars") is None:
+        return None
+    n = int(war.get("stars") or 0)
+    head = star_text(n)
+    line = next((x for x in reward.get("lines") or [] if "길드 코인" in str(x)), None)
+    if line:
+        return "%s  %s" % (head, line)
+    if war.get("coins"):
+        return "%s  길드 코인 %d개." % (head, int(war["coins"]))
+    if not n:
+        return "%s  별을 얻지 못해 길드 코인은 없습니다." % head
+    return head
 
 
 def match_log_text(x):
@@ -319,6 +387,7 @@ class WarTab(object):
         self.wide = False            # 지도를 옆에 낀 모양인가
         self.tile_box = None
         self.rank_box = None
+        self.coin_box = None         # 1:1 보상 칸 (코인 규칙 · 내 몫 - 다시 받으면 이것만 고친다)
         self.menu = None
         self._poll_job = None
         # 1:1 맞대결 (시즌 7~)
@@ -494,7 +563,8 @@ class WarTab(object):
     def _match_key(st, mv):
         """다시 받은 것이 화면에 바뀔 것이 있나 (남은 시간 endsIn 은 늘 바뀌니 빼고 본다)."""
         st = st or {}
-        return (mv, st.get("match"), st.get("mates"), st.get("ranking"), st.get("attacks"))
+        return (mv, st.get("match"), st.get("mates"), st.get("ranking"), st.get("attacks"), st.get("matches"),
+                st.get("contrib"))
 
     def _arm_match_poll(self):
         """1:1 맞대결: 가끔 다시 받아 판 · 명단 · 고른 상대 · 순위만 고친다. 단계가 넘어갔으면 통째로."""
@@ -523,13 +593,15 @@ class WarTab(object):
             self._poll_job = None
 
     def _refresh_match(self):
-        """다시 받은 것으로 판 · 고른 상대 · 우리 명단 · 순위만 다시 그린다 (오른쪽 칸을 통째로 다시 만들지 않는다)."""
+        """다시 받은 것으로 판 · 고른 상대 · 우리 명단 · 맞대결 목록 · 보상(내 몫)만 다시 그린다 (오른쪽 칸을 통째로
+        다시 만들지 않는다)."""
         if not self._board_on:
             return self.paint()
         self._paint_board(keep=True)
         self._fill_foe()
         self._fill_mates()
         self._fill_ranking()
+        self._fill_coin()
 
     # ---------------- 그리기 ----------------
     def _layout(self, wide):
@@ -585,6 +657,7 @@ class WarTab(object):
         self.buttons = {}
         self.tile_box = None
         self.rank_box = None
+        self.coin_box = None
         self.foe_box = None
         self.mates_box = None
 
@@ -912,7 +985,7 @@ class WarTab(object):
         except tk.TclError:
             return
         if is_match(self.st):
-            return self._fill_match_ranking(box)
+            return self._fill_matches(box)
         rows = (self.mapdata or {}).get("guilds") or (self.st or {}).get("ranking") or []
         if len(rows) < 2:
             self._text(box, "참가한 길드가 둘이 안 되어 싸움이 열리지 않았습니다.", pady=(0, 10))
@@ -1089,11 +1162,12 @@ class WarTab(object):
             side="left", padx=(10, 0))
         self._text(head, phase_line(st), fg=U.FG, pady=(2, 10 if board else 2))
         if not board:
-            # 판이 없을 때(신청 · 준비 · 안 나감)는 규칙과 보상을 머리에 (판이 있으면 맨 아래 칸으로)
-            self._text(head, rule_line(st), fg=U.FG_FAINT, font=U.FONT_XS)
-            self._text(head, reward_line(st), fg=U.FG_FAINT, font=U.FONT_XS, pady=(0, 10))
+            # 판이 없을 때(신청 · 준비 · 안 나감)는 규칙을 머리에 (판이 있으면 맨 아래 칸으로). 보상은 늘 보상 칸
+            self._text(head, rule_line(st), fg=U.FG_FAINT, font=U.FONT_XS, pady=(0, 10))
         if st.get("battle"):
             self._battle_card()
+        if ph == "done" and m:
+            self._settle_card(st, m)
         if ph == "apply":
             self._apply_card(st)
             self._teams_card(st)
@@ -1108,19 +1182,15 @@ class WarTab(object):
             self._roster_card(st)
         if m and st.get("mates"):
             self._mates_card(st)
-        if ph in ("war", "done") and st.get("ranking"):
-            self._match_ranking_card(st)
+        if ph in ("plan", "war", "done") and st.get("matches"):
+            self._matches_card(st)
         if ph in ("plan", "war") and st.get("entered"):
             self._teams_card(st)
         if ph in ("war", "done"):
             self._log_card()
         self._star_card(st)
+        self._coin_card(st)
         if board:
-            c = self._card("보상")
-            lines = match_reward_lines(st)
-            for i, t in enumerate(lines):
-                self._text(c, t, fg=U.FG_DIM if i else U.FG_FAINT, font=U.FONT_XS,
-                           pady=(0, 10 if i == len(lines) - 1 else 2))
             c = self._card("규칙")
             self._text(c, rule_line(st), fg=U.FG_FAINT, font=U.FONT_XS, pady=(0, 10))
         if ph == "before":
@@ -1619,57 +1689,146 @@ class WarTab(object):
             self.reload()
         self._call(lambda: self.app.api.guild_war_roster(out), "출전 명단을 정했습니다.", then)
 
-    # ---- 순위 · 별 규칙 ----
-    def _match_ranking_card(self, st):
-        c = self._card("순위 (이긴 길드 → 별 % 순)")
-        self.rank_box = tk.Frame(c, bg=CARD)
+    # ---- 이번 시즌 맞대결 (순위 대신) · 보상 · 결산 ----
+    def _matches_card(self, st):
+        """이번 시즌 맞대결 목록 (서버 matches). 줄 세우는 순위가 없다 - 짝(삼각형)마다 한 덩어리, 우리 판이 맨 위."""
+        c = self._card("이번 시즌 맞대결")
+        self.rank_box = tk.Frame(c, bg=c["bg"])
         self.rank_box.pack(fill="x")
         self._fill_ranking()
-        if st.get("phase") == "done":
-            self._text(c, "길드전이 끝났습니다. 길드 코인은 바로 들어갔고, 꾸미기 · 기술머신 뽑기권 · 1위 길드의 칭호는 "
-                          "선물함에 있습니다.", fg=U.FG_FAINT, font=U.FONT_XS, pady=(0, 10))
+        ph = st.get("phase")
+        if ph == "plan":
+            note = "상대가 발표됐습니다. 전쟁이 시작되면 별 % 와 승패가 보입니다."
+        elif ph == "done":
+            note = ("길드전이 끝났습니다. 결산 길드 코인은 한 번이라도 공격한 길드원에게 바로 들어갔습니다 "
+                    "(순위 보상은 없습니다).")
         else:
-            self._text(c, "전쟁 중의 순위는 지금까지 얻은 별로 센 것입니다. 승패는 전쟁이 끝날 때 정해집니다.",
-                       fg=U.FG_FAINT, font=U.FONT_XS, pady=(0, 10))
+            note = "전쟁 중에는 지금까지 얻은 별로 본 '앞섬' 입니다. 승패는 전쟁이 끝날 때 정해집니다."
+        self._text(c, note, fg=U.FG_FAINT, font=U.FONT_XS, pady=(6, 10))
 
-    def _fill_match_ranking(self, box):
-        rows = (self.st or {}).get("ranking") or []
-        mine = ((self.st or {}).get("guild") or {}).get("id")
-        grid = tk.Frame(box, bg=CARD)
-        grid.pack(fill="x", padx=14, pady=(2, 6))
-        for i, h in enumerate(("", "순위", "길드", "별 %", "결과")):
-            tk.Label(grid, text=h, bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS,
-                     anchor="w" if i == 2 else "e").grid(row=0, column=i, sticky="we", padx=(0, 8))
-        res_kr = {"win": ("승", U.GOOD), "lose": ("패", U.DANGER), "draw": ("비김", U.FG)}
-        for r, x in enumerate(rows, 1):
-            fg = U.ACCENT if x.get("guildId") == mine else U.FG
-            tk.Frame(grid, bg=WM.color_of(x.get("color")), width=U.h(12), height=U.h(12)).grid(
-                row=r, column=0, padx=(0, 8), pady=2, sticky="n")
-            tk.Label(grid, text="%d위" % int(x.get("rank") or r), bg=CARD, fg=fg, font=U.FONT_S, anchor="e").grid(
-                row=r, column=1, sticky="ne", padx=(0, 8), pady=1)
-            cell = tk.Frame(grid, bg=CARD)
-            cell.grid(row=r, column=2, sticky="we", padx=(0, 8), pady=1)
-            lb = tk.Label(cell, text=x.get("name") or "", bg=CARD, fg=fg, font=U.FONT_B, anchor="w", justify="left")
-            lb.pack(fill="x")
-            U.wrap_to_width(lb)                  # 긴 길드 이름은 줄을 바꾼다 (글자를 줄이지 않는다)
-            if x.get("vs"):
-                # vsPct 는 '그 길드를 친 길드(from)' 가 얻은 별 % - 1:1 이면 from == vs, 삼각형이면 이름이 다르다
-                frm = x.get("from") or x["vs"]
-                if frm == x["vs"]:
-                    text = "vs [%s] %s" % (x["vs"], pct_text(x.get("vsPct")))
-                else:
-                    text = "친 길드 [%s] · 맞은 길드 [%s] %s" % (x["vs"], frm, pct_text(x.get("vsPct")))
-                lb = tk.Label(cell, text=text, bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left")
-                lb.pack(fill="x")
-                U.wrap_to_width(lb)
-            tk.Label(grid, text=pct_text(x.get("pct")), bg=CARD, fg=fg, font=U.FONT_B, anchor="e").grid(
-                row=r, column=3, sticky="ne", padx=(0, 8), pady=1)
-            text, color = res_kr.get(x.get("result"), ("-", U.FG_FAINT))
-            tk.Label(grid, text=text, bg=CARD, fg=color, font=U.FONT_B, anchor="e").grid(
-                row=r, column=4, sticky="ne", pady=1)
-        grid.grid_columnconfigure(2, weight=1)
+    def _fill_matches(self, box):
+        st = self.st or {}
+        rows = st.get("matches") or []
+        mine = (st.get("guild") or {}).get("id")
+        plan = st.get("phase") == "plan"
+        bg = box["bg"]
+        if not rows:
+            self._text(box, "이번 시즌에는 열린 맞대결이 없습니다.", pady=(0, 4))
+            return self.fit.schedule()
+        for i, mt in enumerate(rows):
+            ours = bool(mt.get("ours"))
+            tri = mt.get("kind") == "tri"
+            gs = mt.get("guilds") or []
+            blk = U.framed(box, bg=bg, border=U.ACCENT if ours else U.LINE, bw=2 if ours else 1)
+            blk.pack(fill="x", padx=14, pady=(2 if i == 0 else 8, 0))
+            kind = "삼각 맞대결 (세 길드)" if tri else "1:1 맞대결"
+            self._text(blk, ("우리 맞대결 · %s" % kind) if ours else kind, fg=U.ACCENT if ours else U.FG_DIM,
+                       font=U.FONT_B if ours else U.FONT_XS, pady=(6, 0), padx=10)
+            cyc = match_cycle(gs) if tri else ""
+            if cyc:
+                self._text(blk, cyc, fg=U.FG_FAINT, font=U.FONT_XS, padx=10)
+            for g in gs:
+                self._match_guild_row(blk, g, mt, mine, plan, tri)
+            tk.Frame(blk, bg=bg, height=6).pack()
         self.fit.schedule()
 
+    def _match_guild_row(self, parent, g, mt, mine, plan, tri):
+        """맞대결 덩어리 안의 길드 한 줄: [이름] · 승패(오른쪽), 그 아래 별 % · 쓰러뜨린 비율 (삼각형은 칠 길드)."""
+        bg = parent["bg"]
+        me = mine is not None and g.get("guildId") == mine
+        row = tk.Frame(parent, bg=bg)
+        row.pack(fill="x", padx=10, pady=(4, 0))
+        text, color = match_result_text(g.get("result"), mt.get("final"), plan)
+        tk.Label(row, text=text, bg=bg, fg=color, font=U.FONT_B).pack(side="right", anchor="n", padx=(8, 0))
+        lb = tk.Label(row, text="[%s]%s" % (g.get("name") or "?", "  우리" if me else ""), bg=bg,
+                      fg=U.ACCENT if me else U.FG, font=U.FONT_B, anchor="w", justify="left")
+        lb.pack(side="left", fill="x", expand=True)
+        U.wrap_to_width(lb)                      # 긴 길드 이름은 줄을 바꾼다 (글자를 줄이지 않는다)
+        bits = []
+        if tri and g.get("vs"):
+            bits.append("칠 길드 [%s]" % g["vs"])
+        if not plan:
+            bits.append("별 %d / %d개 (%s) · 쓰러뜨린 비율 %s" % (int(g.get("stars") or 0), int(g.get("max") or 0),
+                                                         pct_text(g.get("pct")), pct_text(g.get("ko"))))
+        for t in bits:
+            self._text(parent, t, fg=U.FG_DIM, font=U.FONT_XS, padx=10)
+
+    def _coin_card(self, st):
+        """보상 (길드 코인만): 판마다 받는 코인 표 · 한 시즌 상한과 내 몫 · 결산 코인."""
+        c = self._card("보상 - 길드 코인")
+        self.coin_box = tk.Frame(c, bg=c["bg"])
+        self.coin_box.pack(fill="x")
+        self._fill_coin()
+        self._text(c, "순위 보상(꾸미기 · 칭호 · 기술머신 뽑기권)은 없습니다. 모은 코인은 코인 상점에서 쓰고, '길드 전용' "
+                      "상품은 코인으로만 살 수 있습니다.", fg=U.FG_FAINT, font=U.FONT_XS, pady=(6, 10))
+
+    def _fill_coin(self):
+        box = getattr(self, "coin_box", None)
+        if box is None:
+            return
+        try:
+            for w in box.winfo_children():
+                w.destroy()
+        except tk.TclError:
+            return
+        st = self.st or {}
+        c = coin_rules(st)
+        stars = (list(c.get("stars") or []) + [0, 0, 0])[:3]
+        res = c.get("result") or {}
+        self._text(box, "공격 한 판이 끝나면 (공격한 사람, 그 판의 별로)", fg=U.FG_FAINT, font=U.FONT_XS, pady=(2, 0))
+        for i, n in enumerate(stars):
+            row = self._coin_row(box, None, "%d개" % int(n or 0))
+            self._stars(row, i + 1).pack(side="left", anchor="n")
+        self._coin_row(box, "조커를 이기면", "+%d개" % int(c.get("joker") or 0))
+        self._coin_row(box, "공격을 막아 내면 (지킨 사람 · 공격팀을 다 쓰러뜨렸을 때)", "%d개" % int(c.get("defend") or 0))
+        self._text(box, "판마다 받는 코인은 한 사람 한 시즌 %d개까지입니다." % int(c.get("max") or 0),
+                   fg=U.FG_FAINT, font=U.FONT_XS, pady=(4, 0))
+        full = earned_of(st) >= int(c.get("max") or 0) > 0
+        self._text(box, earned_text(st) + (" - 다 받았습니다" if full else ""), fg=U.FG_DIM if full else U.ACCENT,
+                   font=U.FONT_B)
+        self._text(box, "결산 (한 번이라도 공격한 사람, 우리 길드의 결과로 · 상한 밖)", fg=U.FG_FAINT, font=U.FONT_XS,
+                   pady=(8, 0))
+        for k, kr in RESULT_WORD:
+            self._coin_row(box, kr, "%d개" % int(res.get(k) or 0))
+        self.fit.schedule()
+
+    def _coin_row(self, parent, text, value):
+        """보상 표의 한 줄: 왼쪽 글 · 오른쪽 코인 수. text 가 None 이면 왼쪽을 비워 둔다 (부르는 쪽이 별을 담는다)."""
+        bg = parent["bg"]
+        row = tk.Frame(parent, bg=bg)
+        row.pack(fill="x", padx=14, pady=1)
+        tk.Label(row, text=value, bg=bg, fg=U.ACCENT, font=U.FONT_B).pack(side="right", anchor="n", padx=(8, 0))
+        if text is not None:
+            lb = tk.Label(row, text=text, bg=bg, fg=U.FG, font=U.FONT_S, anchor="w", justify="left")
+            lb.pack(side="left", fill="x", expand=True)
+            U.wrap_to_width(lb)
+        return row
+
+    def _settle_card(self, st, m):
+        """끝난 뒤(done) 맨 위: 우리 판 결과와 받은 결산 코인 (coinRules.result[결과])."""
+        res = m.get("result")
+        if res not in ("win", "lose", "draw"):
+            return
+        n = int((coin_rules(st).get("result") or {}).get(res) or 0)
+        word, color = {"win": ("승리! 우리 길드가 이겼습니다.", U.GOOD), "draw": ("비김 - 우리 길드는 비겼습니다.", U.FG),
+                       "lose": ("패배 - 이번 맞대결은 졌습니다.", U.DANGER)}[res]
+        c = self._card("결산")
+        self._text(c, word, fg=color, font=U.FONT_B, pady=(0, 2))
+        self._text(c, "한 번이라도 공격한 길드원은 결산 길드 코인 %d개를 받았습니다 (%s)."
+                   % (n, " · ".join("%s %d" % (kr, int((coin_rules(st).get("result") or {}).get(k) or 0))
+                                    for k, kr in RESULT_WORD)), fg=U.FG)
+        used = int((st.get("attacks") or {}).get("used") or 0)
+        got = earned_of(st)
+        settled = (st.get("contrib") or {}).get("settled")
+        if settled is not None:                  # 서버가 실제로 준 결산 코인 (없으면 짐작)
+            n, used = int(settled), used if settled else 0
+        if used:
+            mine = "나는 공격 %d번 - 판마다 받은 코인 %d개 + 결산 %d개 = %d개." % (used, got, n, got + n)
+        else:
+            mine = "나는 이번 길드전에서 공격하지 않아 결산 코인이 없습니다 (판마다 받은 코인 %d개)." % got
+        self._text(c, mine, fg=U.ACCENT if used else U.FG_DIM, font=U.FONT_S, pady=(2, 10))
+
+    # ---- 별 규칙 ----
     def _star_card(self, st):
         c = self._card("별 규칙")
         rules = list(st.get("starRules") or STAR_RULES)
@@ -1856,8 +2015,12 @@ class WarTab(object):
         self.battle = GymBattleWindow(self.app, data, on_close=self._battle_closed)
 
     def _battle_closed(self):
-        self.battle = None
+        gb, self.battle = getattr(self, "battle", None), None
         self.tile = None
+        # 1:1: 그 판의 별과 받은 코인 (관장 배틀 창의 결과 칸은 이긴 판에만 서버 줄을 적는다 - 지고 얻은 ★ 의 코인도 보이게)
+        note = match_end_line(getattr(gb, "reward", None))
+        if note and self.alive:
+            self.say(note, U.GOOD if "길드 코인" in note and "없습니다" not in note else U.FG)
         if self.alive:
             self.reload()
 

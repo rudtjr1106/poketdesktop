@@ -12,20 +12,25 @@
   1. state 에 mode 가 없으면(옛 서버 · 시즌 6 까지) 지도전 화면 그대로 - 지도 캔버스가 나오고 /match 를 안 묻는다.
   2. 전쟁 중 1:1: 지도 자리에 맞대결 판 - [우리] 별 % · 쓰러뜨린 비율 · 남은 공격 vs [상대], 앞서는 쪽.
      상대 출전 명단 한 줄씩 (이름 · 앞 3마리 도트 · 받은 최고 별 ★☆☆ · 조커는 '???' · 내가 이미 쳤는지).
-     오른쪽: 내 남은 공격(●● / ●○ / ○○) · 우리 명단(남은 공격 · 얻은 별 · 막아 낸 것) · 순위 · 보상(이긴 길드 ·
-     그 밖 줄, 활약 2번) · 기록(별) · 별 규칙. /map 은 안 묻는다 (서버가 409 로 막는다).
+     오른쪽: 내 남은 공격(●● / ●○ / ○○) · 우리 명단(남은 공격 · 얻은 별 · 막아 낸 것) · 이번 시즌 맞대결(짝마다 한
+     덩어리, 우리 판이 맨 위 · 앞섬) · 보상(길드 코인만 - 별마다 · 조커 · 막기 · 한 시즌 상한과 내 몫 · 결산 이김 /
+     비김 / 짐, 순위 · 꾸미기 · 칭호 · 뽑기권 줄 없음) · 기록(별) · 별 규칙. /map 은 안 묻는다 (서버가 409 로 막는다).
+     공격 창을 닫으면 그 판의 별과 코인 줄(서버 reward.lines)이 알림 줄에 뜬다 - 지고 ★ 을 얻은 판도.
   3. 줄을 누르면 미리보기(앞 3마리 + 가려진 수 · 받은 최고 별) + [공격] -> 서버로 target. 가려진 조커는 음수 userId
      그대로 보낸다. 관장 배틀 창을 닫으면 다시 받는다. 이미 친 상대 · 공격을 다 쓴 뒤에는 까닭이 적히고 단추가 죽는다.
-  4. 삼각형: 별 판이 두 줄 - '우리가 칠 길드 [B]' · '우리를 치는 길드 [C]'.
+  4. 삼각형: 별 판이 두 줄 - '우리가 칠 길드 [B]' · '우리를 치는 길드 [C]'. 맞대결 목록은 세 길드 · 도는 차례 · 칠 길드.
   5. 전략 기간: 상대 발표 + 명단 (공격은 아직), 길드장은 출전 명단 고르기(상한에 맞아야 저장) · 조커 지정(꽉 차면 단추가
      죽는다). 일반 길드원에게는 그 단추가 없다.
-  6. 끝: 결과(승리) · 순위의 승/패 · 보상 안내. 어디에도 글이 잘리지 않고 창 크기는 그대로, Tk 오류가 없다.
+  6. 끝: 결과(승리) · 맨 위 결산 칸(받은 결산 코인 - 공격 안 했으면 없음) · 맞대결 목록의 확정 승/패. 어디에도 글이
+     잘리지 않고 창 크기는 그대로, Tk 오류가 없다.
   7. 관전 카드 · 결과 줄: war.mode == 'match' 면 별로 적는다.
 """
 import io
 import os
+import re
 import sys
 import tempfile
+import types
 
 os.environ["POKET_HOME"] = tempfile.mkdtemp(prefix="poket-gw1v1-ui-")
 
@@ -47,6 +52,9 @@ SHOTS = os.environ.get("GW1V1_SHOTS")
 NAMES = {1: "가람", 2: "나래", 3: "다솜", 4: "라온", 5: "마루", 6: "바다", 7: "사랑"}
 STAR_RULES = ["상대 방어팀 절반 이상 쓰러뜨림", "이김", "이기고 내 팀 절반 이상 남음"]
 STALE = "맞대결 판이 바뀌었습니다. 다시 불러와 주세요."
+COIN_RULES = {"stars": [20, 40, 60], "joker": 20, "defend": 20, "max": 300,           # 서버 state_extra 의 coinRules
+              "result": {"win": 100, "draw": 60, "lose": 30}}
+OLD_REWARD = ("1위", "꾸미기 묶음", "칭호 '", "활약 보상", "선물함")                  # 시즌 7 에 없어진 보상 글
 
 
 def chk(name, cond, got=""):
@@ -106,6 +114,7 @@ class MatchWar(object):
         self.foes = foes0()
         self.result = None
         self.battle = None
+        self.earned = 40                                        # 이번 시즌 판마다 받은 코인 (contrib.earned)
         self.calls, self.saved, self.rosters, self.joked = [], [], [], []
 
     # ---- state
@@ -136,19 +145,42 @@ class MatchWar(object):
                 "lead": "even" if ph == "plan" else "us",
                 "result": self.result if ph == "done" else None}
 
-    def ranking(self):
-        """from = 그 길드를 친 길드 (1:1 이면 vs 와 같다), vsPct = from 이 그 길드에게서 얻은 별 %."""
-        done = self.phase == "done"
-        tri = self.kind == "tri"
-        rows = [{"guildId": 1, "name": "피카단", "result": "win" if done else None, "pct": 54.2, "ko": 61.3,
-                 "vs": "로켓단", "from": "아주아주긴이름의길드" if tri else "로켓단", "vsPct": 40.0, "color": 1},
-                {"guildId": 9, "name": "로켓단", "result": "lose" if done else None, "pct": 40.0, "ko": 48.0,
-                 "vs": "아주아주긴이름의길드" if tri else "피카단", "from": "피카단", "vsPct": 54.2, "color": 0},
-                {"guildId": 8, "name": "아주아주긴이름의길드", "result": "draw" if done else None, "pct": 33.3, "ko": 40.0,
-                 "vs": "피카단" if tri else "솔플", "from": "로켓단" if tri else "솔플", "vsPct": 33.3, "color": 2}]
-        for i, r in enumerate(rows, 1):
-            r["rank"] = i
-        return rows
+    def matches(self):
+        """이번 시즌 맞대결 목록 (서버 guild_war_match.matches 의 꼴) - 우리 판이 맨 위, 덩어리 안은 길드 이름순.
+        final 이 아니면 result 는 지금 앞섬. 전략 기간에는 별이 다 0 이라 서버의 견주기가 draw 다."""
+        ph = self.phase
+        if ph not in ("plan", "war", "done"):
+            return []
+        final, live = ph == "done", ph != "plan"
+
+        def g(gid, name, st, mx, pct, ko, res, vs, frm):
+            if not live:
+                st, pct, ko, res = 0, 0.0, 0.0, "draw"
+            return {"guildId": gid, "name": name, "stars": st, "max": mx, "pct": pct, "ko": ko,
+                    "result": res, "vs": vs, "from": frm}
+        win = self.result or "win"
+        lose = {"win": "lose", "lose": "win", "draw": "draw"}[win]
+        long_name = "아주아주긴이름의길드"
+        if self.kind == "tri":
+            ours = {"kind": "tri", "ours": True, "final": final, "guilds": [
+                g(9, "로켓단", 4, 9, 44.4, 50.0, lose, long_name, "피카단"),
+                g(8, long_name, 4, 9, 40.0, 48.0, "draw", "피카단", "로켓단"),
+                g(1, "피카단", 13, 15, 54.2, 61.3, win, "로켓단", long_name)]}
+            other = [{"kind": "pair", "ours": False, "final": final, "guilds": [
+                g(4, "꼬부기단", 6, 12, 50.0, 55.0, "win", "파이리단", "파이리단"),
+                g(5, "파이리단", 3, 12, 25.0, 30.0, "lose", "꼬부기단", "꼬부기단")]}]
+        else:
+            ours = {"kind": "pair", "ours": True, "final": final, "guilds": [
+                g(9, "로켓단", 4, 9, 40.0, 48.0, lose, "피카단", "피카단"),
+                g(1, "피카단", 13, 15, 54.2, 61.3, win, "로켓단", "로켓단")]}
+            other = [{"kind": "pair", "ours": False, "final": final, "guilds": [
+                g(4, "꼬부기단", 6, 12, 50.0, 55.0, "draw", long_name, long_name),
+                g(8, long_name, 6, 12, 50.0, 55.0, "draw", "꼬부기단", "꼬부기단")]},
+                {"kind": "tri", "ours": False, "final": final, "guilds": [
+                    g(6, "이상해단", 2, 9, 22.2, 30.0, "lose", "파이리단", "치코리타단"),
+                    g(7, "치코리타단", 5, 9, 55.6, 60.0, "win", "이상해단", "파이리단"),
+                    g(5, "파이리단", 3, 9, 33.3, 40.0, "draw", "치코리타단", "이상해단")]}]
+        return [ours] + other
 
     def state(self):
         ph = self.phase or "before"
@@ -159,13 +191,10 @@ class MatchWar(object):
                          "done": None}[ph],
               "applyDays": 3, "planDays": 4, "warDays": 6, "minMembers": 5, "shown": 3, "levelCap": 50,
               "each": 2, "capRatio": 1.2, "jokerMax": 3, "starRules": STAR_RULES,
-              "rewards": [{"rank": 1, "coins": 300, "deco": "우승 꾸미기 묶음", "tm": 3},
-                          {"rank": 2, "coins": 200, "deco": "준우승 꾸미기 묶음", "tm": 2},
-                          {"rank": 3, "coins": 150, "deco": "3위 꾸미기 묶음", "tm": 1},
-                          {"rank": None, "result": "win", "coins": 100, "deco": "참가 묶음 선택권", "tm": 0},
-                          {"rank": None, "result": "other", "coins": 50, "deco": "참가 묶음 선택권", "tm": 0}],
-              "tmActive": {"wins": 2, "count": 1}, "title": "시즌 7 길드전 우승",
-              "contrib": {"win": 20, "joker": 20, "defend": 20, "max": 300, "earned": 40},
+              # 시즌 7: 보상은 길드 코인만 - 순위 보상 · 활약 뽑기권 · 순위표는 비어 온다 (title 은 GW.state 가 그대로 싣는다)
+              "rewards": [], "tmActive": None, "title": "시즌 7 길드전 우승", "coinRules": COIN_RULES,
+              "contrib": {"win": 20, "joker": 20, "defend": 20, "max": 300, "earned": self.earned},
+              "matches": self.matches(),
               "guild": {"id": 1, "members": self.members, "role": self.role},
               "entered": self.entered, "dropped": False,
               "can": {"apply": ph == "apply" and boss, "team": ph in ("apply", "plan"),
@@ -182,8 +211,6 @@ class MatchWar(object):
                              "left": self.my_left() if ph in ("plan", "war") else 0}
             st["mates"] = self.mates()
             st["match"] = self.match()
-            if ph in ("war", "done"):
-                st["ranking"] = self.ranking()
             if self.battle:
                 st["battle"] = {"id": self.battle, "region": "u21"}
         return st
@@ -301,6 +328,14 @@ def images_in(w):
         if c.winfo_class() == "Label" and str(c.cget("image")):
             n += 1
     return n
+
+
+def rows_of(box):
+    """보상 칸의 줄마다 글 (줄 틀이면 그 안의 글들, 글 하나면 그것)."""
+    out = []
+    for c in box.winfo_children():
+        out.append((str(c.cget("text")),) if c.winfo_class() == "Label" else tuple(texts(c)))
+    return out
 
 
 def no_clip(war, top):
@@ -436,12 +471,32 @@ def main():
     chk("  얻은 별 · 이긴 판 · 막아 낸 것 · 내준 별", any("얻은 별 3 · 이김 1판 · 막아 냄 2 / 3번 · 내준 별 ★★★" in x for x in mx)
         and any("받은 공격 없음" in x for x in mx) and any("아직 한 번도 안 친 사람 1명" in x for x in mx), mx)
     rk = texts(war.rank_box)
-    chk("순위: 별 % · vs 상대 · 결과는 아직 '-'", "피카단" in rk and "54.2%" in rk and "vs [로켓단] 40%" in rk
-        and "-" in rk and "아주아주긴이름의길드" in rk, rk)
-    chk("보상: 1~3위 · 그 밖에 이긴 길드 · 비기거나 진 길드 · 활약 2번", any("1위: 길드 코인 300" in x for x in tx)
-        and any("그 밖에 이긴 길드: 길드 코인 100 · 참가 묶음 선택권" in x for x in tx)
-        and any("비기거나 진 길드: 길드 코인 50" in x for x in tx)
-        and any("활약 보상: 공격 2번을 다 이기면" in x for x in tx), [x for x in tx if "코인" in x or "활약" in x])
+    blocks = war.rank_box.winfo_children()
+    chk("이번 시즌 맞대결: 짝마다 한 덩어리 (우리 1:1 · 남의 1:1 · 남의 삼각형), 우리 판이 맨 위", len(blocks) == 3
+        and rk[0] == "우리 맞대결 · 1:1 맞대결" and texts(blocks[1])[0] == "1:1 맞대결", rk[:3])
+    chk("  우리 판은 굵은 다른 빛깔 테", int(blocks[0].cget("highlightthickness")) == 2
+        and int(blocks[1].cget("highlightthickness")) == 1
+        and str(blocks[0].cget("highlightbackground")) != str(blocks[1].cget("highlightbackground")))
+    ours = texts(blocks[0])
+    chk("  길드마다 별 % · 쓰러뜨린 비율 · 전쟁 중엔 앞섬 / 뒤짐", "[피카단]  우리" in ours and "[로켓단]" in ours
+        and "앞섬" in ours and "뒤짐" in ours and "별 13 / 15개 (54.2%) · 쓰러뜨린 비율 61.3%" in ours
+        and "별 4 / 9개 (40%) · 쓰러뜨린 비율 48%" in ours and "승" not in ours, ours)
+    chk("  비긴 짝은 '같음' · 순위(1위 · 2위)는 없다", texts(blocks[1]).count("같음") == 2
+        and not any(re.search(r"\d위", x) for x in rk), rk)
+    tri = texts(blocks[2])
+    chk("  남의 삼각형: 세 길드 · 도는 차례 · 길드마다 칠 길드", "삼각 맞대결 (세 길드)" in tri
+        and "[이상해단] → [파이리단] → [치코리타단] → [이상해단]" in tri and "칠 길드 [파이리단]" in tri
+        and len([x for x in tri if x.startswith("별 ")]) == 3 and len([x for x in tri if x.startswith("칠 길드")]) == 3,
+        tri)
+    cr = rows_of(war.coin_box)
+    chk("보상: 길드 코인만 - ★ 20 · ★★ 40 · ★★★ 60 · 조커 +20 · 막기 20", ("20개", "★", "☆☆") in cr
+        and ("40개", "★★", "☆") in cr and ("60개", "★★★") in cr and ("+20개", "조커를 이기면") in cr
+        and ("20개", "공격을 막아 내면 (지킨 사람 · 공격팀을 다 쓰러뜨렸을 때)") in cr, cr)
+    chk("  한 시즌 상한 300 · 내 몫 '이번 시즌 40 / 300개'", ("판마다 받는 코인은 한 사람 한 시즌 300개까지입니다.",) in cr
+        and ("이번 시즌 40 / 300개",) in cr, cr)
+    chk("  결산: 이김 100 · 비김 60 · 짐 30", cr[-3:] == [("100개", "이김"), ("60개", "비김"), ("30개", "짐")], cr[-4:])
+    chk("  옛 보상 글이 없다 (순위 코인 · 꾸미기 · 칭호 · 활약 뽑기권 · 선물함)",
+        not any(o in x for x in tx for o in OLD_REWARD), [x for x in tx if any(o in x for o in OLD_REWARD)])
     chk("별 규칙: ★☆☆ 절반 · ★★☆ 이김 · ★★★ 절반 남기고", all(r in tx for r in STAR_RULES)
         and any("방어자 한 명마다 가장 잘한 공격 하나만" in x for x in tx))
     chk("기록: 공격마다 별", any("나래 → [로켓단] 비주기 · ★★☆ (6마리 쓰러뜨림)" in x for x in tx)
@@ -485,11 +540,23 @@ def main():
     chk("[공격] -> 서버로 target 21, 관장 배틀 창", "attack:t21" in MW.calls and opened[0]["id"] == 81
         and opened[0]["war"] == {"target": 21, "name": "비주기", "mode": "match"}, (MW.calls[-3:], opened[:1]))
     MW.battle = None
+    said, real_say = [], w.say
+    w.say = lambda text, color=None: (said.append(text), real_say(text, color))     # 알림 줄은 테마마다 그리는 법이 달라 말한 것을 적어 둔다
+    # 관장 배틀 창이 받은 판 끝 보상 (서버 guild_war_match.on_end 의 꼴) - 이긴 판 ★★ = 40, 상한까지 80
+    MW.earned = 80
+    war.battle = types.SimpleNamespace(reward={
+        "lines": ["★★☆  비주기 님에게서 별 2개 (6마리 중 6마리 쓰러뜨림).", "우리 길드 별 15 / 15개 (100.0%).",
+                  "길드 코인 40개 - 이번 시즌 80 / 300개."],
+        "war": {"mode": "match", "target": 21, "name": "비주기", "stars": 2, "ko": 6, "size": 6, "result": "win",
+                "coins": 40}})
     war._battle_closed()
     TG.wait(root, lambda: "남은 공격 1번" in texts(war.inner) and war.foe_sel == 21 and war._foe(21).get("mine"))
     TG.settle(root, 0.2)
     tx = texts(war.inner)
     chk("창을 닫으면 다시 받는다: ●○ · 남은 공격 1번", "●○" in tx and "남은 공격 1번" in tx, tx[:8])
+    chk("판 끝 코인 줄: '★★☆  길드 코인 40개 - 이번 시즌 80 / 300개.' 가 알림 줄에", war.battle is None
+        and "★★☆  길드 코인 40개 - 이번 시즌 80 / 300개." in said, said)
+    chk("  보상 칸의 내 몫도 '이번 시즌 80 / 300개'", ("이번 시즌 80 / 300개",) in rows_of(war.coin_box))
     chk("  친 상대 줄에 '내가 이미 쳤음'", "내가 이미 쳤음" in texts(war.foe_rows[21]))
     ft = texts(war.foe_box)
     chk("막힌 줄(이미 친 상대): 까닭이 적히고 단추가 죽는다", not war.buttons["attack"].enabled
@@ -505,8 +572,6 @@ def main():
     # 그사이 서버의 판이 바뀌어 가려진 조커의 자리 표시가 -1 -> -2 가 됐다 (앱은 아직 -1 을 들고 있다)
     MW.foes[-1] = dict(MW.foes[-1], userId=-2)
     n_match = MW.calls.count("match")
-    said, real_say = [], w.say
-    w.say = lambda text, color=None: (said.append(text), real_say(text, color))     # 알림 줄은 테마마다 그리는 법이 달라 말한 것을 적어 둔다
     war.buttons["attack"].command()
     TG.wait(root, lambda: MW.calls.count("match") > n_match and -2 in war.foe_rows and not war.busy)
     TG.settle(root, 0.2)
@@ -522,10 +587,18 @@ def main():
     chk("  조커 [공격] -> 음수 userId 그대로 target 으로", "attack:t-2" in MW.calls and opened[1]["war"]["target"] == -2,
         MW.calls[-3:])
     MW.battle = None
+    MW.earned = 100
+    war.battle = types.SimpleNamespace(reward={
+        "lines": ["★☆☆  ??? 님에게서 별 1개 (6마리 중 3마리 쓰러뜨림).", "우리 길드 별 16 / 15개 (100.0%).",
+                  "길드 코인 20개 - 이번 시즌 100 / 300개."],
+        "war": {"mode": "match", "target": -2, "name": "???", "stars": 1, "ko": 3, "size": 6, "result": "lose",
+                "coins": 20}})
     war._battle_closed()
     TG.wait(root, lambda: "남은 공격 0번" in texts(war.inner))
     TG.settle(root, 0.2)
     tx = texts(war.inner)
+    chk("  진 판에서 얻은 ★ 의 코인도 알림 줄에 (관장 배틀 창은 이긴 판만 서버 줄을 적는다)",
+        "★☆☆  길드 코인 20개 - 이번 시즌 100 / 300개." in said, said[-2:])
     chk("남은 공격 0: ○○ · 다 썼다는 안내", "○○" in tx and "남은 공격 0번" in tx
         and any("공격을 다 썼습니다 (2번)" in x for x in tx), tx[:8])
     war.pick_foe(25)
@@ -562,9 +635,13 @@ def main():
     chk("  돌아가는 순서와 견주는 법", any("우리 → [로켓단] → [아주아주긴이름의길드] → 우리" in x for x in bx)
         and any("우리가 [로켓단] 에게서 얻은 성적" in x for x in bx))
     chk("  명단은 우리가 칠 길드의 것", any("우리가 칠 길드 [로켓단] 의 출전 명단 5명" in x for x in bx))
-    rk = texts(war.rank_box)
-    chk("  순위 줄: 상대 % 는 우리를 친 길드(from) 와 짝지어", "친 길드 [로켓단] · 맞은 길드 [아주아주긴이름의길드] 40%" in rk
-        and "친 길드 [아주아주긴이름의길드] · 맞은 길드 [피카단] 54.2%" in rk and not any(x.startswith("vs ") for x in rk), rk)
+    blocks = war.rank_box.winfo_children()
+    ours = texts(blocks[0])
+    chk("  맞대결 목록: 우리 삼각형이 맨 위 - 세 길드 · 도는 차례 · 길드마다 칠 길드", len(blocks) == 2
+        and ours[0] == "우리 맞대결 · 삼각 맞대결 (세 길드)"
+        and "[로켓단] → [아주아주긴이름의길드] → [피카단] → [로켓단]" in ours and "[피카단]  우리" in ours
+        and all("칠 길드 [%s]" % n in ours for n in ("로켓단", "피카단", "아주아주긴이름의길드"))
+        and ours.count("앞섬") == 1 and "뒤짐" in ours and "같음" in ours, ours)
     ok, bad = no_clip(war, top)
     chk("글이 잘리지 않는다 (삼각형)", ok, bad)
     chk("창 크기는 그대로다", (top.winfo_width(), top.winfo_height()) == size0, (top.winfo_width(), top.winfo_height()))
@@ -584,6 +661,10 @@ def main():
     chk("상대 발표 + 상대 명단 (조커 가림)", "상대가 발표됐습니다. 전쟁이 시작되면 별이 쌓입니다." in bx
         and "[로켓단]" in bx and len(war.foe_rows) == 5 and "???" in texts(war.foe_rows[-2]), bx[:10])
     chk("  출전 상한이 적힌다", any("출전 상한 6명 (작은 쪽 인원 x 1.2)" in x for x in bx))
+    rk = texts(war.rank_box)
+    chk("맞대결 목록 (전략 기간): 짝만 - 별 · 승패는 아직 '-'", rk[0] == "우리 맞대결 · 1:1 맞대결"
+        and not any(x.startswith("별 ") for x in rk) and not ({"앞섬", "같음", "뒤짐", "승", "패"} & set(rk))
+        and rk.count("-") == 7, rk)
     chk("  아직 칠 수 없다 - 까닭 · 단추 죽음", not war.buttons["attack"].enabled
         and "칠 수 없음: 아직 전략 기간이다 (공격은 전쟁이 시작되면)" in texts(war.foe_box))
     chk("내 공격: ●● 공격 2번 (전쟁이 시작되면)", "●●" in tx and "공격 2번" in tx
@@ -636,13 +717,27 @@ def main():
     bx, tx = texts(war.board), texts(war.inner)
     chk("결과: 승리", "승리! 우리 길드가 이겼습니다." in bx, bx)
     rk = texts(war.rank_box)
-    chk("순위: 승 · 패 · 비김", "승" in rk and "패" in rk and "비김" in rk, rk)
-    chk("보상 안내 · 끝났다고", any("선물함에 있습니다" in x for x in tx)
-        and any("이번 시즌의 길드전이 끝났습니다" in x for x in tx))
+    chk("맞대결 목록: 확정 승 · 패 · 비김 (앞섬 글은 없다)", "승" in rk and "패" in rk and "비김" in rk
+        and not ({"앞섬", "같음", "뒤짐"} & set(rk)), rk)
+    settle = "승리! 우리 길드가 이겼습니다."
+    chk("결산 칸이 맨 위: 우리 판 결과 · 받은 결산 코인 100개 · 내 몫", settle in tx
+        and tx.index(settle) < tx.index("우리 맞대결 · 1:1 맞대결")
+        and "한 번이라도 공격한 길드원은 결산 길드 코인 100개를 받았습니다 (이김 100 · 비김 60 · 짐 30)." in tx
+        and "나는 공격 2번 - 판마다 받은 코인 100개 + 결산 100개 = 200개." in tx, tx[:10])
+    chk("  끝났다고 · 옛 보상 글(선물함 · 1위 · 칭호) 없음", any("이번 시즌의 길드전이 끝났습니다" in x for x in tx)
+        and not any(o in x for x in tx for o in OLD_REWARD), [x for x in tx if any(o in x for o in OLD_REWARD)])
     chk("  칠 수는 없다", not war.buttons["attack"].enabled and "칠 수 없음: 지금은 전쟁 중이 아니다" in texts(war.foe_box))
     chk("  우리 명단: 얻은 별 · 이김 (가람 4 · 2판)", any("얻은 별 4 · 이김 2판" in x for x in texts(war.mates_box)))
     ok, bad = no_clip(war, top)
     chk("글이 잘리지 않는다 (끝)", ok, bad)
+    MW.result = "lose"
+    MW.team_of[1] = [2, 0]
+    chk("다시 받는다 (졌고 나는 공격하지 않았다)", reload(root, war, lambda: "패배 - 이번 맞대결은 졌습니다." in texts(war.inner)))
+    tx = texts(war.inner)
+    chk("  진 판: 결산 30개 · 나는 공격하지 않아 결산 코인이 없다",
+        "한 번이라도 공격한 길드원은 결산 길드 코인 30개를 받았습니다 (이김 100 · 비김 60 · 짐 30)." in tx
+        and "나는 이번 길드전에서 공격하지 않아 결산 코인이 없습니다 (판마다 받은 코인 100개)." in tx, tx[:10])
+    MW.result = "win"
 
     print("\n=== 신청 단계 (1:1 시즌) ===")
     MW.phase = "apply"
@@ -652,6 +747,8 @@ def main():
         and any("1:1 로 맞붙습니다" in x for x in tx) and any("상대가 발표됩니다" in x for x in tx)
         and any("맞대결 판이 나타납니다" in x for x in tx), tx[:6])
     chk("  별 규칙도 보인다", all(r in tx for r in STAR_RULES))
+    chk("  맞대결 목록은 없고(서버가 비워 보낸다) 보상 칸은 있다", war.rank_box is None
+        and ("이번 시즌 100 / 300개",) in rows_of(war.coin_box) and ("100개", "이김") in rows_of(war.coin_box))
     ok, bad = no_clip(war, top)
     chk("글이 잘리지 않는다 (신청)", ok, bad)
     w.close()
@@ -674,6 +771,17 @@ def main():
         v)
     chk("문구: 별 % · 남은 공격", ui_guild_war.pct_text(54.2) == "54.2%" and ui_guild_war.pct_text(40.0) == "40%"
         and ui_guild_war.dots(1, 2) == "●○" and ui_guild_war.dots(0, 2) == "○○" and ui_guild_war.dots(2, 2) == "●●")
+
+    E = ui_guild_war.match_end_line
+    chk("판 끝 줄: 별 0 이면 코인 없음 · 상한이면 서버 글 · 지도전 · 끝나지 않은 판은 없음",
+        E({"war": {"mode": "match", "stars": 0, "coins": 0}, "lines": ["☆☆☆  로사 님에게서 별 0개."]})
+        == "☆☆☆  별을 얻지 못해 길드 코인은 없습니다."
+        and E({"war": {"mode": "match", "stars": 3, "coins": 0},
+               "lines": ["판마다 받는 길드 코인은 이번 시즌 상한(300개)을 다 받았다."]})
+        == "★★★  판마다 받는 길드 코인은 이번 시즌 상한(300개)을 다 받았다."
+        and E({"war": {"target": "u21", "wins": 1, "need": 3}, "lines": ["이겼다"]}) is None and E(None) is None)
+    chk("coinRules 가 빠지면 설계값 (20 · 40 · 60 · 상한 300)", ui_guild_war.coin_rules({})["stars"] == [20, 40, 60]
+        and ui_guild_war.earned_text({"contrib": {"earned": 7}}) == "이번 시즌 7 / 300개")
 
     chk("Tk 콜백에서 난 오류가 없다", not errors, errors[:2])
     root.destroy()

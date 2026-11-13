@@ -1070,6 +1070,14 @@ CREATE TABLE IF NOT EXISTS guild_user (
     coin        INTEGER NOT NULL DEFAULT 0,
     left_at     TEXT
 );
+-- 길드 전용 상품을 시즌마다 몇 개 샀나 (시즌 7 부터, guild.SHOP_EXCLUSIVE - 시즌마다 한 사람이 살 수 있는 수가 있다)
+CREATE TABLE IF NOT EXISTS guild_buy (
+    season      INTEGER NOT NULL,
+    user_id     INTEGER NOT NULL,
+    item_id     TEXT NOT NULL,
+    n           INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (season, user_id, item_id)
+);
 -- 그날 받은 단계 보상. **길드가 아니라 사람에게 건다** - 길드를 옮겨 다니며
 -- 같은 날 같은 단계를 두 번 받을 수 없다.
 CREATE TABLE IF NOT EXISTS guild_claim (

@@ -33,7 +33,7 @@ os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
 from fastapi import HTTPException                            # noqa: E402
 
 from common import deco as C                                 # noqa: E402
-from app import config, db, deco, guild, items               # noqa: E402
+from app import config, db, deco, guild, items, season       # noqa: E402
 
 OK = FAIL = 0
 
@@ -85,6 +85,9 @@ def avg_coin(ids):
 
 def main():
     db.init()
+    # 길드 전용 상품(시즌 7 부터 - 마스터볼 · 금색병뚜껑, '길드 전용' 묶음)이 없는 상점을 본다. 전용 상품은
+    # test_guild_shop_exclusive 가 본다.
+    season.SEASON = 6
 
     print("\n=== 늘어난 상점 도구 ===")
     a = mkuser("가")

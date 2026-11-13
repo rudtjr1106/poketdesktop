@@ -1271,6 +1271,10 @@ class GymBattleWindow(Z.Resizable):
                 lines.append("이긴 곳 %d / %d" % (rw["cleared"], rw.get("total", 256)))
         elif res == "lost":
             lines.append("데리고 다니는 포켓몬이 모두 쓰러졌다. 다시 도전해 보자.")
+        rw = self.reward or {}
+        if res != "won" and (rw.get("war") or {}).get("mode") == "match" and rw.get("lines"):
+            # 길드전 1:1 (시즌 7): 져도 별 · 길드 코인을 받을 수 있다 - 서버가 적어 준 줄을 그대로
+            lines.extend(rw["lines"])
         ups = {}
         for e in self.exp:
             if e.get("leveledUp"):

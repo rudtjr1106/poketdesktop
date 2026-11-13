@@ -11,12 +11,13 @@
   2. 별: 이김(절반 남김 ★★★ / 아님 ★★) · 짐(절반 쓰러뜨림 ★ / 아님 없음) · 비김 · 기권.
   3. 전략 기간: 상대가 정해지고(pair 줄 · 채팅) 한 사람 2번 · 상대 명단은 앞 3마리 · 아직 못 친다 · 조커는 '???' 와
      음수 자리 표시 · 지도 길(map · tile · attacks · guard)은 409.
-  4. 전쟁: 진짜 판 이김 → 별 · 쓰러뜨린 수 · 기여 코인 · 결과 줄 · 채팅 · 같은 사람 두 번 막힘 · 가려진 조커를 음수로
+  4. 전쟁: 진짜 판 이김 → 별 · 쓰러뜨린 수 · 별 코인 · 결과 줄 · 채팅 · 같은 사람 두 번 막힘 · 가려진 조커를 음수로
      친다 → 그 뒤로는 보인다 · 3번째 막힘 · 우리 길드 사람 막힘 · 기권은 별 0, 지킨 사람 코인 없음 · 손 놓은 판은
      시간이 지나 진 것으로 (판에서 쓰러뜨린 수를 센다).
   5. 삼각형 + 출전 상한: 8 · 5 · 5 길드 → 상한 6, 약한 2명 쉼 · 쉬는 사람은 못 치고 명단에 없다 · 길드장이 바꾼다
      (수가 안 맞으면 409) · 승패는 '내가 칠 길드에게서' 대 '나를 친 길드가 나에게서' (2승 1패).
-  6. 결산: 순위(이긴 길드 먼저) · 코인(1~3위 그대로, 그 밖 승리 100, 나머지 50) · 활약 뽑기권 2승 · 한 번만.
+  6. 결산 (보상 = 길드 코인만, 11/12): 판마다 별 코인 ★20 · ★★40 · ★★★60 (+조커 20 · 막기 20) · 결산은 공격한 사람에게
+     이김 100 · 비김 60 · 짐 30 · 순위 보상(꾸미기 · 칭호 · 뽑기권) 없음 · 이번 시즌 맞대결 목록 · 한 번만.
   7. 시즌 6 은 지도전 그대로 (pair 줄 없음 · 칸이 나뉜다 · 맞대결 판 409).
 """
 import datetime
@@ -39,7 +40,7 @@ os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
 
 from fastapi import HTTPException                             # noqa: E402
 
-from app import config, db, deps, guild_war as GW, guild_war_match as GM, gym_routes, season   # noqa: E402
+from app import config, db, deps, guild, guild_war as GW, guild_war_match as GM, gym_routes, season   # noqa: E402
 from common import pokelogic as P                             # noqa: E402
 from common import trainer_battle as TB                       # noqa: E402
 
@@ -149,6 +150,10 @@ def put(s, atk, agid, dfn, dgid, stars, kos, size=2, res=None):
             stars, kos, size))
 
 
+def coin(uid):
+    return guild.coin(uid)
+
+
 def chat(gid):
     return [r["body"] for r in db.q("SELECT body FROM guild_chat WHERE guild_id=? ORDER BY id", (gid,))]
 
@@ -227,10 +232,13 @@ def pair_part():
     chk("state: mode match · each 2 · 상대 · 앞섬 even", st.get("mode") == "match" and st.get("each") == 2
         and st["match"]["target"]["name"] == "약한길드" and st["match"]["lead"] == "even"
         and st["match"]["result"] is None, st.get("match"))
-    chk("  보상 줄: 1~3위 + 승리 100 + 그 밖 50 · 활약 2승",
-        [(x["rank"], x.get("result"), x["coins"]) for x in st["rewards"]]
-        == [(1, None, 300), (2, None, 200), (3, None, 150), (None, "win", 100), (None, "other", 50)]
-        and st["tmActive"] == {"wins": 2, "count": 1}, st["rewards"])
+    chk("  보상은 코인만: coinRules 별 20/40/60 · 조커 20 · 막기 20 · 상한 300 · 결산 100/60/30 · 순위 보상 줄 없음",
+        st["coinRules"] == {"stars": [20, 40, 60], "joker": 20, "defend": 20, "max": 300,
+                            "result": {"win": 100, "draw": 60, "lose": 30}}
+        and st["rewards"] == [] and st["tmActive"] is None and st["ranking"] == [], st.get("coinRules"))
+    chk("  이번 시즌 맞대결: 우리 판 하나 (두 길드)", len(st["matches"]) == 1 and st["matches"][0]["ours"]
+        and sorted(x["name"] for x in st["matches"][0]["guilds"]) == ["강한길드", "약한길드"]
+        and st["matches"][0]["final"] is False, st.get("matches"))
     chk("  우리 명단 6명 (쉬는 사람 없음 · 출전 상한 없음)", len(st["mates"]) == 6
         and not any(x["bench"] for x in st["mates"]) and st["can"]["roster"] is False)
     chk("지도 길은 409 (map · tile · attacks · guard · 옛 공격)",
@@ -262,7 +270,8 @@ def pair_part():
     rw = (out or {}).get("reward") or {}
     chk("  결과 창: war.mode match · 별 3 · 줄에 ★★★", rw.get("war", {}).get("mode") == "match"
         and rw["war"]["stars"] == 3 and any("★★★" in x for x in rw.get("lines", [])), rw)
-    chk("  기여 코인 20", a["coins"] == GW.CONTRIB_WIN, a["coins"])
+    chk("  별 코인 60 (★★★)", a["coins"] == 60 and coin(A[0]) == 60 and rw["war"].get("coins") == 60, (a["coins"], coin(A[0])))
+    chk("  결과 줄에 길드 코인 60개", any("길드 코인 60개" in x for x in rw.get("lines", [])), rw.get("lines"))
     chk("  공격 시작 응답의 war.mode match", r.get("war", {}).get("mode") == "match", r.get("war"))
     chk("  우리 채팅에 ★★★", any("★★★" in x and B[3] and "약한길드" in x for x in chat(g1)), chat(g1)[-1:])
     c = code_of(lambda: GM.attack(A[0], B[3]))
@@ -273,7 +282,7 @@ def pair_part():
     r, out = fight(A[0], hid_id)
     a = last_attack(A[0])
     chk("가려진 조커를 음수 자리 표시로 친다 → 진짜 그 사람", a["def_user"] == B[2] and a["result"] == "win", dict(a))
-    chk("  조커를 이기면 기여 코인 더", a["coins"] == GW.CONTRIB_WIN + GW.CONTRIB_JOKER, a["coins"])
+    chk("  조커를 이기면 +20 (★★★ 60 + 20 = 80)", a["coins"] == 80 and coin(A[0]) == 140, (a["coins"], coin(A[0])))
     mv = GM.match_view(A[1])
     seen = [f for f in mv["foes"] if f["userId"] == B[2]]
     chk("  한 번 붙어 본 조커는 보인다 (이름 · 포켓몬)", seen and not seen[0]["hidden"] and seen[0]["name"] == NAMES[B[2]]
@@ -285,8 +294,8 @@ def pair_part():
     # 약한 길드의 반격: 기권 (별 0, 지킨 사람 코인 없음)
     fight(B[0], A[0], "forfeit")
     a = last_attack(B[0])
-    chk("기권 → 짐 · 별 0 · 지킨 사람 코인 없음", a["result"] == "lose" and a["stars"] == 0 and a["def_coins"] == 0,
-        dict(a))
+    chk("기권 → 짐 · 별 0 · 코인 없음 (공격한 사람 · 지킨 사람 둘 다)", a["result"] == "lose" and a["stars"] == 0
+        and a["coins"] == 0 and a["def_coins"] == 0 and coin(B[0]) == 0 and coin(A[0]) == 140, dict(a))
     # 손 놓은 판: 시간이 지나 진 것으로
     fight(B[1], A[1], "leave")
     later = t + datetime.timedelta(seconds=config.GYM_BATTLE_TTL + 60)
@@ -315,22 +324,26 @@ def pair_part():
     clock(end)
     GW.state(A[0])                                            # 결산은 화면을 열 때 돈다
     rows = dict((r["guildId"], r) for r in GW.scores(s))
-    chk("순위: 강한길드 1위 승리 · 약한길드 2위 패배", rows[g1]["rank"] == 1 and rows[g1]["result"] == "win"
-        and rows[g2]["rank"] == 2 and rows[g2]["result"] == "lose", rows)
-    gifts = db.q("SELECT kind, item_id, count FROM gift WHERE user_id=?", (A[0],))
-    tm = [x for x in gifts if x["kind"] == "item" and x["item_id"] == GW.TM_TICKET]
-    chk("A0: 1위 뽑기권 2장 + 활약(2승) 1장 = 3장 · 칭호", tm and tm[0]["count"] == 3
-        and any(x["kind"] == "title" for x in gifts), [dict(x) for x in gifts])
-    chk("  약한길드에서 공격한 B0 · B1 은 코인만 (뽑기권 없음 - 이긴 판이 없다)",
-        not db.q1("SELECT 1 FROM gift WHERE user_id=? AND kind='item'", (B[0],)))
-    chk("  공격 안 한 A5 는 아무것도 없다", not db.q1("SELECT 1 FROM gift WHERE user_id=?", (A[5],)))
-    chk("  결산 채팅: 별 % · 승리 · 1위", any("별 40.0%" in x and "승리" in x and "1위" in x for x in chat(g1)),
-        chat(g1)[-1:])
-    n = db.q1("SELECT COUNT(*) c FROM gift")["c"]
+    chk("결과: 강한길드 승리 · 약한길드 패배 (순위 칸 없음)", rows[g1]["result"] == "win" and rows[g2]["result"] == "lose"
+        and "rank" not in rows[g1], rows)
+    chk("결산 코인: 공격한 A0 +100 (판 140 + 100 = 240) · 진 길드에서 공격한 B0 · B1 +30",
+        coin(A[0]) == 240 and coin(B[0]) == 30 and coin(B[1]) == 30, (coin(A[0]), coin(B[0]), coin(B[1])))
+    chk("  공격 안 한 A5 는 없음", coin(A[5]) == 0, coin(A[5]))
+    chk("  선물(꾸미기 · 칭호 · 뽑기권)은 하나도 없다", not db.q1("SELECT 1 FROM gift"),
+        [dict(x) for x in db.q("SELECT user_id, kind, item_id FROM gift")])
+    chk("  순위가 안 적힌다 (rank NULL) · score = 별", db.q1("SELECT rank, score FROM guild_war_entry WHERE season=? AND"
+                                                     " guild_id=?", (s, g1))["rank"] is None)
+    chk("  결산 채팅: 별 % · 승리 · 코인 100개", any("별 40.0%" in x and "승리" in x and "길드 코인 100개" in x
+                                              for x in chat(g1)), chat(g1)[-1:])
+    st = GW.state(A[0])
+    chk("  끝난 뒤 맞대결 목록은 final", st["matches"] and st["matches"][0]["final"] is True)
+    chk("  state.contrib.settled = 실제로 받은 결산 코인 (A0 100 · B0 30 · 공격 안 한 A5 0)",
+        st["contrib"].get("settled") == 100 and GW.state(B[0])["contrib"].get("settled") == 30
+        and GW.state(A[5])["contrib"].get("settled") == 0, st["contrib"])
     GW.settle(end)
     db.run("DELETE FROM meta WHERE k=?", ("gw:%d:settled" % s,))
     GW.settle(end)
-    chk("두 번 돌려도(끝 표시를 지워도) 한 번", db.q1("SELECT COUNT(*) c FROM gift")["c"] == n)
+    chk("두 번 돌려도(끝 표시를 지워도) 한 번", coin(A[0]) == 240 and coin(B[0]) == 30, (coin(A[0]), coin(B[0])))
 
 
 # ---------------------------------------------------------------- 5. 삼각형 + 출전 상한
@@ -393,6 +406,8 @@ def tri_part():
     res = dict((g, GM.outcome(s, g)[2]) for g in (g1, g2, g3))
     chk("  2승 1패 (여덟 50% 대 40% 승 · 칠 30% 대 50% 패 · 40% 대 30% 승)",
         sorted(res.values()) == ["lose", "win", "win"] and res[g1] == "win", res)
+    ms = GW.state(A[0])["matches"]
+    chk("  맞대결 목록: 삼각형 하나 (세 길드)", len(ms) == 1 and ms[0]["kind"] == "tri" and len(ms[0]["guilds"]) == 3, ms)
     print("\n=== 7. 시즌 6 은 지도전 그대로 ===")
     season.SEASON = 6
     wipe()
@@ -465,16 +480,11 @@ def review_part():
     chk("  공격을 다 쓴 뒤: 조커 · 명단 밖이 같은 글 (공격 횟수를 다 썼다) - 검토 2", c1 == c2 and "다 썼다" in c1[1],
         (c1, c2))
     r = [x for x in GW.scores(s) if x["guildId"] == g1][0]
-    chk("순위 줄에 우리를 친 길드 이름(from) - 검토 8", r.get("from") == GM._gname(ps[g1]["from_guild"], s), r)
+    chk("성적 줄에 우리를 친 길드 이름(from) - 검토 8", r.get("from") == GM._gname(ps[g1]["from_guild"], s), r)
     st = GW.state(A[0])
-    chk("  1:1 이면 from = vs", st["ranking"] and all(x["from"] == x["vs"] for x in st["ranking"]))
-    # 활약 뽑기권 선물 글 (1:1 은 2승)
-    put(s, A[2], g1, B[2], g2, 3, 2)
-    put(s, A[2], g1, B[4], g2, 3, 2)
-    db.run("UPDATE guild_war_team SET used=2 WHERE season=? AND user_id=?", (s, A[2]))
-    GW._tm_reward(A[2], g1, 9, s, "검", t)
-    g = db.q1("SELECT message FROM gift WHERE user_id=? AND kind='item'", (A[2],))
-    chk("활약 뽑기권 선물 글이 '공격 2승 이상' - 검토 5", g and "공격 2승 이상" in g["message"], g and g["message"])
+    chk("  맞대결 목록: 짝 둘 · 우리 판이 맨 위 · 1:1 이면 from = vs", len(st["matches"]) == 2 and st["matches"][0]["ours"]
+        and not st["matches"][1]["ours"]
+        and all(x["from"] == x["vs"] for m in st["matches"] for x in m["guilds"]), st["matches"])
 
 
 def main():

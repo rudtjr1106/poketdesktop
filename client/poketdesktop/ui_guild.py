@@ -108,6 +108,53 @@ def shop_match(it, q):
             or q in "".join(str(it.get("group") or "").lower().split()))
 
 
+# 길드 전용 상품 (시즌 7~, design-notes/2026-11-12-guild-war-rewards.md). 서버가 상점 groups 맨 앞에 '길드 전용' 을
+# 싣고 그 상품에 exclusive · limit(시즌마다 수) · left(이번 시즌 남은 수) 를 붙인다. 없으면(옛 서버 · 시즌 6) 예전 그대로.
+SHOP_EX_GROUP = "길드 전용"
+SHOP_EX_NOTE = "돈 상점에는 없는 상품입니다. 시즌마다 한 사람이 살 수 있는 수가 정해져 있습니다."
+
+
+def shop_exclusive(it):
+    """코인 상점의 '길드 전용' 상품인가."""
+    return bool((it or {}).get("exclusive"))
+
+
+def shop_left(it):
+    """전용 상품을 이번 시즌에 더 살 수 있는 수 (전용 상품이 아니면 None)."""
+    if not shop_exclusive(it):
+        return None
+    try:
+        return max(0, int(it.get("left") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def shop_left_text(it):
+    """'이번 시즌 1 / 2개 남음' - 다 샀으면 '... - 다음 시즌에 다시 살 수 있습니다'."""
+    left = shop_left(it) or 0
+    out = "이번 시즌 %d / %d개 남음" % (left, int(it.get("limit") or 0))
+    return out if left else out + " - 다음 시즌에 다시 살 수 있습니다"
+
+
+def shop_counts(it):
+    """사기 단추의 개수들. 전용 상품은 시즌 수가 적어(1~2개) 한 개씩만 - 남은 수를 넘는 단추를 안 둔다."""
+    return (1,) if shop_exclusive(it) else (1, 10)
+
+
+def shop_can_buy(it, n, have):
+    """코인 have 개로 그 도구를 n 개 살 수 있나 (전용 상품은 남은 수도)."""
+    if have < int(it.get("coin") or 0) * n:
+        return False
+    left = shop_left(it)
+    return left is None or n <= left
+
+
+def shop_rest_title(shop):
+    """전용 묶음 아래의 나머지 도구 머리글 ('볼 · 성장 · 진화 · 지닌 도구')."""
+    groups = [g for g in (shop or {}).get("groups") or [] if g and g != SHOP_EX_GROUP]
+    return " · ".join(groups) if groups else "다른 도구"
+
+
 def span(sec):
     """남은 시간을 말로. 3 * 3600 + 720 -> '3시간 12분'."""
     sec = max(0, int(sec or 0))
@@ -285,8 +332,8 @@ class GuildWindow(object):
                 self.say("")
         run_async(self.root, lambda: api.guild(), done)
 
-    def act(self, fn, then=None):
-        """서버에 무언가를 시키고, 되면 한마디 띄우고 다시 받는다."""
+    def act(self, fn, then=None, fail=None):
+        """서버에 무언가를 시키고, 되면 한마디 띄우고 다시 받는다. 안 되면 글을 띄우고 fail(오류) 을 부른다."""
         if self._busy:
             return
         self._busy = True
@@ -296,7 +343,10 @@ class GuildWindow(object):
             if not self.alive:
                 return
             if err:
-                return self.say(_err(err), U.DANGER)
+                self.say(_err(err), U.DANGER)
+                if fail:
+                    fail(err)
+                return
             self.say((r or {}).get("message") or "", U.GOOD)
             if then:
                 then(r or {})
@@ -1881,6 +1931,12 @@ class GuildWindow(object):
         self.shop_none = tk.Label(inner, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S)
         bag = s.get("bag") or {}
         self.shop_btns = {}           # {(도구, 몇 개): 단추} - 코인이 모자라면 꺼져 있다
+        # 길드 전용 묶음이 있으면 (시즌 7~) 머리글 두 개 - 전용 묶음이 맨 앞, 그 아래 나머지 도구
+        ex = [it for it in s.get("items") or [] if shop_exclusive(it)]
+        self.shop_heads = None
+        if ex:
+            self.shop_heads = (self._shop_head(inner, ex[0].get("group") or SHOP_EX_GROUP, SHOP_EX_NOTE, True),
+                               self._shop_head(inner, shop_rest_title(s), "", False))
         # 카드는 한 번만 만든다. 찾기와 창 크기 바꾸기는 만들어 둔 것을 담았다 뺐다만 한다.
         self.shop_cards = [(it, self._shop_card(inner, it, have, int(bag.get(it["id"]) or 0)))
                            for it in s.get("items") or []]
@@ -1892,19 +1948,30 @@ class GuildWindow(object):
         self._shop_layout()
         self.shop_q.trace_add("write", lambda *_a: self._shop_search())
 
+    def _shop_head(self, parent, title, note, accent):
+        """코인 상점 묶음의 머리글 (길드 전용 · 나머지 도구). 격자에 한 줄을 다 차지한다."""
+        f = tk.Frame(parent, bg=U.BG)
+        U.marker_label(f, title, bg=U.BG, color=U.ACCENT if accent else U.FG_DIM).pack(anchor="w")
+        if note:
+            lb = tk.Label(f, text=note, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left")
+            lb.pack(fill="x", pady=(2, 0))
+            U.wrap_to_width(lb)
+        return f
+
     def _shop_card(self, parent, it, have, owned):
         """코인 상점의 카드 한 장: 그림 · 이름 · 값 · 설명 · 사기 단추."""
-        c = U.framed(parent, bg=U.BG3)
+        ex = shop_exclusive(it)
+        c = U.framed(parent, bg=U.BG3, border=U.ACCENT if ex else U.LINE)
         price = int(it.get("coin") or 0)
         iid = it["id"]
         # 단추는 바닥에 붙인다 - 같은 줄의 카드는 높이가 같아지므로(설명이 긴 쪽에 맞춘다)
         # 단추가 한 줄로 가지런하다.
         btns = tk.Frame(c, bg=U.BG3)
         btns.pack(side="bottom", fill="x", padx=10, pady=(0, 10))
-        for n in (1, 10):
+        for n in shop_counts(it):
             b = U.ghost_button(btns, "%d개 사기" % n, lambda n=n: self.buy(iid, n), height=28)
             b.pack(side="left", padx=(0, 6))
-            if have < price * n:
+            if not shop_can_buy(it, n, have):
                 b.configure(state="disabled")
             self.shop_btns[(iid, n)] = b
         top = tk.Frame(c, bg=U.BG3)
@@ -1931,6 +1998,11 @@ class GuildWindow(object):
         if owned:
             tk.Label(line, text="가진 것 %d" % owned, bg=U.BG3, fg=U.FG_FAINT,
                      font=U.FONT_XS).pack(side="left", padx=(8, 0))
+        if ex:
+            lb = tk.Label(txt, text=shop_left_text(it), bg=U.BG3, fg=U.GOOD if shop_left(it) else U.FG_DIM,
+                          font=U.FONT_XS, anchor="w", justify="left")
+            lb.pack(fill="x")
+            U.wrap_to_width(lb)
         note = it.get("note") or it.get("heldNote") or it.get("desc") or ""
         if note:
             lb = tk.Label(c, text=natural(note), bg=U.BG3, fg=U.FG_FAINT, font=U.FONT_XS,
@@ -1953,14 +2025,31 @@ class GuildWindow(object):
             cols = shop_cols(width)
             q = self.shop_query
             shown = [c for it, c in self.shop_cards if shop_match(it, q)]
+            heads = getattr(self, "shop_heads", None)
             for _it, c in self.shop_cards:
                 c.grid_forget()
+            for hd in heads or ():
+                hd.grid_forget()
             self.shop_none.grid_forget()
             for k in range(4):
                 inner.grid_columnconfigure(k, weight=1 if k < cols else 0,
                                            uniform="shop" if k < cols else "")
-            for i, c in enumerate(shown):
-                c.grid(row=i // cols, column=i % cols, sticky="nsew", padx=3, pady=3)
+            if heads:
+                # 길드 전용 묶음이 맨 앞 (머리글 + 카드), 그 아래 나머지 도구 (머리글 + 카드)
+                parts = [[c for it, c in self.shop_cards if shop_match(it, q) and shop_exclusive(it)],
+                         [c for it, c in self.shop_cards if shop_match(it, q) and not shop_exclusive(it)]]
+            else:
+                parts = [shown]
+            row = 0
+            for k, cs in enumerate(parts):
+                if not cs:
+                    continue
+                if heads:
+                    heads[k].grid(row=row, column=0, columnspan=cols, sticky="we", padx=3, pady=(10 if row else 2, 2))
+                    row += 1
+                for i, c in enumerate(cs):
+                    c.grid(row=row + i // cols, column=i % cols, sticky="nsew", padx=3, pady=3)
+                row += (len(cs) + cols - 1) // cols
             if not shown:
                 self.shop_none.configure(
                     text=("'%s' (이)가 들어간 도구가 없습니다." % q.strip()) if q.strip()
@@ -2012,7 +2101,22 @@ class GuildWindow(object):
         except Exception:                                   # noqa: BLE001
             pass
 
+    def _reload_shop(self):
+        """상점을 다시 받아 그린다 (코인 상점 칸에 있을 때만)."""
+        if not self.alive:
+            return
+        self.shop = None
+        if self.mode == "guild":
+            if self.tab == "shop":
+                self._draw_tab()
+        elif self.mode == "coinshop":
+            self.draw()
+
     def buy(self, item, n):
+        # 길드 전용 상품은 시즌 수를 넘으면 서버가 409 로 막는다 (다른 창에서 이미 샀을 때) - 글을 띄우고 남은 수를
+        # 다시 받는다. 다른 도구는 예전 그대로 (글만)
+        ex = any(shop_exclusive(it) and it.get("id") == item for it in (self.shop or {}).get("items") or [])
+
         def after(r):
             self.shop = None
             if self.mode == "guild":
@@ -2024,7 +2128,8 @@ class GuildWindow(object):
                 self.app.request_sync()
             except Exception:                               # noqa: BLE001
                 pass
-        self.act(lambda: self.app.api.guild_buy(item, n), after)
+        self.act(lambda: self.app.api.guild_buy(item, n), after,
+                 fail=(lambda _err: self._reload_shop()) if ex else None)
 
     # ---------------- 관리 ----------------
     def _tab_manage(self):

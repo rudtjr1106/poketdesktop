@@ -1473,8 +1473,7 @@ def tm_count(uid, gid, rank, s):
     wins = int(r["n"] or 0) if r else 0
     if not wins:
         return 0, 0
-    need = _gm().TM_ACTIVE_WINS if match_mode(s) else TM_ACTIVE_WINS     # 1:1 은 공격이 2번뿐 - 2번 다 이김
-    return TM_RANK.get(rank, 0), (TM_ACTIVE if wins >= need else 0)
+    return TM_RANK.get(rank, 0), (TM_ACTIVE if wins >= TM_ACTIVE_WINS else 0)
 
 
 def _tm_reward(uid, gid, rank, s, gname, now=None):
@@ -1491,8 +1490,7 @@ def _tm_reward(uid, gid, rank, s, gname, now=None):
     if by_rank:
         bits.append("%d위 보상 %d장" % (rank, by_rank))
     if active:
-        need = _gm().TM_ACTIVE_WINS if match_mode(s) else TM_ACTIVE_WINS
-        bits.append("활약 보상(공격 %d승 이상) %d장" % (need, active))
+        bits.append("활약 보상(공격 %d승 이상) %d장" % (TM_ACTIVE_WINS, active))
     msg = ("시즌 %d 길드전 [%s] - 랜덤 기술머신 뽑기권 %d장 (%s). 가방에서 쓰면 아직 없는 기술머신 하나가 나옵니다."
            % (s, gname, n, " · ".join(bits)))
     db.run("INSERT INTO gift (user_id, kind, item_id, count, title, message, created_at) VALUES (?,?,?,?,?,?,?)",
@@ -1500,15 +1498,14 @@ def _tm_reward(uid, gid, rank, s, gname, now=None):
     return n
 
 
-def tm_text(rank, need=None):
-    """결산 채팅에 붙일 뽑기권 한 마디 (시즌 5). need = 활약 몫의 승수 (1:1 은 2)."""
-    need = need or TM_ACTIVE_WINS
+def tm_text(rank):
+    """결산 채팅에 붙일 뽑기권 한 마디 (시즌 5)."""
     if TM_RANK.get(rank):
         return (" 공격에서 이긴 길드원에게는 랜덤 기술머신 뽑기권 %d장도 드립니다. %d번 이상 이긴 길드원은 활약 보상으로 "
-                "%d장 더 받습니다." % (TM_RANK[rank], need, TM_ACTIVE))
+                "%d장 더 받습니다." % (TM_RANK[rank], TM_ACTIVE_WINS, TM_ACTIVE))
     # 순위 몫이 없는 길드 - '더' 가 아니다
     return (" 공격에서 %d번 이상 이긴 길드원은 활약 보상으로 랜덤 기술머신 뽑기권 %d장을 받습니다."
-            % (need, TM_ACTIVE))
+            % (TM_ACTIVE_WINS, TM_ACTIVE))
 
 
 # ---------------------------------------------------------------- 보여주기

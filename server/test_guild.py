@@ -34,7 +34,7 @@ os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
 from fastapi import HTTPException                            # noqa: E402
 
 from app import (achievements, config, db, deps, guild, guild_routes, gym, items,  # noqa: E402
-                 mypage)
+                 mypage, season)
 
 OK = FAIL = 0
 T0 = datetime.datetime(2026, 10, 6, 3, 0, tzinfo=datetime.timezone.utc)      # 한국 시각 낮 12시
@@ -91,6 +91,8 @@ def later(hours):
 
 def main():
     db.init()
+    # 코인 상점은 길드 전용 상품(시즌 7 부터)이 없는 것으로 본다 - 전용 상품은 test_guild_shop_exclusive 가 본다
+    season.SEASON = 6
     cost = config.GUILD_CREATE_COST
     a = mkuser("가", cost + 1000)
     b = mkuser("나")

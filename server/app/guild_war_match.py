@@ -38,11 +38,15 @@ war AI · 관전 · 조커 · 앞 SHOWN 마리 미리보기 · 기여 코인. gy
 쓰러뜨린 마릿수 / 방어팀 마릿수, 의 평균). **내 성적(칠 길드에게서) 대 나를 친 길드의 성적(나에게서)** 을 견준다 -
 1:1 이면 서로, 삼각형이면 두 상대가 다르다. 같으면 비긴다.
 
-## 순위 · 보상
+## 보상 = 길드 코인만 (2026-11-12 사용자 - design-notes/2026-11-12-guild-war-rewards.md)
 
-이긴 길드(별 % 높은 순) → 비긴 길드 → 진 길드. 같으면 쓰러뜨린 비율 → 마지막 공격이 먼저 끝난 길드.
-1~3위는 지도전의 순위 보상 그대로, 그 밖에 이긴 길드는 코인 REWARD_WIN, 나머지 REWARD_OTHER. 활약 뽑기권은 공격
-TM_ACTIVE_WINS(2)번 다 이김. 받는 사람은 한 번이라도 공격한 길드원 (그대로).
+1:1 에서는 모든 길드가 서로 붙지 않아서 '전체 1등' 이 진짜 1등이 아니다 - **순위 보상(순위 코인 · 금관 같은 꾸미기 ·
+칭호 · 기술머신 뽑기권)이 없다.** 순위표 대신 이번 시즌 맞대결 목록(matches)을 보여 준다.
+
+    판이 끝날 때    공격한 사람: 그 판의 별 ★ 20 · ★★ 40 · ★★★ 60 (+ 조커를 이기면 GW.CONTRIB_JOKER)
+                    지킨 사람: 공격팀을 다 쓰러뜨려 막아 내면 GW.CONTRIB_DEFEND (기권 · 시간 초과는 없음)
+                    - 둘 다 한 사람 한 시즌 GW.CONTRIB_MAX(300) 까지 (guild_war_team.earned, 지도전의 기여 보상 자리)
+    결산            한 번이라도 공격한 사람: 그 길드의 판 결과로 이김 100 · 비김 60 · 짐 30 (상한 밖)
 """
 import hashlib
 import json
@@ -58,8 +62,8 @@ from . import guild_war as GW
 
 EACH = 2                      # 출전한 사람마다 공격 수
 CAP_RATIO = 1.2               # 한 판의 출전 상한 = 가장 작은 길드 x 이것 (반올림)
-REWARD_WIN = 100              # 4위 아래로 이긴 길드의 길드 코인 (1~3위는 GW.REWARD_COINS)
-TM_ACTIVE_WINS = 2            # 활약 뽑기권 - 공격 2번 다 이김 (지도전은 GW.TM_ACTIVE_WINS)
+STAR_COINS = (0, 20, 40, 60)  # 판마다 공격한 사람이 받는 길드 코인 (그 판의 별 0~3)
+RESULT_COINS = {"win": 100, "draw": 60, "lose": 30}   # 결산 - 한 번이라도 공격한 사람 (그 길드의 판 결과)
 STAR_RULES = ["상대 방어팀 절반 이상 쓰러뜨림", "이김", "이기고 내 팀 절반 이상 남음"]
 RESULT_KR = {"win": "승리", "lose": "패배", "draw": "무승부"}
 ONLY = "이번 시즌 길드전은 1:1 맞대결입니다. 앱을 새 판으로 올려 주세요."
@@ -591,6 +595,26 @@ def finish(a, raw, turns=0, tb=None, now=None):
     return getattr(cur, "rowcount", 1) > 0, res, st, ko, size
 
 
+def _reward(a, res, raw, st):
+    """판이 끝났다 (finish 가 적은 뒤에 한 번) - 공격한 사람에게 별 코인(+조커), 막아 낸 사람에게 막기 코인.
+    (공격한 사람이 받은 것, 지킨 사람이 받은 것, 조커를 이겼나). 보상이 깨져도 판의 결과는 그대로다."""
+    s = a["season"]
+    got = kept = 0
+    joker = False
+    try:
+        if st:
+            joker = res == "win" and a["def_user"] in GW._joker_ids(s)
+            got = GW._pay(s, a["atk_user"], STAR_COINS[min(3, st)] + (GW.CONTRIB_JOKER if joker else 0))
+        if res == "lose" and raw == "lost":
+            kept = GW._pay(s, a["def_user"], GW.CONTRIB_DEFEND)
+        if got or kept:
+            db.run("UPDATE guild_war_attack SET coins=?, def_coins=? WHERE id=?", (got, kept, a["id"]))
+    except Exception as err:                                  # noqa: BLE001
+        from . import errors
+        errors.record("GWAR", "guild_war_match._reward %s" % a["id"], err)
+    return got, kept, joker
+
+
 def star_text(n):
     return "★" * n + "☆" * (3 - n)
 
@@ -603,7 +627,7 @@ def on_end(uid, row, tb, events=None, now=None):
     wrote, res, st, ko, size = finish(a, tb.result, tb.turn, tb, now)
     if not wrote:
         return None
-    got, kept, joker = GW._reward(a, res, tb.result)
+    got, kept, joker = _reward(a, res, tb.result, st)
     s = a["season"]
     gname = _gname(a["def_guild"], s)
     mine_name = _gname(a["atk_guild"], s)
@@ -614,24 +638,24 @@ def on_end(uid, row, tb, events=None, now=None):
     if top > st:
         lines.append("우리 길드가 이 사람에게서 얻은 별은 이미 %d개라 그대로다 (방어자마다 가장 잘한 공격만 센다)." % top)
     lines.append("우리 길드 별 %d / %d개 (%.1f%%)." % (us["stars"], us["max"], us["pct"]))
-    if res == "win":
+    if st:
         if got:
-            lines.append("기여 보상: 길드 코인 %d개%s - 이번 시즌 %d / %d개." % (
+            lines.append("길드 코인 %d개%s - 이번 시즌 %d / %d개." % (
                 got, " (조커를 이겼다!)" if joker else "", GW._earned(s, uid), GW.CONTRIB_MAX))
         else:
-            lines.append("기여 보상은 이번 시즌 상한(%d개)을 다 받았다." % GW.CONTRIB_MAX)
+            lines.append("판마다 받는 길드 코인은 이번 시즌 상한(%d개)을 다 받았다." % GW.CONTRIB_MAX)
     word = {"win": "이겼습니다", "draw": "비겼습니다"}.get(res, "졌습니다")
     mine_text = "길드전: %s 님이 [%s] %s 님에게 %s %s (별 %.1f%%)" % (
         a["atk_name"], gname, a["def_name"], word, star_text(st), us["pct"])
     foe_text = "길드전: [%s] %s 님이 %s 님을 쳤습니다 - %s %s" % (
         mine_name, a["atk_name"], a["def_name"], star_text(st), "(막아냈습니다!)" if res != "win" else "")
     if kept:
-        foe_text += " (기여 보상: 길드 코인 %d개)" % kept
+        foe_text += " (막아 낸 사람에게 길드 코인 %d개)" % kept
     guild._say(a["atk_guild"], mine_text, now)
     if db.q1("SELECT 1 FROM guild WHERE id=?", (a["def_guild"],)):
         guild._say(a["def_guild"], foe_text.rstrip(), now)
     war = {"mode": "match", "target": a["def_user"], "name": a["def_name"], "stars": st, "ko": ko, "size": size,
-           "result": res}
+           "result": res, "coins": got}
     GW._watch_end(a, tb, events, (row["rev"] or 0) + 1, res, False, 0, mine_text, war)
     return {"lines": lines, "war": war}
 
@@ -646,25 +670,22 @@ def end_expired(a, b, now=None):
         tb = None
     wrote, res, st, ko, size = finish(a, b["result"], b["turn"], tb, now)
     if wrote:
-        GW._reward(a, res, b["result"])
+        _reward(a, res, b["result"], st)
         GW._watch_end(a, None, None, None, res, False, 0,
                       "길드전: %s 님의 공격이 끝났습니다 (시간이 지나 진 것으로) - %s" % (a["atk_name"], star_text(st)),
                       {"mode": "match", "stars": st, "ko": ko, "size": size})
 
 
-# ---------------------------------------------------------------- 순위 · 결산
+# ---------------------------------------------------------------- 맞대결 목록 · 결산
 def scores(s=None):
-    """순위표: 이긴 길드(별 % → 쓰러뜨린 비율) → 비김 → 짐. 같으면 마지막 공격이 먼저 끝난 길드."""
+    """길드마다 이번 판 성적 (GW.scores 가 넘긴다 - 순위가 아니다, 순위 보상이 없다). 길드 이름순.
+    result 는 끝났으면 승패, 전쟁 중이면 지금 앞섬 (같은 셈)."""
     s = s or season.SEASON
     rows = []
     for i, e in enumerate(GW.in_war(s)):
         gid = e["guild_id"]
         o = outcome(s, gid)
-        if o is None:
-            us = them = None
-            res = None
-        else:
-            us, them, res = o
+        us, them, res = o if o else (None, None, None)
         p = pair_of(gid, s)
         rows.append({"guildId": gid, "name": e["name"], "color": i, "result": res,
                      "stars": us["stars"] if us else 0, "max": us["max"] if us else 0,
@@ -672,65 +693,58 @@ def scores(s=None):
                      "vs": _gname(p["target_guild"], s) if p else None,           # 우리가 칠 길드
                      "from": _gname(p["from_guild"], s) if p else None,          # 우리를 친 길드 (1:1 이면 vs 와 같다)
                      "vsPct": them["pct"] if them else None,                    # from 이 우리에게서 얻은 별 %
-                     "_key": ({"win": 0, "draw": 1, "lose": 2}.get(res, 3),
-                              -(us["p"] if us else 0), -(us["k"] if us else 0),
-                              (us["last"] if us and us["last"] else "~"), gid)})
-    rows.sort(key=lambda r: r["_key"])
-    for i, r in enumerate(rows, 1):
-        r["rank"] = i
-        r["score"] = r["stars"]
-        r.pop("_key")
+                     "score": us["stars"] if us else 0})
+    rows.sort(key=lambda r: (r["name"], r["guildId"]))
     return rows
 
 
-def coins_for(rank, result):
-    if rank in GW.REWARD_COINS:
-        return GW.REWARD_COINS[rank]
-    return REWARD_WIN if result == "win" else GW.REWARD_OTHER
+def matches(s, my_gid=None, ph=None):
+    """이번 시즌 맞대결 목록 - 짝(삼각형)마다 한 덩어리. 우리 판이 맨 위, 나머지는 첫 길드 이름순.
+    [{"kind", "ours", "final", "guilds": [{guildId, name, stars, max, pct, ko, result, vs, from}]}]"""
+    by = dict((r["guildId"], r) for r in scores(s))
+    seen, out = set(), []
+    for p in db.q("SELECT * FROM guild_war_pair WHERE season=? ORDER BY guild_id", (s,)):
+        if p["guild_id"] in seen:
+            continue
+        group = [p["guild_id"], p["target_guild"]]
+        if p["kind"] == "tri":
+            group.append(p["from_guild"])
+        seen.update(group)
+        gs = [dict((k, by[g][k]) for k in ("guildId", "name", "stars", "max", "pct", "ko", "result", "vs", "from"))
+              for g in group if g in by]
+        gs.sort(key=lambda x: (x["name"], x["guildId"]))
+        out.append({"kind": p["kind"], "ours": my_gid in group, "final": ph == "done", "guilds": gs})
+    out.sort(key=lambda m: (not m["ours"], m["guilds"][0]["name"] if m["guilds"] else ""))
+    return out
 
 
 def settle(now=None):
-    """전쟁이 끝났으면 순위대로 보상한다 (GW.settle 이 넘긴다). 한 번만 돈다 - 지도전의 결산과 같은 표시를 쓴다."""
+    """전쟁이 끝났으면 결산 코인을 준다 (GW.settle 이 넘긴다). 한 번만 돈다 - 지도전의 결산과 같은 표시를 쓴다.
+    한 번이라도 공격한 사람에게 그 길드의 판 결과로 RESULT_COINS. 순위 · 꾸미기 · 칭호 · 뽑기권은 없다."""
     s = season.SEASON
     if GW.phase(now)[0] != "done" or GW._meta("gw:%d:settled" % s):
         return False
     GW.expire(now, everything=True)
-    table = scores(s)
-    if len([r for r in table if r["result"]]) < 2:
+    table = [r for r in scores(s) if r["result"]]
+    if len(table) < 2:
         GW._mark("gw:%d:settled" % s, GW._iso(now))
         return True
     msg_of = {}
     for r in table:
-        gid, rank = r["guildId"], r["rank"]
-        n = coins_for(rank, r["result"])
-        db.run("UPDATE guild_war_entry SET rank=?, score=? WHERE season=? AND guild_id=?", (rank, r["score"], s, gid))
+        gid, res = r["guildId"], r["result"]
+        n = RESULT_COINS[res]
+        db.run("UPDATE guild_war_entry SET score=? WHERE season=? AND guild_id=?", (r["score"], s, gid))
         active = [x["atk_user"] for x in db.q(
             "SELECT DISTINCT atk_user FROM guild_war_attack WHERE season=? AND atk_guild=?", (s, gid))]
         for uid in active:
-            if not GW._mark("gw:%d:paid:%d" % (s, uid), GW._iso(now)):
-                continue
-            guild._coin_add(uid, n)
-            GW._deco_reward(uid, rank, s, r["name"], now)
-            GW._tm_reward(uid, gid, rank, s, r["name"], now)
-            if rank == 1:
-                msg = ("시즌 %d 길드전에서 [%s] 길드가 우승했습니다! 칭호 '%s' 을(를) 드립니다. "
-                       "칭호는 마이페이지에서 바꿀 수 있습니다." % (s, r["name"], season.TITLES[GW.TITLE]))
-                db.run("INSERT INTO gift (user_id, kind, item_id, count, title, message, created_at)"
-                       " VALUES (?,?,?,?,?,?,?)", (uid, "title", GW.TITLE, 1, GW.GIFT_TITLE % s, msg, GW._iso(now)))
-        o = outcome(s, gid)
-        if o:
-            us, them, res = o
-            p = pair_of(gid, s)
-            head = ("길드전이 끝났습니다. [%s] 별 %.1f%% vs [%s] 별 %.1f%% - %s! 전체 %d위."
-                    % (r["name"], us["pct"], _gname(p["from_guild"], s), them["pct"], RESULT_KR[res], rank))
-        else:
-            head = "길드전이 끝났습니다. [%s] 전체 %d위." % (r["name"], rank)
-        text = head + " 한 번이라도 공격한 길드원에게 길드 코인 %d개%s" % (
-            n, "와 칭호 '%s' 을(를) 드렸습니다." % season.TITLES[GW.TITLE] if rank == 1 else "를 드렸습니다.")
-        text += " 꾸미기 보상(%s)은 선물함으로 갑니다." % (
-            GW.DECO_RANK_KR[rank] if rank in GW.DECO_RANK else "참가 묶음 선택권")
-        text += GW.tm_text(rank, TM_ACTIVE_WINS)
-        msg_of[gid] = text
+            # 사람마다 표시를 먼저 적는다 - 도중에 끊겨 다시 돌아도, 두 요청이 같이 돌아도 한 번만
+            if GW._mark("gw:%d:paid:%d" % (s, uid), GW._iso(now)):
+                guild._coin_add(uid, n)
+        us, them, _res = outcome(s, gid)
+        p = pair_of(gid, s)
+        msg_of[gid] = ("길드전이 끝났습니다. [%s] 별 %.1f%% vs [%s] 별 %.1f%% - %s! 한 번이라도 공격한 길드원에게 "
+                       "길드 코인 %d개를 드렸습니다." % (r["name"], us["pct"], _gname(p["from_guild"], s), them["pct"],
+                                                    RESULT_KR[res], n))
     for gid, text in msg_of.items():
         if db.q1("SELECT 1 FROM guild WHERE id=?", (gid,)) and GW._mark("gw:%d:said:%d" % (s, gid), GW._iso(now)):
             guild._say(gid, text, now)
@@ -763,15 +777,16 @@ def state_extra(uid, out, now=None):
     out["capRatio"] = CAP_RATIO
     out["starRules"] = list(STAR_RULES)
     out["total"] = EACH
-    out["tmActive"] = {"wins": TM_ACTIVE_WINS, "count": GW.TM_ACTIVE}
-    pick = "참가 묶음 선택권"
-    out["rewards"] = ([{"rank": k, "coins": v, "deco": GW.DECO_RANK_KR[k], "tm": GW.TM_RANK.get(k, 0)}
-                       for k, v in sorted(GW.REWARD_COINS.items())]
-                      + [{"rank": None, "result": "win", "coins": REWARD_WIN, "deco": pick, "tm": 0},
-                         {"rank": None, "result": "other", "coins": GW.REWARD_OTHER, "deco": pick, "tm": 0}])
-    out["match"] = None                       # ranking 은 GW.state 가 이미 GM.scores 로 채웠다
+    # 보상은 길드 코인만 - 순위 보상 줄(rewards) · 활약 뽑기권(tmActive) · 순위표(ranking)는 비운다
+    out["rewards"] = []
+    out["tmActive"] = None
+    out["ranking"] = []
+    out["coinRules"] = {"stars": list(STAR_COINS[1:]), "joker": GW.CONTRIB_JOKER, "defend": GW.CONTRIB_DEFEND,
+                        "max": GW.CONTRIB_MAX, "result": dict(RESULT_COINS)}
+    out["match"] = None
     out["can"]["roster"] = False
     m = guild.member(uid)
+    out["matches"] = matches(s, m["guild_id"] if m else None, ph) if ph in ("plan", "war", "done") else []
     if not m or ph not in ("plan", "war", "done"):
         return out
     gid = m["guild_id"]
@@ -779,6 +794,14 @@ def state_extra(uid, out, now=None):
     if not e or e["locked"] != 1:
         return out
     out["match"] = _match_summary(s, gid, ph)
+    if ph == "done" and isinstance(out.get("contrib"), dict):
+        # 결산으로 받은 코인 (받았으면 그 수, 아니면 0) - 앱이 짐작하지 않게. 공격한 길드의 판 결과로 받는다
+        got = 0
+        if GW._meta("gw:%d:paid:%d" % (s, uid)):
+            a = db.q1("SELECT atk_guild FROM guild_war_attack WHERE season=? AND atk_user=? ORDER BY id LIMIT 1", (s, uid))
+            o = outcome(s, a["atk_guild"]) if a else None
+            got = RESULT_COINS.get(o[2], 0) if o else 0
+        out["contrib"]["settled"] = got
     rows = GW.fighters(gid, s)
     by = dict((r["atk_user"], r) for r in db.q(
         "SELECT atk_user, COALESCE(SUM(stars), 0) st, SUM(CASE WHEN result='win' THEN 1 ELSE 0 END) w"
