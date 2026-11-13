@@ -1124,17 +1124,7 @@ class BoxWindow(object):
             self.party = got[2] if len(got) > 2 else None
             self._paint_party()
             self.mons = mons or []
-            if self.checked:
-                # 고름에서 서버에 더는 없는 것을 뺀다 - 놓아주기가 오류로 끝났어도 일부는 놓아졌을 수 있다
-                have = set(int(m.get("id") or 0) for m in self.mons)
-                self.checked = set(i for i in self.checked if i in have)
-                if self.multi:
-                    self._paint_multi()
-            self._refresh_filter_bar()
-            # 다시 불러온 까닭(떠올리기 결과 같은 것)이 있으면 지우지 않고 남긴다.
-            note, self._note = getattr(self, "_note", None), None
-            self.say(*(note or ("",)))
-            self._render(self.sel)
+            self._show_mons()
         finally:
             if w:
                 # **첫 화면이 그려진 뒤에 걷는다.** 맨 앞에서 걷으면 줄을
@@ -1144,6 +1134,62 @@ class BoxWindow(object):
                     self.root.after_idle(w.close)
                 except tk.TclError:
                     w.close()
+
+    def _show_mons(self):
+        """self.mons 가 바뀌었다 - 고름 · 거르기 줄 · 알림 · 목록을 맞춘다 (전체를 받았을 때도, 바뀐 것만 받았을 때도)."""
+        if self.checked:
+            # 고름에서 서버에 더는 없는 것을 뺀다 - 놓아주기가 오류로 끝났어도 일부는 놓아졌을 수 있다
+            have = set(int(m.get("id") or 0) for m in self.mons)
+            self.checked = set(i for i in self.checked if i in have)
+            if self.multi:
+                self._paint_multi()
+        self._refresh_filter_bar()
+        # 다시 불러온 까닭(떠올리기 결과 같은 것)이 있으면 지우지 않고 남긴다.
+        note, self._note = getattr(self, "_note", None), None
+        self.say(*(note or ("",)))
+        self._render(self.sel)
+
+    # ---------------- 바뀐 것만 다시 받기 (2.5.0) ----------------
+    # 예전에는 옮기기 · 데리고 다니기 · 별명 하나에도 상자 전체(GET /api/pokemon - 800마리면 1MB 넘게, 서버에서
+    # 0.3초 넘게)를 다시 받았다. 큰 상자를 가진 사람이 정리를 하면 그것만으로 서버가 바빴다 (11/14 새벽 14분 동안
+    # 492번, 122초). 이제 건드린 포켓몬과 파티만 받아(POST /api/pokemon/pick) 그 줄만 고친다.
+    PICK_MAX = 1000                  # 서버(main.PICK_MAX)와 같다. 넘으면 전체를 받는다
+
+    def refresh_some(self, ids=()):
+        """건드린 포켓몬(ids)과 파티만 다시 받아 고친다. 못 받으면(옛 서버 · 오류) 전체를 다시 받는다.
+
+        **파티는 늘 같이 받는다** - 하나를 넣거나 빼면 다른 것의 자리 번호가 움직이고, 파티 바꾸기는 박스에
+        있던 것을 올린다. 창이 알던 파티(내려간 것)는 번호로 묻고, 새로 올라온 것은 서버가 붙여 준다.
+        알(음수 번호)은 묻지 않는다 - 서버가 늘 전부 준다.
+        """
+        want = set(int(i) for i in ids or () if i is not None)
+        want |= set(int(m["id"]) for m in self.mons if m.get("onDesktop"))
+        want = sorted(i for i in want if i > 0)
+        if len(want) > self.PICK_MAX:
+            return self.reload()
+
+        def done(r, err):
+            if not self._alive():
+                return
+            if err or not isinstance(r, dict) or not isinstance(r.get("pokemon"), list):
+                return self.reload()
+            self._apply_pick(set(want), r)
+        U.run_async(self.root, lambda: self.app.api.pokemon_pick(want), done)
+
+    def _apply_pick(self, asked, r):
+        """받은 것으로 줄을 고친다. 물었는데 안 온 것은 지운다 (놓아줬다). 차례는 서버의 전체 목록과 같게."""
+        got = dict((int(m["id"]), m) for m in r.get("pokemon") or [])
+        touched = set(asked) | set(got)
+        mons = [m for m in self.mons if not m.get("isEgg") and int(m["id"]) not in touched]
+        mons.extend(got.values())
+        mons.sort(key=box_filter.server_order)
+        eggs = r.get("eggs")
+        if eggs is None:
+            eggs = [m.get("egg") or {} for m in self.mons if m.get("isEgg")]
+        if r.get("boxes"):
+            self.boxes = r["boxes"]
+        self.mons = box_filter.merge_eggs(mons, eggs)
+        self._show_mons()
 
     # ---------------- 파티 프리셋 (1.10.3) ----------------
     def party_presets(self):
@@ -1217,7 +1263,7 @@ class BoxWindow(object):
             # 다시 불러온 뒤에도 '무엇으로 바꿨는지' 가 남게 한다 (_loaded 가 _note 를 적는다)
             self._note = ((r or {}).get("message") or "파티를 바꿨습니다.", U.GOOD)
             self.sel = None
-            self.reload()
+            self.refresh_some()                   # 내려간 것(창이 알던 파티) + 올라온 것(서버가 붙인다)만
             self.app.request_sync()               # 바탕화면의 포켓몬이 바뀐다
         U.run_async(self.root, lambda: api.party_use(no), done)
 
@@ -1505,7 +1551,7 @@ class BoxWindow(object):
                 return self.say(getattr(err, "message", str(err)), U.DANGER)
             self._note = ("%s 로 옮겼습니다." % self.box_name(no), U.GOOD)
             self.box_no = no
-            self.reload()
+            self.refresh_some([pid])
         U.run_async(self.root, work, done)
 
     # ---------------- 여러 마리 고르기 (1.10.6) ----------------
@@ -1635,7 +1681,7 @@ class BoxWindow(object):
             self._sync_checks()
             self._paint_multi()
             self._note = ("%d마리를 %s 로 옮겼습니다." % (len(ids), self.box_name(no)), U.GOOD)
-            self.reload()
+            self.refresh_some(ids)
         U.run_async(self.root, work, done)
 
     def release_checked(self):
@@ -1696,7 +1742,8 @@ class BoxWindow(object):
             self._last_check = None
             self._sync_checks()
             self._paint_multi()
-            self.reload()
+            # 보낸 것을 모두 묻는다 - 놓아진 것은 안 오므로 지워지고, 막힌 것은 그대로 온다 (오류로 끝났어도 맞는다)
+            self.refresh_some(ids)
             self.app.request_sync()
         U.run_async(self.root, work, done)
 
@@ -2130,7 +2177,7 @@ class BoxWindow(object):
                 elif kind == "order":
                     api.set_order(arg)
 
-        U.run_async(self.root, work, self._after(msg))
+        U.run_async(self.root, work, self._after(msg, [src, dst]))
 
     def current(self):
         return next((m for m in self.mons if m["id"] == self.sel), None)
@@ -2584,7 +2631,7 @@ class BoxWindow(object):
                 msg += "  (%s원)" % "{:,}".format(int(res["cost"]))
             self.say(msg, U.GOOD)
             self._note = (msg, U.GOOD)
-            self.reload()
+            self.refresh_some([pid])
             self.app.request_sync()
 
         U.run_async(self.root, lambda: self.app.api.remember(pid, pick, forget), done)
@@ -2607,7 +2654,7 @@ class BoxWindow(object):
                 msg = natural("%s이(가) %s을(를) 떠올렸다!" % (name, kr))
                 self._note = (msg, U.GOOD)
                 self.say(msg, U.GOOD)
-                self.reload()
+                self.refresh_some([pid])
                 self.app.request_sync()
                 return
             if e2:
@@ -2767,13 +2814,19 @@ class BoxWindow(object):
         self.photos = []
 
     # ---------------- 동작 ----------------
-    def _after(self, msg):
+    def _after(self, msg, ids=None):
+        """동작이 끝났을 때. ids(건드린 포켓몬 번호)를 주면 그것과 파티만 다시 받는다 (2.5.0, refresh_some) -
+        안 주면 예전처럼 전체를 다시 받는다. 알림 글은 다시 받은 뒤에도 남는다."""
         def done(_r, err):
             if err:
                 self.say(getattr(err, "message", str(err)), U.DANGER)
             else:
                 self.say(msg, U.GOOD)
-                self.reload()
+                if ids is None:
+                    self.reload()
+                else:
+                    self._note = (msg, U.GOOD)
+                    self.refresh_some(ids)
                 self.app.request_sync()
         return done
 
@@ -2791,7 +2844,7 @@ class BoxWindow(object):
         else:
             msg = "데리고 다닙니다." if on else "박스로 보냈습니다."
         U.run_async(self.root, lambda: self.app.api.set_desktop(m["id"], on),
-                    self._after(msg))
+                    self._after(msg, [m["id"]]))
 
     def do_evs(self):
         """노력치 조정 창 (2.1.3, 게시판 #450). 맞추고 나면 목록을 다시 받아 상세 칸의 노력치 · 능력치를 맞춘다.
@@ -2801,7 +2854,7 @@ class BoxWindow(object):
             return
         from . import ui_evs
         ui_evs.open_editor(self.app, self.win, m,
-                           on_done=lambda r: self._after(r.get("message") or "노력치를 맞췄습니다.")(r, None))
+                           on_done=lambda r: self._after(r.get("message") or "노력치를 맞췄습니다.", [m["id"]])(r, None))
 
     def do_nickname(self):
         m = self.current()
@@ -2814,7 +2867,7 @@ class BoxWindow(object):
         if val is None:
             return
         U.run_async(self.root, lambda: self.app.api.set_nickname(m["id"], val),
-                    self._after("별명을 바꿨습니다."))
+                    self._after("별명을 바꿨습니다.", [m["id"]]))
 
     def do_tint(self):
         """이로치의 색을 고른다 (1.8.0). 고르면 목록과 바탕화면을 다시 맞춘다."""
@@ -2822,7 +2875,7 @@ class BoxWindow(object):
         if not m or m.get("isEgg") or not m.get("shiny"):
             return
         from .ui_tint import TintPicker
-        after = self._after("색을 바꿨습니다.")
+        after = self._after("색을 바꿨습니다.", [m["id"]])
         TintPicker(self.app, m, parent=self.win, on_done=lambda _p: after(None, None))
 
     def do_release(self):
@@ -2834,7 +2887,7 @@ class BoxWindow(object):
         if not confirm_release(self.win, self.app, m):
             return
         name = m["info"]["name"]
-        after = self._after("%s 을(를) 보내주었습니다." % name)
+        after = self._after("%s 을(를) 보내주었습니다." % name, [m["id"]])
 
         def done(r, err):
             # 놓아준 포켓몬을 고른 채면 아무것도 안 고른 모습으로 (그사이 다른 것을 눌렀으면 그대로 둔다)
@@ -2922,7 +2975,7 @@ class BoxWindow(object):
         if not m or not m.get("held"):
             return
         after = self._after("%s을(를) 가방에 넣었습니다."
-                            % (m.get("heldKr") or "도구"))
+                            % (m.get("heldKr") or "도구"), [m["id"]])
         wait = ui_loading.Overlay(self.win, "가방에 넣는 중")
 
         def done(r, err):
@@ -3105,7 +3158,7 @@ class HeldPicker(object):
         pid = self.mon["id"]
         self._paint_note("%s을(를) 지니게 하는 중..." % it["kr"])
         done = self.box._after("%s에게 %s을(를) 지니게 했습니다."
-                               % (self.mon["info"].get("name", ""), it["kr"]))
+                               % (self.mon["info"].get("name", ""), it["kr"]), [pid])
 
         def finish(r, err):
             self._close_wait()

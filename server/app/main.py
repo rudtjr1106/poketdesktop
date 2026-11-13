@@ -1427,12 +1427,9 @@ def assign_boxes(uid):
     return True
 
 
-def box_listing(uid):
-    """상자 전체 (GET /api/pokemon 의 내용). 검사는 이걸 바로 부른다."""
-    assign_boxes(uid)
-    # 알은 따로 싣는다. 포켓몬 목록에 섞으면 옛 클라이언트가 알을 포켓몬으로
-    # 그리려다 터진다. 새 관리 창이 둘을 합쳐 보여준다.
-    mons = [_decorate(m) for m in _mons(uid)]
+def _dress(uid, raw):
+    """상자 목록에 싣는 모습 - 도감 정보 · 유대 · 탐험 중 · 리본. 전체 목록과 고친 것만 받기(pick)가 같이 쓴다."""
+    mons = [_decorate(m) for m in raw]
     # 유대 미션을 마쳤나 (10/22). 가방이 메가스톤을 지닐 수 있는 개체만 밝힌다 - 마치지 않으면 메가진화 못 한다.
     mega.mark_bonded(mons)
     # 탐험에 나가 있는 포켓몬 (1.10.4). 관리 창이 '탐험 중' 으로 적고, 꺼내기·놓아주기를 막는다.
@@ -1447,16 +1444,71 @@ def box_listing(uid):
         for m in mons:
             if m["id"] in rib:
                 m["ribbons"] = rib[m["id"]]
-    return {"pokemon": mons,
+    return mons
+
+
+def _box_info(uid):
+    return {"size": config.BOX_SIZE, "count": config.BOX_COUNT,
+            "names": _box_names(uid), "used": _box_counts(uid)}
+
+
+def box_listing(uid):
+    """상자 전체 (GET /api/pokemon 의 내용). 검사는 이걸 바로 부른다."""
+    assign_boxes(uid)
+    # 알은 따로 싣는다. 포켓몬 목록에 섞으면 옛 클라이언트가 알을 포켓몬으로
+    # 그리려다 터진다. 새 관리 창이 둘을 합쳐 보여준다.
+    return {"pokemon": _dress(uid, _mons(uid)),
             "eggs": eggs.box_list(uid),
-            "boxes": {"size": config.BOX_SIZE, "count": config.BOX_COUNT,
-                      "names": _box_names(uid), "used": _box_counts(uid)}}
+            "boxes": _box_info(uid)}
 
 
 @app.get("/api/pokemon")
 def list_pokemon(ctx=Depends(current)):
     # 상자 전체라 크다 (800마리면 1MB 넘게). FastAPI 의 jsonable_encoder 를 건너뛴다 (deps.json_response).
     return deps.json_response(box_listing(ctx["user"]["id"]))
+
+
+# 고친 것만 받기에 한 번에 물을 수 있는 수. 여러 마리 옮기기 · 놓아주기(한 번에 200마리)보다 넉넉하게.
+PICK_MAX = 1000
+
+
+class PickIn(BaseModel):
+    ids: list = Field(default_factory=list, max_length=PICK_MAX)
+
+
+@app.post("/api/pokemon/pick")
+def pick_pokemon(body: PickIn, ctx=Depends(current)):
+    """상자 창이 동작 하나 뒤에 **바뀐 것만** 다시 받는다 (2.5.0).
+
+    예전에는 옮기기 · 데리고 다니기 · 별명 하나에도 상자 전체(GET /api/pokemon - 800마리면 1MB 넘게)를 다시
+    받았다. 11/14 새벽 14분 동안 상자 다시 받기 492번이 서버 시간 122초였다. 이제 창은 건드린 포켓몬의 번호만
+    보내고 그것만 받아 그 줄만 고친다.
+
+        보내는 것   {"ids": [포켓몬 번호...]}       건드린 것 + 창이 알던 파티 (알은 음수라 빼고 보낸다)
+        받는 것     {"pokemon": [...], "eggs": [...], "boxes": {...}}
+
+    pokemon 에는 물은 것 가운데 아직 내 것인 것 **+ 지금 데리고 다니는 것 전부**(많아야 여섯)가 실린다 - 하나를
+    파티에 넣거나 빼면 다른 것의 자리 번호가 움직이고, 파티 바꾸기는 처음 보는 것을 올린다. 물었는데 없는 것은
+    놓아졌거나 남의 것이다 (창이 지운다). 알은 몇 개 안 되므로 늘 전부, 박스 칸 수도 늘 새로 싣는다.
+    모습은 전체 목록과 똑같다 (_dress).
+    """
+    uid = ctx["user"]["id"]
+    try:
+        ids = sorted(set(int(x) for x in body.ids if int(x) > 0))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "포켓몬 번호를 알 수 없습니다.")
+    rows = {}
+    for r in db.q("SELECT * FROM pokemon WHERE user_id=? AND on_desktop=1", (uid,)):
+        rows[r["id"]] = r
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        for r in db.q("SELECT * FROM pokemon WHERE user_id=? AND id IN (%s)" % ",".join("?" * len(part)),
+                      [uid] + part):
+            rows[r["id"]] = r
+    mons = [db.row_to_mon(r) for r in rows.values()]
+    return deps.json_response({"pokemon": _dress(uid, mons),
+                               "eggs": eggs.box_list(uid),
+                               "boxes": _box_info(uid)})
 
 
 class ClaimIn(BaseModel):

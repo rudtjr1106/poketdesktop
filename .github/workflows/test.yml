@@ -534,6 +534,10 @@ jobs:
       - name: 소켓 알림 - 실시간 배틀 초대 · 새 판
         if: matrix.shard == 3
         run: python client/test_live_push_ui.py
+      # 2.5.0: 상자 창이 동작 하나 뒤에 바뀐 것만 다시 받는다 - 고친 목록이 전체를 받은 것과 같은지
+      - name: 상자 바뀐 것만 다시 받기 (진짜 Tk)
+        if: matrix.shard == 2
+        run: python client/test_box_pick_ui.py
       - name: 새 기술머신 표시 (진짜 Tk)
         if: matrix.shard == 2
         run: python client/test_tm_new.py
@@ -650,6 +654,9 @@ jobs:
       # 2.5.0: 실시간 배틀 초대 · 새 앱 판 알림을 놀러 가기 소켓으로 받는다
       - name: 소켓 알림 - 실시간 배틀 초대 · 새 판
         run: python client/test_live_push_ui.py
+      # 2.5.0: 상자 창이 동작 하나 뒤에 바뀐 것만 다시 받는다
+      - name: 상자 바뀐 것만 다시 받기 (진짜 Tk)
+        run: python client/test_box_pick_ui.py
       # **검은 테두리 검사(smoke_anim_resize.py)는 여기서 안 돌린다.**
       # 그건 윈도우의 투명색 창(-transparentcolor)이 새로 드러난 자리를
       # 검게 합성하는 것이고, 맥은 platform_mac.py 에 SpriteView 를 따로
@@ -692,6 +699,8 @@ jobs:
           python test_release_watch.py
           # 상자(/api/pokemon)를 jsonable_encoder 없이 바로 JSON 으로 - 글자는 예전과 한 바이트도 다르지 않다 (11/14)
           python test_json_response.py
+          # 상자 창이 바뀐 것만 다시 받는다 (2.5.0, POST /api/pokemon/pick): 물은 것 + 파티, 모습은 전체 목록과 같다
+          python test_box_pick.py
           python test_boxes.py
           # 여러 마리 놓아주기: 한 마리씩 따로 보고 막힌 것(탐험·배틀 중·남의 것)은 까닭과 함께
           python test_release_many.py

@@ -186,6 +186,10 @@ class Api(object):
         return (r.get("pokemon") or [], r.get("eggs") or [],
                 r.get("boxes") or {})
 
+    def pokemon_pick(self, ids):
+        """바뀐 것만 (2.5.0): 물은 번호들 + 지금 파티 전부 · 알 전부 · 박스 정보. 관리 창이 동작 하나 뒤에 쓴다."""
+        return self._call("POST", "/api/pokemon/pick", body={"ids": [int(i) for i in ids if int(i) > 0]})
+
     def set_box(self, pid, no):
         """포켓몬을 다른 PC 박스로 옮긴다."""
         return self._call("POST", "/api/pokemon/%d/box" % int(pid),

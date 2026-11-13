@@ -178,6 +178,16 @@ def egg_row(egg):
             "info": {"name": egg.get("name") or "포켓몬 알"}}
 
 
+def server_order(m):
+    """서버가 상자 목록을 주는 차례 (데리고 다니는 것 먼저, 자리 번호, 번호 - ORDER BY on_desktop DESC, slot, id).
+
+    바뀐 것만 다시 받았을 때(2.5.0, /api/pokemon/pick) 고친 줄을 이 차례로 다시 세운다 - 전체를 다시 받은 것과
+    같은 모습이 되게. SQLite 는 slot 이 비어 있는(NULL) 것을 앞에 둔다.
+    """
+    slot = m.get("slot")
+    return (0 if m.get("onDesktop") else 1, slot is not None, slot or 0, m.get("id") or 0)
+
+
 def merge_eggs(mons, eggs):
     """포켓몬 목록에 안 깬 알을 섞는다.
 
