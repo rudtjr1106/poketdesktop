@@ -110,6 +110,7 @@ class TeamWindow(Scene, S.TeamWindow):
         self.cv.bind("<Motion>", self._motion, add="+")
         self.cv.bind("<Leave>", lambda _e: self._set_phover(None), add="+")
         self.cv.bind("<Button-1>", self._press, add="+")
+        self.cv.bind("<ButtonRelease-1>", self._release, add="+")
 
     def _soon(self):
         # Scene 의 것은 _paint 를 부른다 - 이 창의 _paint 는 '고른 것이 바뀌었다' (기본 창)라서 판은 _draw 로 그린다
@@ -319,7 +320,7 @@ class TeamWindow(Scene, S.TeamWindow):
         n = max(1, self.max)
         pg = s(6)
         PH = int(max(s(40), min(s(52), (bot - y - pg * (n - 1)) / float(n))))
-        self._pboxes, self._pitems = {}, {}
+        self._pboxes, self._pitems, self._eboxes = {}, {}, {}
         mons = self.slot_mons()
         self._thumbs([m for m in mons if m])
         for i, m in enumerate(mons):
@@ -357,6 +358,7 @@ class TeamWindow(Scene, S.TeamWindow):
             K.clipped(cv, x1 + 1, y1 + 1, x2 - 1, y2 - 1, c - 1, EMPTY_FILL, T)
             cv.create_text(x1 + s(14), mid, text=str(i + 1), fill=DIM, font=font(11), anchor="w", tags=T)
             cv.create_text(x1 + s(36), mid, text="빈 자리", fill=DIM, font=font(10), anchor="w", tags=T)
+            self._eboxes[i] = (x1, y1, x2, y2)      # 끌어 놓을 수만 있다 (#516 - 놓으면 맨 끝으로)
             return
         r = self.rows.get(m["id"]) or self.row_info(m)
         hov = i == self._phover
@@ -438,12 +440,32 @@ class TeamWindow(Scene, S.TeamWindow):
             pass
 
     def _press(self, e):
-        i = self._plate_at(e.x, e.y)
+        # 판을 누른 자리만 적어 둔다 - 떼는 자리가 같으면 빼기, 다른 판이면 순서 바꾸기 (게시판 #516)
+        self._slot_from = self._plate_at(e.x, e.y)
+        if self._slot_from is not None:
+            try:
+                self.cv.configure(cursor="fleur")
+            except tk.TclError:
+                pass
+
+    def _release(self, e):
+        i, self._slot_from = self._slot_from, None
         if i is None:
             return
+        try:
+            self.cv.configure(cursor="hand2")
+        except tk.TclError:
+            pass
+        j = self._plate_at(e.x, e.y)
+        if j is None:
+            j = next((k for k, (x1, y1, x2, y2) in getattr(self, "_eboxes", {}).items()
+                      if x1 <= e.x <= x2 and y1 <= e.y <= y2), None)
         ms = self.slot_mons()
-        if i < len(ms) and ms[i] is not None:
-            self.toggle(ms[i]["id"])         # 판을 누르면 팀에서 뺀다 (목록의 줄을 다시 누른 것과 같다)
+        if j == i:
+            if i < len(ms) and ms[i] is not None:
+                self.toggle(ms[i]["id"])     # 판을 눌렀다 떼면 팀에서 뺀다 (목록의 줄을 다시 누른 것과 같다)
+        elif j is not None:
+            self.move_slot(i, j)             # 다른 판에 놓으면 그 자리로 옮긴다 (빈 판이면 맨 끝)
 
 
 # ---------------------------------------------------------------- 칭호 · 명패

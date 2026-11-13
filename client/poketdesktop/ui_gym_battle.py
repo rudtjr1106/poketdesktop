@@ -1275,6 +1275,15 @@ class GymBattleWindow(Z.Resizable):
         if res != "won" and (rw.get("war") or {}).get("mode") == "match" and rw.get("lines"):
             # 길드전 1:1 (시즌 7): 져도 별 · 길드 코인을 받을 수 있다 - 서버가 적어 준 줄을 그대로
             lines.extend(rw["lines"])
+        got = {}
+        for e in self.exp:
+            # 이 판에서 얻은 경험치 (게시판 #515) - 쓰러뜨릴 때마다 오는 줄을 포켓몬마다 더한다 (학습장치 몫 포함)
+            if e.get("gained"):
+                k = e.get("id") or e.get("name")
+                name, n = got.get(k, (e.get("name") or "?", 0))
+                got[k] = (name, n + int(e["gained"]))
+        if got:
+            lines.append("얻은 경험치: " + " · ".join("%s +%s" % (nm, format(n, ",")) for nm, n in got.values()))
         ups = {}
         for e in self.exp:
             if e.get("leveledUp"):

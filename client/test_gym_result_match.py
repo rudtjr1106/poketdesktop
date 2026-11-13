@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """관장 배틀 창 결과 칸: 길드전 1:1 (시즌 7) 판은 져도 서버가 준 줄(별 · 길드 코인)을 적는다.
+그리고 이 판에서 얻은 경험치를 포켓몬마다 적는다 (게시판 #515 - 레벨 업만 보였다).
 
     python client/test_gym_result_match.py
 
@@ -30,7 +31,7 @@ def chk(name, cond, got=""):
         print("  FAIL %s   %r" % (name, got))
 
 
-def lines_of(result, reward):
+def lines_of(result, reward, exp=()):
     cls = next(v for v in vars(G).values() if isinstance(v, type) and "_paint_result" in vars(v))
     w = object.__new__(cls)
     got = {}
@@ -40,7 +41,7 @@ def lines_of(result, reward):
     w._paint_result_panel = lambda res, title, lines: got.update(lines=lines)
     w.view = {"result": result, "trainer": {"name": "로켓_03", "role": "[로켓단]"}}
     w.reward = reward
-    w.exp = []
+    w.exp = list(exp)
     w._paint_result()
     return got["lines"]
 
@@ -59,6 +60,21 @@ def main():
     chk("지도전 판은 그대로 (졌을 때 서버 줄 없음)", not any("지도전 줄" in x for x in ls), ls)
     ls = lines_of("lost", None)
     chk("관장 판은 그대로 (보상 없음)", ls and "쓰러졌다" in ls[0], ls)
+    print("-- 얻은 경험치 (#515)")
+    exp = [{"id": 11, "name": "한카리아스", "gained": 1200, "level": 51, "leveledUp": True},
+           {"id": 12, "name": "망나뇽", "gained": 300, "level": 48, "leveledUp": False},
+           {"id": 11, "name": "한카리아스", "gained": 345, "level": 51, "leveledUp": False}]
+    ls = lines_of("won", {"first": True, "prize": 3000}, exp)
+    line = next((x for x in ls if x.startswith("얻은 경험치")), "")
+    chk("이기면 '얻은 경험치: 한카리아스 +1,545 · 망나뇽 +300' (포켓몬마다 더함 · 처음 나온 차례)",
+        line == "얻은 경험치: 한카리아스 +1,545 · 망나뇽 +300", ls)
+    chk("  레벨 업 줄도 그대로", any(x.startswith("레벨 업: 한카리아스 Lv.51") for x in ls), ls)
+    ls = lines_of("lost", None, exp[1:2])
+    chk("  져도 그때까지 얻은 경험치", "얻은 경험치: 망나뇽 +300" in ls, ls)
+    ls = lines_of("won", {"first": False, "prize": 0}, [])
+    chk("  경험치가 없으면 줄이 없다 (길드전 판 · 아무도 못 쓰러뜨림)", not any(x.startswith("얻은 경험치") for x in ls), ls)
+    ls = lines_of("won", {"first": False, "prize": 0}, [{"id": 13, "name": "뮤", "gained": 0, "level": 100}])
+    chk("  0 만 얻은 것(Lv.100)은 안 적는다", not any(x.startswith("얻은 경험치") for x in ls), ls)
     print("\n%d OK, %d FAIL" % (OK, FAIL))
     return 1 if FAIL else 0
 

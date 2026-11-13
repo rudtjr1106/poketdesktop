@@ -53,6 +53,10 @@ def title_text(row):
 
 
 # ---------------------------------------------------------------- 랭크 팀
+# 팀 고르기 창의 아래 줄 (할 말이 없을 때, 두 마리 이상) - 게시판 #516
+MOVE_HINT = "고른 자리를 끌어 다른 자리에 놓으면 순서가 바뀝니다 (1번이 먼저 나갑니다)."
+
+
 @skins.skinnable
 class TeamWindow(object):
     """랭크 팀을 고르는 창.
@@ -83,6 +87,8 @@ class TeamWindow(object):
         title = self.spec.get("title") or "랭크 팀"
         self.mons = []
         self.picked = []          # 고른 순서대로 포켓몬 id
+        self._slot_from = None    # 자리를 끌기 시작한 자리 번호 (게시판 #516 - 끌어 놓아 순서를 바꾼다)
+        self._slot_labels = []
         self.registered = False
         self.max = 6
         self.cap = 50
@@ -297,7 +303,13 @@ class TeamWindow(object):
         return head, "%d / %d마리" % (len(self.picked), self.max)
 
     def team_hint(self):
-        """지금 고른 팀에 대해 아래 줄에 띄울 말 (글, 빛깔). 할 말이 없으면 빈 글."""
+        """지금 고른 팀에 대해 아래 줄에 띄울 말 (글, 빛깔). 할 말이 없으면 두 마리 이상일 때 순서 바꾸는 법."""
+        text, color = self._team_hint()
+        if not text and len(self.picked) >= 2:
+            return MOVE_HINT, U.FG_FAINT
+        return text, color
+
+    def _team_hint(self):
         n = len(self.picked)
         if self.spec:
             # 길드전 팀: 같은 지닌 도구만 본다 (2.0.2 - 겹치면 서버가 저장을 거절한다)
@@ -422,17 +434,22 @@ class TeamWindow(object):
         for w in self.slots.winfo_children():
             w.destroy()
         dup = set(self.held_dup_ids(self._fighting(self.picked)))
+        self._slot_labels = []
         for i, m in enumerate(self.slot_mons()):
             text = ("%d. %s" % (i + 1, (m.get("info") or {}).get("name", "?"))
                     if m else "%d. 빈 자리" % (i + 1))
             bad = bool(m) and m["id"] in dup
             if bad:
                 text += " · 도구 겹침"           # 시즌 5: 앞의 포켓몬과 같은 도구 (held_dup_ids)
-            tk.Label(self.slots, text=text, bg=U.BG2 if m else U.BG,
-                     fg=U.DANGER if bad else (U.FG if m else U.FG_FAINT), font=U.FONT_XS,
-                     padx=6, pady=2, highlightthickness=1,
-                     highlightbackground=U.LINE).grid(
-                row=i // 3, column=i % 3, sticky="we", padx=2, pady=2)
+            lb = tk.Label(self.slots, text=text, bg=U.BG2 if m else U.BG,
+                          fg=U.DANGER if bad else (U.FG if m else U.FG_FAINT), font=U.FONT_XS,
+                          padx=6, pady=2, highlightthickness=1, highlightbackground=U.LINE,
+                          cursor="fleur" if m else "")
+            lb.grid(row=i // 3, column=i % 3, sticky="we", padx=2, pady=2)
+            if m:                                    # 끌어서 다른 자리에 놓으면 순서가 바뀐다 (#516)
+                lb.bind("<ButtonPress-1>", lambda _e, k=i: self._slot_press(k))
+                lb.bind("<ButtonRelease-1>", self._slot_release)
+            self._slot_labels.append(lb)
         for c in range(3):
             self.slots.grid_columnconfigure(c, weight=1, uniform="slot")
 
@@ -585,6 +602,42 @@ class TeamWindow(object):
                                 U.ACCENT)
             self.picked.append(pid)
         self._paint()
+
+    def move_slot(self, i, j):
+        """i 번 자리의 포켓몬을 j 번 자리로 옮긴다 (사이의 것은 한 칸씩 밀린다). 빈 자리에 놓으면 맨 끝으로.
+        게시판 #516 - 선두를 바꾸려면 여섯 마리를 다 빼고 다시 넣어야 했다. 옮겼으면 True."""
+        n = len(self.picked)
+        if i is None or j is None or not 0 <= i < n:
+            return False
+        j = max(0, min(int(j), n - 1))
+        if i == j:
+            return False
+        pid = self.picked.pop(i)
+        self.picked.insert(j, pid)
+        self._paint()
+        name = ((dict((m["id"], m) for m in self.mons).get(pid) or {}).get("info") or {}).get("name", "?")
+        self.say(natural("%s 을(를) %d번 자리로 옮겼습니다%s." % (name, j + 1, " - 먼저 나갑니다" if j == 0 else "")))
+        return True
+
+    def _slot_press(self, i):
+        self._slot_from = i
+        try:
+            self._slot_labels[i].configure(highlightbackground=U.ACCENT, highlightthickness=2)
+        except (tk.TclError, IndexError):
+            pass
+
+    def _slot_release(self, e):
+        """끌던 자리를 놓았다 - 손가락 아래의 자리로 옮긴다 (같은 자리면 아무 일도 없다)."""
+        i, self._slot_from = self._slot_from, None
+        if i is None:
+            return
+        try:
+            under = e.widget.winfo_containing(e.x_root, e.y_root)
+        except tk.TclError:
+            under = None
+        j = next((k for k, lb in enumerate(self._slot_labels) if lb is under), None)
+        if not self.move_slot(i, j):
+            self._paint_slots()                     # 끌기 표시를 거둔다
 
     def fill_party(self):
         party = [m for m in self.mons if m.get("onDesktop")]

@@ -496,6 +496,7 @@ jobs:
           python client/smoke_season.py
           python client/test_practice_ui.py   # 하루 20판 뒤 연습판: 단추·머리줄·대전 기록·트레이 (옛 서버면 예전 글)
           python client/test_held_rank_ui.py  # 시즌 5 같은 지닌 도구 한 마리: 랭크 팀 '도구 겹침'·규칙 카드 (시즌 4·옛 서버면 표시 없음)
+          python client/test_team_reorder.py  # 팀 고르기 창: 자리를 끌어 놓아 순서 바꾸기 (게시판 #516, 기본 + DP)
           python client/test_gw_reward_line.py  # 2.0.2: 길드전 보상 글 (새 서버면 꾸미기 · 뽑기권, 옛 서버면 예전 글)
           python client/smoke_eggs.py
           python client/test_walk_shiny.py
