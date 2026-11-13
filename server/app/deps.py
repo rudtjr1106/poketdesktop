@@ -26,6 +26,27 @@ def dex():
     return _DEX
 
 
+# ---------------------------------------------------------------- 큰 응답을 바로 JSON 으로
+def _json_default(o):
+    from fastapi.encoders import jsonable_encoder
+    return jsonable_encoder(o)
+
+
+def json_response(obj):
+    """dict 를 FastAPI 의 jsonable_encoder 를 거치지 않고 바로 JSON 응답으로 (11/14).
+
+    라우트가 dict 를 돌려주면 FastAPI 는 먼저 jsonable_encoder 로 통째로 한 번 훑어 새로 만들고 나서
+    JSONResponse 가 json.dumps 를 한다. 그 훑기가 json.dumps 보다 열 배쯤 느리다 - 포켓몬 869마리 상자
+    (/api/pokemon, 1.3MB)에서 목록을 만드는 데 0.24초, 훑기가 0.38초, dumps 는 0.04초였다. 그래서 큰 응답만
+    여기로 보낸다. 글자는 JSONResponse 와 똑같다 (같은 dumps 옵션 - ensure_ascii=False, allow_nan=False, 빈칸 없음).
+    json 이 모르는 것(datetime · set · pydantic 등)만 jsonable_encoder 에 맡긴다.
+    """
+    from fastapi.responses import Response
+    body = json.dumps(obj, ensure_ascii=False, allow_nan=False, indent=None, separators=(",", ":"),
+                      default=_json_default).encode("utf-8")
+    return Response(content=body, media_type="application/json")
+
+
 # ---------------------------------------------------------------- 야생 배틀이 살아 있나
 def in_battle(uid, pid):
     """이 포켓몬이 **지금** 야생 배틀을 하고 있나 (도구 쓰기·지닌 도구 바꾸기를 막을 때 본다).

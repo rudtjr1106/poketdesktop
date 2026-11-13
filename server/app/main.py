@@ -1427,9 +1427,8 @@ def assign_boxes(uid):
     return True
 
 
-@app.get("/api/pokemon")
-def list_pokemon(ctx=Depends(current)):
-    uid = ctx["user"]["id"]
+def box_listing(uid):
+    """상자 전체 (GET /api/pokemon 의 내용). 검사는 이걸 바로 부른다."""
     assign_boxes(uid)
     # 알은 따로 싣는다. 포켓몬 목록에 섞으면 옛 클라이언트가 알을 포켓몬으로
     # 그리려다 터진다. 새 관리 창이 둘을 합쳐 보여준다.
@@ -1452,6 +1451,12 @@ def list_pokemon(ctx=Depends(current)):
             "eggs": eggs.box_list(uid),
             "boxes": {"size": config.BOX_SIZE, "count": config.BOX_COUNT,
                       "names": _box_names(uid), "used": _box_counts(uid)}}
+
+
+@app.get("/api/pokemon")
+def list_pokemon(ctx=Depends(current)):
+    # 상자 전체라 크다 (800마리면 1MB 넘게). FastAPI 의 jsonable_encoder 를 건너뛴다 (deps.json_response).
+    return deps.json_response(box_listing(ctx["user"]["id"]))
 
 
 class ClaimIn(BaseModel):

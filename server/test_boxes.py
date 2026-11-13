@@ -304,7 +304,7 @@ def main_():
 
     print("\n=== 목록에 실려 나간다 ===")
     main.set_box_name(main.BoxNameIn(no=0, name="첫방"), ctx(uid))
-    out = main.list_pokemon(ctx(uid))
+    out = main.box_listing(uid)
     b = out.get("boxes") or {}
     chk("박스 정보가 실린다", b.get("size") == size and b.get("count") == config.BOX_COUNT,
         b)

@@ -206,7 +206,7 @@ def main_():
 
     print("\n=== 나가 있는 동안 ===")
     chk("나가 있는 포켓몬", E.away_ids(uid) == {bulba, onix, rat} and E.is_away(uid, bulba) and not E.is_away(uid, pika))
-    listing = main.list_pokemon(ctx(uid))["pokemon"]
+    listing = main.box_listing(uid)["pokemon"]
     chk("포켓몬 목록에 '나가 있음' 이 실린다 (그 셋에만)", sorted(m["id"] for m in listing if m.get("away")) == sorted([bulba, onix, rat])
         and all("away" not in m for m in listing if m["id"] in (lead, pika)))
     why = refused(main.set_desktop, bulba, main.DesktopIn(on=True), ctx(uid))
@@ -251,7 +251,7 @@ def main_():
         and got["bag"] == bag(uid), (gained, one["items"]))
     chk("  물건마다 이름·등급이 실린다", all(i["kr"] == cat[i["id"]]["kr"] and i["tier"] in X.TIERS for i in one["items"]), one["items"])
     chk("  칸이 비고, 포켓몬이 돌아왔다", got["free"] == 1 and not E.is_away(uid, onix) and len(got["out"]) == 2
-        and "away" not in next(m for m in main.list_pokemon(ctx(uid))["pokemon"] if m["id"] == onix))
+        and "away" not in next(m for m in main.box_listing(uid)["pokemon"] if m["id"] == onix))
     why = refused(E.claim, uid, st["out"][1]["id"], later(hours=2))
     chk("**같은 보따리를 두 번 못 받는다**", why and why[0] == 404 and bag(uid) == dict(got["bag"]), why)
     main.set_desktop(onix, main.DesktopIn(on=True), ctx(uid))

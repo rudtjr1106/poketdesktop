@@ -690,6 +690,8 @@ jobs:
           python test_live.py
           # 새 앱 판 알림 (2.5.0): 깃허브 최신 릴리스가 바뀔 때만 소켓으로 민다 (가짜 깃허브)
           python test_release_watch.py
+          # 상자(/api/pokemon)를 jsonable_encoder 없이 바로 JSON 으로 - 글자는 예전과 한 바이트도 다르지 않다 (11/14)
+          python test_json_response.py
           python test_boxes.py
           # 여러 마리 놓아주기: 한 마리씩 따로 보고 막힌 것(탐험·배틀 중·남의 것)은 까닭과 함께
           python test_release_many.py

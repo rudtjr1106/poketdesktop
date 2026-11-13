@@ -793,7 +793,7 @@ def main():
         chk("알 둘 + 포켓몬 넷이면 포켓몬도 못 올린다", False, "막히지 않았다")
     except HTTPException as e:
         chk("알 둘 + 포켓몬 넷이면 포켓몬도 못 올린다 (409)", e.status_code == 409, e.status_code)
-    listed = _main.list_pokemon({"user": {"id": eg}})
+    listed = _main.box_listing(eg)
     chk("포켓몬 목록에 알이 따로 실린다 (안 깬 셋)",
         sorted(e["id"] for e in listed["eggs"]) == sorted([lid, mid_, third])
         and all("species" not in e for e in listed["eggs"]), listed["eggs"])
