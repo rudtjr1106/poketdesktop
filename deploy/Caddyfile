@@ -39,3 +39,7 @@
 		format console
 	}
 }
+
+# 같은 기계에 함께 올린 다른 서비스의 사이트(저장소 밖 ~/caddy-sites/*.caddy — 예: Way 임시 서버).
+# 파일이 없으면 Caddy 는 경고만 남기고 넘어간다.
+import /etc/caddy/sites/*.caddy

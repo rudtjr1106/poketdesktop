@@ -76,6 +76,8 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 함께 올린 다른 서비스의 사이트 설정(Caddyfile 맨 끝 import). 폴더는 미리 만들어 둔다: mkdir -p ~/caddy-sites
+      - /home/ubuntu/caddy-sites:/etc/caddy/sites:ro
       - caddydata:/data
       - caddyconfig:/config
     environment:
