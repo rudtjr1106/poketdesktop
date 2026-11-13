@@ -1020,7 +1020,7 @@ CREATE INDEX IF NOT EXISTS idx_gw_attack_def ON guild_war_attack(season, def_gui
 CREATE INDEX IF NOT EXISTS idx_gw_attack_atk ON guild_war_attack(season, atk_guild);
 CREATE INDEX IF NOT EXISTS idx_gw_attack_region ON guild_war_attack(season, region);
 CREATE INDEX IF NOT EXISTS idx_gw_attack_battle ON guild_war_attack(battle_id);
--- 시즌 7 부터 1:1 맞대결 (guild_war_match.py): 길드마다 칠 길드 · 나를 칠 길드. 1:1 이면 둘이 같고(kind 'pair'),
+-- 시즌 6 부터 1:1 맞대결 (guild_war_match.py): 길드마다 칠 길드 · 나를 칠 길드. 1:1 이면 둘이 같고(kind 'pair'),
 -- 홀수라 세 길드를 묶었으면 A->B->C->A 로 다르다(kind 'tri'). cap = 그 판의 출전 상한 (없으면 NULL).
 CREATE TABLE IF NOT EXISTS guild_war_pair (
     season       INTEGER NOT NULL,
@@ -1070,7 +1070,7 @@ CREATE TABLE IF NOT EXISTS guild_user (
     coin        INTEGER NOT NULL DEFAULT 0,
     left_at     TEXT
 );
--- 길드 전용 상품을 시즌마다 몇 개 샀나 (시즌 7 부터, guild.SHOP_EXCLUSIVE - 시즌마다 한 사람이 살 수 있는 수가 있다)
+-- 길드 전용 상품을 시즌마다 몇 개 샀나 (시즌 6 부터, guild.SHOP_EXCLUSIVE - 시즌마다 한 사람이 살 수 있는 수가 있다)
 CREATE TABLE IF NOT EXISTS guild_buy (
     season      INTEGER NOT NULL,
     user_id     INTEGER NOT NULL,
@@ -1336,7 +1336,7 @@ MIGRATIONS = [
     ("guild_war_attack", "coins", "ALTER TABLE guild_war_attack ADD COLUMN coins INTEGER NOT NULL DEFAULT 0"),
     ("guild_war_attack", "def_coins",
      "ALTER TABLE guild_war_attack ADD COLUMN def_coins INTEGER NOT NULL DEFAULT 0"),
-    # 시즌 7 길드전 1:1 맞대결 (guild_war_match.py): 출전 상한에 걸려 쉬는 사람 · 판마다 별 · 쓰러뜨린 수 · 방어팀 마릿수.
+    # 시즌 6 길드전 1:1 맞대결 (guild_war_match.py): 출전 상한에 걸려 쉬는 사람 · 판마다 별 · 쓰러뜨린 수 · 방어팀 마릿수.
     # 옛 행은 0 / NULL = 지도전 판
     ("guild_war_team", "bench", "ALTER TABLE guild_war_team ADD COLUMN bench INTEGER NOT NULL DEFAULT 0"),
     ("guild_war_attack", "stars", "ALTER TABLE guild_war_attack ADD COLUMN stars INTEGER"),

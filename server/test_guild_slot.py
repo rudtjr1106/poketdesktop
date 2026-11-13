@@ -85,9 +85,9 @@ def avg_coin(ids):
 
 def main():
     db.init()
-    # 길드 전용 상품(시즌 7 부터 - 마스터볼 · 금색병뚜껑, '길드 전용' 묶음)이 없는 상점을 본다. 전용 상품은
+    # 길드 전용 상품(시즌 6 부터 - 마스터볼 · 금색병뚜껑, '길드 전용' 묶음)이 없는 상점을 본다. 전용 상품은
     # test_guild_shop_exclusive 가 본다.
-    season.SEASON = 6
+    season.SEASON = 5
 
     print("\n=== 늘어난 상점 도구 ===")
     a = mkuser("가")

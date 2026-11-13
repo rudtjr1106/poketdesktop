@@ -707,7 +707,7 @@ class Api(object):
         return self._call("GET", "/api/guild/war/tile/%s" % region)
 
     def guild_war_match(self):
-        """1:1 맞대결 (시즌 7~): 우리 판의 별 · 상대 출전 명단(앞 3마리 · 받은 최고 별 · 칠 수 있는지) · 우리 명단.
+        """1:1 맞대결 (시즌 6~): 우리 판의 별 · 상대 출전 명단(앞 3마리 · 받은 최고 별 · 칠 수 있는지) · 우리 명단.
         조커로 가려진 상대는 이름이 '???' 이고 userId 가 음수(명단 안의 자리 표시)다 - 그대로 열쇠로 쓴다."""
         return self._call("GET", "/api/guild/war/match")
 
@@ -733,7 +733,7 @@ class Api(object):
     def guild_war_joker(self, region=None, on=True, user_id=None):
         """길드장: 길드원을 조커로 숨기거나 푼다.
         지도전(시즌 5~6)은 그 칸(region)을 지키는 사람 - 그 칸의 모습(tile)을 돌려준다.
-        1:1 맞대결(시즌 7~)은 그 사람(user_id) - 길드전 모습(state)을 돌려준다."""
+        1:1 맞대결(시즌 6~)은 그 사람(user_id) - 길드전 모습(state)을 돌려준다."""
         if user_id is not None:
             return self._call("POST", "/api/guild/war/joker", {"userId": int(user_id), "on": bool(on)})
         return self._call("POST", "/api/guild/war/joker", {"region": str(region), "on": bool(on)})

@@ -93,7 +93,7 @@ WAR_DAYS = 6                 # 전쟁: 정해 둔 것은 못 바꾼다
 SETTLE_DAYS = 1              # 결산 (끝난 첫날). 시즌 2주 = 3 + 4 + 6 + 1
 MIN_MEMBERS = 5              # 이만큼은 있어야 신청할 수 있다
 TOTAL_ATTACKS = 30           # 길드 하나의 공격 수 합 = 길드 하나가 받는 공격 수 상한
-MATCH_FROM = 7               # 이 시즌부터 지도전 대신 1:1 맞대결 (guild_war_match.py, 2026-11-12 사용자 결정)
+MATCH_FROM = 6               # 이 시즌부터 지도전 대신 1:1 맞대결 (guild_war_match.py, 2026-11-12 사용자 결정 · 11/14 "길드전은 시즌 6부터")
 RING_ROWS = 5                # 원형 지도: 길드마다 부채꼴 하나 = 줄 5개(바깥 -> 안) x 칸 3개
 RING_COLS = 3
 # 명단을 고정하던 요청이 이만큼 지나도 안 끝났으면(서버가 그사이 죽었다) 그 표시는 낡은 것으로 보고 다시 고정한다
@@ -183,7 +183,7 @@ def phase(now=None):
 
 
 def match_mode(s=None):
-    """이 시즌 길드전이 1:1 맞대결인가 (시즌 7 부터). 시즌 번호에 묶는다 - 시즌 중에 규칙이 안 바뀐다."""
+    """이 시즌 길드전이 1:1 맞대결인가 (시즌 6 부터). 시즌 번호에 묶는다 - 시즌 중에 규칙이 안 바뀐다."""
     return (s or season.SEASON) >= MATCH_FROM
 
 
@@ -597,7 +597,7 @@ def _lock_all(s, now=None):
     if busy:
         return True
     try:
-        # 명단이 다 고정됐으니 지도를 나눈다 (시즌 7 부터는 상대를 정한다)
+        # 명단이 다 고정됐으니 지도를 나눈다 (시즌 6 부터는 상대를 정한다)
         (_gm().lock if match_mode(s) else _deal)(s, now)
     except Exception as err:                                  # noqa: BLE001
         from . import errors

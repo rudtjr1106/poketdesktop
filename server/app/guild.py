@@ -118,12 +118,12 @@ SHOP_HELD = ("LIFEORB", "CHOICESCARF", "CHOICEBAND", "CHOICESPECS", "FOCUSSASH",
 # 상점 화면의 묶음 (차례대로). 앱이 group 글을 머리글로 쓴다.
 SHOP_GROUPS = ("볼", "성장", "진화", "지닌 도구")
 BUY_MAX = 99
-# 길드 전용 상품 (시즌 7 부터, 2026-11-12 사용자 - design-notes/2026-11-12-guild-war-rewards.md): 돈 상점에 없는 것을
+# 길드 전용 상품 (시즌 6 부터, 2026-11-12 사용자 - design-notes/2026-11-12-guild-war-rewards.md): 돈 상점에 없는 것을
 # 코인으로, **시즌마다 한 사람이 살 수 있는 수가 있다** (guild_buy). 길드 미션 코인이 길드전 코인보다 훨씬 많아서
 # 수를 안 묶으면 전용 상품이 미션 보상이 된다. 되팔면 손해여야 한다 (금색병뚜껑은 팔면 5,000원 < 200코인 = 50,000원어치).
 # (도구, 코인, 시즌마다 수). 랜덤 기술머신 뽑기권은 넣지 않는다 (사용자).
 SHOP_EXCLUSIVE = (("MASTERBALL", 600, 1), ("GOLDBOTTLECAP", 200, 2))
-EXCLUSIVE_FROM = 7
+EXCLUSIVE_FROM = 6
 EXCLUSIVE_GROUP = "길드 전용"
 
 # 슬롯머신 (2.1.0). 한 번에 SLOT_COST 코인, 하루 횟수 제한 없음 (사용자 결정).
@@ -967,7 +967,7 @@ def claim(uid, tier, now=None):
 
 # ---------------------------------------------------------------- 코인 상점
 def exclusive(item_id):
-    """길드 전용 상품이면 (코인, 시즌마다 수), 아니면 None. 시즌 7 전에는 없다 (시즌 중에 상점을 안 바꾼다)."""
+    """길드 전용 상품이면 (코인, 시즌마다 수), 아니면 None. 시즌 6 전에는 없다 (시즌 중에 상점을 안 바꾼다)."""
     if season.SEASON < EXCLUSIVE_FROM:
         return None
     for iid, price, limit in SHOP_EXCLUSIVE:

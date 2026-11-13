@@ -36,7 +36,7 @@ class WarTab(GW.WarTab):
         sb = K.Scroll(self.right, self.cv, BASE_BG)
         sb.pack(side="right", fill="y", before=self.cv)
         self.cv.configure(yscrollcommand=sb.set)
-        # 1:1 맞대결 판 (시즌 7~): 지도 자리에 끼는 판의 바탕 · 굴림 막대도 DP 것으로
+        # 1:1 맞대결 판 (시즌 6~): 지도 자리에 끼는 판의 바탕 · 굴림 막대도 DP 것으로
         for w in (self.board, self.score_box, self.list_head, self.barea, self.bcv, self.binner):
             w.configure(bg=BASE_BG)
         for ch in self.barea.winfo_children():

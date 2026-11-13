@@ -28,7 +28,7 @@
 
 오른쪽 칸은 길어질 수 있어 안쪽을 굴린다 (창을 키우지 않는다).
 
-## 1:1 맞대결 (시즌 7~, 설계 design-notes/2026-11-12-guild-war-1v1.md)
+## 1:1 맞대결 (시즌 6~, 설계 design-notes/2026-11-12-guild-war-1v1.md)
 
 서버가 state 에 `"mode": "match"` 를 실으면 지도 대신 **맞대결 판**을 낀다 (없으면 위의 지도전 그대로 - 옛 서버 ·
 시즌 6 까지). 인원이 비슷한 길드끼리 1:1 (홀수면 세 길드 삼각형: 우리 -> B, C -> 우리), 한 사람 2번 공격, 별 ★~★★★,
@@ -91,7 +91,7 @@ def span_text(sec):
 
 
 def is_match(st):
-    """1:1 맞대결 시즌(시즌 7~)인가. 서버가 state 에 mode='match' 를 실을 때만 - 없으면 지도전."""
+    """1:1 맞대결 시즌(시즌 6~)인가. 서버가 state 에 mode='match' 를 실을 때만 - 없으면 지도전."""
     return (st or {}).get("mode") == "match"
 
 
@@ -179,7 +179,7 @@ def earned_text(st):
 
 
 def match_reward_lines(st):
-    """1:1 맞대결의 보상 안내 (줄마다) - 보상은 길드 코인만 (시즌 7, 순위 보상이 없다)."""
+    """1:1 맞대결의 보상 안내 (줄마다) - 보상은 길드 코인만 (시즌 6~, 순위 보상이 없다)."""
     c = coin_rules(st)
     stars = list(c.get("stars") or [])[:3]
     res = c.get("result") or {}
@@ -390,7 +390,7 @@ class WarTab(object):
         self.coin_box = None         # 1:1 보상 칸 (코인 규칙 · 내 몫 - 다시 받으면 이것만 고친다)
         self.menu = None
         self._poll_job = None
-        # 1:1 맞대결 (시즌 7~)
+        # 1:1 맞대결 (시즌 6~)
         self.mview = None            # 서버 match_view (상대 출전 명단 · 우리 명단)
         self.foe_sel = None          # 고른 상대 (match 의 userId - 가려진 조커는 음수 자리 표시)
         self.roster_out = None       # 길드장이 고치는 중인 출전 명단 - 뺄 사람들 (전략 기간)
@@ -1099,7 +1099,7 @@ class WarTab(object):
             U.wrap_to_width(lb)
         tk.Frame(c, bg=CARD, height=8).pack()
 
-    # ================ 1:1 맞대결 (시즌 7~) ================
+    # ================ 1:1 맞대결 (시즌 6~) ================
     def _build_board(self):
         """맞대결 판의 뼈대. 지도 자리(self.left)에 끼우고 뺀다 (_use_board). 위는 별 판(안 굴림), 아래는 상대
         출전 명단(굴림)."""

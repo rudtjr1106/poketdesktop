@@ -540,7 +540,7 @@ jobs:
       - name: 길드전 칸 (진짜 Tk)
         if: matrix.shard == 3
         run: python client/test_guild_war_ui.py
-      # 시즌 7 길드전 1:1 맞대결 화면 - 맞대결 판 · 삼각형 · 조커 · 출전 명단 · 공격 (mode 가 없으면 지도전 그대로)
+      # 시즌 6 길드전 1:1 맞대결 화면 - 맞대결 판 · 삼각형 · 조커 · 출전 명단 · 공격 (mode 가 없으면 지도전 그대로)
       - name: 길드전 1:1 맞대결 화면 (진짜 Tk)
         if: matrix.shard == 3
         run: python client/test_guild_war_match_ui.py
@@ -549,7 +549,7 @@ jobs:
         env:
           POKET_SKIN: dp
         run: python client/test_guild_war_match_ui.py
-      # 시즌 7 길드전 보상 = 코인만 · 코인 상점 '길드 전용' 묶음 (시즌마다 수) · 1:1 판은 져도 코인 줄
+      # 시즌 6 길드전 보상 = 코인만 · 코인 상점 '길드 전용' 묶음 (시즌마다 수) · 1:1 판은 져도 코인 줄
       - name: 코인 상점 길드 전용 · 1:1 배틀 결과 줄 (진짜 Tk)
         if: matrix.shard == 3
         shell: bash
@@ -819,8 +819,8 @@ jobs:
           python test_held_v5.py        # 시즌 5 랭크 팀 같은 지닌 도구 한 마리 (시즌 4 는 그대로인지도)
           python test_held_all.py       # 2.0.2: 같은 지닌 도구 한 마리를 모든 팀 배틀에 (막기 · 판에서만 빼기 · 시즌 4 그대로)
           python test_gw_rewards.py     # 2.0.2: 길드전 결산 - 순위 · 활약 기술머신 뽑기권 · 꾸미기 바꿔 주기
-          python test_guild_war_match.py  # 시즌 7 길드전 1:1 맞대결 - 매칭 · 삼각형 · 출전 상한 · 별 · 승패 · 코인 보상 (시즌 6 은 지도전 그대로)
-          python test_guild_shop_exclusive.py  # 시즌 7 길드 전용 상품 (마스터볼 · 금색병뚜껑, 시즌마다 수)
+          python test_guild_war_match.py  # 시즌 6 길드전 1:1 맞대결 - 매칭 · 삼각형 · 출전 상한 · 별 · 승패 · 코인 보상 (시즌 5 는 지도전 그대로)
+          python test_guild_shop_exclusive.py  # 시즌 6 길드 전용 상품 (마스터볼 · 금색병뚜껑, 시즌마다 수)
           python test_walk.py
 
       - name: HTTP 로 두드리는 검사

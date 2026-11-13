@@ -91,8 +91,8 @@ def later(hours):
 
 def main():
     db.init()
-    # 코인 상점은 길드 전용 상품(시즌 7 부터)이 없는 것으로 본다 - 전용 상품은 test_guild_shop_exclusive 가 본다
-    season.SEASON = 6
+    # 코인 상점은 길드 전용 상품(시즌 6 부터)이 없는 것으로 본다 - 전용 상품은 test_guild_shop_exclusive 가 본다
+    season.SEASON = 5
     cost = config.GUILD_CREATE_COST
     a = mkuser("가", cost + 1000)
     b = mkuser("나")

@@ -925,7 +925,7 @@ class GuildWindow(G.GuildWindow):
         ex = [it for it in shown if G.shop_exclusive(it)]
         if not any(G.shop_exclusive(it) for it in sh.get("items") or []):
             return self._shop_block(cv, shown, x1, x2, y, have, bag) + s(12)       # 옛 서버 · 시즌 6: 예전 그대로
-        # 길드 전용 묶음 (시즌 7~): 맨 앞에 머리글 + 판, 그 아래 나머지 도구 머리글 + 판
+        # 길드 전용 묶음 (시즌 6~): 맨 앞에 머리글 + 판, 그 아래 나머지 도구 머리글 + 판
         rest = [it for it in shown if not G.shop_exclusive(it)]
         if ex:
             y = section(cv, x1, x2, y, ex[0].get("group") or G.SHOP_EX_GROUP)

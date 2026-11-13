@@ -12,7 +12,7 @@
     POST   /api/guild/war/joker           길드장: 그 칸을 지키는 길드원을 조커로 숨기기·풀기 {region, on} (시즌 5)
     GET    /api/guild/war/log             내 길드가 낀 판들
 
-시즌 7 부터 1:1 맞대결 (guild_war_match.py) - map · tile · attacks · guard 는 409, 대신:
+시즌 6 부터 1:1 맞대결 (guild_war_match.py) - map · tile · attacks · guard 는 409, 대신:
     GET    /api/guild/war/match           맞대결 판: 칠 상대 명단 · 우리 명단 · 두 성적
     POST   /api/guild/war/attack          {target: 사람} (가려진 조커는 음수 자리 표시)
     POST   /api/guild/war/roster          길드장: 출전 상한에 걸리면 쉴 사람 {out: [...]}
@@ -33,7 +33,7 @@ class TeamIn(BaseModel):
 
 class AttackIn(BaseModel):
     region: str = ""
-    target: int = 0             # 1:1 맞대결 (시즌 7 부터): 칠 사람 (가려진 조커는 음수 자리 표시)
+    target: int = 0             # 1:1 맞대결 (시즌 6 부터): 칠 사람 (가려진 조커는 음수 자리 표시)
 
 
 class PlanIn(BaseModel):
@@ -104,7 +104,7 @@ def attack(body: AttackIn, ctx=Depends(deps.current)):
 
 @router.get("/api/guild/war/match")
 def match(ctx=Depends(deps.current)):
-    """1:1 맞대결 판 (시즌 7 부터): 칠 상대 명단 · 우리 명단 · 두 성적."""
+    """1:1 맞대결 판 (시즌 6 부터): 칠 상대 명단 · 우리 명단 · 두 성적."""
     if not guild_war.match_mode():
         raise HTTPException(409, "이번 시즌 길드전은 지도전입니다.")
     return guild_war_match.match_view(_uid(ctx))

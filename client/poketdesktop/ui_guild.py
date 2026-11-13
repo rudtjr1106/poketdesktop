@@ -108,7 +108,7 @@ def shop_match(it, q):
             or q in "".join(str(it.get("group") or "").lower().split()))
 
 
-# 길드 전용 상품 (시즌 7~, design-notes/2026-11-12-guild-war-rewards.md). 서버가 상점 groups 맨 앞에 '길드 전용' 을
+# 길드 전용 상품 (시즌 6~, design-notes/2026-11-12-guild-war-rewards.md). 서버가 상점 groups 맨 앞에 '길드 전용' 을
 # 싣고 그 상품에 exclusive · limit(시즌마다 수) · left(이번 시즌 남은 수) 를 붙인다. 없으면(옛 서버 · 시즌 6) 예전 그대로.
 SHOP_EX_GROUP = "길드 전용"
 SHOP_EX_NOTE = "돈 상점에는 없는 상품입니다. 시즌마다 한 사람이 살 수 있는 수가 정해져 있습니다."
@@ -1931,7 +1931,7 @@ class GuildWindow(object):
         self.shop_none = tk.Label(inner, text="", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S)
         bag = s.get("bag") or {}
         self.shop_btns = {}           # {(도구, 몇 개): 단추} - 코인이 모자라면 꺼져 있다
-        # 길드 전용 묶음이 있으면 (시즌 7~) 머리글 두 개 - 전용 묶음이 맨 앞, 그 아래 나머지 도구
+        # 길드 전용 묶음이 있으면 (시즌 6~) 머리글 두 개 - 전용 묶음이 맨 앞, 그 아래 나머지 도구
         ex = [it for it in s.get("items") or [] if shop_exclusive(it)]
         self.shop_heads = None
         if ex:

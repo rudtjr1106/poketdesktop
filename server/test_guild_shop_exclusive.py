@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-"""길드 전용 상품 (시즌 7 부터) - guild.SHOP_EXCLUSIVE · exclusive · coin_price · shop · buy · 표 guild_buy.
+"""길드 전용 상품 (시즌 6 부터) - guild.SHOP_EXCLUSIVE · exclusive · coin_price · shop · buy · 표 guild_buy.
 
     .venv-server/bin/python server/test_guild_shop_exclusive.py
 
 길드전 보상을 코인만으로 바꾸며(11/12 사용자) 코인 상점에 돈 상점에 없는 것을 시즌마다 수를 묶어 판다.
 마스터볼 600코인 시즌 1개 · 금색병뚜껑 200코인 시즌 2개 (랜덤 기술머신 뽑기권은 안 넣는다 - 사용자).
 
-  1. 시즌 6: 전용 상품이 없다 (값 0 · 상점 목록 · 묶음 없음 · 사면 404).
-  2. 시즌 7: '길드 전용' 묶음이 맨 앞 · 값 · 시즌마다 수 · 남은 수. 뽑기권은 없다.
+  1. 시즌 5: 전용 상품이 없다 (값 0 · 상점 목록 · 묶음 없음 · 사면 404).
+  2. 시즌 6: '길드 전용' 묶음이 맨 앞 · 값 · 시즌마다 수 · 남은 수. 뽑기권은 없다.
   3. 사기: 코인이 빠지고 가방에 들어온다 · 남은 수가 준다 · 다 사면 409 (코인 그대로) · 한 번에 수보다 많이 409 ·
      코인이 모자라면 400 이고 산 수도 안 늘어난다.
   4. 다음 시즌이면 다시 살 수 있다.
@@ -74,9 +74,9 @@ def main():
     db.init()
     real = season.SEASON
     try:
-        print("=== 1. 시즌 6: 전용 상품 없음 ===")
-        season.SEASON = 6
-        u = mkuser("육", 5000)
+        print("=== 1. 시즌 5: 전용 상품 없음 ===")
+        season.SEASON = 5
+        u = mkuser("오", 5000)
         sh = guild.shop(u)
         chk("값 0 · 목록에 없음 · '길드 전용' 묶음 없음", guild.coin_price("MASTERBALL") == 0
             and guild.coin_price("GOLDBOTTLECAP") == 0 and row(sh, "MASTERBALL") is None
@@ -84,8 +84,8 @@ def main():
         c = code_of(lambda: guild.buy(u, "MASTERBALL", 1))
         chk("  사면 404 · 코인 그대로", c and c[0] == 404 and guild.coin(u) == 5000, c)
 
-        print("\n=== 2. 시즌 7: '길드 전용' 묶음 ===")
-        season.SEASON = 7
+        print("\n=== 2. 시즌 6: '길드 전용' 묶음 ===")
+        season.SEASON = 6
         sh = guild.shop(u)
         mb, gc = row(sh, "MASTERBALL"), row(sh, "GOLDBOTTLECAP")
         chk("묶음이 맨 앞", sh["groups"][0] == guild.EXCLUSIVE_GROUP and sh["groups"][1:] == list(guild.SHOP_GROUPS),
@@ -145,11 +145,11 @@ def main():
             row(guild.shop(u2), "GOLDBOTTLECAP")["left"] == 2 and guild.coin(u2) == 1000)
 
         print("\n=== 4. 다음 시즌 ===")
-        season.SEASON = 8
-        chk("시즌 8: 다시 2개 · 1개", row(guild.shop(u), "GOLDBOTTLECAP")["left"] == 2
+        season.SEASON = 7
+        chk("시즌 7: 다시 2개 · 1개", row(guild.shop(u), "GOLDBOTTLECAP")["left"] == 2
             and row(guild.shop(poor), "MASTERBALL")["left"] == 1)
         guild.buy(u, "GOLDBOTTLECAP", 2)
-        chk("  시즌 8 에 2개 더 산다", bag(u, "GOLDBOTTLECAP") == 4)
+        chk("  시즌 7 에 2개 더 산다", bag(u, "GOLDBOTTLECAP") == 4)
 
         print("\n=== 5. 되팔면 손해 ===")
         for iid, price, _n in guild.SHOP_EXCLUSIVE:

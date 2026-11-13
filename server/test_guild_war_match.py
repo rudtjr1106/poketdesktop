@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""길드전 1:1 맞대결 (시즌 7 부터) - guild_war_match.py · guild_war.py 의 갈래 · 경로.
+"""길드전 1:1 맞대결 (시즌 6 부터 - 11/14 사용자 "길드전은 시즌 6부터") - guild_war_match.py · guild_war.py 의 갈래 · 경로.
 
     .venv-server/bin/python server/test_guild_war_match.py
 
@@ -18,7 +18,7 @@
      (수가 안 맞으면 409) · 승패는 '내가 칠 길드에게서' 대 '나를 친 길드가 나에게서' (2승 1패).
   6. 결산 (보상 = 길드 코인만, 11/12): 판마다 별 코인 ★20 · ★★40 · ★★★60 (+조커 20 · 막기 20) · 결산은 공격한 사람에게
      이김 100 · 비김 60 · 짐 30 · 순위 보상(꾸미기 · 칭호 · 뽑기권) 없음 · 이번 시즌 맞대결 목록 · 한 번만.
-  7. 시즌 6 은 지도전 그대로 (pair 줄 없음 · 칸이 나뉜다 · 맞대결 판 409).
+  7. 시즌 5 는 지도전 그대로 (pair 줄 없음 · 칸이 나뉜다 · 맞대결 판 409).
 """
 import datetime
 import json
@@ -158,7 +158,7 @@ def chat(gid):
     return [r["body"] for r in db.q("SELECT body FROM guild_chat WHERE guild_id=? ORDER BY id", (gid,))]
 
 
-def to_war(gs, s=7):
+def to_war(gs, s=6):
     """신청 → 전략 기간(명단 고정 · 상대 정하기). gs = [(길드, 사람들)]"""
     clock(at(hours=1))
     for gid, ids in gs:
@@ -214,9 +214,9 @@ def pure_part():
 
 # ---------------------------------------------------------------- 3 · 4. 1:1
 def pair_part():
-    print("\n=== 3. 전략 기간 (시즌 7, 6명 vs 5명) ===")
-    season.SEASON = 7
-    s = 7
+    print("\n=== 3. 전략 기간 (시즌 6, 6명 vs 5명) ===")
+    season.SEASON = 6
+    s = 6
     wipe()
     g1, A = mkguild("강한길드", 6)
     g2, B = mkguild("약한길드", 5, species="MAGIKARP", level=5)
@@ -349,8 +349,8 @@ def pair_part():
 # ---------------------------------------------------------------- 5. 삼각형 + 출전 상한
 def tri_part():
     print("\n=== 5. 삼각형 + 출전 상한 (8 · 5 · 5) ===")
-    season.SEASON = 7
-    s = 7
+    season.SEASON = 6
+    s = 6
     wipe()
     g1, A = mkguild("여덟", 8, weak=(6, 7))                   # 6 · 7 번은 방어팀이 약하다 → 쉰다
     g2, B = mkguild("다섯가", 5)
@@ -408,26 +408,26 @@ def tri_part():
         sorted(res.values()) == ["lose", "win", "win"] and res[g1] == "win", res)
     ms = GW.state(A[0])["matches"]
     chk("  맞대결 목록: 삼각형 하나 (세 길드)", len(ms) == 1 and ms[0]["kind"] == "tri" and len(ms[0]["guilds"]) == 3, ms)
-    print("\n=== 7. 시즌 6 은 지도전 그대로 ===")
-    season.SEASON = 6
+    print("\n=== 7. 시즌 5 는 지도전 그대로 ===")
+    season.SEASON = 5
     wipe()
     h1, X = mkguild("육가", 5)
     h2, Y = mkguild("육나", 5)
     to_war([(h1, X), (h2, Y)])
-    st6 = GW.state(X[0])
+    st5 = GW.state(X[0])
     chk("pair 줄 없음 · 칸이 나뉜다 · 공격은 길드 합 30번을 인원수로 (5명 6번씩) · state 에 mode 없음",
-        not db.q1("SELECT 1 FROM guild_war_pair WHERE season=6")
-        and db.q1("SELECT COUNT(*) c FROM guild_war_tile WHERE season=6")["c"] == 30
-        and set(r["attacks"] for r in GW.fighters(h1, 6)) == {6} and "mode" not in st6 and st6["total"] == 30,
-        (st6.get("total"), [r["attacks"] for r in GW.fighters(h1, 6)]))
+        not db.q1("SELECT 1 FROM guild_war_pair WHERE season=5")
+        and db.q1("SELECT COUNT(*) c FROM guild_war_tile WHERE season=5")["c"] == 30
+        and set(r["attacks"] for r in GW.fighters(h1, 5)) == {6} and "mode" not in st5 and st5["total"] == 30,
+        (st5.get("total"), [r["attacks"] for r in GW.fighters(h1, 5)]))
     chk("  맞대결 판은 없다 (match_mode False)", GW.match_mode() is False)
 
 
 # ---------------------------------------------------------------- 8. 검토 (11/12) 에서 나온 것
 def review_part():
     print("\n=== 8. 검토에서 나온 것 ===")
-    season.SEASON = 7
-    s = 7
+    season.SEASON = 6
+    s = 6
     wipe()
     gs = [mkguild("검%d" % i, 5) for i in range(4)]
     clock(at(hours=1))
