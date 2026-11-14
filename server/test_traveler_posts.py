@@ -31,7 +31,7 @@ os.environ["POKET_ITEMS"] = os.path.join(HERE, "data", "items.json")
 os.environ["POKET_ARCHE_DIR"] = os.path.join(TMP, "arche")
 os.environ["POKET_BOARD_IMG_DIR"] = os.path.join(TMP, "board_img")
 
-from app import auth, board_routes, config, db, traveler_posts as TP   # noqa: E402
+from app import arche, auth, board_routes, config, db, traveler_posts as TP   # noqa: E402
 
 OK = FAIL = 0
 UTC = datetime.timezone.utc
@@ -147,11 +147,16 @@ def main():
     TP.reset()
     real_now = TP._now
     TP._now = lambda now=None: (now or kst(2026, 11, 14, 22, 1)).astimezone(UTC).replace(microsecond=0)
+    # 2.5.0: 게시판 · /api/me 는 아르케 ensure_posts 하나로 올린다 (나그네 + 고고학자 글 모두, traveler_posts 는 안 부른다)
+    real_arche_now = arche._now
+    arche._now = lambda now=None: (now or kst(2026, 11, 14, 22, 1)).astimezone(UTC).replace(microsecond=0)
+    arche._posts_at[0] = 0
     try:
         out = board_routes.listing(kind="all", page=1, q="", ctx={"user": dict(db.q1(
             "SELECT * FROM users WHERE id=?", (reader,)))})
         refs = sorted(x["ref"] for x in posts())
-        chk("게시판을 열면 때가 된 글이 먼저 올라간다", refs == ["arche:naive", "arche:pre1", "arche:pre2"], refs)
+        chk("게시판을 열면 때가 된 글이 먼저 올라간다 (2.5.0: 아르케가 고고학자 글까지 · 빈 글은 빼고)",
+            refs == ["arche:end", "arche:naive", "arche:pre1", "arche:pre2"], refs)
         titles = json.dumps(out, ensure_ascii=False)
         chk("  그 목록에 바로 보인다", "첫 글" in titles and "둘째 글" in titles, titles[:200])
         db.run("DELETE FROM board_post")
@@ -160,6 +165,7 @@ def main():
         chk("  30초 안에 다시 열면 다시 안 본다", not posts())
     finally:
         TP._now = real_now
+        arche._now = real_arche_now
 
     print("\n%d OK, %d FAIL" % (OK, FAIL))
     return 1 if FAIL else 0

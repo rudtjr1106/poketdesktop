@@ -723,7 +723,7 @@ def _attach_images(npc, pid, names, now):
 def _post(ref, title, body, images, now, role="npc"):
     """고고학자(또는 role 계정) 이름으로 글 하나 (ref 가 이미 있으면 아무것도 안 한다 - 지운 글도 '있는 것'). 올렸으면 True."""
     npc = npc_user(now, role=role)
-    if npc is None or not body:
+    if npc is None or not str(body or "").strip():          # 빈칸뿐인 글은 안 올린다 (2.4.0 traveler_posts 와 같게)
         return False
     cur = db.run("INSERT INTO board_post (kind, user_id, author, title, body, created_at, ref)"
                  " SELECT 'free', ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM board_post WHERE ref=?)",
