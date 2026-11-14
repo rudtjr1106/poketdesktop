@@ -176,6 +176,9 @@ def effect_text(it):
         from . import ui_bag
         return ui_bag.RENAME_TEXT.rstrip(".") + " (가방에서 쓴다)"
 
+    if kind == "arche":
+        # 아르케의 여섯 봉인 (2.4.0) 이벤트 유물 - 상점에서 팔지 않고 선물로만 온다. 설명은 서버가 그 장 글로 채운다.
+        return (it or {}).get("desc") or "고대 아르케 왕국의 유물이다 (가방에서 쓴다)"
     return "아직 쓸 수 없는 물건"
 
 

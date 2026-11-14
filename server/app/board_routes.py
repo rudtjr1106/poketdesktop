@@ -69,10 +69,10 @@ def _run(fn, *a, **kw):
 @router.get("/api/board")
 def listing(kind: str = "all", page: int = 1, q: str = "", ctx=Depends(deps.current)):
     try:
-        from . import traveler_posts                         # 나그네 예약 글 (2.4.0) - 때가 됐으면 먼저 올린다
-        traveler_posts.ensure()
+        from . import arche                                  # 아르케 예약 글 (이벤트 전 글은 앱이 일지를 안 볼 때도 올라가야)
+        arche.ensure_posts()
     except Exception as e:                                   # noqa: BLE001
-        print("[board] 나그네 예약 글 확인 실패: %r" % e)
+        print("[board] 아르케 예약 글 확인 실패: %r" % e)
     return board.listing(ctx["user"], kind, page, q=q)
 
 

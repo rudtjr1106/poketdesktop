@@ -583,15 +583,19 @@ class ExpeditionWindow(object):
         # 글자를 키우면 갈 곳 여섯과 시간이 낮은 창에 다 안 들어간다 - 단 안에서 굴러간다 (Column)
         self.mid_col = col = Column(body, MID_W)
         mid = col.inner
+        # 아르케 발굴지 (2.4.0) 처럼 기간 한정 곳은 그 동안만. 곳이 여덟이면 글자는 그대로 두고 틈만 좁힌다
+        # (가장 낮은 창에서도 '② 얼마나' 가 굴리지 않고 보이게 - test_expedition_ui).
+        places = X.places()
+        many = len(places) > len(X.PLACES)
         head = tk.Frame(mid, bg=U.BG)
-        head.pack(fill="x", padx=14, pady=(10, 4))
+        head.pack(fill="x", padx=14, pady=((6 if many else 10), 4))
         tk.Label(head, text="① 어디로", bg=U.BG, fg=U.FG, font=U.FONT_B).pack(side="left")
         side_note(tk.Label(head, text="곳마다 잘 맞는 타입이 다릅니다", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS))
         dex = self.app.dex
-        for p in X.PLACES:
+        for p in places:
             card = tk.Frame(mid, bg=PANEL, height=PLACE_H, highlightthickness=2, highlightbackground=U.LINE,
                             cursor="hand2")
-            card.pack(fill="x", padx=14, pady=(0, 3))
+            card.pack(fill="x", padx=14, pady=(0, 2 if many else 3))
             card.pack_propagate(False)
             name = tk.Label(card, text=p["kr"], bg=PANEL, fg=U.FG, font=U.FONT_B, anchor="w")
             name.place(x=10, rely=0.5, anchor="w")

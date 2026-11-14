@@ -282,6 +282,9 @@ def send(uid, pid, place_id, hours, now=None):
     place = X.place(place_id)
     if place is None:
         raise HTTPException(400, "그런 곳은 없습니다.")
+    if not X.place_open(place_id, now):
+        # 기간 한정 곳 (2.4.0 아르케 발굴지) - 이미 보낸 것은 기간이 끝나도 그대로 돌아온다
+        raise HTTPException(409, "%s 은(는) 지금 갈 수 없습니다. 이벤트 동안만 열립니다." % place["kr"])
     try:
         hours = int(hours)
     except (TypeError, ValueError):
@@ -501,10 +504,23 @@ def _claim_row(uid, r, now, rng):
            (json.dumps({"items": loot, "tm": tm_pub, "friend": friend, "gold": gold}, ensure_ascii=False), r["id"]))
     grown = _came_back(uid, r, now)                       # 경험치를 주고 쉬게 한다 (1.10.5)
     view = _view(uid, r, now)
-    return {"id": r["id"], "pokemon": view["pokemon"], "place": r["place"], "placeKr": view["placeKr"],
-            "hours": r["hours"], "grade": r["grade"], "gradeKr": view["gradeKr"],
-            "items": loot, "tm": tm_pub, "bonus": bonus, "growth": grown,
-            "friend": friend, "friendFull": full, "gold": gold}
+    out = {"id": r["id"], "pokemon": view["pokemon"], "place": r["place"], "placeKr": view["placeKr"],
+           "hours": r["hours"], "grade": r["grade"], "gradeKr": view["gradeKr"],
+           "items": loot, "tm": tm_pub, "bonus": bonus, "growth": grown,
+           "friend": friend, "friendFull": full, "gold": gold}
+    if r["place"] == "arche":
+        out["report"] = _dig_report(r)                    # 아르케 발굴지 (2.4.0): 돌아온 시각의 발굴 보고서 한 줄
+    return out
+
+
+def _dig_report(r):
+    """돌아온 시각(ends_at)의 발굴 보고서. 비공개 자료가 없거나 터지면 None - 보따리 받기는 그대로 된다."""
+    try:
+        from . import arche
+        return arche.dig_report(_parse(r["ends_at"]))
+    except Exception as e:                                # noqa: BLE001
+        print("[expedition] 발굴 보고서 실패 %s: %r" % (r["id"], e))
+        return None
 
 
 def _trim(uid):

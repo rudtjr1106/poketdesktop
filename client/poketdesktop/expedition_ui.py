@@ -433,8 +433,12 @@ def show_loot(parent, app, claimed):
                      font=U.FONT_B).pack(side="right")
         body = tk.Frame(box, bg=PANEL)
         body.pack(fill="x", padx=14, pady=(0, 9))
-        if not rows:
+        if not rows and not one.get("report"):
             tk.Label(body, text="아무것도 못 찾았다...", bg=PANEL, fg=U.FG_FAINT, font=U.FONT_S).pack(anchor="w")
+        # 아르케 발굴지 (2.4.0): 발굴 보고서 한 줄 - 돌아온 시각마다 다르다 (서버의 비공개 일지가 정한다)
+        if one.get("report"):
+            tk.Label(body, text="발굴 보고서 · " + str(one["report"]), bg=PANEL, fg=U.ACCENT_TEXT, font=U.FONT_S,
+                     anchor="w", justify="left", wraplength=LOOT_W - 2 * 18 - 2 * 14).pack(fill="x", pady=(0, 4))
         # 친화력으로 데려온 포켓몬 (1.10.5). 물건보다 먼저, 금빛으로 적는다.
         came = friend_line(one)
         if came:

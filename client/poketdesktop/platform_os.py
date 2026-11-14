@@ -65,6 +65,8 @@ drop_keys = _M.drop_keys
 # '한 글자 늦게' 보인다 - 친구 채팅 입력 말풍선이 이걸로 직접 그린다. 없는 곳(맥은 Tk 가 그린다)은 None.
 ime_composition = getattr(_M, "ime_composition", None)
 keep_focus = _M.keep_focus
+# 맨 앞 창의 제목 (아르케 2.4.0 · 윈도우만). 다른 OS 는 None - 맥은 '화면 기록' 권한이 있어야 해서 안 읽는다.
+foreground_title = getattr(_M, "foreground_title", lambda: None)
 watch_right_click = _M.watch_right_click
 take_right_clicks = _M.take_right_clicks
 mouse_buttons_down = _M.mouse_buttons_down
