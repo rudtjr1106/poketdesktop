@@ -114,7 +114,8 @@ def main():
         sh = guild.shop(u)
         ex = [x["id"] for x in sh["items"] if x.get("exclusive")]
         chk("도구 목록에 길드 깃발 없음", items.get("GUILDFLAG") is None)
-        chk("  코인 상점 '길드 전용' = 마스터볼 · 금색병뚜껑 (깃발 없음)", ex == ["MASTERBALL", "GOLDBOTTLECAP"]
+        chk("  코인 상점 '길드 전용' 도구 = 마스터볼 · 금색병뚜껑 (깃발 없음 - 꾸미기 줄 'deco:' 은 test_guild_deco_shop)",
+            [i for i in ex if not i.startswith(guild.DECO_PREFIX)] == ["MASTERBALL", "GOLDBOTTLECAP"]
             and row(sh, "GUILDFLAG") is None and guild.coin_price("GUILDFLAG") == 0, ex)
         chk("  시즌마다 수 그대로 (마스터볼 1 · 금색병뚜껑 2, forever 칸 없음)", row(sh, "MASTERBALL")["limit"] == 1
             and row(sh, "GOLDBOTTLECAP")["limit"] == 2 and "forever" not in row(sh, "MASTERBALL"), row(sh, "MASTERBALL"))
