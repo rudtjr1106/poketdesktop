@@ -269,13 +269,19 @@ def _schedule(delay):
     tm.start()
 
 
+# 타이머는 기다림을 건 때로부터 꼭 NOTIFY_SEC 뒤에 _due 를 부른다. 그때 (시작 + 60) - 시작 이 소수점 셈 오차로
+# 59.99999… 가 되면 알림이 아예 안 가므로(다시 부르는 타이머가 없다) 0.5초 여유를 둔다 (11/15 - 켠 지 얼마 안 된
+# CI 기계에서 몇 판에 한 번 test_champion '1분이 지나도 ...' 가 걸리던 까닭).
+NOTIFY_SLACK = 0.5
+
+
 def _due(t=None, now=None):
     """NOTIFY_SEC 넘게 기다리고 있는데 아직 안 알린 사람을 알린다. 알린 사람 수."""
     t = time.monotonic() if t is None else t
     with _lock:
         _sweep(t)
         ripe = [(u, s) for u, s in _wait.items()
-                if t - s >= config.CHAMPION_NOTIFY_SEC and (u, s) not in _announced]
+                if t - s >= config.CHAMPION_NOTIFY_SEC - NOTIFY_SLACK and (u, s) not in _announced]
         _announced.update(ripe)
     n = 0
     for uid, _s in ripe:
