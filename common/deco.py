@@ -5,6 +5,8 @@
 
   · 장식 (head · hair · face · neck): 걷는 도트의 머리 · 눈 · 목 자리에 얹는다 (위치 점 - common 은 모르고 앱이 안다)
   · 효과 (trail · aura): 걸어간 자리에 남는 발자국 · 별가루 · 꽃잎 · 하트 · 비눗방울 · 음표 · 눈송이, 발밑 빛
+  · 깃발 (flag, 2.5.0): 우리 길드 깃발을 꽂은 깃대를 등 뒤에 지고 다닌다 (효과 창이 그린다 - 깃발 그림은 서버가
+    포켓몬마다 decoFlag 로 실어 준다. 길드에 깃발이 없으면 아무것도 안 그린다)
 
 **장식 하나는 포켓몬 한 마리만 쓴다** (다른 포켓몬에 끼우면 먼저 쓰던 포켓몬에서 빠진다). 한 포켓몬은 칸(slot)마다
 하나씩 - 왕관(head) + 꽃핀(hair) + 진주(neck) + 별가루(trail) + 발밑 빛(aura) 을 다 같이 쓸 수 있다.
@@ -13,10 +15,14 @@
 (+ 버전 2 가 뜰 때 모두에게 한 번 발자국 - server/app/migrations.py 0340) - 과 2.1.0 의 랜덤 캡슐
 (아주 낮은 확률, 왕관 · 순위 효과는 안 나옴 - server/app/guild.py 의 SLOT_TABLE), 그리고 2.3.0 올림픽 1~3위 메달
 (목 칸 - 정산이 선물함으로 넣는다)뿐이다.
+
+2.5.0 (11/15 사용자): 길드 코인 상점 '길드 전용' 에 둘 - **깃발 들기**(guild_flag, 한 사람 한 번)와 **꾸미기 선택권**
+(PICK_DECO, 시즌마다 1장 - 랜덤 캡슐에서 나오는 꾸미기 가운데 아직 없는 것 하나를 고른다. 순위 · 메달은 안 고른다).
 """
 
-SLOTS = ("head", "hair", "face", "neck", "trail", "aura")
-SLOT_KR = {"head": "머리", "hair": "머리 장식", "face": "얼굴", "neck": "목", "trail": "발자취", "aura": "발밑"}
+SLOTS = ("head", "hair", "face", "neck", "trail", "aura", "flag")
+SLOT_KR = {"head": "머리", "hair": "머리 장식", "face": "얼굴", "neck": "목", "trail": "발자취", "aura": "발밑",
+           "flag": "깃발"}
 
 DECOS = {
     "crown_gold": {"kr": "금관", "slot": "head", "desc": "루비 구슬이 달린 금관. 가끔 반짝인다."},
@@ -45,15 +51,25 @@ DECOS = {
     "medal_gold": {"kr": "금메달", "slot": "neck", "desc": "포스크탑 올림픽 시상대에서 받은 금메달. 빨간 끈으로 목에 건다."},
     "medal_silver": {"kr": "은메달", "slot": "neck", "desc": "포스크탑 올림픽 시상대에서 받은 은메달. 빨간 끈으로 목에 건다."},
     "medal_bronze": {"kr": "동메달", "slot": "neck", "desc": "포스크탑 올림픽 시상대에서 받은 동메달. 빨간 끈으로 목에 건다."},
+    # 2.5.0 - 길드 코인 상점 '길드 전용' (한 사람 한 번). 깃발 그림은 지금 든 길드의 깃발 (그리면 같이 바뀐다)
+    "guild_flag": {"kr": "깃발 들기", "slot": "flag",
+                   "desc": "우리 길드 깃발을 꽂은 작은 깃대를 등 뒤에 지고 다닌다. 길드 깃발을 새로 그리면 같이 바뀌고, "
+                           "길드에 깃발이 없으면 보이지 않는다."},
 }
 # 랜덤 캡슐(서버 이름은 slot)에서 나올 수 있는 것 - 왕관과 순위 효과는 길드전 순위 상으로만 남긴다 (사용자 결정)
 RANK_ONLY = ("crown_gold", "crown_silver", "crown_bronze", "fx_stars_gold", "fx_stars_silver", "fx_stars_bronze",
              "fx_glow", "medal_gold", "medal_silver", "medal_bronze")       # 메달은 올림픽 1~3위만
+SHOP_ONLY = ("guild_flag",)              # 길드 코인 상점에서만 (2.5.0) - 랜덤 캡슐 · 꾸미기 선택권에서 안 나온다
 
 
 def slot_pool():
     """랜덤 캡슐 꾸미기 후보 (DECOS 차례)."""
-    return tuple(k for k in DECOS if k not in RANK_ONLY)
+    return tuple(k for k in DECOS if k not in RANK_ONLY and k not in SHOP_ONLY)
+
+
+def pick_pool():
+    """꾸미기 선택권으로 고를 수 있는 것 = 랜덤 캡슐 후보 (2.5.0)."""
+    return slot_pool()
 
 # 길드전 순위 보상 묶음. 참가 묶음은 셋 중 하나를 꾸미기 창에서 고른다 (선택권 PICK).
 BUNDLES = {
@@ -75,7 +91,10 @@ BUNDLE_KR = {
 JOIN_CHOICES = ("join_bow", "join_flower", "join_pearls")
 PICK = "pick_join"                     # 가진 것 목록에서 '참가 묶음 선택권' 을 뜻하는 열쇠
 PICK_KR = "참가 묶음 선택권"
-EFFECTS = ("trail", "aura")
+PICK_DECO = "pick_deco"                # 꾸미기 선택권 (2.5.0, 길드 코인 상점) - pick_pool 가운데 아직 없는 것 하나
+PICK_DECO_KR = "꾸미기 선택권"
+PICKS = (PICK, PICK_DECO)               # 장수가 쌓이는 것 (나머지 꾸미기는 하나만 가진다)
+EFFECTS = ("trail", "aura", "flag")
 
 
 def slot_of(key):
@@ -86,6 +105,8 @@ def slot_of(key):
 def name(key):
     if key == PICK:
         return PICK_KR
+    if key == PICK_DECO:
+        return PICK_DECO_KR
     if key in BUNDLES:
         return BUNDLE_KR[key]
     return (DECOS.get(key) or {}).get("kr", key)

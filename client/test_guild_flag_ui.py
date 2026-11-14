@@ -4,16 +4,14 @@
     python3 client/test_guild_flag_ui.py
     POKET_SKIN=dp python3 client/test_guild_flag_ui.py
 
-설계: design-notes/2026-11-14-guild-flag.md '앱'. 서버는 /api/guild 의 guild 에 flag(문자열|null) · flagItem · canFlag,
-다른 길드 목록 줄에 flag, 코인 상점 '길드 전용' 의 GUILDFLAG 에 forever(limit 1 · left 0|1) 를 싣는다. 규칙은
-server/test_guild_flag.py 가 본다. 여기서는 **길드 창**을 본다 (그리기 창 자체는 test_flag_editor_ui.py):
+설계: design-notes/2026-11-14-guild-flag.md '앱'. 서버는 /api/guild 의 guild 에 flag(문자열|null) · canFlag(마스터 ·
+부마스터 - 사는 것 없이, 11/15 사용자), 다른 길드 목록 줄에 flag 를 싣는다. 규칙은 server/test_guild_flag.py 가 본다. 여기서는 **길드 창**을 본다 (그리기 창 자체는 test_flag_editor_ui.py):
 
   1. 머리의 길드 이름 옆에 깃발 (없으면 이름만, 자리를 비우지 않는다).
   2. 다른 길드 목록의 이름 옆에 그 길드 깃발 (있는 길드만).
-  3. '관리' 탭: 그릴 수 있으면(canFlag) [깃발 그리기], 아니면 안내 ("코인 상점 '길드 전용' 에서 ... 산 마스터 · 부마스터").
+  3. '관리' 탭: 마스터 · 부마스터(canFlag)는 [깃발 그리기], 일반 길드원은 안내 ("길드 마스터 · 부마스터가 그립니다").
      옛 서버(canFlag 가 없다)면 칸 자체가 없다.
   4. [깃발 그리기] -> 지금 깃발로 시작하는 그리기 창 (하나만) -> 저장하면 서버로 576자, 길드 창을 다시 받아 깃발이 바뀐다.
-  5. 코인 상점 길드 전용 줄: 한 번 사면 계속 (forever) - '한 번 사면 계속 · 아직 없음' / 사면 '가지고 있음' 으로 단추가 죽는다.
   기본 · DP 테마 둘 다. Tk 오류 없음.
 
 서버 흉내 · 창 여는 법은 test_guild_ui 의 FakeServer / Api / FakeApp 을 쓴다.
@@ -39,7 +37,6 @@ from poketdesktop import ui_box, ui_common as U, ui_guild   # noqa: E402
 from test_learn_dialog import squeezed                      # noqa: E402
 
 OK = FAIL = 0
-GROUPS = ["볼", "성장", "진화", "지닌 도구"]
 
 
 def chk(name, cond, got=""):
@@ -70,7 +67,6 @@ class Server(TG.FakeServer):
     def __init__(self):
         TG.FakeServer.__init__(self)
         self.flag = None              # 우리 길드 깃발
-        self.item = {}                # {사람: 길드 깃발을 가졌나}
         self.old = False              # 옛 서버 (flag · canFlag 를 안 싣는다)
 
 
@@ -83,8 +79,7 @@ class Api(TG.Api):
         if s.old or not r.get("guild"):
             return r
         r["guild"]["flag"] = s.flag
-        r["flagItem"] = bool(s.item.get(me))
-        r["canFlag"] = r["role"] in ("master", "sub") and r["flagItem"]
+        r["canFlag"] = r["role"] in ("master", "sub")
         return r
 
     def guild_list(self, q="", page=1):
@@ -97,38 +92,12 @@ class Api(TG.Api):
     def guild_flag(self, pixels):
         s, me = self.s, self.me
         s.calls.append(("flag", pixels))
-        if s.roles.get(me) not in ("master", "sub") or not s.item.get(me):
-            s.fail("길드 깃발은 길드 깃발을 가진 마스터 · 부마스터만 그릴 수 있습니다.", 403)
+        if s.roles.get(me) not in ("master", "sub"):
+            s.fail("길드 깃발은 마스터 · 부마스터만 그릴 수 있습니다.", 403)
         if not F.valid(pixels):
             s.fail("깃발 그림이 올바르지 않습니다.")
         s.flag = None if F.is_blank(pixels) else pixels
         return self.guild()
-
-    def guild_shop(self):
-        s, me = self.s, self.me
-        s.calls.append(("shop",))
-        r = TG.Api.guild_shop(self)
-        for it in r["items"]:
-            it["group"] = "볼" if it.get("cat") == "ball" else "성장"
-        ex = [{"id": "MASTERBALL", "kr": "마스터볼", "cat": "ball", "coin": 600, "group": "길드 전용",
-               "exclusive": True, "limit": 1, "left": 1, "note": "반드시 잡히는 볼."},
-              {"id": "GUILDFLAG", "kr": "길드 깃발", "cat": "misc", "coin": 500, "group": "길드 전용",
-               "exclusive": True, "limit": 1, "left": 0 if s.item.get(me) else 1, "forever": True,
-               "note": "길드 이름 옆에 거는 24 x 24 도트 깃발. 마스터 · 부마스터가 그립니다."}]
-        r["items"] = ex + r["items"]
-        r["groups"] = ["길드 전용"] + GROUPS
-        return r
-
-    def guild_buy(self, item, count=1):
-        s, me = self.s, self.me
-        s.calls.append(("buy", item, count))
-        if item != "GUILDFLAG":
-            return TG.Api.guild_buy(self, item, count)
-        if s.item.get(me):
-            s.fail("길드 깃발은 이미 가지고 있습니다.", 409)
-        s.coin[me] -= 500
-        s.item[me] = True
-        return {"ok": True, "spent": 500, "coin": s.coin[me], "message": "길드 깃발 1개를 샀습니다."}
 
 
 def norm(t):
@@ -207,10 +176,6 @@ def img(root, pixels, scale=1):
     return str(flag_art.image(root, pixels, scale))
 
 
-def btn_text(b):
-    return getattr(b, "text", None) or b.label.cget("text")
-
-
 def main():
     PLAT.before_tk()
     skins.register_fonts()
@@ -229,7 +194,6 @@ def main():
     srv.roles = {1: "master", 2: "member"}
     srv.coin[1] = 1200
     srv.flag = FLAG1
-    srv.item[1] = True
     srv.others = [{"id": 2, "name": "꼬부기단", "intro": "", "joinMode": "open", "masterName": "다솜", "members": 3,
                    "max": 15, "points": 10, "full": False, "flag": OTHER},
                   {"id": 3, "name": "깃발없는단", "intro": "", "joinMode": "open", "masterName": "누구", "members": 1,
@@ -282,20 +246,19 @@ def main():
     w.show_tab("manage")
     TG.settle(root, 0.4)
     rows = scan(w.content)
-    chk("그릴 수 있으면 (마스터 + 깃발 가짐) [깃발 그리기] · 설명 · 지금 깃발 2배",
+    chk("마스터는 사는 것 없이 [깃발 그리기] · 설명 · 지금 깃발 2배",
         w.b_flag is not None and has(rows, "길드 깃발") and has(rows, ui_guild.GuildWindow.FLAG_CAN)
         and img(root, FLAG1, 2) in images(w.content), (w.b_flag, [t for t in rows if "깃발" in t]))
     chk("  눌린 위젯 없음 · 판 밖으로 나간 것 없음", not squeezed(top) and not overflow(w.win),
         (squeezed(top)[:3], overflow(w.win)[:3]))
-    srv.item[1] = False
-    reload()
-    rows = scan(w.content)
-    chk("깃발을 안 가진 마스터: 단추 없이 안내 (코인 상점 '길드 전용' ...)", w.b_flag is None
-        and has(rows, ui_guild.GuildWindow.FLAG_NOTE), [t for t in rows if "깃발" in t])
-    srv.item[1] = True
-    srv.roles[1] = "member"
+    srv.roles[1] = "sub"
     srv.g["master"] = 2
     srv.roles[2] = "master"
+    reload()
+    rows = scan(w.content)
+    chk("부마스터도 [깃발 그리기]", w.b_flag is not None and has(rows, ui_guild.GuildWindow.FLAG_CAN),
+        (w.b_flag, [t for t in rows if "깃발" in t]))
+    srv.roles[1] = "member"
     srv.flag = None
     reload()
     rows = scan(w.content)
@@ -339,43 +302,6 @@ def main():
     chk("  그리기 창은 그대로 (안 저장한 것 없음)", ed.alive and not ed.dirty())
     ed.close()
     TG.settle(root, 0.2)
-
-    print("\n=== 5. 코인 상점: 한 번 사면 계속 ===")
-    srv.item[1] = False
-    w.load()                                         # 산 적 없는 상태에서 시작 (11/14 검토 - 받아 둔 canFlag 가 남아 있었다)
-    TG.wait(root, lambda: w.data is not None and not w.data.get("canFlag"), 4)
-    w.show_tab("manage")
-    TG.settle(root, 0.4)
-    chk("  안 가졌으면 관리 탭에 [깃발 그리기] 가 없다", w.b_flag is None, w.b_flag)
-    w.shop = None
-    w.show_tab("shop")
-    TG.wait(root, lambda: w.shop is not None, 4)
-    TG.settle(root, 0.4)
-    rows = scan(w.content)
-    b = w.shop_btns
-    chk("길드 깃발: '한 번 사면 계속 · 아직 없음' · '1개 사기' 단추가 산다", has(rows, "한 번 사면 계속 · 아직 없음")
-        and btn_text(b[("GUILDFLAG", 1)]) == "1개 사기" and b[("GUILDFLAG", 1)].enabled,
-        ([t for t in rows if "계속" in t], btn_text(b[("GUILDFLAG", 1)])))
-    chk("  시즌 수 글은 다른 전용 상품에만 (마스터볼 '이번 시즌 1 / 1개 남음')", has(rows, "이번 시즌 1 / 1개 남음")
-        and len([t for t in rows if "이번 시즌" in t]) == 1, [t for t in rows if "시즌" in t])
-    n_shop = srv.calls.count(("shop",))
-    b[("GUILDFLAG", 1)].command()
-    TG.wait(root, lambda: srv.calls.count(("shop",)) > n_shop and w.shop is not None, 4)
-    TG.settle(root, 0.4)
-    rows = scan(w.content)
-    b = w.shop_btns
-    chk("사면: '한 번 사면 계속 · 가지고 있음' · 단추가 '가지고 있음' 으로 죽는다",
-        ("buy", "GUILDFLAG", 1) in srv.calls and has(rows, "한 번 사면 계속 · 가지고 있음")
-        and btn_text(b[("GUILDFLAG", 1)]) == "가지고 있음" and not b[("GUILDFLAG", 1)].enabled,
-        ([t for t in rows if "계속" in t], btn_text(b[("GUILDFLAG", 1)])))
-    chk("  눌린 위젯 없음 · 판 밖으로 나간 것 없음", not squeezed(top) and not overflow(w.win),
-        (squeezed(top)[:3], overflow(w.win)[:3]))
-    if getattr(w, "shop_inner", None) is not None and w.shop_inner.winfo_exists():
-        chk("  카드 안에 옆으로 잘린 글이 없다 (기본 테마)", not TG.clipped_wide(w.shop_inner),
-            TG.clipped_wide(w.shop_inner)[:3])
-    TG.wait(root, lambda: w.data is not None and w.data.get("canFlag"), 4)
-    chk("  사자마자 (창을 다시 열지 않고) 관리 탭에 [깃발 그리기]",
-        (w.show_tab("manage"), TG.settle(root, 0.4), w.b_flag)[2] is not None)
 
     chk("Tk 콜백에서 난 오류가 없다", not errors, errors[:2])
     w.close()

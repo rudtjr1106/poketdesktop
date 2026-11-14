@@ -197,6 +197,15 @@ def deco_items(state, names=None):
                       % " · ".join(DECO.BUNDLE_KR[b] for b in DECO.JOIN_CHOICES),
                       "effect": {"kind": "decopick", "choices": state.get("choices") or []}})
         bag[iid] = picks
+    dpicks = int(state.get("decoPicks") or 0)
+    if dpicks > 0:
+        # 꾸미기 선택권 (2.5.0, 길드 코인 상점) - 랜덤 캡슐 꾸미기 가운데 아직 없는 것 하나
+        iid = ITEM_PREFIX + DECO.PICK_DECO
+        items.append({"id": iid, "kr": DECO.PICK_DECO_KR, "en": DECO.PICK_DECO, "cat": "deco", "sell": 0,
+                      "note": "길드 코인 상점에서 산 선택권. 랜덤 캡슐에서 나오는 꾸미기 가운데 아직 없는 것 하나를 "
+                              "고른다. 고른 뒤에는 바꿀 수 없다.",
+                      "effect": {"kind": "decopick", "one": True, "choices": state.get("decoChoices") or []}})
+        bag[iid] = dpicks
     return items, bag, worn
 
 
@@ -281,10 +290,6 @@ def item_desc(item):
     if kind == "arche":
         # 아르케의 여섯 봉인 (2.4.0): 설명은 서버가 비공개 일지에서 채운다 (desc). '쓰기' 는 쓴 시각을 남길 뿐이다.
         return (item.get("desc") or "고대 아르케 왕국의 유물이다.") + "\n\n아르케의 발굴품. 쓰면 무언가에 쓰일지도 모른다."
-    if kind == "guildflag":
-        # 길드 깃발 (2.5.0): 가방에서 쓰는 도구가 아니다 (서버 item_routes 도 쓰기를 막는다) - 길드 창 '관리' 에서 그린다.
-        return (item.get("desc") or "길드 깃발을 그리고 다는 권리다.") + \
-            "\n\n가방에서 쓰는 도구가 아니다. 마스터 · 부마스터면 길드 창 '관리' 의 [깃발 그리기] 로 그린다."
     if kind == "ball":
         return "야생 포켓몬을 만났을 때 던지는 볼이다. 가방에서는 쓸 수 없다."
     if kind == "sell":
@@ -1806,14 +1811,34 @@ class BagWindow(object):
         U.run_async(self.root, lambda: api.deco_equip(pid, key, on), done)
 
     def _use_deco_pick(self, it):
-        """참가 묶음 선택권: 묶음 셋 가운데 하나를 고른다 (되돌릴 수 없다 - 고르는 창이 그렇게 말한다)."""
-        choices = (it.get("effect") or {}).get("choices") or [
+        """참가 묶음 선택권: 묶음 셋 가운데 하나를 고른다 (되돌릴 수 없다 - 고르는 창이 그렇게 말한다).
+        꾸미기 선택권(2.5.0, effect.one): 아직 없는 꾸미기 하나를 고른다."""
+        eff = it.get("effect") or {}
+        if eff.get("one"):
+            return self._use_deco_pick_one(eff.get("choices") or [])
+        choices = eff.get("choices") or [
             {"key": b, "kr": DECO.BUNDLE_KR[b]} for b in DECO.JOIN_CHOICES]
         opts = [(c["key"], c.get("kr") or DECO.name(c["key"]), None) for c in choices]
         bundle = ui_box.ask_choice(self.win, DECO.PICK_KR,
                                    "참가 묶음 하나를 고르세요. 고른 뒤에는 바꿀 수 없습니다.", opts)
         if not bundle:
             return
+        self._send_deco_pick(lambda api: api.deco_pick(bundle), DECO.name(bundle))
+
+    def _use_deco_pick_one(self, choices):
+        """꾸미기 선택권 (2.5.0): 고를 수 있는 꾸미기(아직 없는 것) 가운데 하나."""
+        if not choices:
+            self.say("고를 수 있는 꾸미기가 남지 않았습니다 (랜덤 캡슐 꾸미기를 다 가졌습니다).", U.DANGER, U.DANGER)
+            return
+        opts = [(c["key"], c.get("kr") or DECO.name(c["key"]), c.get("slotKr")) for c in choices]
+        key = ui_box.ask_choice(self.win, DECO.PICK_DECO_KR,
+                                "꾸미기 하나를 고르세요. 고른 뒤에는 바꿀 수 없습니다.", opts)
+        if not key:
+            return
+        self._send_deco_pick(lambda api: api.deco_pick_one(key), DECO.name(key))
+
+    def _send_deco_pick(self, call, label):
+        """선택권 고르기를 서버로 (참가 묶음 · 꾸미기 둘 다). 받은 것을 알리고 가방을 다시 받는다."""
         api = self.app.api
         self.use_btn.configure(state="disabled")
         self.say("고르는 중...", U.FG_FAINT)
@@ -1824,11 +1849,11 @@ class BagWindow(object):
             if err:
                 self.say(getattr(err, "message", str(err)), U.DANGER, U.DANGER)
                 return self._refresh_button()
-            got = (r or {}).get("got") or [DECO.name(bundle)]
+            got = (r or {}).get("got") or [label]
             self._pending = ("받았다: %s - 꾸미기 주머니에서 포켓몬에게 씌울 수 있다." % " · ".join(got), U.GOOD)
             self.item_id = None
             self.reload()
-        U.run_async(self.root, lambda: api.deco_pick(bundle), done)
+        U.run_async(self.root, lambda: call(api), done)
 
     def _ask_lure_type(self, it):
         """타입 스프레이: 어느 타입을 부를지 (2.1.1). 고른 타입, 그만두면 None.

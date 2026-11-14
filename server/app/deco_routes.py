@@ -3,7 +3,7 @@
 
     GET  /api/deco           목록 · 가진 것 · 누가 무엇을 쓰고 있나 · 참가 묶음 선택권
     POST /api/deco/equip     {pokemonId, deco, on} - 끼우기 · 빼기 (장식 하나는 한 마리만)
-    POST /api/deco/pick      {bundle} - 참가 묶음 선택권으로 묶음 하나 고르기
+    POST /api/deco/pick      {bundle} - 참가 묶음 선택권으로 묶음 하나 고르기 · {deco} - 꾸미기 선택권으로 하나 (2.5.0)
 """
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ class EquipIn(BaseModel):
 
 class PickIn(BaseModel):
     bundle: str = ""
+    deco: str = ""          # 꾸미기 선택권 (2.5.0) - 있으면 bundle 대신 이것
 
 
 @router.get("/api/deco")
@@ -41,7 +42,10 @@ def equip(body: EquipIn, ctx=Depends(deps.current)):
 @router.post("/api/deco/pick")
 def pick(body: PickIn, ctx=Depends(deps.current)):
     uid = ctx["user"]["id"]
-    got = deco.pick(uid, (body.bundle or "")[:32])
+    if body.deco:
+        got = deco.pick_one(uid, body.deco[:32])
+    else:
+        got = deco.pick(uid, (body.bundle or "")[:32])
     out = deco.state(uid)
     out["got"] = got
     return out

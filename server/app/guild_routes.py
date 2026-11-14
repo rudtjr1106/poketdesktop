@@ -19,7 +19,7 @@
     POST   /api/guild/chat                  한 줄 보내기
     POST   /api/guild/mission/{tier}/claim  단계 보상 받기
     GET    /api/guild/shop                  코인 상점        POST /api/guild/shop/buy
-    POST   /api/guild/flag                  길드 깃발 그리기 {"pixels"} (2.5.0 - 마스터·부마스터 + 길드 깃발을 가진 사람)
+    POST   /api/guild/flag                  길드 깃발 그리기 {"pixels"} (2.5.0 - 마스터·부마스터)
     DELETE /api/admin/guild/{gid}/flag      길드 깃발 내리기 (운영진)
 
 **새 줄은 웹소켓(guild_ws.py 의 /ws/guild)이 밀어 준다.** 여기의 채팅 GET 은 처음 열 때

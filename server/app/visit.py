@@ -267,7 +267,8 @@ def _public_mon(m):
     return {"id": m["id"], "num": sp.get("num"), "species": m["species"],
             "name": m.get("nickname") or sp.get("kr") or m["species"], "level": int(m.get("level") or 1),
             "shiny": bool(m.get("shiny")), "tint": m.get("tint") if m.get("shiny") else None,
-            "deco": m.get("deco") or {}}             # 꾸미기 (버전 2) - 놀러 간 포켓몬도 쓰고 간다
+            "deco": m.get("deco") or {},             # 꾸미기 (버전 2) - 놀러 간 포켓몬도 쓰고 간다
+            "decoFlag": m.get("decoFlag")}           # 깃발 들기 (2.5.0) - 주인 길드 깃발
 
 
 def received_today(uid, now=None):
@@ -521,9 +522,15 @@ def _clean_party(raw, uid=None):
         rows = db.q("SELECT id, deco FROM pokemon WHERE user_id=? AND deco IS NOT NULL AND id IN (%s)"
                     % ",".join("?" * len(out)), tuple([uid] + [x["id"] for x in out]))
         worn = dict((r["id"], deco.worn(r["deco"])) for r in rows)
+        flag = None
+        if any("flag" in d for d in worn.values()):
+            from . import guild
+            flag = guild.name_flag(uid)          # 깃발 들기 (2.5.0) - 손님 화면도 주인 길드 깃발을 그린다
         for x in out:
             if worn.get(x["id"]):
                 x["deco"] = worn[x["id"]]
+                if "flag" in worn[x["id"]]:
+                    x["decoFlag"] = flag
     return out
 
 

@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """꾸미기 효과 (버전 2) - 바탕화면 포켓몬이 걸어간 자리에 남는 발자국 · 별가루 · 꽃잎 · 하트 · 비눗방울 · 음표 ·
-눈송이(2.1.0), 발밑 빛 고리.
+눈송이(2.1.0), 발밑 빛 고리, 그리고 깃발 들기(2.5.0 - 등 뒤에 세운 깃대에 주인 길드 깃발).
+
+깃발 들기: 깃발 그림은 서버가 포켓몬마다 실어 주는 decoFlag (주인이 지금 든 길드의 깃발 - 없으면 아무것도 안 그린다).
+깃대는 몸 뒤쪽(걷는 반대쪽 - 멈추면 마지막 쪽)에 서고, 이 창이 제 포켓몬 창 **밑**에 깔리므로 몸에 가린 만큼은
+몸 뒤로 들어간다. 깃발은 천천히 펄럭인다 (WAVE_TICKS 틱마다 한 칸). 그린 그대로 보이게 뒤집지 않는다.
 
 포켓몬마다 **투명 창 하나**(Trail)를 둔다. 입자마다 작은 창을 띄우는 것보다 가볍다. 창은 클릭이 그대로
 통과하고(fx_layer 와 같은 까닭 - 통과를 못 걸면 아예 안 띄운다), **제 포켓몬 창 바로 아래**에 깔린다
@@ -37,6 +41,10 @@ MAX_PARTS = 90
 MOVED = 0.3                     # 한 틱에 이만큼(px) 넘게 움직였으면 걷는 것
 BAYER = ((0, 8, 2, 10), (12, 4, 14, 6), (3, 11, 1, 9), (15, 7, 13, 5))
 TONES = {"fx_stars_gold": "gold", "fx_stars_silver": "silver", "fx_stars_bronze": "bronze"}
+WAVE_TICKS = 8                  # 깃발이 펄럭이는 한 박자 (틱)
+FLAG_BACK = 0.42                # 깃대 자리: 발 가운데에서 등 쪽으로 몸 폭의 이만큼 (몸에 덜 가리게 - 11/15 그려 보고 늘림)
+FLAG_LOW = 0.25                 # 깃대 아래 끝: 발에서 몸 키의 이만큼 위 (등에 지고 있다)
+FLAG_ABOVE = 6                  # 깃대 꼭대기: 몸 칸 위 끝보다 이만큼(촘촘한 칸) 위 - 깃발이 머리 위로 보이게
 RGBA_OK = PLAT.NAME == "platform_mac"      # 맥 SpriteView 는 알파 그림을 그대로 받는다
 _masks = {}
 _scaled = {}
@@ -128,6 +136,7 @@ class Trail(object):
         self.last = None             # 지난 발 자리 (걸은 거리 · 방향을 잰다)
         self.walked = 0.0
         self.back = 0                # 몸 뒤쪽 (-1 왼쪽 · 1 오른쪽 · 0 위아래로 걷는 중)
+        self.flag_side = 1           # 깃대를 세우는 쪽 (2.5.0) - 마지막으로 옆으로 걸었을 때의 몸 뒤쪽
         self.since = {"star": 0, "petal": 0, "heart": 0, "bubble": 0, "note": 0, "snow": 0}
         self.paw_side = 0
         self.k = max(1, int(round((getattr(pet, "base_scale", None) or 2.0) / 2.0)))
@@ -248,6 +257,8 @@ class Trail(object):
             moved = math.hypot(dx, fy - self.last[1])
             if moved > MOVED:
                 self.back = -1 if dx > 0.2 else (1 if dx < -0.2 else 0)
+                if self.back:
+                    self.flag_side = self.back
         self.last = (fx, fy)
         if moved > MOVED and moved < 60 and getattr(p, "anim_name", "Walk") == "Walk" and not getattr(p, "once", None):
             self.walked += moved        # (60 넘게 한 번에 옮긴 것은 걷기가 아니라 자리 옮기기 - 들어 옮기기 · 화면 바뀜)
@@ -256,13 +267,14 @@ class Trail(object):
             q.age += ms
         self.parts = [q for q in self.parts if q.age < q.life]
         aura = "fx_glow" in self.keys
-        if not self.parts and not aura:
+        flag = self.flag()
+        if not self.parts and not aura and not flag:
             self._show(False)
             return
         self.tick += 1
         if self.tick % EVERY and self.shown:
             return
-        self._render(fx, fy, aura)
+        self._render(fx, fy, aura, flag)
         self._show(True)
         if self._reorder > 0:
             self._reorder -= ms * EVERY
@@ -343,7 +355,28 @@ class Trail(object):
         self.ox, self.oy = int(fx - self.cx), int(fy - self.cy)
         return True
 
-    def compose(self, fx, fy, aura):
+    def flag(self):
+        """깃발 들기를 쓰고 주인 길드에 깃발이 있으면 그 깃발 그림 (common/flag.py 꼴), 아니면 None."""
+        if "guild_flag" not in self.keys:
+            return None
+        px = (getattr(self.pet, "mon", None) or {}).get("decoFlag")
+        return px if isinstance(px, str) and px else None
+
+    def banner_at(self, fx, fy, flag):
+        """(깃대 깃발 그림, 화면 x, 화면 y) - 몸 뒤쪽에 세운다. 그릴 수 없는 깃발이면 None."""
+        k, p = self.k, self.pet
+        side = self.flag_side
+        # 꼭대기 = 몸 칸 위 끝보다 FLAG_ABOVE 위, 아래 끝 = 발에서 FLAG_LOW 위 -> 깃발(24칸)이 머리 둘레 · 위에 온다
+        pole = int(p.fh * (1 - FLAG_LOW) / k) + FLAG_ABOVE - ART.KNOB_H
+        im = ART.banner(flag, pole, side, (self.tick // WAVE_TICKS) % 4)
+        if im is None:
+            return None
+        px = fx + side * max(6.0, p.fw * FLAG_BACK)    # 깃대 자리 (몸 가운데에서 등 쪽으로)
+        sx = px - k if side >= 0 else px - (im.width - 1) * k
+        sy = fy - p.fh * FLAG_LOW - im.height * k      # 깃대 아래 끝 = 등 (몸 아래쪽)
+        return im, sx, sy
+
+    def compose(self, fx, fy, aura, flag=None):
         """지금 모습 한 장 (RGBA, 알파는 0 아니면 255)."""
         k, W, H = self.k, self.W, self.H
         img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -363,6 +396,10 @@ class Trail(object):
                 a = ImageChops.multiply(a, m)
             img.paste(sprite, (x, y), a)
 
+        if flag:
+            got = self.banner_at(fx, fy, flag)
+            if got:
+                put(*got, 16)
         if aura:
             ring = ART.glow_ring(max(10, int(self.pet.fw * 0.8) // k), glow_phase(self.tick))
             put(ring, fx - ring.width * k / 2.0, fy - ring.height * k / 2.0 + k, 16)
@@ -372,13 +409,14 @@ class Trail(object):
                 put(*got)
         return img
 
-    def _render(self, fx, fy, aura):
+    def _render(self, fx, fy, aura, flag=None):
         moved = self._place(fx, fy)
-        sig = (self.ox, self.oy, int(fx), int(fy), glow_phase(self.tick) if aura else 0)
+        sig = (self.ox, self.oy, int(fx), int(fy), glow_phase(self.tick) if aura else 0,
+               (flag, self.flag_side, (self.tick // WAVE_TICKS) % 4) if flag else None)
         if not self.parts and sig == self._sig:
-            return                       # 발밑 빛만 있고 그대로다 - 다시 안 그린다
+            return                       # 발밑 빛 · 깃발만 있고 그대로다 - 다시 안 그린다
         self._sig = sig
-        img = self.compose(fx, fy, aura)
+        img = self.compose(fx, fy, aura, flag)
         if not RGBA_OK:
             flat = Image.new("RGB", (self.W, self.H), KEY)
             flat.paste(img, (0, 0), img.split()[3])

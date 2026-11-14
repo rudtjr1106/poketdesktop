@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 """꾸미기 (버전 2) - 가진 장식 · 효과와 포켓몬에 끼운 것. 목록과 규칙은 common/deco.py.
 
-    deco_owned (user_id, deco)   가진 것. deco = common.deco.DECOS 의 열쇠, 또는 PICK(참가 묶음 선택권, count 개)
+    deco_owned (user_id, deco)   가진 것. deco = common.deco.DECOS 의 열쇠, 또는 PICK(참가 묶음 선택권, count 개) ·
+                                 PICK_DECO(꾸미기 선택권, count 개 - 2.5.0 길드 코인 상점)
     pokemon.deco                 그 포켓몬이 쓰고 있는 것 {칸: 열쇠} (JSON)
 
 규칙:
   · 장식 하나는 포켓몬 한 마리만 쓴다 - 다른 포켓몬에 끼우면 먼저 쓰던 포켓몬에서 빠진다
   · 같은 칸에 이미 다른 것이 있으면 바꿔 낀다 (head 에 금관을 쓰고 있다가 은관을 끼우면 금관은 빠진다)
   · 가진 것만 낀다. 놓아준 포켓몬이 쓰던 장식은 다시 낄 수 있게 된다 (행이 지워지니 따로 할 일이 없다)
-  · 얻는 길은 선물함(kind 'deco') 뿐 - grant 가 묶음('bundle:rank1') · 하나('crown_gold') · 선택권(PICK)을 받는다
+  · 얻는 길은 선물함(kind 'deco') - grant 가 묶음('bundle:rank1') · 하나('crown_gold') · 선택권(PICK)을 받는다 -
+    과 2.5.0 의 길드 코인 상점 (guild.buy - 깃발 들기 · 꾸미기 선택권도 grant 로 준다)
 """
 import json
 import threading
@@ -27,16 +29,16 @@ def _now():
 
 # ---------------------------------------------------------------- 가진 것
 def owned(uid):
-    """{열쇠: 개수}. 장식 · 효과는 1, 참가 묶음 선택권(PICK)은 남은 장수."""
+    """{열쇠: 개수}. 장식 · 효과는 1, 선택권(PICK · PICK_DECO)은 남은 장수."""
     return dict((r["deco"], int(r["count"] or 0)) for r in db.q(
         "SELECT deco, count FROM deco_owned WHERE user_id=? AND count > 0", (uid,)))
 
 
 def _give(uid, key, season=0, now=None, n=1):
     db.run("INSERT INTO deco_owned (user_id, deco, count, season, got_at) VALUES (?,?,?,?,?)"
-           " ON CONFLICT(user_id, deco) DO UPDATE SET count = CASE WHEN deco_owned.deco = ? THEN"
+           " ON CONFLICT(user_id, deco) DO UPDATE SET count = CASE WHEN deco_owned.deco IN (?, ?) THEN"
            " deco_owned.count + excluded.count ELSE 1 END, season = excluded.season",
-           (uid, key, n, int(season or 0), now or _now(), C.PICK))
+           (uid, key, n, int(season or 0), now or _now(), C.PICK, C.PICK_DECO))
 
 
 def grant(uid, what, season=0, now=None):
@@ -52,9 +54,9 @@ def grant(uid, what, season=0, now=None):
         for k in keys:
             _give(uid, k, season, now)
         return [C.name(k) for k in keys]
-    if what == C.PICK:
-        _give(uid, C.PICK, season, now)
-        return [C.PICK_KR]
+    if what in C.PICKS:
+        _give(uid, what, season, now)
+        return [C.name(what)]
     if what in C.DECOS:
         _give(uid, what, season, now)
         return [C.name(what)]
@@ -71,6 +73,26 @@ def pick(uid, bundle, now=None):
         raise HTTPException(409, "참가 묶음 선택권이 없습니다.")
     db.run("DELETE FROM deco_owned WHERE user_id=? AND deco=? AND count <= 0", (uid, C.PICK))
     return grant(uid, "bundle:" + bundle, 0, now)
+
+
+def pick_left(uid, have=None):
+    """꾸미기 선택권으로 아직 고를 수 있는 것 (pick_pool 가운데 안 가진 것, 차례대로)."""
+    have = owned(uid) if have is None else have
+    return [k for k in C.pick_pool() if not have.get(k)]
+
+
+def pick_one(uid, key, now=None):
+    """꾸미기 선택권 한 장으로 꾸미기 하나를 고른다 (2.5.0). 가진 것 · 순위 · 메달 · 깃발 들기는 못 고른다."""
+    if key not in C.pick_pool():
+        raise HTTPException(400, "꾸미기 선택권으로 고를 수 없는 꾸미기입니다.")
+    if owned(uid).get(key):
+        raise HTTPException(409, "이미 가진 꾸미기입니다. 다른 것을 골라 주세요.")
+    cur = db.run("UPDATE deco_owned SET count = count - 1 WHERE user_id=? AND deco=? AND count > 0",
+                 (uid, C.PICK_DECO))
+    if getattr(cur, "rowcount", 1) == 0:
+        raise HTTPException(409, "꾸미기 선택권이 없습니다.")
+    db.run("DELETE FROM deco_owned WHERE user_id=? AND deco=? AND count <= 0", (uid, C.PICK_DECO))
+    return grant(uid, key, 0, now)
 
 
 # ---------------------------------------------------------------- 끼우기
@@ -157,4 +179,8 @@ def state(uid):
     return {"items": items, "picks": have.get(C.PICK, 0),
             "choices": [{"key": b, "kr": C.BUNDLE_KR[b], "items": [C.name(k) for k in C.BUNDLES[b]]}
                         for b in C.JOIN_CHOICES],
+            # 꾸미기 선택권 (2.5.0): 남은 장수 · 고를 수 있는 것 (아직 안 가진 것만)
+            "decoPicks": have.get(C.PICK_DECO, 0),
+            "decoChoices": [{"key": k, "kr": C.name(k), "slot": C.slot_of(k), "slotKr": C.SLOT_KR[C.slot_of(k)]}
+                            for k in pick_left(uid, have)],
             "worn": dict((str(k), v) for k, v in wear.items())}

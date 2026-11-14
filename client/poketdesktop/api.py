@@ -1086,6 +1086,10 @@ class Api(object):
         return self._call("POST", "/api/deco/equip",
                           {"pokemonId": int(pid), "deco": str(deco), "on": bool(on)})
 
+    def deco_pick_one(self, key):
+        """꾸미기 선택권 한 장으로 꾸미기 하나 (2.5.0). 답은 deco_state 꼴 + got."""
+        return self._call("POST", "/api/deco/pick", {"deco": str(key)})
+
     def deco_pick(self, bundle):
         """참가 묶음 선택권 한 장으로 묶음 하나를 고른다."""
         return self._call("POST", "/api/deco/pick", {"bundle": str(bundle)})

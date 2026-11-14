@@ -257,9 +257,6 @@ def use(body: UseIn, me=Depends(deps.current)):
 
     if kind in ("sell", "ball"):
         raise HTTPException(400, "%s은(는) 여기서 쓸 수 없습니다." % it["kr"])
-    if kind == "guildflag":
-        # 길드 깃발 (2.5.0): 가진 것이 곧 권리라 쓰는 도구가 아니다 - 포켓몬을 고르라고 하지 않게 먼저 막는다
-        raise HTTPException(400, "길드 깃발은 가방에서 쓰는 도구가 아닙니다. 길드 창 '관리' 에서 깃발을 그립니다.")
     if items.bag_count(uid, it["id"]) <= 0:
         raise HTTPException(400, "%s이(가) 없습니다." % it["kr"])
 

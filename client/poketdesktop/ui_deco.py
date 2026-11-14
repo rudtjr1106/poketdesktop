@@ -7,9 +7,11 @@
     장식 하나는 한 마리만 씁니다 ...
     ┌ 참가 묶음 선택권 1장 - 하나를 고르세요 ───────────┐   (선택권이 있을 때만)
     │ [리본 + 발자국] [꽃핀 + 꽃잎] [진주 목걸이 + 하트]  │
+    │ 꾸미기 선택권 1장 - 아직 없는 꾸미기 하나  [고르기...] │   (2.5.0 길드 코인 상점 - 있을 때만)
     └──────────────────────────────────────────────┘
     장식   [금관][리본] ...        - **가진 것만** (사용자 10/30: 꾸미기는 가방의 개별 아이템이다)
     효과   [금빛 별가루][발밑 빛] ...
+    깃발   [깃발 들기]                  - 2.5.0, 길드 코인 상점
     (고른 칸의 설명 · 누가 쓰고 있나)
     상태 글                                   [닫기]
 
@@ -38,8 +40,9 @@ ACC = ("crown_gold", "crown_silver", "crown_bronze", "flower_crown", "bow", "flo
        "heart_shades", "pearls", "bowtie", "medal_gold", "medal_silver", "medal_bronze")
 FX = ("fx_stars_gold", "fx_stars_silver", "fx_stars_bronze", "fx_paw", "fx_petals", "fx_hearts", "fx_bubbles",
       "fx_notes", "fx_snow", "fx_glow")
-EMPTY = ("아직 가진 꾸미기가 없습니다. 길드전 순위 보상 · 참가 보상, 올림픽 메달, 랜덤 캡슐(아주 낮은 확률)로 받습니다 "
-         "(선물함이나 랜덤 캡슐에서 오고, 가방의 '꾸미기' 주머니에 들어갑니다).")
+FLAGS = ("guild_flag",)      # 깃발 칸 (2.5.0) - 등 뒤에 세운 깃대에 주인 길드 깃발
+EMPTY = ("아직 가진 꾸미기가 없습니다. 길드전 순위 보상 · 참가 보상, 올림픽 메달, 랜덤 캡슐(아주 낮은 확률), "
+         "길드 코인 상점 '길드 전용'(깃발 들기 · 꾸미기 선택권)으로 받습니다 (가방의 '꾸미기' 주머니에 들어갑니다).")
 WHERE = {"rank1": "길드전 1위", "rank2": "길드전 2위", "rank3": "길드전 3위"}
 NOTE = "장식 하나는 한 마리만 씁니다. 다른 포켓몬에 끼우면 먼저 쓰던 포켓몬에서 빠집니다. 다시 누르면 뺍니다."
 
@@ -54,6 +57,10 @@ def where(key):
         got.append(medal)
     if key in C.slot_pool():
         got.append("랜덤 캡슐")
+    if key in C.pick_pool():
+        got.append("꾸미기 선택권")
+    if key in C.SHOP_ONLY:
+        got.append("길드 코인 상점 '길드 전용'")
     return " · ".join(got)
 
 
@@ -82,6 +89,7 @@ class DecoWindow(object):
         self.state = None            # 서버가 준 꾸미기 목록 (deco.state)
         self.cells = {}              # 열쇠 -> (칸, 그림, 이름, 상태 글)
         self.photos = {}
+        self.b_pick_deco = None      # 꾸미기 선택권 [고르기...] (2.5.0, 선택권이 있을 때만)
         self.focus = None            # 설명을 보여 주는 칸
         info = mon.get("info") or {}
         self.name = info.get("name") or mon.get("nickname") or "포켓몬"
@@ -152,7 +160,8 @@ class DecoWindow(object):
             w.destroy()
         self.cells = {}
         box, cw, tile = self.box, self.cw, self.tile
-        groups = [(title, [k for k in order if k in keys]) for title, order in (("장식", ACC), ("효과", FX))]
+        groups = [(title, [k for k in order if k in keys])
+                  for title, order in (("장식", ACC), ("효과", FX), ("깃발", FLAGS))]
         if not any(g for _t, g in groups):
             tk.Label(self.grid, text=EMPTY, bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, justify="left", anchor="w",
                      wraplength=self.pick_wrap).pack(fill="x", pady=(12, 6))
@@ -209,20 +218,35 @@ class DecoWindow(object):
         name.configure(fg=U.FG if owned else U.FG_FAINT)
         tag.configure(text=text, fg=fg)
 
-    def _paint_picks(self, picks, choices):
-        """참가 묶음 선택권 띠. picks 가 0 이면 감춘다."""
+    def _paint_picks(self, picks, choices, dpicks=0, dchoices=()):
+        """선택권 띠: 참가 묶음 선택권(picks) · 꾸미기 선택권(dpicks, 2.5.0). 둘 다 0 이면 감춘다."""
         for w in self.pick_box.winfo_children():
             w.destroy()
-        if not picks:
+        self.b_pick_deco = None
+        if not picks and not dpicks:
             self.pick_box.pack_forget()
             return
-        tk.Label(self.pick_box, text="참가 묶음 선택권 %d장 - 하나를 고르세요" % picks, bg=U.BG2, fg=U.FG,
-                 font=U.FONT_B, anchor="w", wraplength=self.pick_wrap - 20).pack(fill="x", padx=10, pady=(8, 4))
-        row = tk.Frame(self.pick_box, bg=U.BG2)
-        row.pack(fill="x", padx=10, pady=(0, 10))
-        for c in choices:
-            U.PushButton(row, c["kr"], lambda b=c["key"]: self.pick(b), height=34,
-                         font=U.FONT_S).pack(side="left", padx=(0, 8))
+        if picks:
+            tk.Label(self.pick_box, text="참가 묶음 선택권 %d장 - 하나를 고르세요" % picks, bg=U.BG2, fg=U.FG,
+                     font=U.FONT_B, anchor="w", wraplength=self.pick_wrap - 20).pack(fill="x", padx=10, pady=(8, 4))
+            row = tk.Frame(self.pick_box, bg=U.BG2)
+            row.pack(fill="x", padx=10, pady=(0, 10))
+            for c in choices:
+                U.PushButton(row, c["kr"], lambda b=c["key"]: self.pick(b), height=34,
+                             font=U.FONT_S).pack(side="left", padx=(0, 8))
+        if dpicks:
+            row = tk.Frame(self.pick_box, bg=U.BG2)
+            row.pack(fill="x", padx=10, pady=(8, 10))
+            self.b_pick_deco = U.PushButton(row, "고르기...", lambda: self.pick_deco(list(dchoices)), height=34,
+                                            font=U.FONT_S)
+            self.b_pick_deco.pack(side="right", padx=(10, 0))
+            text = ("%s %d장 - 아직 없는 꾸미기 하나를 고르세요" % (C.PICK_DECO_KR, dpicks) if dchoices
+                    else "%s %d장 - 고를 꾸미기가 남지 않았습니다" % (C.PICK_DECO_KR, dpicks))
+            lb = tk.Label(row, text=text, bg=U.BG2, fg=U.FG, font=U.FONT_B, anchor="w", justify="left")
+            lb.pack(side="left", fill="x", expand=True)
+            U.wrap_to_width(lb)
+            if not dchoices:
+                self.b_pick_deco.configure(state="disabled")
         self.pick_box.pack(fill="x", pady=(10, 0), before=self.grid)
 
     def _say(self, text, bad=False):
@@ -263,7 +287,7 @@ class DecoWindow(object):
         items = dict((it["key"], it) for it in st.get("items") or [])
         pid = self.mon.get("id")
         try:
-            keys = tuple(k for k in ACC + FX if (items.get(k) or {}).get("owned"))
+            keys = tuple(k for k in ACC + FX + FLAGS if (items.get(k) or {}).get("owned"))
             if keys != self._keys:
                 self._keys = keys
                 self._fill_cells(keys)
@@ -273,7 +297,8 @@ class DecoWindow(object):
                 it = items.get(key) or {}
                 by = it.get("wornBy")
                 self._paint_cell(key, True, by == pid, by is not None and by != pid)
-            self._paint_picks(int(st.get("picks") or 0), st.get("choices") or [])
+            self._paint_picks(int(st.get("picks") or 0), st.get("choices") or [],
+                              int(st.get("decoPicks") or 0), st.get("decoChoices") or [])
             if self.focus:
                 self.show_desc(self.focus)
             self._fit()
@@ -345,6 +370,20 @@ class DecoWindow(object):
         self._say("고르는 중...")
         U.run_async(self.root, lambda: self.app.api.deco_pick(bundle),
                     lambda r, err: self._picked(bundle, r, err))
+
+    def pick_deco(self, choices):
+        """꾸미기 선택권 (2.5.0): 아직 없는 꾸미기 하나를 고른다 (되돌릴 수 없다 - 고르는 창이 그렇게 말한다)."""
+        if self.busy or not choices:
+            return
+        from . import ui_box
+        opts = [(c["key"], c.get("kr") or C.name(c["key"]), c.get("slotKr")) for c in choices]
+        key = ui_box.ask_choice(self.win, C.PICK_DECO_KR, "꾸미기 하나를 고르세요. 고른 뒤에는 바꿀 수 없습니다.", opts)
+        if not key:
+            return
+        self.busy = True
+        self._say("고르는 중...")
+        U.run_async(self.root, lambda: self.app.api.deco_pick_one(key),
+                    lambda r, err: self._picked(key, r, err))
 
     def _picked(self, bundle, r, err):
         self.busy = False

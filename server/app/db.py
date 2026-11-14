@@ -1678,6 +1678,8 @@ def _row_to_mon(r):
         "form": (r["form"] if "form" in r.keys() else None) or None,
         # 꾸미기 (버전 2) {칸: 열쇠}. 앱이 걷는 도트에 얹고 효과를 그린다. 아무것도 안 쓰면 빈 dict
         "deco": _deco_of(r),
+        # 깃발 들기 (2.5.0) - 그 포켓몬이 깃발 칸을 쓰면 주인이 지금 든 길드의 깃발 그림 (없으면 None)
+        "decoFlag": _deco_flag(r),
     }
 
 
@@ -1686,6 +1688,15 @@ def _deco_of(r):
         return {}
     from . import deco
     return deco.worn(r["deco"])
+
+
+def _deco_flag(r):
+    """깃발 칸(flag)을 쓰는 포켓몬이면 주인 길드의 깃발 (common/flag.py 꼴). 아니면 None.
+    한 사람에 한 마리만 깃발 칸을 쓸 수 있어서(장식 하나는 한 마리) 묻는 것은 사람마다 많아야 한 번이다."""
+    if "flag" not in _deco_of(r) or "user_id" not in r.keys():
+        return None
+    from . import guild
+    return guild.name_flag(r["user_id"])
 
 
 def insert_mon(user_id, mon, now):

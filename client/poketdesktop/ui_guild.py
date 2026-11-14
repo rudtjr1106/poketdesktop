@@ -131,7 +131,7 @@ def shop_left(it):
 
 
 def shop_forever(it):
-    """한 번 사면 계속 쓰는 전용 상품인가 (길드 깃발, 2.5.0 - 서버가 forever 를 붙인다. limit 1 · left 0 = 이미 가짐)."""
+    """한 번 사면 계속 쓰는 전용 상품인가 (깃발 들기 꾸미기, 2.5.0 - 서버가 forever 를 붙인다. left 0 = 이미 가짐)."""
     return shop_exclusive(it) and bool((it or {}).get("forever"))
 
 
@@ -2140,15 +2140,11 @@ class GuildWindow(object):
         # 길드 전용 상품은 시즌 수를 넘으면 서버가 409 로 막는다 (다른 창에서 이미 샀을 때) - 글을 띄우고 남은 수를
         # 다시 받는다. 다른 도구는 예전 그대로 (글만)
         ex = any(shop_exclusive(it) and it.get("id") == item for it in (self.shop or {}).get("items") or [])
-        forever = any(it.get("forever") and it.get("id") == item for it in (self.shop or {}).get("items") or [])
 
         def after(r):
             self.shop = None
             if self.mode == "guild":
                 self._draw_tab()
-                if forever:
-                    # 길드 깃발을 샀다 - 길드 정보(flagItem · canFlag)를 다시 받아야 '관리' 탭에 [깃발 그리기] 가 뜬다
-                    self.load()
             else:
                 self.data["coin"] = r.get("coin", self.data.get("coin"))
                 self.draw()
@@ -2225,14 +2221,14 @@ class GuildWindow(object):
 
     DISBAND_NOTE = "길드와 채팅, 오늘의 미션 점수가 모두 사라집니다. 되돌릴 수 없습니다. 만들 때 낸 돈은 돌아오지 않습니다."
     # 길드 깃발 (2.5.0, design-notes/2026-11-14-guild-flag.md)
-    FLAG_NOTE = "코인 상점 '길드 전용' 에서 길드 깃발을 산 마스터 · 부마스터가 그립니다."
+    FLAG_NOTE = "길드 마스터 · 부마스터가 그립니다."
     FLAG_CAN = "24 x 24 칸에 도트로 그립니다. 다시 그리면 바뀌고, 다 지우고 저장하면 깃발이 내려갑니다."
     FLAG_NONE = "아직 길드 깃발이 없습니다. "
     MODE_NOTE = "자유 가입은 누구나 바로 들어오고, 승인 필요는 마스터나 부마스터가 받아 줘야 들어옵니다."
 
     def _flag_data(self):
         """관리 탭의 '길드 깃발' 칸: None (옛 서버라 canFlag 가 없다 - 칸을 안 둔다) 또는
-        (지금 깃발, 설명, [깃발 그리기] 를 둘까). 그리기는 마스터 · 부마스터 + 길드 깃발을 가진 사람 (서버의 canFlag)."""
+        (지금 깃발, 설명, [깃발 그리기] 를 둘까). 그리기는 마스터 · 부마스터 (서버의 canFlag - 사는 것 없이)."""
         d = self.data or {}
         if "canFlag" not in d:
             return None

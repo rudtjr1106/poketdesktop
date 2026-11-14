@@ -3878,21 +3878,6 @@
    "sell": 1500,
    "weight": 0
   },
-  "GUILDFLAG": {
-   "buyable": false,
-   "cat": "misc",
-   "cost": 0,
-   "custom": true,
-   "desc": "길드 깃발을 그리고 다는 권리. 마스터 · 부마스터가 가지고 있으면 길드 창 '관리' 에서 24 x 24 도트로 길드 깃발을 그린다. 가진 사람의 이름 옆(랭킹 · 친구 목록)에 우리 길드 깃발이 붙는다.",
-   "effect": {
-    "kind": "guildflag"
-   },
-   "en": "Guild Flag",
-   "id": "GUILDFLAG",
-   "ident": "guild-flag",
-   "kr": "길드 깃발",
-   "sell": 0
-  },
   "GYARADOSITE": {
    "cat": "megastone",
    "chance": 0,

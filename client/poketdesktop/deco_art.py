@@ -465,8 +465,93 @@ def necklace():
     return im
 
 
+# ---------------------------------------------------------------- 깃발 들기 (2.5.0) - 깃대에 우리 길드 깃발
+# 효과 창(deco_fx)이 포켓몬 등 뒤에 세운다. 깃발 그림은 common/flag.py 꼴 (24 x 24, 한 글자가 촘촘한 칸 하나) - 길드
+# 마스터 · 부마스터가 그린 그대로 (뒤집지 않는다 - 깃대가 어느 쪽에 있든 그린 쪽이 보이게).
+POLE = (96, 62, 30, 255)
+POLE_HI = (156, 108, 58, 255)
+KNOB = (248, 190, 46, 255)
+KNOB_D = (176, 110, 22, 255)
+FLAG_W = 24
+KNOB_H = 3
+
+
+def _wave(x, wave):
+    """깃발 칸 줄 x 의 위아래 흔들림 (-1 · 0 · 1). 깃대 쪽 네 줄은 안 흔들린다."""
+    if x < 4:
+        return 0
+    import math
+    return int(round(math.sin(x / 24.0 * 2 * math.pi - wave * math.pi / 2)))
+
+
+@functools.lru_cache(maxsize=48)
+def banner(pixels, pole, side=1, wave=0):
+    """깃대 + 깃발 (촘촘한 칸, RGBA). pixels = common/flag.py 꼴, pole = 깃대 길이(꼭대기 구슬 아래부터). 그릴 수
+    없는 그림이면 None. side 1 = 깃대가 왼쪽 · 깃발이 오른쪽으로 날린다, -1 = 반대. wave 0~3 = 펄럭임.
+    그림의 아래 끝 = 깃대 아래 끝 (부르는 쪽이 발 쪽에 맞춘다)."""
+    from common import flag as F
+    if not pixels or not F.valid(pixels) or F.is_blank(pixels):
+        return None
+    pole = max(F.SIZE + 4, int(pole))
+    w, h = 2 + FLAG_W + 1, KNOB_H + pole
+    im = Image.new("RGBA", (w, h), T)
+    px = im.load()
+    px0 = 0 if side >= 0 else w - 2                      # 깃대 칸 (2칸 폭)
+    for y in range(KNOB_H - 1, h):
+        px[px0, y] = POLE_HI if side >= 0 else POLE
+        px[px0 + 1, y] = POLE if side >= 0 else POLE_HI
+    for x in range(-1, 3):                               # 꼭대기 금빛 구슬 (깃대보다 한 칸씩 넓게)
+        xx = px0 + x
+        if 0 <= xx < w:
+            px[xx, 0] = KNOB if 0 <= x <= 1 else T
+            px[xx, 1] = KNOB if x in (0, 1) else KNOB_D
+    for fy in range(F.SIZE):
+        for fx in range(F.SIZE):
+            c = F.color_at(pixels, fx, fy)
+            if c is None:
+                continue
+            if side >= 0:
+                x, dist = 2 + fx, fx                     # 깃대 오른쪽에, 깃대에서 fx 칸
+            else:
+                x, dist = w - 3 - (F.SIZE - 1) + fx, F.SIZE - 1 - fx      # 깃발은 뒤집지 않고 깃대 왼쪽에
+            y = KNOB_H + fy + _wave(dist, wave)
+            if 0 <= x < w and 0 <= y < h:
+                r, g, b = int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16)
+                px[x, y] = (r, g, b, 255)
+    return im
+
+
+def flag_icon():
+    """깃발 들기 칸 그림 (꾸미기 창 · 가방 · 코인 상점): 깃대에 빨간 삼각 깃발 - 어느 길드 깃발인지는 바탕화면에서."""
+    rows = ["oo" + "." * 13,
+            "YYRRRRRRRRRRR..",
+            "YYRWWRRRRRRR...",
+            "PPRRRRRRRRR....",
+            "PPRRRRRRRR.....",
+            "PPRRRRRRR......",
+            "PPrrrrrr.......",
+            "PP.............",
+            "PP.............",
+            "PP.............",
+            "PP.............",
+            "PP............."]
+    return grid(rows, {"o": KNOB_D, "Y": KNOB, "P": POLE, "R": (222, 64, 64, 255), "r": (170, 40, 46, 255),
+                       "W": (255, 236, 236, 255)})
+
+
+def pick_deco_icon():
+    """꾸미기 선택권: 별 머리핀 · 선글라스 · 음표를 겹친 꾸러미."""
+    im = Image.new("RGBA", (19, 16), T)
+    im.alpha_composite(star_pin(), (0, 0))
+    lens = glasses("shades", 11)[0]
+    im.alpha_composite(lens, (min(19 - lens.width, 5), min(16 - lens.height, 8)))
+    return im
+
+
 def icon(key):
     """꾸미기 창의 칸 그림 (촘촘한 칸 그대로 - 창이 정수 배로 키운다). 모르는 열쇠면 None."""
+    if key == "guild_flag":
+        return flag_icon()
     if key.startswith("crown_"):
         return crown(key[len("crown_"):])
     if key.startswith("fx_stars_"):
@@ -546,7 +631,7 @@ def pick_icon():
 @functools.lru_cache(maxsize=None)
 def item_icon(key, size):
     """size x size 칸 그림 (RGBA). 정수 배로 키우고 테를 두른 뒤 가운데에 놓는다. 모르는 열쇠면 None."""
-    im = pick_icon() if key == "pick_join" else icon(key)
+    im = pick_icon() if key == "pick_join" else (pick_deco_icon() if key == "pick_deco" else icon(key))
     if im is None:
         return None
     k = max(1, (int(size) - 2) // max(im.width, im.height))

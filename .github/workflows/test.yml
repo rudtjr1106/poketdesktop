@@ -601,7 +601,7 @@ jobs:
         env:
           POKET_SKIN: dp
         run: python client/test_guild_shop_exclusive_ui.py
-      # 2.5.0 길드 깃발 (코인 상점 길드 전용 500코인 · 24x24 도트) - 그리기 창 · 길드 창 · 랭킹/친구/길드전 이름 옆
+      # 2.5.0 길드 깃발 (마스터 · 부마스터가 관리에서 · 24x24 도트) - 그리기 창 · 길드 창 · 랭킹/친구/길드전 이름 옆
       - name: 길드 깃발 그리기 창 · 길드 창 (진짜 Tk)
         if: matrix.shard == 3
         shell: bash
@@ -609,6 +609,7 @@ jobs:
           python client/test_flag_editor_ui.py
           python client/test_guild_flag_ui.py
           python client/test_flag_names_ui.py
+          python client/test_guild_deco_ui.py
       - name: 길드 깃발 그리기 창 · 길드 창 - DP 테마 (진짜 Tk)
         if: matrix.shard == 3
         shell: bash
@@ -617,6 +618,7 @@ jobs:
         run: |
           python client/test_flag_editor_ui.py
           python client/test_guild_flag_ui.py
+          python client/test_guild_deco_ui.py
       # 기술머신 창의 포켓몬 도트가 잘려 있었다 (Label width=3 이 3px 로 읽혔다).
       - name: 기술머신 창 도트·목록 (진짜 Tk)
         if: matrix.shard == 1
@@ -884,6 +886,7 @@ jobs:
           python test_gw_rewards.py     # 2.0.2: 길드전 결산 - 순위 · 활약 기술머신 뽑기권 · 꾸미기 바꿔 주기
           python test_guild_war_match.py  # 시즌 6 길드전 1:1 맞대결 - 매칭 · 삼각형 · 출전 상한 · 별 · 승패 · 코인 보상 (시즌 5 는 지도전 그대로)
           python test_guild_shop_exclusive.py  # 시즌 6 길드 전용 상품 (마스터볼 · 금색병뚜껑, 시즌마다 수)
+          python test_guild_deco_shop.py  # 2.5.0 길드 전용 꾸미기 - 깃발 들기(한 번) · 꾸미기 선택권(시즌마다) · decoFlag
           python test_guild_flag.py     # 2.5.0 길드 깃발 - 사기(평생 1개) · 그리기 권한 · 크기/빛깔 막기 · 이름 옆 깃발 · 운영진 내리기
           python test_walk.py
 

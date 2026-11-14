@@ -66,6 +66,7 @@ import zlib
 
 from fastapi import HTTPException
 
+from common import deco as DECO
 from common import flag as FLAG
 
 from . import auth, config, db, items, season, social
@@ -124,18 +125,21 @@ BUY_MAX = 99
 # 코인으로, **시즌마다 한 사람이 살 수 있는 수가 있다** (guild_buy). 길드 미션 코인이 길드전 코인보다 훨씬 많아서
 # 수를 안 묶으면 전용 상품이 미션 보상이 된다. 되팔면 손해여야 한다 (금색병뚜껑은 팔면 5,000원 < 200코인 = 50,000원어치).
 # (도구, 코인, 시즌마다 수). 랜덤 기술머신 뽑기권은 넣지 않는다 (사용자).
-SHOP_EXCLUSIVE = (("MASTERBALL", 600, 1), ("GOLDBOTTLECAP", 200, 2), ("GUILDFLAG", 500, 1))
+SHOP_EXCLUSIVE = (("MASTERBALL", 600, 1), ("GOLDBOTTLECAP", 200, 2))
 EXCLUSIVE_FROM = 6
 EXCLUSIVE_GROUP = "길드 전용"
-# 시즌마다가 아니라 **한 사람 평생** 수인 것 (2.5.0 길드 깃발 - 2026-11-14 사용자 "500코인, 한 번 사면 계속").
-# guild_buy 의 season 0 줄로 센다 (BUY_EVER). 상점 줄에 forever=True.
-EXCLUSIVE_EVER = frozenset(("GUILDFLAG",))
-BUY_EVER = 0
+# 길드 전용 꾸미기 (2.5.0, 11/15 사용자 '1,2 반영'). 도구가 아니라 꾸미기라 가방이 아니라 꾸미기 주머니(deco_owned)로
+# 간다 - 되팔 수 없다. 상점 줄의 id 는 'deco:<열쇠>' (앱의 deco_art.ITEM_PREFIX - 그림을 앱이 그린다).
+#   깃발 들기     300코인 · 한 사람 한 번 (가지면 끝 - 줄에 forever)
+#   꾸미기 선택권 400코인 · 시즌마다 1장 (guild_buy 에 'deco:pick_deco' 로 센다). 고를 꾸미기가 안 남았으면 못 산다
+# (열쇠, 코인, 시즌마다 수 - 깃발 들기는 늘 1)
+DECO_PREFIX = "deco:"
+SHOP_DECO = (("guild_flag", 300, 1), (DECO.PICK_DECO, 400, 1))
+DECO_ONCE = ("guild_flag",)
 
 # 길드 깃발 (2.5.0, 시즌 6 - design-notes/2026-11-14-guild-flag.md). 길드마다 하나, 24 x 24 도트 (common/flag.py).
-# 그리기 = 길드의 마스터 · 부마스터 가운데 FLAG_ITEM 을 가진 사람. 길드 이름 옆에는 누구에게나,
-# 랭킹 · 친구 목록의 이름 옆에는 FLAG_ITEM 을 가졌고 지금 든 길드에 깃발이 있는 사람에게만 붙는다.
-FLAG_ITEM = "GUILDFLAG"
+# 그리기 = 길드의 마스터 · 부마스터 (**사는 것 없이** - 11/15 사용자 "코인을 안 쓰고 그냥 길마, 부마가 관리에서").
+# 길드 이름 옆, 그리고 깃발이 있는 길드에 든 사람의 랭킹 · 친구 목록 이름 옆에 붙는다.
 
 # 슬롯머신 (2.1.0). 한 번에 SLOT_COST 코인, 하루 횟수 제한 없음 (사용자 결정).
 # **앱 화면은 캡슐 뽑기 기계 '랜덤 캡슐'이다** (client/poketdesktop/ui_gacha.py - 처음 슬롯머신으로 만들었다가 사용자가 바꾸라고
@@ -989,24 +993,9 @@ def exclusive(item_id):
     return None
 
 
-def buy_season(item_id):
-    """guild_buy 에 셀 시즌 번호. 평생 상품(EXCLUSIVE_EVER)은 BUY_EVER(0), 나머지는 이번 시즌."""
-    return BUY_EVER if item_id in EXCLUSIVE_EVER else season.SEASON
-
-
 def bought(uid, item_id, s=None):
-    """산 수. s 를 안 주면 그 상품을 세는 시즌 (평생 상품은 0 줄). s=0 도 그대로 0 줄이다."""
-    s = buy_season(item_id) if s is None else s
-    r = db.q1("SELECT n FROM guild_buy WHERE season=? AND user_id=? AND item_id=?", (s, uid, item_id))
+    r = db.q1("SELECT n FROM guild_buy WHERE season=? AND user_id=? AND item_id=?", (s or season.SEASON, uid, item_id))
     return int(r["n"]) if r else 0
-
-
-def _left(uid, item_id, limit):
-    """더 살 수 있는 수. 평생 상품은 이미 가방에 있어도 0 이다 (선물 · 운영진이 준 것 - 한 사람 하나면 된다)."""
-    left = max(0, limit - bought(uid, item_id))
-    if item_id in EXCLUSIVE_EVER and items.bag_count(uid, item_id) > 0:
-        left = 0
-    return left
 
 
 def coin_price(item_id):
@@ -1044,15 +1033,14 @@ def shop(uid):
     rows.sort(key=lambda x: (SHOP_GROUPS.index(x["group"]), x["coin"], x["kr"]))
     groups = list(SHOP_GROUPS)
     if season.SEASON >= EXCLUSIVE_FROM:
-        # 길드 전용은 맨 앞에. limit = 시즌마다 수, left = 이번 시즌에 더 살 수 있는 수.
-        # forever = 한 사람 평생 수 (길드 깃발 - limit 1 · left 0 이면 이미 가짐)
+        # 길드 전용은 맨 앞에. limit = 시즌마다 수, left = 이번 시즌에 더 살 수 있는 수
         pub = dict((it["id"], it) for it in items.public_list())
         ex = []
         for iid, price, limit in SHOP_EXCLUSIVE:
             if iid in pub:
                 ex.append(dict(pub[iid], coin=price, group=EXCLUSIVE_GROUP, exclusive=True, limit=limit,
-                               left=_left(uid, iid, limit), forever=iid in EXCLUSIVE_EVER))
-        rows = ex + rows
+                               left=max(0, limit - bought(uid, iid))))
+        rows = ex + [_deco_row(uid, key, price, limit) for key, price, limit in SHOP_DECO] + rows
         groups = [EXCLUSIVE_GROUP] + groups
     r = db.q1("SELECT balls FROM users WHERE id=?", (uid,))
     return {"items": rows, "coin": coin(uid), "bag": items.bag_get(uid, r["balls"] if r else 0),
@@ -1065,8 +1053,75 @@ def slot_odds():
     return [{"key": k, "kr": kr, "pct": per / 10.0, "tier": tier} for k, kr, per, tier, _g, _n in SLOT_TABLE]
 
 
+def _deco_left(uid, key, limit, have=None):
+    """그 꾸미기 상품을 이번에 더 살 수 있는 수. 깃발 들기는 가졌으면 0, 선택권은 이번 시즌 수 · 고를 것이 남은 만큼."""
+    from . import deco
+    have = deco.owned(uid) if have is None else have
+    if key in DECO_ONCE:
+        return 0 if have.get(key) else 1
+    room = len(deco.pick_left(uid, have)) - int(have.get(DECO.PICK_DECO) or 0)   # 아직 안 고른 장도 셈한다
+    return max(0, min(limit - bought(uid, DECO_PREFIX + key), room))
+
+
+def _deco_row(uid, key, price, limit):
+    """코인 상점 '길드 전용' 의 꾸미기 줄 (도구 줄과 같은 꼴 + deco). 설명은 note."""
+    if key == DECO.PICK_DECO:
+        note = ("랜덤 캡슐에서 나오는 꾸미기(%s) 가운데 아직 없는 것 하나를 고른다. 가방의 꾸미기 주머니나 꾸미기 창에서 "
+                "고른다." % " · ".join(DECO.name(k) for k in DECO.pick_pool()))
+    else:
+        note = DECO.DECOS[key]["desc"] + " 한 번 사면 계속 쓴다."
+    return {"id": DECO_PREFIX + key, "kr": DECO.name(key), "en": key, "cat": "deco", "sell": 0, "coin": price,
+            "group": EXCLUSIVE_GROUP, "exclusive": True, "limit": limit, "left": _deco_left(uid, key, limit),
+            "forever": key in DECO_ONCE, "deco": key, "note": note}
+
+
+def _buy_deco(uid, key, count=1):
+    """길드 전용 꾸미기를 산다 (2.5.0). 꾸미기 주머니로 바로 간다 - 선택권은 장수가 쌓인다."""
+    from . import deco
+    got = next(((k, p, lim) for k, p, lim in SHOP_DECO if k == key), None)
+    if season.SEASON < EXCLUSIVE_FROM or not got:
+        raise HTTPException(404, "코인 상점에 없는 물건입니다.")
+    _k, price, limit = got
+    kr = DECO.name(key)
+    if int(count or 1) != 1:
+        raise HTTPException(409, "%s 은(는) 한 번에 1개씩 삽니다." % kr)
+    s = season.SEASON
+    iid = DECO_PREFIX + key
+    if key in DECO_ONCE:
+        if deco.owned(uid).get(key):
+            raise HTTPException(409, "%s 은(는) 이미 가지고 있습니다. 한 번 사면 계속 씁니다." % kr)
+    else:
+        if _deco_left(uid, key, limit) <= 0 and bought(uid, iid, s) < limit:
+            raise HTTPException(409, "고를 수 있는 꾸미기가 남지 않았습니다 (랜덤 캡슐 꾸미기를 다 가졌습니다).")
+        cur = db.run("INSERT INTO guild_buy (season, user_id, item_id, n) VALUES (?,?,?,1)"
+                     " ON CONFLICT(season, user_id, item_id) DO UPDATE SET n = guild_buy.n + 1"
+                     " WHERE guild_buy.n + 1 <= ?", (s, uid, iid, limit))
+        if getattr(cur, "rowcount", 1) <= 0:
+            raise HTTPException(409, "%s 은(는) 이번 시즌에 %d장까지 살 수 있습니다. 다음 시즌에 다시 살 수 있습니다."
+                                % (kr, limit))
+
+    def undo():
+        if key not in DECO_ONCE:
+            db.run("UPDATE guild_buy SET n = n - 1 WHERE season=? AND user_id=? AND item_id=?", (s, uid, iid))
+    try:
+        cur = db.run("UPDATE guild_user SET coin = coin - ? WHERE user_id=? AND coin >= ?", (price, uid, price))
+    except Exception:
+        undo()
+        raise
+    if cur.rowcount <= 0:
+        undo()
+        raise HTTPException(400, "길드 코인이 모자랍니다. (%d개 필요)" % price)
+    deco.grant(uid, key)
+    tail = ("가방의 꾸미기 주머니나 꾸미기 창에서 하나를 고르세요." if key == DECO.PICK_DECO
+            else "꾸미기 창에서 포켓몬에게 씌울 수 있습니다.")
+    return {"ok": True, "spent": price, "coin": coin(uid),
+            "message": "%s 을(를) 길드 코인 %d개로 샀습니다! %s" % (kr, price, tail)}
+
+
 def buy(uid, item_id, count=1):
     """길드 코인으로 산다. 코인은 사람이 갖는 것이라 길드를 나온 뒤에도 쓸 수 있다."""
+    if str(item_id or "").startswith(DECO_PREFIX):
+        return _buy_deco(uid, str(item_id)[len(DECO_PREFIX):], count)       # 길드 전용 꾸미기 (2.5.0)
     it = items.get(item_id)
     price = coin_price(it["id"]) if it else 0
     if not price:
@@ -1074,24 +1129,16 @@ def buy(uid, item_id, count=1):
     n = max(1, min(BUY_MAX, int(count or 1)))
     total = price * n
     ex = exclusive(it["id"])
-    ever = it["id"] in EXCLUSIVE_EVER
-    s = buy_season(it["id"])
+    s = season.SEASON
     if ex:
-        # 시즌마다 수: 늘리는 문장 안에서 한도를 본다 (두 창에서 같이 사도 못 넘는다). 코인이 모자라면 되돌린다.
-        # 평생 상품(길드 깃발)은 season 0 줄로 센다 - 다음 시즌에도 다시 못 산다
+        # 시즌마다 수: 늘리는 문장 안에서 한도를 본다 (두 창에서 같이 사도 못 넘는다). 코인이 모자라면 되돌린다
         limit = ex[1]
-        if ever and items.bag_count(uid, it["id"]) > 0:
-            raise HTTPException(409, "%s 은(는) 이미 가지고 있습니다. 한 번 사면 계속 씁니다." % it["kr"])
         if n > limit:
-            raise HTTPException(409, ("%s 은(는) 한 사람이 %d개까지 살 수 있습니다." if ever
-                                      else "%s 은(는) 시즌마다 %d개까지 살 수 있습니다.") % (it["kr"], limit))
+            raise HTTPException(409, "%s 은(는) 시즌마다 %d개까지 살 수 있습니다." % (it["kr"], limit))
         cur = db.run("INSERT INTO guild_buy (season, user_id, item_id, n) VALUES (?,?,?,?)"
                      " ON CONFLICT(season, user_id, item_id) DO UPDATE SET n = guild_buy.n + excluded.n"
                      " WHERE guild_buy.n + excluded.n <= ?", (s, uid, it["id"], n, limit))
         if getattr(cur, "rowcount", 1) <= 0:
-            if ever:
-                raise HTTPException(409, "%s 은(는) 한 사람이 %d개만 살 수 있습니다 (이미 샀습니다). 한 번 사면 계속 씁니다."
-                                    % (it["kr"], limit))
             raise HTTPException(409, "%s 은(는) 이번 시즌에 %d개까지 살 수 있습니다 (이미 %d개). 다음 시즌에 다시 살 수 있습니다."
                                 % (it["kr"], limit, bought(uid, it["id"], s)))
     def undo():
@@ -1276,11 +1323,6 @@ def slot(uid, rng=None, now=None, count=1, pay="coin"):
 
 
 # ---------------------------------------------------------------- 길드 깃발 (2.5.0)
-def has_flag_item(uid):
-    """길드 깃발(FLAG_ITEM)을 가졌나 - 가방에 1개 이상. 가진 것이 곧 권리다 (쓰면 없어지는 도구가 아니다)."""
-    return uid is not None and items.bag_count(uid, FLAG_ITEM) > 0
-
-
 def flag_of(gid):
     """그 길드의 깃발 문자열. 깃발이 없거나 길드가 없으면 None."""
     if gid is None:
@@ -1300,7 +1342,7 @@ def flags_of(gids):
 
 
 def name_flags(uids):
-    """{사람: 깃발} - 랭킹 · 친구 목록의 이름 옆에 붙일 것. **길드 깃발을 가졌고 지금 든 길드에 깃발이 있는 사람만.**
+    """{사람: 깃발} - 랭킹 · 친구 목록의 이름 옆에 붙일 것. **지금 든 길드에 깃발이 있는 사람만.**
 
     길드를 옮기면 새 길드의 깃발이 붙는다 (없으면 안 붙는다) - 사람이 아니라 지금 든 길드에서 읽는다.
     같은 길드 사람은 같은 문자열이다 (응답이 커지면 여기서 길드 번호만 주는 꼴로 바꿀 수 있다).
@@ -1310,8 +1352,7 @@ def name_flags(uids):
         return {}
     marks = ",".join("?" * len(ids))
     rows = db.q("SELECT m.user_id, g.flag FROM guild_member m JOIN guild g ON g.id=m.guild_id"
-                " JOIN bag b ON b.user_id=m.user_id AND b.item=? AND b.count>0"
-                " WHERE m.user_id IN (%s) AND g.flag IS NOT NULL" % marks, (FLAG_ITEM,) + tuple(ids))
+                " WHERE m.user_id IN (%s) AND g.flag IS NOT NULL" % marks, tuple(ids))
     return dict((r["user_id"], r["flag"]) for r in rows if r["flag"])
 
 
@@ -1325,7 +1366,7 @@ FLAG_SAY_GAP = 600      # 깃발을 고쳐 그린 알림은 10분에 한 번 - �
 
 
 def set_flag(uid, pixels, now=None):
-    """길드 깃발을 그린다 (마스터 · 부마스터 + 길드 깃발을 가진 사람). 다 지운 그림이면 깃발을 내린다.
+    """길드 깃발을 그린다 (마스터 · 부마스터, 사는 것 없이). 다 지운 그림이면 깃발을 내린다.
 
     돌려주는 것은 /api/guild 와 같은 꼴(state) + ok · message - 화면이 그대로 다시 그린다.
     """
@@ -1337,8 +1378,6 @@ def set_flag(uid, pixels, now=None):
         # 큰 요청은 다른 것을 보기 전에 막는다 (깃발은 576자 - 그보다 길면 볼 까닭이 없다)
         raise HTTPException(400, "깃발 그림이 너무 큽니다. %d x %d 칸까지 그릴 수 있습니다." % (FLAG.SIZE, FLAG.SIZE))
     m = _need_manager(uid)                  # 길드가 없으면 400, 일반 길드원이면 403
-    if not has_flag_item(uid):
-        raise HTTPException(403, "길드 깃발이 없습니다. 코인 상점 '길드 전용' 에서 길드 깃발을 사면 그릴 수 있습니다.")
     if not FLAG.valid(pixels):
         raise HTTPException(400, "깃발 그림이 올바르지 않습니다. %d x %d 칸을 정해진 빛깔로 칠해 주세요." % (FLAG.SIZE, FLAG.SIZE))
     gid = m["guild_id"]
@@ -1430,8 +1469,8 @@ def state(uid, now=None):
             "rejoinHours": config.GUILD_REJOIN_HOURS, "cooldown": cooldown(uid, now),
             "limits": {"name": [NAME_MIN, NAME_MAX], "intro": INTRO_MAX,
                        "chat": config.GUILD_CHAT_LEN, "subs": config.GUILD_MAX_SUBS},
-            # 길드 깃발 (2.5.0): 내가 가졌나 · 지금 그릴 수 있나 (마스터 · 부마스터 + 가짐)
-            "flagItem": has_flag_item(uid), "canFlag": False}
+            # 길드 깃발 (2.5.0): 지금 그릴 수 있나 (마스터 · 부마스터 - 사는 것 없이)
+            "canFlag": False}
     m = member(uid)
     if not m:
         pend = db.q("SELECT r.guild_id, r.created_at, g.name FROM guild_request r"
@@ -1484,7 +1523,7 @@ def state(uid, now=None):
         "members": members, "requests": reqs, "mission": ms, "pending": [],
         "chatLast": (last["x"] or 0) if last else 0, "stamp": _stamp(gid),
         "can": {"manage": m["role"] in ("master", "sub"), "master": m["role"] == "master"},
-        "canFlag": bool(base["flagItem"] and m["role"] in ("master", "sub")),
+        "canFlag": m["role"] in ("master", "sub"),
     })
     # 길드전 (시즌 4): 지금 어느 단계인가, 내가 칠 것이 남았나. 화면은 이것을 보고 '길드전' 칸을 낸다.
     from . import guild_war                  # 그쪽이 이 모듈을 불러온다 - 여기서는 쓸 때 부른다
