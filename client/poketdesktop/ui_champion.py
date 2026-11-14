@@ -309,9 +309,19 @@ class League(object):
 
     # ---- 창
     def open_window(self, parent=None):
-        if self.win is not None and self.win.alive:
-            self.win.focus()
-            return self.win
+        """독도 창을 띄운다. 이미 떠 있으면 앞으로.
+
+        **'떠 있다' 는 창이 실제로 있는지까지 본다** (2.5.0, 게시판 #542 '독도에 안 들어가져요'). 독도 창은 관장
+        창의 자식이라 관장 창을 닫으면 같이 사라지는데, 예전에는 그때 alive 가 그대로 남아 그 뒤로 독도를 누를
+        때마다 없는 창을 앞으로 꺼내려다 조용히 끝났다 - 앱을 다시 켤 때까지. 이제 사라지는 순간(<Destroy>)
+        스스로 정리하고, 그래도 남아 있으면 여기서 한 번 더 본다.
+        """
+        w = self.win
+        if w is not None and w.alive and w.exists():
+            w.focus()
+            return w
+        if w is not None:
+            w.gone()                   # 사라졌는데 정리가 안 됐다 - 지금 정리하고 새로 띄운다
         self.win = LeagueWindow(self, parent)
         return self.win
 
@@ -348,6 +358,8 @@ class LeagueWindow(object):
         self.seek_note = None
         self.top, f = ui_box._shell(parent or self.root, TITLE, U.wide(W), U.h(320))
         self.top.protocol("WM_DELETE_WINDOW", self.close)
+        # 관장 창(부모)을 닫으면 이 창도 같이 사라진다 - 그때 스스로 정리한다 (open_window 를 보라, 게시판 #542)
+        self.top.bind("<Destroy>", lambda e: self.gone() if e.widget is self.top else None, add="+")
         self.status = tk.Label(f, text=" ", bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w",
                                justify="left", wraplength=U.wide(W) - 48)
         self.status.pack(side="bottom", fill="x", pady=(6, 0))
@@ -381,7 +393,15 @@ class LeagueWindow(object):
         except tk.TclError:
             pass
 
-    def close(self):
+    def exists(self):
+        """창이 아직 화면에 있나 (부모와 같이 사라졌으면 False)."""
+        try:
+            return bool(self.top.winfo_exists())
+        except tk.TclError:
+            return False
+
+    def gone(self):
+        """창이 사라졌다 (닫았든 부모와 같이 사라졌든) - 타이머를 멈추고 League 가 이 창을 놓게 한다."""
         if not self.alive:
             return
         self.alive = False
@@ -394,6 +414,11 @@ class LeagueWindow(object):
         self._job = self._tick_job = None
         if self.league.win is self:
             self.league.win = None
+
+    def close(self):
+        if not self.alive:
+            return
+        self.gone()
         try:
             self.top.destroy()
         except tk.TclError:

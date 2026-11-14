@@ -311,6 +311,36 @@ def main():
     chk("  관전은 참가자만 - [관전] 단추가 없다", not find_buttons(lw.body, "관전") and "라온  vs  바다 · 3턴" in t)
     lw.close()
 
+    print("=== 관장 창을 닫은 뒤에도 독도가 다시 열린다 (2.5.0, 게시판 #542) ===")
+    # 독도 창은 관장 창의 자식이다. 관장 창을 닫으면 같이 사라지는데, 예전에는 alive 가 남아서 그 뒤로 독도를
+    # 누르면 없는 창을 앞으로 꺼내려다 조용히 끝났다 (앱을 다시 켤 때까지 '독도에 안 들어가져요').
+    gym = tk.Toplevel(root)
+    gym.geometry("300x200+40+40")
+    root.update()
+    app.open_league(gym)
+    old = app.league.win
+    TG.pump(root, lambda: old.st is not None)
+    gym.destroy()                                   # 관장 창을 닫았다 - 독도 창도 같이 사라진다
+    root.update()
+    chk("부모와 같이 사라지면 스스로 정리한다 (alive · League.win)", not old.alive and app.league.win is None,
+        (old.alive, app.league.win))
+    app.open_league()
+    new = app.league.win
+    TG.pump(root, lambda: new is not None and new.st is not None)
+    root.update()
+    chk("  다시 누르면 새 창이 뜬다", new is not None and new is not old and new.alive and new.exists()
+        and new.top.winfo_viewable(), (new, new and new.exists()))
+    stale = new
+    stale.top.unbind("<Destroy>")                   # 예전 코드처럼 정리 없이 사라진 경우 (alive 만 남았다)
+    stale.top.destroy()
+    root.update()
+    app.open_league()
+    again = app.league.win
+    TG.pump(root, lambda: again.st is not None)
+    chk("  정리가 안 된 채 사라졌어도 open_window 가 알아채고 새로 띄운다", again is not stale and again.exists()
+        and not stale.alive, (again is stale, stale.alive))
+    again.close()
+
     print("=== 참가자 ===")
     api.st = member_state()
     app.open_league()
