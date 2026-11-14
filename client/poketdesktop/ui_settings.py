@@ -300,6 +300,7 @@ class SettingsWindow(object):
         self.grass = tk.BooleanVar(value=bool(s.get("showGrass", True)))
         self.notif = tk.BooleanVar(value=bool(s.get("notifyImportant", True)))
         self.drag = tk.BooleanVar(value=bool(s.get("petDrag", False)))
+        self.behind = tk.BooleanVar(value=bool(s.get("petBehind", False)))
         self.fr_note = tk.BooleanVar(value=bool(s.get("friendlyNotify", True)))
         self.fr_auto = tk.BooleanVar(value=bool(s.get("friendlyAuto", False)))
         self.cl_note = tk.BooleanVar(value=bool(s.get("championNotify", True)))
@@ -321,6 +322,9 @@ class SettingsWindow(object):
                  "내려놓을 수 있습니다. 돌아다닐 영역 안에서만 옮겨지고, 포켓몬은 "
                  "내려놓으면 잠깐 서 있다가 다시 걸어다닙니다. 야생 포켓몬과 배틀 "
                  "중인 포켓몬은 옮길 수 없습니다.", self._toggle_plain),
+                # 다른 창 뒤로 (2.5.0, 게시판 #533) - 떠 있는 창에 바로 건다 (overlay.apply_behind)
+                (self.behind, "포켓몬을 다른 창 뒤로", "petBehind",
+                 "켜면 포켓몬 · 알 · 이름표가 다른 프로그램 창을 가리지 않고 그 뒤에서 돌아다닙니다. 바탕화면이 보이는 자리에서는 그대로 보입니다. 풀숲과 배틀 연출은 그대로 맨 위에 뜹니다.", self._toggle_behind),
                 (self.grass, "풀숲 띄우기", "showGrass",
                  "끄면 야생이 돋지 않습니다. 데려온 포켓몬은 그대로"
                  " 걸어다닙니다.", self._toggle_grass),
@@ -662,6 +666,15 @@ class SettingsWindow(object):
         """
         self.app.settings[key] = bool(var.get())
         self._save()
+        self.app.refresh_tray()
+
+    def _toggle_behind(self, key, var):
+        """포켓몬을 다른 창 뒤로 (2.5.0). 저장하고 떠 있는 도트 · 이름표 · 알에 바로 건다 - 다시 만들지 않는다."""
+        self.app.settings[key] = bool(var.get())
+        self._save()
+        ov = getattr(self.app, "overlay", None)
+        if ov is not None and hasattr(ov, "apply_behind"):
+            ov.apply_behind()
         self.app.refresh_tray()
 
     def _toggle_grass(self, _key, var):
