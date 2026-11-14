@@ -23,8 +23,16 @@
 줄마다 [−] 왼쪽의 별(☆/★)을 누르면 그 도구는 '판매 제외' 다. '전부 고르기' 에서 빠지고, 별을 풀기 전에는
 + · 전부 · 줄 누르기도 안 먹는다 (아끼는 도구가 한꺼번에 팔릴까 봐 일일이 확인하던 것). 목록은 앱 설정
 sellKeep 에 남는다 - 서버는 모른다 (취향이다).
+
+## 분류 (2.5.0, 게시판 #522)
+
+목록 위의 칩(전체 · 지닌 도구 · 열매 · 폼 도구 · 진화의 돌 …)으로 그 분류만 본다. 가방에 있는 분류만 나온다.
+**열매는 따로 뺀다** - 가방의 분류로는 지닌 도구(오랭열매)와 노력치(시몬열매)에 섞여 있다. '전부 고르기' 는
+**지금 보이는 분류만** 고른다 (지닌 도구만 정리하려다 다른 것까지 다 고르지 않게). 고른 것과 합계는 분류를
+바꿔도 그대로 남는다.
 """
 import tkinter as tk
+import tkinter.font as tkfont
 
 from common.korean import natural
 
@@ -32,11 +40,59 @@ from . import item_icons
 from . import skins
 from . import ui_common as U
 from . import ui_loading
-from .ui_bag import _scroller
+from .ui_bag import CAT_KR, _scroller
 
 W, H = 520, 620
 ROW_H = 44
 KEEP = ("POKEBALL",)     # 이건 안 판다 (가방의 팔기와 같다)
+
+# 분류 칩의 차례와 이름 (2.5.0). 가방의 분류(CAT_KR)에 '열매' 를 더한다.
+GROUP_ORDER = ["held", "berry", "form", "stone", "megastone", "zcrystal", "ev", "iv", "ball", "misc", "deco"]
+GROUP_KR = dict(CAT_KR, berry="열매", all="전체")
+
+
+def group_of(it):
+    """여러 개 팔기의 분류. 열매는 지닌 도구 · 노력치에 섞여 있어서 따로 뺀다. 모르는 분류는 기타."""
+    if str(it.get("id") or "").endswith("BERRY"):
+        return "berry"
+    cat = it.get("cat") or "misc"
+    return cat if cat in GROUP_ORDER else "misc"
+
+
+def groups(lines):
+    """칩으로 보일 분류 [(열쇠, 이름)] - 전체 + 목록에 있는 것만 (GROUP_ORDER 차례). 분류가 하나뿐이면 전체만."""
+    have = set(group_of(it) for it, _h, _p in lines or [])
+    out = [(g, GROUP_KR.get(g, g)) for g in GROUP_ORDER if g in have]
+    return [("all", GROUP_KR["all"])] + (out if len(out) > 1 else [])
+
+
+class _Chips(object):
+    """분류 칩 (기본 테마). 창 폭에 맞춰 줄을 바꾼다. 고른 칩은 Segmented 처럼 금색."""
+
+    def __init__(self, parent, items, current, on_pick, width):
+        self.frame = tk.Frame(parent, bg=U.BG)
+        self.cells = {}
+        fnt = tkfont.Font(root=parent, font=U.FONT_XS)
+        pad, gap = U.h(10), U.h(6)
+        row, used = None, 0
+        for key, label in items:
+            w = fnt.measure(label) + 2 * pad + gap + 4
+            if row is None or used + w > width:
+                row = tk.Frame(self.frame, bg=U.BG)
+                row.pack(fill="x", pady=(0, U.h(4)))
+                used = 0
+            lb = tk.Label(row, text=label, font=U.FONT_XS, padx=pad, pady=U.h(2), bd=0)
+            lb.pack(side="left", padx=(0, gap))
+            lb.bind("<Button-1>", lambda _e, k=key: on_pick(k))
+            self.cells[key] = lb
+            used += w
+        self.set(current)
+
+    def set(self, key):
+        for k, lb in self.cells.items():
+            on = k == key
+            lb.configure(bg=U.ACCENT if on else U.INK, fg=U.ACCENT_DARK if on else U.FG_DIM,
+                         cursor="" if on else "hand2")
 
 
 def won(n):
@@ -75,6 +131,8 @@ class SellMany(object):
         self.stars = {}              # 도구 id -> 별 라벨 (기본 테마)
         self.lines = sellable(items, bag)
         self.money = int(money or 0)
+        self.group = "all"           # 지금 보는 분류 (2.5.0, 게시판 #522)
+        self.chips = None
 
         self.win = tk.Toplevel(parent)
         U.style_window(self.win, "여러 개 팔기", W, H)
@@ -118,6 +176,12 @@ class SellMany(object):
         self.hint = tk.Label(head, text="", bg=U.BG, fg=U.FG_FAINT,
                              font=U.FONT_XS, anchor="e")
         self.hint.pack(side="right")
+
+        # 분류 칩 (2.5.0). 분류가 둘 이상일 때만
+        items = groups(self.lines)
+        if len(items) > 1:
+            self.chips = _Chips(f, items, self.group, self.set_group, U.h(W) - U.h(36))
+            self.chips.frame.pack(fill="x", pady=(2, 2))
 
         self.canvas, self.box = _scroller(f, U.BG)
         U.scrollable(self.canvas, 60)
@@ -189,6 +253,34 @@ class SellMany(object):
         self.hint.configure(text="가진 돈 %s원" % won(self.money))
         self.ok_btn.configure(text="팔기" if not pieces else "%s원에 팔기" % won(total))
 
+    # ---------------- 분류 (2.5.0) ----------------
+    def visible(self):
+        """지금 보이는 도구 id (목록 차례). 전체면 다."""
+        return [it["id"] for it, _h, _p in self.lines if self.group == "all" or group_of(it) == self.group]
+
+    def set_group(self, key):
+        """그 분류만 본다. 고른 것과 합계는 그대로."""
+        if key == self.group:
+            return
+        self.group = key
+        if self.chips is not None:
+            self.chips.set(key)
+        self._show_group()
+        self._paint()
+
+    def _show_group(self):
+        """보이는 줄만 담는다 (기본 테마 - 줄 틀을 빼고 다시 담는다). 맨 위로 굴린다."""
+        show = set(self.visible())
+        for iid, (f, _c, _h, _p) in self.rows.items():
+            f.pack_forget()
+        for it, _h, _p in self.lines:
+            if it["id"] in show:
+                self.rows[it["id"]][0].pack(fill="x", pady=2)
+        try:
+            self.canvas.yview_moveto(0)
+        except (tk.TclError, AttributeError):
+            pass
+
     # ---------------- 고르기 ----------------
     def toggle_keep(self, iid):
         """판매 제외 별을 켜고 끈다. 켜면 그 도구는 고른 것에서도 빠진다."""
@@ -239,7 +331,9 @@ class SellMany(object):
         self._paint()
 
     def _all(self):
-        for iid, (_f, _c, have, _p) in self.rows.items():
+        """지금 보이는 분류만 다 고른다 (2.5.0 - 전체를 보고 있으면 전부). 판매 제외는 빼고."""
+        for iid in self.visible():
+            _f, _c, have, _p = self.rows[iid]
             if iid in self.keep:                 # 판매 제외는 빼고
                 self.pick.pop(iid, None)
                 continue

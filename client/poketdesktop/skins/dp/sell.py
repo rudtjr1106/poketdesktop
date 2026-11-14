@@ -91,6 +91,15 @@ class SellMany(S.SellMany):
         self.head.pack(side="top", fill="x")
         self.all_btn = K.CButton(self.head, "전부 고르기", self._all, "gray", font(10))
         self.none_btn = K.CButton(self.head, "고른 것 지우기", self._none, "gray", font(10))
+        # 분류 칩 (2.5.0, 게시판 #522) - 분류가 둘 이상일 때만. 고른 칩은 파랑
+        items = S.groups(self.lines)
+        self.chip_btns = []
+        if len(items) > 1:
+            for key, label in items:
+                b = K.CButton(self.head, label, (lambda k=key: self.set_group(k)),
+                              "blue" if key == self.group else "gray", font(9))
+                b.key = key
+                self.chip_btns.append(b)
         self.head.bind("<Configure>", lambda _e: self._draw_head())
 
         # 가운데 (흰 판 한 겹 안의 줄들)
@@ -126,6 +135,18 @@ class SellMany(S.SellMany):
         self.all_btn.layout(0, by, w1, by + s(BTN_H) + 2)
         self.none_btn.layout(w1 + s(8), by, w1 + s(8) + w2, by + s(BTN_H) + 2)
         want = by + s(BTN_H) + 4
+        # 분류 칩 - 폭에 맞춰 줄을 바꾼다
+        if self.chip_btns:
+            ch = s(24)
+            x, y = 0, want + s(4)
+            for b in self.chip_btns:
+                bw = b.want_width(s(18))
+                if x and x + bw > w:
+                    x, y = 0, y + ch + s(6)
+                b.kind = "blue" if b.key == self.group else "gray"
+                b.layout(x, y, x + bw, y + ch + 2)
+                x += bw + s(6)
+            want = y + ch + 4
         if int(cv.cget("height")) != want:
             cv.configure(height=want)
 
@@ -204,6 +225,15 @@ class SellMany(S.SellMany):
         self._flat(cv, allb, by1, by2, ok, tags)
         cv.create_text((allb[0] + allb[1]) // 2, cy, text="전부", fill=INK if ok else FAINT, font=font(9),
                        anchor="center", tags=tags)
+
+    def _show_group(self):
+        """보이는 줄만 목록에 (2.5.0). 칩 빛깔도 다시."""
+        ids = self.visible()
+        if ids:
+            self.vl.set([(U.h(ROW), iid) for iid in ids], keep=False)
+        else:
+            self.vl.set([(U.h(ROW), None)], keep=False)
+        self._draw_head()
 
     @staticmethod
     def _flat(cv, box, y1, y2, ok, tags):
