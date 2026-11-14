@@ -565,6 +565,15 @@ jobs:
       - name: 상자 바뀐 것만 다시 받기 (진짜 Tk)
         if: matrix.shard == 2
         run: python client/test_box_pick_ui.py
+      # 2.5.0 (게시판 #522 · #533 · #543): 여러 개 팔기 분류 칩 (두 테마) · 포켓몬을 다른 창 뒤로 · 관리 창 칸 폭 끌기
+      - name: 여러 개 팔기 분류 · 다른 창 뒤로 · 칸 폭 (진짜 Tk)
+        if: matrix.shard == 1
+        shell: bash
+        run: |
+          python client/test_sell_groups.py
+          python client/test_sell_groups.py dp
+          python client/test_pet_behind.py
+          python client/test_box_cols_ui.py
       - name: 새 기술머신 표시 (진짜 Tk)
         if: matrix.shard == 2
         run: python client/test_tm_new.py
@@ -694,12 +703,9 @@ jobs:
       # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0, 1.12.0 에서 쌓이는 말풍선·키보드 되찾기): 걷기·말풍선·보따리
       - name: 친구 채팅 (진짜 Tk)
         run: python client/test_visit_ui.py
-      # 2.5.0: 실시간 배틀 초대 · 새 앱 판 알림을 놀러 가기 소켓으로 받는다
-      - name: 소켓 알림 - 실시간 배틀 초대 · 새 판
-        run: python client/test_live_push_ui.py
-      # 2.5.0: 상자 창이 동작 하나 뒤에 바뀐 것만 다시 받는다
-      - name: 상자 바뀐 것만 다시 받기 (진짜 Tk)
-        run: python client/test_box_pick_ui.py
+      # 2.5.0 (게시판 #533): 포켓몬을 다른 창 뒤로 - 맥은 NSWindow 층을 내리고 orderBack 한다 (platform_mac.send_back)
+      - name: 포켓몬을 다른 창 뒤로 (진짜 Tk)
+        run: python client/test_pet_behind.py
       # **검은 테두리 검사(smoke_anim_resize.py)는 여기서 안 돌린다.**
       # 그건 윈도우의 투명색 창(-transparentcolor)이 새로 드러난 자리를
       # 검게 합성하는 것이고, 맥은 platform_mac.py 에 SpriteView 를 따로

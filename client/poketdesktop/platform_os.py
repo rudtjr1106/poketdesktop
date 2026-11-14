@@ -32,6 +32,8 @@ raise_above = _M.raise_above
 # 이미 '항상 위' 인 창을 다시 맨 위로 (overlay 가 몇 초에 한 번 부른다).
 keep_on_top = getattr(_M, "keep_on_top", _M.raise_above)
 show_again = _M.show_again
+# '항상 위' 를 풀고 다른 창 뒤에 둔다 (2.5.0, 설정 petBehind)
+send_back = _M.send_back
 bind_right = _M.bind_right
 RIGHT_CLICK = _M.RIGHT_CLICK
 NATIVE_MENU = getattr(_M, "NATIVE_MENU", True)

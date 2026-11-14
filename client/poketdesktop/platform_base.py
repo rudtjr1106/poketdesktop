@@ -13,7 +13,8 @@
     SpriteView                       투명 창 안에서 도트를 그리는 것
     work_area(w, h)                  쓸 수 있는 화면 (작업표시줄/독 제외)
     double_click_ms()                두 번 클릭으로 치는 간격
-    show_again(win)                  숨긴 창을 다시 보여준다 (항상 위를 다시 건다)
+    show_again(win)                  숨긴 창을 다시 보여준다 (항상 위를 다시 건다 - win._poket_behind 면 뒤로)
+    send_back(win)                   항상 위를 풀고 다른 창 뒤에 둔다 (설정 petBehind, 2.5.0)
     bind_right(widget, fn)           오른쪽 클릭을 건다 (버튼 번호가 OS 마다 다르다)
     single_lock(dir) / single_release(h)   중복 실행 막기
     data_dir(app_name)               설정을 두는 자리 (None 이면 기본 자리)
@@ -106,7 +107,24 @@ def show_again(win):
     포켓몬이 다른 창 뒤로 숨는다.
     """
     win.deiconify()
+    if getattr(win, "_poket_behind", False):
+        send_back(win)              # 다른 창 뒤로 다니는 포켓몬 (설정 petBehind) - 다시 보일 때도 뒤로
+        return
     raise_above(win)
+
+
+def send_back(win):
+    """'항상 위' 를 풀고 다른 창 뒤에 둔다 (2.5.0, 설정 petBehind, 게시판 #533). 기본 구현은 -topmost 만 푼다.
+
+    창이 튀면(테두리 없는 창) 제자리로 돌린다 (raise_above 와 같은 까닭).
+    """
+    try:
+        before = (win.winfo_x(), win.winfo_y())
+        win.attributes("-topmost", False)
+        if (win.winfo_x(), win.winfo_y()) != before:
+            win.geometry("+%d+%d" % before)
+    except Exception:                                       # noqa: BLE001
+        pass
 
 
 def make_click_through(win):

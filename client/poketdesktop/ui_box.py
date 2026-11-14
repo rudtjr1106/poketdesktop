@@ -69,6 +69,40 @@ COLS = [("도감", 12, 50, "w"), ("이름", 66, 168, "w"), ("Lv", 240, 34, "cent
         ("타입", 282, 118, "w"), ("성격", 404, 56, "center"),
         ("개체값", 464, 58, "center"), ("위치", 528, 74, "center")]
 
+# ---- 칸 너비 조절 (2.5.0, 게시판 #543) ----
+# 머리글의 칸 경계를 끌어서 칸 폭을 바꾼다 (엑셀처럼). 바꾼 폭은 설정 boxCols({제목: 폭})에 남아 껐다 켜도 그대로다.
+# 글자를 크게 해서 이름 · 레벨이 칸에 안 들어가거나 겹칠 때 쓴다. 경계를 두 번 누르면 그 칸만 처음 폭으로.
+# 칸 사이는 처음 배치(COLS)의 간격 그대로 두고 폭만 바꾼다 - 기본 폭이면 예전과 한 픽셀도 다르지 않다.
+COL_GAPS = [4, 6, 8, 4, 4, 6]       # 칸 사이 (COLS 의 x 에서 앞 칸 끝을 뺀 것)
+COL_MIN = 24                        # 이보다 좁게는 안 줄인다
+COL_MAX = 480
+# 상세 칸 폭 (설정 boxDetailW). 목록과의 경계를 끌어 넓힌다. 0 이면 DETAIL_W.
+DETAIL_MAX = 2 * 340
+
+
+def col_layout(widths=None):
+    """칸 배치 [(제목, x, 폭, 맞춤)]. widths = {제목: 폭} (끌어서 바꾼 것). 없는 칸은 COLS 의 폭."""
+    widths = widths if isinstance(widths, dict) else {}
+    out, x = [], COLS[0][1]
+    for i, (title, _x, w, anchor) in enumerate(COLS):
+        try:
+            w = int(widths.get(title, w))
+        except (TypeError, ValueError):
+            pass
+        w = max(COL_MIN, min(COL_MAX, w))
+        out.append((title, x, w, anchor))
+        x += w + (COL_GAPS[i] if i < len(COL_GAPS) else 6)
+    return out
+
+
+def detail_width(settings):
+    """상세 칸 폭 - 설정(boxDetailW)이 있으면 그것, 없으면 DETAIL_W. DETAIL_W 보다 좁게는 안 된다."""
+    try:
+        w = int((settings or {}).get("boxDetailW") or 0)
+    except (TypeError, ValueError):
+        w = 0
+    return max(DETAIL_W, min(DETAIL_MAX, w)) if w else DETAIL_W
+
 STAT_ROWS = [("hp", "HP"), ("atk", "공격"), ("def", "방어"),
              ("spa", "특수공격"), ("spd", "특수방어"), ("spe", "스피드")]
 
@@ -244,9 +278,11 @@ class Row(object):
     뒤 모든 줄을 다시 칠하면 줄 수만큼 도로 멈춘다.
     """
 
-    def __init__(self, parent, mon, dex, on_pick, dnd=None, selected=False):
+    def __init__(self, parent, mon, dex, on_pick, dnd=None, selected=False, cols=None):
         self.mon = mon
         self.dex = dex
+        self.cols = cols or COLS      # 칸 배치 (2.5.0 - 창이 끌어서 바꾼 폭을 준다, col_layout)
+        self._placed = []             # [(칸 위젯, 몇째 칸)] - relayout 이 다시 놓는다
         self.sig = _row_sig(mon)
         self.on_pick = on_pick
         # 끌어서 옮기기. 창이 넘겨준 세 가지를 그대로 부른다.
@@ -287,9 +323,9 @@ class Row(object):
 
         self.cells = []
         self._num_text = "알" if self.egg else "%04d" % mon.get("num", 0)
-        self.num_cell = self._cell(self._num_text, COLS[0], U.FG_FAINT, U.FONT_XS)
+        self.num_cell = self._cell(self._num_text, 0, U.FG_FAINT, U.FONT_XS)
         self.name_cell = self._cell(
-            name, COLS[1],
+            name, 1,
             self._egg_fg() or (U.SHINY if shiny else
                                (_egg_color(self.legend) if self.legend
                                 else (U.FG if self.party else dim))),
@@ -300,19 +336,19 @@ class Row(object):
                 wpx = _text_width(self.f, name, U.FONT_S)
             except Exception:
                 wpx = len(name) * 11
-            gx = min(COLS[1][1] + wpx + 6, COLS[2][1] - 14)
+            self._name_px = wpx
             self.gender = tk.Label(self.f, text=g, bg=base,
                                    fg=U.gender_color(mon.get("gender")),
                                    font=U.FONT_S)
-            self.gender.place(x=gx, rely=0.5, anchor="w")
+            self.gender.place(x=self._gender_x(), rely=0.5, anchor="w")
             self.cells.append(self.gender)
         else:
             self.gender = None
-        self._cell("-" if self.egg else str(mon.get("level", "")), COLS[2],
+        self._cell("-" if self.egg else str(mon.get("level", "")), 2,
                    U.FG if self.party else dim, U.FONT_B)
 
         self.types = tk.Frame(self.f, bg=base)
-        self.types.place(x=COLS[3][1], rely=0.5, anchor="w")
+        self.types.place(x=self.cols[3][1], rely=0.5, anchor="w")
         if self.egg:
             kind = self.egg.get("kind")
             U.chip(self.types, EGG_KIND.get(kind, "알"), _egg_color(kind),
@@ -327,21 +363,21 @@ class Row(object):
         if self.egg:
             pct, hours = box_filter.egg_progress(self.egg)
             # 성격 칸에는 남은 시간, 개체값 칸에는 자란 정도.
-            self._cell("%d시간" % hours if hours else "곧!", COLS[4], dim, U.FONT_XS)
-            self._cell("%d%%" % pct, COLS[5],
+            self._cell("%d시간" % hours if hours else "곧!", 4, dim, U.FONT_XS)
+            self._cell("%d%%" % pct, 5,
                        U.GOOD if pct >= 90 else (U.FG if self.party else dim),
                        U.FONT_XS)
         else:
-            self._cell(info.get("nature", ""), COLS[4], dim, U.FONT_XS)
+            self._cell(info.get("nature", ""), 4, dim, U.FONT_XS)
             iv = info.get("ivPercent", 0)
             # 이 칸은 종족값 순으로 볼 때 종족값 합계로 바뀐다 (show_bst). 두 쪽 글을 다 들고 있는다.
             self._iv_text = ("%.0f%%" % iv, U.GOOD if iv >= 75 else (U.FG if self.party else dim))
             bst = box_filter.bst_of(mon, dex)
             self._bst_text = ("%d" % bst, U.GOOD if bst >= 600 else (U.FG if self.party else dim))
-            self.iv_cell = self._cell(self._iv_text[0], COLS[5], self._iv_text[1], U.FONT_XS)
+            self.iv_cell = self._cell(self._iv_text[0], 5, self._iv_text[1], U.FONT_XS)
         # 탐험에 나가 있는 포켓몬 (1.10.4): 박스에 있지만 데리고 다닐 수 없다
         away = bool(mon.get("away")) and not self.party
-        self._cell("따라다님" if self.party else ("탐험 중" if away else "박스"), COLS[6],
+        self._cell("따라다님" if self.party else ("탐험 중" if away else "박스"), 6,
                    U.GOOD if self.party else (U.INFO if away else U.FG_FAINT), U.FONT_XS)
 
         pid = self.mon["id"]
@@ -376,13 +412,31 @@ class Row(object):
         except tk.TclError:
             pass
 
-    def _cell(self, text, col, fg, font):
-        title, x, w, anchor = col
+    def _cell(self, text, idx, fg, font):
+        title, x, w, anchor = self.cols[idx]
         lb = tk.Label(self.f, text=text, bg=self.base, fg=fg, font=font,
                       anchor=anchor if anchor != "center" else "center")
         lb.place(x=x if anchor == "w" else x, y=0, width=w, relheight=1.0)
         self.cells.append(lb)
+        self._placed.append((lb, idx))
         return lb
+
+    def _gender_x(self):
+        """성별 기호 자리 - 이름 바로 뒤, 단 레벨 칸을 넘지 않게."""
+        return min(self.cols[1][1] + getattr(self, "_name_px", 0) + 6, self.cols[2][1] - 14)
+
+    def relayout(self, cols):
+        """칸 폭이 바뀌었다 (머리글 경계를 끌었다, 2.5.0) - 칸들을 새 자리 · 폭으로 다시 놓는다. 줄을 다시 만들지 않는다."""
+        self.cols = cols
+        try:
+            for lb, idx in self._placed:
+                _t, x, w, _a = cols[idx]
+                lb.place_configure(x=x, width=w)
+            if self.gender is not None:
+                self.gender.place_configure(x=self._gender_x())
+            self.types.place_configure(x=cols[3][1])
+        except tk.TclError:
+            pass
 
     def pack(self, **kw):
         """줄과 그 아래 선을 함께 담는다. after/before 는 줄에 건다."""
@@ -491,6 +545,14 @@ class BoxWindow(object):
         self._sep_on = False     # 'PC 박스' 머리가 담겨 있나
         self._wait = None        # 불러오는 중 표시
         self.sel = None
+        # 칸 배치 (2.5.0, 게시판 #543 - 머리글 경계를 끌어서 바꾼 폭, 설정 boxCols) · 상세 칸 폭 (boxDetailW)
+        self.cols = col_layout((getattr(app, "settings", None) or {}).get("boxCols"))
+        self.detail_w = detail_width(getattr(app, "settings", None))
+        self._col_drag = None
+        self._col_job = None
+        self._head_cells = []         # [(머리글, 몇째 칸)]
+        self._handles = []            # [(경계 손잡이, 몇째 칸)]
+        self.d_frame = None           # 상세 칸 (폭을 끌어서 바꾼다)
         # 놓아준 뒤에는 아무것도 고르지 않은 채 둔다 (게시판 #512) - 사용자가 직접 누를 때까지. clear_selection 참고
         self._keep_empty = False
         # 끌어서 옮기기 상태. Row 가 이 세 가지를 부른다.
@@ -635,10 +697,11 @@ class BoxWindow(object):
         head.pack(fill="x")
         head.pack_propagate(False)
         self.heads = {}          # 기준 -> 그 머리글 (누르면 그 기준으로 줄 세워 본다)
-        for title, x, w, anchor in COLS:
+        for i, (title, x, w, anchor) in enumerate(self.cols):
             lb = tk.Label(head, text=title, bg=U.INK, fg=U.FG_FAINT, font=U.FONT_XS,
                           anchor=anchor if anchor != "center" else "center")
             lb.place(x=x, y=0, width=w, relheight=1.0)
+            self._head_cells.append((lb, i))
             key = SORT_OF.get(title)
             if key:
                 # 머리글을 누르면 박스를 넘어 그 기준으로 줄 세워 본다. 다시 누르면 박스로 돌아온다.
@@ -647,6 +710,7 @@ class BoxWindow(object):
                 lb.configure(cursor="hand2")
                 lb.bind("<Button-1>", lambda _e, k=key: self.set_sort(k))
         self.head_iv = self.heads["bst"]     # (종족값 순으로 볼 때 이 칸에 종족값 합계가 적힌다)
+        self._col_handles(head)
         self._paint_sort()
         tk.Frame(wrap, bg=U.LINE, height=U.h(2)).pack(fill="x")
 
@@ -680,6 +744,153 @@ class BoxWindow(object):
                                  text="거름망에 맞는 포켓몬이 박스에 없습니다.",
                                  bg=U.BG, fg=U.FG_FAINT, font=U.FONT_S)
 
+    # ---------------- 칸 너비 · 상세 칸 폭 (2.5.0, 게시판 #543) ----------------
+    def _col_handles(self, head):
+        """머리글의 칸 경계마다 끌 손잡이. 칸 오른쪽 끝(다음 칸과의 사이)에 둔다."""
+        for i in range(len(self.cols)):
+            hd = tk.Frame(head, bg=U.INK, width=U.h(7), cursor="sb_h_double_arrow")
+            hd.bind("<ButtonPress-1>", lambda e, k=i: self._col_press(k, e))
+            hd.bind("<B1-Motion>", self._col_move)
+            hd.bind("<ButtonRelease-1>", self._col_release)
+            hd.bind("<Double-Button-1>", lambda _e, k=i: self.reset_col(k))
+            hd.bind("<Enter>", lambda _e, w=hd: w.configure(bg=U.LINE2))
+            hd.bind("<Leave>", lambda _e, w=hd: w.configure(bg=U.INK))
+            self._handles.append((hd, i))
+        self._place_handles()
+
+    def _place_handles(self):
+        hw = U.h(7)
+        for hd, i in self._handles:
+            _t, x, w, _a = self.cols[i]
+            gap = COL_GAPS[i] if i < len(COL_GAPS) else 6
+            hd.place(x=x + w + gap // 2 - hw // 2, y=0, width=hw, relheight=1.0)
+            hd.lift()
+
+    def col_widths(self):
+        """{제목: 폭} - 지금 칸 폭."""
+        return dict((t, w) for t, _x, w, _a in self.cols)
+
+    def set_col_width(self, i, w, save=False):
+        """i 째 칸의 폭을 바꾸고 머리글 · 줄을 다시 놓는다. save 면 설정에 적는다."""
+        widths = self.col_widths()
+        widths[self.cols[i][0]] = w
+        self.cols = col_layout(widths)
+        self._apply_cols()
+        if save:
+            self._save_cols()
+
+    def reset_col(self, i):
+        """그 칸만 처음 폭으로 (경계를 두 번 눌렀다)."""
+        self.set_col_width(i, COLS[i][2], save=True)
+
+    def _apply_cols(self):
+        try:
+            for lb, i in self._head_cells:
+                _t, x, w, _a = self.cols[i]
+                lb.place_configure(x=x, width=w)
+            self._place_handles()
+        except tk.TclError:
+            return
+        for r in list(self.rows.values()):
+            if r is not None and hasattr(r, "relayout"):      # DP 테마는 줄 대신 None (칸 폭 끌기는 기본 테마만)
+                r.relayout(self.cols)
+
+    def _save_cols(self):
+        """기본 폭과 다른 칸만 적는다 (설정 boxCols). 다 기본이면 지운다."""
+        s = getattr(self.app, "settings", None)
+        if s is None:
+            return
+        base = dict((t, w) for t, _x, w, _a in COLS)
+        changed = dict((t, w) for t, w in self.col_widths().items() if base.get(t) != w)
+        if changed:
+            s["boxCols"] = changed
+        else:
+            s.pop("boxCols", None)
+        self._save_settings()
+
+    def _save_settings(self):
+        try:
+            from . import config
+            config.save_settings(self.app.settings)
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    def _col_press(self, i, e):
+        self._col_drag = (i, e.x_root, self.cols[i][2])
+
+    def _col_move(self, e):
+        d = self._col_drag
+        if d is None:
+            return
+        i, x0, w0 = d
+        w = max(COL_MIN, min(COL_MAX, w0 + (e.x_root - x0)))
+        if w == self.cols[i][2]:
+            return
+        widths = self.col_widths()
+        widths[self.cols[i][0]] = w
+        self.cols = col_layout(widths)
+        # 끄는 동안 마우스 움직임마다 줄을 다 다시 놓으면 무겁다 - 한가할 때 한 번에
+        if self._col_job is None:
+            self._col_job = self.root.after_idle(self._col_flush)
+
+    def _col_flush(self):
+        self._col_job = None
+        self._apply_cols()
+
+    def _col_release(self, _e):
+        if self._col_drag is None:
+            return
+        self._col_drag = None
+        if self._col_job is not None:
+            try:
+                self.root.after_cancel(self._col_job)
+            except Exception:                               # noqa: BLE001
+                pass
+            self._col_job = None
+        self._apply_cols()
+        self._save_cols()
+
+    def set_detail_width(self, w, save=False):
+        """상세 칸 폭을 바꾼다 (DETAIL_W ~ DETAIL_MAX, 목록이 너무 좁아지지 않게). save 면 설정 boxDetailW 에."""
+        w = max(DETAIL_W, min(DETAIL_MAX, int(w)))
+        try:
+            room = self.win.winfo_width() - U.h(420)          # 목록 칸은 이만큼은 남긴다
+            if room > DETAIL_W:
+                w = min(w, room)
+        except tk.TclError:
+            pass
+        self.detail_w = w
+        if self.d_frame is not None:
+            try:
+                self.d_frame.configure(width=w)
+            except tk.TclError:
+                pass
+        if save:
+            s = getattr(self.app, "settings", None)
+            if s is not None:
+                if w == DETAIL_W:
+                    s.pop("boxDetailW", None)
+                else:
+                    s["boxDetailW"] = w
+                self._save_settings()
+        return w
+
+    def _sash_press(self, e):
+        self._sash_drag = (e.x_root, self.detail_w)
+
+    def _sash_move(self, e):
+        d = getattr(self, "_sash_drag", None)
+        if d is None:
+            return
+        x0, w0 = d
+        self.set_detail_width(w0 - (e.x_root - x0))       # 왼쪽으로 끌면 넓어진다
+
+    def _sash_release(self, _e):
+        if getattr(self, "_sash_drag", None) is None:
+            return
+        self._sash_drag = None
+        self.set_detail_width(self.detail_w, save=True)
+
     def fit_scroll(self):
         """스크롤 영역을 내용에 맞춘다.
 
@@ -694,9 +905,20 @@ class BoxWindow(object):
         self.fit.schedule()
 
     def _detail(self, parent):
-        d = tk.Frame(parent, bg=U.BG2, width=DETAIL_W, highlightthickness=0)
+        d = tk.Frame(parent, bg=U.BG2, width=getattr(self, "detail_w", DETAIL_W), highlightthickness=0)
         d.pack(side="right", fill="y")
         d.pack_propagate(False)
+        self.d_frame = d
+        # 목록과의 경계 (2.5.0, 게시판 #543) - 끌어서 상세 칸을 넓힌다. 두 번 누르면 처음 폭으로
+        sash = tk.Frame(parent, bg=U.BG, width=U.h(5), cursor="sb_h_double_arrow")
+        sash.pack(side="right", fill="y")
+        sash.bind("<ButtonPress-1>", self._sash_press)
+        sash.bind("<B1-Motion>", self._sash_move)
+        sash.bind("<ButtonRelease-1>", self._sash_release)
+        sash.bind("<Double-Button-1>", lambda _e: self.set_detail_width(DETAIL_W, save=True))
+        sash.bind("<Enter>", lambda _e: sash.configure(bg=U.LINE2))
+        sash.bind("<Leave>", lambda _e: sash.configure(bg=U.BG))
+        self._sash = sash
         tk.Frame(d, bg=U.LINE2, width=2).place(x=0, y=0, relheight=1.0)
 
         # 이 칸은 세로로 길다 - 도트, 이름, 타입, 경험치, 종족값, 기술까지
@@ -1262,7 +1484,12 @@ class BoxWindow(object):
             self._paint_party()
             # 다시 불러온 뒤에도 '무엇으로 바꿨는지' 가 남게 한다 (_loaded 가 _note 를 적는다)
             self._note = ((r or {}).get("message") or "파티를 바꿨습니다.", U.GOOD)
-            self.sel = None
+            # 고른 줄의 모습(금색 바탕 · 굵고 큰 이름)도 푼다. 예전에는 sel 만 비워서 그 줄이 고른 모습으로 남았고,
+            # 다른 것을 고르면 이름이 크게 나오는 줄이 둘이 됐다 (게시판 #543 '이름 글씨가 크고 작게 섞여')
+            prev, self.sel = self.sel, None
+            r0 = self.rows.get(prev)
+            if r0 is not None:
+                r0.set_selected(False)
             self.refresh_some()                   # 내려간 것(창이 알던 파티) + 올라온 것(서버가 붙인다)만
             self.app.request_sync()               # 바탕화면의 포켓몬이 바뀐다
         U.run_async(self.root, lambda: api.party_use(no), done)
@@ -1961,7 +2188,7 @@ class BoxWindow(object):
                 return
             # 고름은 만들 때 칠한다. 다 만든 뒤 이백 줄을 다시 칠하지 않는다.
             row = Row(self.inner, m, self.app.dex, self.select, self._dnd,
-                      selected=(pid == self.sel))
+                      selected=(pid == self.sel), cols=self.cols)
             row.show_bst(self.sort == "bst")    # 종족값 순으로 보는 중에 새로 만든 줄
             if pid in self.checked:
                 row.set_checked(True)           # 여러 마리 고르기로 골라 둔 것 (다른 박스에 다녀왔다)
@@ -2195,6 +2422,11 @@ class BoxWindow(object):
             r = self.rows.get(i)
             if r is not None:
                 r.set_selected(i == pid)
+        # 고른 모습이 남은 다른 줄 (sel 만 바뀌고 칠이 안 풀린 줄 - #543). selected 만 보므로 Tk 를 부르지 않는다.
+        # DP 테마는 rows 에 줄 대신 None 을 둔다 (줄을 캔버스에 그린다) - 그런 칸은 건너뛴다
+        for i, r in list(self.rows.items()):
+            if r is not None and getattr(r, "selected", False) and i != pid:
+                r.set_selected(False)
         m = self.current()
         if m:
             self.show_detail(m)

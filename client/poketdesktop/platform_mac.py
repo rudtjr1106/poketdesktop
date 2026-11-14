@@ -274,8 +274,36 @@ def show_again(win):
     해도 그렇다. 그래서 부른 직후에 다시 걸어 준다.
     """
     win.deiconify()
-    raise_above(win)
+    if getattr(win, "_poket_behind", False):
+        send_back(win)              # 다른 창 뒤로 다니는 포켓몬 (설정 petBehind, 2.5.0)
+    else:
+        raise_above(win)
     keep_click_through(win)
+
+
+def send_back(win):
+    """'항상 위' 를 풀고 다른 앱 창 뒤로 (2.5.0, 설정 petBehind, 게시판 #533).
+
+    보통 창 층(0)으로 내리고 그 층의 맨 뒤로 보낸다 (orderBack). 바탕화면은 그보다 아래 층이라 포켓몬이
+    바탕화면 뒤로 숨지는 않는다. 앱을 앞으로 꺼내지 않는다.
+    """
+    from . import focus_guard
+
+    def go():
+        try:
+            win.update_idletasks()
+            win.attributes("-topmost", False)
+        except Exception:                                   # noqa: BLE001
+            pass
+        w = nswindow(win)
+        if w is None:
+            return
+        try:
+            w.setLevel_(0)
+            w.orderBack_(None)
+        except Exception:                                   # noqa: BLE001
+            pass
+    focus_guard.quiet(win, go)
 
 
 def make_click_through(win):

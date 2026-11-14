@@ -214,7 +214,8 @@ class Pet(object):
         self.once = None                     # 한 번만 돌리는 중인 동작
         self.once_then = None
         self.photos = self._photos(anim, key)
-        PLAT.raise_above(self.win)
+        # 항상 위 - 설정 petBehind 면 다른 창 뒤로 (2.5.0). 검사용 가짜 overlay 에는 없을 수 있다
+        (getattr(overlay, "lift_pet", None) or PLAT.raise_above)(self.win)
 
         self.facing = random.choice(list(self.photos.keys()))
         self.frame = random.randrange(anim.count())
@@ -281,8 +282,8 @@ class Pet(object):
                                    fg=self.nameplate_color(), font=U.FONT_TIP)
         self.name_label.pack(padx=5, pady=1)
         # 맥에서는 창이 화면에 올라간 뒤에 걸어야 '항상 위' 가 먹는다.
-        # 그냥 두면 이름표만 다른 창 뒤로 숨는다.
-        PLAT.raise_above(w)
+        # 그냥 두면 이름표만 다른 창 뒤로 숨는다. 설정 petBehind 면 도트와 같이 뒤로 (2.5.0).
+        (getattr(self.ov, "lift_pet", None) or PLAT.raise_above)(w)
         self.name_win = w
         self.measure_nameplate()
         self.place()
@@ -1502,6 +1503,44 @@ class Overlay(object):
     def stop(self):
         self._running = False
 
+    # ---------------- 다른 창 뒤로 (2.5.0, 설정 petBehind, 게시판 #533) ----------------
+    def behind(self):
+        """걸어다니는 포켓몬 · 알 · 이름표를 다른 창 뒤로 둘까 (설정 petBehind, 기본은 끔 - 예전처럼 항상 위).
+
+        켜면 다른 프로그램을 쓰는 동안 그 창을 가리지 않는다. 바탕화면이 보이는 자리에서는 그대로 보인다.
+        풀숲 · 배틀 연출 · 설명 창은 그대로 항상 위다 (눌러서 쓰는 것들이다).
+        """
+        return bool((self.settings or {}).get("petBehind"))
+
+    def lift_pet(self, w):
+        """도트 · 이름표 창을 띄운 뒤. 보통은 항상 위, 설정이 켜져 있으면 지금 쓰는 창 뒤로.
+
+        창에 표시(_poket_behind)를 달아 둔다 - 숨겼다 다시 보일 때(PLAT.show_again)와 3초마다 다시 올릴 때
+        (keep_on_top) 그것을 보고 뒤로 둔다. 다시 보여 주는 자리가 스무 곳이 넘어서 하나씩 고치지 않는다.
+        """
+        if self.behind():
+            w._poket_behind = True
+            PLAT.send_back(w)
+        else:
+            w._poket_behind = False
+            PLAT.raise_above(w)
+
+    def pet_windows(self):
+        """걸어다니는 것들의 창 (도트 · 이름표) - 포켓몬 · 화면에만 있는 것(야생 · 투기장) · 알."""
+        for p in list(self.pets.values()) + list(self.extra) + list(self.eggs.values()):
+            for w in (getattr(p, "win", None), getattr(p, "name_win", None)):
+                if w is not None:
+                    yield w
+
+    def apply_behind(self):
+        """설정을 바꿨다 - 지금 떠 있는 창에 바로 건다 (도트를 다시 만들지 않는다)."""
+        for w in list(self.pet_windows()):
+            try:
+                if w.winfo_exists():
+                    self.lift_pet(w)
+            except Exception:                              # noqa: BLE001
+                pass
+
     def keep_on_top(self):
         """'항상 위' 로 만들어 둔 창을 전부 다시 맨 위로.
 
@@ -1519,6 +1558,11 @@ class Overlay(object):
                 continue
             if getattr(w, "_poket_under", False):
                 continue                # 꾸미기 효과 창 - 올리지 않고 아래에서 제 포켓몬 밑으로 넣는다
+            if getattr(w, "_poket_behind", False):
+                # 다른 창 뒤로 다니는 포켓몬 (설정 petBehind, 2.5.0). 진화 연출 같은 것이 항상 위를 다시 걸었다 -
+                # 올리지 않고 도로 뒤로 보낸다
+                PLAT.send_back(w)
+                continue
             PLAT.keep_on_top(w)
         for p in list(getattr(self, "pets", {}).values()) + list(getattr(self, "extra", [])):
             t = getattr(p, "trail", None)

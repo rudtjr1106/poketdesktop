@@ -20,8 +20,9 @@ from .platform_base import (NATIVE_MENU, RIGHT_CLICK,   # noqa: F401
                             SpriteView, accept_first_click, activate, keep_focus,
                             bind_right, data_dir, mouse_buttons_down,
                             take_right_clicks, watch_right_click,
-                            hide_from_dock, show_again,
+                            hide_from_dock,
                             own_dialog, surface, take_keys, drop_keys)
+from .platform_base import show_again as _base_show_again
 
 
 def raise_above(win):
@@ -72,6 +73,64 @@ def keep_on_top(win):
             SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE)
     except Exception:                                       # noqa: BLE001
         pass
+
+
+def _ours(hwnd):
+    """그 창이 이 프로그램(프로세스)의 것인가."""
+    import os
+    pid = ctypes.c_ulong(0)
+    ctypes.windll.user32.GetWindowThreadProcessId(ctypes.c_void_p(hwnd), ctypes.byref(pid))
+    return pid.value == os.getpid()
+
+
+def _desktop(hwnd):
+    """바탕화면 창인가 (Progman / WorkerW - 아이콘과 배경을 그리는 창)."""
+    buf = ctypes.create_unicode_buffer(64)
+    ctypes.windll.user32.GetClassNameW(ctypes.c_void_p(hwnd), buf, 64)
+    return buf.value in ("Progman", "WorkerW")
+
+
+def send_back(win):
+    """'항상 위' 를 풀고 **지금 쓰는 창 바로 뒤로** 넣는다 (2.5.0, 설정 petBehind, 게시판 #533).
+
+    맨 아래(HWND_BOTTOM)로 보내면 바탕화면 창(Progman) 뒤로 들어가 아예 안 보일 수 있다. 그래서 지금 앞에 있는
+    창(GetForegroundWindow) 바로 뒤에 끼운다 - 그 창을 가리지 않고, 바탕화면보다는 위다. 앞 창이 우리 것이거나
+    바탕화면이면 '항상 위' 만 푼다 - 다른 프로그램을 누르면 윈도우가 그 창을 우리 위로 올린다.
+
+    -topmost 를 풀 때 테두리 없는 창이 (0, 0) 으로 튀면 제자리로 돌린다 (raise_above 와 같다). 포커스는 안
+    가져간다 (SWP_NOACTIVATE, focus_guard).
+    """
+    from . import focus_guard
+    focus_guard.quiet(win, lambda: _send_back(win))
+
+
+def _send_back(win):
+    SWP_NOSIZE, SWP_NOMOVE, SWP_NOACTIVATE, SWP_NOOWNERZORDER = 0x0001, 0x0002, 0x0010, 0x0200
+    try:
+        win.update_idletasks()
+        before = (win.winfo_x(), win.winfo_y())
+        win.attributes("-topmost", False)
+        win.update_idletasks()
+        if (win.winfo_x(), win.winfo_y()) != before:
+            win.geometry("+%d+%d" % before)
+        u = ctypes.windll.user32
+        me = u.GetParent(win.winfo_id()) or win.winfo_id()
+        fg = u.GetForegroundWindow()
+        if fg and fg != me and not _ours(fg) and not _desktop(fg):
+            u.SetWindowPos(ctypes.c_void_p(me), ctypes.c_void_p(fg), 0, 0, 0, 0,
+                           SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER)
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
+def show_again(win):
+    """숨긴 창을 다시 보여준다 (platform_base.show_again). 다른 창 뒤로 다니는 포켓몬(win._poket_behind)은
+    여기의 send_back 으로 - 기본 구현의 send_back 은 지금 쓰는 창 뒤로 넣지 못한다."""
+    if getattr(win, "_poket_behind", False):
+        win.deiconify()
+        send_back(win)
+        return
+    _base_show_again(win)
 
 
 def order_below(win, ref):
