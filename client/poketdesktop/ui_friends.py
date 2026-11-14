@@ -15,7 +15,7 @@ import tkinter as tk
 
 from common.korean import ago
 
-from . import skins
+from . import flag_art, skins
 from . import ui_common as U
 from . import ui_loading
 from .ui_common import run_async
@@ -435,9 +435,14 @@ class FriendsWindow(object):
     def _friend_row(self, f):
         row = self._card()
         self._dot(row, f.get("online"))
+        # 길드 깃발 (2.5.0): 이름 바로 앞에 1배(24px). 서버는 그 친구가 '길드 깃발' 을 가졌고 지금 든 길드에 깃발이
+        # 있을 때만 flag 를 싣는다 - 없으면 자리를 비우지 않고 예전 그대로 이름만
+        flag = flag_art.label(row, f.get("flag"), bg=U.BG3)
+        if flag is not None:
+            flag.pack(side="left", padx=(8, 0))
         tk.Label(row, text=f["name"], bg=U.BG3,
                  fg=f.get("frameColor") or U.FG,
-                 font=U.FONT_B).pack(side="left", padx=(8, 8))
+                 font=U.FONT_B).pack(side="left", padx=(6 if flag is not None else 8, 8))
         if f.get("title"):
             tk.Label(row, text=f["title"], bg=U.BG3,
                      fg=f.get("frameColor") or U.ACCENT_TEXT,

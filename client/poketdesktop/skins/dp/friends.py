@@ -6,7 +6,8 @@ DP 의 친구수첩처럼: 귤빛 띠 아래에 줄 쳐진 크림색 공책 한 
     위 띠      '친구수첩'(제목만 테두리 글씨) · 몇 명 / 접속 중 몇 명, '새로고침'
     찾기       흰 입력칸 · '찾기' 단추 한 줄, 그 아래 안내 / 찾은 사람 줄
     공책       왼쪽 빨간 여백 줄, 가로 괘선. 받은 신청 · 친구 · 보낸 신청 · 차단이 차례로 (보이는 줄만 그린다)
-               친구 줄: 접속 점 · 이름(명패 색) · 칭호 · 마지막 접속 / 티어 · RP · 전적, 오른쪽에 납작한 단추들
+               친구 줄: 접속 점 · (길드 깃발) · 이름(명패 색) · 칭호 · 마지막 접속 / 티어 · RP · 전적, 오른쪽에 납작한 단추들
+               (길드 깃발 2.5.0 은 create_image 1배 24px - 깃발이 있는 줄만 조금 높다)
                (단추 자리를 먼저 재고 글은 남은 폭에 맞춘다 - 단추 밑으로 글이 들어가지 않는다)
     아래 줄    진한 테의 글상자 (알림)
 
@@ -16,6 +17,9 @@ _friend_actions · _request_actions · _pending_actions · _blocked_actions 가 
 """
 import tkinter as tk
 
+from common import flag as F
+
+from ... import flag_art
 from ... import ui_common as U
 from ... import ui_friends as FR
 from . import DIM, INK, INK2, LINE, WHITE, WIN_BG, font, tone
@@ -211,7 +215,23 @@ class FriendsWindow(FR.FriendsWindow):
         # 기본 화면의 줄(카드 54 + 틈 6)보다 높지 않게 - 한 화면에 보이는 친구 수가 줄지 않는다
         hts = {"title": s(34), "note": s(40), "request": s(44), "friend": s(48), "pending": s(40),
                "blocked": s(40)}
-        self.vl.set([(hts.get(kind, s(40)), (kind, x)) for kind, x in self._items], keep=keep)
+        # 길드 깃발이 있는 친구 줄만 깃발만큼 조금 높다 (_friend_geo - 글자는 그대로)
+        self.vl.set([(self._friend_geo(x)[2] if kind == "friend" else hts.get(kind, s(40)), (kind, x))
+                     for kind, x in self._items], keep=keep)
+
+    def _friend_geo(self, f):
+        """친구 줄의 (이름 줄 가운데, 아래 줄 가운데, 줄 높이) - 줄 맨 위에서 잰 값.
+
+        길드 깃발(2.5.0, 1배 = 24px)이 있으면 이름 줄 가운데에 놓고, 아래 줄(티어 · RP · 전적)과 겹치지 않게
+        그 줄만 높인다. 깃발이 없거나 틀린 꼴이면 예전 그대로."""
+        s = U.h
+        if flag_art.image(self.vl.cv, f.get("flag")) is None:
+            return s(16), s(34), s(48)
+        half = K.tkfont_of(self.vl.cv, font(9)).metrics("linespace") // 2 + 1
+        fh = F.SIZE // 2
+        ty = max(s(16), s(3) + fh)
+        by = max(s(34), ty + fh + s(3) + half)
+        return ty, by, max(s(48), by + half + s(6))
 
     def _draw_row(self, cv, data, x, y, w, h, tags, hov):
         s = U.h
@@ -265,10 +285,17 @@ class FriendsWindow(FR.FriendsWindow):
     def _friend_text(self, cv, f, x, lx, y, right, tags):
         """친구 줄의 글 두 줄 (이름 · 칭호 · 접속 / 티어 · RP · 전적). right 를 넘는 것은 줄이거나 뺀다."""
         s = U.h
-        ty, by = y + s(16), y + s(34)
+        gty, gby, _gh = self._friend_geo(f)
+        ty, by = y + gty, y + gby
         self._dot_at(cv, x + s(16), ty, f.get("online"), tags)
         col = f.get("frameColor")
-        nid = K.text(cv, lx, ty, _fit(cv, f["name"], font(11), right - lx), font(11),
+        nx = lx
+        img = flag_art.image(cv, f.get("flag"))
+        if img is not None and lx + F.SIZE + s(6) < right:
+            # 길드 깃발 (2.5.0): 이름 바로 앞에 1배 그대로 (이름은 남은 폭에 맞춘다)
+            cv.create_image(lx, ty, image=img, anchor="w", tags=tags + ("flag",))
+            nx = lx + F.SIZE + s(6)
+        nid = K.text(cv, nx, ty, _fit(cv, f["name"], font(11), right - nx), font(11),
                      fill=tone(col) if col else INK, anchor="w", tags=tags)[1]
         xx = cv.bbox(nid)[2] + s(8)
         f9 = K.tkfont_of(cv, font(9))

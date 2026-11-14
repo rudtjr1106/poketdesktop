@@ -23,17 +23,20 @@ import datetime
 
 from . import db
 
-SEASON = 5
+SEASON = 6
 # 화면에 적는 날짜. 시즌은 운영자가 migrations 로 닫는다 - 이 날짜가 지났다고
-# 저절로 닫히지 않는다. 시즌 2 는 9/15~10/1, 시즌 3 은 10/2~10/16, 시즌 4 는 10/17~10/31, 시즌 5 는 11/1 부터
-# 같은 2주다 (티어 경계 150/350/600 이 2주에 맞춰져 있다).
+# 저절로 닫히지 않는다. 시즌 2 는 9/15~10/1, 시즌 3 은 10/2~10/16, 시즌 4 는 10/17~10/31, 시즌 5 는 11/1~11/15,
+# 시즌 6 은 11/16 부터 같은 2주다 (티어 경계 150/350/600 이 2주에 맞춰져 있다).
 #
 # 시즌 4 에서 바뀐 것: Z기술 (common/zmoves), 점수가 가까운 사람부터 붙는
 # 매칭 (pvp.RP_BANDS), 길드전 (guild_war - 시즌이 시작한 순간부터 센다), 악당 출현 (boss).
 #
 # 시즌 5 (버전 2, 2026-11-01): rules_v5 - 양쪽 길드전 AI · 같은 도구 한 마리 · 점수 폭. 길드전 조커 · 기여 코인 · 꾸미기 보상.
-SEASON_STARTS = "2026-11-01"
-SEASON_ENDS = "2026-11-15"
+#
+# 시즌 6 (2.5.0, 2026-11-16): 길드전 1:1 맞대결 · 보상은 길드 코인만 · 코인 상점 '길드 전용' (guild_war.MATCH_FROM ·
+# guild.EXCLUSIVE_FROM) · 아르케의 여섯 봉인 이벤트. 랭크 규칙은 시즌 5 그대로 (rules_v5).
+SEASON_STARTS = "2026-11-16"
+SEASON_ENDS = "2026-11-29"
 
 
 def rules_v5():
@@ -152,6 +155,12 @@ TITLES = {
     "s5_hyper": "시즌 5 하이퍼볼",
     "s5_super": "시즌 5 슈퍼볼",
     "s5_guildwar": "시즌 5 길드전 우승",
+    # 시즌 6. 길드전은 1:1 맞대결이라 '전체 1등' 이 없어서 길드전 칭호가 없다 (guild_war_match - 보상은 길드 코인만).
+    "s6_champion": "시즌 6 챔피언",
+    "s6_elite": "시즌 6 사천왕",
+    "s6_master": "시즌 6 마스터볼",
+    "s6_hyper": "시즌 6 하이퍼볼",
+    "s6_super": "시즌 6 슈퍼볼",
 }
 # 이름 둘레의 색. 랭킹·친구·투기장에서 남에게 보인다.
 FRAMES = {
@@ -221,7 +230,8 @@ S4_ITEMS = {
 S4_PERKS = {
     "champion": ("관장 등록",),
 }
-# 시즌 5 가 끝날 때 줄 것. 시즌 4 와 같은 틀 · 같은 도구 · 같은 관장 등록이다.
+# 시즌 5 가 끝날 때 준 것. 시즌 4 와 같은 틀 · 같은 도구 · 같은 관장 등록이다. 실제로 나간 숫자는 migrations 에 있다
+# (_season6_open, 여기는 보여 주기용이다).
 S5_REWARDS = [
     ("champion", "s5_champion", "gold", 1, "legendary"),
     ("elite", "s5_elite", "silver", 1, "mythical"),
@@ -231,6 +241,16 @@ S5_REWARDS = [
 ]
 S5_ITEMS = dict(S4_ITEMS)
 S5_PERKS = dict(S4_PERKS)
+# 시즌 6 이 끝날 때 줄 것. 같은 틀 · 같은 도구 · 같은 관장 등록이다.
+S6_REWARDS = [
+    ("champion", "s6_champion", "gold", 1, "legendary"),
+    ("elite", "s6_elite", "silver", 1, "mythical"),
+    ("master", "s6_master", "master", 1, None),
+    ("hyper", "s6_hyper", None, 0, None),
+    ("super", "s6_super", None, 0, None),
+]
+S6_ITEMS = dict(S5_ITEMS)
+S6_PERKS = dict(S5_PERKS)
 
 
 def _now_iso():
@@ -468,16 +488,16 @@ def rules_public():
                      "frameColor": FRAMES[frame][1] if frame else None,
                      "shiny": n, "egg": EGG_KR.get(egg),
                      # 도구와 도구가 아닌 보상 (시즌 4 부터). 옛 클라이언트는 모르는 칸이라 안 그린다.
-                     "items": _reward_items(t), "perks": list(S5_PERKS.get(t, ()))}
-                    for t, title, frame, n, egg in S5_REWARDS],
+                     "items": _reward_items(t), "perks": list(S6_PERKS.get(t, ()))}
+                    for t, title, frame, n, egg in S6_REWARDS],
     }
 
 
 def _reward_items(tier):
-    """그 자리에 더 주는 도구 [{id, kr, count}] (지금 시즌의 표 - S5_ITEMS)."""
+    """그 자리에 더 주는 도구 [{id, kr, count}] (지금 시즌의 표 - S6_ITEMS)."""
     from . import items                 # 늦게 부른다 - items 가 선물을 줄 때 season 을 부른다
     out = []
-    for item_id, n in S5_ITEMS.get(tier, ()):
+    for item_id, n in S6_ITEMS.get(tier, ()):
         it = items.get(item_id) or {}
         out.append({"id": item_id, "kr": it.get("kr") or item_id, "count": int(n)})
     return out

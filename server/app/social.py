@@ -160,6 +160,8 @@ def listing(uid):
     focusing = focus.focusing_many([o for o, _ in friends])
     stats = _stats([o for o, _ in friends])
     decos = season.deco_map([o for o, _ in friends])
+    from . import guild                       # 길드 깃발 (2.5.0) - guild 가 이 모듈을 불러오므로 여기서
+    flags = guild.name_flags([o for o, _ in friends])
 
     def brief(other, r):
         st = stats.get(other)
@@ -182,6 +184,8 @@ def listing(uid):
         for k in ("rp", "tier", "tierKr", "title", "frame", "frameColor"):
             if d.get(k) is not None:
                 out[k] = d[k]
+        # 이름 옆 길드 깃발 - 길드 깃발을 가졌고 지금 든 길드에 깃발이 있을 때만
+        out["flag"] = flags.get(other)
         return out
 
     return {

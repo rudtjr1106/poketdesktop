@@ -10,7 +10,7 @@
      뽑기권도 (1등 타입 확정 · 2~5등 랜덤, season.S4_ITEMS).
   3. 그다음에 RP 를 0, 숨은 점수를 1000 쪽으로 절반만 남긴다. 친구 전적은 그대로.
   4. 두 번 돌려도 선물을 또 넣지 않는다.
-  5. 시즌 5 의 날짜 · 규칙표 · 칭호 목록이 시즌 5 것으로 나온다. 시즌 5 규칙(rules_v5)이 켜진다.
+  5. 시즌 5 칭호가 있다 (지금 시즌의 규칙표는 test_season6.py).
 """
 import os
 import sys
@@ -57,31 +57,12 @@ def main():
     db.init()
 
     print("=== 시즌 5 ===")
-    chk("시즌 5 는 11/1 ~ 11/15", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
-        == (5, "2026-11-01", "2026-11-15"))
-    chk("시즌 5 규칙이 켜진다 (양쪽 길드전 AI · 같은 도구 한 마리 · 점수는 연승 · 연패로 ±3)", season.rules_v5()
-        and season.rp_bounds() == (20, 3, 15, 3))
-    chk("티어 경계는 그대로", [(k, rp) for k, _n, rp in season.TIERS] == migrations.S4_TIER_RP, season.TIERS)
-    rules = season.rules_public()
-    chk("규칙표가 시즌 5 것", rules["season"] == 5 and rules["endsAt"] == "2026-11-15"
-        and [r["title"] for r in rules["rewards"]]
-        == ["시즌 5 챔피언", "시즌 5 사천왕", "시즌 5 마스터볼", "시즌 5 하이퍼볼", "시즌 5 슈퍼볼"],
-        [r["title"] for r in rules["rewards"]])
-    chk("보상의 틀은 그대로 (챔피언 전설의 알 + 타입 확정 뽑기권 + 관장 등록, 사천왕 환상의 알 + 랜덤 뽑기권)",
-        rules["rewards"][0]["egg"] == "전설의 포켓몬 알" and rules["rewards"][1]["egg"] == "환상의 포켓몬 알"
-        and [x["id"] for x in rules["rewards"][0]["items"]] == ["RANKTICKETTMTYPE"]
-        and [x["id"] for x in rules["rewards"][1]["items"]] == ["RANKTICKETTM"]
-        and rules["rewards"][0]["perks"] == ["관장 등록"] and rules["rewards"][2]["egg"] is None, rules["rewards"][:2])
-    chk("시즌 5 칭호 · 길드전 칭호가 정해져 있다",
+    # 지금 시즌의 날짜 · 규칙표 · 칭호 목록은 test_season6.py 가 본다 (시즌 6, 2026-11-16). 여기는 시즌 5 를 연 손질만.
+    chk("시즌 5 칭호 · 길드전 칭호가 있다",
         all(k in season.TITLES for k in ("s5_champion", "s5_elite", "s5_master", "s5_hyper", "s5_super", "s5_guildwar"))
         and GW.TITLE == "s5_guildwar")
-    seasonal = [o for o in migrations.ONCE if "season" in o[0]]
-    chk("시즌 손질 가운데 맨 끝이 시즌 5 열기",
-        seasonal[-1] == ("0350-season5-open", migrations._season5_open), seasonal[-1][0])
-    howto = dict((t, (g, can)) for t, g, _how, can in achievements._season_titles())
-    chk("칭호 목록: 시즌 5 는 지금 얻을 수 있고 시즌 4 는 지난 시즌",
-        howto["s5_champion"][1] and howto["s5_guildwar"][1] and not howto["s4_champion"][1]
-        and not howto["s4_guildwar"][1], dict((k, howto[k]) for k in ("s5_champion", "s4_champion", "s4_guildwar")))
+    chk("시즌 5 열기 손질이 있다", ("0350-season5-open", migrations._season5_open) in migrations.ONCE)
+    chk("티어 경계는 시즌 4 와 같다", migrations.S5_TIER_RP == migrations.S4_TIER_RP)
 
     print("\n=== 시즌 4 -> 5 전환 ===")
     # 시즌 4 가 끝난 상태: 마스터볼 여섯(자리는 다섯), 하이퍼·슈퍼·몬스터, 배치 못 마친 사람.

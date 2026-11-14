@@ -27,6 +27,7 @@ from tkinter import font as tkfont
 
 from common.korean import natural
 
+from ... import flag_art
 from ... import item_icons
 from ... import ui_common as U
 from ... import ui_guild as G
@@ -412,8 +413,11 @@ class GuildWindow(G.GuildWindow):
         inner = x2 - x1 - s(24)
         menu = self.seg
         n = len(menu.order)
-        name = clamp_lines(cv, g.get("name", ""), font(13), inner, 2)
-        nh = K.text_height(cv, name, font(13), inner)
+        # 길드 깃발 (2.5.0) - 있으면 이름 왼쪽에 (1배 24px), 없으면 이름만
+        flag = flag_art.image(cv, g.get("flag"), 1)
+        fw = (flag.width() + s(8)) if flag is not None else 0
+        name = clamp_lines(cv, g.get("name", ""), font(13), inner - fw, 2)
+        nh = max(K.text_height(cv, name, font(13), inner - fw), flag.height() if flag is not None else 0)
         reqs = len(d.get("requests") or [])
         # 꼬리표 줄 · 길드원 수 줄: 한 줄에 안 들어가면 다음 줄로 (글자가 클 때)
         chips = []
@@ -453,7 +457,9 @@ class GuildWindow(G.GuildWindow):
         K.rrect(cv, x1, y, x2, y + s(24), s(8), fill=rc)                      # 직책 빛 띠 (판 위 가장자리)
         card(cv, x1, y + s(5), x2, y + ph)
         yy = y + s(5) + s(10)
-        K.text(cv, x1 + s(12), yy, name, font(13), anchor="nw")
+        if flag is not None:
+            cv.create_image(x1 + s(12), yy + nh // 2, image=flag, anchor="w", tags=("flag",))
+        K.text(cv, x1 + s(12) + fw, yy + nh // 2, name, font(13), anchor="w")
         yy += nh + s(8)
         for i, row in enumerate(chip_rows):
             if i:
@@ -949,7 +955,8 @@ class GuildWindow(G.GuildWindow):
         f9 = K.tkfont_of(cv, font(9))
         # 단추 자리 (줄마다 같다) - 글은 남은 폭에 맞추고, 설명은 줄을 바꿔 다 보인다 (줄 높이가 그만큼 는다)
         counts = sorted(set(n for it in items for n in G.shop_counts(it)), reverse=True)
-        bws = [f10.measure("%d개 사기" % n) + s(22) for n in counts]
+        bws = [max(f10.measure(G.shop_btn_text(it, n)) for it in items if n in G.shop_counts(it)) + s(22)
+               for n in counts]
         tx = x1 + s(64)
         room = x2 - s(14) - sum(bws) - s(6) * len(bws) - tx - s(8)
 
@@ -992,7 +999,7 @@ class GuildWindow(G.GuildWindow):
             bx = x2 - s(14)
             by = (yy + rh - s(8) - s(15)) if low else (yy + rh // 2)
             for n in sorted(G.shop_counts(it), reverse=True):
-                b = button(cv, bx, by, "%d개 사기" % n, (lambda n=n, iid=iid: self.buy(iid, n)), "blue",
+                b = button(cv, bx, by, G.shop_btn_text(it, n), (lambda n=n, iid=iid: self.buy(iid, n)), "blue",
                            enabled=G.shop_can_buy(it, n, have), h=s(30))
                 self.shop_btns[(iid, n)] = b
                 bx -= b.w + s(6)
@@ -1097,8 +1104,13 @@ class GuildWindow(G.GuildWindow):
             elif act[0] == "join":
                 right = button(cv, x2 - s(14), cy, act[1], act[2], "red", enabled=act[3], h=s(28)).w
             mode = G.MODE_KR.get(g.get("joinMode"), "")
-            room = x2 - x1 - s(30) - right - s(12) - (chip_w(cv, mode) + s(8) if mode else 0)
-            nid = K.text(cv, x1 + s(16), cy, clamp_lines(cv, g["name"], font(12), room, 1), font(12), anchor="w")[1]
+            flag = flag_art.image(cv, g.get("flag"), 1)                 # 길드 깃발 (2.5.0, 있을 때만)
+            fw = (flag.width() + s(8)) if flag is not None else 0
+            if flag is not None:
+                cv.create_image(x1 + s(16), cy, image=flag, anchor="w", tags=("flag",))
+            room = x2 - x1 - s(30) - right - s(12) - (chip_w(cv, mode) + s(8) if mode else 0) - fw
+            nid = K.text(cv, x1 + s(16) + fw, cy, clamp_lines(cv, g["name"], font(12), room, 1), font(12),
+                         anchor="w")[1]
             if mode:
                 chip(cv, cv.bbox(nid)[2] + s(8), cy, mode, "#7a8698")
             ly = cy + s(12) + s(4) + s(8)
@@ -1257,6 +1269,7 @@ class GuildWindow(G.GuildWindow):
                 xx += tw + s(8)
             K.text(cv, x1 + s(16), y + s(52), self.MODE_NOTE, font(9), fill=INK2, anchor="nw", width=inner)
             y += mh + s(14)
+        y = self._draw_flag_section(cv, x1, x2, y)
         y = section(cv, x1, x2, y, "길드 나가기")
         text, can_leave, can_disband = self._leave_data()
         rows = [(text, "길드 나가기" if can_leave else None, self.leave)]
@@ -1284,3 +1297,27 @@ class GuildWindow(G.GuildWindow):
             K.text(cv, x1 + s(16), yy + rh // 2, t, font(9), fill=INK, anchor="w", width=tw)
             yy += rh
         return y + h + s(16)
+
+    def _draw_flag_section(self, cv, x1, x2, y):
+        """관리의 '길드 깃발' 칸 (2.5.0): 지금 깃발(2배) · 설명 · [깃발 그리기] (그릴 수 있는 사람만). 칸 바닥의 y.
+        무엇을 보일지는 기본 창 그대로 (_flag_data - 옛 서버면 칸이 없다)."""
+        self.b_flag = None
+        fd = self._flag_data()
+        if fd is None:
+            return y
+        s = U.h
+        pixels, text, can = fd
+        y = section(cv, x1, x2, y, "길드 깃발", "길드 이름 옆에 보입니다")
+        img = flag_art.image(cv, pixels, 2)
+        bw = (K.tkfont_of(cv, font(10)).measure("깃발 그리기") + s(22)) if can else 0
+        tx = x1 + s(16) + ((img.width() + s(12)) if img is not None else 0)
+        tw = max(s(60), x2 - s(14) - ((bw + s(12)) if can else 0) - tx)
+        th = K.text_height(cv, text, font(9), tw)
+        fh = max(th, img.height() if img is not None else 0, s(32)) + s(20)
+        card(cv, x1, y, x2, y + fh)
+        if img is not None:
+            cv.create_image(x1 + s(16), y + fh // 2, image=img, anchor="w", tags=("flag",))
+        if can:
+            self.b_flag = button(cv, x2 - s(14), y + fh // 2, "깃발 그리기", self.flag_editor, "blue", h=s(32))
+        K.text(cv, tx, y + fh // 2, text, font(9), fill=INK, anchor="w", width=tw)
+        return y + fh + s(14)

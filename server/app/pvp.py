@@ -1339,10 +1339,13 @@ def ranking(limit=50, uid=None):
         " WHERE r.ranked=1 ORDER BY r.rp DESC, r.rating DESC, r.wins DESC"
         " LIMIT ?", (limit,))
     deco = season.deco_map([r["user_id"] for r in rows])
+    from . import guild                     # 길드 깃발 (2.5.0) - 그쪽이 이 모듈을 쓰는 곳이 있어 여기서 부른다
+    flags = guild.name_flags([r["user_id"] for r in rows])
     out = []
     for i, r in enumerate(rows, 1):
         d = deco.get(r["user_id"], {})
         out.append({"rank": i, "userId": r["user_id"], "name": r["username"],
+                    "flag": flags.get(r["user_id"]),      # 길드 깃발을 가졌고 지금 길드에 깃발이 있으면 (이름 옆)
                     "rating": r["rating"], "rp": r["rp"] or 0,
                     "tier": d.get("tier"), "tierKr": d.get("tierKr"),
                     "title": d.get("title"), "frame": d.get("frame"),

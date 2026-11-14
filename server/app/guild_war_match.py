@@ -700,8 +700,9 @@ def scores(s=None):
 
 def matches(s, my_gid=None, ph=None):
     """이번 시즌 맞대결 목록 - 짝(삼각형)마다 한 덩어리. 우리 판이 맨 위, 나머지는 첫 길드 이름순.
-    [{"kind", "ours", "final", "guilds": [{guildId, name, stars, max, pct, ko, result, vs, from}]}]"""
+    [{"kind", "ours", "final", "guilds": [{guildId, name, stars, max, pct, ko, result, vs, from, flag}]}]"""
     by = dict((r["guildId"], r) for r in scores(s))
+    flags = guild.flags_of(list(by))
     seen, out = set(), []
     for p in db.q("SELECT * FROM guild_war_pair WHERE season=? ORDER BY guild_id", (s,)):
         if p["guild_id"] in seen:
@@ -710,7 +711,8 @@ def matches(s, my_gid=None, ph=None):
         if p["kind"] == "tri":
             group.append(p["from_guild"])
         seen.update(group)
-        gs = [dict((k, by[g][k]) for k in ("guildId", "name", "stars", "max", "pct", "ko", "result", "vs", "from"))
+        gs = [dict(((k, by[g][k]) for k in ("guildId", "name", "stars", "max", "pct", "ko", "result", "vs", "from")),
+                   flag=flags.get(g))                 # 길드 깃발 (2.5.0) - 산 것과 상관없이 길드에 있으면
               for g in group if g in by]
         gs.sort(key=lambda x: (x["name"], x["guildId"]))
         out.append({"kind": p["kind"], "ours": my_gid in group, "final": ph == "done", "guilds": gs})
@@ -760,8 +762,11 @@ def _match_summary(s, gid, ph):
         return None
     us, them, res = outcome(s, gid)
 
+    flags = guild.flags_of([p["target_guild"], p["from_guild"], gid])
+
     def g(x):
-        return {"guildId": x, "name": _gname(x, s), "size": len(roster(x, s))}
+        # flag = 길드 깃발 (2.5.0, 없으면 None - 길드가 없어졌어도 None)
+        return {"guildId": x, "name": _gname(x, s), "size": len(roster(x, s)), "flag": flags.get(x)}
     lead = {"win": "us", "lose": "them", "draw": "even"}[res]
     return {"kind": p["kind"], "target": g(p["target_guild"]), "from": g(p["from_guild"]), "own": g(gid),
             "cap": p["cap"],

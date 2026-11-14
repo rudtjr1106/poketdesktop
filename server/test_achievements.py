@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""도감 업적 검사 (시즌 3 에 생김, 칭호 목록은 시즌 5 기준).
+"""도감 업적 검사 (시즌 3 에 생김, 칭호 목록은 시즌 6 기준).
 
     python server/test_achievements.py
 
@@ -251,19 +251,20 @@ def main():
     got_hidden = [x for x in hid if x["owned"]]
     chk("  얻은 숨은 칭호는 이름과 조건이 보인다",
         all(x["name"] != "???" and "숨은 업적 -" not in x["how"] for x in got_hidden), got_hidden[:2])
-    s5 = by["s5_master"]
-    chk("랭킹전(이번 시즌): 티어와 RP 를 적는다", "시즌 5" in s5["how"] and "마스터볼" in s5["how"]
-        and "600" in s5["how"] and s5["open"] and s5["group"] == "랭킹전 시즌 5", s5)
-    chk("  이번 시즌의 다섯 칭호가 한 묶음", sorted(c["id"] for c in rows if c["group"] == "랭킹전 시즌 5")
-        == sorted(t for _tier, t, _f, _n, _e in season.S5_REWARDS),
-        [c["id"] for c in rows if c["group"] == "랭킹전 시즌 5"])
-    chk("  챔피언·사천왕은 자리로 설명한다", "1위" in by["s5_champion"]["how"]
-        and "2~5위" in by["s5_elite"]["how"], (by["s5_champion"]["how"], by["s5_elite"]["how"]))
+    s6 = by["s6_master"]
+    chk("랭킹전(이번 시즌): 티어와 RP 를 적는다", "시즌 6" in s6["how"] and "마스터볼" in s6["how"]
+        and "600" in s6["how"] and s6["open"] and s6["group"] == "랭킹전 시즌 6", s6)
+    chk("  이번 시즌의 다섯 칭호가 한 묶음", sorted(c["id"] for c in rows if c["group"] == "랭킹전 시즌 6")
+        == sorted(t for _tier, t, _f, _n, _e in season.S6_REWARDS),
+        [c["id"] for c in rows if c["group"] == "랭킹전 시즌 6"])
+    chk("  챔피언·사천왕은 자리로 설명한다", "1위" in by["s6_champion"]["how"]
+        and "2~5위" in by["s6_elite"]["how"], (by["s6_champion"]["how"], by["s6_elite"]["how"]))
     gw = by["s5_guildwar"]
-    chk("길드전 칭호: 조건과 함께, 이번 시즌에 얻을 수 있다", gw["name"] == season.TITLES["s5_guildwar"]
-        and "길드전" in gw["how"] and "1위" in gw["how"] and "공격" in gw["how"]
-        and gw["open"] and gw["group"] == "길드전", gw)
-    old = [by["s4_master"], by["s4_guildwar"], by["s3_master"], by["s2_master"], by["s1_top10"]]
+    chk("길드전 칭호(시즌 5): 조건과 함께, 이제는 다시 얻을 수 없다 (시즌 6 부터 1:1 맞대결 - 길드전 칭호 없음)",
+        gw["name"] == season.TITLES["s5_guildwar"] and "길드전" in gw["how"] and "1위" in gw["how"]
+        and "공격" in gw["how"] and not gw["open"] and "s6_guildwar" not in by, gw)
+    old = [by["s5_master"], by["s5_guildwar"], by["s4_master"], by["s4_guildwar"], by["s3_master"], by["s2_master"],
+           by["s1_top10"]]
     chk("지난 시즌 칭호는 다시 얻을 수 없다고 알린다", all(not x["open"]
         and "다시 얻을 수 없음" in x["group"] for x in old), old)
     chk("  시즌 1 은 등수로", "6~10위" in by["s1_top10"]["how"] and "1위" in by["s1_champion"]["how"])

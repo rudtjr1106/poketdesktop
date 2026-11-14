@@ -19,7 +19,7 @@
 import datetime
 import tkinter as tk
 
-from . import skins
+from . import flag_art, skins
 from . import ui_common as U
 from . import ui_loading
 from . import ui_season as S
@@ -434,9 +434,10 @@ class RankWindow(object):
             bits.append("%d연패" % abs(streak))
         # 옛 서버는 rp 가 없다. 그때는 점수를 그대로.
         score = "%s RP" % format(int(r.get("rp") or 0), ",") if "rp" in r else "%d" % r.get("rating", 0)
+        # flag: 길드 깃발 (2.5.0) - 그 사람이 '길드 깃발' 을 가졌고 지금 든 길드에 깃발이 있을 때만 서버가 싣는다
         return {"mine": bool(r.get("me")), "rank": r.get("rank", 0), "tier": r.get("tier"),
                 "tierKr": r.get("tierKr"), "name": r.get("name", "?"), "color": r.get("frameColor"),
-                "title": r.get("title"), "bits": "  ·  ".join(bits), "score": score}
+                "title": r.get("title"), "bits": "  ·  ".join(bits), "score": score, "flag": r.get("flag")}
 
     def _records_head(self):
         s = self.rec_summary
@@ -652,6 +653,10 @@ class RankWindow(object):
         chip = S.tier_chip(top, d["tier"], d["tierKr"])
         if chip:
             chip.pack(side="left", padx=(0, 8))
+        # 길드 깃발 (2.5.0): 이름 바로 앞에 1배(24px). 없으면 자리를 비우지 않고 이름만 - 줄은 깃발만큼 높아질 수 있다
+        flag = flag_art.label(top, d.get("flag"), bg=box["bg"])
+        if flag is not None:
+            flag.pack(side="left", padx=(0, 6))
         tk.Label(top, text=d["name"], bg=box["bg"],
                  fg=d["color"] or (U.ACCENT if mine else U.FG),
                  font=U.FONT_B).pack(side="left")

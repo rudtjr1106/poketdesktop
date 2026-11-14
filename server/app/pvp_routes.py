@@ -149,6 +149,8 @@ def ranking(limit: int = 50, ctx=Depends(deps.current)):
                # 오늘 랜덤 배틀을 몇 판 더 걸 수 있나 (1.9.0 - 랭킹 탭 머리줄에 적는다).
                # 하루 상한은 랜덤 배틀에만 걸린다.
                "fight": pvp.fight_status(uid)})
+    from . import guild                     # 길드 깃발 (2.5.0) - 내 이름 옆 (가졌고 지금 길드에 깃발이 있으면)
+    me["flag"] = guild.name_flag(uid)
     return {"ranking": pvp.ranking(max(1, min(100, limit)), uid),
             "me": me, "season": pvp.SEASON,
             "placement": pvp.PLACEMENT,

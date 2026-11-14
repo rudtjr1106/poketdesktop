@@ -483,8 +483,9 @@ def _season_titles():
                 how = ("시즌 %d 에서 %s 티어(RP %d)에 오르기 - 시즌이 끝날 때 받는다"
                        % (no, season.TIER_KR.get(tier, tier), tier_rp.get(tier, 0)))
             out.append((title, group, how, no == now))
+    tier_rows(6, season.S6_REWARDS)
     tier_rows(5, season.S5_REWARDS)
-    # 길드전 1위 길드의 칭호 (guild_war.TITLE). 그 시즌에만 얻을 수 있다.
+    # 길드전 1위 길드의 칭호 (guild_war.TITLE). 그 시즌에만 얻을 수 있다. 시즌 6 부터는 1:1 맞대결이라 길드전 칭호가 없다.
     for no in (5, 4):
         out.append(("s%d_guildwar" % no, "길드전" if now == no else "지난 시즌 (다시 얻을 수 없음)",
                     "시즌 %d 길드전에서 1위를 한 길드에서 한 번이라도 공격하기" % no, now == no))

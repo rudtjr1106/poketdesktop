@@ -53,6 +53,9 @@
     '???' 이고 userId 가 음수(자리 표시)다 - 그 값을 그대로 열쇠로 쓰고 공격할 때도 그대로 보낸다.
   · 공격은 지도전과 같은 관장 배틀 창 (POST /attack {target}). 창이 닫히면 다시 받는다.
   · 전략 · 전쟁 중에는 POLL_MS 마다 다시 받아 판 · 명단 · 고른 상대 · 순위만 고친다 (굴려 둔 자리 그대로).
+  · 길드 깃발 (2.5.0, design-notes/2026-11-14-guild-flag.md): 서버가 match 의 own · target · from 과 matches[].guilds[]
+    에 flag 를 실으면 별 판의 우리 · 상대 길드 이름 앞, 이번 시즌 맞대결 목록의 길드 이름 앞에 1배(24px)로 놓는다.
+    깃발이 없으면 예전 그대로 이름만. 지도전 길은 손대지 않는다.
 """
 import tkinter as tk
 from tkinter import ttk
@@ -61,7 +64,7 @@ from PIL import ImageTk
 
 from common import tint as T
 
-from . import skins, sprite_cache, sprites
+from . import flag_art, skins, sprite_cache, sprites
 from . import ui_common as U
 from . import ui_war_map as WM
 from .ui_common import run_async
@@ -673,6 +676,20 @@ class WarTab(object):
         lb = tk.Label(parent, text=text, bg=parent["bg"], fg=fg or U.FG_DIM, font=font or U.FONT_S,
                       anchor="w", justify="left")
         lb.pack(fill="x", padx=padx, pady=pady)
+        U.wrap_to_width(lb)
+        return lb
+
+    def _flag_text(self, parent, flag, text, fg, font, pady=(0, 0), padx=14):
+        """길드 이름이 든 글 한 줄 - 그 길드의 깃발(2.5.0, 1배 = 24px)이 있으면 글 앞에 놓는다. 글은 깃발 오른쪽
+        남은 폭에서 줄을 바꾼다 (글자를 줄이지 않는다). 깃발이 없거나 틀린 꼴이면 _text 와 똑같은 라벨 하나."""
+        bg = parent["bg"]
+        if flag_art.image(parent, flag) is None:
+            return self._text(parent, text, fg=fg, font=font, pady=pady, padx=padx)
+        line = tk.Frame(parent, bg=bg)
+        line.pack(fill="x", padx=padx, pady=pady)
+        flag_art.label(line, flag, bg=bg).pack(side="left", anchor="n", padx=(0, 6))
+        lb = tk.Label(line, text=text, bg=bg, fg=fg, font=font, anchor="w", justify="left")
+        lb.pack(side="left", fill="x", expand=True)
         U.wrap_to_width(lb)
         return lb
 
@@ -1300,9 +1317,9 @@ class WarTab(object):
             self._text(c, "세 길드 삼각 맞대결 · 우리 → [%s] → [%s] → 우리" % (tg.get("name") or "?", fr.get("name") or "?"),
                        fg=U.FG_FAINT, font=U.FONT_XS, pady=(10, 2))
             self._side_row(c, "우리가 칠 길드 [%s] · 출전 %d명" % (tg.get("name") or "?", int(tg.get("size") or 0)),
-                           "우리", m.get("us") or {}, plan, True)
+                           "우리", m.get("us") or {}, plan, True, flag=tg.get("flag"))
             self._side_row(c, "우리를 치는 길드 [%s] · 출전 %d명" % (fr.get("name") or "?", int(fr.get("size") or 0)),
-                           "[%s]" % (fr.get("name") or "?"), m.get("them") or {}, plan, False)
+                           "[%s]" % (fr.get("name") or "?"), m.get("them") or {}, plan, False, flag=fr.get("flag"))
         else:
             self._text(c, "1:1 맞대결", fg=U.FG_FAINT, font=U.FONT_XS, pady=(10, 2))
             grid = tk.Frame(c, bg=CARD)
@@ -1310,11 +1327,11 @@ class WarTab(object):
             grid.grid_columnconfigure(0, weight=1, uniform="side")
             grid.grid_columnconfigure(2, weight=1, uniform="side")
             self._side_col(grid, "우리 [%s]" % own["name"] if own.get("name") else "우리 길드", ours, m.get("us") or {},
-                           plan, True).grid(row=0, column=0, sticky="nwe")
+                           plan, True, flag=own.get("flag")).grid(row=0, column=0, sticky="nwe")
             tk.Label(grid, text="vs", bg=CARD, fg=U.FG_FAINT, font=(U.FAMILY_BLACK, U.pt(14))).grid(
                 row=0, column=1, padx=10, sticky="n", pady=(U.h(18), 0))
             self._side_col(grid, "[%s]" % (tg.get("name") or "?"), int(tg.get("size") or 0), m.get("them") or {},
-                           plan, False).grid(row=0, column=2, sticky="nwe")
+                           plan, False, flag=tg.get("flag")).grid(row=0, column=2, sticky="nwe")
         text, color = lead_line(st, m)
         self._text(c, text, fg=color, font=U.FONT_B, pady=(8, 2))
         if tri and not plan:
@@ -1332,12 +1349,10 @@ class WarTab(object):
                                                pct_text(side.get("ko"))),
                 "공격 %d번 · 남은 공격 %d번" % (int(side.get("attacks") or 0), int(side.get("left") or 0)))
 
-    def _side_col(self, parent, title, size, side, plan, us):
-        """1:1 별 판의 한 칸 (위에서 아래로)."""
+    def _side_col(self, parent, title, size, side, plan, us, flag=None):
+        """1:1 별 판의 한 칸 (위에서 아래로). flag = 그 길드의 깃발 (2.5.0 - 있으면 이름 앞에)."""
         f = tk.Frame(parent, bg=CARD)
-        lb = tk.Label(f, text=title, bg=CARD, fg=U.ACCENT if us else U.FG, font=U.FONT_B, anchor="w", justify="left")
-        lb.pack(fill="x")
-        U.wrap_to_width(lb)
+        self._flag_text(f, flag, title, U.ACCENT if us else U.FG, U.FONT_B, padx=0)
         tk.Label(f, text="출전 %d명" % size, bg=CARD, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w").pack(fill="x")
         if plan:
             return f
@@ -1350,9 +1365,9 @@ class WarTab(object):
             U.wrap_to_width(lb)
         return f
 
-    def _side_row(self, parent, title, who, side, plan, us):
-        """삼각형 별 판의 한 줄: 제목, 그 아래 큰 별 % 와 작은 글."""
-        self._text(parent, title, fg=U.ACCENT if us else U.FG, font=U.FONT_B, pady=(6, 0))
+    def _side_row(self, parent, title, who, side, plan, us, flag=None):
+        """삼각형 별 판의 한 줄: 제목(그 길드의 깃발이 있으면 앞에 - 2.5.0), 그 아래 큰 별 % 와 작은 글."""
+        self._flag_text(parent, flag, title, U.ACCENT if us else U.FG, U.FONT_B, pady=(6, 0))
         if plan:
             return
         row = tk.Frame(parent, bg=CARD)
@@ -1740,6 +1755,9 @@ class WarTab(object):
         row.pack(fill="x", padx=10, pady=(4, 0))
         text, color = match_result_text(g.get("result"), mt.get("final"), plan)
         tk.Label(row, text=text, bg=bg, fg=color, font=U.FONT_B).pack(side="right", anchor="n", padx=(8, 0))
+        flag = flag_art.label(row, g.get("flag"), bg=bg)          # 길드 깃발 (2.5.0) - 있으면 이름 앞에
+        if flag is not None:
+            flag.pack(side="left", anchor="n", padx=(0, 6))
         lb = tk.Label(row, text="[%s]%s" % (g.get("name") or "?", "  우리" if me else ""), bg=bg,
                       fg=U.ACCENT if me else U.FG, font=U.FONT_B, anchor="w", justify="left")
         lb.pack(side="left", fill="x", expand=True)

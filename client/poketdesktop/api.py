@@ -657,6 +657,11 @@ class Api(object):
     def guild_buy(self, item, count=1):
         return self._call("POST", "/api/guild/shop/buy", {"item": item, "count": int(count)})
 
+    def guild_flag(self, pixels):
+        """길드 깃발을 그려 저장한다 (2.5.0, 시즌 6). pixels = common/flag.py 꼴의 576자 (다 '.' 이면 깃발을 내린다).
+        답은 /api/guild 와 같은 꼴 (길드 정보)."""
+        return self._call("POST", "/api/guild/flag", {"pixels": pixels})
+
     def guild_slot(self, count=1):
         """랜덤 캡슐 (2.1.0, 서버 이름은 slot). 결과는 서버가 정한다 - 화면(ui_gacha)은 그 등급의
         캡슐을 배출하고 열어 보일 뿐이다. count=10 이면 열 번 (2.1.1, 답에 results)."""

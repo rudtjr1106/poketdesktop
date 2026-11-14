@@ -19,6 +19,8 @@
     POST   /api/guild/chat                  한 줄 보내기
     POST   /api/guild/mission/{tier}/claim  단계 보상 받기
     GET    /api/guild/shop                  코인 상점        POST /api/guild/shop/buy
+    POST   /api/guild/flag                  길드 깃발 그리기 {"pixels"} (2.5.0 - 마스터·부마스터 + 길드 깃발을 가진 사람)
+    DELETE /api/admin/guild/{gid}/flag      길드 깃발 내리기 (운영진)
 
 **새 줄은 웹소켓(guild_ws.py 의 /ws/guild)이 밀어 준다.** 여기의 채팅 GET 은 처음 열 때
 지난 줄을 받는 데 쓰고, 웹소켓이 막힌 망에서는 2초마다 묻는 예비 길이 된다. 그 응답에
@@ -61,6 +63,10 @@ class ChatIn(BaseModel):
 class BuyIn(BaseModel):
     item: str = ""
     count: int = 1
+
+
+class FlagIn(BaseModel):
+    pixels: str = ""        # common/flag.py 꼴 (24 x 24 = 576자). 빈 그림 = 깃발 내리기
 
 
 def _uid(ctx):
@@ -127,6 +133,19 @@ class SlotIn(BaseModel):
 def slot(body: Optional[SlotIn] = None, ctx=Depends(deps.current)):
     """랜덤 캡슐 (2.1.0, 서버 이름은 slot). 몸이 없거나 {} 이면 한 번 (2.1.0 앱), {"count": 10} 이면 열 번."""
     return guild.slot(_uid(ctx), count=(body.count if body else 1))
+
+
+@router.post("/api/guild/flag")
+def flag(body: FlagIn, ctx=Depends(deps.current)):
+    """길드 깃발 그리기 (2.5.0). 돌려주는 것은 GET /api/guild 와 같은 꼴 + ok · message.
+    576자보다 긴 그림은 set_flag 가 길드를 읽기 전에 400 으로 막는다."""
+    return guild.set_flag(_uid(ctx), body.pixels)
+
+
+@router.delete("/api/admin/guild/{gid}/flag")
+def clear_flag(gid: int, ctx=Depends(deps.current)):
+    """운영진이 길드 깃발을 내린다 (부적절한 그림). 그 길드 채팅에 알림."""
+    return guild.clear_flag(_uid(ctx), gid)
 
 
 @router.post("/api/guild/mission/{tier}/claim")

@@ -5,6 +5,7 @@
     본문       무늬 없는 바탕 위의 흰 판 **한 장** (보이는 줄만 그린다 - kit.VList):
                내 티어 띠(티어 빛 막대 · 볼 꼬리표 · RP · 다음 티어까지) · 규칙과 시즌 보상 · 파란 꼬리표 '순위' ·
                순위 줄 · 지난 시즌 명예의 전당. 내 줄은 크림 바탕에 빨간 ▶ 커서. 1 · 2 · 3 등은 금 · 은 · 동 숫자.
+               길드 깃발(2.5.0)이 있는 사람은 이름 앞에 깃발 그림(create_image, 1배 24px) - 그 줄만 조금 높다.
     대전 기록  [전체 | 공격한 판 | 공격받은 판] 탭(빨간 밑줄), 줄마다 승/패 칸 · 공격/방어 꼬리표 · '다시 보기'
     아래 줄    진한 테의 글상자 (알림)
 
@@ -15,6 +16,9 @@ paint_msg · flat_button.
 """
 import tkinter as tk
 
+from common import flag as F
+
+from ... import flag_art
 from ... import ui_common as U
 from ... import ui_rank as R
 from ...ui_season import TIER_COLOR, TIER_MARK
@@ -299,7 +303,7 @@ class RankWindow(R.RankWindow):
         if kind == "empty":
             return K.text_height(cv, d, font(10), inner) + s(60)
         if kind == "rank":
-            return s(52)
+            return self._rank_geo(d)[2]
         if kind == "hall":
             return s(32)
         if kind == "tabs":
@@ -371,6 +375,20 @@ class RankWindow(R.RankWindow):
         K.text(cv, x + w // 2, y + U.h(28), d, font(10), fill=DIM, anchor="n", width=self._inner(w),
                justify="center", tags=tags)
 
+    def _rank_geo(self, d):
+        """순위 줄의 (이름 줄 가운데, 아래 줄 가운데, 줄 높이) - 줄 맨 위에서 잰 값.
+
+        길드 깃발(2.5.0, 1배 = 24px)이 있으면 이름 줄 가운데에 놓고, 아래 줄 글과 겹치지 않게 그 줄만 조금 높인다
+        (글자는 그대로). 깃발이 없거나 틀린 꼴이면 예전 그대로."""
+        s = U.h
+        if flag_art.image(self.vl.cv, d.get("flag")) is None:
+            return s(17), s(37), s(52)
+        half = K.tkfont_of(self.vl.cv, font(9)).metrics("linespace") // 2 + 1      # 아래 줄 글의 반 높이
+        fh = F.SIZE // 2
+        ty = max(s(17), s(4) + fh)
+        by = max(s(37), ty + fh + s(3) + half)
+        return ty, by, max(s(52), by + half + s(8))
+
     def _row_rank(self, cv, d, x, y, w, h, tags, hov):
         s = U.h
         mine = d["mine"]
@@ -382,10 +400,16 @@ class RankWindow(R.RankWindow):
         rank = d["rank"]
         K.text(cv, x + s(50), y + h // 2, "%d" % rank, font(15), fill=MEDAL.get(rank, INK2), anchor="e", tags=tags)
         lx = x + s(64)
-        ty, by = y + s(17), y + s(37)
+        gty, gby, _gh = self._rank_geo(d)
+        ty, by = y + gty, y + gby
         right = K.tkfont_of(cv, font(12)).measure(d["score"]) + s(30)
         tw = tier_chip(cv, lx, ty, d["tier"], d["tierKr"], font(9), tags)
         nx = lx + tw + (s(8) if tw else 0)
+        img = flag_art.image(cv, d.get("flag"))
+        if img is not None:
+            # 길드 깃발 (2.5.0): 이름 바로 앞에 1배 그대로
+            cv.create_image(nx, ty, image=img, anchor="w", tags=tags + ("flag",))
+            nx += F.SIZE + s(6)
         col = d["color"] or ("#c06810" if mine else INK)
         nid = K.text(cv, nx, ty, d["name"], font(11), fill=tone(col), anchor="w", tags=tags)[1]
         xx = cv.bbox(nid)[2] + s(8)
