@@ -223,11 +223,13 @@ def rules_part():
         and not it.get("buyable") and it.get("custom") is True, it)
     with open(os.path.join(ROOT, "docs", "guide", "index.html"), encoding="utf-8") as f:
         guide = f.read()
-    rank_txt = "1위 길드 %d장 · 2위 %d장 · 3위 %d장" % (GW.TM_RANK[1], GW.TM_RANK[2], GW.TM_RANK[3])
-    act_txt = "%d번 이상 이기면 활약 보상으로 %d장" % (GW.TM_ACTIVE_WINS, GW.TM_ACTIVE)
-    chk("안내서의 수가 서버와 같다 ('%s' · '%s')" % (rank_txt, act_txt), rank_txt in guide and act_txt in guide)
-    chk("  안내서: 이긴 길드원만 받는다 · 다 가진 묶음은 선택권", "한 번이라도 이긴 길드원만" in guide
-        and "순위 묶음을 이미 다 가진 사람" in guide)
+    # 안내서는 시즌 6 부터 1:1 맞대결 · 코인 보상 것 (guild_war_match) - 시즌 4 · 5 순위 보상은 이미 받은 것만 적는다
+    from app import guild_war_match as GM
+    coin_txt = "★ %d · ★★ %d · ★★★ %d" % tuple(GM.STAR_COINS[1:])
+    res_txt = "이김 %d · 비김 %d · 짐 %d" % (GM.RESULT_COINS["win"], GM.RESULT_COINS["draw"], GM.RESULT_COINS["lose"])
+    chk("안내서의 코인 수가 서버와 같다 ('%s' · '%s')" % (coin_txt, res_txt), coin_txt in guide and res_txt in guide)
+    chk("  안내서: 시즌 4 · 5 순위 보상은 이미 받은 사람이 그대로", "시즌 4 · 5 의 순위 보상" in guide
+        and "시즌 4 · 5 길드전 1위" in guide)
     chk("tm_text: 1위는 순위 몫 + 활약 몫, 그 밖은 활약 몫만",
         "뽑기권 2장도" in GW.tm_text(1) and "활약 보상으로 1장" in GW.tm_text(1)
         and "장도 드립니다" not in GW.tm_text(4) and "활약 보상으로 랜덤 기술머신 뽑기권 1장을" in GW.tm_text(4)
