@@ -190,6 +190,9 @@ def relic_part(root, ov, app):
     img = seen.got[0][1]
     chk("  긴 글은 줄을 바꿔 그린다 (글자를 줄이지 않는다 - 폭 제한 · 높이가 는다)", img.width <= AD.PANEL_W + 40
         and img.height > 60, img.size)
+    pa, pi = AD.panel_image("아"), AD.panel_image("이")
+    chk("  새겨진 글은 12px (11px 면 ㅏ 의 가로획이 빠져 '아' 가 '이' 로 보였다 - 11/16)",
+        AD.TEXT_PX == 12 and pa.tobytes() != pi.tobytes(), AD.TEXT_PX)
     sh.on_click()
     chk("  다시 눌러도 on_seen 은 한 번", len(seen.got) == 1)
     pump(root, lambda: sh.closed, 30)

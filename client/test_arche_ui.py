@@ -179,6 +179,32 @@ def _has_big_title(im):
     return n > 12
 
 
+def glyph_part():
+    """11/16 사용자 '고고학자 일지의 ㅏ 가 ㅣ 처럼 보인다' - Galmuri11 은 12px 도트 글꼴인데 11px 로 그려 가로획이 빠졌다."""
+    print("=== 일지 글자 (12px) ===")
+    chk("일지 글자는 12px (Galmuri11 의 제 크기)", J.TEXT_PX == 12 and J.LINE_H >= 14, (J.TEXT_PX, J.LINE_H))
+    for a, b in (("아", "이"), ("자", "지"), ("상", "싱"), ("간", "긴"), ("사", "시")):
+        ia, ib = J.A_text(a, (0, 0, 0)), J.A_text(b, (0, 0, 0))
+        chk("'%s' 와 '%s' 가 다르게 그려진다 (ㅏ 의 가로획)" % (a, b), ia.size != ib.size or ia.tobytes() != ib.tobytes())
+    w = J.PHOTO[2] - J.PHOTO[0]
+    im = J.Image.new("RGB", (J.LW, J.LH))
+    d = J.ImageDraw.Draw(im)
+    chk("상태 줄: 이름 + 값이 한 줄에 안 들면 값을 다음 줄로 ('장이 닫히기까지 13일 23시간')",
+        J._row(d, 0, "장이 닫히기까지", "13일 23시간", w, J.INK, J.RED) == 2 * J.LINE_H
+        and J._row(d, 0, "봉인", "굳게 닫혀 있다", w, J.INK, J.INK) == J.LINE_H)
+    ch = {"n": 1, "open": True, "solvers": 37, "first": "가나다라마바사아자차카타"}
+    simg, sxy = J.stamp_overlay(ch)
+    chk("도장: 12자 닉네임이어도 사진 폭 안 · 왼쪽 쪽을 안 덮는다", simg.width <= J.STAMP_W + 1 and sxy[0] >= J.RIGHT[0],
+        (simg.size, sxy))
+    chk("석실 줄: 긴 이름이면 이름만 (칸 안)", J.fit_text(w - J.text_w("석실 1") - 8, "잡았다 · 울트라네크로즈마",
+                                                       "울트라네크로즈마") == "울트라네크로즈마")
+    tw = J.TEXT_L[2] - J.TEXT_L[0]
+    chk("준비 전 큰 제목은 두 배 글자로 줄을 바꿔 칸 안", all(2 * J.text_w(x) <= tw for x in J.big_lines("아르케의 여섯 봉인", tw)))
+    from common import arche as CA
+    chk("장 제목(두 배 글자)이 모두 한 줄로 칸 안", all(2 * J.text_w(c["kr"]) <= tw for c in CA.CHAPTERS),
+        [(c["kr"], 2 * J.text_w(c["kr"])) for c in CA.CHAPTERS])
+
+
 def book_part():
     print("=== 수첩 ===")
     im, hits, pages = J.draw_book({"ready": False, "chapters": []}, 1, 0, FakeCtl())
@@ -201,11 +227,16 @@ def book_part():
     mixed = [{"at": iso(time.time() - 300), "text": "보통 일지"},
              {"at": iso(time.time() - 200), "text": "실마리 글", "hint": 1},
              {"at": iso(time.time() - 100), "text": "발굴 보고서 · 새벽", "dig": True}]
-    heads = [b[1][0] for b in J.left_blocks(state(journal=mixed)["chapters"][0], [], 160) if b[0] == "entry"]
-    marks = [b[1][2] for b in J.left_blocks(state(journal=mixed)["chapters"][0], [], 160) if b[0] == "entry"]
-    chk("일지에 섞여 온 실마리는 '(실마리)' 머리 · 발굴 보고서는 '내 발굴 보고서' (11/15)",
+    heads = [b[1][0] for b in J.left_blocks(state(journal=mixed)["chapters"][0], [], 400) if b[0] == "entry"]
+    marks = [b[1][2] for b in J.left_blocks(state(journal=mixed)["chapters"][0], [], 400) if b[0] == "entry"]
+    chk("일지에 섞여 온 실마리는 '(실마리)' 머리 · 발굴 보고서는 '내 발굴 보고서' (11/15, 칸이 넓을 때)",
         heads[0].startswith("고고학자의 일지 ·") and "(실마리)" in heads[1] and heads[2].startswith("내 발굴 보고서")
         and marks == [False, True, False], heads)
+    heads = [b[1][0] for b in J.left_blocks(state(journal=mixed)["chapters"][0], [], 160) if b[0] == "entry"]
+    marks = [b[1][2] for b in J.left_blocks(state(journal=mixed)["chapters"][0], [], 160) if b[0] == "entry"]
+    chk("일지 칸(160)에서는 머리줄이 짧은 말로 칸 안에 (넘쳐 오른쪽 쪽까지 그려지지 않는다 - 11/16)",
+        all(J.text_w(h) <= 160 for h in heads) and heads[0].startswith("고고학자 ·") and heads[1].startswith("실마리 ·")
+        and heads[2].startswith("발굴 보고서 ·") and marks == [False, True, False], [(h, J.text_w(h)) for h in heads])
     pages = J.paginate(J.left_blocks(state(journal=one_long)["chapters"][0], [], 160), 120, 170)
     chk("글 하나가 한 쪽보다 길면 쪽을 넘어 나눈다 (쪽마다 높이 안)", len(pages) >= 3
         and all(sum(b[2] for b in pg) <= 170 for pg in pages[1:]) and sum(b[2] for b in pages[0]) <= 120,
@@ -231,6 +262,7 @@ def book_part():
         and not _has_big_title(p1))
     lines = J.wrap("가나다라마바사아자차카타파하 " * 6, 160)
     chk("줄바꿈: 모든 줄이 칸 안", all(J.text_w(s) <= 160 for s in lines) and len(lines) >= 3, lines)
+    glyph_part()
     seen = [{"id": "u", "kind": "unown", "at": NOW - 60, "glyph": 5},
             {"id": "s", "kind": "stars", "at": NOW - 30, "pts": [[0.1, 0.2, 1], [0.6, 0.5, 0]]},
             {"id": "r", "kind": "relic", "at": NOW - 10, "text": "지어낸 새김 글"}]

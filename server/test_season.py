@@ -742,8 +742,8 @@ def main():
     i = names.index("0290-season3-open")
     chk("손질 차례: 0290(시즌 3 열기) 다음에 0300", names[i:i + 2]
         == ["0290-season3-open", "0300-s3-void-early"], names[-3:])
-    chk("시즌 6 은 11/16 부터 2주", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
-        == (6, "2026-11-16", "2026-11-29"))
+    chk("시즌 6 은 11/16 ~ 11/30 (11/16 사용자 - 하루 길다)", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
+        == (6, "2026-11-16", "2026-11-30"))
     # 시즌과 무관한 손질(0330 끝난 배틀 정리 · 0340 감사의 선물)도 붙는다 - 시즌 손질 가운데 맨 끝이면 된다.
     chk("시즌 6 열기는 시즌 손질 가운데 맨 끝", [n for n in names if "season" in n][-1] == "0370-season6-open",
         names[-3:])

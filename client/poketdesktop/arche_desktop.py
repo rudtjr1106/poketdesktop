@@ -62,7 +62,7 @@ READ_MIN_MS = 10000          # 새겨진 글을 읽을 시간
 READ_PER_CHAR = 150
 READ_MAX_MS = 45000
 PANEL_W = 320                # 새겨진 글 판의 폭 (화면 px) - 긴 글은 줄을 바꿔 아래로 늘린다 (글자는 안 줄인다)
-TEXT_PX = 11                 # Galmuri11 (2배로 키워 그린다)
+TEXT_PX = 12                 # Galmuri11 은 12px 도트 글꼴 - 11px 면 ㅏ 의 가로획이 빠진다 (ui_arche.TEXT_PX). 2배로 키워 그린다
 
 STAR_K = 2
 STAR_GAP = 260               # 별이 하나씩 뜬다

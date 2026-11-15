@@ -32,6 +32,7 @@ LEFT = (10, 9, 184, 214)           # 왼쪽 쪽 (x0, y0, x1, y1)
 RIGHT = (192, 9, 364, 214)
 TEXT_L = (18, 16, 178, 186)        # 왼쪽 글 칸
 PHOTO = (202, 16, 354, 104)        # 사진 (흰 테 안쪽)
+STAMP_W = PHOTO[2] - PHOTO[0] + 8   # 사진 모서리 도장의 가장 넓은 폭 (오른쪽 쪽 밖으로 안 나가게)
 TABS_X = 364
 
 COVER = (58, 40, 28)
@@ -98,8 +99,13 @@ def _ver(v):
 
 
 # ---------------------------------------------------------------- 글자
+# Galmuri11 은 **12px 에 맞춘 도트 글꼴**이다 (unitsPerEm 1200 = 한 점이 100). 11px 로 그리면 줄이 하나씩 빠져
+# ㅏ 의 짧은 가로획이 사라져 '아 → 이 · 자 → 지 · 상 → 싱' 으로 보였다 (11/16 사용자 '일지의 ㅏ 가 ㅣ 처럼').
+TEXT_PX = 12
+
+
 def _font():
-    return A.font(11)
+    return A.font(TEXT_PX)
 
 
 def text_w(s):
@@ -109,7 +115,7 @@ def text_w(s):
     return r - l
 
 
-LINE_H = 13
+LINE_H = 14                         # 12px 글자 + 줄 틈 (11px 일 때 13 과 같은 틈)
 
 
 def wrap(text, width):
@@ -150,6 +156,25 @@ def _big(im, xy, s, fill=INK):
     im.paste(big, xy, big)
 
 
+BIG_H = 2 * LINE_H
+
+
+def big_lines(s, width):
+    """큰 제목을 width 에 맞춰 줄로 (두 배 글자 기준). 글자는 안 줄이고 낱말에서 줄을 바꾼다."""
+    return wrap(s, width // 2)
+
+
+def _row(d, y, label, value, width, lcol, vcol, x0=None):
+    """오른쪽 쪽의 '이름 ......... 값' 한 줄. 둘이 한 줄에 안 들어가면 값을 다음 줄 오른쪽에 (글자는 안 줄인다 -
+    12px 에서 '장이 닫히기까지1일 23시간' 처럼 붙었다). 다음 y 를 돌려준다."""
+    x0 = PHOTO[0] if x0 is None else x0
+    _text(d, (x0, y), label, lcol)
+    if text_w(label) + 8 + text_w(value) > width:
+        y += LINE_H
+    _text(d, (x0 + width - text_w(value), y), value, vcol)
+    return y + LINE_H
+
+
 def A_text(s, fill):
     f = _font()
     l, t, r, b = f.getbbox(s or " ")
@@ -188,27 +213,41 @@ def star_view(r, width):
     return x0, x1, max(24, min(STAR_H_MAX, h))
 
 
+def fit_text(width, *cands):
+    """칸(width)에 드는 첫 글 (모두 넘치면 마지막 것). 글자는 안 줄이고 말을 줄인다 - 머리줄 · 상태 줄용."""
+    for s in cands:
+        if text_w(s) <= width:
+            return s
+    return cands[-1]
+
+
+def entry_head(e, width):
+    """일지 글 한 덩이의 머리줄 (글쓴이 · 시각). 칸을 넘으면 짧은 말로 - 넘친 머리줄이 접힌 곳 너머 오른쪽 쪽까지
+    그려졌다 (11/16: 12px 로 바꾸며 본 것, 실마리 머리줄은 11px 때도 넘쳤다)."""
+    at = _kst(_ts(e.get("at")))
+    if e.get("hint"):
+        return fit_text(width, "고고학자의 일지 (실마리) · " + at, "실마리 · " + at), True
+    if e.get("dig"):
+        return fit_text(width, "내 발굴 보고서 · " + at, "발굴 보고서 · " + at), False
+    return fit_text(width, "고고학자의 일지 · " + at, "고고학자 · " + at), False
+
+
 def left_blocks(ch, seen, width):
     """왼쪽 쪽에 쌓을 블록들 [(kind, payload, height)]. 쪽 나누기는 높이로 한다."""
     blocks = []
     for e in ch.get("journal") or []:
         # 서버는 실마리(hint) · 내 발굴 보고서(dig)도 일지에 섞어 보낸다 (11/15) - 머리줄로 갈라 그린다
-        if e.get("hint"):
-            head, mark = "고고학자의 일지 (실마리) · %s" % _kst(_ts(e.get("at"))), True
-        elif e.get("dig"):
-            head, mark = "내 발굴 보고서 · %s" % _kst(_ts(e.get("at"))), False
-        else:
-            head, mark = "고고학자의 일지 · %s" % _kst(_ts(e.get("at"))), False
+        head, mark = entry_head(e, width)
         text = e.get("text") or ""
         lines = wrap(text, width)
         blocks.append(("entry", (head, lines, mark), (len(lines) + 1) * LINE_H + 6, (text, width)))
     for e in ch.get("hints") or []:
-        head = "고고학자의 일지 (실마리) · %s" % _kst(_ts(e.get("at")))
+        head = entry_head(dict(e, hint=True), width)[0]
         text = e.get("text") or ""
         lines = wrap(text, width)
         blocks.append(("entry", (head, lines, True), (len(lines) + 1) * LINE_H + 6, (text, width)))
     for r in seen:
-        head = "내가 본 것 · %s" % _kst(r.get("at"))
+        head = fit_text(width - 6, "내가 본 것 · %s" % _kst(r.get("at")), "본 것 · %s" % _kst(r.get("at")))
         kind = r.get("kind")
         if kind == "parade":
             gl = r.get("glyphs") or []
@@ -361,9 +400,13 @@ def draw_book(state, n, page, ctl, t=0, stamp=None, version=VERSION):
         hits["tab%d" % (i + 1)] = (TABS_X, y0, LW - 2, y0 + 26)
 
     if not (state or {}).get("ready", True) or ch is None:
-        _big(im, (LEFT[0] + 10, 30), "아르케의 여섯 봉인")
+        y = 30
+        for s in big_lines("아르케의 여섯 봉인", TEXT_L[2] - TEXT_L[0]):    # 두 배 글자로는 한 줄에 안 든다 - 두 줄로
+            _big(im, (TEXT_L[0], y), s)
+            y += BIG_H
+        y += 8
         for i, s in enumerate(wrap("고고학자가 아직 발굴 일지를 정리하고 있다. 조금 뒤에 다시 펼쳐 보자.", TEXT_L[2] - TEXT_L[0])):
-            _text(d, (TEXT_L[0], 70 + i * LINE_H), s, INK)
+            _text(d, (TEXT_L[0], y + i * LINE_H), s, INK)
         return im, hits, 1
 
     width = TEXT_L[2] - TEXT_L[0]
@@ -473,22 +516,21 @@ def draw_book(state, n, page, ctl, t=0, stamp=None, version=VERSION):
         return im, hits, pages
     solvers = int(ch.get("solvers") or 0)
     if ch.get("open") and not ch.get("ritual"):
-        _text(d, (PHOTO[0], y), "봉인", INK_DIM)
-        _text(d, (PHOTO[2] - text_w("굳게 닫혀 있다"), y), "굳게 닫혀 있다", INK)
-        y += LINE_H + 2
+        y = _row(d, y, "봉인", "굳게 닫혀 있다", pw, INK_DIM, INK) + 2
         left = (closes - time.time()) if closes else 0
-        _text(d, (PHOTO[0], y), "장이 닫히기까지", INK_DIM)
-        s = _left(left)
-        _text(d, (PHOTO[2] - text_w(s), y), s, RED)
-        y += LINE_H + 2
+        y = _row(d, y, "장이 닫히기까지", _left(left), pw, INK_DIM, RED) + 2
     elif ch.get("ritual"):
         _text(d, (PHOTO[0], y), "봉인이 풀렸다!", GOOD)
         y += LINE_H + 2
         for e in ch.get("encounters") or []:
             st = e.get("state")
             lab = "석실 %d" % (int(e.get("slot") or 0) + 1)
-            s = {"caught": "잡았다" + (" · " + e["name"] if e.get("name") else ""), "ready": "기다린다",
-                 "locked": "닫혀 있다"}.get(st, st or "")
+            room = pw - text_w(lab) - 8
+            if st == "caught" and e.get("name"):
+                # 석실은 셋까지라 줄을 늘릴 자리가 없다 - 긴 이름이면 '잡았다 · ' 를 빼고 이름만 (초록 = 잡았다)
+                s = fit_text(room, "잡았다 · " + e["name"], e["name"])
+            else:
+                s = {"caught": "잡았다", "ready": "기다린다", "locked": "닫혀 있다"}.get(st, st or "")
             _text(d, (PHOTO[0], y), lab, INK_DIM)
             _text(d, (PHOTO[2] - text_w(s), y), s, GOOD if st == "caught" else INK)
             y += LINE_H
@@ -519,7 +561,12 @@ def stamp_overlay(ch, stamp=None):
     else:
         lines = ["봉인을 연 트레이너 %d명" % solvers]
         if ch.get("first"):
-            lines.append("첫 발견자 · %s" % ch["first"])
+            one = "첫 발견자 · %s" % ch["first"]
+            # 도장은 사진 폭 안에 - 긴 닉네임(12자)이면 왼쪽 쪽 머리줄까지 덮었다. 넘치면 이름을 다음 줄로
+            if text_w(one) + 10 <= STAMP_W:
+                lines.append(one)
+            else:
+                lines += ["첫 발견자", ch["first"]]
     sw = max(text_w(x) for x in lines) + 10
     sh = LINE_H * len(lines) + 4
     im = Image.new("RGBA", (sw + 1, sh + 1), (0, 0, 0, 0))

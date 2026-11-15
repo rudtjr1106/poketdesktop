@@ -37,7 +37,7 @@ SEASON = 6
 # guild.EXCLUSIVE_FROM) · 아르케의 여섯 봉인 이벤트 · 테라스탈 (common/tera, 관장 8곳 = 테라오브). 랭크 규칙은
 # 시즌 5 그대로 (rules_v5) - 랭크 AI 가 테라스탈도 알아서 쓴다.
 SEASON_STARTS = "2026-11-16"
-SEASON_ENDS = "2026-11-29"
+SEASON_ENDS = "2026-11-30"   # 11/16 사용자: 시즌 6 은 11/30 까지 (12/1 0시에 닫는다 - 다른 시즌보다 하루 길다)
 
 
 def rules_v5():

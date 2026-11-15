@@ -57,14 +57,14 @@ def main():
     db.init()
 
     print("=== 시즌 6 ===")
-    chk("시즌 6 은 11/16 ~ 11/29", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
-        == (6, "2026-11-16", "2026-11-29"))
+    chk("시즌 6 은 11/16 ~ 11/30 (11/16 사용자)", (season.SEASON, season.SEASON_STARTS, season.SEASON_ENDS)
+        == (6, "2026-11-16", "2026-11-30"))
     chk("랭크 규칙은 시즌 5 그대로 (양쪽 길드전 AI · 같은 도구 한 마리 · 점수 폭)", season.rules_v5()
         and season.rp_bounds() == (20, 3, 15, 3))
     chk("길드전은 1:1 맞대결 · 코인 상점 길드 전용이 켜진다", GW.match_mode() is True)
     chk("티어 경계는 그대로", [(k, rp) for k, _n, rp in season.TIERS] == migrations.S5_TIER_RP, season.TIERS)
     rules = season.rules_public()
-    chk("규칙표가 시즌 6 것", rules["season"] == 6 and rules["endsAt"] == "2026-11-29"
+    chk("규칙표가 시즌 6 것", rules["season"] == 6 and rules["endsAt"] == "2026-11-30"
         and [r["title"] for r in rules["rewards"]]
         == ["시즌 6 챔피언", "시즌 6 사천왕", "시즌 6 마스터볼", "시즌 6 하이퍼볼", "시즌 6 슈퍼볼"],
         [r["title"] for r in rules["rewards"]])
