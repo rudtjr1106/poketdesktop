@@ -308,6 +308,12 @@ def main():
     chk("여럿: 데려온 포켓몬 · 지닌 도구 · 아무것도 못 찾음", "Lv.5 이브이를 데려왔습니다!" in t and "도감에 새로 등록" in t
         and "구애머리띠" in t and "지닌 도구" in t and "물건 5개를 가져왔습니다. 포켓몬 1마리를 데려왔습니다." in t
         or ("이브이" in t and "구애머리띠" in t and "지닌 도구" in t), t[:300])
+    dig = [{"pokemon": {"name": "꼬마돌"}, "placeKr": "아르케 발굴지", "hours": 2, "grade": "normal", "items": [],
+            "report": "흙 세 번째 층에서 숫자 조각이 나왔다"}]
+    modal(lambda: XU.show_loot(host, app, dig), look_loot)
+    t = " | ".join(st.get("said", []))
+    chk("아르케 발굴지: 발굴 보고서 줄이 테마 창에도 나온다 ('아무것도 못 찾았다' 대신, 11/15 검수)",
+        "발굴 보고서 · 흙 세 번째 층에서 숫자 조각이 나왔다" in t and "아무것도 못 찾았다" not in t, t)
     many = [dict(claimed[i % 2], pokemon={"name": "포켓몬%d" % i}) for i in range(8)]
     modal(lambda: XU.show_loot(host, app, many), look_loot)
     chk("물건이 많으면 창을 키우는 대신 안쪽이 굴러가고 '확인' 이 창 안에 있다 (창 %d / 화면 %d)"

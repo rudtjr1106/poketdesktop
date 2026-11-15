@@ -15,7 +15,7 @@
 
 앱은 "이 말을 안다" · "이걸 했다" 만 보낸다. 의식(ritual)은 조건을 묶은 것이고 (`all` / `any`), 조건 종류는
 _cond 에 있다 (값은 비공개). 판정은 그 장이 **열려 있는 동안에만** - 지난 장은 닫힌다. 의식을 마친 장의 전설은
-**이벤트 끝까지** 다시 도전할 수 있다 (장 마감 직전에 의식을 마친 사람이 배틀을 못 끝내 잃지 않게).
+**이벤트가 끝난 뒤 하루까지** 다시 도전할 수 있다 (장 마감 직전에 의식을 마친 사람이 배틀을 못 끝내 잃지 않게 - BATTLE_GRACE).
 
 ## 전설 배틀
 
@@ -59,6 +59,9 @@ KEY_TEXT_MAX = 200
 LEAD = 90                      # 현상을 이만큼 앞뒤로 준다 (초) - 폴링 간격보다 길게
 CARD_BEFORE_DAYS = 7           # 이벤트 이만큼 전부터 /api/me 에 카드를 싣는다
 CARD_AFTER_DAYS = 1
+# 의식을 마친 장의 전설은 이벤트가 끝난 뒤에도 이만큼 더 만날 수 있다 (11/15 검수: 6장은 장 마감 = 이벤트 끝이라
+# 마지막 행렬로 23시 넘어 의식을 마친 사람은 몇 분 안에 잡지 못하면 그 전설을 영영 잃었다). 일지도 그동안 열린다.
+BATTLE_GRACE = datetime.timedelta(days=CARD_AFTER_DAYS)
 CATCH_FLOOR = 45               # 포획률 하한 (해금 종의 하한과 같은 값 - achievements.catch_species)
 PERFECT_IVS = 3                # 개체값 31 인 능력 수 (본편 전설 규칙)
 PREFIX = "arche:"
@@ -481,7 +484,10 @@ def _revealed():
     return out
 
 
-def _journal(n, now, revealed):
+def _journal(n, now, revealed, digs=()):
+    """그 장 일지 (시각 차례). 실마리는 **때(after)가 되면 누구의 일지에나** 보인다 (11/15 사용자 원칙: 혼자서도
+    느리게 깰 수 있게 - 함께하면 실마리 전에 푼다). 게시판 글로 올리는 것은 예전처럼 푼 사람이 적을 때만 (ensure_posts).
+    digs = 그 사람이 이 장 동안 '아르케 발굴지' 에서 받아 온 발굴 보고서 [(돌아온 시각, 글)] - 탐험 창을 닫아도 남게."""
     lo = A.window(n)[0]
     out = []
     for j in _sec(n).get("journal") or []:
@@ -492,9 +498,33 @@ def _journal(n, now, revealed):
         if at <= now:
             out.append({"at": _iso(at), "text": str(j.get("text") or "")})
     for i, h in enumerate(_sec(n).get("hints") or [], 1):
-        if (n, i) in revealed:
-            out.append({"at": revealed[(n, i)], "text": str((h or {}).get("text") or ""), "hint": i})
+        h = h or {}
+        try:
+            due = lo + datetime.timedelta(hours=float(h.get("after") or 0))
+        except (TypeError, ValueError):
+            due = None
+        if (n, i) in revealed or (due is not None and due <= now):
+            at = revealed.get((n, i)) or _iso(due)
+            out.append({"at": at, "text": str(h.get("text") or ""), "hint": i})
+    for at, text in digs:
+        out.append({"at": at, "text": text, "dig": True})
     out.sort(key=lambda x: x["at"])
+    return out
+
+
+def _digs(uid, n, now):
+    """그 사람이 n 장 동안 '아르케 발굴지' 탐험에서 받아 온 발굴 보고서 [(돌아온 시각 iso, 글)] (받은 것만, 돌아온 차례).
+    탐험 기록은 사람마다 최근 것만 남는다 (expedition.KEEP_DONE) - 그보다 오래된 것은 빠질 수 있다."""
+    lo, hi = A.window(n)
+    out = []
+    for r in db.q("SELECT ends_at FROM expedition WHERE user_id=? AND place='arche' AND state='done'"
+                  " ORDER BY ends_at", (uid,)):
+        at = _parse(r["ends_at"])
+        if at is None or not (lo <= at < hi) or at > now:
+            continue
+        text = dig_report(at)
+        if text:
+            out.append((_iso(at), "발굴 보고서 · %s" % text))
     return out
 
 
@@ -578,7 +608,7 @@ def state(uid, now=None):
             continue
         try:
             prog = mine.get(n)
-            row.update({"journal": _journal(n, now, revealed), "inscription": sec.get("inscription"),
+            row.update({"journal": _journal(n, now, revealed, _digs(uid, n, now)), "inscription": sec.get("inscription"),
                         "photo": sec.get("photo") or c["place"],
                         # 일지 사진: 판에 새긴 아르케 글자 번호 · 사진 아래 한 줄 (비공개 데이터 그대로 - 모두 보는 것)
                         "marks": sec.get("marks"), "caption": sec.get("caption"),
@@ -606,7 +636,7 @@ def state(uid, now=None):
                 if m is not None and m["state"] == "caught":
                     e_.update(state="caught", num=_num_of(m["species"]), name=_kr_of(m["species"]),
                               shiny=bool(m["shiny"]))
-                elif prog is not None and prev_caught and now < e:
+                elif prog is not None and prev_caught and now < e + BATTLE_GRACE:
                     e_["state"] = "ready"
                     if m is not None:
                         e_["num"] = _num_of(m["species"])       # 한 번 만나 본 전설
@@ -615,9 +645,10 @@ def state(uid, now=None):
                 prev_caught = e_["state"] == "caught"
                 enc.append(e_)
             row["encounters"] = enc
-        except Exception as e:                               # noqa: BLE001
-            # 리뷰 I2: 한 장이 터져도 일지 전체가 500 이 되지 않게 그 장만 빈 채로
-            print("[arche] %d 장 state 실패 (uid %s): %r" % (n, uid, e))
+        except Exception as err:                             # noqa: BLE001
+            # 리뷰 I2: 한 장이 터져도 일지 전체가 500 이 되지 않게 그 장만 빈 채로. (변수 이름을 e 로 쓰면 파이썬이
+            # except 끝에서 지워 버려 이벤트 끝 시각 e 가 사라지고, 뒤의 장들이 모두 같이 터졌다 - 11/15 검수)
+            print("[arche] %d 장 state 실패 (uid %s): %r" % (n, uid, err))
             row = {k: row[k] for k in ("n", "title", "place", "placeKr", "opensAt", "closesAt", "open", "past",
                                        "future", "slots") if k in row}
             row.update(journal=[], ritual=False, solvers=0, keys=[], encounters=[])
@@ -771,9 +802,10 @@ def ensure_posts(now=None, force=False):
     · 장 열림 글 ref='arche:<장>' - 비공개 자료의 post.title · post.body (없으면 일지 첫 글) · post.images
     · 예약 글 (비공개 자료 맨 위 posts: {ref, at, by, title, body, images?}) - at 이 지났으면 by 계정(npc · traveler)으로.
       **장과 상관없이** 본다 - 이벤트 전 · 이벤트 끝 무렵 글도 (11/11).
-    · 실마리 i 번 ref='arche:<장>:h<i>' - 장이 열리고 after 시간이 지났는데 의식을 마친 사람이 minSolvers 보다 적으면.
-      일지에 올라간 것은 meta 'arche:hint:<장>:<i>' 로 적는다 (게시판 글이 안 올라가도 일지에는 남는다).
+    · 실마리 i 번 ref='arche:<장>:h<i>' - 장이 열리고 after 시간이 지났는데 의식을 마친 사람이 minSolvers 보다 적으면
+      (minSolvers 가 없으면 조건 없이). 올라간 것은 meta 'arche:hint:<장>:<i>' 로 적는다.
       닫힌 장에는 더 안 올린다. 단계마다 따로 본다 (앞 단계가 필요 없었으면 건너뛴다).
+      **일지에는 이것과 상관없이 때가 되면 누구에게나 보인다** (_journal, 11/15 - 혼자서도 느리게 깰 수 있게).
     """
     now = _now(now)
     if not force and time.monotonic() - _posts_at[0] < POST_EVERY:
@@ -803,10 +835,12 @@ def ensure_posts(now=None, force=False):
                 continue
             if now < due:
                 continue
-            if solvers is None:
-                solvers = _solvers(n)
-            if solvers >= _int(h.get("minSolvers"), 0):
-                continue
+            need = h.get("minSolvers")
+            if need is not None:                             # 없으면 조건 없음 - 때가 되면 올린다
+                if solvers is None:
+                    solvers = _solvers(n)
+                if solvers >= _int(need, 0):
+                    continue
             cur = db.run("INSERT INTO meta (k, v) VALUES (?,?) ON CONFLICT(k) DO NOTHING",
                          ("arche:hint:%d:%d" % (n, i), _iso(now)))
             if not getattr(cur, "rowcount", 1):
@@ -889,9 +923,13 @@ def use_item(uid, item_id, now=None):
     if cool > 0:
         last = db.q1("SELECT at FROM arche_use WHERE user_id=? AND item=? ORDER BY at DESC LIMIT 1", (uid, item_id))
         if last is not None and _parse(last["at"]) and _parse(last["at"]) > now - datetime.timedelta(minutes=cool):
-            return {"ok": False, "keep": True, "arche": {"ritual": []},
-                    "message": korean.natural("%s 은(는) 아직 조용하다. 한 번 울리면 한동안 소리를 내지 않는 것 같다."
-                                              % (it.get("kr") or item_id))}
+            secs = (_parse(last["at"]) + datetime.timedelta(minutes=cool) - now).total_seconds()
+            left = max(1, int(-(-secs // 60)))                  # 올림 (분)
+            wait = ("%d시간 %d분" % (left // 60, left % 60)) if left >= 60 else ("%d분" % left)
+            wait = wait.replace(" 0분", "")
+            return {"ok": False, "keep": True, "arche": {"ritual": []}, "waitMin": left,
+                    "message": korean.natural("%s 은(는) 아직 조용하다. 다시 울리기까지 %s 쯤 남은 것 같다."
+                                              % (it.get("kr") or item_id, wait))}
     db.run("DELETE FROM arche_use WHERE user_id=? AND at<?", (uid, _iso(now - datetime.timedelta(days=2))))
     db.run("INSERT INTO arche_use (user_id, item, at) VALUES (?,?,?)", (uid, item_id, _iso(now)))
     done = check(uid, now)
@@ -1011,7 +1049,7 @@ def start_battle(uid, n, slot, now=None):
     n, slot = c["n"], int(slot)
     if not ready():
         raise HTTPException(409, "고고학자의 일지가 아직 준비 중이에요.")
-    if now >= A.event_window()[1]:
+    if now >= A.event_window()[1] + BATTLE_GRACE:
         raise HTTPException(409, "아르케의 봉인은 다시 닫혔어요. 이벤트가 끝났어요.")
     if db.q1("SELECT 1 FROM arche_progress WHERE user_id=? AND chapter=?", (uid, n)) is None:
         raise HTTPException(409, "아직 이 장의 봉인이 풀리지 않았어요.")
@@ -1169,7 +1207,7 @@ def on_end(uid, row, tb):
     word = PLACE_WORD.get((A.chapter(got[0]) or {}).get("place"), "봉인")
     if tb.result == "won":
         lines = ["%s 은(는) 쓰러져 %s 깊은 곳으로 모습을 감췄다..." % (name, word),
-                 "봉인은 그대로다. 이벤트가 끝날 때까지 다시 도전할 수 있다."]
+                 "봉인은 그대로다. 이벤트가 끝나고 하루 뒤까지 다시 도전할 수 있다."]
     else:
         lines = ["%s 은(는) 아직 %s에 머물러 있다." % (name, word),
                  "다시 도전할 수 있다."]

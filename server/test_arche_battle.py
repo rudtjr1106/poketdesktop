@@ -116,8 +116,11 @@ def t_막기():
     chk("없는 장 → 400", (refused(AR.start_battle, u, 7, 0, now=DURING) or (0,))[0] == 400)
     got = refused(AR.start_battle, u, 1, 1, now=DURING)
     chk("앞 자리를 안 잡았으면 → 409", got and got[0] == 409 and "앞 자리" in got[1], got)
-    got = refused(AR.start_battle, u, 1, 0, now=A.event_window()[1])
-    chk("이벤트가 끝나면 → 409", got and got[0] == 409, got)
+    got = refused(AR.start_battle, u, 1, 0, now=A.event_window()[1] + AR.BATTLE_GRACE)
+    chk("이벤트가 끝나고 하루가 지나면 → 409", got and got[0] == 409 and "끝났어요" in got[1], got)
+    got = refused(AR.start_battle, u, 1, 0, now=A.event_window()[1] + datetime.timedelta(hours=2))
+    chk("  끝난 뒤 하루 동안은 의식을 마친 장의 전설을 마저 만난다 (6장 마감 = 이벤트 끝, 11/15)",
+        not (got and "끝났어요" in got[1]), got)
     v = setup()
     db.run("UPDATE pokemon SET on_desktop=0 WHERE user_id=?", (v,))
     chk("파티가 없으면 → 409", (refused(AR.start_battle, v, 1, 0, now=DURING) or (0,))[0] == 409)

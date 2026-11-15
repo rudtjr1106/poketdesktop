@@ -40,7 +40,8 @@ from .overlay import work_area
 
 SPEED = 1.0                  # 검사가 빠르게 돌린다 (끝 시각까지 남은 시간도 같이 줄인다)
 STALL_MS = 15000             # 장면의 예약이 이만큼 하나도 안 돌면 멈춘 것으로 보고 정리 (기다리는 동안은 hold 로 뺀다)
-MAX_MS = 10 * 60 * 1000      # 무엇이든 이보다 길게는 안 띄운다
+MAX_MS = 10 * 60 * 1000      # 무엇이든 이보다 길게는 안 띄운다 - 별 · 유물(놓여서 기다리는 것)만은 서버가 정한 끝까지 (cap_ms)
+PASSIVE_GRACE_MS = 60 * 1000  # 별 · 유물이 끝 시각 뒤에 더 머물 여유
 TICK_MS = 100                # 맥 클릭 자리 좇기 · 항상 위 다시 걸기
 KEEP_TICKS = 30              # 3초마다 '항상 위' 다시
 KEY = (255, 0, 253)          # 현상 창의 투명색
@@ -314,6 +315,11 @@ class Show(object):
         self.beat = time.monotonic()
         self.hold_until = 0.0
         self.t0 = time.monotonic()
+        # 이 현상이 화면에 머물 수 있는 가장 긴 때. 별 · 유물은 자료의 dur 대로 (별 한 시간 · 유물 15~20분) - 10분에서
+        # 자르면 켜 둔 앱에서는 정각에 떴다 사라지고 다시 안 떴다 (11/15 검수)
+        self.cap_ms = MAX_MS
+        if self.kind in ("stars", "relic"):
+            self.cap_ms = max(MAX_MS, self.left_ms() + PASSIVE_GRACE_MS)
         self.watch_job = None
         self.tick_job = None
         self._n = 0
@@ -476,7 +482,7 @@ class Show(object):
         if self.closed:
             return
         now = time.monotonic()
-        if (now - max(self.beat, self.hold_until)) * 1000.0 > STALL_MS or (now - self.t0) * 1000.0 > MAX_MS:
+        if (now - max(self.beat, self.hold_until)) * 1000.0 > STALL_MS or (now - self.t0) * 1000.0 > self.cap_ms:
             config.log("아르케 현상(%s)이 멈춰 정리합니다 (단계 %s)" % (self.kind, self.phase))
             return self.cleanup()
         self.watch_job = self.root.after(500, self._watch)
@@ -620,7 +626,7 @@ class Show(object):
         if self.read:
             return
         self.phase = "wait"
-        wait = max(ms(RELIC_MIN_WAIT), min(self.left_ms(), MAX_MS))
+        wait = max(ms(RELIC_MIN_WAIT), min(self.left_ms(), self.cap_ms))
         self.hold(wait + 1000)
         self.wait_job = self.after(wait, self._relic_leave)
 
@@ -698,7 +704,7 @@ class Show(object):
     def _stars_shown(self, placed):
         self.phase = "shown"
         self.seen(snap_stars(self.star_pts, self.star_ratio))
-        stay = max(ms(STAR_MIN_MS), min(self.left_ms(), MAX_MS))
+        stay = max(ms(STAR_MIN_MS), min(self.left_ms(), self.cap_ms))
         self.hold(stay + 1000)
 
         def hide(i):

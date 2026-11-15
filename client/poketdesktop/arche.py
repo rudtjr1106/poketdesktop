@@ -91,10 +91,26 @@ class ArcheController(object):
 
     # ---------------------------------------------------------------- 상태
     def on(self):
+        """이벤트 기간 - 또는 끝난 뒤 하루 (카드가 남아 있는 동안: 일지를 돌아보고, 의식을 마친 장의 전설을 마저 잡는다 -
+        서버 arche.BATTLE_GRACE). 시작 전 카드는 startsIn 이 남아 있어 켜지지 않는다."""
         c = self.card or {}
-        return bool(c.get("active"))
+        if c.get("active"):
+            return True
+        return self.after_end()
+
+    def after_end(self):
+        """이벤트가 끝난 뒤 하루 (서버 카드가 startsIn · endsIn 을 둘 다 0 으로 싣는다 - 칸이 없으면 모른다 = 아니다)."""
+        c = self.card or {}
+        return (not c.get("active") and "startsIn" in c and "endsIn" in c
+                and not c.get("startsIn") and not c.get("endsIn"))
 
     PASSIVE = ("relic", "stars")         # 바탕화면에 가만히 놓여 있는 현상 (누르기 · 보기를 기다린다) - 무엇도 막지 않는다
+    # 별 · 유물을 띄우지 않는 까닭은 이것들뿐이다 - 집중 · 배틀 · 중계 · 공습 중에도 띄운다 (도트를 빼앗지 않는다).
+    # 4장은 '별' 과 '집중 4세트' 를 같이 요구한다 - 집중 중에 별이 안 뜨면 스스로 길을 막는다 (11/15 검수)
+    PASSIVE_STOP = ("overlay", "hidden", "stealth")
+    # 끝내 띄우지 못한 것도 '내가 본 것' 에 조용히 남기는 현상 - 글자 · 별 그림은 일지가 그린다 (11/15 검수: 올림픽 중계 ·
+    # 집중 · 공습과 겹친 안농 글자가 기록도 없이 사라져 혼자 길이 깨졌다)
+    RECORD_MISSED = ("unown", "stars")
 
     def busy(self):
         """움직이는 현상(안농이 걷는 중 등)이 돌거나 전설 배틀 창이 열려 있다 (다른 기능의 막힘 판정이 본다).
@@ -227,9 +243,17 @@ class ArcheController(object):
         self.pending.pop(pid, None)
         until = _parse(ph.get("until")) or self.now()
         why = self.blocked()
+        if why and ph.get("kind") in self.PASSIVE and why not in self.PASSIVE_STOP:
+            why = None
         if why:
             if self.now() + 5 < until:                       # 그 현상이 끝나기 전이면 조금 뒤에 다시
                 self.pending[pid] = self.root.after(5000, lambda p=ph: self._fire(p))
+            elif ph.get("kind") in self.RECORD_MISSED:
+                self._mark_done(pid)                         # 끝내 못 띄웠다 - 앱은 켜져 있었으니 일지에는 남긴다
+                try:
+                    self._seen(ph)
+                except Exception as e:                      # noqa: BLE001
+                    config.log("아르케 기록 실패 (%s): %s" % (ph.get("kind"), e))
             return
         self._mark_done(pid)
         try:
@@ -255,7 +279,8 @@ class ArcheController(object):
             return self._seen_parade(ph, data)
         row = {"id": ph.get("id"), "kind": ph.get("kind"), "at": time.time() + self.skew,
                "glyph": data.get("glyph"), "text": data.get("text"),
-               "pts": data.get("pts") if ph.get("kind") == "stars" else None}
+               "pts": data.get("pts") if ph.get("kind") == "stars" else None,
+               "band": data.get("band") if ph.get("kind") == "stars" else None}
         if any(r.get("id") == row["id"] for r in self.seen):
             return
         self.seen.append(row)

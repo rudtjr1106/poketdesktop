@@ -203,8 +203,11 @@ def t_다시_읽기_장_경계():
     chk("다섯 시간 뒤 글이 올라온다", [j["text"] for j in ch(st, 1)["journal"]] == ["첫 일지 글", "다섯 시간 뒤 글"])
     chk("2장은 아직 future", ch(st, 2)["future"] and not ch(st, 2).get("journal"))
     st = AR.state(u, now=A.window(2)[0])
+    plain = [j for j in ch(st, 1)["journal"] if not j.get("hint")]
     chk("1장이 닫힌 순간 = 2장 open · 1장 past (일지 그대로)", st["chapter"] == 2 and ch(st, 1)["past"]
-        and ch(st, 2)["open"] and len(ch(st, 1)["journal"]) == 2, (st["chapter"], ch(st, 1)["past"]))
+        and ch(st, 2)["open"] and len(plain) == 2, (st["chapter"], ch(st, 1)["past"], len(plain)))
+    chk("  지난 장 일지에는 때가 된 실마리 셋이 그대로 (11/15 - 누구에게나 때가 되면)",
+        [j.get("hint") for j in ch(st, 1)["journal"] if j.get("hint")] == [1, 2, 3], ch(st, 1)["journal"])
     # 운영자가 고치면 다음 요청 때
     s2 = json.loads(json.dumps(SECRETS))
     s2["chapters"]["1"]["inscription"] = "고친 새김글"
@@ -456,11 +459,28 @@ def t_게시글():
     AR.ensure_posts(now=OPEN1 + datetime.timedelta(hours=31), force=True)
     chk("30시간 · 푼 사람 1 ≥ 1 → 둘째 실마리 없음",
         db.q1("SELECT 1 FROM board_post WHERE ref='arche:1:h2'") is None)
+    lone = mkuser()
+    st = AR.state(lone, now=OPEN1 + datetime.timedelta(hours=31))
+    chk("  그래도 일지에는 때가 되면 누구에게나 보인다 (혼자 하는 사람 - 11/15 사용자 원칙)",
+        [j.get("hint") for j in ch(st, 1)["journal"] if j.get("hint")] == [1, 2]
+        and [j["text"] for j in ch(st, 1)["journal"] if j.get("hint") == 2] == ["실마리 둘"], ch(st, 1)["journal"])
+    chk("  게시판에 안 올라간 실마리의 일지 시각은 그 때 (열림 + after)",
+        [j["at"] for j in ch(st, 1)["journal"] if j.get("hint") == 2] == [(OPEN1 + datetime.timedelta(hours=30)).isoformat()])
+    st = AR.state(lone, now=OPEN1 + datetime.timedelta(hours=29))
+    chk("  때 전에는 안 보인다", [j.get("hint") for j in ch(st, 1)["journal"] if j.get("hint")] == [1])
     AR.ensure_posts(now=OPEN1 + datetime.timedelta(hours=41), force=True)
     refs = [r["ref"] for r in db.q("SELECT ref FROM board_post WHERE ref LIKE 'arche:1:h%' ORDER BY id")]
     chk("40시간 · 1 < 30 → 셋째 실마리 (둘째는 건너뜀)", refs == ["arche:1:h1", "arche:1:h3"], refs)
     AR.ensure_posts(now=A.window(2)[0] + datetime.timedelta(minutes=1), force=True)
     chk("2장이 열리면 2장 글", db.q1("SELECT 1 FROM board_post WHERE ref='arche:2'") is not None)
+    # minSolvers 를 안 적은 실마리는 '조건 없음' (전에는 0 으로 읽어 영영 안 올라갔다)
+    s3 = json.loads(json.dumps(SECRETS))
+    s3["chapters"]["2"]["hints"] = [{"after": 1, "text": "조건 없는 실마리"}]
+    write_secrets(s3, bump=5)
+    AR.ensure_posts(now=A.window(2)[0] + datetime.timedelta(hours=1, minutes=1), force=True)
+    chk("minSolvers 가 없는 실마리는 때가 되면 게시판에도 올라간다",
+        db.q1("SELECT 1 FROM board_post WHERE ref='arche:2:h1'") is not None)
+    write_secrets(SECRETS, bump=5)
     chk("닫힌 1장에는 실마리를 더 안 올린다", len(db.q("SELECT ref FROM board_post WHERE ref LIKE 'arche:1:h%'")) == 2)
     # NPC 이름을 진짜 사람이 쓰고 있으면 글을 안 올린다 (터지지도 않는다)
     s2 = json.loads(json.dumps(SECRETS))
@@ -574,6 +594,8 @@ def t_플레이테스트():
     n_use = db.q1("SELECT COUNT(*) c FROM arche_use WHERE user_id=?", (u,))["c"]
     chk("비석은 한 번 울리면 여섯 시간 조용하다 (계속 쓰기로 시각 맞추기 막기)", a.get("ok") and not b.get("ok") and n_use == 1
         and "조용" in b.get("message", ""), (a.get("ok"), b, n_use))
+    chk("  쉬는 동안에는 다시 울리기까지 남은 때를 알려 준다 (5시간 35분)",
+        b.get("waitMin") == 335 and "5시간 35분" in b.get("message", ""), b)
     c = AR.use_item(u, "ARCHESTONE", now=t + datetime.timedelta(hours=6, minutes=1))
     chk("여섯 시간 뒤엔 다시 울린다", c.get("ok") and db.q1("SELECT COUNT(*) c FROM arche_use WHERE user_id=?", (u,))["c"] == 2)
     write_secrets(SECRETS, bump=22)
@@ -707,6 +729,25 @@ def t_발굴지():
     chk("dig_report: 나머지는 *", AR.dig_report(kst(11, 15, 15, 0)) == "보통 보고서")
     chk("dig_report: 보고서 없는 장 · 이벤트 밖은 None", AR.dig_report(A.window(2)[0]) is None
         and AR.dig_report(OPEN1 - datetime.timedelta(hours=1)) is None)
+    # 받아 온 보고서는 그 장 일지에도 남는다 (탐험 창을 닫았거나 테마 창이 안 보여 줘도 - 11/15 검수)
+    st = AR.state(u, now=kst(11, 15, 5, 0))
+    digs = [j for j in ch(st, 1)["journal"] if j.get("dig")]
+    chk("받아 온 발굴 보고서가 일지에 (돌아온 시각 · '발굴 보고서 · …')",
+        [(j["at"], j["text"]) for j in digs] == [(kst(11, 15, 3, 0).isoformat(), "발굴 보고서 · 새벽 보고서")], digs)
+    v = mkuser()
+    st = AR.state(v, now=kst(11, 15, 5, 0))
+    chk("  남의 보고서는 안 보인다", not [j for j in ch(st, 1)["journal"] if j.get("dig")])
+    # 한 장의 일지가 터져도 뒤 장들은 그대로 (except 변수가 이벤트 끝 시각 e 를 지우던 것)
+    db.run("INSERT INTO arche_progress (user_id, chapter, ritual_at, first) VALUES (?,2,?,0)",
+           (u, A.window(2)[0].isoformat()))
+    real = AR._digs
+    AR._digs = lambda uid, n, now: (_ for _ in ()).throw(RuntimeError("시험")) if n == 1 else real(uid, n, now)
+    try:
+        st = AR.state(u, now=A.window(2)[0] + datetime.timedelta(hours=1))
+    finally:
+        AR._digs = real
+    chk("  한 장이 터져도 다음 장의 전설 자리는 그대로 셈한다",
+        ch(st, 1)["journal"] == [] and [e["state"] for e in ch(st, 2)["encounters"]][:1] == ["ready"], ch(st, 2).get("encounters"))
 
 
 def main():

@@ -369,9 +369,19 @@ def _loot_cards(cv, w, lines, claimed, live, win, app, keep):
 
         # 판 안에 넣을 덩어리들: (높이, 그리는 함수(y))
         blocks = []
-        if not rows:
+        if not rows and not one.get("report"):
             blocks.append((s(28), lambda yy: K.text(cv, pad, yy + s(14), "아무것도 못 찾았다...", font(10),
                                                     fill=DIM, anchor="w")))
+        # 아르케 발굴지 (2.4.0): 발굴 보고서 한 줄 - 기본 화면과 같이 맨 위에 (테마에서 빠져 있었다 - 11/15 검수).
+        # 놓쳐도 일지의 '내 발굴 보고서' 에 남는다 (서버 arche._digs).
+        if one.get("report"):
+            rtext = "발굴 보고서 · " + str(one["report"])
+            rw = w - 2 * pad
+            rh = K.text_height(cv, rtext, small, rw) + s(10)
+
+            def report(yy, rtext=rtext, rw=rw, rh=rh):
+                K.text(cv, pad, yy + s(5), rtext, small, fill=tone(U.ACCENT_TEXT), anchor="nw", width=rw)
+            blocks.append((rh, report))
         came = XU.friend_line(one)
         if came:
             text, badge = came

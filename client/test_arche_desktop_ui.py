@@ -226,6 +226,13 @@ def stars_part(root, ov, app):
     sh2 = AD.play(app, ph("stars", {"pts": [], "band": 0.2}, pid="s2"), Seen())
     settle(root, 0.1)
     chk("별이 없으면 바로 끝", sh2.closed)
+    # 11/15 검수: 별 · 유물은 자료의 dur 대로 머문다 (10분 MAX_MS 에서 자르지 않는다 - 별은 한 시간)
+    long_s = 36000                       # 검사는 SPEED 로 시간을 줄인다 - 그래도 10분(MAX_MS)을 넘는 길이
+    s_hour = AD.Show(app, ph("stars", {"pts": []}, left=long_s, pid="s-h"), Seen())
+    u_hour = AD.Show(app, ph("unown", {"glyph": 1}, left=long_s, pid="u-h"), Seen())
+    chk("별의 머무는 상한 = 남은 시간 + 1분 (10분에서 자르지 않는다 - 한 시간 별은 한 시간)",
+        s_hour.cap_ms == AD.ms(long_s * 1000) + AD.PASSIVE_GRACE_MS > AD.MAX_MS and u_hour.cap_ms == AD.MAX_MS,
+        (s_hour.cap_ms, u_hour.cap_ms))
 
 
 # ---------------------------------------------------------------- 4. 물방울 · 모래바람 · 떨림

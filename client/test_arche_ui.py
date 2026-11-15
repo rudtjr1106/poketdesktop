@@ -198,6 +198,14 @@ def book_part():
     im, hits, pages = J.draw_book(state(journal=long), 1, 0, FakeCtl())
     chk("긴 일지는 쪽을 넘긴다 (글자를 줄이지 않는다)", pages >= 2 and "next" in hits, pages)
     one_long = [{"at": iso(NOW - 3600), "text": "한 덩어리로 아주 긴 지어낸 일지 글이다. " * 40}]
+    mixed = [{"at": iso(time.time() - 300), "text": "보통 일지"},
+             {"at": iso(time.time() - 200), "text": "실마리 글", "hint": 1},
+             {"at": iso(time.time() - 100), "text": "발굴 보고서 · 새벽", "dig": True}]
+    heads = [b[1][0] for b in J.left_blocks(state(journal=mixed)["chapters"][0], [], 160) if b[0] == "entry"]
+    marks = [b[1][2] for b in J.left_blocks(state(journal=mixed)["chapters"][0], [], 160) if b[0] == "entry"]
+    chk("일지에 섞여 온 실마리는 '(실마리)' 머리 · 발굴 보고서는 '내 발굴 보고서' (11/15)",
+        heads[0].startswith("고고학자의 일지 ·") and "(실마리)" in heads[1] and heads[2].startswith("내 발굴 보고서")
+        and marks == [False, True, False], heads)
     pages = J.paginate(J.left_blocks(state(journal=one_long)["chapters"][0], [], 160), 120, 170)
     chk("글 하나가 한 쪽보다 길면 쪽을 넘어 나눈다 (쪽마다 높이 안)", len(pages) >= 3
         and all(sum(b[2] for b in pg) <= 170 for pg in pages[1:]) and sum(b[2] for b in pages[0]) <= 120,
@@ -249,6 +257,13 @@ def hub_part(root, app):
         getattr(getattr(pane, "win", None), "winfo_manager", lambda: "없음")())
     pane.win.pack(fill="both", expand=True)
     pane.on_shown()
+    ctl = getattr(app, "arche", None)
+    if ctl is not None:
+        card0, st0 = ctl.card, ctl.state
+        ctl.card, ctl.state = {"active": False, "startsIn": 0, "endsIn": 0}, None
+        pane.on_shown()
+        chk("끝난 뒤 허브 탭은 '끝났어요' (예전: '열립니다')", "끝났어요" in pane.body.cget("text"), pane.body.cget("text"))
+        ctl.card, ctl.state = card0, st0
     holder.destroy()
 
 
@@ -300,6 +315,37 @@ def controller_part(root, app):
     chk("막혀 있으면 안 띄운다", not any(p["id"] == "ph2" for p in played), played)
     del ctl.blocked
     app.overlay.hidden = False
+    # 11/15 검수: 별 · 유물은 집중 · 중계 중에도 띄운다 (4장은 별과 집중을 같이 요구한다). 숨기기만은 막는다.
+    ctl.blocked = lambda: "focus"
+    app.api.st = state(phenomena=[{"id": "st-f", "at": iso(time.time()), "until": iso(time.time() + 30),
+                                    "kind": "stars", "data": {"pts": [[0.5, 0.5, 1]]}}])
+    ctl.poll()
+    chk("집중 중에도 별은 뜬다", pump(root, lambda: any(p["id"] == "st-f" for p in played), 3), played)
+    ctl.blocked = lambda: "hidden"
+    app.api.st = state(phenomena=[{"id": "st-h", "at": iso(time.time()), "until": iso(time.time() + 30),
+                                    "kind": "stars", "data": {"pts": [[0.5, 0.5, 1]]}}])
+    ctl.poll()
+    settle(root, 0.6)
+    chk("  숨기기 중에는 별도 안 뜬다", not any(p["id"] == "st-h" for p in played), played)
+    # 끝내 못 띄운 안농 글자는 일지에 조용히 남긴다 (올림픽 중계 · 집중 · 공습과 겹쳐도 혼자 길이 안 끊기게)
+    ctl.blocked = lambda: "olympics"
+    app.api.st = state(phenomena=[{"id": "un-m", "at": iso(time.time()), "until": iso(time.time() + 1),
+                                    "kind": "unown", "data": {"glyph": 4, "parade": "tpm", "pos": 0, "of": 2}}])
+    ctl.poll()
+    pump(root, lambda: any(r.get("id") == "parade:tpm" for r in ctl.seen), 8)
+    rows = [r for r in ctl.seen if r.get("id") == "parade:tpm"]
+    chk("막혀 끝내 못 띄운 안농 글자도 '내가 본 것' 에 남는다 (화면에는 안 띄움)",
+        rows and rows[0]["glyphs"] == [4, None] and not any(p["id"] == "un-m" for p in played), (rows, played))
+    del ctl.blocked
+    # 끝난 뒤 하루 (카드 startsIn · endsIn 이 0): 일지를 다시 펼치고 의식을 마친 장의 전설을 마저 만난다
+    card0 = ctl.card
+    ctl.card = {"active": False, "startsIn": 0, "endsIn": 0}
+    chk("끝난 뒤 하루는 켜져 있다 (on)", ctl.on() and ctl.after_end())
+    ctl.card = {"active": False, "startsIn": 3600, "endsIn": 99999}
+    chk("  시작 전 카드는 아니다", not ctl.on() and not ctl.after_end())
+    ctl.card = {"active": False}
+    chk("  칸이 없는 카드는 모른다 = 아니다", not ctl.on())
+    ctl.card = card0
     # 의식 → 일지 → 도장 → 배틀. 바탕화면에 놓인 유물(누르기를 기다리는 현상)이 있어도 입장은 막히지 않는다
     lingering = types.SimpleNamespace(closed=False, cleanup=lambda: None, kind="relic")
     ctl.shows.append(lingering)

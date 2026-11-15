@@ -64,6 +64,16 @@ def _ts(iso):
 KST = datetime.timezone(datetime.timedelta(hours=9))
 
 
+def _span(a, b):
+    """장 기간 '11/22~24' (같은 달이면 끝 날만) - 머리줄이 왼쪽 쪽 밖으로 넘쳤다 (11/15 검수: '모래 속 고성' 장)."""
+    s, e = _kst(a, "%m/%d"), _kst(b, "%m/%d")
+    if s == e or not e:
+        return s
+    sm, _, _sd = s.partition("/")
+    em, _, ed = e.partition("/")
+    return "%s~%s" % (s, ed if sm == em and ed else e)
+
+
 def _kst(ts, fmt="%m/%d %H:%M"):
     if ts is None:
         return ""
@@ -159,14 +169,39 @@ def _parade_per(width):
     return max(1, int((width - 8) // PARADE_GW))
 
 
+STAR_HALF = 0.16              # 별 기록 그림: 별이 모인 곳 가운데에서 화면 폭의 이만큼 양쪽만 키워 그린다
+STAR_H_MAX = 72
+
+
+def star_view(r, width):
+    """'내가 본 것' 의 별 기록을 그릴 틀 (x0, x1, 높이). 화면 폭 전체를 160px 에 담으면 글자 칸이 2px 도 안 돼
+    못 읽었다 (11/15 검수) - 별이 모인 곳(가운데값) 둘레만 잘라 키운다. 높이는 화면 비(16:9)와 띠 높이(band)로."""
+    xs = sorted(float(p[0]) for p in (r.get("pts") or []) if p and len(p) >= 2)
+    mid = xs[len(xs) // 2] if xs else 0.5
+    x0 = max(0.0, min(1.0 - 2 * STAR_HALF, mid - STAR_HALF))
+    x1 = x0 + 2 * STAR_HALF
+    try:
+        band = float(r.get("band") or 0.22)
+    except (TypeError, ValueError):
+        band = 0.22
+    h = int((width - 10) * band * 9.0 / 16.0 / (x1 - x0))
+    return x0, x1, max(24, min(STAR_H_MAX, h))
+
+
 def left_blocks(ch, seen, width):
     """왼쪽 쪽에 쌓을 블록들 [(kind, payload, height)]. 쪽 나누기는 높이로 한다."""
     blocks = []
     for e in ch.get("journal") or []:
-        head = "고고학자의 일지 · %s" % _kst(_ts(e.get("at")))
+        # 서버는 실마리(hint) · 내 발굴 보고서(dig)도 일지에 섞어 보낸다 (11/15) - 머리줄로 갈라 그린다
+        if e.get("hint"):
+            head, mark = "고고학자의 일지 (실마리) · %s" % _kst(_ts(e.get("at"))), True
+        elif e.get("dig"):
+            head, mark = "내 발굴 보고서 · %s" % _kst(_ts(e.get("at"))), False
+        else:
+            head, mark = "고고학자의 일지 · %s" % _kst(_ts(e.get("at"))), False
         text = e.get("text") or ""
         lines = wrap(text, width)
-        blocks.append(("entry", (head, lines, False), (len(lines) + 1) * LINE_H + 6, (text, width)))
+        blocks.append(("entry", (head, lines, mark), (len(lines) + 1) * LINE_H + 6, (text, width)))
     for e in ch.get("hints") or []:
         head = "고고학자의 일지 (실마리) · %s" % _kst(_ts(e.get("at")))
         text = e.get("text") or ""
@@ -190,7 +225,7 @@ def left_blocks(ch, seen, width):
             lines = wrap("떨어진 돌 조각에 새겨진 글: " + (r.get("text") or "…"), width - 6)
         elif kind == "stars":
             lines = wrap("화면 위쪽에 별이 떴다.", width - 6)
-            blocks.append(("seen", (head, lines, r), (len(lines) + 1) * LINE_H + 34))
+            blocks.append(("seen", (head, lines, r), (len(lines) + 1) * LINE_H + star_view(r, width)[2] + 12))
             continue
         else:
             lines = wrap({"drip": "어디선가 물방울이 떨어졌다.", "sand": "모래바람이 바탕화면을 쓸고 지나갔다.",
@@ -334,8 +369,10 @@ def draw_book(state, n, page, ctl, t=0, stamp=None, version=VERSION):
     width = TEXT_L[2] - TEXT_L[0]
     place = ch.get("place") or "cave"
     opens, closes = _ts(ch.get("opensAt")), _ts(ch.get("closesAt"))
-    head = "제%d장 · %s · %s ~ %s" % (n, ch.get("placeKr") or PLACE_KR.get(place, ""), _kst(opens, "%m/%d"),
-                                     _kst(closes - 1 if closes else None, "%m/%d"))
+    span = _span(opens, closes - 1 if closes else None)
+    head = "제%d장 · %s · %s" % (n, ch.get("placeKr") or PLACE_KR.get(place, ""), span)
+    if text_w(head) > TEXT_L[2] - TEXT_L[0]:
+        head = "제%d장 · %s" % (n, span)          # 칸을 넘으면 장소 이름을 뺀다 (큰 제목 · 사진 설명에 있다) - 글자는 안 줄인다
     future = bool(ch.get("future")) or (not ch.get("open") and not ch.get("past"))
     old = _ver(version) < _ver(ch.get("minClient") or "0")
 
@@ -381,14 +418,19 @@ def draw_book(state, n, page, ctl, t=0, stamp=None, version=VERSION):
                         except (TypeError, ValueError):
                             pass
                 elif extra.get("kind") == "stars":
-                    d.rectangle([TEXT_L[0] + 3, yy, TEXT_L[2] - 4, yy + 22], fill=(24, 30, 52))
+                    x0, x1, sh = star_view(extra, TEXT_L[2] - TEXT_L[0])
+                    sw = TEXT_L[2] - TEXT_L[0] - 10
+                    d.rectangle([TEXT_L[0] + 3, yy, TEXT_L[2] - 4, yy + sh + 2], fill=(24, 30, 52))
                     for p in extra.get("pts") or []:
                         try:
-                            px = TEXT_L[0] + 4 + int(float(p[0]) * (TEXT_L[2] - TEXT_L[0] - 10))
-                            py = yy + 1 + int(float(p[1]) * 20)
-                            d.point([(px, py)], fill=(255, 255, 255))
+                            fx, fy = float(p[0]), float(p[1])
+                            if not x0 <= fx <= x1:
+                                continue
+                            px = TEXT_L[0] + 5 + int((fx - x0) / (x1 - x0) * sw)
+                            py = yy + 2 + int(fy * (sh - 3))
+                            d.rectangle([px, py, px + 1, py + 1], fill=(255, 255, 255))
                             if len(p) > 2 and int(p[2]) > 0:
-                                d.point([(px + 1, py), (px - 1, py), (px, py + 1), (px, py - 1)], fill=(160, 176, 230))
+                                d.point([(px + 2, py), (px - 1, py), (px, py + 2), (px, py - 1)], fill=(160, 176, 230))
                         except Exception:                   # noqa: BLE001
                             pass
             else:
@@ -786,7 +828,10 @@ class ArchePane(object):
         st = (ctl.state if ctl is not None else None) or {}
         n = int(st.get("chapter") or 0)
         c = ctl.chapter(n) if (ctl is not None and n) else None
-        if not st.get("active"):
+        if not st.get("active") and _ended(ctl, st):
+            text = ("아르케의 여섯 봉인은 끝났어요. 여섯 봉인이 모두 풀려 전설들이 제 땅으로 돌아갔다.\n"
+                    "끝난 날 하루 동안은 일지를 다시 펼쳐 보고, 봉인을 연 장의 전설을 마저 만날 수 있어요.")
+        elif not st.get("active"):
             text = ("시즌 6 첫날 밤, 게시판에 처음 보는 이름으로 글이 올라온다. 어느 고고학자의 발굴 일지…\n"
                     "11월 16일 0시부터 2주 동안 열립니다.")
         elif c:
@@ -809,6 +854,18 @@ def _ctl(app):
     if ctl is None or not callable(getattr(ctl, "on", None)) or not callable(getattr(ctl, "open_window", None)):
         return None
     return ctl
+
+
+def _ended(ctl, st):
+    """이벤트가 끝났나 - 서버 state 의 end, 없으면 카드(끝난 뒤 하루는 startsIn · endsIn 이 0), 그것도 없으면 장 표."""
+    import time
+    from common import arche as A
+    end = _ts(st.get("end")) if st.get("end") else None
+    if end is not None:
+        return time.time() + float(getattr(ctl, "skew", 0) or 0) >= end
+    if ctl is not None and callable(getattr(ctl, "after_end", None)) and ctl.after_end():
+        return True
+    return time.time() >= A.event_window()[1].timestamp()
 
 
 def menu_row(app, pet):
