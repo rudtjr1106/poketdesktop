@@ -142,11 +142,12 @@ def decorate(mon):
         it = _items.get(held) or {}
         out["heldKr"] = it.get("kr", held)
         out["heldDesc"] = it.get("desc", "")
-    # 테라 타입 (2.5.0). 정하지 않았으면 그 종의 첫째 타입 - 화면은 이것만 그리면 된다.
+    # 테라 타입 (2.5.0) = 지닌 테라피스의 타입 (2.5.1, 11/16). 안 지녔으면 없다 (테라스탈 못 한다) - teraType None ·
+    # teraKr '없음'. 옛 앱(2.5.0)은 이것을 '없음 타입' · 옛 설명으로 그린다 - 앱을 올리면 맞게 나온다.
     from common import tera as _tera
     out["teraType"] = _tera.type_of(d, mon)
-    out["teraKr"] = d.type_name(out["teraType"])
-    out["teraSet"] = bool(mon.get("tera"))
+    out["teraKr"] = d.type_name(out["teraType"]) if out["teraType"] else "없음"
+    out["teraSet"] = bool(out["teraType"])
     mt = move_types(mon, d)
     if mt:
         out["moveTypes"] = mt

@@ -412,8 +412,11 @@ class Fighter(object):
 
     # ---- 테라스탈 (2.5.0) ----
     def tera_type(self):
-        """이 포켓몬의 테라 타입 (아직 안 했어도). 정해 두지 않았으면 그 종의 첫째 타입."""
-        return TR.type_of(self._dex, self.mon)
+        """이 포켓몬의 테라 타입 (아직 안 했어도) = 지금 지닌 테라피스의 타입. 안 지녔으면 None - 테라스탈 못 한다.
+        테라피스는 뺏기지 않지만(held.stuck), 판 안에서 도구를 써 버렸으면(item_gone) 못 한다 - Z크리스탈과 같다."""
+        if self.item_gone:
+            return None
+        return TR.shard_type(self._held)
 
     def orig_types(self):
         """테라스탈하기 전의 타입 (자속을 셀 때 본다 - 원래 타입의 자속은 남는다)."""
@@ -1343,6 +1346,7 @@ class Battle(object):
         """이 쪽이 지금 테라스탈할 수 있으면 그 타입. 아니면 None.
 
         테라오브가 있어야 하고 **한 판에 한 번**이다. 메가진화한 포켓몬은 못 한다.
+        **테라피스를 지닌 포켓몬만** 한다 (안 지녔으면 tera_type() 이 None, 2.5.1 - 11/16 사용자).
         """
         if not self.tera_orb.get(who) or who in self.tera_done:
             return None

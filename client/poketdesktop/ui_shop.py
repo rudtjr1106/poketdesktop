@@ -168,10 +168,6 @@ def effect_text(it):
         # 적었다. 가방에서는 멀쩡히 쓰이는데 막아 둔 것처럼 보였다.
         return "먹이면 몸 색이 바뀌어 이로치가 된다 (가방에서 포켓몬에게 쓴다)"
 
-    if kind == "tera":
-        # 테라피스 (2.5.0). 타입 이름은 도구 이름에 있다 ("테라피스 불꽃").
-        return "포켓몬의 테라 타입을 바꾼다. 테라스탈하면 그 타입이 된다 (가방에서 포켓몬에게 쓴다)"
-
     # 타입 스프레이 · 닉네임 변경권 (2.1.1) - 가방 설명과 같은 글
     if kind == "lure":
         from . import ui_bag
@@ -209,9 +205,6 @@ def effect_note(it):
     if kind == "rename":
         from . import ui_bag
         return ui_bag.RENAME_NOTE
-    if kind == "tera":
-        from . import ui_bag
-        return ui_bag.TERA_RULE
     if kind == "shiny":
         note = note or "랭크 시즌 보상으로만 받는다. 겉모습만 바뀌고 능력은 그대로다"
     elif kind == "iv":

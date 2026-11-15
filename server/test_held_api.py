@@ -115,7 +115,7 @@ def main():
     st, shop = call("GET", "/api/shop", token=token)
     items = dict((it["id"], it) for it in shop["items"])
     held = [it for it in shop["items"] if it["cat"] == "held"]
-    chk("상점에 지닌 도구가 있다 (227종 - 1.13 에 110종을 넣었다)", len(held) == 227, len(held))
+    chk("상점에 지닌 도구가 있다 (245종 - 1.13 에 110종, 2.5.1 에 테라피스 18종을 넣었다)", len(held) == 245, len(held))
     chk("지닌 도구는 본가 설명이 붙어 있다", all(it.get("desc") for it in held))
     chk("holdable 표시가 온다", items["LEFTOVERS"].get("holdable") is True
         and items["POKEBALL"].get("holdable") is False)

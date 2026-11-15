@@ -98,7 +98,9 @@ def crystals():
 
 
 def shards():
-    """테라피스 18종 (2.5.0). 스텔라는 안 넣는다. 상점에서만 산다 (드랍 0)."""
+    """테라피스 18종 (2.5.0). 스텔라는 안 넣는다. 상점에서만 산다 (드랍 0).
+    **지니는 도구다 (2.5.1, 11/16 사용자 '지닌도구류로')** - 상점 · 가방의 '지닌 도구' 칸, 지닌 동안 그 타입으로
+    테라스탈한다 (common.tera.type_of). 2.5.0 처음 판은 가방에서 한 번 쓰는 '기타' 소모품이었다."""
     names, flavor = _names(), _flavor()
     out = []
     for r in _rows("items.csv"):
@@ -110,14 +112,13 @@ def shards():
             continue
         en = (names.get(r["id"]) or {}).get("9") or ident
         kr = (names.get(r["id"]) or {}).get(KO) or en
-        # PokeAPI 에 한국어 설명이 없다. 이 게임에서 하는 일을 적는다.
-        desc = flavor.get(r["id"]) or ("포켓몬 1마리의 테라 타입을 %s 타입으로 바꾼다. 테라스탈하면 그 타입이 된다."
-                                       % TYPE_KR[t])
-        out.append({"cat": "misc", "chance": 0, "cost": SHARD_COST,
+        # PokeAPI 에 한국어 설명이 없다. 이 게임에서 하는 일을 적는다 (규칙 한 줄은 held.effect_note 가 덧말로).
+        desc = "테라스탈의 힘이 깃든 %s 타입 결정 조각." % TYPE_KR[t]       # 하는 일은 heldNote 가 (두 번 안 나오게)
+        out.append({"cat": "held", "chance": 0, "cost": SHARD_COST,
                     "desc": desc,
-                    "effect": {"kind": "tera", "type": t}, "en": en, "id": _key(en),
+                    "effect": {"kind": "held"}, "en": en, "id": _key(en),
                     "ident": ident, "kr": kr, "rarity": "epic",
-                    "sell": SHARD_COST // 2, "weight": 0})
+                    "sell": SHARD_COST // 2, "teraType": t, "weight": 0})
     return out
 
 
@@ -272,7 +273,7 @@ def main():
     data = patch(json.loads(raw))
     new = _dump(data)
     n_z = sum(1 for it in data["items"].values() if it["id"] in ZM.CRYSTALS)
-    n_t = sum(1 for it in data["items"].values() if (it.get("effect") or {}).get("kind") == "tera")
+    n_t = sum(1 for it in data["items"].values() if it.get("teraType"))
     if "--check" in sys.argv:
         ok = new == raw
         print("items.json: Z크리스탈 %d개, 테라피스 %d개 - %s" % (n_z, n_t, "같다" if ok else "다르다 (다시 돌릴 것)"))

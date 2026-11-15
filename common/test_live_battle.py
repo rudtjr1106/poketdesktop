@@ -343,8 +343,11 @@ def main():
                           rng=random.Random(seed))
         return lb
 
+    # 2.5.1: 테라피스도 지니는 도구라 Z크리스탈과 한 포켓몬이 같이 못 지닌다 - Z 는 za(불꽃Z), 테라는 ta(테라피스 풀)
     za = mon("CHARIZARD", 50, ("FLAMETHROWER", "AIRSLASH"))
-    za["held"], za["tera"] = "FIRIUMZ", "GRASS"
+    za["held"] = "FIRIUMZ"
+    ta = mon("CHARIZARD", 50, ("FLAMETHROWER", "AIRSLASH"))
+    ta["held"] = "GRASSTERASHARD"
     zb = mon("SNORLAX", 50, ("TACKLE",))
     lb = gim(za, zb)
     lb.start()
@@ -354,25 +357,33 @@ def main():
     lb.zring["me"] = lb.tera_orb["me"] = True          # a 쪽만 가졌다
     lb.start()
     g = lb.view("a")["gimmick"]
-    chk("가졌으면 테라 타입과 Z기술 목록이 온다",
-        g["canTera"] == "GRASS" and g["teraKr"] == "풀"
+    chk("Z크리스탈을 지녔으면 Z기술 목록이 오고, 테라피스가 없으니 테라 단추는 없다",
+        g["canTera"] is None
         and [(z["key"], z["name"], z["power"]) for z in g["zMoves"]] == [("FLAMETHROWER", "다이내믹풀플레임", 175)],
         g)
     gb = lb.view("b")["gimmick"]
     chk("안 가진 상대 쪽 화면에는 안 뜬다", gb["canTera"] is None and gb["zMoves"] == [], gb)
-    lb.choose("a", "move", "FLAMETHROWER", tera=True, z=True)
+    lb.choose("a", "move", "FLAMETHROWER", z=True)
+    lb.choose("b", "move", "TACKLE")
+    ev = lb.resolve()
+    chk("고른 대로 Z기술이 나간다", "zpower" in [e.get("t") for e in ev], [e.get("t") for e in ev])
+    lb = gim(ta, zb)
+    lb.zring["me"] = lb.tera_orb["me"] = True
+    lb.start()
+    g = lb.view("a")["gimmick"]
+    chk("테라피스를 지녔으면 그 타입으로 테라 단추 (Z크리스탈이 없으니 Z기술은 없다)",
+        g["canTera"] == "GRASS" and g["teraKr"] == "풀" and g["zMoves"] == [], g)
+    lb.choose("a", "move", "FLAMETHROWER", tera=True)
     lb.choose("b", "move", "TACKLE")
     ev = lb.resolve()
     kinds_ = [e.get("t") for e in ev]
-    chk("고른 대로 테라스탈하고 Z기술이 나간다", "tera" in kinds_ and "zpower" in kinds_
-        and kinds_.index("tera") < kinds_.index("zpower"), kinds_)
+    chk("고른 대로 테라스탈하고 기술이 나간다", "tera" in kinds_ and kinds_.index("tera") < kinds_.index("move"), kinds_)
     va = lb.view("a")
     chk("내 포켓몬에 테라 타입이 실린다", va["me"]["team"][0]["tera"] == "GRASS"
         and va["me"]["team"][0]["typeIds"] == ["GRASS"], va["me"]["team"][0]["typeIds"])
     chk("상대 화면에도 드러난다", lb.view("b")["foe"]["team"][0]["tera"] == "GRASS")
     g = va["gimmick"]
-    chk("쓴 뒤에는 다시 못 누른다", g["canTera"] is None and g["teraUsed"] and g["teraOn"]
-        and g["zMoves"] == [] and g["zUsed"], g)
+    chk("쓴 뒤에는 다시 못 누른다", g["canTera"] is None and g["teraUsed"] and g["teraOn"], g)
     lb2 = L.LiveBattle.load(DEX, json.loads(json.dumps(lb.dump())))
     g2 = lb2.view("a")["gimmick"]
     chk("저장했다 불러와도 그대로다", g2 == g and lb2.a.team[0].tera == "GRASS", g2)
@@ -383,10 +394,15 @@ def main():
     lb.choose("a", "move", "AIRSLASH", z=True)
     chk("타입이 안 맞는 기술에는 Z 요청을 안 받는다", lb.a.z_req is False)
     lb.choose("a", "move", "FLAMETHROWER", z=True, tera=True)
-    chk("맞는 기술이면 받는다", lb.a.z_req is True and lb.a.tera_req is True)
+    chk("맞는 기술이면 Z 요청을 받고, 테라피스가 없으면 테라 요청은 안 받는다", lb.a.z_req is True and lb.a.tera_req is False)
+    lb = gim(ta, zb)
+    lb.zring["me"] = lb.tera_orb["me"] = True
+    lb.start()
+    lb.choose("a", "move", "FLAMETHROWER", tera=True)
+    chk("테라피스를 지녔으면 테라 요청을 받는다", lb.a.tera_req is True)
     lb2 = L.LiveBattle.load(DEX, json.loads(json.dumps(lb.dump())))
-    chk("골라 둔 요청도 저장된다", lb2.a.z_req is True and lb2.a.tera_req is True)
-    lb = gim(za, zb)
+    chk("골라 둔 요청도 저장된다", lb2.a.tera_req is True)
+    lb = gim(ta, zb)
     lb.tera_orb["me"] = True
     lb.start()
     lb.choose("b", "move", "TACKLE")

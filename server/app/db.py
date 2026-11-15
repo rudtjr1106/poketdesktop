@@ -1349,7 +1349,7 @@ MIGRATIONS = [
     # (지니면 바뀌는 폼은 적지 않는다 - 지닌 도구로 정한다).
     ("pokemon", "form",
      "ALTER TABLE pokemon ADD COLUMN form TEXT"),
-    # 테라 타입 (2.5.0, common/tera). 옛 행은 NULL = 그 종의 첫째 타입.
+    # 테라 타입 (2.5.0 처음 판 - 가방에서 테라피스를 써서 정하던 칸). 2.5.1 부터 테라피스는 지니는 도구라 안 본다.
     ("pokemon", "tera",
      "ALTER TABLE pokemon ADD COLUMN tera TEXT"),
     # 옛 행은 전부 1 로 둔다. 그때는 걸려온 판도 점수에 들어갔으니
@@ -1679,7 +1679,7 @@ def _row_to_mon(r):
                  if "tint" in r.keys() and r["shiny"] else None),
         # 폼 (1.13). 도구를 써서 바꾼 모습의 열쇠
         "form": (r["form"] if "form" in r.keys() else None) or None,
-        # 테라 타입 (2.5.0). 정하지 않았으면 None - 배틀은 그 종의 첫째 타입으로 본다.
+        # 테라 타입 (2.5.0 처음 판 칸, 2.5.1 부터 안 본다 - 테라 타입은 지닌 테라피스, common.tera.type_of).
         "tera": (r["tera"] if "tera" in r.keys() else None) or None,
         # 꾸미기 (버전 2) {칸: 열쇠}. 앱이 걷는 도트에 얹고 효과를 그린다. 아무것도 안 쓰면 빈 dict
         "deco": _deco_of(r),

@@ -168,9 +168,13 @@ def t_카탈로그와_맞는다():
     p = os.path.join(HERE, "..", "server", "data", "items.json")
     with open(p, encoding="utf-8") as f:
         it = json.load(f)["items"]
-    held_cat = set(k for k, v in it.items() if v["cat"] == "held")
-    chk("held 분류 도구가 전부 held.KR 에 있다 (효과 없는 도구 금지)",
+    # 테라피스(2.5.1)는 '지닌 도구' 칸이지만 배틀 효과가 아니라 테라스탈의 열쇠다 - 메가스톤 · Z크리스탈처럼 KR 밖
+    held_cat = set(k for k, v in it.items() if v["cat"] == "held" and not v.get("teraType"))
+    chk("held 분류 도구가 전부 held.KR 에 있다 (효과 없는 도구 금지 - 테라피스는 빼고)",
         not (held_cat - set(H.KR)), sorted(held_cat - set(H.KR)))
+    shards = set(k for k, v in it.items() if v.get("teraType"))
+    chk("테라피스 18종은 지닐 수 있고 · 종류순 묶음은 '테라피스'",
+        len(shards) == 18 and all(H.normalize(k) == k and H.group(k) == "tera" for k in shards), sorted(shards))
     chk("held.KR 의 도구가 전부 카탈로그에 있다", not (set(H.KR) - set(it)),
         sorted(set(H.KR) - set(it)))
     bad = [(k, H.KR[k], it[k]["kr"]) for k in H.KR if k in it

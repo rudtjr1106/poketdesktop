@@ -271,14 +271,22 @@ def evo_lines(dex, mon, item_kr=None):
     return out
 
 
+def tera_label(m):
+    """상자 상세의 '테라' 칸 값: '풀 타입' · 정하지 않았으면 '없음' · 옛 서버면 '?' (테마 상자들도 쓴다)."""
+    kr = (m or {}).get("teraKr")
+    if not kr:
+        return "?"
+    return (kr + " 타입") if m.get("teraSet") else "없음"
+
+
 def tera_note(m):
     """상자 상세의 '테라' 칸 설명 (2.5.0). 테마 상자들도 이 글을 쓴다."""
     if not (m or {}).get("teraKr"):
         return "서버를 새 판으로 올리면 보인다."
-    head = "테라스탈하면 이 타입 하나가 된다."
     if not m.get("teraSet"):
-        head += " 정하지 않아 그 종의 첫째 타입이다."
-    return head + " 가방의 테라피스로 바꾼다."
+        # 2.5.1: 테라피스는 지니는 도구 - 지닌 포켓몬만 테라스탈한다 (11/16 사용자)
+        return "테라피스를 지니지 않아 테라스탈하지 못한다. 테라피스를 지니게 하면 그 타입으로 테라스탈한다."
+    return "지닌 테라피스의 타입이다. 테라스탈하면 이 타입 하나가 된다."
 
 
 class Row(object):
@@ -1002,7 +1010,7 @@ class BoxWindow(object):
                       highlightbackground=U.LINE)
         tb.pack(fill="x", pady=(10, 0))
         self.d_trait = {}
-        # 테라 타입 (2.5.0). 테라스탈하면 될 타입이다 - 정하지 않았으면 그 종의 첫째 타입.
+        # 테라 타입 (2.5.0). 테라스탈하면 될 타입 = 지닌 테라피스의 타입 (2.5.1) - 안 지녔으면 '없음' (테라스탈 못 한다).
         for key, title in (("ability", "특성"), ("nature", "성격"), ("tera", "테라")):
             row = tk.Frame(tb, bg="#101623")
             row.pack(fill="x", padx=11, pady=(8 if key == "ability" else 4,
@@ -2634,9 +2642,9 @@ class BoxWindow(object):
         self._trait("nature", (info.get("nature") or "?") + " 성격",
                     info.get("natureNote"))
         # 테라 타입 (2.5.0). 옛 서버는 이 칸을 안 준다 - 그때는 '?' 로 둔다.
-        tera = m.get("teraKr")
-        self._trait("tera", (tera + " 타입") if tera else "?", tera_note(m))
-        self.d_trait["tera"][0].configure(fg=U.TYPE_COLOR.get(m.get("teraType"), U.FG))
+        self._trait("tera", tera_label(m), tera_note(m))
+        self.d_trait["tera"][0].configure(fg=U.TYPE_COLOR.get(m.get("teraType"), U.FG)
+                                          if m.get("teraSet") else U.FG_FAINT)
 
         self._exp(info)
         self._show_held(m)

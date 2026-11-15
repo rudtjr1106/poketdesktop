@@ -49,7 +49,9 @@ def mon(species, moves=("TACKLE",), tera=None, held=None, level=50, ability=None
     m["held"] = held
     m["nickname"] = None
     if tera:
-        m["tera"] = tera
+        # 2.5.1: 테라 타입 = 지닌 테라피스 (지니는 도구). tera= 는 그 타입 테라피스를 지니게 한다
+        assert not held, "테라피스와 다른 도구를 같이 지닐 수 없다"
+        m["held"] = tera + "TERASHARD"
     if ability:
         m["ability"] = ability
     return m
@@ -73,10 +75,21 @@ def dmg(bt, user, target, key):
 def main():
     print("=== 테라 타입 ===")
     chk("타입은 열여덟 (스텔라는 없다)", len(TR.TYPES) == 18 and "STELLAR" not in TR.TYPES)
-    chk("정하지 않았으면 그 종의 첫째 타입",
-        TR.type_of(DEX, mon("CHARIZARD")) == "FIRE" and TR.type_of(DEX, mon("GYARADOS")) == "WATER")
-    chk("정해 두었으면 그 타입", TR.type_of(DEX, mon("CHARIZARD", tera="GRASS")) == "GRASS")
-    chk("없는 타입은 버리고 기본으로", TR.type_of(DEX, mon("CHARIZARD", tera="STELLAR")) == "FIRE")
+    chk("테라피스를 안 지녔으면 테라 타입이 없다 (11/16 사용자 - 처음 판은 그 종의 첫째 타입)",
+        TR.type_of(DEX, mon("CHARIZARD")) is None and TR.type_of(DEX, mon("CLEFABLE")) is None)
+    chk("다른 도구를 지녔거나 2.5.0 에 정해 둔 칸(tera)만 있으면 없다",
+        TR.type_of(DEX, mon("CHARIZARD", held="LIFEORB")) is None
+        and TR.type_of(DEX, dict(mon("CHARIZARD"), tera="FIRE")) is None)
+    chk("테라피스 18종 = 타입 열여덟", len(TR.SHARDS) == 18 and TR.shard_type("FAIRYTERASHARD") == "FAIRY"
+        and TR.shard_type("LIFEORB") is None and TR.shard_type(None) is None)
+    chk("지닌 테라피스의 타입 (자기 타입과 같아도 - 페어리 포켓몬에 페어리)",
+        TR.type_of(DEX, mon("CHARIZARD", tera="GRASS")) == "GRASS"
+        and TR.type_of(DEX, mon("CLEFABLE", tera="FAIRY")) == "FAIRY")
+    chk("없는 타입은 버린다 (없음)", TR.type_of(DEX, mon("CHARIZARD", tera="STELLAR")) is None)
+    bt, a, b = duel(mon("CLEFABLE", ("MOONBLAST",)), mon("SNORLAX"))
+    chk("정하지 않은 포켓몬은 테라오브가 있어도 테라스탈 못 한다 (단추가 없다)", bt.can_tera("me") is None, bt.can_tera("me"))
+    bt, a, b = duel(mon("CLEFABLE", ("MOONBLAST",), tera="FAIRY"), mon("SNORLAX"))
+    chk("페어리 테라피스를 쓴 픽시는 테라스탈 · 페어리", bt.can_tera("me") == "FAIRY", bt.can_tera("me"))
 
     print("\n=== 바뀐다 ===")
     bt, a, b = duel(mon("CHARIZARD", ("FLAMETHROWER",), tera="GRASS"), mon("SNORLAX"))
@@ -201,18 +214,27 @@ def main():
         (a.ab, [e.get("text") for e in ev]))
 
     print("\n=== 메가진화와 ===")
-    bt, a, b = duel(mon("CHARIZARD", ("FLAMETHROWER",), tera="GRASS", held="CHARIZARDITEX"),
-                    mon("SNORLAX"), keystone=True)
-    ev = bt.take_turn("FLAMETHROWER", mega=True, tera=True)
+    # 2.5.1: 테라피스는 지닌 도구 칸을 쓰므로 메가스톤과 같이 못 지닌다 - 스톤 없이 메가진화하는 레쿠쟈(화룡점정)로 본다
+    bt, a, b = duel(mon("CHARIZARD", ("FLAMETHROWER",), held="CHARIZARDITEX"), mon("SNORLAX"), keystone=True)
+    chk("메가스톤을 지닌 포켓몬은 테라피스가 없어 테라스탈 단추가 없다",
+        bt.can_tera("me") is None and bt.can_mega("me") is not None, (bt.can_tera("me"), bt.can_mega("me")))
+    bt, a, b = duel(mon("RAYQUAZA", ("DRAGONASCENT",), tera="FLYING"), mon("SNORLAX"), keystone=True)
+    chk("레쿠쟈는 테라피스를 지녀도 화룡점정으로 메가진화할 수 있다 (둘 다 열려 있다)",
+        bt.can_tera("me") == "FLYING" and bt.can_mega("me") is not None, (bt.can_tera("me"), bt.can_mega("me")))
+    ev = bt.take_turn("DRAGONASCENT", mega=True, tera=True)
     chk("같은 턴에 둘 다 누르면 메가진화만 된다",
         a.mega and a.tera is None and not any(e.get("t") == "tera" for e in ev), (a.mega, a.tera))
     chk("메가진화한 뒤에는 테라스탈할 수 없다", bt.can_tera("me") is None)
-    bt, a, b = duel(mon("CHARIZARD", ("FLAMETHROWER",), tera="GRASS", held="CHARIZARDITEX"),
-                    mon("SNORLAX"), keystone=True)
-    bt.take_turn("FLAMETHROWER", tera=True)
-    chk("테라스탈한 뒤에는 메가진화할 수 없다", a.tera == "GRASS" and bt.can_mega("me") is None)
-    bt.take_turn("FLAMETHROWER", mega=True)
+    bt, a, b = duel(mon("RAYQUAZA", ("DRAGONASCENT",), tera="FLYING"), mon("SNORLAX"), keystone=True)
+    bt.take_turn("DRAGONASCENT", tera=True)
+    chk("테라스탈한 뒤에는 메가진화할 수 없다", a.tera == "FLYING" and bt.can_mega("me") is None)
+    bt.take_turn("DRAGONASCENT", mega=True)
     chk("눌러도 안 바뀐다", a.mega is None)
+    bt, a, b = duel(mon("CLEFABLE", ("MOONBLAST",), tera="FAIRY"), mon("SNORLAX", ("KNOCKOFF",)))
+    ev = []
+    bt._use("foe", b, a, "KNOCKOFF", ev)
+    chk("탁쳐서떨구기로도 테라피스는 안 떨어진다 (Z크리스탈과 같다)",
+        a.held == "FAIRYTERASHARD" and bt.can_tera("me") == "FAIRY", (a.held, [e.get("text") for e in ev]))
 
     print("\n=== 저장·교체 ===")
     bt, a, b = duel(mon("CHARIZARD", ("FLAMETHROWER",), tera="GRASS"), mon("SNORLAX"))
@@ -228,13 +250,23 @@ def main():
     chk("안 한 포켓몬은 저장할 것이 없다", (b0.volatile() or {}).get("tera") is None)
 
     print("\n=== 자동 배틀 ===")
-    team_a = [mon("CHARIZARD", ("FLAMETHROWER", "AIRSLASH")), mon("GYARADOS", ("WATERFALL", "ICEFANG")),
+    bare_a = [mon("CHARIZARD", ("FLAMETHROWER", "AIRSLASH")), mon("GYARADOS", ("WATERFALL", "ICEFANG")),
               mon("SNORLAX", ("BODYSLAM", "EARTHQUAKE"))]
-    team_b = [mon("VENUSAUR", ("ENERGYBALL", "SLUDGEBOMB")), mon("GOLEM", ("ROCKSLIDE", "EARTHQUAKE")),
+    bare_b = [mon("VENUSAUR", ("ENERGYBALL", "SLUDGEBOMB")), mon("GOLEM", ("ROCKSLIDE", "EARTHQUAKE")),
               mon("ALAKAZAM", ("PSYCHIC", "SHADOWBALL"))]
+    both = {"me": True, "foe": True}
+    none_set = PB.simulate(DEX, bare_a, bare_b, seed=77, tera_orb=both)
+    chk("테라 타입을 정한 포켓몬이 없으면 테라오브가 있어도 AI 가 안 쓴다 (11/16)",
+        not any(e.get("t") == "tera" for e in none_set["events"]))
+    # 아래부터는 모두 테라피스로 첫째 타입을 정해 둔 팀 (2.5.0 처음 판의 기본값과 같게 - 로그 비교가 그대로 맞는다)
+    team_a = [mon("CHARIZARD", ("FLAMETHROWER", "AIRSLASH"), tera="FIRE"),
+              mon("GYARADOS", ("WATERFALL", "ICEFANG"), tera="WATER"),
+              mon("SNORLAX", ("BODYSLAM", "EARTHQUAKE"), tera="NORMAL")]
+    team_b = [mon("VENUSAUR", ("ENERGYBALL", "SLUDGEBOMB"), tera="GRASS"),
+              mon("GOLEM", ("ROCKSLIDE", "EARTHQUAKE"), tera="ROCK"),
+              mon("ALAKAZAM", ("PSYCHIC", "SHADOWBALL"), tera="PSYCHIC")]
     plain = PB.simulate(DEX, team_a, team_b, seed=77)
     chk("테라오브가 없으면 테라 사건이 없다", not any(e.get("t") == "tera" for e in plain["events"]))
-    both = {"me": True, "foe": True}
     r1 = PB.simulate(DEX, team_a, team_b, seed=77, tera_orb=both)
     r2 = PB.simulate(DEX, team_a, team_b, seed=77, tera_orb=both)
     teras = [e for e in r1["events"] if e.get("t") == "tera"]

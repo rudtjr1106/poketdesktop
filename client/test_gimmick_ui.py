@@ -47,6 +47,19 @@ from poketdesktop import ui_gym_battle as GB                # noqa: E402
 from poketdesktop import ui_live_battle as LUI              # noqa: E402
 from poketdesktop import ui_raid_battle as RUI              # noqa: E402
 from test_learn_dialog import squeezed                      # noqa: E402
+from common import battle as BATTLE                         # noqa: E402
+
+# 2.5.1: 테라 타입 = 지닌 테라피스 (지니는 도구) 라 한 마리가 Z크리스탈과 테라피스를 같이 못 지닌다. 이 검사는 단추
+# 막대(두 단추가 겹치지 않나 · 순서 · 함께 보내기)를 보려고, 시험용 포켓몬에 적어 둔 tera 를 테라 타입으로 쓰게 한다.
+# 엔진의 규칙(지닌 테라피스만)은 common/test_tera · test_live_battle · server/test_gimmick 이 본다.
+_REAL_TERA_TYPE = BATTLE.Fighter.tera_type
+
+
+def _test_tera_type(self):
+    return _REAL_TERA_TYPE(self) or (None if self.item_gone else self.mon.get("tera"))
+
+
+BATTLE.Fighter.tera_type = _test_tera_type
 
 OK = FAIL = 0
 DATA = os.path.join(ROOT, "server", "data")
@@ -364,24 +377,24 @@ def helper_part():
     chk("  빛줄기는 한 바퀴의 앞쪽에만 스친다 (나머지는 쉰다)", any(sweeps) and not all(sweeps) and sweeps[0]
         and not sweeps[-1], sweeps)
 
-    print("\n=== 가방 · 상점 · 상자: 테라피스 ===")
+    print("\n=== 가방 · 상점 · 상자: 테라피스 (2.5.1 - 지니는 도구) ===")
     from poketdesktop import ui_bag, ui_box, ui_shop
-    shard = {"id": "WATERTERASHARD", "kr": "테라피스 물", "cat": "misc", "desc": "물 타입으로 바꾼다.",
-             "effect": {"kind": "tera", "type": "WATER"}}
-    chk("가방에서 쓸 수 있는 도구다 (대상 포켓몬을 고른다)", "tera" in ui_bag.USABLE and "tera" not in ui_bag.NO_TARGET)
-    chk("  설명 끝에 규칙 한 줄", ui_bag.item_desc(shard).endswith(ui_bag.TERA_RULE), ui_bag.item_desc(shard))
-    chk("  대상 안내", "같은 타입" in ui_bag.target_hint(shard), ui_bag.target_hint(shard))
-    st = ui_bag.BagWindow._target_state(None, shard, {"teraType": "WATER", "teraKr": "물", "info": {}, "level": 5})
-    chk("  이미 그 타입인 포켓몬은 막는다", st[1] is True and "이미 물" in st[2], st)
-    st = ui_bag.BagWindow._target_state(None, shard, {"teraType": "FIRE", "teraKr": "불꽃", "info": {}, "level": 5})
-    chk("  다른 타입이면 줄 끝에 지금 테라 타입", st[1] is False and st[2] == "테라 타입: 불꽃", st)
-    st = ui_bag.BagWindow._target_state(None, shard, {"info": {}, "level": 5})
-    chk("  옛 서버(테라 칸 없음)면 막지 않는다", st[1] is False, st)
-    chk("상점 설명 · 덧말", "테라 타입" in ui_shop.effect_text(shard) and ui_shop.effect_note(shard) == ui_bag.TERA_RULE)
-    chk("상자 '테라' 칸 설명: 정한 것 / 안 정한 것 / 옛 서버",
-        "첫째 타입" not in ui_box.tera_note({"teraKr": "물", "teraSet": True})
-        and "첫째 타입" in ui_box.tera_note({"teraKr": "물", "teraSet": False})
+    from common import held as HELD
+    shard = {"id": "WATERTERASHARD", "kr": "테라피스 물", "cat": "held", "teraType": "WATER",
+             "desc": "테라스탈의 힘이 깃든 결정 조각. 지니게 하면 테라스탈할 때 물 타입이 된다.",
+             "effect": {"kind": "held"}, "holdable": True, "heldNote": HELD.effect_note("WATERTERASHARD")}
+    chk("지닌 도구로 다룬다 (따로 쓰는 길 'tera' 는 없다)", "held" in ui_bag.USABLE and "tera" not in ui_bag.USABLE)
+    chk("  가방 설명에 하는 일이 붙는다", "테라스탈" in ui_bag.item_desc(shard), ui_bag.item_desc(shard))
+    chk("  대상 안내는 지니게 하기", ui_bag.target_hint(shard) == ui_bag.target_hint({"effect": {"kind": "held"}}),
+        ui_bag.target_hint(shard))
+    chk("  지닌 도구 묶음 '테라피스'", HELD.group("WATERTERASHARD") == "tera" and HELD.group_kr("tera") == "테라피스")
+    chk("상자 '테라' 칸 설명: 지닌 것 / 안 지닌 것 / 옛 서버",
+        "지닌 테라피스" in ui_box.tera_note({"teraKr": "물", "teraSet": True})
+        and "테라스탈하지 못한다" in ui_box.tera_note({"teraKr": "없음", "teraSet": False})
         and "새 판" in ui_box.tera_note({}))
+    chk("상자 '테라' 칸 값: 지닌 것 '물 타입' / 안 지닌 것 '없음' / 옛 서버 '?'",
+        ui_box.tera_label({"teraKr": "물", "teraSet": True}) == "물 타입"
+        and ui_box.tera_label({"teraKr": "없음", "teraSet": False}) == "없음" and ui_box.tera_label({}) == "?")
 
 
 def main():

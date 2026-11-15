@@ -13,8 +13,11 @@
 
 안 넣은 것: 스텔라 타입, 오거폰·테라파고스의 전용 처리.
 
-포켓몬마다 테라 타입이 하나 있다 (mon["tera"]). 따로 정하지 않았으면 **그 종의 첫째 타입**이다.
-'테라피스' 로 바꾼다 (서버 gimmick.set_tera). 메가진화한 포켓몬은 테라스탈하지 못하고, 테라스탈한
+**테라피스는 지니는 도구다 (2.5.1, Z크리스탈과 같다)** - 테라피스를 지닌 포켓몬만 테라스탈하고, 지닌 테라피스의
+타입이 테라 타입이다 (11/16 사용자 "테라피스가 있어야 되는 거 아니야? · 지닌도구류로 해줘"). 지니지 않은 포켓몬은
+테라 타입이 없다 - 테라오브가 있어도 단추가 안 뜨고 AI 도 안 쓴다. 테라피스는 뺏기거나 떨어지지 않는다 (held.stuck).
+2.5.0 처음 판은 가방에서 한 번 써서 정하는 소모품이었고(mon["tera"] 칸 - 이제 안 본다), 정하지 않은 포켓몬은 그 종의
+첫째 타입으로 쳤다. 메가진화한 포켓몬은 테라스탈하지 못하고, 테라스탈한
 포켓몬은 메가진화하지 못한다 - 본가에 없는 조합이라 이 게임이 정한 것이다 (battle.Battle.can_tera).
 처음 넣은 것은 시즌 4 (1.11.0) 준비 때이고, 그때는 내지 않고 뺐다가 2.5.0 에서 다시 넣었다.
 """
@@ -29,18 +32,23 @@ def valid(t):
     return t in TYPES
 
 
-def default_type(dex, mon):
-    """정하지 않은 포켓몬의 테라 타입 - 그 종(메가가 아닌 원래 모습)의 첫째 타입."""
-    sp = dex.get((mon or {}).get("species")) or {}
-    for t in sp.get("types") or ():
-        if t in TYPES:
-            return t
-    return "NORMAL"
+# 테라피스 18종 - 도구 열쇠 'FAIRYTERASHARD' -> 'FAIRY' (스텔라는 없다)
+SHARDS = dict((t + "TERASHARD", t) for t in TYPES)
+
+
+def is_shard(item):
+    return bool(item) and item in SHARDS
+
+
+def shard_type(item):
+    """지닌 도구가 테라피스면 그 타입, 아니면 None."""
+    return SHARDS.get(item) if item else None
 
 
 def type_of(dex, mon):
-    t = (mon or {}).get("tera")
-    return t if valid(t) else default_type(dex, mon)
+    """이 포켓몬의 테라 타입 = 지닌 테라피스의 타입. 안 지녔으면 None (테라스탈하지 못한다).
+    dex 는 예전 꼴(정하지 않으면 첫째 타입)과 부르는 곳을 맞추려고 남겨 둔다."""
+    return shard_type((mon or {}).get("held"))
 
 
 def stab(orig, tera, mtype, base=STAB):

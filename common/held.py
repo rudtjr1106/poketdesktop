@@ -24,6 +24,7 @@ PokeAPI 는 도구의 **이름·설명·가격**만 준다. 무엇을 하는지�
 있는지만 보고 없으면 바로 돌아간다 - 위 규칙 1 이다.
 """
 from . import movecalc as MC
+from . import tera as TR
 from . import zmoves as ZM
 
 # 도구 id -> 한글 이름. 로그의 문구에 쓴다. 서버의 items.json 과 같은
@@ -238,7 +239,7 @@ ALL = frozenset(KR)
 # 거기 없는 것은 아래 네 묶음에 적는다. 어디에도 없으면 '기타' (새 도구가 생기면 여기도 적을 것).
 GROUPS = (("berry", "열매"), ("type", "타입 강화"), ("attack", "공격 강화"), ("recover", "회복 · 버티기"),
           ("once", "한 번 발동"), ("guard", "상태 · 방어"), ("field", "날씨 · 필드"), ("train", "육성"),
-          ("species", "전용 도구"), ("etc", "기타"))
+          ("species", "전용 도구"), ("tera", "테라피스"), ("etc", "기타"))      # 테라피스 (2.5.1 - 지니는 도구)
 ATTACK = {"CHOICEBAND", "CHOICESPECS", "CHOICESCARF", "LIFEORB", "EXPERTBELT", "MUSCLEBAND", "WISEGLASSES",
           "METRONOME", "SCOPELENS", "WIDELENS", "ZOOMLENS", "LOADEDDICE", "PUNCHINGGLOVE", "QUICKCLAW"}
 RECOVER = {"LEFTOVERS", "BLACKSLUDGE", "SHELLBELL", "BIGROOT", "FOCUSSASH", "FOCUSBAND", "ASSAULTVEST",
@@ -253,6 +254,8 @@ _GROUP_KR = dict(GROUPS)
 def group(item):
     """지닌 도구의 종류 열쇠 (GROUPS 의 하나). 모르는 도구는 'etc'."""
     item = item or ""
+    if TR.is_shard(item):
+        return "tera"
     if item.endswith("BERRY"):
         return "berry"
     if item in SPECIES_STAT or item in SPECIES_CRIT or item in SPECIES_POWER or item in LOCKED \
@@ -296,14 +299,15 @@ def is_mega_stone(item):
 
 
 def stuck(item, f=None):
-    """뺏기지도 떨어지지도 않는 도구 - 메가스톤과 Z크리스탈 (본가와 같다), 폼이 걸린 도구 (1.13).
+    """뺏기지도 떨어지지도 않는 도구 - 메가스톤과 Z크리스탈 (본가와 같다), 폼이 걸린 도구 (1.13),
+    테라피스 (2.5.1 - 지니는 동안 테라스탈한다. Z크리스탈처럼 잠근다).
 
     트릭·바꿔치기·탁쳐서떨구기·도둑질·나쁜손버릇·매지션이 이것을 본다. f(그 도구를 지닌 포켓몬)를
     주면 플레이트·메모리·카세트는 그 전용 포켓몬(아르세우스·실버디·게노세크트)이 지녔을 때만 잠근다.
     """
     if not item:
         return False
-    if is_mega_stone(item) or ZM.is_crystal(item) or item in LOCKED:
+    if is_mega_stone(item) or ZM.is_crystal(item) or TR.is_shard(item) or item in LOCKED:
         return True
     sp = LOCKED_FOR.get(item)
     return bool(sp and f is not None and _species(f) == sp)
@@ -318,10 +322,12 @@ def normalize(v):
     if not v:
         return None
     k = "".join(c for c in str(v).upper() if c.isalnum())
-    return k if (k in ALL or k in MEGA or k in ZM.CRYSTALS) else None
+    return k if (k in ALL or k in MEGA or k in ZM.CRYSTALS or TR.is_shard(k)) else None
 
 
 def name(item):
+    if TR.is_shard(item):
+        return "테라피스 " + _TYPE_KR.get(TR.shard_type(item), "")
     return KR.get(item) or MEGA.get(item) or ZM.CRYSTALS.get(item) or (item or "")
 
 
@@ -1098,6 +1104,9 @@ def effect_note(item_id):
     h = normalize(item_id)
     if not h:
         return ""
+    if TR.is_shard(h):
+        return ("지니면 테라스탈할 때 %s 타입이 된다 (한 판에 한 번, 테라오브 필요). 테라피스를 지니지 않은 포켓몬은 "
+                "테라스탈하지 못한다" % _TYPE_KR.get(TR.shard_type(h), TR.shard_type(h)))
     if ZM.is_crystal(h):
         own = ZM.EXCLUSIVE.get(h)
         if own:

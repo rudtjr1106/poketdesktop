@@ -52,10 +52,6 @@ THUMB = 22              # 목록에 놓는 도트 높이 (다른 창과 겹치�
 EV_STAT_MAX = 252       # 서버 config 와 같은 값 (스탯 하나당)
 EV_TOTAL_MAX = 510      # 서버 config 와 같은 값 (여섯 개 합계)
 HYPER_MIN_LEVEL = 50    # 병뚜껑을 받을 수 있는 최소 레벨
-# 테라피스 (2.5.0) 설명 끝에 붙이는 규칙 한 줄 (가방 · 상점 · 상자가 같이 쓴다)
-TERA_RULE = ("테라스탈은 관장 8곳을 이긴 뒤부터, 한 판에 한 번 쓸 수 있다. 정하지 않은 포켓몬의 테라 타입은 "
-             "그 종의 첫째 타입이다.")
-
 STAT_ROWS = [("hp", "HP"), ("atk", "공격"), ("def", "방어"),
              ("spa", "특수공격"), ("spd", "특수방어"), ("spe", "스피드")]
 STAT_KR = dict(STAT_ROWS)
@@ -75,8 +71,7 @@ CAT_COLOR = {"megastone": "#a98bff", "zcrystal": "#ffd23c", "form": "#5fd3c6", "
 # "deco" (버전 2) 는 꾸미기 - /api/deco/equip 으로 씌우고 뺀다. "decopick" 은 참가 묶음 선택권 (묶음을 고른다).
 # "lure" (2.1.1) 는 타입 스프레이 (풀숲), "rename" 은 닉네임 변경권.
 USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket", "form", "tmticket", "deco", "decopick",
-          "tera",
-          "lure", "rename", "arche")
+          "lure", "rename", "arche")       # 테라피스는 2.5.1 부터 지니는 도구 ("held") - 따로 쓰는 길이 없다
 # **대상 포켓몬이 없는 도구.** 고를 것이 없으니 목록을 띄우지 않고 바로 쓴다.
 NO_TARGET = ("ticket", "tmticket", "decopick", "lure", "rename", "arche")
 
@@ -273,10 +268,6 @@ def item_desc(item):
         return out
     if kind == "form":
         return form_desc(item)
-    if kind == "tera":
-        # 테라피스 (2.5.0). 테라스탈은 관장 8곳을 이긴 뒤부터 쓸 수 있다.
-        return ((item.get("desc") or "포켓몬의 테라 타입을 바꾼다.")
-                + "\n\n" + TERA_RULE)
     if kind == "ticket":
         out = item.get("desc") or "쓰면 확률로 알을 받는다."
         pct = int(round(float(eff.get("chance") or 0) * 100))
@@ -427,8 +418,6 @@ def target_hint(item):
         return "이 도구가 통하는 포켓몬을 밝게 표시했다"
     if kind == "deco":
         return "한 마리에 칸마다 하나. 다른 포켓몬이 쓰던 것이면 옮겨 온다"
-    if kind == "tera":
-        return "지금 테라 타입을 줄 끝에 적었다. 같은 타입에는 못 쓴다"
     return ""
 
 
@@ -1432,13 +1421,6 @@ class BagWindow(object):
 
         if kind == "deco":
             return self._deco_state(it, mon)
-
-        if kind == "tera":
-            # 테라피스 (2.5.0): 지금 테라 타입(정하지 않았으면 그 종의 첫째 타입)과 같으면 못 쓴다.
-            # 옛 서버는 teraType 을 안 보낸다 - 그때는 막지 않고 서버가 거른다.
-            if mon.get("teraType") and mon.get("teraType") == eff.get("type"):
-                return False, True, "이미 %s" % (mon.get("teraKr") or ""), U.FG_FAINT
-            return False, False, "테라 타입: %s" % (mon.get("teraKr") or "?"), U.INFO
 
         return False, True, "쓸 수 없다", U.FG_FAINT
 

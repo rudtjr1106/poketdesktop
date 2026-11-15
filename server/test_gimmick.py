@@ -6,8 +6,7 @@
 서버를 띄우지 않는다. 임시 DB 에 모듈을 직접 붙인다. 못 박는 것:
 
   1. Z링·테라오브는 **관장 8곳** (키스톤과 같다). 그 전에는 배틀에서 아무 일도 없다.
-  2. 테라 타입: 정하지 않았으면 그 종의 첫째 타입. 테라피스를 쓰면 바뀌고 하나가 든다.
-     이미 그 타입이면 안 쓴다 (가방에서 안 빠진다).
+  2. 테라 타입 = 지닌 테라피스의 타입 (2.5.1, 지니는 도구). 안 지녔으면 없다 - 테라스탈 못 한다.
   3. Z크리스탈은 상점에서 사서 지니게 할 수 있다 (타입 20,000원, 전용 30,000원).
   4. 랜덤 배틀: 가진 사람만 AI 가 알아서 쓴다.
   5. 관장 배틀: 가진 사람에게만 단추가 뜨고, 눌러서 쓴다.
@@ -94,64 +93,51 @@ def main_():
     c = gimmick.card(new)
     chk("화면에 줄 것: 몇 곳 남았나", c == {"zring": False, "teraOrb": False, "gyms": 7, "need": 8}, c)
 
-    print("\n=== 테라 타입 ===")
+    print("\n=== 테라 타입 = 지닌 테라피스 (2.5.1) ===")
     pid = mkmon(vet, "CHARIZARD", ("FLAMETHROWER", "AIRSLASH"))
-    row = db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (pid,)))
-    chk("새 포켓몬의 칸은 비어 있다", row["tera"] is None, row["tera"])
-    dec = deps.decorate(row)
-    chk("화면에는 그 종의 첫째 타입으로 간다",
-        dec["teraType"] == "FIRE" and dec["teraKr"] == "불꽃" and dec["teraSet"] is False, dec.get("teraType"))
-    chk("없는 타입은 거절", _raises(lambda: gimmick.set_tera(vet, pid, "STELLAR"), ValueError))
-    chk("남의 포켓몬은 못 바꾼다", _raises(lambda: gimmick.set_tera(new, pid, "GRASS"), LookupError))
-    chk("이미 그 타입이면 False (바뀐 것이 없다)", gimmick.set_tera(vet, pid, "FIRE") is False)
-    chk("다른 타입이면 바뀐다", gimmick.set_tera(vet, pid, "grass") is True
-        and db.q1("SELECT tera FROM pokemon WHERE id=?", (pid,))["tera"] == "GRASS")
     dec = deps.decorate(db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (pid,))))
-    chk("바꾼 뒤의 화면 값", dec["teraType"] == "GRASS" and dec["teraKr"] == "풀" and dec["teraSet"] is True)
+    chk("테라피스를 안 지녔으면 테라 타입이 없다 - 화면에 '없음' (11/16 사용자, 처음 판은 그 종의 첫째 타입)",
+        dec["teraType"] is None and dec["teraKr"] == "없음" and dec["teraSet"] is False, (dec.get("teraType"), dec.get("teraKr")))
+    fairy = mkmon(vet, "CLEFABLE", ("MOONBLAST",), slot=1, held="FAIRYTERASHARD")
+    dec = deps.decorate(db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (fairy,))))
+    chk("페어리 테라피스를 지닌 픽시는 테라 타입 페어리 (페어리 포켓몬에 페어리)",
+        dec["teraType"] == "FAIRY" and dec["teraKr"] == "페어리" and dec["teraSet"] is True, dec.get("teraType"))
+    orb = mkmon(vet, "GYARADOS", ("WATERFALL",), slot=2, held="LIFEORB")
+    db.run("UPDATE pokemon SET tera='WATER' WHERE id=?", (orb,))      # 2.5.0 처음 판에 가방에서 정해 둔 칸
+    dec = deps.decorate(db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (orb,))))
+    chk("다른 도구를 지녔으면 없다 - 2.5.0 에 정해 둔 칸(pokemon.tera)은 이제 안 본다", dec["teraType"] is None, dec)
 
-    print("\n=== 테라피스 ===")
-    shards = [it for it in items.catalog().values() if (it.get("effect") or {}).get("kind") == "tera"]
+    print("\n=== 테라피스 (지니는 도구) ===")
+    shards = [it for it in items.catalog().values() if it.get("teraType")]
     z_type = [it for it in items.catalog().values() if ZM.is_crystal(it["id"]) and it["cost"] == 20000]
     chk("테라피스 18종, 타입 Z크리스탈과 같은 20,000원 (팔면 10,000원)",
         len(shards) == 18 and all(it["cost"] == 20000 and it["sell"] == 10000 for it in shards) and len(z_type) == 18
-        and set(it["effect"]["type"] for it in shards) == set(ZM.TYPE_Z), len(shards))
+        and set(it["teraType"] for it in shards) == set(ZM.TYPE_Z), len(shards))
+    chk("지닌 도구 칸 · 지니는 도구 (가방에서 쓰는 도구가 아니다)",
+        all(it["cat"] == "held" and it["effect"] == {"kind": "held"} for it in shards))
     chk("주워서는 안 나온다", all(not it.get("weight") and not it.get("chance") for it in shards))
     chk("설명이 있다", all(it.get("desc") for it in shards))
-    items.bag_add(vet, "WATERTERASHARD", 2)
-    out = item_routes.use(item_routes.UseIn(item="WATERTERASHARD", pokemon=pid), me=me(vet))
-    chk("쓰면 테라 타입이 바뀐다", out["pokemon"]["teraType"] == "WATER" and "물" in out["message"], out["message"])
-    chk("하나가 든다", items.bag_count(vet, "WATERTERASHARD") == 1)
-    code = status_of(lambda: item_routes.use(item_routes.UseIn(item="WATERTERASHARD", pokemon=pid), me=me(vet)))
-    chk("이미 그 타입이면 거절하고", code == 400, code)
-    chk("테라피스는 그대로 남는다", items.bag_count(vet, "WATERTERASHARD") == 1)
-    pid2 = mkmon(vet, "BLASTOISE", ("SURF",), slot=1)
-    code = status_of(lambda: item_routes.use(item_routes.UseIn(item="WATERTERASHARD", pokemon=pid2), me=me(vet)))
-    chk("정하지 않은 포켓몬에게 그 종의 첫째 타입 테라피스도 거절 (거북왕에게 물)", code == 400, code)
-    code = status_of(lambda: item_routes.use(item_routes.UseIn(item="FIRETERASHARD", pokemon=pid), me=me(vet)))
-    chk("가방에 없으면 못 쓴다", code == 400, code)
-    # 두 창에서 같은 포켓몬에 쓰는 경우 (2.5.0): 테라피스를 먼저 빼고, 못 바꾸면 돌려준다
-    items.bag_add(vet, "ICETERASHARD", 1)
-    real_set = gimmick.set_tera
-    gimmick.set_tera = lambda *a: False           # 앞 창이 먼저 바꿔 버렸다
-    try:
-        code = status_of(lambda: item_routes.use(item_routes.UseIn(item="ICETERASHARD", pokemon=pid), me=me(vet)))
-    finally:
-        gimmick.set_tera = real_set
-    chk("못 바꾸면 거절하고 테라피스를 돌려준다", code == 400 and items.bag_count(vet, "ICETERASHARD") == 1,
-        (code, items.bag_count(vet, "ICETERASHARD")))
-    real_q1 = gimmick.db.q1
-
-    def stale_q1(sql, args=()):
-        row = real_q1(sql, args)                   # 이 창이 읽은 뒤에
-        db.run("UPDATE pokemon SET tera='ROCK' WHERE id=?", (pid2,))   # 다른 창이 먼저 바꿨다
-        return row
-    gimmick.db.q1 = stale_q1
-    try:
-        got = gimmick.set_tera(vet, pid2, "GHOST")
-    finally:
-        gimmick.db.q1 = real_q1
-    chk("조건을 건 UPDATE: 읽은 뒤 다른 창이 바꿨으면 False 이고 덮어쓰지 않는다",
-        got is False and db.q1("SELECT tera FROM pokemon WHERE id=?", (pid2,))["tera"] == "ROCK", got)
+    pub = dict((x["id"], x) for x in items.public_list())
+    chk("상점에서 팔고 지닐 수 있고, 하는 일이 덧말로 붙는다",
+        pub["FAIRYTERASHARD"]["buyable"] and pub["FAIRYTERASHARD"]["holdable"]
+        and "테라스탈" in (pub["FAIRYTERASHARD"]["heldNote"] or ""), pub["FAIRYTERASHARD"])
+    from common import held as HELD
+    chk("뺏기지도 떨어지지도 않는다 (트릭 · 탁쳐서떨구기 - Z크리스탈과 같다)",
+        all(HELD.stuck(it["id"]) for it in shards))
+    items.bag_add(vet, "WATERTERASHARD", 1)
+    items.bag_add(vet, "FAIRYTERASHARD", 1)
+    out = main.hold(pid, main.HoldIn(item="WATERTERASHARD"), ctx=me(vet))
+    chk("지니게 하면 테라 타입이 그 타입 (리자몽에게 물)", out["pokemon"]["teraType"] == "WATER"
+        and items.bag_count(vet, "WATERTERASHARD") == 0, out["pokemon"].get("teraType"))
+    out = main.hold(pid, main.HoldIn(item="FAIRYTERASHARD"), ctx=me(vet))
+    chk("다른 테라피스로 바꿔 지니면 그 타입 · 먼저 것은 가방으로", out["pokemon"]["teraType"] == "FAIRY"
+        and items.bag_count(vet, "WATERTERASHARD") == 1 and items.bag_count(vet, "FAIRYTERASHARD") == 0,
+        (out["pokemon"].get("teraType"), items.bag_count(vet, "WATERTERASHARD")))
+    out = main.hold(pid, main.HoldIn(item="FAIRYTERASHARD"), ctx=me(vet))
+    chk("같은 것을 또 지니게 하면 그대로", out["pokemon"]["teraType"] == "FAIRY" and "이미" in out.get("message", ""),
+        out.get("message"))
+    chk("가방에서 '쓰는' 길은 없다 (2.5.0 처음 판의 쓰기)",
+        status_of(lambda: item_routes.use(item_routes.UseIn(item="WATERTERASHARD", pokemon=pid), me=me(vet))) == 400)
 
     print("\n=== Z크리스탈 ===")
     zs = [it for it in items.catalog().values() if ZM.is_crystal(it["id"])]
@@ -178,16 +164,19 @@ def main_():
     print("\n=== 랜덤 배틀: 가진 사람만 AI 가 쓴다 ===")
     poor = mkuser("gm_poor", gyms=0)
     pp = mkmon(poor, "VENUSAUR", ("ENERGYBALL", "SLUDGEBOMB"), held="GRASSIUMZ")
-    db.run("UPDATE pokemon SET tera='GRASS' WHERE id=?", (pp,))
-    db.run("UPDATE pokemon SET tera='FIRE' WHERE id=?", (rp,))
     r = pvp.run_match(rich, poor, kind="random", seed=5)
     ev = pvp.match_view(rich, r["matchId"])["events"]
     who_z = [e["who"] for e in ev if e.get("t") == "zpower"]
     who_t = [e["who"] for e in ev if e.get("t") == "tera"]
     chk("관장 8곳인 쪽은 Z기술을 쓴다", who_z == ["me"], who_z)
-    chk("관장 8곳인 쪽은 테라스탈한다", who_t == ["me"], who_t)
+    chk("테라피스를 안 지녔으면 테라오브가 있어도 테라스탈하지 않는다 (Z크리스탈을 지녔다)", who_t == [], who_t)
     chk("상대 화면에서는 뒤집혀 보인다",
         [e["who"] for e in pvp.match_view(poor, r["matchId"])["events"] if e.get("t") == "zpower"] == ["foe"])
+    db.run("UPDATE pokemon SET held='FIRETERASHARD' WHERE id=?", (rp,))
+    r = pvp.run_match(rich, poor, kind="random", seed=5)
+    who_t = [e["who"] for e in pvp.match_view(rich, r["matchId"])["events"] if e.get("t") == "tera"]
+    chk("테라피스를 지니면 관장 8곳인 쪽은 테라스탈한다", who_t == ["me"], who_t)
+    db.run("UPDATE pokemon SET held='FIRIUMZ' WHERE id=?", (rp,))
     mkmon(new, "SNORLAX", ("BODYSLAM",))
     r2 = pvp.run_match(poor, new, kind="friend", seed=5)
     ev2 = pvp.match_view(poor, r2["matchId"])["events"]
@@ -198,7 +187,7 @@ def main_():
     trainer = {"id": "t", "name": "시험", "role": "관장", "sprite": "x", "level": 50,
                "team": [{"species": "SNORLAX", "level": 50, "moves": ["TACKLE"], "iv": 31, "evs": {},
                          "nature": "HARDY", "ability": "IMMUNITY", "held": None, "gender": "M"}]}
-    mons = [db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (rp,)))]
+    mons = [db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (rp,)))]       # 불꽃Z 를 지녔다
     tb = TB.TrainerBattle(d, mons, trainer, random.Random(4))
     tb.start()
     g = tb.view()["gimmick"]
@@ -207,14 +196,24 @@ def main_():
     tb.zring["me"], tb.tera_orb["me"] = gimmick.has_zring(rich), gimmick.has_orb(rich)
     tb.start()
     g = tb.view()["gimmick"]
-    chk("가졌으면 뜬다", g["canTera"] == "FIRE" and [z["key"] for z in g["zMoves"]] == ["FLAMETHROWER"], g)
+    chk("Z크리스탈을 지녔으면 Z기술 단추만 (테라피스가 없어 테라스탈 단추는 없다)",
+        g["canTera"] is None and [z["key"] for z in g["zMoves"]] == ["FLAMETHROWER"], g)
     tb = TB.TrainerBattle.load(d, json.loads(json.dumps(tb.dump())))
-    ev = tb.act("move", "FLAMETHROWER", tera=True, z=True)
-    kinds = [e.get("t") for e in ev]
-    chk("저장했다 불러온 판에서 눌러도 나간다", "tera" in kinds and "zpower" in kinds, kinds)
-    g = TB.TrainerBattle.load(d, json.loads(json.dumps(tb.dump()))).view()["gimmick"]
-    chk("쓴 것이 저장된다", g["teraUsed"] and g["zUsed"] and g["canTera"] is None and g["zMoves"] == [], g)
+    ev = tb.act("move", "FLAMETHROWER", z=True)
+    chk("저장했다 불러온 판에서 Z기술을 눌러도 나간다", "zpower" in [e.get("t") for e in ev], [e.get("t") for e in ev])
     chk("관장은 쓰지 않는다", not any(e.get("who") == "foe" and e.get("t") in ("tera", "zpower") for e in ev))
+    tmon = dict(mons[0], held="FIRETERASHARD")
+    tb = TB.TrainerBattle(d, [tmon], trainer, random.Random(4))
+    tb.zring["me"], tb.tera_orb["me"] = gimmick.has_zring(rich), gimmick.has_orb(rich)
+    tb.start()
+    g = tb.view()["gimmick"]
+    chk("테라피스를 지녔으면 테라스탈 단추 (지닌 테라피스의 타입) · Z기술은 없다",
+        g["canTera"] == "FIRE" and g["zMoves"] == [], g)
+    tb = TB.TrainerBattle.load(d, json.loads(json.dumps(tb.dump())))
+    ev = tb.act("move", "FLAMETHROWER", tera=True)
+    chk("저장했다 불러온 판에서 테라스탈을 눌러도 나간다", "tera" in [e.get("t") for e in ev], [e.get("t") for e in ev])
+    g = TB.TrainerBattle.load(d, json.loads(json.dumps(tb.dump()))).view()["gimmick"]
+    chk("쓴 것이 저장된다", g["teraUsed"] and g["canTera"] is None, g)
 
     print("\n" + "=" * 54)
     print("  합계  OK %d   FAIL %d" % (OK, FAIL))

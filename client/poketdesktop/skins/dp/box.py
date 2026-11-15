@@ -896,7 +896,7 @@ class BoxWindow(Scene, BX.BoxWindow):
                  nature=(info.get("nature") or "?") + " 성격",
                  nature_note=natural(info.get("natureNote") or "알려진 설명이 없습니다."),
                  # 테라 타입 (2.5.0) - 옛 서버는 안 준다 ('?')
-                 tera=((m.get("teraKr") + " 타입") if m.get("teraKr") else "?"),
+                 tera=BX.tera_label(m),
                  tera_note=natural(BX.tera_note(m)), tera_type=m.get("teraType"),
                  held=held, held_text=((m.get("heldKr") or held) + ("\n" + m["heldDesc"] if m.get("heldDesc") else ""))
                  if held else "없음. 가방의 도구를 지니게 하면 배틀에서 효과가 납니다.",

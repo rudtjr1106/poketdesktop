@@ -1643,13 +1643,12 @@
    "weight": 0
   },
   "BUGTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 벌레 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 벌레 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "BUG"
+    "kind": "held"
    },
    "en": "Bug Tera Shard",
    "id": "BUGTERASHARD",
@@ -1657,6 +1656,7 @@
    "kr": "테라피스 벌레",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "BUG",
    "weight": 0
   },
   "BURNDRIVE": {
@@ -2268,13 +2268,12 @@
    "weight": 0
   },
   "DARKTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 악 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 악 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "DARK"
+    "kind": "held"
    },
    "en": "Dark Tera Shard",
    "id": "DARKTERASHARD",
@@ -2282,6 +2281,7 @@
    "kr": "테라피스 악",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "DARK",
    "weight": 0
   },
   "DAWNSTONE": {
@@ -2564,13 +2564,12 @@
    "weight": 14
   },
   "DRAGONTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 드래곤 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 드래곤 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "DRAGON"
+    "kind": "held"
    },
    "en": "Dragon Tera Shard",
    "id": "DRAGONTERASHARD",
@@ -2578,6 +2577,7 @@
    "kr": "테라피스 드래곤",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "DRAGON",
    "weight": 0
   },
   "DRAMPANITE": {
@@ -2844,13 +2844,12 @@
    "weight": 0
   },
   "ELECTRICTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 전기 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 전기 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "ELECTRIC"
+    "kind": "held"
    },
    "en": "Electric Tera Shard",
    "id": "ELECTRICTERASHARD",
@@ -2858,6 +2857,7 @@
    "kr": "테라피스 전기",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "ELECTRIC",
    "weight": 0
   },
   "ELECTRIUMZ": {
@@ -3041,13 +3041,12 @@
    "weight": 0
   },
   "FAIRYTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 페어리 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 페어리 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "FAIRY"
+    "kind": "held"
    },
    "en": "Fairy Tera Shard",
    "id": "FAIRYTERASHARD",
@@ -3055,6 +3054,7 @@
    "kr": "테라피스 페어리",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "FAIRY",
    "weight": 0
   },
   "FALINKSITE": {
@@ -3142,13 +3142,12 @@
    "weight": 0
   },
   "FIGHTINGTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 격투 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 격투 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "FIGHTING"
+    "kind": "held"
    },
    "en": "Fighting Tera Shard",
    "id": "FIGHTINGTERASHARD",
@@ -3156,6 +3155,7 @@
    "kr": "테라피스 격투",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "FIGHTING",
    "weight": 0
   },
   "FIGHTINIUMZ": {
@@ -3247,13 +3247,12 @@
    "weight": 14
   },
   "FIRETERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 불꽃 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 불꽃 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "FIRE"
+    "kind": "held"
    },
    "en": "Fire Tera Shard",
    "id": "FIRETERASHARD",
@@ -3261,6 +3260,7 @@
    "kr": "테라피스 불꽃",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "FIRE",
    "weight": 0
   },
   "FIRIUMZ": {
@@ -3411,13 +3411,12 @@
    "weight": 0
   },
   "FLYINGTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 비행 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 비행 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "FLYING"
+    "kind": "held"
    },
    "en": "Flying Tera Shard",
    "id": "FLYINGTERASHARD",
@@ -3425,6 +3424,7 @@
    "kr": "테라피스 비행",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "FLYING",
    "weight": 0
   },
   "FLYINIUMZ": {
@@ -3696,13 +3696,12 @@
    "weight": 0
   },
   "GHOSTTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 고스트 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 고스트 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "GHOST"
+    "kind": "held"
    },
    "en": "Ghost Tera Shard",
    "id": "GHOSTTERASHARD",
@@ -3710,6 +3709,7 @@
    "kr": "테라피스 고스트",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "GHOST",
    "weight": 0
   },
   "GLALITITE": {
@@ -3867,13 +3867,12 @@
    "weight": 0
   },
   "GRASSTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 풀 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 풀 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "GRASS"
+    "kind": "held"
    },
    "en": "Grass Tera Shard",
    "id": "GRASSTERASHARD",
@@ -3881,6 +3880,7 @@
    "kr": "테라피스 풀",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "GRASS",
    "weight": 0
   },
   "GRASSYSEED": {
@@ -4049,13 +4049,12 @@
    "weight": 0
   },
   "GROUNDTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 땅 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 땅 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "GROUND"
+    "kind": "held"
    },
    "en": "Ground Tera Shard",
    "id": "GROUNDTERASHARD",
@@ -4063,6 +4062,7 @@
    "kr": "테라피스 땅",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "GROUND",
    "weight": 0
   },
   "GYARADOSITE": {
@@ -4387,13 +4387,12 @@
    "weight": 14
   },
   "ICETERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 얼음 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 얼음 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "ICE"
+    "kind": "held"
    },
    "en": "Ice Tera Shard",
    "id": "ICETERASHARD",
@@ -4401,6 +4400,7 @@
    "kr": "테라피스 얼음",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "ICE",
    "weight": 0
   },
   "ICICLEPLATE": {
@@ -5954,13 +5954,12 @@
    "zType": "NORMAL"
   },
   "NORMALTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 노말 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 노말 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "NORMAL"
+    "kind": "held"
    },
    "en": "Normal Tera Shard",
    "id": "NORMALTERASHARD",
@@ -5968,6 +5967,7 @@
    "kr": "테라피스 노말",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "NORMAL",
    "weight": 0
   },
   "NUGGET": {
@@ -6324,13 +6324,12 @@
    "weight": 0
   },
   "POISONTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 독 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 독 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "POISON"
+    "kind": "held"
    },
    "en": "Poison Tera Shard",
    "id": "POISONTERASHARD",
@@ -6338,6 +6337,7 @@
    "kr": "테라피스 독",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "POISON",
    "weight": 0
   },
   "POKEBALL": {
@@ -6679,13 +6679,12 @@
    "weight": 0
   },
   "PSYCHICTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 에스퍼 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 에스퍼 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "PSYCHIC"
+    "kind": "held"
    },
    "en": "Psychic Tera Shard",
    "id": "PSYCHICTERASHARD",
@@ -6693,6 +6692,7 @@
    "kr": "테라피스 에스퍼",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "PSYCHIC",
    "weight": 0
   },
   "PSYCHIUMZ": {
@@ -7243,13 +7243,12 @@
    "weight": 0
   },
   "ROCKTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 바위 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 바위 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "ROCK"
+    "kind": "held"
    },
    "en": "Rock Tera Shard",
    "id": "ROCKTERASHARD",
@@ -7257,6 +7256,7 @@
    "kr": "테라피스 바위",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "ROCK",
    "weight": 0
   },
   "ROCKYHELMET": {
@@ -8199,13 +8199,12 @@
    "weight": 0
   },
   "STEELTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 강철 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 강철 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "STEEL"
+    "kind": "held"
    },
    "en": "Steel Tera Shard",
    "id": "STEELTERASHARD",
@@ -8213,6 +8212,7 @@
    "kr": "테라피스 강철",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "STEEL",
    "weight": 0
   },
   "STICK": {
@@ -8833,13 +8833,12 @@
    "weight": 14
   },
   "WATERTERASHARD": {
-   "cat": "misc",
+   "cat": "held",
    "chance": 0,
    "cost": 20000,
-   "desc": "포켓몬 1마리의 테라 타입을 물 타입으로 바꾼다. 테라스탈하면 그 타입이 된다.",
+   "desc": "테라스탈의 힘이 깃든 물 타입 결정 조각.",
    "effect": {
-    "kind": "tera",
-    "type": "WATER"
+    "kind": "held"
    },
    "en": "Water Tera Shard",
    "id": "WATERTERASHARD",
@@ -8847,6 +8846,7 @@
    "kr": "테라피스 물",
    "rarity": "epic",
    "sell": 10000,
+   "teraType": "WATER",
    "weight": 0
   },
   "WAVEINCENSE": {
