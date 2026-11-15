@@ -23,6 +23,7 @@ from . import movecalc as MC
 from . import pokelogic as P
 from . import statusmoves as SM
 from . import attackfx as AF      # 기술에 붙은 고유 효과 (statusmoves 다음에 불러온다)
+from . import tera as TR          # 테라스탈 (2.5.0)
 from . import zmoves as ZM        # Z기술 (시즌 4)
 
 # ---------------------------------------------------------------- 상수
@@ -207,6 +208,9 @@ class Fighter(object):
         # 메가진화한 폼 열쇠 (시즌 3). **교체해도 안 풀린다** (본가와 같다) -
         # 그래서 물러날 때 지워지는 cond 가 아니라 따로 둔다.
         self.mega = None
+        # 테라스탈한 타입 (2.5.0). 안 했으면 None. 메가처럼 **교체해도 안 풀린다** -
+        # 쓰러지거나 판이 끝날 때까지 간다. 그동안 types() 는 이 타입 하나만 준다.
+        self.tera = None
         # 메가진화하면서 바뀐 기술 {원래 열쇠: 바뀐 열쇠} (attackfx.MEGA_MOVES). 메가진화하는 그 턴에는
         # 고른 기술이 아직 원래 열쇠로 넘어오므로, 쓰는 순간에 이것을 보고 바꿔 쓴다 (Battle._use).
         # (폼의 기술 바꾸기가 먼저 쓰므로 __init__ 앞쪽에서 이미 만들었다.)
@@ -257,6 +261,8 @@ class Fighter(object):
             out["itemGone"] = True
         if self.mega:
             out["mega"] = self.mega
+        if self.tera:
+            out["tera"] = self.tera
         return out or None
 
     def load_volatile(self, d):
@@ -274,6 +280,8 @@ class Fighter(object):
             form = self._dex.get(d["mega"])
             if form:
                 self.mega_evolve(form)       # 변신보다 먼저 - 변신은 그 위에 입힌다
+        if TR.valid(d.get("tera")):
+            self.tera = d["tera"]
         self.cond = dict(d.get("cond") or {})
         if self.mega:
             self._drop_form()                # 고치기 전에 저장된 판 (메가지가르데에 퍼펙트폼 자국이 남았다)
@@ -402,7 +410,22 @@ class Fighter(object):
             self._forms[form] = out
         return self._forms[form]
 
+    # ---- 테라스탈 (2.5.0) ----
+    def tera_type(self):
+        """이 포켓몬의 테라 타입 (아직 안 했어도). 정해 두지 않았으면 그 종의 첫째 타입."""
+        return TR.type_of(self._dex, self.mon)
+
+    def orig_types(self):
+        """테라스탈하기 전의 타입 (자속을 셀 때 본다 - 원래 타입의 자속은 남는다)."""
+        return self._types()
+
     def types(self):
+        if self.tera:
+            # 테라스탈: 타입이 그것 하나다. 변환자재·물붓기·핼러윈·날개쉬기는 이 위에 못 얹는다.
+            return [self.tera]
+        return self._types()
+
+    def _types(self):
         spec = None if self.types_override else self.form_spec()
         if self.types_override:
             out = list(self.types_override)
@@ -582,6 +605,7 @@ def _damage(dex, move, user, target, rng, crit=None):
     위력을 정하고, 고정 데미지 기술(나이트헤드·분노의앞니·일격기·카운터 ...)은
     타입 무효만 보고 그 값을 그대로 준다 - 급소·자속·상성 배율이 없다.
     """
+    dex_power = (move or {}).get("power") or 0      # 도감 위력 (resolve 가 그 판의 위력으로 바꾸기 전 - 테라 60 보정이 본다)
     move = SM.resolve(MC.resolve(move, user, target), user, target)   # 날씨구슬·자연의힘 ...
     abil = user.ability_on or target.ability_on
     fixed = MC.fixed(move, user, target, rng)
@@ -653,11 +677,19 @@ def _damage(dex, move, user, target, rng, crit=None):
     else:
         a = atk_of.stat(atk_key, crit)
         d = target.stat(def_key, stages=def_stages)
+    tera = getattr(user, "tera", None)
+    if tera:
+        # 테라 타입 기술은 위력 60 부터 (본가처럼 위력이 상대·체력에 따라 정해지는 0·150 짜리는 빼고)
+        power = TR.floor_power(power, move, mtype, tera,
+                               variable=mk in MC.VARIABLE and dex_power in (0, 150))
     base = math.floor(math.floor(math.floor(2 * user.level / 5 + 2) * power * a / d)
                       / 50) + 2
 
     mult = 1.0
-    if abil:
+    if tera:
+        # 테라스탈: 테라 타입 1.5배(원래 타입과 같으면 2배), 원래 타입의 자속도 남는다
+        mult *= TR.stab(user.orig_types(), tera, mtype, A.stab(user) if abil else STAB)
+    elif abil:
         if mtype in user.types():
             mult *= A.stab(user)
     else:
@@ -735,7 +767,7 @@ def exp_gain(dex, foe, winner_level, participants=1, shared=False):
     return max(1, int(raw))
 
 
-# ---------------------------------------------------------------- Z기술을 들고 있는 쪽
+# ---------------------------------------------------------------- Z기술·테라스탈을 들고 있는 쪽
 # 관장·실시간·레이드·파티전은 판을 여러 번 새로 만든다 (라운드마다, 저장했다 불러올 때마다).
 # '한 판에 한 번' 이 지켜지려면 그 바깥의 객체가 들고 있다가 **같은 객체를** Battle 에 물려야 한다 -
 # 메가진화의 keystone·mega_done 과 같은 틀이다. 네 군데가 같은 줄을 되풀이하지 않게 여기 모았다.
@@ -743,14 +775,18 @@ def gimmick_init(holder):
     """새 판. holder 는 TrainerBattle·LiveBattle·레이드의 한 사람 ... (속성 넷을 단다)"""
     holder.zring = {"me": False, "foe": False}
     holder.z_done = set()
+    holder.tera_orb = {"me": False, "foe": False}     # 테라스탈 (2.5.0)
+    holder.tera_done = set()
 
 
 def gimmick_share(holder, bt):
     bt.zring, bt.z_done = holder.zring, holder.z_done
+    bt.tera_orb, bt.tera_done = holder.tera_orb, holder.tera_done
 
 
 def gimmick_dump(holder):
-    return {"zring": dict(holder.zring), "zDone": sorted(holder.z_done)}
+    return {"zring": dict(holder.zring), "zDone": sorted(holder.z_done),
+            "teraOrb": dict(holder.tera_orb), "teraDone": sorted(holder.tera_done)}
 
 
 def gimmick_load(holder, d):
@@ -758,14 +794,23 @@ def gimmick_load(holder, d):
     d = d or {}
     holder.zring = dict(d.get("zring") or {"me": False, "foe": False})
     holder.z_done = set(d.get("zDone") or [])
+    # 2.5.0 전에 저장한 판은 테라스탈 칸이 없다 - 꺼진 것으로 읽는다 (그 판은 끝까지 테라스탈 없이)
+    holder.tera_orb = dict(d.get("teraOrb") or {"me": False, "foe": False})
+    holder.tera_done = set(d.get("teraDone") or [])
 
 
 def gimmick_view(bt, who, active=True):
-    """화면에 줄 것: Z기술 단추를 띄울지와 무엇이 되는지.
+    """화면에 줄 것: 테라스탈·Z기술 단추를 띄울지와 무엇이 되는지.
 
     active 가 False 면 (판이 끝났다, 교체를 골라야 한다 ...) 지금은 못 누른다.
     """
+    f = bt.fighter(who)
+    tera = bt.can_tera(who) if active else None
     return {
+        "canTera": tera,
+        "teraKr": bt.dex.type_name(tera) if tera else None,
+        "teraUsed": who in bt.tera_done,
+        "teraOn": bool(f is not None and f.tera),
         "zMoves": bt.z_preview(who) if active else [],
         "zUsed": who in bt.z_done,
     }
@@ -801,13 +846,16 @@ class Battle(object):
         self.keystone = {"me": False, "foe": False}
         self.auto_mega = {"me": False, "foe": False}
         self.mega_done = set()
-        # Z기술 (시즌 4). 키스톤과 같은 틀이다: Z링은 부르는 쪽이 채우고,
-        # auto_z 는 AI 가 알아서 쓰는 쪽, z_done 은 이 판에서 이미 쓴 쪽 (한 판에 한 번).
+        # Z기술 (시즌 4) · 테라스탈 (2.5.0). 키스톤과 같은 틀이다: Z링 · 테라오브는 부르는 쪽이 채우고,
+        # auto_* 는 AI 가 알아서 쓰는 쪽, *_done 은 이 판에서 이미 쓴 쪽 (한 판에 한 번씩).
         self.zring = {"me": False, "foe": False}
         self.auto_z = {"me": False, "foe": False}
         self.z_done = set()
         self.z_want = {}                    # 이 턴에 Z기술로 쓰겠다고 한 기술 {who: 기술 열쇠}
         self._zcur = None                   # 지금 나가고 있는 Z기술 (열쇠, 기술) - move_of 가 본다
+        self.tera_orb = {"me": False, "foe": False}
+        self.auto_tera = {"me": False, "foe": False}
+        self.tera_done = set()
         # 이 턴에 누가 무엇을 하려 하고(pending) 누가 이미 움직였나(acted).
         # 기습·질풍신뢰·힘껏펀치·부리캐논이 본다. 턴을 돌리는 쪽이 채운다 -
         # 안 채운 판(레이드)에서는 '모른다' 로 치고 실패시키지 않는다.
@@ -1219,8 +1267,8 @@ class Battle(object):
         if not self.keystone.get(who) or who in self.mega_done:
             return None
         f = self.me if who == "me" else self.foe
-        if f is None or f.mega or not f.alive():
-            return None
+        if f is None or f.mega or not f.alive() or f.tera:
+            return None                     # 테라스탈한 포켓몬은 메가진화하지 못한다 (2.5.0)
         return f.mega_target()
 
     def mega_step(self, want, ev):
@@ -1289,6 +1337,60 @@ class Battle(object):
                            "text": "%s 의 원시회귀! 원래의 모습을 되찾았다!" % before})
                 f.ab["shown"] = True
                 return
+
+    # ---------------- 테라스탈 (2.5.0) ----------------
+    def can_tera(self, who):
+        """이 쪽이 지금 테라스탈할 수 있으면 그 타입. 아니면 None.
+
+        테라오브가 있어야 하고 **한 판에 한 번**이다. 메가진화한 포켓몬은 못 한다.
+        """
+        if not self.tera_orb.get(who) or who in self.tera_done:
+            return None
+        f = self.me if who == "me" else self.foe
+        if f is None or f.mega or f.tera or not f.alive():
+            return None
+        return f.tera_type()
+
+    def _tera_worth(self, who):
+        """AI: 지금 테라스탈하는 것이 이득인가. 난수를 안 쓴다 (같은 판은 같은 답).
+
+        테라스탈한 셈 치고 내가 줄 수 있는 것과 받을 것을 다시 세어 본다.
+          · 내 가장 센 기술이 1.25배 넘게 세지고, 받는 것이 1.5배를 안 넘는다  -> 한다
+          · 상대의 가장 센 기술이 내 체력 절반 넘게 깎는데 0.6배 아래로 준다   -> 한다
+        """
+        t = self.can_tera(who)
+        f, o = (self.me, self.foe) if who == "me" else (self.foe, self.me)
+        if not t or o is None or not o.alive():
+            return False
+        give0, take0 = self.best_damage(f, o), self.best_damage(o, f)
+        f.tera = t
+        try:
+            give1, take1 = self.best_damage(f, o), self.best_damage(o, f)
+        finally:
+            f.tera = None
+        if give1 >= give0 * 1.25 and give1 > 0 and take1 <= max(1.0, take0) * 1.5:
+            return True
+        return take0 >= f.hp * 0.5 and take1 <= take0 * 0.6 and give1 >= give0 * 0.9
+
+    def tera_step(self, want, ev):
+        """턴이 시작할 때 테라스탈한다. want = {"me": bool, "foe": bool}.
+
+        메가진화처럼 **기술보다 먼저, 빠른 쪽부터**다. 부르는 쪽이 mega_step 다음에 둔다 -
+        같은 턴에 둘 다 하려는 포켓몬은 메가진화가 먼저 되어 테라스탈은 안 된다.
+        """
+        sides = [w for w in ("me", "foe") if self.can_tera(w)
+                 and (want.get(w) or (self.auto_tera.get(w) and self._tera_worth(w)))]
+        sides.sort(key=lambda w: -self.speed(w))
+        for w in sides:
+            f = self.me if w == "me" else self.foe
+            t = self.can_tera(w)
+            if not t:
+                continue
+            f.tera = t
+            self.tera_done.add(w)
+            ev.append({"t": "tera", "who": w, "name": f.name, "type": t,
+                       "typeKr": self.dex.type_name(t),
+                       "text": "%s 은(는) %s 타입으로 테라스탈했다!" % (f.name, self.dex.type_name(t))})
 
     # ---------------- Z기술 (시즌 4) ----------------
     def z_moves(self, who):
@@ -1374,8 +1476,11 @@ class Battle(object):
             ev.append({"t": "msg", "who": who, "text": "%s 은(는) Z파워로 급소를 노리기 쉬워졌다!" % user.name})
 
     # ---------------- 한 턴 ----------------
-    def take_turn(self, my_move, mega=False, z=False):
-        """내 기술을 정해서 한 턴을 진행한다. 일어난 일 목록을 돌려준다."""
+    def take_turn(self, my_move, mega=False, z=False, tera=False):
+        """내 기술을 정해서 한 턴을 진행한다. 일어난 일 목록을 돌려준다.
+
+        tera: 이 턴에 테라스탈한다 (2.5.0 - 테라오브가 있고 될 때만, 메가진화 다음).
+        """
         if self.over:
             return [{"t": "over", "result": self.result}]
         self.turn_no += 1
@@ -1383,6 +1488,7 @@ class Battle(object):
         self.begin_turn()
         # 메가진화가 먼저다 - 바뀐 타입·특성·스피드를 보고 AI 가 고르고 순서를 정한다.
         self.mega_step({"me": bool(mega)}, ev)
+        self.tera_step({"me": bool(tera)}, ev)
         foe_move = self.choose_ai()
 
         watch = my_move == WAIT
@@ -1755,6 +1861,10 @@ class Battle(object):
         abil = user.ability_on or target.ability_on
         tw = "foe" if who == "me" else "me"
         k = MC.key(move) if key != STRUGGLE else STRUGGLE
+        if k == "TERABLAST" and user.tera:
+            # 테라버스트: 테라스탈했으면 **여기서부터** 테라 타입이다. 데미지를 셀 때만 바꾸면
+            # 축전·저수·피뢰침이 노말로 보고 못 받고, 기술 연출의 타입도 틀린다.
+            move = dict(move, type=user.tera)
         if k in AF.IGNORE_ABILITY:
             user.cond["breaker"] = True       # 이 기술은 상대의 특성을 무시한다 (_use 가 끝에 지운다)
         if not bounced and user.stance_ok():

@@ -546,6 +546,15 @@ class GBDuel(GBLower):
             cv.create_rectangle(x, ry - th // 2, x + tw, ry + th // 2, fill=col, outline="", tags=tg)
             cv.create_text(x + tw // 2, ry, text=st, fill=kit.look_of(col)[3], font=f, anchor="center", tags=tg)
             x += tw + s(6)
+        tera = DB.tera_tag(mon)
+        if tera:
+            # 테라스탈한 동안 (2.5.0): 그 타입 빛깔의 네모 꼬리표 '테라 풀' (상태 이상 꼬리표와 같은 꼴)
+            col = DB.TYPE_COLOR.get(mon.get("tera"), "#5fc8d8")
+            tw = kit.tkfont_of(cv, f).measure(tera) + s(12)
+            th = kit.tkfont_of(cv, f).metrics("linespace") + s(2)
+            cv.create_rectangle(x, ry - th // 2, x + tw, ry + th // 2, fill=col, outline="", tags=tg)
+            cv.create_text(x + tw // 2, ry, text=tera, fill=kit.look_of(col)[3], font=f, anchor="center", tags=tg)
+            x += tw + s(6)
         kr = {"atk": "공", "def": "방", "spa": "특공", "spd": "특방", "spe": "스피드", "acc": "명중", "eva": "회피"}
         bits = ["%s%+d" % (kr.get(k, k), v) for k, v in (mon.get("stages") or {}).items()]
         if bits:

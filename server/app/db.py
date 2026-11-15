@@ -1349,6 +1349,9 @@ MIGRATIONS = [
     # (지니면 바뀌는 폼은 적지 않는다 - 지닌 도구로 정한다).
     ("pokemon", "form",
      "ALTER TABLE pokemon ADD COLUMN form TEXT"),
+    # 테라 타입 (2.5.0, common/tera). 옛 행은 NULL = 그 종의 첫째 타입.
+    ("pokemon", "tera",
+     "ALTER TABLE pokemon ADD COLUMN tera TEXT"),
     # 옛 행은 전부 1 로 둔다. 그때는 걸려온 판도 점수에 들어갔으니
     # '내가 건 것' 과 구분이 없었다. 어차피 시즌 1 로 점수를 초기화한다.
     ("battle_record", "started",
@@ -1676,6 +1679,8 @@ def _row_to_mon(r):
                  if "tint" in r.keys() and r["shiny"] else None),
         # 폼 (1.13). 도구를 써서 바꾼 모습의 열쇠
         "form": (r["form"] if "form" in r.keys() else None) or None,
+        # 테라 타입 (2.5.0). 정하지 않았으면 None - 배틀은 그 종의 첫째 타입으로 본다.
+        "tera": (r["tera"] if "tera" in r.keys() else None) or None,
         # 꾸미기 (버전 2) {칸: 열쇠}. 앱이 걷는 도트에 얹고 효과를 그린다. 아무것도 안 쓰면 빈 dict
         "deco": _deco_of(r),
         # 깃발 들기 (2.5.0) - 그 포켓몬이 깃발 칸을 쓰면 주인이 지금 든 길드의 깃발 그림 (없으면 None)

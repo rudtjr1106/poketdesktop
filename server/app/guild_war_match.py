@@ -503,7 +503,7 @@ def _trainer(d, s):
     uid = d["user_id"]
     return {"id": "gw:u%d" % uid, "name": d["name"], "role": "[%s]" % _gname(d["guild_id"], s), "sprite": None,
             "level": GW.AI_LEVEL, "team": GW._ready(json.loads(d["def_team"] or "[]")), "noMega": True, "ai": "war",
-            "keystone": mega.has_keystone(uid), "zring": gimmick.has_zring(uid)}
+            "keystone": mega.has_keystone(uid), "zring": gimmick.has_zring(uid), "orb": gimmick.has_orb(uid)}
 
 
 def attack(uid, target, now=None):
@@ -533,6 +533,7 @@ def attack(uid, target, now=None):
     tb = TB.TrainerBattle(deps.dex(), GW._ready(json.loads(me["atk_team"]), lost), trainer, random.Random())
     tb.keystone["me"] = mega.has_keystone(uid)
     tb.zring["me"] = gimmick.has_zring(uid)
+    tb.tera_orb["me"] = gimmick.has_orb(uid)          # 테라스탈 (2.5.0)
     events = tb.start()
     if lost:
         at = 1 if events and events[0].get("t") == "intro" else 0

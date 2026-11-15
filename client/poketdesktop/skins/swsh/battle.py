@@ -25,6 +25,7 @@ from ..dp.battle import CAT_COLOR, CAT_KR, F, GENDER, HP_COLORS, MOVE_OFF, U, Z,
 from ..dp.battle import mix
 from . import CYAN, CYAN_L, DESC, DIMK, MAG, MAG_HI, NAVY, NAVY2, ON_NAVY_DIM
 from . import _sw as S
+from ...ui_gimmick import fit_lines
 
 TRACK = "#3a3f70"             # 이름표 체력 막대 홈 (.hpk .b)
 SHADOW = "#171a35"            # 포켓몬 발밑 그림자 (받침 대신 - 옅게)
@@ -226,11 +227,15 @@ class Orb(DB.Touch):
                 cv.create_oval(ox - rr, oy - rr, ox + rr, oy + rr, fill=col, outline="", tags=t)
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
         ink = kit.look_of(body)[3] if on else "#ffffff"
+        # 원 안에 안 들어가는 글('테라스탈 · 에스퍼', 2.5.0)은 글자를 줄이지 않고 두 줄로
+        text = fit_lines(self.text, kit.tkfont_of(cv, self.spec).measure, (x2 - x1) - 2 * b - s(10))
+        two = "\n" in text
         if on:
-            cv.create_text(cx, cy - s(7), text=self.text, fill=ink, font=self.spec, anchor="center", tags=t)
-            cv.create_text(cx, cy + s(9), text="켜짐", fill=ink, font=F(9), anchor="center", tags=t)
+            cv.create_text(cx, cy - s(9 if two else 7), text=text, fill=ink, font=self.spec, anchor="center",
+                           justify="center", tags=t)
+            cv.create_text(cx, cy + s(14 if two else 9), text="켜짐", fill=ink, font=F(9), anchor="center", tags=t)
         else:
-            cv.create_text(cx, cy, text=self.text, fill=ink, font=self.spec, anchor="center", tags=t)
+            cv.create_text(cx, cy, text=text, fill=ink, font=self.spec, anchor="center", justify="center", tags=t)
 
 
 class SwLower(object):
@@ -300,8 +305,8 @@ class SwLower(object):
         mega, gim = getattr(self, "mega", None), getattr(self, "gim", None)
         if mega is not None and mega.shown:
             out.append(mega.btn)
-        if gim is not None and gim.z.shown:
-            out.append(gim.z.btn)
+        if gim is not None:
+            out.extend(t.btn for t in gim.shown())       # 테라스탈 (2.5.0) · Z기술
         return out
 
     def _draw_lower(self):

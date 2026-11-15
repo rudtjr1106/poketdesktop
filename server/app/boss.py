@@ -360,7 +360,7 @@ def on_win(uid, region, trainer_id, level, rng=None, now=None):
     return {"lines": lines, "boss": True, "egg": bool(egg), "species": species, "legend": True}
 
 
-def start(uid, party, zring=False, keystone=False, rng=None, now=None):
+def start(uid, party, zring=False, keystone=False, rng=None, now=None, orb=False):
     """새 판을 만든다. (region, trainer id, TrainerBattle, 시작 이벤트)"""
     region, tid, trainer = next_fight(uid, party, now)
     if not trainer["team"]:
@@ -368,4 +368,5 @@ def start(uid, party, zring=False, keystone=False, rng=None, now=None):
     tb = TB.TrainerBattle(deps.dex(), party, trainer, rng or random.Random())
     tb.keystone["me"] = keystone
     tb.zring["me"] = zring                             # 악당 쪽은 Z기술을 쓰지 않는다
+    tb.tera_orb["me"] = orb                            # 테라스탈도 같다 (2.5.0, 악당 쪽은 안 쓴다)
     return region, tid, tb, tb.start()

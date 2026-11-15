@@ -758,7 +758,7 @@ def on_switch_in(bt, f, who, ev):
     if a in ("MULTITYPE", "RKSSYSTEM"):
         # 지닌 플레이트(메모리)의 타입이 된다. 물러나면 풀리고 나올 때 다시 정한다.
         t = (MC.PLATE_TYPE if a == "MULTITYPE" else MEMORY_TYPE).get(f._held)
-        if t and f.types() != [t]:
+        if t and f.types() != [t] and not getattr(f, "tera", None):   # 테라스탈한 동안에는 그 타입 그대로 (2.5.0)
             f.types_override = [t]
             pop(bt, f, who, ev)
             ev.append({"t": "msg", "who": who,
@@ -895,6 +895,8 @@ def before_move(bt, user, uwho, move, ev):
     """변환자재·리베로: 쓰는 기술의 타입으로 바뀐다(나올 때마다 한 번)."""
     if not has(user, "PROTEAN", "LIBERO") or user.ab.get("protean"):
         return
+    if getattr(user, "tera", None):
+        return                    # 테라스탈한 동안에는 타입이 안 바뀐다 - 한 번뿐인 기회도 안 쓴다 (2.5.0)
     t = move_type(user, move)
     if not t or user.types() == [t]:
         return
@@ -1079,7 +1081,7 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
             bt.field.terrain, bt.field.terrain_turns = "grassy", 5
             ev.append({"t": "msg", "who": twho, "text": "발밑에 풀이 무성해졌다!"})
         elif t == "COLORCHANGE" and target.alive() and mtype \
-                and target.types() != [mtype]:
+                and target.types() != [mtype] and not getattr(target, "tera", None):    # 테라스탈하면 안 바뀐다
             pop(bt, target, twho, ev)
             target.types_override = [mtype]
             ev.append({"t": "msg", "who": twho,

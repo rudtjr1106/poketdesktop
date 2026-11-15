@@ -35,6 +35,13 @@ def _hour():
     return datetime.datetime.now().hour
 
 
+def _tera(body, tera):
+    """배틀 한 수의 요청에 테라스탈(2.5.0)을 얹는다. **켰을 때만 싣는다** - 안 켠 요청은 예전과 같다."""
+    if tera:
+        body["tera"] = True
+    return body
+
+
 class Api(object):
     def __init__(self, base, token=None):
         self.base = (base or "").rstrip("/")
@@ -854,12 +861,12 @@ class Api(object):
     def boss_start(self):
         return self._call("POST", "/api/boss/start", {})
 
-    def gym_act(self, bid, kind, move="", slot=-1, mega=False, z=False):
+    def gym_act(self, bid, kind, move="", slot=-1, mega=False, z=False, tera=False):
         # mega: 이 기술과 함께 메가진화 (시즌 3). 되는지는 서버가 다시 본다.
-        # z: 이 기술을 Z기술로 (시즌 4). 같은 약속이다.
+        # z: 이 기술을 Z기술로 (시즌 4). tera: 이 턴에 테라스탈 (2.5.0, 켰을 때만 싣는다). 같은 약속이다.
         return self._call("POST", "/api/gym/battle/%d/act" % int(bid),
-                          {"kind": kind, "move": move, "slot": int(slot), "hour": _hour(),
-                           "mega": bool(mega), "z": bool(z)})
+                          _tera({"kind": kind, "move": move, "slot": int(slot), "hour": _hour(),
+                                 "mega": bool(mega), "z": bool(z)}, tera))
 
     # ---------------- 레이드 ----------------
     # 판정은 전부 서버가 한다. 라운드를 넘기는 것도 서버다 - 여기서는
@@ -883,10 +890,10 @@ class Api(object):
         """방장이 정각을 안 기다리고 시작한다."""
         return self._call("POST", "/api/raid/start", {})
 
-    def raid_act(self, kind, move="", slot=-1, mega=False, z=False):
+    def raid_act(self, kind, move="", slot=-1, mega=False, z=False, tera=False):
         return self._call("POST", "/api/raid/act",
-                          {"kind": kind, "move": move, "slot": int(slot), "mega": bool(mega),
-                           "z": bool(z)},
+                          _tera({"kind": kind, "move": move, "slot": int(slot), "mega": bool(mega),
+                                 "z": bool(z)}, tera),
                           timeout=RAID_TIMEOUT)
 
     def raid_leave(self, lobby=False):
@@ -921,10 +928,10 @@ class Api(object):
         return self._call("POST", "/api/live/%d/answer" % int(mid),
                           {"accept": bool(accept)})
 
-    def live_act(self, kind, move="", slot=-1, mega=False, z=False):
+    def live_act(self, kind, move="", slot=-1, mega=False, z=False, tera=False):
         return self._call("POST", "/api/live/act",
-                          {"kind": kind, "move": move, "slot": int(slot), "mega": bool(mega),
-                           "z": bool(z)},
+                          _tera({"kind": kind, "move": move, "slot": int(slot), "mega": bool(mega),
+                                 "z": bool(z)}, tera),
                           timeout=RAID_TIMEOUT)
 
     def live_seen(self):

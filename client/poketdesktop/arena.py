@@ -28,6 +28,7 @@ from . import config
 from . import fx_layer as FL
 from . import mega_fx
 from . import platform_os as PLAT
+from . import tera_fx
 from . import ui_common as U
 from .overlay import Pet, work_area
 
@@ -704,7 +705,10 @@ class Arena(object):
         # 이 판 동안 그 모습으로 싸운다 (1.8.0). 끝나면 cleanup 이 되돌린다.
         if t == "mega" and src:
             return mega_fx.battle(self, src, ev.get("num"), done, ev.get("label"))
-        # Z기술 (시즌 4). 머리 위 글씨로 알린다 - 기술 자체는 뒤따르는 move 가 그린다.
+        # 테라스탈 (2.5.0) · Z기술 (시즌 4). 머리 위 글씨로 알린다 - 기술 자체는 뒤따르는 move 가 그린다.
+        if t == "tera" and src:
+            self.float_over(src, "테라스탈! %s" % (ev.get("typeKr") or ""), "#7fe3f2")
+            return tera_fx.desk(self, src, ev.get("type"), done)     # 결정이 모였다 깨지는 연출
         if t == "zpower" and src:
             self.float_over(src, "Z기술!", "#ffd23c")
         if t == "faint":

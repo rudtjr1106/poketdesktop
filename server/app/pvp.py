@@ -601,7 +601,8 @@ def run_match(a_uid, b_uid, kind="random", seed=None, practice=None):
     out = PB.simulate(dex, a_mons, b_mons, seed=seed,
                       keystone={"me": mega.has_keystone(a_uid),
                                 "foe": mega.has_keystone(b_uid)},
-                      zring=gimmick.flags(a_uid, b_uid), war_ai=war_ai)
+                      zring=gimmick.flags(a_uid, b_uid), war_ai=war_ai,
+                      tera_orb=gimmick.orbs(a_uid, b_uid))      # 테라스탈 (2.5.0) - 이것도 AI 가 알아서 쓴다
 
     # 엔진은 a 시점으로 me/foe 를 말한다. 여기서 사람 쪽으로 옮긴다.
     win = out["winner"]

@@ -376,11 +376,11 @@ class BWLower(object):
             b = BWMoveTouch(cv, m, (lambda k=m.get("key"): self.use_move(k)), self._peek, tag="mv%d" % i)
             b.layout(x1, y1, x1 + mw, y1 + mh)
             self._move_btns.append(b)
-        # 맨 아랫줄: 시안 .sub 의 알약 세 칸 - [메가진화 · Z기술] [포켓몬] [기권] (두 단추 자리는 늘 같다)
+        # 맨 아랫줄: 시안 .sub 의 알약 세 칸 - [메가진화 · 테라스탈 · Z기술] [포켓몬] [기권] (두 단추 자리는 늘 같다)
         ry1, ry2 = h - bottom, h - s(10)
         cv.create_window(s(14), (ry1 + ry2) // 2, window=self.tbar, anchor="w")
         self.tbar.update_idletasks()
-        tw = self.tbar.winfo_reqwidth() if (self.mega.shown or self.gim.z.shown) else 0
+        tw = self.tbar.winfo_reqwidth() if (self.mega.shown or self.gim.shown()) else 0
         third = (w - s(28) - 2 * gap) // 3
         left = s(14) + (tw + gap if tw > 2 else 0)
         bw = max(1, min(third, (w - s(14) - gap - left) // 2))

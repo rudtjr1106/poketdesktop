@@ -224,10 +224,12 @@ def accept(uid, mid, now=None):
     from . import mega
     lb.keystone["me"] = mega.has_keystone(row["a_id"])
     lb.keystone["foe"] = mega.has_keystone(row["b_id"])
-    # Z기술 (시즌 4): 조건은 키스톤과 같다
+    # Z기술 (시즌 4) · 테라스탈 (2.5.0): 조건은 키스톤과 같다
     from . import gimmick
     lb.zring = gimmick.flags(row["a_id"], row["b_id"])
     lb.bt.zring = lb.zring
+    lb.tera_orb = gimmick.orbs(row["a_id"], row["b_id"])
+    lb.bt.tera_orb = lb.tera_orb
     ev = lb.start()
     cur = db.run(
         "UPDATE live_match SET state='fighting', data=?, events=?, turn=0,"
@@ -336,7 +338,7 @@ def _save(row, lb, ev, now=None):
     return ok
 
 
-def act(uid, kind, value, now=None, mega=False, z=False):
+def act(uid, kind, value, now=None, mega=False, z=False, tera=False):
     """이번 턴에 할 것을 적는다. 둘 다 모이면 그 자리에서 턴이 돈다.
 
     **부딪히면 다시 해본다** - 둘이 같은 판을 동시에 두드리므로, rev 가
@@ -348,7 +350,7 @@ def act(uid, kind, value, now=None, mega=False, z=False):
             raise LookupError("진행 중인 실시간 배틀이 없습니다.")
         lb = _load(row)
         who = side_of(row, uid)
-        lb.choose(who, kind, value, mega=mega, z=z)
+        lb.choose(who, kind, value, mega=mega, z=z, tera=tera)
         ev = None
         if lb.ready():
             ev = lb.resolve()
@@ -476,13 +478,14 @@ def public(row, uid, now=None):
 
 
 SPECTATE_MON = ("species", "num", "name", "level", "hp", "maxhp", "status", "shiny", "tint",
-                "fainted", "mega")
+                "fainted", "mega", "tera", "teraKr")                       # 테라스탈한 타입 (2.5.0)
 SPECTATE_EVENT = ("t", "who", "target", "text", "move", "moveType", "cat", "hp", "maxhp", "damage",
                   "crit", "eff", "slot", "status", "num", "newName", "to", "result",
                   "base", "z",                                # Z기술 (시즌 4)
                   "transform",                                # 변신한 모습 번호 (1.12.1)
                   "look", "label",                            # 배틀 중 폼의 도트 번호·이름, 원시회귀 (1.13)
-                  "charge", "carry", "stay")                  # 두 턴 기술의 첫 턴 - 숨는·모으는 연출 (2.0)
+                  "charge", "carry", "stay",                  # 두 턴 기술의 첫 턴 - 숨는·모으는 연출 (2.0)
+                  "type", "typeKr")                           # 테라스탈한 타입 (2.5.0)
 _RECALL = re.compile(r"^(?:상대는 )?(.+?)(?:, 돌아와!| 을\(를\) 불러들였다!)$")
 
 

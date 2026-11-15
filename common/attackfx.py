@@ -151,6 +151,8 @@ def move_type(move, user):
         return H.MASK.get(user.held)         # 덩굴방망이: 쓰고 있는 가면의 타입 (1.13)
     if k == "AURAWHEEL" and user.cond.get("hangry"):
         return "DARK"                       # 모르페코의 배고픈 모양
+    if k == "TERABLAST" and getattr(user, "tera", None):
+        return user.tera                    # 테라버스트: 테라스탈했으면 테라 타입 (2.5.0)
     return None
 
 
@@ -609,7 +611,8 @@ def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
         say(ev, tw, "%s 의 %s 이(가) 타 버렸다!" % (target.name, H.name(berry)))
 
     # ---- 쓴 쪽
-    if k in LOSE_TYPE and total and user.alive():
+    if k in LOSE_TYPE and total and user.alive() and not getattr(user, "tera", None):
+        # (테라스탈한 동안에는 타입을 잃지 않는다 - 테라 타입 하나뿐이라 뺄 것이 없다, 2.5.0)
         lost = LOSE_TYPE[k]
         rest = [t for t in user.types() if t != lost]
         user.types_override = rest or ["NORMAL"]

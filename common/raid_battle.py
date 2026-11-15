@@ -126,8 +126,9 @@ class Player(object):
         self.keystone = False
         self.mega_done = set()
         self.mega_req = False
-        # Z기술 (시즌 4). 이것도 사람마다 제 판에서 한 번씩 (zring["me"]).
+        # Z기술 (시즌 4) · 테라스탈 (2.5.0). 이것도 사람마다 제 판에서 한 번씩 (zring["me"] · tera_orb["me"]).
         B.gimmick_init(self)
+        self.tera_req = False
         self.z_req = False
 
     @property
@@ -280,11 +281,11 @@ class RaidBattle(object):
         return events
 
     # ---------------- 고르기 ----------------
-    def choose(self, i, kind, value=None, mega=False, z=False):
+    def choose(self, i, kind, value=None, mega=False, z=False, tera=False):
         """이번 라운드에 할 것을 적어 둔다. 라운드는 아직 안 돈다.
 
         mega: 이 라운드에 메가진화 (기술을 고를 때만, 될 때만 받는다).
-        z: 고른 기술을 Z기술로 (시즌 4, 같은 조건).
+        z: 고른 기술을 Z기술로 (시즌 4, 같은 조건). tera: 테라스탈 (2.5.0, 같은 조건).
         """
         p = self.players[i]
         if self.over:
@@ -305,9 +306,10 @@ class RaidBattle(object):
                     raise ValueError(why)
             p.choice = ("move", key)
             p.mega_req = bool(mega) and p.bt.can_mega("me") is not None
+            p.tera_req = bool(tera) and p.bt.can_tera("me") is not None
             p.z_req = bool(z) and key in p.bt.z_moves("me")
         elif kind == "switch":
-            p.mega_req = p.z_req = False
+            p.mega_req = p.tera_req = p.z_req = False
             slot = int(value)
             if slot == p.slot or slot not in p.alive_slots():
                 raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
@@ -394,10 +396,14 @@ class RaidBattle(object):
                 p.bt.mega_step({"me": True}, got)
                 ev.extend(self._tag(got, i))
             p.mega_req = False
-            # Z기술 (시즌 4): 메가진화 다음에
+            # 테라스탈 (2.5.0) · Z기술 (시즌 4): 메가진화 다음에
             if p.playing() and p.choice and p.choice[0] == "move":
+                if p.tera_req:
+                    got = []
+                    p.bt.tera_step({"me": True}, got)
+                    ev.extend(self._tag(got, i))
                 p.bt.z_request("me", p.choice[1], p.z_req)
-            p.z_req = False
+            p.tera_req = p.z_req = False
 
         # 4) 기술
         for actor in self._order():
@@ -692,6 +698,7 @@ class RaidBattle(object):
             "stages": dict((k, v) for k, v in f.stages.items() if v),
             "fainted": not f.alive(),
             "mega": bool(f.mega),
+            "tera": f.tera, "teraKr": self.dex.type_name(f.tera) if f.tera else None,    # 2.5.0
             "ability": f.ability,
             "abilityKr": dex.ability_name(f.ability) if f.ability else None,
         }
@@ -800,7 +807,7 @@ class RaidBattle(object):
                 "auto": p.auto, "choice": list(p.choice) if p.choice else None,
                 "keystone": p.keystone, "megaDone": sorted(p.mega_done),
                 "megaReq": p.mega_req,
-                "gimmick": B.gimmick_dump(p), "zReq": p.z_req,
+                "gimmick": B.gimmick_dump(p), "teraReq": p.tera_req, "zReq": p.z_req,
             } for p in self.players],
             "field": self.field.dump(),
             "rng": [st[0], list(st[1]), st[2]],
@@ -830,6 +837,7 @@ class RaidBattle(object):
             p.mega_done = set(x.get("megaDone") or [])
             p.mega_req = bool(x.get("megaReq"))
             B.gimmick_load(p, x.get("gimmick"))
+            p.tera_req = bool(x.get("teraReq"))
             p.z_req = bool(x.get("zReq"))
             self.players.append(p)
         self.round = int(d["round"])

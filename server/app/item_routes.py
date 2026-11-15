@@ -318,6 +318,8 @@ def use(body: UseIn, me=Depends(deps.current)):
         out = _use_shiny(uid, it, mon)
     elif kind == "form":
         out = _use_form(uid, it, mon, dex, body.form)
+    elif kind == "tera":
+        out = _use_tera(uid, it, eff, mon, dex)
     else:
         raise HTTPException(400, "%s은(는) 아직 쓸 수 없습니다." % it["kr"])
 
@@ -833,6 +835,36 @@ def _use_shiny(uid, it, mon):
         raise HTTPException(400, "%s은(는) 이미 이로치다." % name)
     return {"ok": True, "shiny": True,
             "message": "%s의 몸 색이 바뀌었다! 반짝이는 이로치가 되었다!" % name}
+
+
+# ---------------------------------------------------------------- 테라피스 (2.5.0)
+def _use_tera(uid, it, eff, mon, dex):
+    """테라피스 — 이 포켓몬의 테라 타입을 그 타입으로 바꾼다.
+
+    이미 그 타입이면 테라피스를 안 쓴다. 정하지 않은 포켓몬은 그 종의 첫째 타입이라,
+    거기에 같은 타입 테라피스를 쓰려고 해도 여기서 막힌다.
+    **가방에서 먼저 뺀다** - 마지막 한 개를 두 창에서 동시에 써도 하나만 바뀐다. 못 바꾸면 돌려준다.
+    """
+    from . import gimmick
+    name = _name(mon, dex)
+    kr = dex.type_name(eff.get("type"))
+    if gimmick.tera_of(mon) == eff.get("type"):
+        raise HTTPException(400, "%s의 테라 타입은 이미 %s이다." % (name, kr))
+    if not items.bag_take(uid, it["id"], 1):
+        raise HTTPException(400, "%s이(가) 없습니다." % it["kr"])
+    try:
+        changed = gimmick.set_tera(uid, mon["id"], eff.get("type"))
+    except (ValueError, LookupError) as e:
+        items.bag_add(uid, it["id"], 1)
+        raise HTTPException(400, str(e))
+    except Exception:                                       # noqa: BLE001
+        items.bag_add(uid, it["id"], 1)
+        raise
+    if not changed:
+        items.bag_add(uid, it["id"], 1)
+        raise HTTPException(400, "%s의 테라 타입은 이미 %s이다." % (name, kr))
+    return {"ok": True, "keep": True, "tera": eff.get("type"),
+            "message": "%s의 테라 타입이 %s(으)로 바뀌었다!" % (name, kr)}
 
 
 # ---------------------------------------------------------------- 거들기

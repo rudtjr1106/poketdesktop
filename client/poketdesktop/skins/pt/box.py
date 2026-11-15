@@ -550,7 +550,8 @@ class BoxWindow(DPX.BoxWindow):
         p = s(10)
         cx1, cx2 = x1 + p, x2 - p
         iw = cx2 - cx1
-        for title, name, note in (("특성", d["ability"], d["ability_note"]), ("성격", d["nature"], d["nature_note"])):
+        for title, name, note in (("특성", d["ability"], d["ability_note"]), ("성격", d["nature"], d["nature_note"]),
+                                  ("테라", d.get("tera") or "?", d.get("tera_note") or "")):     # 테라 타입 (2.5.0)
             y0 = y
             y += p
             self._label(cv, cx1, y, title)

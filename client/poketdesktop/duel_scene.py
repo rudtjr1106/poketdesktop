@@ -97,7 +97,7 @@ def wait_of(ev):
         return 0.5
     if t == "faint":
         return STEP_S + 0.2
-    if t in ("mega", "zpower"):
+    if t in ("mega", "tera", "zpower"):
         return 0.9
     if t == "ability":
         return 0.8
@@ -169,7 +169,8 @@ def load_art(host, mon, side, done):
     같은 포켓몬(번호·색·보는 쪽)은 한 번만 만든다.
     """
     num, skin = mon.get("num"), T.skin(mon)
-    key = (num, skin, side)
+    tera = mon.get("tera")                   # 테라스탈한 타입 (2.5.0) - 결정 모습 + 머리 위 왕관으로
+    key = (num, skin, side, tera)
     cache = host._art
     got = cache.get(key)
     if isinstance(got, dict):
@@ -183,6 +184,13 @@ def load_art(host, mon, side, done):
     api = host.app.api
 
     def work():
+        got = _frames()
+        if got and tera:
+            from . import ui_gimmick
+            got = (ui_gimmick.tera_look(got[0], tera), got[1])
+        return got
+
+    def _frames():
         from . import sprite_cache, sprites
         got = walk_frames(api, num, skin, side)
         if got:
@@ -622,8 +630,9 @@ class FightScene(object):
         side = self.sides.get(s)
         if not self.alive or side is None or side.mon is None:
             return
-        if (side.mon.get("num"), T.skin(side.mon)) != (mon.get("num"), T.skin(mon)):
-            return                           # 그사이 다른 포켓몬으로 바뀌었다
+        if (side.mon.get("num"), T.skin(side.mon), side.mon.get("tera")) != (mon.get("num"), T.skin(mon),
+                                                                             mon.get("tera")):
+            return                           # 그사이 다른 포켓몬으로 바뀌었다 (테라스탈해 결정 모습이 되었다)
         side.art = art
         if not art.get("frames"):
             return
@@ -692,6 +701,12 @@ class FightScene(object):
             mon["num"] = ev.get("transform") or ev["look"]
             self._flash(who, mon, now)
             self.say("변신!" if ev.get("transform") else (ev.get("label") or "폼체인지!"), who, "#c9a0ff", 1200)
+        elif t == "tera" and who in SIDES and self.sides[who].mon:       # 2.5.0
+            # 메가진화처럼 흰 빛에 싸였다가 결정 모습(머리 위 왕관)으로 - 판이 끝날 때까지
+            mon = dict(self.sides[who].mon)
+            mon["tera"], mon["teraKr"] = ev.get("type"), ev.get("typeKr")
+            self._flash(who, mon, now)
+            self.say("테라스탈! %s" % (ev.get("typeKr") or ""), who, "#7fe3f2", 1200)
         elif t == "zpower" and who in SIDES and self.sides[who].mon:      # 시즌 4
             self.say("Z기술!", who, "#ffd23c", 1200)
         elif t == "move":

@@ -43,6 +43,7 @@ class ActIn(BaseModel):
     slot: int = -1
     mega: bool = False           # 이 라운드에 메가진화 (시즌 3)
     z: bool = False              # 고른 기술을 Z기술로 (시즌 4)
+    tera: bool = False           # 이 라운드에 테라스탈 (2.5.0)
 
 
 def _name(ctx):
@@ -153,7 +154,7 @@ def act(body: ActIn, ctx=Depends(deps.current)):
         raise HTTPException(400, "무엇을 할지 알 수 없습니다.")
     value = body.move if kind == "move" else int(body.slot)
     try:
-        row = raid.choose(uid, kind, value, mega=bool(body.mega), z=bool(body.z))
+        row = raid.choose(uid, kind, value, mega=bool(body.mega), z=bool(body.z), tera=bool(body.tera))
     except LookupError as e:
         raise HTTPException(404, str(e))
     except ValueError as e:

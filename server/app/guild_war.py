@@ -43,7 +43,7 @@ x 칸 3개 = 15칸. 처음에는 한반도 지도(시·군·구를 묶은 칸)�
 
 공격은 **관장 배틀처럼 직접 싸운다** - common/trainer_battle 판을 gym_battle 표에 두고 관장 배틀 창으로
 한다 (region = "gw:시즌:칸"). 상대 방어팀은 AI 가 굴린다 (ai="war": 실수 없이, 한 턴을 미리 셈해서,
-Z기술·메가진화도 쓴다). **판을 시작하는 순간 공격권 하나를 쓴다** - 기권·창 닫기·시간 초과는
+Z기술·테라스탈·메가진화도 쓴다). **판을 시작하는 순간 공격권 하나를 쓴다** - 기권·창 닫기·시간 초과는
 진 것이다. 판이 끝나면 gym_routes.act 가 on_end 를 부른다.
 
 **그 칸을 지키는 사람을 우리 길드가 합쳐 3번 이기면**(WINS_TO_TAKE) 칸이 넘어온다. **한 번 넘어간
@@ -1051,9 +1051,10 @@ def _trainer(t, s):
         name, sprite, uid = (r["name"] if r else "?"), None, t["guard_user"]
     return {"id": "gw:%s" % t["region"], "name": name, "role": "[%s]" % gname, "sprite": sprite,
             "level": AI_LEVEL, "team": team, "noMega": True, "ai": "war",
-            # 사람이 지키는 칸은 그 사람의 키스톤·Z링을 쓴다. AI 수비대는 둘 다 가졌다.
+            # 사람이 지키는 칸은 그 사람의 키스톤·Z링·테라오브를 쓴다. AI 수비대는 다 가졌다.
             "keystone": mega.has_keystone(uid) if uid else True,
-            "zring": gimmick.has_zring(uid) if uid else True}
+            "zring": gimmick.has_zring(uid) if uid else True,
+            "orb": gimmick.has_orb(uid) if uid else True}
 
 
 def _active_battle(uid):
@@ -1090,6 +1091,7 @@ def attack(uid, region, now=None):
     tb = TB.TrainerBattle(deps.dex(), _ready(json.loads(me["atk_team"]), lost), trainer, random.Random())
     tb.keystone["me"] = mega.has_keystone(uid)
     tb.zring["me"] = gimmick.has_zring(uid)
+    tb.tera_orb["me"] = gimmick.has_orb(uid)
     events = tb.start()
     if lost:
         # 내 공격팀에서 도구가 빠진 것을 판 처음에 알린다 (관장 판의 '쉬는 포켓몬' 알림과 같은 자리)

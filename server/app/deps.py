@@ -142,6 +142,11 @@ def decorate(mon):
         it = _items.get(held) or {}
         out["heldKr"] = it.get("kr", held)
         out["heldDesc"] = it.get("desc", "")
+    # 테라 타입 (2.5.0). 정하지 않았으면 그 종의 첫째 타입 - 화면은 이것만 그리면 된다.
+    from common import tera as _tera
+    out["teraType"] = _tera.type_of(d, mon)
+    out["teraKr"] = d.type_name(out["teraType"])
+    out["teraSet"] = bool(mon.get("tera"))
     mt = move_types(mon, d)
     if mt:
         out["moveTypes"] = mt

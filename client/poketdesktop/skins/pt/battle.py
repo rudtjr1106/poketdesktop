@@ -23,6 +23,7 @@ from ..dp import kit
 from ..dp.battle import CAT_KR, HP_COLORS, F, U, Z, ball, hp_colors, mix
 from . import BAR_SH, CYAN, CYAN_SOFT, DIM, FAINT, INK, RIM, STEEL, STEEL2, WHITE
 from . import _pt as P
+from ...ui_gimmick import fit_lines
 
 SKY_TOP, SKY_BOT = "#cfe9f7", "#e9f4d8"        # 위 장면 (시안 .scene)
 PAD, PAD_SH = "#c9dca0", "#a7bd7a"             # 발판
@@ -188,9 +189,13 @@ class PtPill(DB.Pill):
         P.grad_round(cv, x1 + e, y1 + e, x2 - e, y2 - sh - e, max(0, (y2 - sh - y1) // 2 - e), top, body)
         ink = self._fg if kit.look_of(self.fill)[3] == "#ffffff" else INK
         cy = (y1 + y2 - sh) // 2
+        # 좁은 칸에 단추가 둘 들어가면 '테라스탈 · 에스퍼' 가 안 들어간다 (2.5.0) - 글자를 줄이지 않고 두 줄로
+        fnt = kit.tkfont_of(cv, F(14))
+        text = fit_lines(self.text, fnt.measure, x2 - x1 - U.h(16))
         if ink == WHITE:
-            cv.create_text(w // 2, cy + 2, text=self.text, fill=mix(rim, "#000000", 0.2), font=F(14), anchor="center")
-        cv.create_text(w // 2, cy, text=self.text, fill=ink, font=F(14), anchor="center")
+            cv.create_text(w // 2, cy + 2, text=text, fill=mix(rim, "#000000", 0.2), font=F(14), anchor="center",
+                           justify="center")
+        cv.create_text(w // 2, cy, text=text, fill=ink, font=F(14), anchor="center", justify="center")
 
     def configure(self, text=None, state=None, **_kw):
         if text is not None:
@@ -358,8 +363,8 @@ class PtLower(object):
         ry2 = h - s(10)
         ry1 = ry2 - bottom_h
         tw = (w - 2 * side - 2 * gap) // 3
-        # 왼쪽 칸: 메가진화 · Z기술 (시안의 빨간 '가방' 자리) - 보일 때만
-        shown = [p for p in (self.mega, self.gim.z) if p.shown]
+        # 왼쪽 칸: 메가진화 · 테라스탈 · Z기술 (시안의 빨간 '가방' 자리) - 보일 때만
+        shown = [p for p in [self.mega] + self.gim.shown() if p.shown]
         if shown:
             pw = max(s(60), (tw - s(20) * len(shown)) // len(shown))
             for p in shown:

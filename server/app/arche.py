@@ -1052,6 +1052,7 @@ def start_battle(uid, n, slot, now=None):
     tb = TB.TrainerBattle(deps.dex(), party, legend_trainer(uid, n, slot, species, level), random.Random())
     tb.keystone["me"] = mega.has_keystone(uid)
     tb.zring["me"] = gimmick.has_zring(uid)
+    tb.tera_orb["me"] = gimmick.has_orb(uid)          # 테라스탈 (2.5.0)
     events = tb.start()
     if benched:
         at = 1 if events and events[0].get("t") == "intro" else 0

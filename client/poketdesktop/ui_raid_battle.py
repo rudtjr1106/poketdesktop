@@ -251,7 +251,7 @@ class RaidBattleWindow(Z.Resizable):
         self.msg.pack(side="left", fill="both", expand=True, padx=14)
         U.wrap_to_width(self.msg)
         self.mega = MegaToggle(f, before=self.msg, make=U.ghost_button)   # 시즌 3, 고를 때만 보인다
-        # Z기술 단추 (시즌 4). Z기술을 켜고 끄면 기술 칸을 다시 그린다 (이름·위력이 바뀐다)
+        # 테라스탈 (2.5.0) · Z기술 단추 (시즌 4). Z기술을 켜고 끄면 기술 칸을 다시 그린다 (이름·위력이 바뀐다)
         self.gim = ui_gimmick.GimmickBar(f, before=self.msg, make=U.ghost_button,
                                          on_change=self._gim_changed,
                                          prev=getattr(self, "gim", None))
@@ -298,6 +298,7 @@ class RaidBattleWindow(Z.Resizable):
         if not mon or mon.get("fainted"):
             return self._paint(key)
         num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
+        tera = mon.get("tera")                          # 테라스탈한 타입 (2.5.0) - 결정 모습으로 그린다
         size = U.h(BOSS_H if boss else MON_H)
         cap = U.h(BOSS_W if boss else MON_W)
 
@@ -305,17 +306,20 @@ class RaidBattleWindow(Z.Resizable):
             path = sprite_cache.ensure(self.app.api, num, shiny)
             if not path:
                 return None
-            return sprites.load_animation(path, size, 0.2, 4.0, max_size=(cap, size))
-
-        def done(anim, err):
-            if not self.alive or err or anim is None:
-                return
-            cur = self.shown.get(key) or {}
-            if cur.get("num") != num:
-                return
-            # 쇼다운 도트는 왼쪽을 본다. 우리 쪽은 뒤집어 보스를 보게 한다.
+            anim = sprites.load_animation(path, size, 0.2, 4.0, max_size=(cap, size))
+            # 쇼다운 도트는 왼쪽을 본다. 우리 쪽은 뒤집어 보스를 보게 한다. 투명색 풀기 · 테라스탈한 결정 모습(2.5.0)은
+            # 여기(작업 스레드)에서 - 화면 스레드에서 하면 연출 도중 잠깐 멈칫한다.
             frames = anim.frames[sprites.RIGHT if boss else sprites.LEFT]
-            photos = [ImageTk.PhotoImage(sprites.to_rgba(f, anim.key)) for f in frames]
+            return anim, ui_gimmick.tera_look([sprites.to_rgba(f, anim.key) for f in frames], tera)
+
+        def done(res, err):
+            if not self.alive or err or res is None:
+                return
+            anim, rgba = res
+            cur = self.shown.get(key) or {}
+            if cur.get("num") != num or cur.get("tera") != tera:
+                return
+            photos = [ImageTk.PhotoImage(im) for im in rgba]
             self.anims[key] = (photos, list(anim.durations) or [100])
             self._tick(key, 0)
         run_async(self.root, work, done)
@@ -384,6 +388,8 @@ class RaidBattleWindow(Z.Resizable):
             mark, color = "고름", U.GOOD
         else:
             mark = m.get("name") or ""
+            if ui_gimmick.tera_tag(m):
+                mark += " · " + ui_gimmick.tera_tag(m)     # 테라스탈한 동안 (2.5.0)
             color = U.FG_DIM
         cv.itemconfigure(it["mark"], text=mark, fill=color)
 
@@ -666,11 +672,17 @@ class RaidBattleWindow(Z.Resizable):
                 self.set_mon(key, mon, boss=(key == BOSS))
                 self._flash("변신!" if ev.get("transform") else (ev.get("label") or "폼체인지!"), "#c9a0ff")
             return STEP_MS + 300
-        if t == "zpower":
-            # Z기술 (시즌 4). 레이드는 자리(p)로 누구인지 안다.
+        if t in ("tera", "zpower"):
+            # 테라스탈 (2.5.0) · Z기술 (시즌 4). 레이드는 자리(p)로 누구인지 안다.
             size = U.h(BOSS_H if key == BOSS else MON_H) * 0.6
-            ui_gimmick.z_event(self, ev, size=size, key=key,
-                               banner=lambda s: self._flash(s, "#ffd23c"))
+            if t == "tera":
+                ui_gimmick.tera_event(
+                    self, ev, size=size, key=key,
+                    apply=lambda m, key=key: self.set_mon(key, m, boss=(key == BOSS)),
+                    banner=lambda s: self._flash(s, "#9be8f5"))
+            else:
+                ui_gimmick.z_event(self, ev, size=size, key=key,
+                                   banner=lambda s: self._flash(s, "#ffd23c"))
             return None
         if t == "move":
             self.say(text)
@@ -1086,6 +1098,7 @@ class RaidBattleWindow(Z.Resizable):
             return
         mega = self.mega.take() if kind == "move" else False
         z = self.gim.take(move) if kind == "move" else False
+        tera = self.gim.take_tera() if kind == "move" else False
         self.sent = True
         self.hide_commands()
         self.say("...")
@@ -1105,7 +1118,7 @@ class RaidBattleWindow(Z.Resizable):
             self.sync(r)
             self.show_commands()
         run_async(self.root, lambda: self.app.api.raid_act(kind, move, slot,
-                                                          **ui_gimmick.act_kwargs(mega, z)), done)
+                                                          **ui_gimmick.act_kwargs(mega, z, tera)), done)
 
     def use_move(self, key):
         self._send("move", move=key)

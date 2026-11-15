@@ -895,6 +895,9 @@ class BoxWindow(Scene, BX.BoxWindow):
                  ability_note=natural(info.get("abilityNote") or "알려진 설명이 없습니다."),
                  nature=(info.get("nature") or "?") + " 성격",
                  nature_note=natural(info.get("natureNote") or "알려진 설명이 없습니다."),
+                 # 테라 타입 (2.5.0) - 옛 서버는 안 준다 ('?')
+                 tera=((m.get("teraKr") + " 타입") if m.get("teraKr") else "?"),
+                 tera_note=natural(BX.tera_note(m)), tera_type=m.get("teraType"),
                  held=held, held_text=((m.get("heldKr") or held) + ("\n" + m["heldDesc"] if m.get("heldDesc") else ""))
                  if held else "없음. 가방의 도구를 지니게 하면 배틀에서 효과가 납니다.",
                  exp=exp, friend=friend, evo=lines, rows=rows, ivsum=ivsum, quick=quick, evsum=evsum, moves=moves,
@@ -1061,7 +1064,8 @@ class BoxWindow(Scene, BX.BoxWindow):
     def _d_info(self, cv, d, x1, x2, y):
         s = U.h
         iw = x2 - x1
-        for title, name, note in (("특성", d["ability"], d["ability_note"]), ("성격", d["nature"], d["nature_note"])):
+        for title, name, note in (("특성", d["ability"], d["ability_note"]), ("성격", d["nature"], d["nature_note"]),
+                                  ("테라", d.get("tera") or "?", d.get("tera_note") or "")):     # 테라 타입 (2.5.0)
             self._label(cv, x1, y, title)
             y = self._wrap(cv, x1 + s(40), y, name, font(10), width=iw - s(40))
             y = self._wrap(cv, x1 + s(40), y + 2, note, font(9), fill=INK2, width=iw - s(40)) + s(10)

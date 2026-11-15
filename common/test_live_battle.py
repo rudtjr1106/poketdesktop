@@ -337,49 +337,69 @@ def main():
     chk("같은 팀이면 어느 쪽도 늘 이기지는 않는다",
         wins["a"] < 6 and wins["b"] < 6, wins)
 
-    print("\n=== Z기술을 내가 고른다 (시즌 4) ===")
+    print("\n=== 테라스탈·Z기술을 내가 고른다 (2.5.0 · 시즌 4) ===")
     def gim(a_mon, b_mon, seed=9):
         lb = L.LiveBattle(DEX, (1, "가", [L.leveled(a_mon, 50)]), (2, "나", [L.leveled(b_mon, 50)]),
                           rng=random.Random(seed))
         return lb
 
     za = mon("CHARIZARD", 50, ("FLAMETHROWER", "AIRSLASH"))
-    za["held"] = "FIRIUMZ"
+    za["held"], za["tera"] = "FIRIUMZ", "GRASS"
     zb = mon("SNORLAX", 50, ("TACKLE",))
     lb = gim(za, zb)
     lb.start()
     g = lb.view("a")["gimmick"]
-    chk("Z링이 없으면 단추가 안 뜬다", g["zMoves"] == [] and not g["zUsed"], g)
+    chk("Z링·테라오브가 없으면 단추가 안 뜬다", g["canTera"] is None and g["zMoves"] == [] and not g["zUsed"], g)
     lb = gim(za, zb)
-    lb.zring["me"] = True                              # a 쪽만 가졌다
+    lb.zring["me"] = lb.tera_orb["me"] = True          # a 쪽만 가졌다
     lb.start()
     g = lb.view("a")["gimmick"]
-    chk("가졌으면 Z기술 목록이 온다",
-        [(z["key"], z["name"], z["power"]) for z in g["zMoves"]] == [("FLAMETHROWER", "다이내믹풀플레임", 175)],
+    chk("가졌으면 테라 타입과 Z기술 목록이 온다",
+        g["canTera"] == "GRASS" and g["teraKr"] == "풀"
+        and [(z["key"], z["name"], z["power"]) for z in g["zMoves"]] == [("FLAMETHROWER", "다이내믹풀플레임", 175)],
         g)
     gb = lb.view("b")["gimmick"]
-    chk("안 가진 상대 쪽 화면에는 안 뜬다", gb["zMoves"] == [], gb)
-    lb.choose("a", "move", "FLAMETHROWER", z=True)
+    chk("안 가진 상대 쪽 화면에는 안 뜬다", gb["canTera"] is None and gb["zMoves"] == [], gb)
+    lb.choose("a", "move", "FLAMETHROWER", tera=True, z=True)
     lb.choose("b", "move", "TACKLE")
     ev = lb.resolve()
     kinds_ = [e.get("t") for e in ev]
-    chk("고른 대로 Z기술이 나간다", "zpower" in kinds_, kinds_)
+    chk("고른 대로 테라스탈하고 Z기술이 나간다", "tera" in kinds_ and "zpower" in kinds_
+        and kinds_.index("tera") < kinds_.index("zpower"), kinds_)
     va = lb.view("a")
+    chk("내 포켓몬에 테라 타입이 실린다", va["me"]["team"][0]["tera"] == "GRASS"
+        and va["me"]["team"][0]["typeIds"] == ["GRASS"], va["me"]["team"][0]["typeIds"])
+    chk("상대 화면에도 드러난다", lb.view("b")["foe"]["team"][0]["tera"] == "GRASS")
     g = va["gimmick"]
-    chk("쓴 뒤에는 다시 못 누른다", g["zMoves"] == [] and g["zUsed"], g)
+    chk("쓴 뒤에는 다시 못 누른다", g["canTera"] is None and g["teraUsed"] and g["teraOn"]
+        and g["zMoves"] == [] and g["zUsed"], g)
     lb2 = L.LiveBattle.load(DEX, json.loads(json.dumps(lb.dump())))
     g2 = lb2.view("a")["gimmick"]
-    chk("저장했다 불러와도 그대로다", g2 == g, g2)
+    chk("저장했다 불러와도 그대로다", g2 == g and lb2.a.team[0].tera == "GRASS", g2)
     # 요청을 받아 두는 것은 될 때만
     lb = gim(za, zb)
-    lb.zring["me"] = True
+    lb.zring["me"] = lb.tera_orb["me"] = True
     lb.start()
     lb.choose("a", "move", "AIRSLASH", z=True)
     chk("타입이 안 맞는 기술에는 Z 요청을 안 받는다", lb.a.z_req is False)
-    lb.choose("a", "move", "FLAMETHROWER", z=True)
-    chk("맞는 기술이면 받는다", lb.a.z_req is True)
+    lb.choose("a", "move", "FLAMETHROWER", z=True, tera=True)
+    chk("맞는 기술이면 받는다", lb.a.z_req is True and lb.a.tera_req is True)
     lb2 = L.LiveBattle.load(DEX, json.loads(json.dumps(lb.dump())))
-    chk("골라 둔 요청도 저장된다", lb2.a.z_req is True)
+    chk("골라 둔 요청도 저장된다", lb2.a.z_req is True and lb2.a.tera_req is True)
+    lb = gim(za, zb)
+    lb.tera_orb["me"] = True
+    lb.start()
+    lb.choose("b", "move", "TACKLE")
+    lb.choose("a", "move", "FLAMETHROWER", tera=True)
+    lb.choose("a", "move", "AIRSLASH")
+    chk("다시 고르면서 끄면 테라스탈 요청도 꺼진다", lb.a.tera_req is False)
+    old = json.loads(json.dumps(lb.dump()))
+    old.pop("gimmick", None)
+    for s in ("a", "b"):
+        old[s].pop("teraReq", None)
+    lb3 = L.LiveBattle.load(DEX, old)
+    chk("2.5.0 전에 저장한 판(칸 없음)은 테라스탈 없이 불러온다",
+        lb3.view("a")["gimmick"]["canTera"] is None and lb3.a.tera_req is False)
 
     # 상대가 먼저 유턴으로 물러나 턴이 멈췄다 이어져도 (서버는 그사이 저장했다 불러온다) Z기술이 나간다
     ja = mon("JOLTEON", 50, ("UTURN",))

@@ -36,7 +36,8 @@ from common import tint as T
 
 from ... import battle_zoom as Z
 from ... import sprite_cache, sprites
-from ...ui_common import run_async
+from ...ui_common import TYPE_COLOR, run_async
+from ...ui_gimmick import tera_tag
 from . import BEZEL, CUR, DIM, FONT, INK, INK2, MSG_FRAME, WHITE, kit
 from . import PLATE_BOT, PLATE_HOVER_BOT, PLATE_HOVER_TOP, PLATE_LINE, PLATE_OFF_BOT, PLATE_OFF_TOP, PLATE_SEL, PLATE_TOP
 
@@ -746,7 +747,7 @@ class DPLower(object):
         ry1, ry2 = h - bottom, h - s(8)
         cv.create_window(s(12), (ry1 + ry2) // 2, window=self.tbar, anchor="w")
         self.tbar.update_idletasks()
-        tw = self.tbar.winfo_reqwidth() if (self.mega.shown or self.gim.z.shown) else 0
+        tw = self.tbar.winfo_reqwidth() if (self.mega.shown or self.gim.shown()) else 0
         f = kit.tkfont_of(cv, self.switch_btn.spec)
         bw = max(f.measure(self.switch_btn.text), f.measure(self.forfeit_btn.text)) + s(64)
         bw = max(bw, s(130))
@@ -1025,6 +1026,16 @@ class DPDuel(DPLower):
             th = kit.tkfont_of(cv, f).metrics("linespace") + U.h(2)
             kit.rrect(cv, x, y - th // 2, x + tw, y + th // 2, U.h(4), fill=col, tags=("st_" + who, items["tag"]))
             cv.create_text(x + tw // 2, y, text=st, fill=kit.look_of(col)[3], font=f, anchor="center",
+                           tags=("st_" + who, items["tag"]))
+            x += tw + U.h(6)
+        tera = tera_tag(mon)
+        if tera:
+            # 테라스탈한 동안 (2.5.0): 그 타입 빛깔의 꼬리표 '테라 풀'
+            col = TYPE_COLOR.get(mon.get("tera"), "#5fc8d8")
+            tw = kit.tkfont_of(cv, f).measure(tera) + U.h(12)
+            th = kit.tkfont_of(cv, f).metrics("linespace") + U.h(2)
+            kit.rrect(cv, x, y - th // 2, x + tw, y + th // 2, U.h(4), fill=col, tags=("st_" + who, items["tag"]))
+            cv.create_text(x + tw // 2, y, text=tera, fill=kit.look_of(col)[3], font=f, anchor="center",
                            tags=("st_" + who, items["tag"]))
             x += tw + U.h(6)
         kr = {"atk": "공", "def": "방", "spa": "특공", "spd": "특방", "spe": "스피드", "acc": "명중", "eva": "회피"}

@@ -42,6 +42,7 @@ class ActIn(BaseModel):
     ball: str = ""               # kind=ball 일 때 던질 볼 (도구 id)
     mega: bool = False           # 이 턴에 메가진화 (시즌 3)
     z: bool = False              # 고른 기술을 Z기술로 (시즌 4)
+    tera: bool = False           # 이 턴에 테라스탈 (2.5.0)
     slot: int = -1
     hour: int = -1
 
@@ -174,6 +175,7 @@ def start(region: str, ctx=Depends(deps.current)):
     tb = TB.TrainerBattle(deps.dex(), party, dict(t, ai="gym"), random.Random())
     tb.keystone["me"] = mega.has_keystone(uid)          # 관장 8곳 (시즌 3)
     tb.zring["me"] = gimmick.has_zring(uid)          # Z기술 (시즌 4)
+    tb.tera_orb["me"] = gimmick.has_orb(uid)         # 테라스탈 (2.5.0)
     events = tb.start()
     if benched:
         # 인사 바로 뒤에 알린다. 교체 목록에 없는 까닭을 판 처음에 말해 둔다.
@@ -224,7 +226,8 @@ def act(bid: int, body: ActIn, ctx=Depends(deps.current)):
     kos_before = len(tb.kos)
     try:
         if kind == "move":
-            events = tb.act("move", body.move or "", mega=bool(body.mega), z=bool(body.z))
+            events = tb.act("move", body.move or "", mega=bool(body.mega), z=bool(body.z),
+                            tera=bool(body.tera))
         elif kind == "switch":
             events = tb.act("switch", int(body.slot))
         else:

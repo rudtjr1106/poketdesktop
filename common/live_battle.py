@@ -88,6 +88,7 @@ class Player(object):
         self.forfeited = False
         self.auto = 0                   # 서버가 대신 고른 횟수
         self.mega_req = False           # 이번 턴에 메가진화 (시즌 3)
+        self.tera_req = False           # 이번 턴에 테라스탈 (2.5.0)
         self.z_req = False              # 이번 턴에 고른 기술을 Z기술로 (시즌 4)
 
     @property
@@ -119,7 +120,7 @@ class LiveBattle(object):
         # 메가진화 (시즌 3). 키스톤은 서버가 채운다 (관장 8곳). 자리는 a=me, b=foe.
         self.keystone = {"me": False, "foe": False}
         self.mega_done = set()
-        B.gimmick_init(self)             # Z링 (시즌 4). 서버가 채운다
+        B.gimmick_init(self)             # Z링 (시즌 4) · 테라오브 (2.5.0). 서버가 채운다
         self._wire()
         self.turn = 0
         # **판이 실제로 움직인 횟수.** turn 과 다르다 - 교체(_do_switches)는
@@ -217,15 +218,17 @@ class LiveBattle(object):
         p = self.side(who)
         return [i for i in p.alive_slots() if i != p.slot]
 
-    def choose(self, who, kind, value=None, mega=False, z=False):
+    def choose(self, who, kind, value=None, mega=False, z=False, tera=False):
         """이 사람이 이번에 할 것을 적어 둔다. 턴은 아직 안 돈다.
 
         mega: 이 턴에 메가진화 (기술을 고를 때만, 될 때만 받는다).
-        z: 고른 기술을 Z기술로 (시즌 4, 같은 조건).
+        z: 고른 기술을 Z기술로 (시즌 4, 같은 조건). tera: 테라스탈 (2.5.0, 같은 조건).
         """
         p = self.side(who)
         p.mega_req = bool(mega) and kind == "move" \
             and self.bt.can_mega(self._seat(who)) is not None
+        p.tera_req = bool(tera) and kind == "move" \
+            and self.bt.can_tera(self._seat(who)) is not None
         p.z_req = bool(z) and kind == "move" and value in self.bt.z_moves(self._seat(who))
         if self.over:
             raise ValueError("이미 끝난 승부입니다.")
@@ -396,10 +399,12 @@ class LiveBattle(object):
         self.bt.mega_step({"me": self.a.mega_req and "me" in moves,
                            "foe": self.b.mega_req and "foe" in moves}, ev)
         self.a.mega_req = self.b.mega_req = False
-        # Z기술 (시즌 4): 메가진화 다음에. 교체한 쪽은 못 한다.
+        # 테라스탈 (2.5.0) · Z기술 (시즌 4): 메가진화 다음에. 교체한 쪽은 못 한다.
+        self.bt.tera_step({"me": self.a.tera_req and "me" in moves,
+                           "foe": self.b.tera_req and "foe" in moves}, ev)
         self.bt.z_request("me", moves.get("me"), self.a.z_req)
         self.bt.z_request("foe", moves.get("foe"), self.b.z_req)
-        self.a.z_req = self.b.z_req = False
+        self.a.tera_req = self.b.tera_req = self.a.z_req = self.b.z_req = False
 
         me, foe = self.a.mon, self.b.mon
         me.flinched = False
@@ -644,6 +649,7 @@ class LiveBattle(object):
             "stages": dict((k, v) for k, v in f.stages.items() if v),
             "fainted": not f.alive(),
             "mega": bool(f.mega),
+            "tera": f.tera, "teraKr": dex.type_name(f.tera) if f.tera else None,    # 2.5.0
         }
         if mine or f.ab.get("shown"):
             out["ability"] = f.ability
@@ -684,7 +690,7 @@ class LiveBattle(object):
             "canMega": bool(self.can_act(who) and self.phase() == "choose"
                             and self.bt.can_mega(self._seat(who))),
             "megaUsed": self._seat(who) in self.mega_done,
-            # Z기술 단추 (시즌 4)
+            # 테라스탈 · Z기술 단추 (2.5.0 · 시즌 4)
             "gimmick": B.gimmick_view(self.bt, self._seat(who),
                                       bool(self.can_act(who) and self.phase() == "choose")),
             "weather": self.field.weather, "terrain": self.field.terrain,
@@ -731,7 +737,7 @@ class LiveBattle(object):
                 "choice": list(p.choice) if p.choice else None,
                 "needSwitch": p.need_switch, "pendingOut": p.pending_out,
                 "forfeited": p.forfeited, "auto": p.auto, "megaReq": p.mega_req,
-                "zReq": p.z_req}
+                "teraReq": p.tera_req, "zReq": p.z_req}
 
     def _load_side(self, d):
         p = Player(d["uid"], d["name"], [self._load_fighter(x) for x in d["team"]])
@@ -742,6 +748,7 @@ class LiveBattle(object):
         p.forfeited = bool(d.get("forfeited"))
         p.auto = int(d.get("auto") or 0)
         p.mega_req = bool(d.get("megaReq"))
+        p.tera_req = bool(d.get("teraReq"))
         p.z_req = bool(d.get("zReq"))
         return p
 

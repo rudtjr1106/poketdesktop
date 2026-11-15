@@ -105,6 +105,8 @@ def _side_view(f):
     # 로그까지 글자가 바뀐다 (test_held 의 요약값이 그걸 지킨다).
     if f.mega:
         out["mega"] = True
+    if f.tera:
+        out["tera"] = f.tera           # 테라스탈한 타입 (2.5.0). 이것도 했을 때만 싣는다
     return out
 
 
@@ -204,7 +206,7 @@ class PartyBattle(object):
     RANK_SETTLE_TURNS = 2       # 나온 지 이 턴이 안 된 선수를 바꾸면
     RANK_SETTLE_PEN = 0.3       #   이만큼 깎는다 (막 바꿔 들어온 선수를 또 바꾸기)
 
-    def __init__(self, dex, a_mons, b_mons, seed=None, keystone=None, zring=None, war_ai=False):
+    def __init__(self, dex, a_mons, b_mons, seed=None, keystone=None, zring=None, war_ai=False, tera_orb=None):
         if not a_mons or not b_mons:
             # 엔진이 정책을 갖지는 않지만, 여기서 안 막으면 아래에서
             # team[0] 이 IndexError 를 내고 서버가 500 을 뱉는다.
@@ -231,6 +233,9 @@ class PartyBattle(object):
         # Z기술 (시즌 4). 메가와 같은 틀 - 한 판에 한 번, AI 가 알아서 쓴다.
         self.zring = dict(zring or {"me": False, "foe": False})
         self.z_done = set()
+        # 테라스탈 (2.5.0). 같은 틀 - 한 판에 한 번, AI 가 알아서 쓴다 (Battle._tera_worth).
+        self.tera_orb = dict(tera_orb or {"me": False, "foe": False})
+        self.tera_done = set()
         # 시즌 5 랭크: 양쪽 다 길드전 방어 AI 로 고른다 (맨 위 설명). 끄면 아래 칸은 하나도 안 쓴다.
         self.war_ai = bool(war_ai)
         if self.war_ai:
@@ -344,6 +349,8 @@ class PartyBattle(object):
         bt.auto_mega = {"me": True, "foe": True}
         bt.zring, bt.z_done = self.zring, self.z_done
         bt.auto_z = {"me": True, "foe": True}
+        bt.tera_orb, bt.tera_done = self.tera_orb, self.tera_done
+        bt.auto_tera = {"me": True, "foe": True}
         self.bt = bt
         return bt
 
@@ -583,7 +590,9 @@ class PartyBattle(object):
              "keystone": {"me": bool(self.keystone.get(other)), "foe": bool(self.keystone.get(who))},
              "megaDone": sorted(side(x) for x in self.mega_done),
              "gimmick": {"zring": {"me": bool(self.zring.get(other)), "foe": bool(self.zring.get(who))},
-                         "zDone": sorted(side(x) for x in self.z_done)},
+                         "zDone": sorted(side(x) for x in self.z_done),
+                         "teraOrb": {"me": bool(self.tera_orb.get(other)), "foe": bool(self.tera_orb.get(who))},
+                         "teraDone": sorted(side(x) for x in self.tera_done)},
              "warStall": dict(self.war_stall[who]), "warSent": self.war_sent[who]}
         # json 을 한 번 지난다 - 사본이 진짜 판의 mon dict 를 같이 쥐면 셈이 도구 · PP 를 고쳐 쓸 수 있다
         blob = json.dumps(d)
@@ -825,14 +834,15 @@ class PartyBattle(object):
         return "me" if ra > rb else "foe"
 
 
-def simulate(dex, a_mons, b_mons, seed=None, keystone=None, zring=None, war_ai=False):
+def simulate(dex, a_mons, b_mons, seed=None, keystone=None, zring=None, war_ai=False, tera_orb=None):
     """한 줄로 쓰는 입구. keystone = {"me": a 가 가졌나, "foe": b 가 가졌나}.
 
-    zring 도 같은 꼴이다 (시즌 4). 안 주면 Z기술 없이 싸운다 -
+    zring · tera_orb 도 같은 꼴이다 (시즌 4 · 2.5.0). 안 주면 Z기술 · 테라스탈 없이 싸운다 -
     그때의 로그는 예전과 한 글자도 다르지 않다.
     war_ai: 양쪽 다 길드전 방어 AI 로 고른다 (시즌 5 랭크 · 연습판, 맨 위 설명). 안 주면 예전 판 그대로.
     """
-    return PartyBattle(dex, a_mons, b_mons, seed, keystone=keystone, zring=zring, war_ai=war_ai).run()
+    return PartyBattle(dex, a_mons, b_mons, seed, keystone=keystone, zring=zring, war_ai=war_ai,
+                       tera_orb=tera_orb).run()
 
 
 def _steady_choose(bt, user, target):

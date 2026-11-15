@@ -556,11 +556,11 @@ def t_길드전_방어_AI(dex, gyms):
         and got["happiness"] == full.get("happiness", 255), (got["ivs"], got.get("happiness")))
     team = [TB.trainer_mon(dict(e, level=50, iv=31)) for e in gyms["trainers"][-1]["team"]]
     tr = {"id": "gw:c01", "name": "AI 수비대", "role": "[로켓단]", "level": 50, "team": team, "noMega": True,
-          "ai": "war", "keystone": True, "zring": True}
+          "ai": "war", "keystone": True, "zring": True, "orb": True}
     mine = [TB.trainer_mon(dict(e, level=50, iv=31)) for e in gyms["trainers"][-2]["team"]]
     tb = TB.TrainerBattle(dex, mine, tr, random.Random(5))
-    chk("키스톤·Z링을 쓰고, Z기술을 알아서 쓴다", tb.war and tb.keystone["foe"] and tb.zring["foe"]
-        and tb.bt.auto_z["foe"])
+    chk("키스톤·Z링·테라오브를 쓰고, 테라스탈·Z기술을 알아서 쓴다", tb.war and tb.keystone["foe"] and tb.zring["foe"]
+        and tb.tera_orb["foe"] and tb.bt.auto_tera["foe"] and tb.bt.auto_z["foe"])
     chk("실수하지 않고, 불리하면 늘 바꾼다", tb.mistake() == 0.0 and tb.smartness() == 1.0)
     tb.start()
     spent, turns = [], 0
@@ -584,6 +584,8 @@ def t_길드전_방어_AI(dex, gyms):
     gym_tb = TB.TrainerBattle(dex, mine, dict(tr, ai=None, zring=None), random.Random(5))
     chk("ai 가 없는 판은 그대로 (길드전 AI 가 아니고 셈하지 않는다)",
         not gym_tb.war and not gym_tb.searches and not gym_tb.bt.auto_z["foe"])
+    gym_tb = TB.TrainerBattle(dex, mine, dict(tr, ai=None, zring=None, orb=None), random.Random(5))
+    chk("  관장 판은 테라스탈하지 않는다 (2.5.0)", not gym_tb.tera_orb["foe"] and not gym_tb.bt.auto_tera["foe"])
     chk("  Z링을 가진 관장(시즌 챔피언)은 Z기술을 알아서 쓴다",
         TB.TrainerBattle(dex, mine, dict(tr, ai=None), random.Random(5)).bt.auto_z["foe"])
 

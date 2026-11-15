@@ -170,7 +170,7 @@ class TrainerBattle(object):
         # 문구만 달라진다: 승부를 걸어오지 않고 나타나고, 이기는 것이 아니라 쓰러뜨린다.
         if trainer.get("wild"):
             self.trainer["wild"] = True
-        # 길드전 (시즌 4): 사람이 짠 방어팀을 **센 AI** 가 굴린다 (_war_choice). 자기 키스톤·Z링을 쓴다.
+        # 길드전 (시즌 4): 사람이 짠 방어팀을 **센 AI** 가 굴린다 (_war_choice). 자기 키스톤·Z링·테라오브를 쓴다.
         # 관장 (2026-11-02): 같은 셈으로 두되 얕게 · 레벨이 낮으면 가끔 셈 없이 (GYM_TUNE, _gym_slip).
         if trainer.get("ai") in ("war", "gym"):
             self.trainer["ai"] = trainer["ai"]
@@ -192,13 +192,17 @@ class TrainerBattle(object):
                      else give_mega_stone(dex, self.foe_team, trainer.get("level")))
         self.keystone = {"me": False, "foe": mega_slot is not None}
         self.mega_done = set()
-        # Z기술 (시즌 4). 내 Z링은 서버가 채운다. 관장은 쓰지 않는다.
+        # Z기술 (시즌 4) · 테라스탈 (2.5.0). 내 Z링 · 테라오브는 서버가 채운다. 관장은 쓰지 않는다.
         B.gimmick_init(self)
         if self.war:
             self.keystone["foe"] = bool(trainer.get("keystone"))
             self.zring["foe"] = bool(trainer.get("zring"))
-        elif trainer.get("zring"):
-            self.zring["foe"] = True           # Z링을 가진 관장 (시즌 챔피언 관장) - 알아서 Z기술을 쓴다
+            self.tera_orb["foe"] = bool(trainer.get("orb"))
+        else:
+            if trainer.get("zring"):
+                self.zring["foe"] = True       # Z링을 가진 관장 (시즌 챔피언 관장) - 알아서 Z기술을 쓴다
+            if trainer.get("orb"):
+                self.tera_orb["foe"] = True    # 테라오브를 가진 트레이너 (자료에 orb 를 적은 경우만 - 지금은 없다)
         self._make_duel(FD.Field())
         self.turn = 0
         self.over = False
@@ -234,6 +238,8 @@ class TrainerBattle(object):
         B.gimmick_share(self, self.bt)
         if self.war or self.zring.get("foe"):  # 길드전의 방어 AI · Z링을 가진 관장은 Z기술을 알아서 쓴다
             self.bt.auto_z["foe"] = True
+        if self.war or self.tera_orb.get("foe"):   # 테라스탈도 같다 (2.5.0, _tera_worth 로 때를 고른다)
+            self.bt.auto_tera["foe"] = True
 
     @property
     def war(self):
@@ -1283,13 +1289,14 @@ class TrainerBattle(object):
     def valid_switches(self):
         return [i for i, f in enumerate(self.me_team) if f.alive() and i != self.mi]
 
-    def act(self, kind, value=None, mega=False, z=False):
+    def act(self, kind, value=None, mega=False, z=False, tera=False):
         """kind: 'move' (value=기술) / 'switch' (value=자리) / 'forfeit' / 'pass'
 
         pass: 내 쪽은 아무것도 안 하고 상대만 움직인다 (2.4.0 아르케 - 볼을 던져 놓친 턴). 턴 끝 처리는 그대로 돈다.
 
         mega: 이 턴에 메가진화한다 (기술을 고를 때만. 교체하면서는 못 한다).
         z: 고른 기술을 Z기술로 쓴다 (시즌 4, 기술을 고를 때만).
+        tera: 이 턴에 테라스탈한다 (2.5.0, 기술을 고를 때만 - 메가진화 다음).
         """
         if self.over:
             return [{"t": "over", "result": self.result}]
@@ -1386,6 +1393,7 @@ class TrainerBattle(object):
         # 메가진화 (시즌 3): 둘 다 고른 뒤, 순서를 정하기 전에. 교체한 쪽은 못 한다.
         bt.auto_mega["foe"] = bool(self.keystone.get("foe")) and foe_slot is None
         bt.mega_step({"me": bool(mega) and kind == "move"}, ev)
+        bt.tera_step({"me": bool(tera) and kind == "move"}, ev)
         bt.z_request("me", me_move, bool(z) and kind == "move")
         bt._auto_z("foe", foe_move)            # 길드전 방어 AI 만 켜져 있다 (관장은 auto_z 가 꺼져 있다)
 
@@ -1558,6 +1566,8 @@ class TrainerBattle(object):
             "stages": dict((k, v) for k, v in f.stages.items() if v),
             "fainted": not f.alive(),
             "mega": bool(f.mega),
+            # 테라스탈한 타입 (2.5.0). 안 했으면 None. 상대 것도 보인다 - 본가처럼 드러난다.
+            "tera": f.tera, "teraKr": dex.type_name(f.tera) if f.tera else None,
         }
         if mine or f.ab.get("shown"):
             out["ability"] = f.ability
@@ -1601,7 +1611,7 @@ class TrainerBattle(object):
             "megaUsed": "me" in self.mega_done,
             "me": {"slot": self.mi, "team": [self.side(f, True) for f in self.me_team]},
             "foe": {"slot": self.fi, "team": foe_team},
-            # Z기술 단추 (시즌 4): zMoves(무엇이 되는지)·zUsed
+            # 테라스탈 · Z기술 단추 (2.5.0 · 시즌 4): canTera(타입) · teraUsed · zMoves(무엇이 되는지) · zUsed
             "gimmick": B.gimmick_view(self.bt, "me", not self.over and not self.need_switch),
         }
 

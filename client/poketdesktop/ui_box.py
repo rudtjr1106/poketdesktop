@@ -271,6 +271,16 @@ def evo_lines(dex, mon, item_kr=None):
     return out
 
 
+def tera_note(m):
+    """상자 상세의 '테라' 칸 설명 (2.5.0). 테마 상자들도 이 글을 쓴다."""
+    if not (m or {}).get("teraKr"):
+        return "서버를 새 판으로 올리면 보인다."
+    head = "테라스탈하면 이 타입 하나가 된다."
+    if not m.get("teraSet"):
+        head += " 정하지 않아 그 종의 첫째 타입이다."
+    return head + " 가방의 테라피스로 바꾼다."
+
+
 class Row(object):
     """목록 한 줄. 아래에 1px 선(line)이 붙어 다닌다.
 
@@ -992,10 +1002,11 @@ class BoxWindow(object):
                       highlightbackground=U.LINE)
         tb.pack(fill="x", pady=(10, 0))
         self.d_trait = {}
-        for key, title in (("ability", "특성"), ("nature", "성격")):
+        # 테라 타입 (2.5.0). 테라스탈하면 될 타입이다 - 정하지 않았으면 그 종의 첫째 타입.
+        for key, title in (("ability", "특성"), ("nature", "성격"), ("tera", "테라")):
             row = tk.Frame(tb, bg="#101623")
             row.pack(fill="x", padx=11, pady=(8 if key == "ability" else 4,
-                                              8 if key == "nature" else 0))
+                                              8 if key == "tera" else 0))
             top = tk.Frame(row, bg="#101623")
             top.pack(fill="x")
             tk.Label(top, text=title, bg="#101623", fg=U.FG_FAINT,
@@ -2622,6 +2633,10 @@ class BoxWindow(object):
                     info.get("abilityNote"))
         self._trait("nature", (info.get("nature") or "?") + " 성격",
                     info.get("natureNote"))
+        # 테라 타입 (2.5.0). 옛 서버는 이 칸을 안 준다 - 그때는 '?' 로 둔다.
+        tera = m.get("teraKr")
+        self._trait("tera", (tera + " 타입") if tera else "?", tera_note(m))
+        self.d_trait["tera"][0].configure(fg=U.TYPE_COLOR.get(m.get("teraType"), U.FG))
 
         self._exp(info)
         self._show_held(m)

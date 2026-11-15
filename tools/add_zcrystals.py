@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Z크리스탈을 items.json 에 넣고, common/zmoves.py 가 쓰는 표를 뽑는다 (시즌 4).
+"""Z크리스탈 (시즌 4) · 테라피스 (2.5.0) 를 items.json 에 넣고, common/zmoves.py 가 쓰는 표를 뽑는다.
 
     python tools/add_zcrystals.py            items.json 에 넣는다 (있으면 고쳐 쓴다)
     python tools/add_zcrystals.py --tables   common/zmoves.py 에 붙여 넣을 표를 찍는다
     python tools/add_zcrystals.py --check    items.json 이 지금 자료와 같은지만 본다
-    python tools/add_zcrystals.py --sprites  도구 그림을 채운다 (Z크리스탈을 받는다. 못 받으면 그린다)
+    python tools/add_zcrystals.py --sprites  도구 그림을 채운다 (Z크리스탈은 받고, 테라피스는 그린다)
 
 **build_items.py 를 다시 돌리면 이것도 다시 돌려야 한다** (add_megas.py 와 같다 - build_items 는
 PokeAPI 의 '지닐 수 있는 도구' 목록으로 items.json 을 통째로 새로 쓴다).
@@ -34,6 +34,7 @@ KO = "3"                                 # PokeAPI 의 한국어
 with io.open(DEX, encoding="utf-8") as _f:
     TYPE_KR = dict((k, v["kr"]) for k, v in json.load(_f)["types"].items())
 Z_COST, Z_COST_OWN = 20000, 30000        # 타입 크리스탈 / 전용 크리스탈 (사용자 결정)
+SHARD_COST = Z_COST                      # 테라피스 - 타입 Z크리스탈과 같은 값 (11/15 사용자 "Z기술이랑 동일한 가격")
 
 
 def _rows(name):
@@ -96,10 +97,34 @@ def crystals():
     return out
 
 
+def shards():
+    """테라피스 18종 (2.5.0). 스텔라는 안 넣는다. 상점에서만 산다 (드랍 0)."""
+    names, flavor = _names(), _flavor()
+    out = []
+    for r in _rows("items.csv"):
+        ident = r["identifier"]
+        if not ident.endswith("-tera-shard"):
+            continue
+        t = _key(ident[:-len("-tera-shard")])
+        if t not in ZM.TYPE_Z:                          # 스텔라는 안 넣는다
+            continue
+        en = (names.get(r["id"]) or {}).get("9") or ident
+        kr = (names.get(r["id"]) or {}).get(KO) or en
+        # PokeAPI 에 한국어 설명이 없다. 이 게임에서 하는 일을 적는다.
+        desc = flavor.get(r["id"]) or ("포켓몬 1마리의 테라 타입을 %s 타입으로 바꾼다. 테라스탈하면 그 타입이 된다."
+                                       % TYPE_KR[t])
+        out.append({"cat": "misc", "chance": 0, "cost": SHARD_COST,
+                    "desc": desc,
+                    "effect": {"kind": "tera", "type": t}, "en": en, "id": _key(en),
+                    "ident": ident, "kr": kr, "rarity": "epic",
+                    "sell": SHARD_COST // 2, "weight": 0})
+    return out
+
+
 def patch(data):
     """items.json 의 자료(dict)에 넣는다. 드랍표는 안 건드린다 - 주워서는 안 나온다."""
     items = data["items"]
-    for it in crystals():
+    for it in crystals() + shards():
         items[it["id"]] = it
     return data
 
@@ -162,7 +187,8 @@ def tables():
 # ---------------------------------------------------------------- 그림
 SPRITES = os.path.join(ROOT, "server", "data", "item_sprites")
 Z_SPRITE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/%s--bag.png"
-# Z크리스탈 그림을 못 받으면 타입 색 조각을 직접 그린다.
+# 테라피스는 공개 도트 저장소(PokeAPI·pokesprite)에 그림이 없다. 타입 색 조각을 직접 그린다.
+# Z크리스탈 그림을 못 받았을 때도 같은 조각을 그린다.
 TYPE_RGB = {
     "NORMAL": (168, 167, 122), "FIRE": (238, 129, 48), "WATER": (99, 144, 240),
     "ELECTRIC": (247, 208, 44), "GRASS": (122, 199, 76), "ICE": (150, 217, 214),
@@ -191,7 +217,7 @@ def _fetch(url):
 
 
 def shard_png(rgb, size=32):
-    """타입 색의 뾰족한 결정 조각 (Z크리스탈 그림을 못 받았을 때)."""
+    """테라피스: 타입 색의 뾰족한 결정 조각 (Z크리스탈 그림을 못 받았을 때도)."""
     from PIL import Image, ImageDraw
     big = size * 4                                           # 크게 그려 줄인다 (가장자리가 매끈해진다)
     img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
@@ -213,9 +239,9 @@ def shard_png(rgb, size=32):
 
 
 def sprites(force=False):
-    """Z크리스탈 그림을 받는다 (못 받으면 그 타입 색 조각을 그린다)."""
+    """Z크리스탈은 받고(못 받으면 그 타입 색 조각), 테라피스는 그린다."""
     got = drawn = kept = 0
-    for it in crystals():
+    for it in crystals() + shards():
         path = os.path.join(SPRITES, it["id"] + ".png")
         if os.path.exists(path) and not force:
             kept += 1
@@ -226,7 +252,7 @@ def sprites(force=False):
         if data:
             got += 1
         else:
-            t = it.get("zType") or "NORMAL"
+            t = it.get("zType") or (it.get("effect") or {}).get("type") or "NORMAL"
             data = shard_png(TYPE_RGB.get(t, TYPE_RGB["NORMAL"]))
             drawn += 1
         with open(path, "wb") as f:
@@ -246,13 +272,14 @@ def main():
     data = patch(json.loads(raw))
     new = _dump(data)
     n_z = sum(1 for it in data["items"].values() if it["id"] in ZM.CRYSTALS)
+    n_t = sum(1 for it in data["items"].values() if (it.get("effect") or {}).get("kind") == "tera")
     if "--check" in sys.argv:
         ok = new == raw
-        print("items.json: Z크리스탈 %d개 - %s" % (n_z, "같다" if ok else "다르다 (다시 돌릴 것)"))
+        print("items.json: Z크리스탈 %d개, 테라피스 %d개 - %s" % (n_z, n_t, "같다" if ok else "다르다 (다시 돌릴 것)"))
         return 0 if ok else 1
     with io.open(ITEMS, "w", encoding="utf-8") as f:
         f.write(new)
-    print("items.json: Z크리스탈 %d개를 넣었다 (도구 %d개)" % (n_z, len(data["items"])))
+    print("items.json: Z크리스탈 %d개, 테라피스 %d개를 넣었다 (도구 %d개)" % (n_z, n_t, len(data["items"])))
     return 0
 
 

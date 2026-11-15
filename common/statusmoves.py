@@ -1112,6 +1112,12 @@ def _set_types(bt, f, fw, types, ev):
 
 def h_type_change(bt, move, who, user, target, tw, ev):
     k = key(move)
+    # 테라스탈한 포켓몬의 타입은 못 바꾼다 (본가와 같다, 2.5.0). 상대에게 거는 넷은 상대를, 자기에게 거는
+    # 셋은 쓰는 쪽을 본다.
+    changes = target if k in ("SOAK", "MAGICPOWDER", "TRICKORTREAT", "FORESTSCURSE") else (
+        user if k in ("REFLECTTYPE", "CONVERSION", "CONVERSION2") else None)
+    if changes is not None and getattr(changes, "tera", None):
+        return fail(ev, who)
     if k == "SOAK":
         if target.types() == ["WATER"] or target.ability in ("MULTITYPE", "RKSSYSTEM"):
             return fail(ev, who)

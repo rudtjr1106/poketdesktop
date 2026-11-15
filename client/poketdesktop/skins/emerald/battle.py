@@ -366,13 +366,13 @@ class GBALower(object):
         rw = max(s(240), int(w * 0.33))
         lx1, lx2 = s(6), w - s(6) - rw - gap
         rx1, rx2 = lx2 + gap, w - s(6)
-        # 왼쪽: 기술 창 (메가진화 · Z기술 켜기가 있으면 창 왼쪽 아래)
+        # 왼쪽: 기술 창 (메가진화 · 테라스탈 · Z기술 켜기가 있으면 창 왼쪽 아래)
         _frame(cv, lx1, top, lx2, bot)
         ins = _inset()
         pad = s(6)
         mbot = bot - ins - pad
         self.tbar.configure(bg=PAPER)
-        if self.mega.shown or self.gim.z.shown:
+        if self.mega.shown or self.gim.shown():
             self.tbar.update_idletasks()
             ph = max(self.tbar.winfo_reqheight(), s(36))
             cv.create_window(lx1 + ins + pad, mbot - ph // 2, window=self.tbar, anchor="w")

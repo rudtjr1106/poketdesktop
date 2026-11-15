@@ -338,7 +338,7 @@ class LiveBattleWindow(Z.Resizable):
         self.msg.pack(side="left", fill="both", expand=True, padx=14)
         U.wrap_to_width(self.msg)
         self.mega = MegaToggle(f, before=self.msg, make=U.ghost_button)   # 시즌 3, 고를 때만 보인다
-        # Z기술 단추 (시즌 4). Z기술을 켜고 끄면 기술 칸을 다시 그린다 (이름·위력이 바뀐다)
+        # 테라스탈 (2.5.0) · Z기술 단추 (시즌 4). Z기술을 켜고 끄면 기술 칸을 다시 그린다 (이름·위력이 바뀐다)
         self.gim = ui_gimmick.GimmickBar(f, before=self.msg, make=U.ghost_button,
                                          on_change=self._gim_changed,
                                          prev=getattr(self, "gim", None))
@@ -392,6 +392,7 @@ class LiveBattleWindow(Z.Resizable):
             self.sendout.forget(who)
             return
         num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
+        tera = mon.get("tera")                          # 테라스탈한 타입 (2.5.0) - 결정 모습으로 그린다
         # 이름표에 가려지지 않는 높이까지만 (글자 크기를 키워 장면이 낮아졌을 때 - Z.Resizable.dot_fit)
         size = self.dot_fit(who, U.h(MON_H[who]), U.h(MON_W[who]))
 
@@ -399,19 +400,22 @@ class LiveBattleWindow(Z.Resizable):
             path = sprite_cache.ensure(self.app.api, num, shiny)
             if not path:
                 return None
-            return sprites.load_animation(path, size, 0.2, 4.0,
+            anim = sprites.load_animation(path, size, 0.2, 4.0,
                                           max_size=(U.h(MON_W[who]), size))
-
-        def done(anim, err):
-            if not self.alive or err or anim is None:
-                return
-            cur = self.shown.get(who) or {}
-            if cur.get("num") != num:
-                return
+            # 쇼다운 도트는 왼쪽을 본다. 내 쪽은 뒤집어 상대를 보게 한다. 투명색 풀기 · 테라스탈한 결정 모습(2.5.0)은
+            # 여기(작업 스레드)에서 - 화면 스레드에서 하면 연출 도중 잠깐 멈칫한다.
             frames = anim.frames[sprites.LEFT if who == "me" else sprites.RIGHT]
-            first = sprites.to_rgba(frames[0], anim.key)
-            photos = [ImageTk.PhotoImage(first)] + [ImageTk.PhotoImage(sprites.to_rgba(f, anim.key))
-                                                    for f in frames[1:]]
+            return anim, ui_gimmick.tera_look([sprites.to_rgba(f, anim.key) for f in frames], tera)
+
+        def done(res, err):
+            if not self.alive or err or res is None:
+                return
+            anim, rgba = res
+            cur = self.shown.get(who) or {}
+            if cur.get("num") != num or cur.get("tera") != tera:
+                return
+            first = rgba[0]
+            photos = [ImageTk.PhotoImage(im) for im in rgba]
             self.anims[who] = (photos, list(anim.durations) or [100])
             # 볼에서 나오는 중이면 다 커진 뒤에 움직이기 시작한다 (sendout 이 부른다)
             if not self.sendout.arrive(who, first, lambda: self._tick(who, 0)):
@@ -465,6 +469,8 @@ class LiveBattleWindow(Z.Resizable):
         cv.itemconfigure(it["name"], text=(mon.get("name") or "") + gender)
         cv.itemconfigure(it["lv"], text="Lv.%d" % (mon.get("level") or 0))
         bits = []
+        if ui_gimmick.tera_tag(mon):
+            bits.append(ui_gimmick.tera_tag(mon))      # 테라스탈한 동안 (2.5.0)
         if mon.get("statusKr"):
             bits.append(mon["statusKr"])
         kr = {"atk": "공", "def": "방", "spa": "특공", "spd": "특방",
@@ -740,6 +746,10 @@ class LiveBattleWindow(Z.Resizable):
             return None
         if t == "msg" and (ev.get("transform") or ev.get("look")):
             return self._transform(ev)             # 변신·배틀 중 폼 (1.13)
+        if t == "tera":                      # 테라스탈 (2.5.0)
+            ui_gimmick.tera_event(self, ev, size=Z.px(MON_H.get(who, 100)) * 0.55,
+                                  banner=lambda s: self._banner(who, s))
+            return None
         if t == "zpower":                    # Z파워를 두른다 - 기술은 뒤따르는 move 가 그린다
             ui_gimmick.z_event(self, ev, size=Z.px(MON_H.get(who, 100)) * 0.55,
                                banner=lambda s: self._banner(who, s))
@@ -1155,6 +1165,7 @@ class LiveBattleWindow(Z.Resizable):
             return
         mega = self.mega.take() if kind == "move" else False
         z = self.gim.take(move) if kind == "move" else False
+        tera = self.gim.take_tera() if kind == "move" else False
         self.sent = True
         self.hide_commands()
         self.say("...")
@@ -1176,7 +1187,7 @@ class LiveBattleWindow(Z.Resizable):
             self.sync(r)
             self.show_commands()
         run_async(self.root, lambda: self.app.api.live_act(kind, move, slot,
-                                                          **ui_gimmick.act_kwargs(mega, z)), done)
+                                                          **ui_gimmick.act_kwargs(mega, z, tera)), done)
 
     def _leave_after_forfeit(self, room):
         """내가 기권했다 - 결과 창을 따로 띄우지 않고 닫는다 (제보, 1.9.2).

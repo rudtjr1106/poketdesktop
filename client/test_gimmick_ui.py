@@ -1,23 +1,22 @@
 # -*- coding: utf-8 -*-
-"""배틀 창의 Z기술 단추 검사 (시즌 4).
+"""배틀 창의 테라스탈 (2.5.0) · Z기술 (시즌 4) 단추 검사.
 
     python client/test_gimmick_ui.py
     python client/run_as_windows.py client/test_gimmick_ui.py
 
-**창을 진짜로 띄운다.** 가짜 api 는 관장·실시간·레이드 검사의 것을 빌려 쓴다 (Z기술 값을
-엔진에 넘기는 것만 얹었다) - 판은 서버와 같은 엔진이 이 프로세스에서 돈다.
-
-테라스탈은 1.11.0 에 내지 않기로 했다 (2026-10-14) - 단추가 없는 것도 본다.
+**창을 진짜로 띄운다.** 가짜 api 는 관장·실시간·레이드 검사의 것을 빌려 쓴다 (테라스탈·Z기술
+값을 엔진에 넘기는 것만 얹었다) - 판은 서버와 같은 엔진이 이 프로세스에서 돈다.
 
 ## 무엇을 못 박나
 
-  1. Z링이 있을 때만 단추가 뜬다. 없으면 아예 안 보이고, 보내는 요청도 예전과 같다.
+  1. Z링·테라오브가 있을 때만 단추가 뜬다. 없으면 아예 안 보이고, 보내는 요청도 예전과 같다.
   2. 단추는 메시지 막대에 메가진화 단추와 나란히 선다. 막대 안에 들어오고 눌린 위젯이 없다.
-  3. Z기술을 켜면 기술 칸이 바뀐다 - 되는 기술은 Z기술의 이름·위력으로 보인다.
-  4. 켜고 기술을 쓰면 그 값이 **그 기술과 함께** 간다. 한 번 보내면 꺼진다.
+  3. 테라스탈 단추에는 될 타입이 적힌다.
+  4. Z기술을 켜면 기술 칸이 바뀐다 - 되는 기술은 Z기술의 이름·위력으로 보인다.
+  5. 켜고 기술을 쓰면 그 값이 **그 기술과 함께** 간다. 한 번 보내면 꺼진다.
      Z기술을 켜고 안 되는 기술을 고르면 그 기술이 보통으로 나간다 (Z파워는 안 닳는다).
-  5. 쓰고 나면 단추가 다시 안 뜬다.
-  6. 실시간·레이드 창도 같다.
+  6. 사건이 오면 타입 표시가 테라 타입으로 바뀌고 이름표에 '테라 ○○' 가 붙는다. 쓰고 나면 단추가 다시 안 뜬다.
+  7. 실시간·레이드 창도 같다.
 """
 import json
 import os
@@ -64,13 +63,13 @@ def chk(name, cond, got=""):
 
 
 class GymApi(TG.FakeApi):
-    """관장 검사의 가짜 api + Z기술. 받은 요청을 그대로 적어 둔다."""
+    """관장 검사의 가짜 api + 테라스탈·Z기술. 받은 요청을 그대로 적어 둔다."""
 
     def gym_act(self, bid, kind, move="", slot=-1, mega=False, **kw):
         self.megas.append(bool(mega))
         self.sent = getattr(self, "sent", []) + [dict(kw, move=move)]
         if kind == "move":
-            ev = self.tb.act("move", move, mega=mega, z=bool(kw.get("z")))
+            ev = self.tb.act("move", move, mega=mega, tera=bool(kw.get("tera")), z=bool(kw.get("z")))
         else:
             ev = self.tb.act(kind, slot) if kind != "forfeit" else self.tb.act("forfeit")
         return self._out(ev, {})
@@ -80,7 +79,7 @@ class LiveApi(TL.FakeApi):
     def live_act(self, kind, move="", slot=-1, mega=False, **kw):
         self.sent = getattr(self, "sent", []) + [dict(kw, move=move)]
         value = move if kind == "move" else (slot if kind == "switch" else None)
-        self.lb.choose("a", kind, value, mega=mega, z=bool(kw.get("z")))
+        self.lb.choose("a", kind, value, mega=mega, tera=bool(kw.get("tera")), z=bool(kw.get("z")))
         if self.auto_foe and self.lb.can_act("b"):
             self.lb.choose("b", *self.lb.auto_choice("b"))
         if self.lb.ready():
@@ -94,7 +93,8 @@ class LiveApi(TL.FakeApi):
 class RaidApi(TR.FakeApi):
     def raid_act(self, kind, move="", slot=-1, mega=False, **kw):
         self.sent = getattr(self, "sent", []) + [dict(kw, move=move)]
-        self.rb.choose(0, kind, move if kind == "move" else slot, mega=mega, z=bool(kw.get("z")))
+        self.rb.choose(0, kind, move if kind == "move" else slot, mega=mega,
+                       tera=bool(kw.get("tera")), z=bool(kw.get("z")))
         for i in range(1, len(self.rb.players)):
             if self.rb.players[i].playing():
                 self.rb.choose(i, *self.rb.auto_choice(i))
@@ -131,24 +131,18 @@ def cell_names(win):
     return out
 
 
-def no_tera(gim):
-    """테라스탈 단추가 없다 (1.11.0 에 내지 않는다)."""
-    return not hasattr(gim, "tera") and "테라스탈" not in [w.cget("text") for w in _labels(gim.z.bar)]
-
-
-def _labels(w):
-    out = []
-    for c in w.winfo_children():
-        if isinstance(c, tk.Label):
-            out.append(c)
-        out.extend(_labels(c))
-    return out
+def apart(a, b):
+    """두 단추가 겹치지 않나."""
+    ha, hb = a.btn.holder, b.btn.holder
+    return (ha.winfo_x() + ha.winfo_width() <= hb.winfo_x()
+            or hb.winfo_x() + hb.winfo_width() <= ha.winfo_x())
 
 
 def gym_part(root, dex, gyms, kmap):
     print("=== 관장 배틀 창 ===")
     liz = TG.mon(dex, "CHARIZARD", 100, ["FLAMETHROWER", "DRAGONCLAW", "AIRSLASH", "SUNNYDAY"], "BLAZE", 21)
     liz["held"] = "FIRIUMZ"
+    liz["tera"] = "GRASS"
     party = [liz, TG.mon(dex, "GARCHOMP", 100, ["EARTHQUAKE"], "ROUGHSKIN", 22)]
     api = GymApi(dex, gyms, kmap, party)
     app = TG.FakeApp(root, api, dex)
@@ -158,28 +152,31 @@ def gym_part(root, dex, gyms, kmap):
         api.region = low["region"]
         api.tb = TB.TrainerBattle(dex, [dict(m) for m in party], api.by_region[low["region"]],
                                   random.Random(7))
-        api.tb.zring["me"] = have
+        api.tb.zring["me"] = api.tb.tera_orb["me"] = have
         b = GB.GymBattleWindow(app, api._out(api.tb.start()))
         TG.pump(root, lambda: not b.busy, 30)
         root.update()
         return b
 
     b = open_battle(False)
-    chk("Z링이 없으면 단추가 안 뜬다", not b.gim.z.shown and not b.gim.z.btn.holder.winfo_ismapped())
+    chk("Z링·테라오브가 없으면 단추가 안 뜬다", not b.gim.tera.shown and not b.gim.z.shown
+        and not b.gim.tera.btn.holder.winfo_ismapped() and not b.gim.z.btn.holder.winfo_ismapped())
     b.use_move("FLAMETHROWER")
     TG.pump(root, lambda: not b.busy, 30)
-    chk("  그때 보내는 요청에는 Z 칸이 아예 없다 (예전과 같다)",
+    chk("  그때 보내는 요청에는 테라·Z 칸이 아예 없다 (예전과 같다)",
         api.sent[-1] == {"move": "FLAMETHROWER"}, api.sent[-1])
     b.close()
     root.update()
 
     b = open_battle(True)
-    ok, got = in_bar(b.gim.z)
-    chk("Z기술 단추가 메시지 막대 안에 뜬다", ok, got)
-    chk("  테라스탈 단추는 없다", no_tera(b.gim))
+    for name, tg in (("테라스탈", b.gim.tera), ("Z기술", b.gim.z)):
+        ok, got = in_bar(tg)
+        chk("%s 단추가 메시지 막대 안에 뜬다" % name, ok, got)
+    chk("  두 단추가 겹치지 않는다", apart(b.gim.tera, b.gim.z))
     chk("  메시지 글이 함께 보인다", "무엇을 할까" in b.msg.cget("text"), b.msg.cget("text"))
     chk("  눌린 위젯이 없다", not squeezed(b.win), squeezed(b.win)[:3])
-    chk("기본은 꺼짐", not b.gim.z.on)
+    chk("테라스탈 단추에 될 타입이 적힌다", b.gim.tera.text == "테라스탈 · 풀", b.gim.tera.text)
+    chk("기본은 둘 다 꺼짐", not b.gim.tera.on and not b.gim.z.on)
     before = cell_names(b)
     chk("끄면 기술 칸은 원래 이름", "화염방사" in before and "다이내믹풀플레임" not in before, before)
 
@@ -199,13 +196,16 @@ def gym_part(root, dex, gyms, kmap):
     root.update()
     chk("다시 끄면 원래 이름으로 돌아온다", "화염방사" in cell_names(b), cell_names(b))
 
+    b.gim.tera.toggle()
     b.gim.z.toggle()
     b.open_switch()
     root.update()
-    chk("교체 화면에서는 숨고 꺼진다", not b.gim.z.shown and not b.gim.z.on)
+    chk("교체 화면에서는 숨고 꺼진다", not b.gim.tera.shown and not b.gim.z.shown
+        and not b.gim.tera.on and not b.gim.z.on)
     b.show_commands()
     root.update()
-    chk("기술 화면으로 돌아오면 다시 뜬다 (꺼진 채)", b.gim.z.shown and not b.gim.z.on)
+    chk("기술 화면으로 돌아오면 다시 뜬다 (꺼진 채)", b.gim.tera.shown and b.gim.z.shown
+        and not b.gim.tera.on and not b.gim.z.on)
 
     # Z기술을 켜고 안 되는 기술을 고르면 그 기술이 보통으로 나간다
     b.gim.z.toggle()
@@ -218,14 +218,23 @@ def gym_part(root, dex, gyms, kmap):
     seen = []
     orig = b._apply
     b._apply = lambda ev: (seen.append(ev.get("t")), orig(ev))[1]
+    b.gim.tera.toggle()
     b.gim.z.toggle()
     b.use_move("FLAMETHROWER")
-    chk("보내면 단추가 바로 꺼진다", not b.gim.z.on)
+    chk("보내면 단추가 바로 꺼진다", not b.gim.tera.on and not b.gim.z.on)
     TG.pump(root, lambda: not b.busy, 40)
     root.update()
-    chk("켜고 쓰면 z 가 기술과 함께 간다", api.sent[-1] == {"move": "FLAMETHROWER", "z": True}, api.sent[-1])
-    chk("Z파워 사건을 재생한다 (테라스탈은 없다)", "zpower" in seen and "tera" not in seen, seen)
-    chk("쓰고 나면 단추가 다시 안 뜬다", not b.gim.z.shown and b.view["gimmick"]["zUsed"], b.view.get("gimmick"))
+    chk("켜고 쓰면 tera·z 가 기술과 함께 간다",
+        api.sent[-1] == {"move": "FLAMETHROWER", "tera": True, "z": True}, api.sent[-1])
+    chk("테라스탈·Z파워 사건을 재생한다 (테라스탈이 먼저)", "tera" in seen and "zpower" in seen
+        and seen.index("tera") < seen.index("zpower"), seen)
+    me = b.shown.get("me") or {}
+    chk("타입 표시가 테라 타입 하나로 바뀐다", me.get("tera") == "GRASS" and me.get("typeIds") == ["GRASS"],
+        (me.get("tera"), me.get("typeIds")))
+    st = b.cv.itemcget(b.box["me"]["status"], "text")
+    chk("이름표 상태 줄에 '테라 풀' 이 붙는다", st.startswith("테라 풀"), st)
+    chk("쓰고 나면 단추가 다시 안 뜬다", not b.gim.tera.shown and not b.gim.z.shown
+        and b.view["gimmick"]["teraUsed"] and b.view["gimmick"]["zUsed"], b.view.get("gimmick"))
     # 연출은 판이 끝난 뒤에도 잠깐 돈다 - 느린 PC(CI 윈도우)에서는 그 끝을 기다린다
     TG.pump(root, lambda: all(e.dead for e in b.effects), 5)
     chk("연출이 남기고 간 것이 없다", all(e.dead for e in b.effects), [type(e).__name__ for e in b.effects])
@@ -238,27 +247,33 @@ def live_part(root, dex):
     api = LiveApi(dex)
     liz = TL.mon(dex, "CHARIZARD", ["FLAMETHROWER", "DRAGONCLAW"], 1)
     liz["held"] = "FIRIUMZ"
+    liz["tera"] = "GRASS"
     a = [liz, TL.mon(dex, "PIKACHU", ["THUNDERBOLT"], 2)]
     b = [TL.mon(dex, "SNORLAX", ["TACKLE"], 3), TL.mon(dex, "BLASTOISE", ["SURF"], 4)]
     api.lb = LB.LiveBattle(dex, (1, "나", a), (2, "상대", b), rng=random.Random(4))
-    api.lb.zring["me"] = True                                  # 자리 a 가 me
+    api.lb.zring["me"] = api.lb.tera_orb["me"] = True         # 자리 a 가 me
     api.events = api.lb.start()
     app = TL.FakeApp(root, api, dex)
     w = LUI.LiveBattleWindow(app, api.match())
     TL.pump(root, lambda: not w.busy, 25)
     TL.rest(root, 0.3)
-    ok, got = in_bar(w.gim.z)
-    chk("Z기술 단추가 메시지 막대 안에 뜬다", ok, got)
-    chk("  테라스탈 단추는 없다", no_tera(w.gim))
+    for name, tg in (("테라스탈", w.gim.tera), ("Z기술", w.gim.z)):
+        ok, got = in_bar(tg)
+        chk("%s 단추가 메시지 막대 안에 뜬다" % name, ok, got)
     chk("  눌린 위젯이 없다", not squeezed(w.win), squeezed(w.win)[:3])
     w.gim.z.toggle()
     root.update()
     chk("Z기술을 켜면 기술 칸이 바뀐다", "다이내믹풀플레임" in cell_names(w), cell_names(w))
+    w.gim.tera.toggle()
     w.use_move("FLAMETHROWER")
-    TL.pump(root, lambda: "me" in api.lb.z_done and not w.busy, 25)
-    chk("z 가 기술과 함께 간다", api.sent[-1] == {"move": "FLAMETHROWER", "z": True}, api.sent[-1])
+    TL.pump(root, lambda: (w.shown.get("me") or {}).get("tera") == "GRASS" and not w.busy, 25)
+    chk("tera·z 가 기술과 함께 간다", api.sent[-1] == {"move": "FLAMETHROWER", "tera": True, "z": True},
+        api.sent[-1])
+    me = w.shown.get("me") or {}
+    chk("테라스탈하면 타입 표시가 바뀐다", me.get("tera") == "GRASS" and me.get("typeIds") == ["GRASS"],
+        (me.get("tera"), me.get("typeIds")))
     TL.rest(root, 0.3)
-    chk("쓰고 나면 단추가 다시 안 뜬다", not w.gim.z.shown)
+    chk("쓰고 나면 단추가 다시 안 뜬다", not w.gim.tera.shown and not w.gim.z.shown)
     w.close()
     root.update()
 
@@ -273,12 +288,13 @@ def raid_part(root, dex):
                                  100 + i), 50)
         if i == 0:
             lead["held"] = "FIRIUMZ"
+            lead["tera"] = "GRASS"
         players.append((i + 1, "참가자%d" % (i + 1),
                         [lead, RB.leveled(TR.mon(dex, "PIKACHU", 50, ["THUNDERBOLT"], 200 + i), 50)]))
     boss = TR.mon(dex, "MEWTWO", 60, ["PSYCHIC", "SHADOWBALL", "AURASPHERE", "RECOVER"], 1)
     api.rb = RB.RaidBattle(dex, boss, players, hp_mult=40, max_rounds=15, rng=random.Random(5))
     p0 = api.rb.players[0]
-    p0.zring["me"] = True                              # 서버(raid.begin)가 하는 것과 같다
+    p0.zring["me"] = p0.tera_orb["me"] = True          # 서버(raid.begin)가 하는 것과 같다
     api.events = api.rb.start()
     api.round = 0
     api.state = "fighting"
@@ -286,20 +302,86 @@ def raid_part(root, dex):
     bw = RUI.RaidBattleWindow(app, api.room())
     TR.pump(root, lambda: not bw.busy, 25)
     TR.rest(root, 0.3)
-    ok, got = in_bar(bw.gim.z)
-    chk("Z기술 단추가 메시지 막대 안에 뜬다", ok, got)
-    chk("  테라스탈 단추는 없다", no_tera(bw.gim))
+    for name, tg in (("테라스탈", bw.gim.tera), ("Z기술", bw.gim.z)):
+        ok, got = in_bar(tg)
+        chk("%s 단추가 메시지 막대 안에 뜬다" % name, ok, got)
     chk("  눌린 위젯이 없다", not squeezed(bw.win), squeezed(bw.win)[:3])
+    bw.gim.tera.toggle()
     bw.gim.z.toggle()
     root.update()
     chk("Z기술을 켜면 기술 칸이 바뀐다", "다이내믹풀플레임" in cell_names(bw), cell_names(bw))
     bw.use_move("FLAMETHROWER")
-    TR.pump(root, lambda: "me" in p0.z_done and not bw.busy, 25)
-    chk("z 가 기술과 함께 간다", api.sent[-1] == {"move": "FLAMETHROWER", "z": True}, api.sent[-1])
+    TR.pump(root, lambda: (bw.shown.get(0) or {}).get("tera") == "GRASS" and not bw.busy, 25)
+    chk("tera·z 가 기술과 함께 간다", api.sent[-1] == {"move": "FLAMETHROWER", "tera": True, "z": True},
+        api.sent[-1])
+    me = bw.shown.get(0) or {}
+    chk("테라스탈하면 내 칸의 타입 표시가 바뀐다", me.get("tera") == "GRASS", me.get("tera"))
     TR.rest(root, 0.3)
-    chk("쓰고 나면 단추가 다시 안 뜬다", not bw.gim.z.shown)
+    chk("쓰고 나면 단추가 다시 안 뜬다", not bw.gim.tera.shown and not bw.gim.z.shown)
+    other = bw.shown.get(1) or {}
+    chk("다른 사람 칸은 그대로", not other.get("tera"), other.get("tera"))
     bw.close()
     root.update()
+
+
+def helper_part():
+    print("\n=== 거들기 ===")
+    chk("요청에는 켠 것만 싣는다", ui_gimmick.act_kwargs(False, False) == {"mega": False}
+        and ui_gimmick.act_kwargs(True, False, True) == {"mega": True, "tera": True}
+        and ui_gimmick.act_kwargs(False, True, True) == {"mega": False, "tera": True, "z": True})
+    chk("이름표 글: 테라스탈했으면 '테라 ○○'", ui_gimmick.tera_tag({"teraKr": "풀"}) == "테라 풀"
+        and ui_gimmick.tera_tag({}) == "" and ui_gimmick.tera_tag(None) == "")
+    wide = lambda s: len(s) * 10                       # noqa: E731 - 글자 하나 10px 로 잰다
+    chk("좁은 단추는 ' · ' 에서 줄을 바꾸고, 넉넉하면 그대로 (글자는 안 줄인다)",
+        ui_gimmick.fit_lines("테라스탈 · 에스퍼", wide, 60) == "테라스탈\n에스퍼"
+        and ui_gimmick.fit_lines("테라스탈 · 에스퍼", wide, 200) == "테라스탈 · 에스퍼"
+        and ui_gimmick.fit_lines("메가진화", wide, 10) == "메가진화")
+
+    print("\n=== 결정 모습 (테라스탈한 도트) ===")
+    from PIL import Image, ImageDraw
+    from poketdesktop import tera_fx
+    frames = []
+    for k in range(6):                                   # 가로 40 x 세로 60, 아래쪽에 몸 (발이 맨 아래 줄)
+        im = Image.new("RGBA", (40, 60), (0, 0, 0, 0))
+        ImageDraw.Draw(im).ellipse((8, 18 + (k % 2), 32, 59), fill=(220, 120, 40, 255))
+        frames.append(im)
+    out = ui_gimmick.tera_look(frames, "GRASS")
+    room = out[0].height - 60
+    chk("위쪽만 늘린다 (폭 그대로, 왕관 자리)", len(out) == 6 and out[0].width == 40 and room >= 12,
+        (len(out), out[0].size))
+    a_out, a_in = out[0].getchannel("A"), frames[0].getchannel("A")
+    chk("  발 자리(맨 아래 줄)가 그대로 - 창의 도트는 발에 맞춰 선다",
+        a_out.getbbox()[3] == out[0].height and a_in.getbbox()[3] == 60
+        and a_out.getpixel((20, out[0].height - 1)) == 255 and a_in.getpixel((20, 59)) == 255,
+        (a_out.getbbox(), a_in.getbbox()))
+    top = out[0].getchannel("A").crop((0, 0, 40, room + 17)).getbbox()
+    chk("  몸 위에 왕관이 있다", top is not None and top[3] <= room + 17, top)
+    px = out[0].convert("RGB").getpixel((20, room + 45))
+    chk("  몸은 그 타입 빛깔로 (풀: 초록이 빨강보다 짙다)", px[1] > px[0], px)
+    chk("  테라스탈 안 했으면 그대로", ui_gimmick.tera_look(frames, None) is frames)
+    chk("  그림이 이상하면 원래 프레임 그대로 (판을 막지 않는다)", tera_fx.crystal_frames(["x"], "#00ff00") == ["x"])
+    sweeps = [tera_fx._sweep(40, 60, k, 10) is not None for k in range(10)]
+    chk("  빛줄기는 한 바퀴의 앞쪽에만 스친다 (나머지는 쉰다)", any(sweeps) and not all(sweeps) and sweeps[0]
+        and not sweeps[-1], sweeps)
+
+    print("\n=== 가방 · 상점 · 상자: 테라피스 ===")
+    from poketdesktop import ui_bag, ui_box, ui_shop
+    shard = {"id": "WATERTERASHARD", "kr": "테라피스 물", "cat": "misc", "desc": "물 타입으로 바꾼다.",
+             "effect": {"kind": "tera", "type": "WATER"}}
+    chk("가방에서 쓸 수 있는 도구다 (대상 포켓몬을 고른다)", "tera" in ui_bag.USABLE and "tera" not in ui_bag.NO_TARGET)
+    chk("  설명 끝에 규칙 한 줄", ui_bag.item_desc(shard).endswith(ui_bag.TERA_RULE), ui_bag.item_desc(shard))
+    chk("  대상 안내", "같은 타입" in ui_bag.target_hint(shard), ui_bag.target_hint(shard))
+    st = ui_bag.BagWindow._target_state(None, shard, {"teraType": "WATER", "teraKr": "물", "info": {}, "level": 5})
+    chk("  이미 그 타입인 포켓몬은 막는다", st[1] is True and "이미 물" in st[2], st)
+    st = ui_bag.BagWindow._target_state(None, shard, {"teraType": "FIRE", "teraKr": "불꽃", "info": {}, "level": 5})
+    chk("  다른 타입이면 줄 끝에 지금 테라 타입", st[1] is False and st[2] == "테라 타입: 불꽃", st)
+    st = ui_bag.BagWindow._target_state(None, shard, {"info": {}, "level": 5})
+    chk("  옛 서버(테라 칸 없음)면 막지 않는다", st[1] is False, st)
+    chk("상점 설명 · 덧말", "테라 타입" in ui_shop.effect_text(shard) and ui_shop.effect_note(shard) == ui_bag.TERA_RULE)
+    chk("상자 '테라' 칸 설명: 정한 것 / 안 정한 것 / 옛 서버",
+        "첫째 타입" not in ui_box.tera_note({"teraKr": "물", "teraSet": True})
+        and "첫째 타입" in ui_box.tera_note({"teraKr": "물", "teraSet": False})
+        and "새 판" in ui_box.tera_note({}))
 
 
 def main():
@@ -326,6 +408,7 @@ def main():
     orig_later = GB.GymBattleWindow.later
     GB.GymBattleWindow.later = lambda self, ms, fn: orig_later(self, max(1, ms // 10), fn)
 
+    helper_part()
     gym_part(root, dex, gyms, kmap)
     live_part(root, dex)
     raid_part(root, dex)

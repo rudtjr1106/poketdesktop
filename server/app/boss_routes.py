@@ -41,7 +41,7 @@ def start(ctx=Depends(deps.current)):
         raise HTTPException(409, "데리고 다니는 포켓몬이 없습니다.")
     try:
         region, tid, tb, events = boss.start(
-            uid, party, zring=gimmick.has_zring(uid), keystone=mega.has_keystone(uid))
+            uid, party, zring=gimmick.has_zring(uid), keystone=mega.has_keystone(uid), orb=gimmick.has_orb(uid))
     except LookupError as e:
         raise HTTPException(404, str(e))
     except ValueError as e:
