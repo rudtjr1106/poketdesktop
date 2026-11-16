@@ -14,7 +14,8 @@
   4. 그대로인 것: 받는 쪽 마릿수, 방금 붙은 사람·차단한 사람 제외.
   5. **RP 띠가 배치보다 먼저다** (10/17). 같은 띠 안에서만 배치를 마친 사람끼리 먼저 붙인다 -
      배치가 같은 사람을 찾느라 RP 가 먼 상대를 고르지 않는다.
-  6. **3시간 건너뛰기는 한국 시각 자정에 새로 센다** (11/10). 같은 상대 30분 쿨타임은 자정에도 그대로다.
+  6. **3시간 건너뛰기는 한국 시각 자정에 새로 센다** (11/10). 랜덤 배틀은 같은 상대 30분 쿨타임도 자정에
+     새로 센다 (11/16 - 자정을 끼고 40판 몰아 치기). 친구 배틀의 30분은 자정에도 그대로다.
 """
 import datetime
 import os
@@ -175,13 +176,31 @@ def main():
     got = set(picks(me, 8))
     chk("  오늘 만난 사람은 그대로 3시간 동안 안 고른다 (0:01 에 만났으면 0:40 에도)", got == {far}, got)
     db.run("DELETE FROM battle_record")
+
+    print("\n=== 랜덤 배틀은 같은 상대 30분 쿨타임도 자정에 새로 센다 (11/16) ===")
+    # 30분이 자정을 넘어 이어지면, 23:50 부터 20판 + 0시에 20판을 30분 안에 몰아 쳐서 앞 20판의 상대를 다 빼고
+    # 뒤 20판을 RP 낮은 상대로 채울 수 있었다.
     met_at(near, kst(8, 23, 55))
+    pvp._now = lambda: kst(8, 23, 58)
+    got = set(picks(me, 8))
+    chk("자정 전(23:58)에는 3분 전(23:55)에 만난 사람을 뺀다", got == {far}, got)
     pvp._now = lambda: kst(9, 0, 5)
     got = set(picks(me, 8))
-    chk("같은 상대 30분 쿨타임은 자정에도 그대로 (23:55 에 만난 사람은 0:05 에 안 고른다)", got == {far}, got)
-    pvp._now = lambda: kst(9, 0, 30)
+    chk("**자정이 지나면(0:05) 23:55 에 만난 RP 가까운 사람을 다시 고른다** (30분 안이어도)", got == {near}, got)
+    why = pvp.can_fight(me, near, "random", practice_ok=True) or ""
+    chk("  랜덤 배틀로 걸 때도 막지 않는다 (골라 놓고 can_fight 에 걸리지 않게)", "분에 한 번" not in why, why)
+    why = pvp.can_fight(me, near, "friend") or ""
+    chk("  친구 배틀의 30분은 자정에도 그대로", "분에 한 번" in why, why)
+    db.run("DELETE FROM battle_record")
+    met_at(near, kst(9, 0, 10), practice=1)     # 연습판: 3시간 건너뛰기에는 안 들고 30분에만 든다
+    pvp._now = lambda: kst(9, 0, 20)
     got = set(picks(me, 8))
-    chk("  30분이 지나면(0:30) 다시 고른다", got == {near}, got)
+    chk("오늘 안에서는 30분 쿨타임 그대로 (0:10 연습판 상대를 0:20 에 안 고른다)", got == {far}, got)
+    why = pvp.can_fight(me, near, "random", practice_ok=True) or ""
+    chk("  랜덤 배틀로 걸어도 막는다", "분에 한 번" in why, why)
+    pvp._now = lambda: kst(9, 0, 41)
+    got = set(picks(me, 8))
+    chk("  30분이 지나면(0:41) 다시 고른다", got == {near}, got)
     pvp._now = lambda: datetime.datetime(2026, 11, 10, 15, 0, tzinfo=pvp.KST).astimezone(datetime.timezone.utc)
     db.run("DELETE FROM battle_record")
 
