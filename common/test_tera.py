@@ -352,6 +352,15 @@ def more():
         r1.get("warStats"))
     r0 = PB.simulate(DEX, team_a, team_b, seed=21, war_ai=True)
     chk("테라오브가 없으면 테라스탈이 없다", not any(e.get("t") == "tera" for e in r0["events"]))
+    # 11/17: 한쪽이 바꾸는 턴(_switch_turn)에도 기술을 쓰는 쪽은 테라스탈한다 (전에는 이 길에 tera_step 이 없었다)
+    pb = PB.PartyBattle(DEX, [mon("CHARIZARD", ("FLAMETHROWER",), tera="FIRE"), mon("SNORLAX", ("TACKLE",))],
+                        [mon("SNORLAX", ("TACKLE",)), mon("BLISSEY", ("TACKLE",))], seed=5, tera_orb=both, war_ai=True)
+    bt = pb._round_battle()
+    pb.moved_out = {"me": False, "foe": False}
+    ev = pb._switch_turn(bt, {"me": (None, "FLAMETHROWER"), "foe": (1, None)})
+    tv = [(e["who"], e["type"]) for e in ev if e.get("t") == "tera"]
+    chk("랭크: 상대가 바꾸는 턴에도 기술을 쓰는 쪽은 테라스탈한다 (바꾼 쪽은 안 한다)", tv == [("me", "FIRE")],
+        (tv, [e.get("t") for e in ev][:12]))
 
     print("\n=== 관장 · 레이드 판 저장 (2.5.0) ===")
     trainer = {"id": "t", "name": "시험", "role": "관장", "sprite": "x", "level": 50,
@@ -364,6 +373,21 @@ def more():
     chk("관장 판: 테라스탈한 채로 저장 · 불러오기", back.me.tera == "GRASS" and "me" in back.tera_done
         and back.view()["me"]["team"][0]["tera"] == "GRASS", (back.me.tera, sorted(back.tera_done)))
     chk("  관장 쪽은 쓰지 않는다", not back.tera_orb["foe"] and not back.bt.auto_tera["foe"])
+    # 11/17: 테라오브를 가진 상대(길드전 방어 AI 와 같은 auto_tera)가 바꿔 넣은 포켓몬은 그 턴에 테라스탈하지 않는다
+    orb_trainer = dict(trainer, orb=True, team=[
+        {"species": "SNORLAX", "level": 50, "moves": ["TACKLE"]},
+        {"species": "CHARIZARD", "level": 50, "moves": ["FLAMETHROWER"], "held": "FIRETERASHARD"}])
+    tb = TB.TrainerBattle(DEX, [mon("SNORLAX", ("TACKLE",))], orb_trainer, random.Random(4))
+    tb.start()
+    tb._forced = ("switch", 1)
+    ev = tb.act("move", "TACKLE")
+    chk("상대가 바꿔 넣은 턴에는 테라스탈하지 않는다 (메가진화와 같다)",
+        tb.foe.species["internal"] == "CHARIZARD" and tb.foe.tera is None
+        and not any(e.get("t") == "tera" for e in ev), (tb.foe.tera, [e.get("t") for e in ev][:12]))
+    tb._forced = ("move", "FLAMETHROWER")
+    ev = tb.act("move", "TACKLE")
+    chk("  다음 턴, 기술을 쓸 때는 테라스탈한다", tb.foe.tera == "FIRE"
+        and any(e.get("t") == "tera" and e.get("who") == "foe" for e in ev), (tb.foe.tera, [e.get("t") for e in ev][:12]))
     players = [(1, "가", [RB.leveled(mon("CHARIZARD", ("FLAMETHROWER",), tera="GRASS"), 50)]),
                (2, "나", [RB.leveled(mon("SNORLAX", ("TACKLE",)), 50)])]
     rb = RB.RaidBattle(DEX, mon("MEWTWO", ("PSYCHIC",), level=60), players, hp_mult=40, max_rounds=5,
