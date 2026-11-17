@@ -1773,8 +1773,10 @@ def before_attack(bt, k, move, who, user, target, tw, ev):
     return True
 
 
-def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
-    """때리고 난 뒤 (고속스핀·끌어내기·유턴·필드 부수기·떨어뜨리기·탁쳐서떨구기)."""
+def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev, landed=False):
+    """때리고 난 뒤 (고속스핀·끌어내기·유턴·필드 부수기·떨어뜨리기·탁쳐서떨구기).
+
+    total 은 실제로 깎은 체력, landed 는 한 대라도 맞았는지다 (탈·아이스페이스가 대신 맞으면 total 0 · landed True)."""
     if k in SPINNERS and user.alive() and total:
         side = bt.field.side(who)
         gone = [hz for hz in FD.HAZARDS if side.pop(hz, None)]
@@ -1798,7 +1800,8 @@ def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
     if k in DRAG_ATTACKS and total and target.alive() and user.alive() and not sub_hit:
         if not target.cond.get("ingrain") and not (A.has(target, "SUCTIONCUPS") and not A.breaks(user)):
             bt.request_switch(tw, "drag", ev, k)
-    if k in OUT_ATTACKS and total and user.alive() and bt.kind != "wild" and _team_others(bt, who, user):
+    # 유턴·볼트체인지·퀵턴은 맞히기만 하면 물러난다 - 탈·아이스페이스에 막혀 0 을 깎았어도 (11/16 문의 #594)
+    if k in OUT_ATTACKS and (total or landed) and user.alive() and bt.kind != "wild" and _team_others(bt, who, user):
         bt.request_switch(who, "out", ev, k)
     if (k == "KNOCKOFF" and total and target.alive() and not sub_hit
             and MC.item_on(target) and not H.stuck(target._held, target)

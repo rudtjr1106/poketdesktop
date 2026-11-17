@@ -2030,6 +2030,7 @@ class Battle(object):
 
         total = 0
         sub_hit = False
+        landed = False      # 한 대라도 맞았나. 탈·아이스페이스가 대신 맞으면 total 은 0 이어도 맞은 것이다 (문의 #594)
         fixed_move = k in MC.FIXED or move.get("_fixed") is not None
         if MC.attacks(move) and type_eff(self.dex, move, A.move_type(user, move) if abil
                                          else move.get("type"), user, target, abil) != 0:
@@ -2085,7 +2086,7 @@ class Battle(object):
                 if SM.sub_blocks(user, target, hit_move):
                     # 대타출동이 대신 맞는다. 맞는 쪽 특성·도구·부가효과는 없다.
                     total += SM.hit_sub(self, user, who, target, tw, dmg, ev)
-                    sub_hit = True
+                    sub_hit = landed = True
                     continue
                 if target.held:
                     # 반감 열매, 기합의띠. 맞는 쪽 도구가 데미지를 고친다.
@@ -2106,6 +2107,7 @@ class Battle(object):
                 # 조개껍질방울이 전부 이 값을 쓴다. 대타(hit_sub)는 이미 깎인
                 # 만큼만 돌려준다.
                 total += hp_before - target.hp
+                landed = True
                 self._note_hurt(target, move, hp_before - target.hp, who)
                 ev.append({"t": "hit", "who": who, "target": "foe" if who == "me" else "me",
                            "damage": dmg, "crit": crit, "eff": 1.0 if fixed_move else eff,
@@ -2141,7 +2143,7 @@ class Battle(object):
             elif 0 < eff < 1:
                 ev.append({"t": "msg", "text": "효과가 별로인 듯하다..."})
             self._after_special(k, move, who, user, target, tw, total, ev)
-            SM.after_attack(self, k, move, who, user, target, tw, total, sub_hit, ev)
+            SM.after_attack(self, k, move, who, user, target, tw, total, sub_hit, ev, landed=landed)
             AF.after_attack(self, k, move, who, user, target, tw, total, sub_hit, ev)
             if user.held or target.held:
                 # 생명의구슬 반동, 조개껍질방울, 자보·애터·의문열매, 그리고

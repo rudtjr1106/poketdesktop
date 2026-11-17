@@ -193,6 +193,23 @@ def t_관장():
         chk("%s: 쓰자마자 묻고, 고르면 이어진다%s" % (DEX.move(key).get("kr") or key, " (랭크를 넘겨받는다)" if key == "BATONPASS" else ""),
             ok, (texts(ev), texts(ev2), lax.maxhp - lax.hp, first.maxhp - first.hp))
 
+    print("-- 탈·아이스페이스가 대신 맞아도 물러난다 (11/16 문의 #594: 누리레느의 퀵턴이 따라큐의 탈에 막혀 안 물러남)")
+    # 탈·아이스페이스는 데미지를 0 으로 돌려서 '준 피해' 가 0 이다. 그래도 기술은 맞았다 - 본가도 물러난다.
+    for key, user, foe_sp, foe_ab in (("FLIPTURN", "PRIMARINA", "MIMIKYU", "DISGUISE"),
+                                      ("UTURN", "SCIZOR", "MIMIKYU", "DISGUISE"),
+                                      ("FLIPTURN", "PRIMARINA", "EISCUE", "ICEFACE")):
+        tb = gym([mon(foe_sp, ["SPLASH"], ability=foe_ab)], [mon(user, [key]), mon("SNORLAX", ["TACKLE"])])
+        foe = tb.foe
+        ev = tb.act("move", key)
+        blocked = any("대신 공격을 받았다" in (e.get("text") or "") for e in ev)
+        chk("%s → %s(%s): 막혀도 교체를 묻는다" % (key, foe_sp, foe_ab), blocked and tb.need_switch, texts(ev))
+        if tb.need_switch:
+            tb.act("switch", 1)
+        chk("  고르면 나온 포켓몬으로 바뀐다", tb.mi == 1 and not tb.need_switch, (tb.mi, tb.need_switch))
+    tb = gym([mon("MIMIKYU", ["SPLASH"], ability="DISGUISE")], [mon("PRIMARINA", ["FLIPTURN"])])
+    ev = tb.act("move", "FLIPTURN")
+    chk("  바꿀 동료가 없으면 탈에 막혀도 안 묻는다", not tb.need_switch and tb.pending_out is None, texts(ev))
+
     print("-- 턴 도중에 나온 포켓몬은 그 턴에 움직이지 않는다 (위기회피)")
     party = [mon("GOLISOPOD", ["TACKLE"], ability="EMERGENCYEXIT"), mon("SNORLAX", ["TACKLE"])]
     tb = gym([mon("JOLTEON", ["SEISMICTOSS"])], party)                  # 늘 50 을 깎는다. 갑주무사보다 빠르다
