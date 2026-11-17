@@ -532,6 +532,28 @@ def t_ask(op, a, b):
         (raises(LookupError, board.image_file, b, iid), raises(Exception, board.image_file, op, iid)))
     chk("내 활동 수에 내 문의/건의도 든다", board.mine(b["id"])["postCount"] >= 1
         and ib in [x["id"] for x in board.mine_page(b["id"], "posts", 1)["items"]])
+
+    print("\n=== 문의/건의는 운영진만 지운다 (11/17) ===")
+    cb = board.comment(b, ib, "하나 더 여쭤봐요", now=at(day + 230))
+
+    def com(user, cid):
+        return [c for c in board.detail(user, ib)["commentList"] if c["id"] == cid][0]
+    chk("쓴 사람에게 글 삭제 단추가 없다 (canDelete)", board.detail(b, ib)["canDelete"] is False)
+    chk("  내 댓글에도 없다", com(b, cb)["canDelete"] is False and com(b, cb)["mine"] is True, com(b, cb))
+    chk("  운영진에게는 글 · 댓글 둘 다 있다", board.detail(op, ib)["canDelete"] is True and com(op, cb)["canDelete"] is True)
+    chk("쓴 사람이 글을 지우려 하면 403 ('운영진만')",
+        "운영진만" in str(raises(PermissionError, board.remove, b, ib))
+        and status(board_routes.remove, ib, ctx={"user": b}) == 403)
+    chk("  댓글도 못 지운다", "운영진만" in str(raises(PermissionError, board.remove_comment, b, cb)))
+    chk("  지워지지 않고 그대로", board.detail(b, ib)["comments"] == 3)
+    cf = board.comment(b, fr, "자유 글 댓글", now=at(day + 240))
+    board.remove_comment(b, cf)
+    chk("자유 글은 그대로: 쓴 사람이 자기 댓글 · 글을 지운다",
+        board.detail(a, fr)["canDelete"] is True and board.detail(a, fr)["comments"] == 0)
+    board.remove_comment(op, cb)
+    chk("운영진은 문의/건의 댓글을 지운다", board.detail(b, ib)["comments"] == 2)
+    board.remove(op, ib)
+    chk("  글도 지운다", raises(LookupError, board.detail, b, ib))
     print("\n=== 종류는 꼭 고른다 ===")
     chk("종류 없이 쓰면 400 ('골라 주세요')", "골라" in str(raises(ValueError, board.create, b, "", "제목", "내용")))
     chk("  HTTP 로 종류를 안 보내도 400 (예전엔 자유)", status(board_routes.create, board_routes.PostIn(

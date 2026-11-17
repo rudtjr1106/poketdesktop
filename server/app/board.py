@@ -46,6 +46,10 @@
 한다. 답글이 달린 댓글을 지우면 '삭제된 댓글입니다' 로 자리를 남긴다 -
 없애 버리면 답글이 무엇에 대한 말인지 알 수 없다.
 
+**문의/건의는 운영진만 지운다** (ADMIN_DELETE_ONLY, 11/17 운영진 결정) - 글도 댓글도, 쓴 사람이어도
+못 지운다. 문의와 운영진의 답이 기록으로 남아야 같은 문의에 같은 답을 하고, 답을 받은 뒤 글을 지워
+'답을 못 받았다' 가 되는 일이 없다. 화면은 canDelete 를 보고 단추를 띄우므로 서버만 바꾸면 된다.
+
 ## 도배
 
 글은 30초, 댓글은 5초에 하나. 하루 글 20개·댓글 200개까지. 같은 사람이
@@ -82,6 +86,8 @@ from . import config, db, season
 KINDS = ("notice", "free", "qna", "patch", "ask")
 KIND_KR = {"notice": "공지", "free": "자유", "qna": "Q&A", "patch": "패치노트", "ask": "문의/건의"}
 PRIVATE = ("ask",)
+# 운영진만 지우는 칸 - 글과 그 글의 댓글 모두 (위 '지우기'). 쓴 사람도 못 지운다.
+ADMIN_DELETE_ONLY = ("ask",)
 # '전체' 에 흐르는 글. 공지는 맨 위에 따로 붙고, 패치노트는 자기 칸에만 있다.
 FLOW = ("free", "qna")
 SEARCH_MAX = 30               # 찾는 말 길이
@@ -239,10 +245,15 @@ def _post_row(r, authors, uid, admin, now, counts, likes=None):
            "mine": r["user_id"] == uid,
            "private": r["kind"] in PRIVATE,          # 운영진과 쓴 사람만 보는 글 (화면이 알려 준다)
            # 패치노트는 서버가 올린 글이다. 고치면 다음 판과 모양이 갈린다.
-           "canDelete": (r["user_id"] == uid or admin) and not patch,
+           "canDelete": _may_delete(r["kind"], r["user_id"], uid, admin) and not patch,
            "canEdit": r["user_id"] == uid and not patch}
     out.update(_who(r, authors))
     return out
+
+
+def _may_delete(kind, author_id, uid, admin):
+    """이 칸(kind)의 글 · 댓글을 지울 수 있나. 운영진은 늘, 쓴 사람은 문의/건의가 아닐 때만 (ADMIN_DELETE_ONLY)."""
+    return bool(admin) or (author_id == uid and kind not in ADMIN_DELETE_ONLY)
 
 
 def _likes(ids, uid):
@@ -357,7 +368,7 @@ def detail(user, pid, now=None):
                "deleted": bool(c["deleted"]),
                "body": "" if c["deleted"] else c["body"],
                "mine": c["user_id"] == uid and not c["deleted"],
-               "canDelete": (c["user_id"] == uid or admin) and not c["deleted"]}
+               "canDelete": _may_delete(r["kind"], c["user_id"], uid, admin) and not c["deleted"]}
         out.update(_who(c, authors))
         if c["deleted"]:                      # 누가 썼는지도 가린다
             out.update({"author": "", "authorTitle": None, "authorColor": None,
@@ -431,6 +442,8 @@ def remove(user, pid):
         raise LookupError("없는 글이거나 지워진 글입니다.")
     if r["user_id"] != user["id"] and not is_admin(user):
         raise PermissionError("내가 쓴 글만 지울 수 있습니다.")
+    if r["kind"] in ADMIN_DELETE_ONLY and not is_admin(user):
+        raise PermissionError("문의/건의 글은 운영진만 지울 수 있습니다.")
     if r["kind"] == "patch":
         raise PermissionError("패치노트는 지울 수 없습니다.")
     db.run("UPDATE board_post SET deleted=1 WHERE id=?", (pid,))
@@ -506,6 +519,9 @@ def remove_comment(user, cid):
         raise LookupError("없는 댓글이거나 지워진 댓글입니다.")
     if c["user_id"] != user["id"] and not is_admin(user):
         raise PermissionError("내가 쓴 댓글만 지울 수 있습니다.")
+    post = db.q1("SELECT kind FROM board_post WHERE id=?", (c["post_id"],))
+    if post and post["kind"] in ADMIN_DELETE_ONLY and not is_admin(user):
+        raise PermissionError("문의/건의 댓글은 운영진만 지울 수 있습니다.")
     db.run("UPDATE board_comment SET deleted=1 WHERE id=?", (cid,))
     db.run("DELETE FROM board_notify WHERE comment_id=?", (cid,))    # 지운 댓글은 알리지 않는다
     return c["post_id"]
