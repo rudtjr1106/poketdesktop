@@ -1734,6 +1734,18 @@ class Battle(object):
             ev.append(e)
 
     def _use(self, who, user, target, key, ev, called=False, instructed=False, bounced=False):
+        """기술 하나를 쓴다 (_use_one). 하양허브는 그 기술이 다 끝난 뒤에 한꺼번에 (held.on_stat_drop, 11/17) -
+        다른 기술이 부른 기술(손가락흔들기 ...)은 안쪽 묶음이라 바깥 기술이 끝날 때 한 번 본다."""
+        self._herb_batch = getattr(self, "_herb_batch", 0) + 1
+        try:
+            return self._use_one(who, user, target, key, ev, called, instructed, bounced)
+        finally:
+            self._herb_batch -= 1
+            if not self._herb_batch:
+                # 판이 끝났어도(상대를 쓰러뜨려 라운드가 끝남) 본다 - 살아남은 쪽은 능력 변화를 안고 다음 라운드로 간다
+                H.flush_herbs(self, ev)
+
+    def _use_one(self, who, user, target, key, ev, called=False, instructed=False, bounced=False):
         """기술 하나를 쓴다. 실제 일은 _do_use 가 하고, 여기서는 **쓰고 난 뒤**를 본다.
 
         파괴광선의 반동 턴, 빗나간 무릎차기, 대폭발로 쓰러지는 것, 연속자르기의
@@ -2713,7 +2725,21 @@ class Battle(object):
         그대로 부르면 보스의 화상 데미지가 사람 수만큼 들어가고 리플렉터·
         날씨의 남은 턴도 그만큼 줄어든다. 첫 사람만 보스와 판(field)을 맡고
         나머지는 자기 쪽만 처리한다. 야생·관장·PvP 는 기본값 그대로다.
+
+        하양허브는 턴 끝 처리가 다 끝난 뒤에 (문어굳히기가 방어 · 특수방어를 같이 떨어뜨린다 - held.on_stat_drop).
         """
+        self._herb_batch = getattr(self, "_herb_batch", 0) + 1
+        try:
+            self._end_of_turn_steps(ev, sides, field)
+        finally:
+            self._herb_batch -= 1
+            if not self._herb_batch:
+                H.flush_herbs(self, ev)
+        if (self.me.held or self.foe.held) and not self.over:
+            H.settle(self, ev)                      # 멘탈허브·시몬열매·빨간실·탈출 도구 (1.13)
+
+    def _end_of_turn_steps(self, ev, sides, field):
+        """턴 끝 처리의 차례 (_end_of_turn 이 하양허브 묶음으로 감싸 부른다)."""
         self.turn_open = False             # 다음에 고르는 것은 다음 턴의 기술이다
         SM.end_turn_pre(self, ev, sides, field)
         if self.me.ability_on or self.foe.ability_on:
@@ -2757,8 +2783,6 @@ class Battle(object):
         AF.end_turn(self, ev, sides, field)         # 소금절이·시럽봄·미래예지
         SM.end_turn_post(self, ev, sides, field)
         self._check_faint(ev)
-        if (self.me.held or self.foe.held) and not self.over:
-            H.settle(self, ev)                      # 멘탈허브·시몬열매·빨간실·탈출 도구 (1.13)
 
     def _drain_seed(self, f, who, ev):
         """씨뿌리기: 최대 체력의 1/8 을 빼앗아 맞은편에 준다.

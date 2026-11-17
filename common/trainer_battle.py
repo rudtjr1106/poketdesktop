@@ -1393,7 +1393,14 @@ class TrainerBattle(object):
         # 메가진화 (시즌 3): 둘 다 고른 뒤, 순서를 정하기 전에. 교체한 쪽은 못 한다.
         bt.auto_mega["foe"] = bool(self.keystone.get("foe")) and foe_slot is None
         bt.mega_step({"me": bool(mega) and kind == "move"}, ev)
-        bt.tera_step({"me": bool(tera) and kind == "move"}, ev)
+        # 테라스탈도 교체한 쪽은 못 한다 (11/17). 메가진화는 위에서 막는데 테라스탈은 안 막아서, 길드전 방어 AI 가
+        # 바꿔 넣은 포켓몬을 그 턴에 바로 테라스탈시켜 내 기술을 받았다 (본가는 기술을 고를 때만 테라스탈한다).
+        keep_tera = bt.auto_tera.get("foe")
+        bt.auto_tera["foe"] = bool(keep_tera) and foe_slot is None
+        try:
+            bt.tera_step({"me": bool(tera) and kind == "move"}, ev)
+        finally:
+            bt.auto_tera["foe"] = keep_tera
         bt.z_request("me", me_move, bool(z) and kind == "move")
         bt._auto_z("foe", foe_move)            # 길드전 방어 AI 만 켜져 있다 (관장은 auto_z 가 꺼져 있다)
 

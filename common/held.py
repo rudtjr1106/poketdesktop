@@ -723,18 +723,42 @@ def on_status(bt, f, who, ev):
 
 
 def on_stat_drop(bt, f, who, ev):
-    """능력이 떨어진 직후. 하양허브, 탈출팩."""
+    """능력이 떨어진 직후. 하양허브, 탈출팩.
+
+    하양허브는 **기술 하나(또는 턴 끝 처리)가 다 끝난 뒤** 떨어진 것을 한꺼번에 되돌린다 (11/17, 본가와 같다).
+    전에는 떨어지는 그 자리에서 바로 돌아서, 껍질깨기 · 인파이트 · 문어굳히기처럼 둘 이상 떨어뜨리면 첫 하락
+    (방어)만 되돌리고 다음 하락(특수방어)은 남았다. 기술 · 턴 끝 처리 중이면(bt._herb_batch) 표시만 해 두고
+    Battle 이 그 묶음 끝에서 flush_herbs 를 부른다. 묶음 밖(나오자마자 받은 위협 · 끈적끈적네트)은 그 자리에서.
+    """
     if f.held == "WHITEHERB" and not f.used \
             and any(v < 0 for v in f.stages.values()):
-        for k, v in f.stages.items():
-            if v < 0:
-                f.stages[k] = 0
-        _consume(f)
-        _say(ev, who, "%s 은(는) 하양허브로 능력 하락을 되돌렸다!" % f.name)
+        if getattr(bt, "_herb_batch", 0):
+            f.cond["herb"] = True
+            return
+        _white_herb(f, who, ev)
     elif f.held == "EJECTPACK" and not f.used and f.alive() and _can_leave(bt):
         _consume(f)
         f.cond["eject"] = "out"                    # 기술이 끝난 뒤에 물러난다 (settle)
         _say(ev, who, "%s 은(는) 탈출팩으로 돌아가려 한다!" % f.name)
+
+
+def _white_herb(f, who, ev):
+    for k, v in f.stages.items():
+        if v < 0:
+            f.stages[k] = 0
+    _consume(f)
+    _say(ev, who, "%s 은(는) 하양허브로 능력 하락을 되돌렸다!" % f.name)
+
+
+def flush_herbs(bt, ev):
+    """기술 하나 · 턴 끝 처리가 끝났다. 그동안 능력이 떨어져 표시해 둔 하양허브를 지금 쓴다 (on_stat_drop)."""
+    for who in ("me", "foe"):
+        f = bt.fighter(who)
+        if f is None or not f.cond.pop("herb", None):
+            continue
+        if f.alive() and f.held == "WHITEHERB" and not f.used \
+                and any(v < 0 for v in f.stages.values()):
+            _white_herb(f, who, ev)
 
 
 def flee_sure(f):

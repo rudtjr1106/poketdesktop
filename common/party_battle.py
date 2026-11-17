@@ -699,11 +699,17 @@ class PartyBattle(object):
             if slot is not None:
                 self._war_switch(who, slot, ev)
         keep = dict(bt.auto_mega)
+        keep_tera = dict(bt.auto_tera)
         bt.auto_mega = dict((w, keep.get(w) and moves[w] is not None) for w in ("me", "foe"))
+        # 테라스탈도 메가진화처럼 바꾸지 않은 쪽만 (11/17). 전에는 이 길에 tera_step 이 없어서, 한쪽이 바꾸는 턴에는
+        # 기술을 쓰는 쪽도 테라스탈하지 못했다 (take_turn 은 mega_step 다음에 tera_step 을 부른다).
+        bt.auto_tera = dict((w, keep_tera.get(w) and moves[w] is not None) for w in ("me", "foe"))
         try:
             bt.mega_step({"me": False}, ev)
+            bt.tera_step({"me": False}, ev)
         finally:
             bt.auto_mega = keep
+            bt.auto_tera = keep_tera
         for who in ("me", "foe"):
             f, k = bt.fighter(who), moves[who]
             if k is None:

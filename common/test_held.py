@@ -344,6 +344,43 @@ def t_효과(dex):
     ev = []
     bt._change_stat(f, "atk", -2, ev, "me")
     chk("하양허브가 하락을 되돌린다", f.stages["atk"] == 0 and f.used, (f.stages, texts(ev)))
+    # 하양허브 (11/17): 한 기술로 둘 이상 떨어지면 기술이 끝난 뒤 한꺼번에 되돌린다 (본가와 같다). 전에는 첫 하락만.
+    r2 = random.Random(1117)                              # 위의 rng 를 안 건드린다 (뒤 검사의 포켓몬이 그대로)
+    cloy = P.make_pokemon(dex.get(91), 50, r2)            # 파르셀: 껍질깨기 (방어 · 특방 -1, 공격 · 특공 · 스피드 +2)
+    cloy["moves"] = ["SHELLSMASH"]
+    bt, f, foe = pair(dex, with_item(cloy, "WHITEHERB"), pika)
+    ev = []
+    bt._use("me", f, foe, "SHELLSMASH", ev)
+    chk("껍질깨기: 방어 · 특방 둘 다 되돌리고 오른 것은 그대로",
+        f.stages["def"] == 0 and f.stages["spd"] == 0 and f.stages["atk"] == 2 and f.stages["spe"] == 2 and f.used,
+        (f.stages, texts(ev)))
+    chk("  되돌린 문구는 한 번, 기술 문구들 뒤에", texts(ev).count("하양허브") == 1
+        and [e.get("text", "") for e in ev if e.get("text")][-1].endswith("하양허브로 능력 하락을 되돌렸다!"), texts(ev))
+    champ = P.make_pokemon(dex.get(68), 50, r2)           # 괴력몬: 인파이트 (방어 · 특방 -1)
+    champ["moves"] = ["CLOSECOMBAT"]
+    tough = P.make_pokemon(dex.get(143), 100, r2)         # 잠만보 Lv.100: 맞고도 버틴다
+    bt, f, foe = pair(dex, with_item(champ, "WHITEHERB"), tough)
+    ev = []
+    bt._use("me", f, foe, "CLOSECOMBAT", ev)
+    chk("인파이트: 방어 · 특방 둘 다 되돌린다", f.stages["def"] == 0 and f.stages["spd"] == 0 and f.used,
+        (f.stages, texts(ev)))
+    weak = P.make_pokemon(dex.get(10), 5, r2)             # 캐터피 Lv.5: 한 방에 쓰러진다
+    bt, f, foe = pair(dex, with_item(champ, "WHITEHERB"), weak)
+    ev = []
+    bt._use("me", f, foe, "CLOSECOMBAT", ev)
+    chk("  상대를 쓰러뜨려 판이 끝나도 되돌린다 (살아남은 쪽은 다음 라운드로 간다)",
+        not foe.alive() and f.stages["def"] == 0 and f.stages["spd"] == 0 and f.used, (foe.hp, f.stages, texts(ev)))
+    bt, f, foe = pair(dex, with_item(tough, "WHITEHERB"), champ)
+    f.cond["octolock"] = "foe"                            # 문어굳히기: 턴 끝에 방어 · 특방 -1
+    ev = []
+    bt._end_of_turn(ev)
+    chk("문어굳히기(턴 끝): 둘 다 되돌린다", f.stages["def"] == 0 and f.stages["spd"] == 0 and f.used,
+        (f.stages, texts(ev)))
+    bt, f, foe = pair(dex, with_item(char, "WHITEHERB"), dict(pika, moves=["GROWL"]))
+    f.used = True                                          # 이미 쓴 하양허브는 다시 안 돈다
+    ev = []
+    bt._use("foe", foe, f, "GROWL", ev)
+    chk("  이미 쓴 하양허브는 기술 뒤에도 안 돈다", "하양허브" not in texts(ev), texts(ev))
 
     # 맹독구슬: 턴 끝에 독에 걸린다 (독 타입은 안 걸린다)
     evs, bt = solo(dex, with_item(tank, "TOXICORB"), wall, 1, turns=1)
