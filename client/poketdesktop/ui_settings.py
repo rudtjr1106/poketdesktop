@@ -734,7 +734,8 @@ class SettingsWindow(object):
         if self.app.overlay:
             self.app.overlay.apply_alpha()      # 투명도도 그대로(100%)로
         from . import win_alpha
-        win_alpha.apply_all(self.app.root)      # 창 투명도도 - 열려 있는 창이 비친 채로 남지 않게 (#566)
+        # 창 투명도도 - 열려 있는 창이 비친 채로 남지 않게 (#566). 창을 못 훑으면 apply_all 이 그냥 넘어간다
+        win_alpha.apply_all(getattr(self.app, "root", None))
         # 긴급 숨기기 단축키도 기본값(쓰지 않음)이 됐다 - 운영체제에 등록해 둔 것을 푼다
         fn = getattr(self.app, "apply_boss_key", None)
         if fn is not None:
