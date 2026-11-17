@@ -7,7 +7,8 @@
   1. move_slot: 3번 → 1번 (사이는 한 칸씩 밀림) · 빈 자리에 놓으면 맨 끝 · 같은 자리 · 없는 자리는 그대로.
   2. 옮기면 아래 줄에 "OO 을(를) 1번 자리로 옮겼습니다 - 먼저 나갑니다." · 목록 줄의 고른 차례 숫자도 바뀐다.
   3. 할 말이 없고 두 마리 이상이면 아래 줄에 순서 바꾸는 법 (MOVE_HINT). 겹친 도구 같은 진짜 까닭이 있으면 그것.
-  4. 기본 테마: 고른 자리(글자 칸)만 끌 수 있고, 손을 뗀 자리로 옮긴다. 같은 자리 · 밖에서 떼면 그대로.
+  4. 기본 테마: 고른 자리(글자 칸)만 끌 수 있고, 손을 뗀 자리로 옮긴다. 밖에서 떼면 그대로.
+     같은 자리에서 떼면(누르기만 하면) 그 포켓몬이 빠진다 (게시판 #617 - DP 테마와 같게).
   5. DP 테마: 판을 눌렀다 같은 판에서 떼면 예전처럼 뺀다, 다른 판에서 떼면 옮긴다 (빈 판이면 맨 끝).
 진짜 Tk 창을 띄운다. 서버는 test_held_rank_ui 의 가짜 api 를 쓴다.
 """
@@ -88,6 +89,8 @@ def main():
     chk("처음 팀 1 · 2 · 3", tw.picked == [1, 2, 3], tw.picked)
     chk("할 말이 없고 두 마리 이상이면 아래 줄에 순서 바꾸는 법", tw.team_hint()[0] == ui_season.MOVE_HINT,
         tw.team_hint())
+    chk("  그 안내에 '누르면 빠진다' 도 있다 (#617)", "누르면 팀에서 빠집니다" in ui_season.MOVE_HINT,
+        ui_season.MOVE_HINT)
     chk("3번 → 1번: 메타그로스가 선두, 나머지는 한 칸씩 밀림", tw.move_slot(2, 0) is True and tw.picked == [3, 1, 2],
         tw.picked)
     msg = H.status(tw)
@@ -111,9 +114,6 @@ def main():
         chk("  누르면 그 자리에 표시", str(labels[2].cget("highlightbackground")) == U.ACCENT)
         tw._slot_release(Ev(under=labels[0]))
         chk("3번을 1번 자리에 놓으면 옮겨진다", tw.picked == [3, 1, 2], tw.picked)
-        tw._slot_press(0)
-        tw._slot_release(Ev(under=tw._slot_labels[0]))
-        chk("  같은 자리에서 떼면 그대로", tw.picked == [3, 1, 2], tw.picked)
         tw._slot_press(1)
         tw._slot_release(Ev(under=None))
         chk("  자리 밖에서 떼면 그대로 · 표시는 거둔다", tw.picked == [3, 1, 2]
@@ -121,6 +121,12 @@ def main():
         tw._slot_press(0)
         tw._slot_release(Ev(under=tw._slot_labels[4]))
         chk("  빈 자리에 놓으면 맨 끝", tw.picked == [1, 2, 3], tw.picked)
+        tw._slot_press(0)
+        tw._slot_release(Ev(under=tw._slot_labels[0]))
+        chk("  **같은 자리에서 떼면 그 포켓몬이 빠진다** (#617, DP 테마와 같다)", tw.picked == [2, 3], tw.picked)
+        chk("    목록 줄의 차례 숫자 · 자리 글도 따라 바뀐다", order_marks(tw) == {2: 1, 3: 2}
+            and H.slots_text(tw).startswith("1. 갸라도스\n2. 메타그로스\n3. 빈 자리"),
+            (order_marks(tw), H.slots_text(tw)))
     else:
         print("-- 2. DP 테마: 판 끌어 놓기")
         H.pump(root, lambda: len(getattr(tw, "_pboxes", {})) + len(getattr(tw, "_eboxes", {})) == 6, 3)

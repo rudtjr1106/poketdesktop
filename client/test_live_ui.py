@@ -412,6 +412,27 @@ def main():
     chk("  서버에 물어 받은 판에 실린 수로도 고친다", badge(w4) == ["관전 2명"], badge(w4))
     chk("  장면 안에 있다", inside(w4.cv, [i for i in w4.cv.find_withtag("watchers") if w4.cv.type(i) == "text"][0])[0])
     w4.close()
+
+    print("=== 창 투명도와 함께 (#566) ===")
+    from poketdesktop import win_alpha as WA
+    look = {"winOpacity": 60}
+    WA.install(root, lambda: look)
+    api5 = FakeApi(dex)
+    w5 = LUI.LiveBattleWindow(FakeApp(root, api5, dex), api5.match())
+    # 시간에 기대지 않는다 (느린 윈도우 CI 에서 0.05초가 연출 시간을 넘길 수 있다): 떠오르는 동안 문지기가 비켜 있고,
+    # 어느 순간에도 창 투명도(0.6)보다 또렷하지 않다.
+    chk("떠오르는 동안에는 창 투명도가 연출을 덮지 않는다 (_own_alpha · 0.6 을 넘지 않음)",
+        w5.win._own_alpha is True and not WA.eligible(w5.win)
+        and float(w5.win.attributes("-alpha")) <= 0.6 + 0.01, w5.win.attributes("-alpha"))
+    pump(root, lambda: not w5.busy, timeout=25)
+    rest(root, 0.4)
+    chk("  다 떠오르면 1.0 이 아니라 창 투명도 (60% 또렷)", round(float(w5.win.attributes("-alpha")), 2) == 0.6,
+        w5.win.attributes("-alpha"))
+    look["winOpacity"] = 100
+    WA.apply_all(root)
+    chk("  그 뒤에 손잡이를 움직이면 이 창도 따라간다", round(float(w5.win.attributes("-alpha")), 2) == 1.0,
+        w5.win.attributes("-alpha"))
+    w5.close()
     chk("길드원끼리가 아닌 판에는 안 적는다", not w.cv.find_withtag("watchers") if w.alive else True)
 
     print("=== 좁은 화면 ===")

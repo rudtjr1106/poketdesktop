@@ -35,6 +35,7 @@ from . import effects, skins, sprite_cache, sprites
 from . import sendout_fx as SO
 from . import battle_zoom as Z
 from . import platform_os as PLAT
+from . import win_alpha as WA
 from .ui_common import run_async
 from .ui_gym import shade
 from . import ui_spectate as SP
@@ -126,6 +127,7 @@ class LiveBattleWindow(Z.Resizable):
         # 처음 크기: 지난번에 끌어 놓은 크기(없으면 기본 크기). 배율도 여기서 잡힌다.
         ww, wh, gx, gy = self.zoom_open()
         self.win = tk.Toplevel(self.root)
+        self.win._own_alpha = True          # 비친 데서 또렷해지며 뜬다 (_enter) - 그동안은 창 투명도가 덮지 않게
         U.style_window(self.win, "%s — %s" % ("챔피언리그 · 독도" if data.get("kind") == "champion" else "실시간 배틀",
                                              data.get("foeName") or ""),
                        ww, wh)
@@ -193,8 +195,10 @@ class LiveBattleWindow(Z.Resizable):
             if vs is not None:
                 vs.close()
             self._vs = None
+            # 다 떠오르면 창 투명도(#566)에 맡긴다 - 끝값도 그 값이고, 뒤에 손잡이를 움직이면 이 창도 따라간다
+            self.win._own_alpha = False
             try:
-                self.win.attributes("-alpha", 1.0)
+                self.win.attributes("-alpha", WA.current())
             except tk.TclError:
                 pass
             start()
@@ -208,7 +212,7 @@ class LiveBattleWindow(Z.Resizable):
             if k <= 0.0:
                 return done()
             try:
-                self.win.attributes("-alpha", max(0.0, min(1.0, t / EF.FADE_S)))
+                self.win.attributes("-alpha", max(0.0, min(1.0, t / EF.FADE_S)) * WA.current())
             except tk.TclError:
                 pass
             fx.draw(0, 0, self.sw, self.sh, k)

@@ -81,6 +81,9 @@ DEFAULTS = {
     # 뒤가 비친다. 걸어다니는 포켓몬·알·바탕화면에서 싸우는 상대에 다 적용된다.
     # 창이나 글을 가려서 불편하다는 사람이 있어서 뒀다.
     "petOpacity": 100,
+    # 테두리가 있는 포스크탑 창(관리 · 가방 · 게시판 · 설정 ...)이 얼마나 또렷한가 (게시판 #566 - '회사에서 쓸 때').
+    # 100 이면 그대로. 바탕화면 포켓몬은 petOpacity 로 따로 정한다. 창에 입히는 것은 win_alpha.py.
+    "winOpacity": 100,
     # 바탕화면 포켓몬(과 알)을 마우스로 들어서 옮길지 (1.9.1). **기본은 끈다.**
     # 예전에는 늘 끌 수 있었는데, 쓰다듬으려다 실수로 끌려가서 뺐던 기능이다.
     # 원하는 자리에 두고 싶다는 사람만 설정에서 켠다.
@@ -209,6 +212,19 @@ def pet_alpha(settings):
     except (TypeError, ValueError):
         return 1.0
     return max(PET_OPACITY_MIN, min(100.0, v)) / 100.0
+
+
+# 창 투명도는 70% 까지 (또렷함 30). 창은 글을 읽고 누르는 곳이라 포켓몬처럼 거의 안 보이게 하면 쓸 수가 없다.
+WIN_OPACITY_MIN = 30
+
+
+def win_alpha(settings):
+    """테두리 있는 포스크탑 창의 알파 (0.3 ~ 1.0). 이상한 값이면 1.0."""
+    try:
+        v = float((settings or {}).get("winOpacity", 100))
+    except (TypeError, ValueError):
+        return 1.0
+    return max(WIN_OPACITY_MIN, min(100.0, v)) / 100.0
 
 
 def catch_mode(settings):

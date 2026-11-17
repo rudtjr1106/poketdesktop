@@ -124,6 +124,10 @@ class SettingsWindow(ST.SettingsWindow):
                   "적용됩니다. 99% 면 거의 보이지 않습니다.", 0, 100 - config.PET_OPACITY_MIN, 1, "%.0f%%",
                   lambda: 100 - int(round(config.pet_alpha(self.app.settings) * 100)),
                   lambda v: self._set_alpha(int(round(v))), big=10)
+        self._num("창 투명도", "올릴수록 포스크탑 창(관리 · 가방 · 게시판 · 설정 등) 뒤가 비쳐 보입니다. 바탕화면 포켓몬은 "
+                  "'포켓몬 투명도' 로 따로 정합니다.", 0, 100 - config.WIN_OPACITY_MIN, 1, "%.0f%%",
+                  lambda: 100 - int(round(config.win_alpha(self.app.settings) * 100)),
+                  lambda v: self._set_win_alpha(int(round(v))), big=10)       # 게시판 #566 (기본 테마와 같은 줄)
         self._num("걷는 속도", "느리게 두면 더 느긋하게 돌아다닙니다.", 0.3, 3.0, 0.1, "x%.1f",
                   lambda: self.app.settings["walkSpeed"], lambda v: self._set("walkSpeed", round(v, 1)))
         self._num("부드러움", "높을수록 부드럽지만 그만큼 더 자주 그립니다.", 10, 60, 5, "%.0f fps",

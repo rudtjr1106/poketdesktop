@@ -247,6 +247,9 @@ class App(object):
         # 가져가게 (윈도우 · 맥 - 다른 데서는 아무것도 안 한다). 긴급 숨기기가 이 위에 문지기를 더 세운다.
         from . import focus_guard
         focus_guard.install()
+        # 창 투명도 (게시판 #566): 테두리 있는 창이 뜰 때마다 설정의 '창 투명도' 를 입힌다.
+        from . import win_alpha
+        win_alpha.install(self.root, lambda: self.settings)
         # 긴급 숨기기 (1.10.3): 떠 있는 것을 전부 치웠다 되돌린다. 단축키는 설정에서 고른
         # 사람에게만 등록한다 (기본은 꺼짐). 트레이 메뉴에는 늘 있다.
         from . import hotkey as HOTKEY

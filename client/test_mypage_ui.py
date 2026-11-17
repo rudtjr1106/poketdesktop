@@ -306,6 +306,8 @@ def main():
     U.init_fonts(root)
     U.apply_theme(root)
     app = FakeApp(root)
+    from poketdesktop import win_alpha
+    win_alpha.install(root, lambda: app.settings)       # 앱이 켤 때 하는 것 (창 투명도, #566)
 
     print("=== 탭 ===")
     keys = [t[0] for t in ui_hub.TABS]
@@ -562,6 +564,19 @@ def main():
         and abs(config.pet_alpha(app.settings) - 0.01) < 1e-9, app.settings["petOpacity"])
     w.settings._set_alpha(100)
     chk("100% (아예 안 보임)는 안 된다", app.settings["petOpacity"] == 1)
+    chk("'창 투명도' 손잡이가 '포켓몬 투명도' 바로 아래에 있다 (#566)", "창 투명도" in tx
+        and tx.index("창 투명도") > tx.index("포켓몬 투명도"), tx[:12])
+    w.settings._set_win_alpha(40)
+    chk("  창 투명도를 바꾸면 저장된다 (또렷함 60)", app.settings["winOpacity"] == 60
+        and config.load_settings().get("winOpacity") == 60, app.settings.get("winOpacity"))
+    chk("  열려 있는 창에 바로 입힌다", round(float(top.attributes("-alpha")), 2) == 0.6,
+        top.attributes("-alpha"))
+    w.settings._set_win_alpha(95)
+    chk("  창 투명도는 70% 까지", app.settings["winOpacity"] == config.WIN_OPACITY_MIN == 30,
+        app.settings["winOpacity"])
+    w.settings._set_win_alpha(0)
+    chk("  0% 로 돌리면 그대로", app.settings["winOpacity"] == 100
+        and round(float(top.attributes("-alpha")), 2) == 1.0, app.settings["winOpacity"])
     bad = squeezed(top)
     chk("눌린 위젯 없음", not bad, bad[:3])
     w.show_page()

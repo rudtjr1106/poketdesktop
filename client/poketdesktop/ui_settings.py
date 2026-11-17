@@ -126,6 +126,13 @@ class SettingsWindow(object):
             0, 100 - config.PET_OPACITY_MIN,
             100 - int(round(config.pet_alpha(s) * 100)), "%.0f%%",
             lambda v: self._set_alpha(int(round(v))), step=1)
+        # 창 투명도 (게시판 #566). 포켓몬 투명도와 같은 꼴(winOpacity, 100 = 그대로)이고 70% 까지.
+        Row(p, "창 투명도",
+            "올릴수록 포스크탑 창(관리 · 가방 · 게시판 · 설정 등) 뒤가 비쳐 보입니다. "
+            "바탕화면 포켓몬은 '포켓몬 투명도' 로 따로 정합니다.",
+            0, 100 - config.WIN_OPACITY_MIN,
+            100 - int(round(config.win_alpha(s) * 100)), "%.0f%%",
+            lambda v: self._set_win_alpha(int(round(v))), step=1)
         Row(p, "걷는 속도", "느리게 두면 더 느긋하게 돌아다닙니다.",
             0.3, 3.0, s["walkSpeed"], "x%.1f",
             lambda v: self._set("walkSpeed", round(v, 1)), step=0.1)
@@ -651,6 +658,13 @@ class SettingsWindow(object):
         if self.app.overlay:
             self.app.overlay.apply_alpha()
 
+    def _set_win_alpha(self, transparent):
+        """창 투명도(0 = 그대로, 70 까지)를 받아 또렷한 정도로 적고, 떠 있는 창에 바로 입힌다."""
+        from . import win_alpha
+        self.app.settings["winOpacity"] = max(config.WIN_OPACITY_MIN, 100 - int(transparent))
+        self._save()
+        win_alpha.apply_all(self.app.root)
+
     def _set_size(self, px):
         # 크기는 도트를 다시 만들어야 해서 앱 쪽 경로를 그대로 쓴다.
         self.app.set_size(px)
@@ -719,6 +733,8 @@ class SettingsWindow(object):
         self.app.set_size(self.app.settings["targetHeight"])
         if self.app.overlay:
             self.app.overlay.apply_alpha()      # 투명도도 그대로(100%)로
+        from . import win_alpha
+        win_alpha.apply_all(self.app.root)      # 창 투명도도 - 열려 있는 창이 비친 채로 남지 않게 (#566)
         # 긴급 숨기기 단축키도 기본값(쓰지 않음)이 됐다 - 운영체제에 등록해 둔 것을 푼다
         fn = getattr(self.app, "apply_boss_key", None)
         if fn is not None:

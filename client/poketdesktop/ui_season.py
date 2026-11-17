@@ -54,7 +54,7 @@ def title_text(row):
 
 # ---------------------------------------------------------------- 랭크 팀
 # 팀 고르기 창의 아래 줄 (할 말이 없을 때, 두 마리 이상) - 게시판 #516
-MOVE_HINT = "고른 자리를 끌어 다른 자리에 놓으면 순서가 바뀝니다 (1번이 먼저 나갑니다)."
+MOVE_HINT = "고른 자리를 끌어 다른 자리에 놓으면 순서가 바뀌고, 누르면 팀에서 빠집니다 (1번이 먼저 나갑니다)."
 
 
 @skins.skinnable
@@ -627,7 +627,8 @@ class TeamWindow(object):
             pass
 
     def _slot_release(self, e):
-        """끌던 자리를 놓았다 - 손가락 아래의 자리로 옮긴다 (같은 자리면 아무 일도 없다)."""
+        """끌던 자리를 놓았다 - 손가락 아래의 자리로 옮긴다. 같은 자리에서 떼면(누르기만 했으면) 그 포켓몬을
+        뺀다 (게시판 #617 - 한 마리를 빼려고 '비우기' 로 다 비우고 다시 넣어야 했다. DP 테마와 같은 동작)."""
         i, self._slot_from = self._slot_from, None
         if i is None:
             return
@@ -636,7 +637,9 @@ class TeamWindow(object):
         except tk.TclError:
             under = None
         j = next((k for k, lb in enumerate(self._slot_labels) if lb is under), None)
-        if not self.move_slot(i, j):
+        if j == i and 0 <= i < len(self.picked):
+            self.toggle(self.picked[i])
+        elif not self.move_slot(i, j):
             self._paint_slots()                     # 끌기 표시를 거둔다
 
     def fill_party(self):
