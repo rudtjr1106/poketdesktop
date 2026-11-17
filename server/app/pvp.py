@@ -66,7 +66,7 @@ PLACEMENT = 5
 # 상대는 접속해 있지 않아도 된다. 그 사람의 지금 파티를 가져와 붙인다.
 # 그래서 자는 사람을 몇 번이고 때릴 수 있는데, 점수는 서로 주고받는
 # 것이라 아침에 점수가 바닥나 있게 된다. 두 가지로 막는다.
-PAIR_COOLDOWN_MIN = 30      # 같은 사람에게 다시 걸기까지
+PAIR_COOLDOWN_MIN = 30      # 같은 사람에게 다시 걸기까지 (랜덤 배틀은 한국 시각 자정에 새로 센다 - RANDOM_REPEAT_MIN 설명)
 # 하루에 내가 걸 수 있는 **랜덤 배틀** 수.
 #
 # **친구 배틀은 안 센다.** 친구에게 한 판 걸었다고 랭크 한 판이 줄면, 친구와
@@ -124,6 +124,13 @@ MET_PENALTY = 30
 # **한국 시각 자정에 새로 센다** (11/10 사용자 결정). 하루 20판이 자정에 풀리는데 3시간은 그대로 이어져서,
 # 밤에 그날 몫 20판으로 RP 가 가까운 사람을 다 만난 사람이 자정에 바로 20판을 더 치면 그들이 모두 빠져
 # '전체' 띠에서 RP 1,300점 넘게 낮은 상대만 스무 번 만났다 (11/09 0시, 3분에 +464).
+#
+# **같은 상대 30분 쿨타임도 랜덤 배틀에서는 자정에 새로 센다** (11/16). 30분이 자정을 넘어 이어지면 같은 길이
+# 남는다: 23시 50분부터 그날 몫 20판을 몰아 치고(한 판 10초 남짓) 0시가 되자마자 다음 날 몫 20판을 치면, 40판이
+# 30분 안에 끝나서 앞 20판에 만난 RP 가까운 사람이 모두 30분 쿨타임에 걸린다 - 뒤 20판은 다시 띠 밖의 낮은
+# 상대만 만난다. 자정에 둘 다 새로 세면 0시의 20판은 낮에 치는 20판과 같은 상대를 만난다. 자정을 끼고 같은
+# 사람을 연달아 만날 수는 있지만 고르는 것은 서버이고(RP 가까운 몇 명 중 하나) 하루 20판 상한은 그대로다.
+# 친구 배틀의 30분은 자정에도 그대로다 (can_fight).
 RANDOM_REPEAT_MIN = 180
 # 이 안에 만난 적이 없는 사람을 먼저 고른다.
 FRESH_WINDOW_MIN = 60 * 24
@@ -833,7 +840,8 @@ def _recent_foes(uid, minutes=PAIR_COOLDOWN_MIN, practice=True, today_only=False
     """최근에 붙은 사람들. 연달아 같은 사람을 때리지 않게.
 
     같은 상대 30분 쿨타임(기본값)은 **연습판도 센다** - 점수가 없어도 한 사람을 몰아 치지 못하게.
-    자정에도 안 풀린다 (몰아 치기를 막는 것이라 23시 59분과 0시에 같은 사람을 치면 안 된다).
+    today_only 면 오늘(한국 날짜) 판만 본다 - **랜덤 배틀은 30분도 자정에 새로 센다** (11/16, RANDOM_REPEAT_MIN
+    설명: 자정을 끼고 40판을 30분 안에 몰아 치면 뒤 20판이 RP 가 낮은 상대만 만났다). 친구 배틀은 그대로다.
     """
     return set(_last_met(uid, minutes, practice, today_only))
 
@@ -873,8 +881,9 @@ def find_opponent(uid, rng=None):
         return None
     # 3시간 건너뛰기는 점수판만, 그리고 오늘(자정부터) 판만 본다 (_last_met). 그래도 30분 안에 만난 사람은
     # 연습판이라도 뺀다 - 안 빼면 골라 놓고 can_fight 의 같은 상대 쿨타임에 걸려 '30분에 한 번' 으로 끝난다.
-    skip = (_recent_foes(uid, RANDOM_REPEAT_MIN, practice=False, today_only=True) | _recent_foes(uid)
-            | _blocked_ids(uid))
+    # 30분도 오늘 판만 본다 (11/16) - can_fight 의 랜덤 배틀 쿨타임과 같은 셈이어야 골라 놓고 막히지 않는다.
+    skip = (_recent_foes(uid, RANDOM_REPEAT_MIN, practice=False, today_only=True)
+            | _recent_foes(uid, today_only=True) | _blocked_ids(uid))
     skip.add(uid)
 
     my_power = team_power(mine) or 1.0
@@ -1063,7 +1072,8 @@ def can_fight(uid, other, kind="friend", practice_ok=False):
     if kind == "random" and not rank_ready(ranked_team(other))[0]:
         return "상대 팀이 랭크전 조건(Lv.%d 이상 %d마리)을 못 채웠습니다." % (
             season.RANK_MIN_LEVEL, season.RANK_MIN_COUNT)
-    if other in _recent_foes(uid):
+    # 랜덤 배틀은 30분도 한국 시각 자정에 새로 센다 (11/16, find_opponent 와 같은 셈). 친구 배틀은 자정에도 그대로.
+    if other in _recent_foes(uid, today_only=(kind == "random")):
         return ("같은 상대에게는 %d분에 한 번만 걸 수 있습니다."
                 % PAIR_COOLDOWN_MIN)
     return None
