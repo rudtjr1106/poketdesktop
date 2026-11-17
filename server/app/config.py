@@ -197,6 +197,7 @@ GYM_BATTLE_TTL = _int("POKET_GYM_BATTLE_TTL", 3600)
 # 제보가 오면 그 판을 들여다보므로 바로 지우지는 않는다.
 BATTLE_KEEP_DAYS = _int("POKET_BATTLE_KEEP_DAYS", 3)
 HOUSEKEEP = _bool("POKET_HOUSEKEEP", True)          # 한 시간마다 도는 정리 (테스트에서 끈다)
+STATS_SAMPLE = _bool("POKET_STATS_SAMPLE", True)    # 1분마다 접속자 수를 세어 최대 동시 접속을 적는다 (stats.py, 테스트에서 끈다)
 # 경험치 배율. 원작 트레이너전은 야생의 1.5배지만, 여기서는 여섯 마리를 연달아
 # 잡는 판이라 레벨이 너무 빨리 올랐다. 1.5 -> 1.2 (1.3.0 배포 뒤) -> 1.0 (1.3.2 배포 뒤,
 # 야생과 같다).

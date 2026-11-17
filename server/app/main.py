@@ -37,7 +37,7 @@ from . import (achievements, airraid, arche, arche_routes, auth, avatar, battle_
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws, internal_routes,
-               boss_routes, gym_routes, social_routes, tm_routes, tms, troubles, visit, walk)
+               boss_routes, gym_routes, social_routes, stats, tm_routes, tms, troubles, visit, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
@@ -67,6 +67,7 @@ app.include_router(airraid.router)              # 공습 (2.3.0 - 하루 한 번
 app.include_router(champion.router)             # 챔피언리그 - 독도 (관장 256곳을 다 이긴 사람끼리 실시간 배틀)
 app.include_router(arche_routes.router)         # 아르케의 여섯 봉인 (2.4.0 - 시즌 6 이벤트)
 app.include_router(troubles.router)             # 앱이 배틀을 접은 까닭 (1.13.3)
+app.include_router(stats.router)                # 밖에 보여 주는 숫자 셋 - 가입자 · 접속 중 · 최대 동시 접속 (인증 없음)
 
 RNG = deps.RNG
 
@@ -128,6 +129,8 @@ def _startup():
     errors.sweep()
     # 끝난 배틀은 한 시간마다 치운다 (10/28). 처음 한 번의 큰 정리는 위 migrations 의 0330 이 했다.
     housekeep.start()
+    # 1분마다 접속자 수를 세어 최대 동시 접속을 적는다 (11/17). /api/stats 가 그 수를 읽는다.
+    stats.start()
     d = dex()
     n = sum(1 for s in d.species if s.get("spawnable"))
     print("[poketdesktop] 도감 %d종 (야생 등장 %d종) 준비 완료" % (len(d.species), n))

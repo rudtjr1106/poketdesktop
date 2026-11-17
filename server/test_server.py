@@ -65,6 +65,12 @@ def main():
     chk("야생 등장 890종 이상", (h.get("spawnable") or 0) >= 890, h.get("spawnable"))
     print("       서버가 보는 IP: %s (실제 IP 보임: %s)"
           % (h.get("observedIp"), h.get("ipVisible")))
+    # 밖에 보여 주는 숫자 셋 (app/stats.py, 포트폴리오 사이트가 읽는다). 인증 없이 열려 있으니 합계 말고는 없어야 한다.
+    # 값은 1분에 한 번 세는 것이라 여기서는 꼴만 본다 - 세는 규칙은 test_stats.py 가 본다.
+    st, s = call("GET", "/api/stats")
+    chk("stats 200 (토큰 없이)", st == 200, s)
+    chk("stats 는 숫자 셋뿐", sorted(s) == ["online", "peakOnline", "users"]
+        and all(type(v) is int and v >= 0 for v in s.values()), s)
     st, dex = call("GET", "/api/pokedex")
     chk("도감 내려받기", st == 200 and len(dex.get("species", [])) == 1025,
         len(dex.get("species", [])) if st == 200 else st)
