@@ -580,6 +580,57 @@ def main():
     chk("게으름·독치장이 들어갔다",
         "TRUANT" in A.IMPLEMENTED and "TOXICDEBRIS" in A.IMPLEMENTED)
 
+    # 파동의방호 (게시판 #673): 메가루카리오Z 의 특성. 직접 닿는 기술의 데미지가 절반 (Bulbapedia · Serebii 'Aura Guard').
+    # 전에는 원본 자료에 특성이 없어 루카리오의 첫 특성(불굴의마음)을 대신 썼다 (megaAbilityGuess).
+    mz = DEX.get("LUCARIO_MEGA_Z") or {}
+    chk("메가루카리오Z 의 특성은 파동의방호 (짐작이 아니다)", mz.get("abil") == ["AURAGUARD"]
+        and not mz.get("megaAbilityGuess"), (mz.get("abil"), mz.get("megaAbilityGuess")))
+    ab = (DEX.raw.get("abilities") or {}).get("AURAGUARD") or {}
+    chk("  이름 '파동의방호' · 설명이 있다", ab.get("kr") == "파동의방호" and "직접" in (ab.get("desc") or ""), ab)
+    from common import ability_kr as AK
+    chk("  PokeAPI 의 그 특성(314 aura-guard)이고, 도감을 다시 만들어도 같은 이름 · 설명이 나온다 (ability_kr)",
+        ab.get("id") == 314 and AK.NAME.get("AURAGUARD") == ab.get("kr") and AK.DESC.get("AURAGUARD") == ab.get("desc"),
+        (ab.get("id"), AK.NAME.get("AURAGUARD"), AK.DESC.get("AURAGUARD")))
+    chk("  구현된 특성이다", "AURAGUARD" in A.IMPLEMENTED)
+    bt, a, b = duel("MACHAMP", "LUCARIO", a_moves=("CLOSECOMBAT", "AURASPHERE"), a_ab="NOGUARD", b_ab="AURAGUARD")
+    plain_bt, pa, pb = duel("MACHAMP", "LUCARIO", a_moves=("CLOSECOMBAT", "AURASPHERE"), a_ab="NOGUARD", b_ab="INNERFOCUS")
+    cc = B.damage(DEX, bt.move_of("CLOSECOMBAT"), a, b, B.MAX_RNG, crit=False)[0]
+    cc0 = B.damage(DEX, plain_bt.move_of("CLOSECOMBAT"), pa, pb, B.MAX_RNG, crit=False)[0]
+    chk("파동의방호: 직접 닿는 기술(인파이트)은 절반", abs(cc - cc0 * 0.5) <= 1, (cc, cc0))
+    sp_ = B.damage(DEX, bt.move_of("AURASPHERE"), a, b, B.MAX_RNG, crit=False)[0]
+    sp0 = B.damage(DEX, plain_bt.move_of("AURASPHERE"), pa, pb, B.MAX_RNG, crit=False)[0]
+    chk("  닿지 않는 기술(파동탄)은 그대로", sp_ == sp0, (sp_, sp0))
+    bt, a, b = duel("MACHAMP", "LUCARIO", a_moves=("CLOSECOMBAT",), a_ab="MOLDBREAKER", b_ab="AURAGUARD")
+    cc_mb = B.damage(DEX, bt.move_of("CLOSECOMBAT"), a, b, B.MAX_RNG, crit=False)[0]
+    chk("  틀깨기는 무시한다 (복슬복슬과 같다)", abs(cc_mb - cc0) <= 1, (cc_mb, cc0))
+    # 실제로 닿는가로 본다: 원격 · 펀치글러브를 낀 펀치는 안 닿으니 반감하지 않는다 (복슬복슬도 같다, 11/19 검토에서 찾음)
+    for guard_ab in ("AURAGUARD", "FLUFFY"):
+        for label, a_sp, a_ab, held, mv in (("원격 모크나이퍼의 리프블레이드", "DECIDUEYE", "LONGREACH", None, "LEAFBLADE"),
+                                            ("펀치글러브 괴력몬의 드레인펀치", "MACHAMP", "NOGUARD", "PUNCHINGGLOVE", "DRAINPUNCH")):
+            g = B.Fighter(DEX, mon(a_sp, moves=(mv,), ability=a_ab)); g.held = held
+            n = B.Fighter(DEX, mon(a_sp, moves=(mv,), ability=a_ab)); n.held = held
+            t1 = B.Fighter(DEX, mon("LUCARIO", moves=("TACKLE",), ability=guard_ab))
+            t0 = B.Fighter(DEX, mon("LUCARIO", moves=("TACKLE",), ability="INNERFOCUS"))
+            for f in (g, n, t1, t0):
+                f.ability_on = True
+            d1 = B.damage(DEX, DEX.move(mv), g, t1, B.MAX_RNG, crit=False)[0]
+            d0 = B.damage(DEX, DEX.move(mv), n, t0, B.MAX_RNG, crit=False)[0]
+            chk("  %s: %s 은 닿지 않으니 반감하지 않는다" % (guard_ab, label), d1 == d0, (d1, d0))
+
+    # 헤롱헤롱바디로 걸린 헤롱헤롱도 누가 걸었는지 적는다 - 그래야 그 포켓몬이 물러나면 풀린다 (SM.on_leave).
+    # 전에는 True 만 적어서 안 풀렸다 - 랭크에서는 다음 상대에게까지 헤롱헤롱이 이어졌다 (11/19 검토에서 찾음).
+    class Zero(random.Random):
+        def random(self):
+            return 0.0
+    bt, a, b = duel("MACHAMP", "CLEFABLE", a_moves=("CLOSECOMBAT",), a_ab="NOGUARD", b_ab="CUTECHARM",
+                    a_gender="M", b_gender="F")
+    bt.rng = Zero(1)
+    ev = []
+    A.after_hit(bt, a, "me", b, "foe", bt.move_of("CLOSECOMBAT"), 10, 1.0, False, b.hp, ev)
+    chk("헤롱헤롱바디: 건 쪽(foe)을 적어 둔다", a.cond.get("attract") == "foe", a.cond.get("attract"))
+    SM.on_leave(bt, "foe")
+    chk("  헤롱헤롱바디의 포켓몬이 물러나면 헤롱헤롱이 풀린다", not a.cond.get("attract"), a.cond.get("attract"))
+
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
 

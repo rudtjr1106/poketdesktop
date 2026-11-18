@@ -89,6 +89,12 @@
    "id": 188,
    "kr": "오라브레이크"
   },
+  "AURAGUARD": {
+   "desc": "파동으로 몸을 지킨다. 직접 닿는 기술로 받는 데미지가 절반이 된다.",
+   "en": "Auraguard",
+   "id": 314,
+   "kr": "파동의방호"
+  },
   "BADDREAMS": {
    "desc": "잠듦 상태의 상대에게 데미지를 준다.",
    "en": "Baddreams",
@@ -8796,7 +8802,7 @@
   },
   {
    "abil": [
-    "STEADFAST"
+    "AURAGUARD"
    ],
    "base": {
     "atk": 100,
@@ -8836,7 +8842,6 @@
    "kr": "메가루카리오Z",
    "legendary": false,
    "mega": true,
-   "megaAbilityGuess": true,
    "megaOf": "LUCARIO",
    "megaStone": "LUCARIONITEZ",
    "megaStoneKr": "루카리오나이트Z",

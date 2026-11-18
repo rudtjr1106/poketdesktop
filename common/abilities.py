@@ -39,6 +39,7 @@ IGNORABLE = {
     "IMMUNITY", "WATERVEIL", "MAGMAARMOR", "INNERFOCUS", "SHIELDDUST", "WONDERSKIN",
     "SWEETVEIL", "PASTELVEIL", "THERMALEXCHANGE", "MINDSEYE",
     "EELEVATE", "ICEFACE", "TERASHIFT", "FLOWERGIFT", "TABLETSOFRUIN", "VESSELOFRUIN",
+    "AURAGUARD",
 }
 
 # 화학변화가스로도 안 꺼지는 것 (폼이 걸려 있는 특성)
@@ -172,7 +173,7 @@ IMPLEMENTED = (
        "TECHNICIAN", "SHARPNESS", "RECKLESS", "SHEERFORCE", "TINTEDLENS", "ANALYTIC",
        "TOXICBOOST", "FLAREBOOST", "NEUROFORCE", "ELECTROMORPHOSIS", "WINDPOWER",
        "THICKFAT", "HEATPROOF", "PURIFYINGSALT", "FILTER", "SOLIDROCK", "PRISMARMOR",
-       "MULTISCALE", "SHADOWSHIELD", "FLUFFY", "ICESCALES", "SCRAPPY",
+       "MULTISCALE", "SHADOWSHIELD", "FLUFFY", "ICESCALES", "SCRAPPY", "AURAGUARD",
        "BULLETPROOF", "SOUNDPROOF", "OVERCOAT", "WONDERGUARD", "GOODASGOLD", "WINDRIDER",
        "STATIC", "FLAMEBODY", "POISONPOINT", "EFFECTSPORE", "ROUGHSKIN", "IRONBARBS",
        "GOOEY", "TANGLINGHAIR", "MUMMY", "LINGERINGAROMA", "POISONTOUCH", "STAMINA",
@@ -317,7 +318,8 @@ def is_status(move):
 
 
 def has_secondary(move):
-    return bool((move.get("ail") and move.get("ailChance"))
+    # 조이기류의 묶기(trap)는 주 효과라 부가효과로 세지 않는다 - 우격다짐이 위력을 올리지도 지우지도 않는다 (#664)
+    return bool((move.get("ail") and move.get("ailChance") and move.get("ail") != "trap")
                 or (move.get("stat") and move.get("statChance"))
                 or move.get("flinch"))
 
@@ -601,11 +603,14 @@ def defense_mult(user, target, move, mtype, eff):
     if g == "MULTISCALE" and target.hp >= target.maxhp:
         m *= 0.5
     if g == "FLUFFY":
-        if "contact" in fl:
+        if is_contact(move, user):                     # 원격 · 펀치글러브 펀치는 안 닿는다 (11/19)
             m *= 0.5
         if mtype == "FIRE":
             m *= 2.0
     if g == "ICESCALES" and move.get("cat") == "special":
+        m *= 0.5
+    if g == "AURAGUARD" and is_contact(move, user):
+        # 파동의방호 (메가루카리오Z, 게시판 #673): 직접 닿는 기술의 데미지가 절반. 복슬복슬과 달리 불꽃 약점은 없다.
         m *= 0.5
     if g == "PUNKROCK" and "sound" in fl:
         m *= 0.5
@@ -987,7 +992,7 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
             g2 = (user.mon or {}).get("gender")
             if g1 in ("M", "F") and g2 in ("M", "F") and g1 != g2:
                 pop(bt, target, twho, ev)
-                user.cond["attract"] = True
+                user.cond["attract"] = twho     # 건 쪽 - 그 포켓몬이 물러나면 풀린다 (SM.on_leave, 11/19 - 전에는 True 라 안 풀렸다)
                 ev.append({"t": "msg", "who": uwho,
                            "text": "%s 은(는) 헤롱헤롱해졌다!" % user.name})
         elif t == "PERISHBODY" and not user.cond.get("perish") \

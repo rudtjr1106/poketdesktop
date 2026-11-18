@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 from common.ability_kr import DESC as ABILITY_KR  # noqa: E402
 from common.ability_kr import OVERRIDE as ABILITY_OVERRIDE  # noqa: E402
+from common.ability_kr import NAME as ABILITY_NAME  # noqa: E402
 from common.move_kr import DESC as MOVE_KR  # noqa: E402
 
 CSV_BASE = "https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv"
@@ -331,7 +332,7 @@ def build():
     for aid, ident in abil_ident.items():
         key = norm(ident)
         d = {"id": aid, "en": ident.title(),
-             "kr": abil_kr.get(aid, ident.title())}
+             "kr": abil_kr.get(aid) or ABILITY_NAME.get(key) or ident.title()}   # 한국어 이름이 없으면 손으로 적은 것
         # **9세대 특성 47개에는 PokeAPI 에 한국어 줄이 아예 없다.**
         # 그대로 두면 영어가 화면에 나온다(찌리비의 풍력발전이 그랬다).
         # 손으로 적어 둔 것이 있으면 그걸 쓴다. 저쪽에 한국어가 들어오면

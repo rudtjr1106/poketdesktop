@@ -309,12 +309,33 @@ def t_무효(dex):
     chk("7. (견줌) 감점을 끄면 비긴 셈에서 인파이트가 뽑힌 적이 있다", got[False].get("CLOSECOMBAT", 0) > 0, got[False])
 
 
+def t_묶은_쪽이_쓰러지면(dex):
+    """조이기류: 묶은 쪽이 쓰러지면 묶기가 풀린다 (본가 · 관장 판과 같다). 랭크는 라운드마다 판을 새로 세워서
+    묶인 쪽 cond 의 bound 가 다음 라운드까지 따라가, 새로 나온 상대에게도 데미지와 교체 봉인이 이어졌다 (11/19 #664 검토)."""
+    print("\n-- 묶은 쪽이 쓰러지면 묶기가 풀린다")
+    for war in (True, False):
+        a = [mon("CHARIZARD", ["FIRESPIN"]), mon("SNORLAX", ["BODYSLAM"])]
+        b = [mon("BLISSEY", ["SEISMICTOSS"]), mon("SKARMORY", ["BRAVEBIRD"])]
+        pb = PB.PartyBattle(dex, a, b, 7, keystone={"me": False, "foe": False},
+                            zring={"me": False, "foe": False}, war_ai=war)
+        pb.events.append({"t": "teams"})
+        pb.round_no = 1
+        bt = pb._round_battle()
+        foe = bt.foe
+        foe.cond["bound"] = {"turns": 4, "by": "me", "move": "FIRESPIN"}
+        bt.me.hp = 0                                    # 묶은 리자몽이 쓰러졌다
+        pb._advance("me")
+        chk("%s: 묶은 쪽이 쓰러지면 상대의 묶기가 풀린다" % ("시즌5 랭크(_war_advance)" if war else "랭크(_advance)"),
+            not foe.cond.get("bound"), foe.cond.get("bound"))
+
+
 def main():
     dex = P.Pokedex.load(os.path.join(ROOT, "server", "data", "pokedex.json"))
     t_판정(dex)
     t_날뛰기(dex)
     t_랭크(dex)
     t_무효(dex)
+    t_묶은_쪽이_쓰러지면(dex)
     print("\n합계 OK %d · FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0
 

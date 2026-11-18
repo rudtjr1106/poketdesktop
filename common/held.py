@@ -937,8 +937,10 @@ def screen_turns(f):
 
 
 def bind_turns(f, rng):
-    """조이기·김밥말이 … 를 건 쪽의 도구: 끈기갈고리손톱이면 7턴 (난수를 안 쓴다)."""
-    return 7 if f is not None and f.held == "GRIPCLAW" else rng.randint(4, 5)
+    """조이기·김밥말이 … 가 붙잡는 턴 수. 턴 끝마다 하나씩 줄고, 0 이 되는 턴 끝에는 데미지 없이 풀린다
+    (statusmoves.end_turn) - 그래서 데미지는 (이 값 - 1)번이다. 본가 · 쇼다운처럼 4~5번 (끈기갈고리손톱이면 7번)
+    깎이게 5~6 · 8 이다 (11/19 - 전에는 4~5 · 7 이라 한 번씩 덜 깎였다, 게시판 #664 를 보다 찾음)."""
+    return 8 if f is not None and f.held == "GRIPCLAW" else rng.randint(5, 6)
 
 
 def bind_frac(f):

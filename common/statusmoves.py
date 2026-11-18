@@ -1883,7 +1883,7 @@ def apply_ail(bt, ail, move, user, target, who, tw, ev):
         confuse(bt, target, tw, ev, source=user, quiet=MC.attacks(move))
     elif ail == "trap":
         if not target.cond.get("bound"):
-            target.cond["bound"] = {"turns": H.bind_turns(user, bt.rng), "by": who, "move": k}   # 끈기갈고리손톱 7턴
+            target.cond["bound"] = {"turns": H.bind_turns(user, bt.rng), "by": who, "move": k}   # 5~6 (끈기갈고리손톱 8) - 데미지는 하나 적게
             say(ev, tw, "%s 은(는) %s 에 붙잡혔다!" % (target.name, bt.move_name(k)))
     elif ail == "silence":
         target.cond["silenced"] = 2
