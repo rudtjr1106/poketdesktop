@@ -12,6 +12,7 @@ from common import tint as T                   # noqa: E402
 from common.korean import natural              # noqa: E402
 from common.version import VERSION             # noqa: E402
 
+from . import action_launch                    # noqa: E402
 from . import api as apimod                    # noqa: E402
 from . import autostart                     # noqa: E402
 from . import config, single, sprite_cache, ui_loading, updater, walk_cache  # noqa: E402
@@ -108,6 +109,37 @@ RAID_MSG = "공습을 막는 중이에요. 끝난 뒤에 해 주세요."
 def _raid_on(app):
     r = getattr(app, "airraid", None)
     return bool(r is not None and r.busy())
+
+
+# 액션 배틀 (2.6.0): 판이 열려 있는 동안은 다른 대전 · 놀러 가기를 막는다 (visit.Visit.busy 도 같은 것을 본다)
+ACTION_MSG = "액션 배틀이 끝난 뒤에 해 주세요."
+
+
+def _action_on(app):
+    return bool(getattr(app, "action_match", None))
+
+
+def _reset_action(app):
+    """액션 배틀 창(자식 프로세스)을 닫고 상태를 처음으로. 판은 서버가 끊김으로 보고 기권 처리한다.
+
+    App 을 빌려 쓰는 검사의 가짜 앱(close_windows)에도 쓸 수 있게 메서드가 아니라 여기 둔다.
+    """
+    h = getattr(app, "action_battle", None)
+    if h is not None:
+        h.close()
+    job = getattr(app, "_action_job", None)
+    if job is not None:
+        try:
+            app.root.after_cancel(job)
+        except Exception:                                   # noqa: BLE001
+            pass
+    app._action_job = None            # 소켓 없이 걸어 둔 도전을 물어보는 예약 (App.action_watch)
+    app.action_battle = None          # 띄운 창 (action_launch.Handle)
+    app.action_match = None           # 열린 판 (open · fighting). 있는 동안 다른 대전 · 놀러 가기를 막는다
+    app.action_pending = None         # 내가 걸어 두고 아직 답을 못 받은 도전 (친구 탭이 '기다리는 중' 을 띄운다)
+    app._action_opened = None         # 창을 띄운 판 번호 - 같은 판을 두 번 띄우지 않는다
+    app._action_told = set()          # 이미 물어본 도전 번호
+
 
 class App(object):
     def __init__(self):
@@ -220,6 +252,9 @@ class App(object):
         self._live_job = None
         self._live_asking = False
         self._live_told = None
+        # 액션 배틀 (2.6.0). 창은 따로 뜨는 웹 화면이고, 여기는 도전 · 열린 판 · 띄운 창만 든다 (_reset_action).
+        self._action_asking = False
+        _reset_action(self)
         # 서버가 놀러 가기 소켓으로 밀어 주는 것 (hello 의 push, 2.5.0). 여기 든 것은 폴링하지 않는다.
         self._pushes = set()
         self._update_hint_job = None
@@ -823,6 +858,9 @@ class App(object):
                 if live and (live.get("invited") or live.get("state") == "fighting"
                              or live.get("unseen")):
                     self.check_live()
+                # 액션 배틀 (2.6.0): 소켓이 끊겨 있던 사이의 도전 · 열린 판을 따라잡는다. 옛 서버는 칸이 없다
+                if "action" in me:
+                    self.note_action(me.get("action"))
             if self.overlay:
                 added = self.overlay.sync(mons or [], paths or {}, walks or {})
                 self._check_battle_mine()          # 싸우던 포켓몬이 파티에서 빠졌나 (게시판 #218)
@@ -1571,6 +1609,9 @@ class App(object):
         self._pushes = set((ev or {}).get("push") or [])
         if "live" in self._pushes:
             self.check_live()
+        # 액션 배틀 (2.6.0): 끊겨 있던 사이 받아진 도전(open 알림을 놓쳤다) · 서버가 다시 켜져 없어진 판을 맞춘다
+        if getattr(self, "action_pending", None) or getattr(self, "action_match", None):
+            self.check_action()
         self.on_update_hint((ev or {}).get("latest"))
 
     def live_pushed(self):
@@ -1704,6 +1745,247 @@ class App(object):
         if self.live_battle:
             return self.live_battle.focus()
         self.check_live()
+
+    # ---------------- 액션 배틀 (2.6.0) ----------------
+    # 친구 · 길드끼리 키보드로 하는 실시간 대전. 판정과 화면은 서버가 맡고(웹 화면 /action/play), 앱은 도전 · 수락 ·
+    # 입장권을 받아 창만 띄운다 (action_launch: 윈도우 Edge 앱 창 · 맥 웹뷰 자식 프로세스 · 아니면 기본 브라우저).
+    # 바뀐 것은 놀러 가기 소켓으로 온다 ({"t": "action", "s": ask · open · declined · gone · over}) - 그때 한 번 묻는다.
+    def action_block(self):
+        """지금 액션 배틀을 걸거나 받을 수 없는 까닭. 되면 None."""
+        if _focus_on(self):
+            return FOCUS_PVP_MSG
+        if _action_on(self):
+            return "이미 액션 배틀 중입니다."
+        if self.live_battle:
+            return "실시간 배틀이 끝난 뒤에 해 주세요."
+        return None
+
+    def action_invite(self, friend, on_err=None):
+        """친구에게 액션 배틀을 건다 (친구 줄의 '액션'). on_err(까닭) - 막혔을 때 그 까닭을 띄울 곳 (친구 탭)."""
+        uid, name = friend.get("id"), friend.get("name") or "상대"
+
+        def fail(msg):
+            self.notify(msg)
+            if on_err:
+                try:
+                    on_err(msg)
+                except Exception:                           # noqa: BLE001 (탭이 닫혔다)
+                    pass
+
+        why = self.action_block()
+        if why:
+            return fail(why)
+
+        def done(r, err):
+            if err:
+                return fail(getattr(err, "message", str(err)))
+            self.notify("%s 님에게 액션 배틀을 신청했습니다. 수락하면 새 창에서 시작합니다." % name)
+            self._action_seen((r or {}).get("match"))
+        run_async(self.root, lambda: self.api.action_invite(uid), done)
+
+    def action_cancel(self):
+        """걸어 둔 도전을 거둬들인다 (친구 줄의 '취소')."""
+        mid = (self.action_pending or {}).get("id")
+        if mid is None:
+            return
+
+        def done(_r, err):
+            if err:
+                self.notify(getattr(err, "message", str(err)))
+            self._set_action_pending(None)
+        run_async(self.root, lambda: self.api.action_cancel(mid), done)
+
+    def on_action_push(self, ev=None):
+        """서버가 '액션 배틀이 바뀌었다' 고 알렸다. 걸어 둔 도전이 끝난 것이면 알리고, 무엇이든 한 번 물어 맞춘다.
+
+        건 사람에게 오는 끝은 declined (거절) · over (답이 없어 만료) 둘이다 (gone 은 받는 사람에게 간다).
+        """
+        ev = ev or {}
+        pend = self.action_pending or {}
+        if ev.get("s") in ("declined", "over") and ev.get("id") == pend.get("id"):
+            name = (pend.get("foe") or {}).get("name") or "상대"
+            self.notify("%s 님이 액션 배틀을 거절했습니다." % name if ev.get("s") == "declined"
+                        else "%s 님에게 건 액션 배틀 신청이 받아지지 않고 끝났습니다." % name)
+        self.check_action()
+
+    def note_action(self, card):
+        """/api/me 의 action (소켓이 끊겨 있던 사이를 따라잡는다). 서버에 무언가 있거나, 들고 있던 것이 있으면 묻는다."""
+        if card or self.action_match or self.action_pending:
+            self.check_action()
+
+    def check_action(self):
+        """지금 내 액션 배틀을 한 번 물어 그대로 맞춘다: 걸어 둔 도전 · 열린 판(창) · 받은 도전(확인 창)."""
+        if not self.api or self._quitting:
+            return
+
+        def done(r, err):
+            if err or not isinstance(r, dict):
+                return self.action_watch()        # 못 물었다 - 걸어 둔 도전이 있고 소켓이 없으면 조금 뒤 또 묻는다
+            m = r.get("match")
+            self._action_seen(m)                  # 걸어 둔 도전이 남아 있으면 그 안에서 다시 예약한다 (_set_action_pending)
+            if not (m and m.get("state") in ("open", "fighting")):
+                self.action_match = None          # 끝났거나 없어졌다 - 다른 대전 · 놀러 가기를 다시 연다
+            for inv in r.get("incoming") or []:
+                if inv.get("state") == "invited" and inv.get("id") not in self._action_told:
+                    return self._ask_action(inv)   # 한 번에 하나만 묻는다
+        run_async(self.root, lambda: self.api.action_state(), done)
+
+    def _action_seen(self, m):
+        """서버가 준 내 판 하나를 반영한다: 걸어 둔 도전이면 '기다리는 중', 열렸으면 창을 띄운다."""
+        state = (m or {}).get("state")
+        self._set_action_pending(m if state == "invited" and m.get("mine") else None)
+        if state in ("open", "fighting"):
+            self.open_action(m)
+
+    def _set_action_pending(self, m):
+        """걸어 둔 도전을 바꾼다. 바뀌었으면 친구 탭을 다시 그린다 ('기다리는 중' · '취소').
+        남아 있으면 소켓이 없을 때 물어볼 예약을 다시 걸고, 없어졌으면 지운다 (action_watch)."""
+        old = (self.action_pending or {}).get("id")
+        self.action_pending = m
+        if (m or {}).get("id") != old:
+            self._redraw_friends()
+        self.action_watch()
+
+    def _friends_pane(self):
+        """떠 있는 친구 탭. 없으면 None."""
+        pane = self.hub.panes.get("friends") if self.hub else None
+        return pane if pane is not None and getattr(pane, "alive", False) else None
+
+    def _redraw_friends(self):
+        """친구 탭이 떠 있으면 다시 그린다."""
+        pane = self._friends_pane()
+        if pane is not None:
+            try:
+                pane.draw()
+            except Exception:                               # noqa: BLE001
+                pass
+
+    def action_pushed(self):
+        """액션 배틀 알림이 소켓으로 오나 (붙어 있고, 서버가 밀어 준다고 했다 - live_pushed 와 같은 것을 본다)."""
+        if "action" not in self._pushes:
+            return False
+        sock = getattr(self.visit, "sock", None) if self.visit is not None else None
+        return bool(sock is not None and getattr(sock, "connected", False))
+
+    def action_watch(self, ms=3000):
+        """걸어 둔 도전이 있는데 소켓이 끊겨 있으면 잠깐 자주 물어본다 (live_watch 와 같은 모양).
+
+        받아졌다는 open 알림은 소켓으로만 온다. 끊겨 있으면 따라잡는 것이 90초 동기화(/api/me)뿐인데, 서버는 받은 판에
+        ACTION_JOIN_SEC(45초) 안에 둘 다 안 들어오면 접는다 - 그대로 두면 판이 접힌 뒤에야 창이 뜬다.
+        붙어 있으면 알림이 오므로 묻지 않는다. 도전이 없어지면(_set_action_pending(None)) · 끌 때(_reset_action) 멈춘다.
+        """
+        if self._action_job is not None:
+            try:
+                self.root.after_cancel(self._action_job)
+            except Exception:                               # noqa: BLE001
+                pass
+            self._action_job = None
+        if self.action_pending and not self._quitting and not self.action_pushed():
+            self._action_job = self.root.after(max(1000, ms), self._action_poll)
+
+    def _action_poll(self):
+        self._action_job = None
+        self.check_action()
+
+    def action_gone(self):
+        """열린 판(open · fighting)이 있는데 그 창이 없으면 그 판, 아니면 None.
+
+        창을 닫았거나 · 끊겼거나(1006 · 새로고침) · 기본 브라우저로 열어 붙잡은 창이 없다. 띄우는 중(입장권 · 창을
+        기다린다)은 없는 것으로 보지 않는다 - 그사이 '돌아가기' 를 또 눌러 창이 둘 뜨지 않게.
+        """
+        m = self.action_match
+        if not m or m.get("state") not in ("open", "fighting"):
+            return None
+        h = self.action_battle
+        if h is None:
+            return None if self._action_opened == m.get("id") else m
+        return None if h.alive() else m
+
+    def action_rejoin(self):
+        """창이 없는 판에 다시 들어간다 (친구 줄의 '돌아가기'). 입장권을 새로 받아 창을 띄운다.
+
+        서버는 싸우는 중에도 입장권을 주고, 끊긴 쪽을 ACTION_GRACE(15초) 기다렸다가 기권 처리한다 - 그 안에 들어오면
+        이어 한다. **저절로는 안 한다** (알림 · 동기화는 같은 판을 다시 안 띄운다 - 일부러 닫은 창을 되살리지 않는다).
+        """
+        m = self.action_gone()
+        if m is None:
+            return
+        self._action_opened = None
+        self.open_action(m, again=True)
+
+    def _ask_action(self, match):
+        """걸려온 도전을 물어본다. 한 번에 하나만. 받을 수 없는 때면 묻지 않고 거절한다 (건 사람이 기다리지 않게)."""
+        mid = match.get("id")
+        if self._action_asking or mid in self._action_told:
+            return
+        self._action_told.add(mid)
+        name = (match.get("foe") or {}).get("name") or "친구"
+        why = self.action_block()
+        if why:
+            self.notify("%s 님의 액션 배틀 신청을 받지 못했습니다. %s" % (name, why))
+            return run_async(self.root, lambda: self.api.action_answer(mid, False), lambda _r, _e: None)
+        self._action_asking = True
+        try:
+            PLAT.activate()
+            ok = confirm(self.root, "액션 배틀",
+                         "%s 님이 액션 배틀을 신청했습니다.\n"
+                         "수락하면 새 창에서 바로 시작합니다. 키보드로 움직이며 싸우고, "
+                         "포켓몬은 셋을 골라 Lv.50 으로 맞춰집니다." % name,
+                         danger=False, ok_text="수락")
+        except Exception:                                   # noqa: BLE001
+            ok = False
+        finally:
+            self._action_asking = False
+
+        def done(r, err):
+            if err:
+                msg = getattr(err, "message", str(err))
+                self.notify(msg)
+                if ok:
+                    # 수락이 막혔다 (그사이 상대가 거뒀거나 다른 대전에 들어갔다). 말없이 끝나지 않게 까닭을 보여 준다
+                    try:
+                        confirm(self.root, "액션 배틀", "수락할 수 없습니다.\n%s" % msg, danger=False, ok_text="확인")
+                    except Exception:                       # noqa: BLE001
+                        pass
+                return
+            if ok:
+                self._action_seen((r or {}).get("match"))
+        run_async(self.root, lambda: self.api.action_answer(mid, ok), done)
+
+    def open_action(self, match, again=False):
+        """열린 판의 창을 띄운다: 입장권을 받아 서버 주소 뒤에 붙여 연다. 같은 판은 한 번만 띄운다 -
+        창을 닫았으면 그 판은 저절로는 다시 안 띄운다 (서버가 끊김으로 보고 기권 처리한다). 사람이 '돌아가기' 를
+        누르면 again=True 로 다시 온다 (action_rejoin)."""
+        mid = match.get("id")
+        self.action_match = match
+        if mid == self._action_opened:
+            return
+        self._action_opened = mid
+        old, self.action_battle = self.action_battle, None
+        if old is not None:
+            old.close()                   # 지난 판의 결과 창이 아직 떠 있다
+        api = self.api
+
+        def work():
+            return action_launch.open(api.base + api.action_ticket(mid)["path"])
+
+        def done(handle, err):
+            if err:
+                self.notify("액션 배틀 창을 못 열었습니다. %s" % getattr(err, "message", err))
+                if self._action_opened == mid:
+                    self._action_opened = self.action_match = None     # 다음 알림 · 동기화가 다시 해 본다
+            elif self._quitting or self._action_opened != mid:
+                return handle.close()     # 그사이 끄거나 로그아웃했다
+            else:
+                self.action_battle = handle
+                if match.get("mine") and match.get("state") == "open" and not again:
+                    # 건 사람은 알림(open)으로 창이 뜬다 - 앱이 뒤에 있으면 창도 뒤에 뜰 수 있다. 고르는 시간은
+                    # 15초뿐이니(common/action_battle.PICK_SEC) 한 줄 남긴다 (받은 사람은 제가 눌렀다)
+                    self.notify("%s 님이 액션 배틀을 수락했습니다. 새 창에서 15초 안에 포켓몬을 고르세요."
+                                % ((match.get("foe") or {}).get("name") or "상대"))
+            if again:
+                self._redraw_friends()    # '돌아가기' 를 걷는다 (못 열었으면 판이 끝난 것이라 그때도 걷힌다)
+        run_async(self.root, work, done)
 
     # ---------------- 레이드 ----------------
     def open_raid_battle(self, room):
@@ -1840,6 +2122,8 @@ class App(object):
             return tell(None, OLY_MSG)
         if _raid_on(self):
             return tell(None, RAID_MSG)
+        if _action_on(self):
+            return tell(None, ACTION_MSG)
         if getattr(self, "_pvp_busy", False):
             return tell(None, "이미 상대를 찾는 중입니다.")
         if self.match_playing():
@@ -2291,6 +2575,7 @@ class App(object):
             except Exception:                               # noqa: BLE001
                 pass
             self._live_job = None
+        _reset_action(self)         # 액션 배틀 창(자식 프로세스)도 닫는다 - 끄기 · 다시 켜기 · 업데이트가 다 여기를 거친다
         rb = getattr(self, "raid_battle", None)
         if rb:
             try:

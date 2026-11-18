@@ -29,6 +29,15 @@ def _bool(name, default):
     return v.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _float_or_none(name):
+    """주면 그 값, 안 주면(또는 틀리면) None - 기본값을 다른 곳(엔진)이 쥐고 있는 것."""
+    v = os.environ.get(name, "").strip()
+    try:
+        return float(v) if v else None
+    except ValueError:
+        return None
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
@@ -384,3 +393,16 @@ RELEASE_REPO = os.environ.get("POKET_RELEASE_REPO", "rudtjr1106/poketdesktop")
 CHAMPION_START = os.environ.get("POKET_CHAMPION_START", "2026-11-11T00:00:00+09:00")
 CHAMPION_WAIT_SEC = _int("POKET_CHAMPION_WAIT_SEC", 600)   # [상대 찾기] 를 켜 두면 이만큼 기다린다
 CHAMPION_NOTIFY_SEC = _int("POKET_CHAMPION_NOTIFY_SEC", 60)  # 이만큼 기다려도 상대가 없으면 다른 참가자에게 알린다
+
+# 액션 배틀 (2.6.0, action.py · action_ws.py): 친구 · 길드원끼리 키보드로 하는 실시간 대전. 판은 서버가 30번/초로 굴린다.
+ACTION_INVITE_SEC = _int("POKET_ACTION_INVITE_SEC", 180)   # 도전이 살아 있는 시간 (LIVE_INVITE_SEC 와 같은 까닭으로 넉넉히)
+ACTION_JOIN_SEC = _int("POKET_ACTION_JOIN_SEC", 45)        # 받은 뒤 둘 다 들어오기를 기다린다. 못 오면 기록 없이 접는다
+ACTION_TICKET_SEC = _int("POKET_ACTION_TICKET_SEC", 60)    # 입장권 (한 번만 쓴다)
+ACTION_ROOMS = _int("POKET_ACTION_ROOMS", 20)              # 동시에 도는 판 - 판은 이 서버 프로세스 안에서 돈다
+ACTION_GRACE = _float("POKET_ACTION_GRACE", 15)            # 연결이 끊긴 뒤 이만큼 기다렸다가 기권 처리 (초)
+# 판 길이 (고르기 · 3 2 1 · 싸움, 초). 엔진(common/action_battle.py)이 정한다 - 검사 서버가 짧게 돌릴 때만 준다.
+ACTION_PICK_SEC = _float_or_none("POKET_ACTION_PICK_SEC")
+ACTION_READY_SEC = _float_or_none("POKET_ACTION_READY_SEC")
+ACTION_FIGHT_SEC = _float_or_none("POKET_ACTION_FIGHT_SEC")
+# 웹 화면 (server/web/action). 서버가 내보낸다 - 고칠 때 앱을 다시 내지 않아도 된다
+ACTION_WEB = os.environ.get("POKET_ACTION_WEB", os.path.join(ROOT, "web", "action"))

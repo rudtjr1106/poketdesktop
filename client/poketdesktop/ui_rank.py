@@ -41,7 +41,7 @@ CARD_BG = "#161b28"
 # 대전 기록 (1.12.1)
 RECORD_LIMIT = 50
 RESULT = {"win": ("승", U.GOOD), "lose": ("패", U.RED), "draw": ("무", U.FG_DIM)}
-KIND = {"random": "랜덤 배틀", "friend": "친구 배틀", "live": "실시간 배틀"}
+KIND = {"random": "랜덤 배틀", "friend": "친구 배틀", "live": "실시간 배틀", "action": "액션 배틀"}
 REC_FILTERS = (("all", "전체"), ("attack", "공격한 판"), ("defend", "공격받은 판"))
 REC_EMPTY = {"all": "아직 대전 기록이 없습니다.\n랜덤 배틀로 한 판 붙어 보세요.",
              "attack": "내가 건 대전이 아직 없습니다.",
@@ -456,8 +456,10 @@ class RankWindow(object):
     def _record_data(self, r):
         """대전 기록의 한 줄. watch = 다시 볼 수 있으면 대전 번호."""
         attack = r.get("started", True)
+        # 액션 배틀은 턴이 없다 - 서버가 같은 칸에 싸운 초를 적는다
+        span = "%d초" if r.get("kind") == "action" else "%d턴"
         bits = [KIND.get(r.get("kind"), r.get("kind") or ""), when_text(r.get("at")),
-                "%d턴" % (r.get("turns") or 0),
+                span % (r.get("turns") or 0),
                 "남은 %d : %d" % (r.get("myLeft") or 0, r.get("foeLeft") or 0)]
         if r.get("rpDelta"):
             bits.append("RP %+d" % r["rpDelta"])

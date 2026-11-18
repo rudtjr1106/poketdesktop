@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>포스크탑 액션 배틀</title>
+<link rel="stylesheet" href="/action/static/action.css">
+</head>
+<body>
+<!-- 아레나 · 몸 · 이펙트 · 화면 칸은 이 캔버스 하나에 그린다. 아래 넷만 DOM 이다 (키로 다룬다). -->
+<canvas id="stage"></canvas>
+
+<section id="pick" class="layer" hidden>
+  <div class="box pick-box">
+    <header class="pick-head">
+      <div>
+        <h1>나갈 포켓몬 셋</h1>
+        <p class="hint"><kbd>1</kbd>~<kbd>6</kbd> 으로 고르고 <kbd>Enter</kbd>. 고른 순서대로 나간다. 안 고르면 앞 3마리.</p>
+      </div>
+      <div class="timer" data-timer>15</div>
+    </header>
+    <div class="cards" data-mine></div>
+    <h2>상대 팀</h2>
+    <div class="cards foes" data-foe></div>
+    <footer class="pick-foot">
+      <span class="keys">이동 <kbd>W A S D</kbd>·<kbd>방향키</kbd> · 기술 <kbd>J K U I</kbd>·<kbd>Z X C V</kbd> · 피하기 <kbd>Space</kbd>·<kbd>Shift</kbd> · 교체 <kbd>1 2 3</kbd></span>
+      <span class="status" data-status></span>
+      <button type="button" class="go" data-go tabindex="-1">나가기 (Enter)</button>
+    </footer>
+  </div>
+</section>
+
+<section id="confirm" class="layer dim" hidden>
+  <div class="box small">
+    <h1>기권할까요?</h1>
+    <p>이 판은 진 것으로 남는다.</p>
+    <div class="row">
+      <button type="button" class="go danger" data-yes tabindex="-1">기권 (Enter)</button>
+      <button type="button" data-no tabindex="-1">계속 (Esc)</button>
+    </div>
+  </div>
+</section>
+
+<section id="result" class="layer dim" hidden>
+  <div class="box small result">
+    <h1 data-title></h1>
+    <p data-why></p>
+    <div class="row">
+      <button type="button" class="go" data-close tabindex="-1">닫기 (Enter)</button>
+    </div>
+  </div>
+</section>
+
+<section id="help" class="layer" hidden>
+  <div class="box help">
+    <h1>액션 배틀</h1>
+    <p>직접 움직여 피하고 때린다. 기술은 쓰는 순간 상대 쪽을 향한다 - <b>피하기가 명중률이다.</b>
+      준비 동작 · 바닥 표시를 보고 비킨다. 날아가는 기술끼리 부딪히면 센 쪽이 남는다.</p>
+    <table>
+      <tr><th>이동</th><td><kbd>W A S D</kbd> 또는 <kbd>← ↑ → ↓</kbd></td></tr>
+      <tr><th>기술 1 · 2 · 3 · 4</th><td><kbd>J K U I</kbd> 또는 <kbd>Z X C V</kbd></td></tr>
+      <tr><th>피하기</th><td><kbd>Space</kbd> 또는 <kbd>Shift</kbd> · 0.2초 무적, 대기 1.6초</td></tr>
+      <tr><th>교체</th><td><kbd>1 2 3</kbd> · 0.6초 걸리고 대기 6초</td></tr>
+      <tr><th>기권</th><td><kbd>Esc</kbd> → 확인</td></tr>
+      <tr><th>도움말</th><td><kbd>H</kbd></td></tr>
+    </table>
+    <p class="hint">상대 셋을 다 쓰러뜨리면 이긴다. 3분이 지나면 남은 마리 수 → 남은 체력으로 가른다.</p>
+    <div class="row"><button type="button" data-close tabindex="-1">닫기 (Esc)</button></div>
+  </div>
+</section>
+
+<script type="module" src="/action/static/js/main.js"></script>
+</body>
+</html>

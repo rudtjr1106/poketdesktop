@@ -1,0 +1,187 @@
+/* 액션 배틀 화면. 색은 게임 창의 것: 짙은 남색 바탕, 금색 강조 하나.
+   캔버스가 창을 채우고, 고르기 · 기권 확인 · 결과 · 도움말만 DOM 으로 위에 뜬다. */
+:root {
+  color-scheme: dark;
+  --ink: #0b0e15;
+  --bg: #131722;
+  --panel: #1b2030;
+  --raised: #262d42;
+  --line: #2a3147;
+  --line2: #39415e;
+  --fg: #f2f4fb;
+  --dim: #a9b1c9;
+  --faint: #6f7894;
+  --gold: #ffc043;
+  --gold-ink: #2a1f08;
+  --win: #5fd97a;
+  --lose: #ff6b6b;
+  --r: 10px;
+  --font: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--fg);
+  font-family: var(--font);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+.layer {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.layer[hidden] { display: none; }
+.layer.dim { background: rgba(5, 7, 12, 0.62); }
+#pick { background: rgba(8, 10, 16, 0.86); }
+#help { pointer-events: none; }
+#help .box { pointer-events: auto; }
+
+.box {
+  background: var(--bg);
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  padding: 20px 24px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+}
+.box.small { width: 380px; text-align: center; }
+
+h1 { margin: 0 0 6px; font-size: 22px; font-weight: 800; }
+h2 { margin: 16px 0 8px; font-size: 14px; color: var(--dim); font-weight: 700; }
+p { margin: 6px 0; color: var(--dim); font-size: 14px; line-height: 1.55; }
+.hint { font-size: 13px; color: var(--faint); }
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 6px;
+  border: 1px solid var(--line2);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--fg);
+  font: 700 12px/1.5 var(--font);
+  text-align: center;
+}
+
+button {
+  font: 700 14px var(--font);
+  color: var(--fg);
+  background: var(--raised);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.45; cursor: default; }
+button.go { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+button.danger { background: #c9424f; color: #fff; border-color: #c9424f; }
+.row { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+
+/* ---------------------------------------------------------------- 고르기 */
+.pick-box { width: min(1180px, 100%); }
+.pick-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.timer {
+  min-width: 64px;
+  padding: 6px 12px;
+  border-radius: var(--r);
+  background: var(--panel);
+  border: 1px solid var(--line2);
+  font-size: 30px;
+  font-weight: 800;
+  text-align: center;
+  color: var(--gold);
+}
+.cards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 8px 12px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  text-align: center;
+}
+.card.mine:hover { border-color: var(--line2); }
+.card.mine.on { border-color: var(--gold); background: #2a2616; }
+.card-head { align-self: stretch; display: flex; justify-content: space-between; align-items: center; height: 20px; }
+.card .key {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--gold);
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  padding: 0 6px;
+}
+.card .order { font-size: 12px; font-weight: 800; color: var(--gold); }
+.card .icon { image-rendering: pixelated; }
+.card .name { font-size: 15px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.card .item { font-size: 11px; color: var(--faint); min-height: 15px; }
+.types { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+.type { font-size: 11px; font-weight: 700; color: #10131c; border-radius: 4px; padding: 0 6px; }
+.moves { list-style: none; margin: 4px 0 0; padding: 0; align-self: stretch; text-align: left; }
+.moves li {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  column-gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  padding: 2px 0;
+}
+.moves li i { width: 8px; height: 8px; border-radius: 50%; }
+.moves .mv { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.moves .kind { grid-column: 2; font-size: 10.5px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.moves li.off { opacity: 0.5; }
+.foes .card { padding: 8px 6px; }
+.pick-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.pick-foot .keys { font-size: 12px; color: var(--faint); flex: 1; line-height: 1.9; }
+.pick-foot .status { font-size: 13px; color: var(--dim); font-weight: 700; }
+
+/* ---------------------------------------------------------------- 결과 · 도움말 */
+.result h1 { font-size: 34px; }
+#result[data-mood="win"] h1 { color: var(--win); }
+#result[data-mood="lose"] h1 { color: var(--lose); }
+#result[data-mood="draw"] h1 { color: var(--gold); }
+#result[data-mood="void"] h1 { color: var(--dim); }
+
+.help { width: 520px; }
+.help table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+.help th { text-align: left; color: var(--dim); font-weight: 700; padding: 6px 10px 6px 0; white-space: nowrap; }
+.help td { padding: 6px 0; color: var(--fg); }
+.help tr + tr { border-top: 1px solid var(--line); }
+
+@media (max-width: 900px) {
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pick-foot { flex-wrap: wrap; }
+}

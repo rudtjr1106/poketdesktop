@@ -937,6 +937,31 @@ class Api(object):
     def live_seen(self):
         return self._call("POST", "/api/live/seen", {})
 
+    # ---------------- 액션 배틀 (2.6.0) ----------------
+    # 친구 · 길드끼리 키보드로 하는 실시간 대전. 판은 서버가 내보내는 웹 화면에서 하고, 앱은 도전 · 수락 ·
+    # 입장권만 맡는다. 판(M) = {id, state, foe: {id, name}, mine, result, reason, created}.
+    def action_state(self):
+        """지금 내 판과 받은 도전. {"match": M | None, "incoming": [M..]}"""
+        return self._call("GET", "/api/action")
+
+    def action_can(self, uid):
+        """저 사람에게 지금 걸 수 있나. {"ok", "why"}"""
+        return self._call("GET", "/api/action/can/%d" % int(uid))
+
+    def action_invite(self, uid):
+        return self._call("POST", "/api/action/invite/%d" % int(uid), {})
+
+    def action_answer(self, mid, accept=True):
+        return self._call("POST", "/api/action/%d/answer" % int(mid), {"accept": bool(accept)})
+
+    def action_cancel(self, mid):
+        """걸어 둔 도전을 거둬들인다."""
+        return self._call("POST", "/api/action/%d/cancel" % int(mid), {})
+
+    def action_ticket(self, mid):
+        """한 번 쓰는 입장권. {"ticket", "path"} - path 에 #조각으로 붙어 있다 (서버 주소 뒤에 붙여 연다)."""
+        return self._call("POST", "/api/action/%d/ticket" % int(mid), {})
+
     # ---------------- 챔피언리그 - 독도 (관장 256곳을 다 이긴 사람끼리 실시간 배틀) ----------------
     def champion(self):
         """지금 모습: 자격 · 여는 때 · 내 전적 · 기다리는 사람 · 접속 중인 참가자 · 진행 중인 판 · 순위 · 최근 판."""

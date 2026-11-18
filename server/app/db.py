@@ -691,6 +691,33 @@ CREATE TABLE IF NOT EXISTS live_match (
 CREATE INDEX IF NOT EXISTS idx_live_a ON live_match(a_id, state);
 CREATE INDEX IF NOT EXISTS idx_live_b ON live_match(b_id, state);
 
+-- 액션 배틀 (2.6.0, action.py) 한 판. **판 자체는 메모리에서 돈다** (action_ws 의 방, 30번/초) - 여기는 도전 ·
+-- 상태 · 결과와, 받는 순간 읽어 둔 두 팀(data)만 적는다. 판이 끝나면 data 는 지운다 (방이 이미 들고 있다).
+-- 서버가 다시 켜지면 끝나지 않은 줄은 기록 없이 aborted 가 된다 (action.abort_all).
+--   state   invited / open(받았다 - 둘이 들어오기를 기다린다) / fighting / done /
+--           aborted(못 왔다 · 서버를 다시 켰다) / declined / cancelled / expired
+--   result  a / b / draw (done 일 때)
+--   reason  ko / timeout / forfeit (done) · noshow / restart / error / stale / cancel (aborted)
+--   data    {"a": [팀], "b": [팀], "seed": n} - Lv.50 으로 맞춘 앞 6마리
+CREATE TABLE IF NOT EXISTS action_match (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    a_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    b_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    a_name      TEXT NOT NULL,
+    b_name      TEXT NOT NULL,
+    state       TEXT NOT NULL,
+    result      TEXT,
+    reason      TEXT,
+    data        TEXT,
+    -- 전적을 이미 썼나. live_match.recorded 와 같다 - 먼저 찍고 그다음에 쓴다
+    recorded    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_action_a ON action_match(a_id, state);
+CREATE INDEX IF NOT EXISTS idx_action_b ON action_match(b_id, state);
+CREATE INDEX IF NOT EXISTS idx_action_state ON action_match(state);
+
 -- 챔피언리그 (독도, champion.py) 참가 자격. 관장 256곳을 처음 다 이긴 순간 한 줄 - 그 뒤로는 관장이 바뀌어
 -- 이긴 곳이 255곳이 되어도 빠지지 않는다 (관장을 바꾸면 migrations 가 그 지역 기록을 지운다).
 CREATE TABLE IF NOT EXISTS champion_member (

@@ -206,6 +206,8 @@ def why_not(uid, now=None):
         return "관장 %d곳을 전부 이겨야 챔피언리그에 나갈 수 있습니다 (지금 %d곳)." % (total(), cleared(uid))
     if live.my_match(uid):
         return "이미 진행 중인 실시간 배틀이 있습니다."
+    if live.other_busy(uid):
+        return "이미 다른 배틀을 하고 있습니다."
     return team_why(uid)
 
 
@@ -302,7 +304,8 @@ def _announce(uid, t, now=None):
         busy = set(_wait)
     name = _name(uid)
     for other, _n, _q in members():
-        if other == uid or other in busy or not social.is_online(other) or live.my_match(other):
+        if other == uid or other in busy or not social.is_online(other) or live.my_match(other) \
+                or live.other_busy(other):
             continue
         if social.blocked_between(uid, other):
             continue
@@ -333,7 +336,7 @@ def challenge(uid, other, now=None):
         raise ValueError("이 트레이너와는 싸울 수 없습니다.")
     if not social.is_online(other):
         raise ValueError("상대가 지금 접속해 있지 않습니다. 실시간 배틀은 둘 다 켜 있어야 합니다.")
-    if live.my_match(other):
+    if live.my_match(other) or live.other_busy(other):
         raise ValueError("상대가 다른 배틀을 하고 있습니다.")
     why = team_why(other, mine=False)
     if why:
@@ -555,7 +558,7 @@ def state(uid, now=None):
         if other == uid or not social.is_online(other) or social.blocked_between(uid, other):
             continue
         online.append({"id": other, "name": r["name"], "waiting": other in waiting,
-                       "busy": live.my_match(other) is not None})
+                       "busy": live.my_match(other) is not None or live.other_busy(other)})
     return {
         "open": is_open(now), "startsAt": config.CHAMPION_START, "opens": open_text(),
         "total": total(), "cleared": cleared(uid), "member": member, "members": len(table),

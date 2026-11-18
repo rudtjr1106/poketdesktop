@@ -160,6 +160,21 @@ jobs:
       # 쪽만 다음을 골라야 한다.
       - name: 실시간 배틀 (엔진)
         run: python common/test_live_battle.py
+      # 2.6.0 액션 배틀: 기술 920개의 꼴 표 · 실시간 판 (이동 · 맞음 · 피하기 무적 · 쿨타임 · PP · 상태 · 힘겨루기 ·
+      # 교체 · 쓰러짐 · 끝 · 같은 시드 같은 판 · 상대에게 안 보내는 것)
+      - name: 액션 배틀 (엔진)
+        run: |
+          python common/test_action_moves.py
+          python common/test_action_battle.py
+      # 액션 배틀 웹 화면 (서버가 내보낸다): 키 · 보간 · 예측 · 도트 · 이펙트 순수 모듈 검사와 문법.
+      # node 22 - 확장자 .js 의 ES 모듈을 그대로 읽는다 (그보다 낮으면 import 문을 CommonJS 로 읽다 죽는다)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: 액션 배틀 웹 화면 (node)
+        run: |
+          node --test server/web/action/test/
+          for f in server/web/action/js/*.js; do node --check "$f"; done
       # 게으름·독치장 같은 특성과 역린류·2턴 기술, 속이기의 '첫 턴에만'.
       - name: 특성·턴제 기술 (엔진)
         run: python common/test_new_abilities.py
@@ -332,6 +347,11 @@ jobs:
       - name: 실시간 배틀 화면 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/test_live_ui.py
+      # 액션 배틀 (2.6.0): 친구 줄 '액션' · 도전 알림 → 확인 → 입장권 → 창 띄우기 · 막힘 · 끌 때 창 정리 ·
+      # Edge 앱 창 명령 줄 (윈도우) · 맥 자식 프로세스에 주소는 stdin 으로
+      - name: 액션 배틀 (앱 쪽, 진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_action_ui.py
       # 배틀 창 크기 (1.10.3): 배틀 창을 끌어서 키우고 줄일 때 장면·도트·글자가 함께 따라가는지,
       # 어느 크기에서도 눌리는 것이 없는지, 판(고르던 칸·재생)이 그대로인지, 바꾼 크기를 기억하는지
       - name: 배틀 창 크기 (끌어서 바꿔 본다)
@@ -750,6 +770,8 @@ jobs:
           python test_sprite_fix.py
           python test_raid.py
           python test_live.py
+          # 액션 배틀 (2.6.0): 도전 · 받기 · 한 번 쓰는 입장권 · 실시간 배틀/챔피언과 겹침 · 기록 한 번 · 재시작 정리
+          python test_action.py
           # 새 앱 판 알림 (2.5.0): 깃허브 최신 릴리스가 바뀔 때만 소켓으로 민다 (가짜 깃허브)
           python test_release_watch.py
           # 상자(/api/pokemon)를 jsonable_encoder 없이 바로 JSON 으로 - 글자는 예전과 한 바이트도 다르지 않다 (11/14)
@@ -840,6 +862,11 @@ jobs:
           POKET_EVENT_RESPAWN: "0"
           # 친구 집에 놀러 가기: 끊긴 뒤 끝내기까지 기다리는 초 (운영은 20초 - 검사는 짧게)
           POKET_VISIT_GRACE: "2"
+          # 액션 배틀 한 판을 짧게 (운영: 고르기 15 · 준비 3 · 싸움 180 · 끊김 15초)
+          POKET_ACTION_PICK_SEC: "1"
+          POKET_ACTION_READY_SEC: "0.5"
+          POKET_ACTION_FIGHT_SEC: "8"
+          POKET_ACTION_GRACE: "2"
           POKET_WILD_COOLDOWN_MIN: "60"
           POKET_WILD_COOLDOWN_MAX: "60"
           POKET_MISS_COOLDOWN: "60"
@@ -929,6 +956,9 @@ jobs:
           python server/test_visit.py http://127.0.0.1:8788 /tmp/poket-test.db
           # 실시간 배틀 초대가 놀러 가기 소켓으로 온다 (2.5.0): 걸기 · 거절 · 거두기 · 받기가 그 사람에게만
           python server/test_live_push.py http://127.0.0.1:8788
+          # 액션 배틀 (2.6.0): 진짜 웹소켓으로 둘이 한 판 - 입장권은 첫 메시지로만 · 고르기 → 싸움 스냅숏 ·
+          # 기술이 둘 다에게 · 상대 정보는 안 온다 · 한쪽이 끊기면 GRACE 뒤 기권 · 기권 · 시간 끝
+          POKET_ACTION_GRACE=2 python server/test_action_ws.py http://127.0.0.1:8788 /tmp/poket-test.db
 
       - name: 서버 로그 (실패했을 때만)
         if: failure()

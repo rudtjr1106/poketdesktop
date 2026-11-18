@@ -12,3 +12,6 @@ pystray>=0.19; sys_platform != "darwin"
 # 메뉴 막대에 아이콘도 안 올라간다 - 그러면 게임을 조작할 수 없다.
 pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
 pyobjc-framework-Quartz>=10.0; sys_platform == "darwin"
+# 맥 전용 (2.6.0). 액션 배틀 창 (WKWebView 자식 프로세스 - action_view). 없으면 기본 브라우저로 연다.
+# 윈도우는 더할 것이 없다 (Edge 앱 창).
+pyobjc-framework-WebKit>=10.0; sys_platform == "darwin"

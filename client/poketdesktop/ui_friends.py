@@ -45,6 +45,7 @@ class FriendsWindow(object):
         self._job = None          # 목록을 나눠 만드는 일 (U.Chunked)
         self._live_job = None     # 실시간 배틀 초대를 물어보는 예약
         self._live_key = None     # 지금 그려 둔 '기다리는 중' 이 어느 초대인지
+        self._gone_key = None     # 지금 그려 둔 '돌아가기' 가 어느 액션 판인지 (2.6.0)
 
         # parent 가 있으면 탭 안의 한 칸으로, 없으면 지금까지처럼 창으로.
         self.win = U.panel(parent, self.root, "포스크탑 — 친구",
@@ -157,10 +158,12 @@ class FriendsWindow(object):
         except Exception:                                   # noqa: BLE001
             pass
         # 걸어 둔 초대가 생기거나 사라졌을 때만 다시 그린다. 매번 그리면
-        # 스크롤 자리와 마우스가 4초마다 튄다.
+        # 스크롤 자리와 마우스가 4초마다 튄다. 액션 판의 창이 닫혔을 때('돌아가기', 2.6.0)도 같이 본다.
         key = (getattr(self.app, "live_pending", None) or {}).get("id")
-        if key != self._live_key:
-            self._live_key = key
+        gone = getattr(self.app, "action_gone", None)
+        gone = ((gone() if gone is not None else None) or {}).get("id")
+        if key != self._live_key or gone != getattr(self, "_gone_key", None):
+            self._live_key, self._gone_key = key, gone
             try:
                 self.draw()
             except Exception:                               # noqa: BLE001
@@ -387,7 +390,7 @@ class FriendsWindow(object):
 
     def _friend_actions(self, f):
         """친구 줄의 오른쪽: [("button", 글, 할 일, 모양) | ("label", 글, 색, 작은 글인가)] (오른쪽부터).
-        모양: ghost(보통) · red(배틀) · accent(놀러 가기 · 실시간)."""
+        모양: ghost(보통) · red(배틀) · accent(놀러 가기 · 실시간 · 액션)."""
         uid = f["id"]
         out = [("button", "삭제", lambda: self.act(lambda: self.app.api.friend_remove(uid), "친구를 삭제했습니다."),
                 "ghost"),
@@ -401,6 +404,19 @@ class FriendsWindow(object):
         if pend and pend.get("foeId") == uid:
             out.append(("button", "취소", lambda: self.app.live_cancel(self.draw), "ghost"))
             out.append(("label", "수락을 기다리는 중...", U.ACCENT, False))
+            return out
+        # 액션 배틀 (2.6.0): 걸어 둔 도전도 같은 모양. 바뀌면 앱이 이 탭을 다시 그린다 (app._set_action_pending)
+        act = getattr(self.app, "action_pending", None) or {}
+        if act and (act.get("foe") or {}).get("id") == uid:
+            out.append(("button", "취소", lambda: self.app.action_cancel(), "ghost"))
+            out.append(("label", "액션 수락을 기다리는 중...", U.ACCENT, False))
+            return out
+        # 이 친구와의 액션 판이 살아 있는데 창이 없다 (닫았다 · 끊겼다 · 새로고침). 서버는 15초(ACTION_GRACE) 기다렸다가
+        # 기권 처리한다 - 그 안에 누르면 입장권을 새로 받아 다시 들어간다. 저절로는 안 띄운다 (app.action_rejoin)
+        gone = getattr(self.app, "action_gone", None)
+        gone = gone() if gone is not None else None
+        if gone and (gone.get("foe") or {}).get("id") == uid:
+            out.append(("button", "돌아가기", lambda: self.app.action_rejoin(), "accent"))
             return out
         # 친구 집에 놀러 가기 (1.11.0): 앱이 켜져 있고 다른 친구와 연결돼 있지 않은 친구에게만.
         visit = getattr(self.app, "visit", None)
@@ -419,6 +435,8 @@ class FriendsWindow(object):
         if f.get("online"):
             out.append(("button", "실시간", lambda: self.app.live_invite(uid, f.get("name"), on_err=self._fight_err),
                         "accent"))
+            # 액션 배틀 (2.6.0): 키보드로 하는 실시간 대전 (새 창). 상대가 옛 앱이면 서버가 까닭을 돌려준다
+            out.append(("button", "액션", lambda: self.app.action_invite(f, on_err=self._fight_err), "accent"))
         return out
 
     def _fight_done(self, _r, why):

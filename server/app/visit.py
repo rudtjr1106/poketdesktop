@@ -42,6 +42,7 @@ visitable). 놀러 가기는 POST /api/visit/start 로 하고, 그 뒤의 파티
                   {"t": "say", "text": "...", "pet": 12}   말 (SAY_MAX 자까지). pet = 주인이 말한 포켓몬
                   {"t": "act", "act": "dance", "pet": 12}  동작 (ACTS)
                   {"t": "look", "look": 10006}      손님: 보낸 포켓몬의 모습 (메가진화한 모습으로 걷기)
+                  {"t": "caps", "v": ["action"]}    이 앱이 아는 것 (붙자마자 한 번). 액션 배틀은 상대 앱이 알 때만 건다
                   "ping"                            -> "pong"
     서버 -> 화면   {"t": "hello", "push": [...], "latest": "2.5.1"}   붙었다. push = 이 서버가 밀어 주는 것
                                                     (앱은 여기 있는 것만 폴링을 멈춘다), latest = 깃허브의 최신 앱 판
@@ -53,6 +54,7 @@ visitable). 놀러 가기는 POST /api/visit/start 로 하고, 그 뒤의 파티
 
                   {"t": "champion", "s": ...}       챔피언리그 - 독도 (champion.py)
                   {"t": "live", "s": ..., "id": 판}   실시간 배틀 초대가 왔다 · 받았다 · 거절했다 (live._poke)
+                  {"t": "action", "s": ..., "id": 판} 액션 배틀 도전이 왔다 · 판이 열렸다 · 끝났다 (action._poke)
                   {"t": "update", "v": "2.5.1"}     새 앱 판이 나왔다 (release_watch)
 
 끊기면 GRACE 초를 기다렸다가 끝낸다 (프로그램을 다시 켜는 사이에 끝나지 않게). 서버를 다시 올리면
@@ -88,6 +90,7 @@ PARTY_GAP = 0.5              # 주인의 파티 보내기를 이보다 자주 �
 SAY_GAP = 0.6                # 말·동작을 이보다 자주 받지 않는다 (도배 막기)
 MAX_PER_USER = 3
 MAX_TOTAL = 600
+CAPS_MAX = 16                # 앱이 알리는 능력 수 (믿지 않는다 - 짧은 글자 몇 개만 받는다)
 
 _lock = threading.RLock()
 _conns = {}                  # {사람: set(Conn)}
@@ -99,10 +102,10 @@ _gone = {}                   # {사람: 끊긴 시각} - GRACE 를 센다
 
 
 class Conn(object):
-    __slots__ = ("ws", "uid", "last")
+    __slots__ = ("ws", "uid", "last", "caps")
 
     def __init__(self, ws, uid):
-        self.ws, self.uid, self.last = ws, uid, {}
+        self.ws, self.uid, self.last, self.caps = ws, uid, {}, frozenset()
 
 
 def _now():
@@ -135,6 +138,18 @@ def online(uid):
 def busy(uid):
     with _lock:
         return uid in _of
+
+
+def set_caps(c, v):
+    """앱이 보낸 능력 목록({"t": "caps", "v": [...]} 의 v)을 그 연결에 적는다."""
+    if isinstance(v, list):
+        c.caps = frozenset(x for x in v[:CAPS_MAX] if isinstance(x, str) and len(x) <= 32)
+
+
+def has_cap(uid, cap):
+    """그 사람의 붙어 있는 앱 가운데 cap 을 아는 것이 있나 (액션 배틀은 상대 앱이 알 때만 건다)."""
+    with _lock:
+        return any(cap in c.caps for c in _conns.get(uid, ()))
 
 
 def presence(ids):
@@ -211,7 +226,7 @@ def push_all(payload):
 
 # 이 서버가 소켓으로 밀어 주는 것 (hello 에 싣는다). 앱은 여기 있는 것만 폴링을 멈춘다 - 옛 서버에 붙으면
 # 목록이 없으므로 예전처럼 묻는다.
-PUSHES = ("live",)
+PUSHES = ("live", "action")
 
 
 def _hello(uid):
@@ -683,6 +698,9 @@ async def visit_socket(ws: WebSocket):
             try:
                 msg = json.loads(text)
             except ValueError:
+                continue
+            if isinstance(msg, dict) and msg.get("t") == "caps":
+                set_caps(c, msg.get("v"))
                 continue
             got = receive(uid, msg, conn=c)
             if got:

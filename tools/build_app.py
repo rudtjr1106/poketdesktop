@@ -376,8 +376,13 @@ def build():
     except ImportError:
         print("pyobjc 가 없습니다. 이게 없으면 투명 배경도 메뉴 막대 "
               "아이콘도 안 됩니다.")
-        print("  pip install pyobjc-framework-Cocoa pyobjc-framework-Quartz")
+        print("  pip install pyobjc-framework-Cocoa pyobjc-framework-Quartz pyobjc-framework-WebKit")
         return 1
+    import importlib.util
+    if importlib.util.find_spec("WebKit") is None:
+        # 멈추지는 않는다 - 앱은 돈다. 다만 액션 배틀 창(2.6.0)이 앱 창 대신 기본 브라우저로 열린다.
+        print("  pyobjc-framework-WebKit 이 없습니다. 액션 배틀이 기본 브라우저로 열리는 판이 됩니다.")
+        print("  pip install pyobjc-framework-WebKit")
 
     print("포스크탑 v%s 맥 번들 빌드" % VERSION)
     icon = make_icns()
@@ -433,6 +438,10 @@ def build():
         "--hidden-import", "Foundation",
         "--hidden-import", "Quartz",
         "--hidden-import", "objc",
+        # 액션 배틀 창 (2.6.0): 앱이 자기를 --action-view 로 한 번 더 띄우고 그 안에서만 WebKit 을 부른다
+        # (run.pyw → action_view). 함수 · 갈래 안에서 불러서 못 찾을 수 있어 적어 둔다 - 빠지면 기본 브라우저로 열린다.
+        "--hidden-import", "WebKit",
+        "--hidden-import", "poketdesktop.action_view",
         # 안 쓰는 무거운 것들은 뺀다
         "--exclude-module", "numpy",
         "--exclude-module", "scipy",

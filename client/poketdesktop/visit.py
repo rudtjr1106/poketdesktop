@@ -83,11 +83,15 @@ DROP_MS = 380                # 보따리가 머리 위에서 떨어지는 시간
 CANT_GO = {"battle": "배틀 중에는 놀러 갈 수 없습니다.",
            "pvp": "대전 상대를 찾는 중에는 놀러 갈 수 없습니다.",
            "spectate": "친선전을 구경하는 동안에는 놀러 갈 수 없습니다.",
-           "raid": "공습을 막는 동안에는 놀러 갈 수 없습니다."}
+           "raid": "공습을 막는 동안에는 놀러 갈 수 없습니다.",
+           "action": "액션 배틀 중에는 놀러 갈 수 없습니다."}
 GAVE_UP = {"battle": "배틀이 시작돼서 놀러 가지 않았습니다.",
            "pvp": "대전 상대를 찾는 중이라 놀러 가지 않았습니다.",
            "spectate": "친선전을 구경하는 중이라 놀러 가지 않았습니다.",
-           "raid": "공습을 막는 중이라 놀러 가지 않았습니다."}
+           "raid": "공습을 막는 중이라 놀러 가지 않았습니다.",
+           "action": "액션 배틀이 열려서 놀러 가지 않았습니다."}
+# 붙자마자 서버에 알리는 이 앱이 아는 것 (2.6.0). 서버는 이걸 보고 액션 배틀 도전을 받아 준다 - 옛 앱에는 안 건다.
+CAPS = {"t": "caps", "v": ["action"]}
 # 자세마다 쓸 동작 (그 종에 있는 것 중 앞에서부터)
 POSES = {"sleep": ("Sleep", "EventSleep", "Laying"), "sit": ("Sit", "Idle"),
          "lie": ("Laying", "Sleep", "Sit"), "faint": ("Laying", "Sleep")}
@@ -859,10 +863,16 @@ class Visit(object):
     def start(self):
         if self.sock is None:
             try:
-                self.sock = make_socket(self.app, self.on_event)
+                self.sock = make_socket(self.app, self._from_socket)
             except Exception:                               # noqa: BLE001
                 self.sock = None
         return self
+
+    def _from_socket(self, ev):
+        """소켓이 넘긴 것. 붙으면(다시 붙은 것도) 이 앱이 아는 것(CAPS)부터 알리고 넘긴다."""
+        if (ev or {}).get("t") == "open":
+            self.send(CAPS)
+        self.on_event(ev)
 
     def stop(self):
         self.leave(None, tell=False, walk=False)
@@ -912,6 +922,11 @@ class Visit(object):
                 fn = getattr(self.app, "on_live_push", None)
                 if fn is not None:
                     fn(ev)
+            elif t == "action":
+                # 액션 배틀 도전이 왔다 · 열렸다 · 거절했다 · 없어졌다 · 끝났다 - 앱이 /api/action 을 한 번 묻는다 (2.6.0)
+                fn = getattr(self.app, "on_action_push", None)
+                if fn is not None:
+                    fn(ev)
             elif t == "update":
                 # 새 앱 판이 나왔다 (2.5.0)
                 fn = getattr(self.app, "on_update_hint", None)
@@ -941,10 +956,12 @@ class Visit(object):
 
     # ---------------- 보내기 ----------------
     def busy(self):
-        """바탕화면에서 배틀이 돌거나 곧 열리나. 그렇다면 무엇인지 ("battle" / "pvp" / "spectate"), 아니면 None.
+        """바탕화면에서 배틀이 돌거나 곧 열리나. 그렇다면 무엇인지 (CANT_GO 의 열쇠), 아니면 None.
 
         야생 배틀·대전 재생·친선전 구경은 내 바탕화면에서 한다. 놀러 가면 화면이 친구 집이 되고 내 도트가
         빠져서 둘이 섞인다. 배틀 창(실시간·관장·레이드)은 따로 뜨는 창이라 상관없다.
+        액션 배틀(2.6.0)도 따로 뜨는 창이지만 두 손으로 키보드를 쥐고 하는 판이라, 그동안 친구 집 · 말풍선이
+        끼어들지 않게 막는다 (다른 대전과 겹치지 않게 하는 것과 같은 줄).
         """
         app = self.app
         wild = getattr(app, "wild", None)
@@ -959,6 +976,8 @@ class Visit(object):
         r = getattr(app, "airraid", None)
         if r is not None and r.busy():
             return "raid"                       # 공습 장면이 바탕화면을 쥐고 있다 (2.3.0, 독립 검토)
+        if getattr(app, "action_match", None):
+            return "action"                     # 액션 배틀 판이 열려 있다 (2.6.0)
         return None
 
     def can_go(self):

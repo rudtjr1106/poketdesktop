@@ -45,6 +45,9 @@ ACT_TRIES = 5
 listeners = []
 # 싸우는 사람에게 줄 판(public)에 덧붙이는 함수들 (row, out). 길드 친선전이 '관전 N명' 을 얹는다.
 decorators = []
+# 이 판 말고 다른 대전 중인가를 보는 함수들 (uid -> bool). 액션 배틀(action.py)이 건다 - 한 사람은 한 번에 한 판.
+# 실시간 배틀 · 챔피언리그 · 친선전이 my_match 옆에서 같이 본다 (other_busy).
+BUSY = []
 
 
 def _emit(mid):
@@ -135,6 +138,11 @@ def current(uid):
     return my_match(uid) or recent(uid)
 
 
+def other_busy(uid):
+    """실시간 배틀이 아닌 다른 대전(액션 배틀)에 걸려 있거나 싸우는 중인가 (BUSY)."""
+    return any(fn(uid) for fn in BUSY)
+
+
 def expire_old(now=None):
     """답 없는 초대와 아무도 안 돌아오는 판을 접는다."""
     cut = (_now(now) - datetime.timedelta(seconds=config.LIVE_INVITE_SEC)) \
@@ -169,7 +177,9 @@ def can_invite(uid, other):
         return "상대가 지금 접속해 있지 않습니다. 실시간 배틀은 둘 다 켜 있어야 합니다."
     if my_match(uid):
         return "이미 진행 중인 실시간 배틀이 있습니다."
-    if my_match(other):
+    if other_busy(uid):
+        return "이미 다른 배틀을 하고 있습니다."
+    if my_match(other) or other_busy(other):
         return "상대가 다른 배틀을 하고 있습니다."
     if not pvp.ranked_team(uid):
         return "데리고 다니는 포켓몬이 없습니다."
@@ -270,6 +280,8 @@ def open_direct(a, b, now=None, kind="live"):
         raise ValueError("이 트레이너와는 싸울 수 없습니다.")
     if my_match(a) or my_match(b):
         raise ValueError("이미 진행 중인 실시간 배틀이 있습니다.")
+    if other_busy(a) or other_busy(b):
+        raise ValueError("이미 다른 배틀을 하고 있습니다.")
     if not pvp.ranked_team(a) or not pvp.ranked_team(b):
         raise ValueError("둘 다 데리고 다니는 포켓몬이 있어야 합니다.")
     cur = db.run(

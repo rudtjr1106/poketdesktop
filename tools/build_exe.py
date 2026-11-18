@@ -135,6 +135,8 @@ def build(onedir=False):
         # 길드 채팅의 웹소켓 (websocket-client). try 안에서 불러서 못 찾을 수 있어 적어 둔다 -
         # 빠지면 오류 없이 채팅이 2초 폴링으로만 돈다 (눈에 안 띄는 고장).
         "--hidden-import", "websocket",
+        # 액션 배틀 창 (2.6.0): Edge 앱 창을 띄운다. 새 의존성은 없다 (winreg · ctypes 는 표준 라이브러리)
+        "--hidden-import", "poketdesktop.action_launch",
         # 화면 테마 (skins/). 테마마다 화면 파일을 이름으로 불러서(importlib) PyInstaller 가 못 본다 -
         # 파일마다 하나씩 넣는다 (skin_modules - --collect-submodules 는 2.0.0 에서 0개를 모았다).
         # 테마의 글꼴 파일도 같이 (skins.font_dir 이 poketdesktop/fonts 를 본다).

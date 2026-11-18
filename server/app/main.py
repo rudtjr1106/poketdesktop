@@ -32,7 +32,7 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
-from . import (achievements, airraid, arche, arche_routes, auth, avatar, battle_routes, board, board_routes, boosts, champion, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
+from . import (achievements, action, action_routes, action_ws, airraid, arche, arche_routes, auth, avatar, battle_routes, board, board_routes, boosts, champion, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
                expedition, focus, item_routes, olympics, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
@@ -68,6 +68,9 @@ app.include_router(champion.router)             # 챔피언리그 - 독도 (관�
 app.include_router(arche_routes.router)         # 아르케의 여섯 봉인 (2.4.0 - 시즌 6 이벤트)
 app.include_router(troubles.router)             # 앱이 배틀을 접은 까닭 (1.13.3)
 app.include_router(stats.router)                # 밖에 보여 주는 숫자 셋 - 가입자 · 접속 중 · 최대 동시 접속 (인증 없음)
+app.include_router(action_routes.router)        # 액션 배틀 (2.6.0) - 도전 · 입장권 · 웹 화면 (/action/play)
+app.include_router(action_ws.router)            # 액션 배틀의 판 (/ws/action, 30번/초)
+app.mount("/action/static", action_routes.static_files(), name="action_static")   # 웹 화면의 js · css
 
 RNG = deps.RNG
 
@@ -120,6 +123,13 @@ def _startup():
             print("[visit] 안 받은 보따리 %d개를 준 사람에게 돌려줬습니다" % n)
     except Exception as e:                                  # noqa: BLE001
         print("[visit] 보따리를 돌려주지 못했습니다: %r" % (e,))
+    # 액션 배틀 (2.6.0) 의 판은 메모리(방)에서 돌았다 - 끝나지 않은 줄은 기록 없이 접는다.
+    try:
+        n = action.abort_all()
+        if n:
+            print("[action] 끝나지 않은 판 %d개를 접었습니다" % n)
+    except Exception as e:                                  # noqa: BLE001
+        print("[action] 판을 접지 못했습니다: %r" % (e,))
     # 양쪽이 다 본 오래된 대전 로그를 치운다. 한 판에 수십 KB 라
     # 그냥 두면 Turso 용량을 제일 먼저 먹는다. 전적은 그대로 남는다.
     try:
@@ -1334,6 +1344,8 @@ def me(ctx=Depends(current)):
         # 결과를 아직 안 봤을 때). 상대가 기다리고 있으므로 이 동기화로라도
         # 알려야 한다.
         "live": live.me_card(uid),
+        # 액션 배틀 (2.6.0): 받은 도전 · 건 도전 · 열린 판. 소켓으로 밀지만 끊겨 있던 앱이 여기서 따라잡는다
+        "action": action.me_card(uid),
         # 도감 업적 (시즌 3). 안 본 것만. 화면이 게임 안에서 알리고 seen 을 부른다
         # - 운영체제 알림은 쓰지 않는다(게임 안의 일이라서).
         "achievements": achievements.me_card(uid),

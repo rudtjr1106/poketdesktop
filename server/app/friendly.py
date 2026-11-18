@@ -197,6 +197,8 @@ def seek(uid, on, now=None):
     if on:
         if live.my_match(uid):
             raise ValueError("이미 진행 중인 실시간 배틀이 있습니다.")
+        if live.other_busy(uid):
+            raise ValueError("이미 다른 배틀을 하고 있습니다.")
         if not pvp.ranked_team(uid):
             raise ValueError("데리고 다니는 포켓몬이 없습니다.")
         why = _held_why(uid)                 # 같은 도구는 한 팀에 한 마리 (2.0.2)
