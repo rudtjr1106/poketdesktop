@@ -12,7 +12,8 @@
      7. Cmd · Ctrl · Alt 와 같이 누른 키는 게임 키가 아니다. Cmd 를 누르거나 떼면 눌린 키를 비운다 (맥은 Cmd 를 누른 채
         뗀 키의 keyup 을 안 준다).
      8. 판이 도는 동안 F5 · Ctrl/Cmd+R 은 막는다 (입장권은 한 번만 쓰여 새로 불러오면 못 돌아온다).
-     9. 연결이 끊긴 뒤에는 싸우는 중이어도 움직이지 않는다. */
+     9. 연결이 끊긴 뒤에는 싸우는 중이어도 움직이지 않는다.
+    10. 피하기는 뺐다 (2026-11-19) - Space · Shift 는 아무 동작도 아니다. 키 처리로는 가되 막지 않는다. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { keyAction, InputState, MoveSender, bindInput, canAct, slotOf, teamSlotOf } from '../js/input.js';
@@ -44,8 +45,6 @@ test('물리 키 자리로 읽는다 (한글 입력 상태의 Process 키도)', 
   assert.deepEqual(keyAction('ArrowLeft'), { move: 'left' });
   assert.deepEqual(keyAction('KeyJ'), { act: 'm0' });
   assert.deepEqual(keyAction('KeyV'), { act: 'm3' });
-  assert.deepEqual(keyAction('Space'), { act: 'dodge' });
-  assert.deepEqual(keyAction('ShiftRight'), { act: 'dodge' });
   assert.deepEqual(keyAction('Digit2'), { act: 'sw1' });
   assert.deepEqual(keyAction('Numpad3'), { act: 'sw2' });
   assert.deepEqual(keyAction('Escape'), { ui: 'menu' });
@@ -56,10 +55,25 @@ test('물리 키 자리로 읽는다 (한글 입력 상태의 Process 키도)', 
   assert.deepEqual(s.keydown(ev('KeyU', { key: 'ㅕ' })), { act: 'm2' });
 });
 
-test('두 벌 배치 - 기술 네 칸 · 피하기 · 교체가 양쪽에서 같다', () => {
+test('두 벌 배치 - 기술 네 칸 · 이동이 양쪽에서 같다', () => {
   const pairs = [['KeyJ', 'KeyZ'], ['KeyK', 'KeyX'], ['KeyU', 'KeyC'], ['KeyI', 'KeyV'],
-    ['Space', 'ShiftLeft'], ['KeyW', 'ArrowUp'], ['KeyA', 'ArrowLeft'], ['KeyS', 'ArrowDown'], ['KeyD', 'ArrowRight']];
+    ['KeyW', 'ArrowUp'], ['KeyA', 'ArrowLeft'], ['KeyS', 'ArrowDown'], ['KeyD', 'ArrowRight']];
   for (const [a, b] of pairs) assert.deepEqual(keyAction(a), keyAction(b), a + ' = ' + b);
+});
+
+test('피하기 없음 - Space · Shift 는 아무 동작도 아니다 (dodge 를 만들지 않는다)', () => {
+  for (const code of ['Space', 'ShiftLeft', 'ShiftRight']) {
+    assert.equal(keyAction(code), null, code);
+    const s = new InputState();
+    assert.equal(s.keydown(ev(code)), null, code + ' - 새 동작 없음');
+    assert.deepEqual(s.vector(), { x: 0, y: 0 }, code + ' - 걷지도 않는다');
+  }
+  const r = bound();
+  r.down('Space');
+  r.down('ShiftLeft');
+  r.down('ShiftRight');
+  assert.deepEqual(r.got, ['Space', 'ShiftLeft', 'ShiftRight'], '키 처리로는 간다 (동작 null)');
+  assert.deepEqual(r.prevented, [], '게임 키가 아니라 막지 않는다');
 });
 
 test('이동 벡터 - 8방향, 대각선은 길이 1, 반대쪽은 지운다', () => {
@@ -151,7 +165,7 @@ test('Cmd · Ctrl · Alt 와 같이 누른 키는 게임 키가 아니다 - Cmd 
   const r = bound();
   r.down('KeyH', { metaKey: true });
   r.down('ShiftLeft', { metaKey: true });
-  r.down('Digit4', { metaKey: true });        // Cmd+Shift+4 (화면 찍기) - Shift 가 피하기로 가지 않는다
+  r.down('Digit4', { metaKey: true });        // Cmd+Shift+4 (화면 찍기) - 창 단축키로 둔다
   r.down('KeyJ', { ctrlKey: true });
   r.down('Space', { altKey: true });
   assert.deepEqual(r.got, [], '키 처리로 가지 않는다');
@@ -253,7 +267,6 @@ test('기본 키 Z X C V → 기술 칸 0~3 (칸에 적는 글자도 그 차례)
     assert.equal(slotOf(keyAction(c).act), m);
     assert.equal('Key' + SLOT_KEYS[m], c, '칸 ' + m + ' 의 글자');
   });
-  assert.equal(slotOf('dodge'), -1);
   assert.equal(slotOf('m4'), -1);
   assert.equal(slotOf(undefined), -1);
   assert.equal(teamSlotOf(keyAction('Digit2').act), 1);

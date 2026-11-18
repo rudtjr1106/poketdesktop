@@ -91,40 +91,44 @@ test('결과 - 내 쪽에서 본 글', () => {
 });
 
 /* ---------------------------------------------------------------- 조작 띠 · 누름 (2026-11-19)
-     6. 기본 키는 Z X C V - 칸 차례도 그대로 (한 줄, 가운데). 피하기 Shift 는 Z 왼쪽, 교체 1 2 3 은 V 오른쪽.
-        칸은 옛것(236×60)의 1.6~1.8배. 위 체력 칸과 겹치지 않는다.
+     6. 기본 키는 Z X C V - 칸 차례도 그대로. 교체 1 2 3 은 V 오른쪽. 칸은 일곱 (기술 넷 · 교체 셋) 한 줄,
+        띠 전체가 가운데. 피하기 칸은 없다 (2026-11-19 뺐다). 칸은 옛것(236×60)의 1.6~1.8배. 위 체력 칸과 겹치지 않는다.
      7. 누름: 못 쓰는 칸('대기 중' · 'PP 없음' · '못 씀')은 안 보내고 흔든다. 대기가 (왕복을 빼고) 0.25초 안이면 보낸다 -
         서버가 들고 있다가 쓴다. 바로 쓸 수 있으면 (대기 0 · 서 있음) 준비 몸짓을 먼저 그려도 된다.
      8. 누른 칸은 바로 반짝, 못 쓰면 0.3초 흔들리고 까닭이 0.8초 떠 있다. */
 
-test('조작 띠 - Z X C V 한 줄 가운데, 왼쪽 Shift 피하기, 오른쪽 교체 셋', () => {
+test('조작 띠 - [Z][X][C][V] [1][2][3] 일곱 칸 한 줄, 띠 전체가 가운데', () => {
   assert.deepEqual(SLOT_KEYS, ['Z', 'X', 'C', 'V']);
   assert.deepEqual(SLOT_ALT, ['J', 'K', 'U', 'I']);
   const L = stripLayout(3);
-  const ys = new Set([L.dodge, ...L.moves, ...L.cards].map((r) => r.y));
-  assert.equal(ys.size, 1, '한 줄');
-  for (let m = 1; m < 4; m++) assert.ok(L.moves[m].x > L.moves[m - 1].x + L.moves[m - 1].w, '왼쪽부터 Z X C V, 안 겹친다');
-  const mid = (L.moves[0].x + L.moves[3].x + L.moves[3].w) / 2;
-  assert.ok(Math.abs(mid - ARENA_W / 2) < 1, '기술 칸은 가운데');
+  assert.deepEqual(Object.keys(L).sort(), ['box', 'cards', 'moves'], '피하기 칸은 없다');
+  const all = [...L.moves, ...L.cards];
+  assert.equal(all.length, 7, '기술 넷 + 교체 셋');
+  assert.equal(new Set(all.map((r) => r.y)).size, 1, '한 줄');
+  for (let i = 1; i < all.length; i++) assert.ok(all[i].x > all[i - 1].x + all[i - 1].w, '왼쪽부터 Z X C V 1 2 3, 안 겹친다');
+  const left = all[0].x;
+  const right = all[6].x + all[6].w;
+  assert.deepEqual([L.box.x, L.box.x + L.box.w], [left, right], '띠 상자 = 일곱 칸');
+  assert.ok(Math.abs(left - (ARENA_W - right)) <= 1, '띠 전체가 가운데 (왼쪽 ' + left + ' · 오른쪽 ' + (ARENA_W - right) + ')');
   const area = L.moves[0].w * L.moves[0].h;
   assert.ok(area >= 236 * 60 * 1.6 && area <= 236 * 60 * 1.8, '옛 칸의 1.6~1.8배 (' + (area / (236 * 60)).toFixed(2) + ')');
-  assert.ok(L.dodge.x + L.dodge.w < L.moves[0].x, '피하기는 Z 왼쪽');
   assert.ok(L.cards[0].x > L.moves[3].x + L.moves[3].w, '교체는 V 오른쪽');
-  for (let j = 1; j < 3; j++) assert.ok(L.cards[j].x > L.cards[j - 1].x + L.cards[j - 1].w);
-  assert.ok(L.dodge.x >= 20 && L.cards[2].x + L.cards[2].w <= ARENA_W - 20, '아레나 안 (양옆 20)');
+  assert.ok(left >= 180, '왼쪽 아래 구석 (이동 키 · Esc · 핑) 과 안 겹친다');
   assert.ok(L.box.y + L.box.h <= ARENA_H - 10 && L.box.y > 100 + 14, '아래 끝 · 위 체력 칸과 안 겹친다');
-  assert.equal(stripLayout(1).cards.length, 1);
+  const one = stripLayout(1);
+  assert.equal(one.cards.length, 1);
+  assert.ok(Math.abs(one.box.x - (ARENA_W - one.box.x - one.box.w)) <= 1, '교체 칸 수가 달라도 가운데');
 });
 
 test('키 → 칸: Z X C V (와 J K U I) 가 m0~m3', () => {
   ['KeyZ', 'KeyX', 'KeyC', 'KeyV'].forEach((c, m) => assert.deepEqual(keyAction(c), { act: 'm' + m }));
   ['KeyJ', 'KeyK', 'KeyU', 'KeyI'].forEach((c, m) => assert.deepEqual(keyAction(c), { act: 'm' + m }));
-  assert.deepEqual(keyAction('ShiftLeft'), { act: 'dodge' });
+  for (const c of ['Space', 'ShiftLeft', 'ShiftRight']) assert.equal(keyAction(c), null, c + ' - 피하기 없음');
 });
 
 const MV = (extra = {}) => ({ key: 'EMBER', kr: '불꽃세례', type: 'FIRE', kind: 'proj', ok: true, why: '', cd: 2, pp: 13, ...extra });
 const ME = (extra = {}) => ({
-  i: 0, st: 'idle', sm: -1, cd: [0, 0, 0, 0], pp: [13, 13, 13, 13], dcd: 0, scd: 0, need: false,
+  i: 0, st: 'idle', sm: -1, cd: [0, 0, 0, 0], pp: [13, 13, 13, 13], scd: 0, need: false,
   team: [{ hpr: 1000, ko: false }, { hpr: 500, ko: false }, { hpr: 0, ko: true }], ...extra,
 });
 const moves4 = [MV(), MV({ kind: 'melee', type: 'FIGHTING' }), MV({ ok: false, why: '턴제에서만 뜻이 있다', kind: 'none' }), MV()];
@@ -169,10 +173,10 @@ test('누름 - 발버둥만 남으면 네 칸 다 보낸다 (가장 긴 대기�
   assert.deepEqual([cooling.send, cooling.reason], [false, '대기 중']);
 });
 
-test('누름 - 피하기 · 교체', () => {
+test('누름 - 교체 · 모르는 동작 (옛 dodge) 은 안 보낸다', () => {
   const s = (me) => ({ me, moves: moves4, age: 0, rtt: 0.05 });
-  assert.equal(pressVerdict('dodge', s(ME())).send, true);
-  assert.deepEqual([pressVerdict('dodge', s(ME({ dcd: 1.2 }))).send, pressVerdict('dodge', s(ME({ dcd: 1.2 }))).reason], [false, '대기 중']);
+  assert.equal(pressVerdict('dodge', s(ME())).send, false, '피하기는 없다');
+  assert.equal(pressVerdict('zzz', s(ME())).send, false);
   assert.equal(pressVerdict('sw1', s(ME())).send, true);
   assert.equal(pressVerdict('sw0', s(ME())).reason, '나와 있음');
   assert.equal(pressVerdict('sw2', s(ME())).reason, '기절');

@@ -6,7 +6,8 @@
 서버도 DB 도 없이 common/action_battle.py 만 굴린다. 판 시계는 step() 한 번이 TICK (1/30초).
 
 제일 중요한 것.
-  · **피하기가 명중률이다.** 무적 중에는 탄이 지나간다 · 예고(광선 · 내려찍기)를 보고 비키면 안 맞는다.
+  · **걸어서 비키는 것이 명중률이다.** 예고(광선 · 내려찍기)를 보고 비키면 안 맞는다. 피하기(대시 · 무적)는 없다
+    (2026-11-19 '너무 사기다') - 'dodge' 를 눌러도 아무 일 없다. 회피 랭크는 걷는 빠르기 (한 랭크 6%, ±36%).
   · **상대에게 숨기는 것.** 상대 F 에 체력 · 쿨타임 · PP 가 없고, 상대 팀 보기에 기술 · 도구가 없다.
   · **같은 시드 · 같은 입력 = 같은 판.**
   · **판 길이.** 마주 보고 기술만 쏟아붓는 봇끼리 한 마리를 쓰러뜨리는 데 4~30초 (DAMAGE_SCALE 0.42),
@@ -201,7 +202,7 @@ def t_walk():
         math.hypot(a.x - b.x, a.y - b.y))
 
 
-# ---------------------------------------------------------------- 맞기 · 피하기
+# ---------------------------------------------------------------- 맞기 · 비키기
 def t_shot():
     print("== 탄")
     ab = fight([("BLASTOISE", ["WATERGUN"])], [("SNORLAX", ["TACKLE"])])
@@ -224,33 +225,114 @@ def t_shot():
         (dmg, f_b.maxhp, f_a.stat("spa")))
 
 
-def t_dodge():
-    print("== 피하기")
+def t_no_dodge():
+    print("== 피하기는 없다 (2026-11-19 '너무 사기다' - 걷기 · 교체로만 비킨다)")
+    chk("KEYS 에 dodge 가 없다 · DODGE_ 상수도 없다", "dodge" not in AB.KEYS and not [k for k in dir(AB) if "DODGE" in k],
+        AB.KEYS)
 
     def shoot(dodge):
+        """탄이 다가올 때 b 가 왼쪽(탄 쪽)으로 걸으며 dodge 를 누른다 (dodge=False 면 걷기만)."""
         ab = fight([("BLASTOISE", ["WATERGUN"])], [("SNORLAX", ["TACKLE"])])
         b = ab.sides["b"]
         press(ab, "a", "m0")
         evs = run_until(ab, lambda _: ab.shots and ab.shots[0].x >= b.x - 110, 2.0)
+        walk(ab, "b", -1, 0)
         if dodge:
-            walk(ab, "b", -1, 0)
             press(ab, "b", "dodge")
+        evs += run(ab, AB.TICK)
+        f = me(ab, "b")
         evs += run(ab, 0.8)
-        return ab, evs
+        return ab, evs, f
 
-    ab, ev = shoot(False)
-    chk("(안 피하면 맞는다)", of(ev, "hit", v="b"))
-    ab, ev = shoot(True)
-    chk("피하기 이벤트", of(ev, "dodge", w="b"))
-    chk("무적 중엔 탄이 지나간다", not of(ev, "hit", v="b"), of(ev, "hit"))
-    chk("피하기 대기 1.6초 (0.8초 지났다)", abs(me(ab, "b")["dcd"] - (AB.DODGE_CD - 0.8)) < 0.15, me(ab, "b")["dcd"])
-    press(ab, "b", "dodge")
+    ab0, ev0, f0 = shoot(False)
+    ab1, ev1, f1 = shoot(True)
+    b0, b1 = ab0.sides["b"], ab1.sides["b"]
+    chk("press('dodge') 는 버린다: 이벤트가 안 누른 판과 같다 (dodge 이벤트 없음)", ev1 == ev0 and not of(ev1, "dodge"),
+        [e["e"] for e in ev1])
+    chk("  다음 틱의 내 F 도 같다 (걷기 그대로 · 무적 없음 · st walk)", f1 == f0 and f1["st"] == "walk" and not f1["inv"],
+        (f0, f1))
+    chk("  움직임도 같다 (밀려남 없음)", (b1.x, b1.y) == (b0.x, b0.y) and b1.push is None, ((b0.x, b0.y), (b1.x, b1.y)))
+    chk("  무적으로 지나가지 않고 맞는다", of(ev1, "hit", v="b"), [e["e"] for e in ev1])
+
+    ab = fight([("BLASTOISE", ["WATERGUN", "TACKLE"])], [("SNORLAX", ["TACKLE"])])
+    a = ab.sides["a"]
+    press(ab, "a", "m0")
+    run_until(ab, lambda _: a.cast is not None and a.cast.stage == "rec", 2.0)
+    press(ab, "a", "m1")
+    press(ab, "a", "dodge")
+    chk("  들고 있던 키를 dodge 가 덮지 않는다", a.buf is not None and a.buf[0] == "m1", a.buf)
+    c = a.cast
+    run(ab, AB.TICK)
+    chk("  회복을 끊지 않는다", a.cast is c and me(ab, "a")["st"] == "rec", me(ab, "a")["st"])
+    run(ab, 2.0)
+    x0, y0 = a.x, a.y
+    press(ab, "a", "dodge")
     ev = run(ab, 0.3)
-    chk("대기 중엔 다시 못 피한다", not of(ev, "dodge"))
-    run(ab, 1.0)
-    press(ab, "b", "dodge")
-    ev = run(ab, 2 * AB.TICK)
-    chk("대기가 지나면 다시", of(ev, "dodge", w="b") and me(ab, "b")["st"] == "dodge" and me(ab, "b")["inv"])
+    chk("  아무것도 안 할 때 눌러도 아무 일 없다", not ev and me(ab, "a")["st"] == "idle" and a.buf is None
+        and (a.x, a.y) == (x0, y0), (ev, me(ab, "a")["st"], a.buf))
+
+    ab = fight(TEAM_A, TEAM_B, seed=4)
+    sts, keys, ev = set(), set(), []
+    for _ in range(int(20 / AB.TICK)):
+        if ab.phase == "over":
+            break
+        bot(ab, "a", ab.tick)
+        bot(ab, "b", ab.tick + 1)
+        if ab.tick % 5 == 0:
+            ab.press("a", "dodge", ab.tick)
+            ab.press("b", "dodge", ab.tick)
+        ab.step()
+        ev += ab.drain_events()
+        for w in ("a", "b"):
+            for f in ab.snapshot(w)["f"].values():
+                sts.add(f["st"])
+                keys |= set(f)
+    chk("dodge 를 섞어 누르는 봇 판 20초: st dodge · dcd · dodge 이벤트가 한 번도 없다",
+        "dodge" not in sts and "dcd" not in keys and not of(ev, "dodge") and of(ev, "hit"), (sorted(sts), sorted(keys)))
+
+
+def t_eva_walk():
+    print("== 회피 랭크 = 걷는 빠르기 (한 랭크 %d%%, ±6 에서 멈춘다) · 명중 랭크 = 탄 빠르기" % round(AB.EVA_WALK * 100))
+
+    def walked(eva):
+        ab = fight([("SNORLAX", ["TACKLE"])], [("PIDGEY", ["GUST"])])
+        s = ab.sides["a"]
+        s.mon.f.stages["eva"] = eva
+        place(ab, "a", 300, 200)
+        place(ab, "b", 1300, 800)
+        walk(ab, "a", 1, 0)
+        x0 = s.x
+        run(ab, 1.0)
+        return s.x - x0, me(ab, "a")["spd"], 180 + 0.9 * max(20, min(250, s.mon.f.stat("spe")))
+
+    base, _, plain = walked(0)
+    chk("회피 0: 그대로 (180 + 0.9 × 스피드)", abs(base - plain) < 1.0, (base, plain))
+    for eva, mult in ((2, 1.12), (-2, 0.88), (6, 1.36), (-6, 0.64), (9, 1.36), (-9, 0.64)):
+        d, spd, _ = walked(eva)
+        chk("회피 %+d: 걷는 빠르기 × %.2f (%.1f / %.1f)" % (eva, mult, d, base),
+            abs(d - base * mult) < 1.0 and abs(spd - plain * mult) < 0.06, (d, base * mult, spd, plain * mult))
+
+    ab = fight([("SNORLAX", ["DOUBLETEAM", "MINIMIZE"])], [("PIDGEY", ["GUST"])])
+    s = ab.sides["a"]
+    v0 = ab._walk_speed(s)
+    press(ab, "a", "m0")
+    ev = run(ab, 1.0)
+    chk("그림자분신(회피 +1)을 쓰면 6% 빨리 걷는다", of(ev, "stat", w="a", st="eva", d=1)
+        and abs(ab._walk_speed(s) - v0 * 1.06) < 1e-6, (ab._walk_speed(s), v0))
+    for _ in range(3):
+        press(ab, "a", "m1")
+        run(ab, AM.kit(DEX, "MINIMIZE")["cd"] + 0.6)
+    chk("  작아지기를 거듭 써도 +6 (36%) 에서 멈춘다", s.mon.f.stages["eva"] == 6
+        and abs(ab._walk_speed(s) - v0 * 1.36) < 1e-6, (s.mon.f.stages["eva"], ab._walk_speed(s) / v0))
+
+    for acc, mult in ((0, 1.0), (2, 5 / 3.0)):
+        ab = fight([("BLASTOISE", ["WATERGUN"])], [("SNORLAX", ["TACKLE"])])
+        ab.sides["a"].mon.f.stages["acc"] = acc
+        press(ab, "a", "m0")
+        run_until(ab, lambda _: ab.shots, 2.0)
+        v = math.hypot(ab.shots[0].vx, ab.shots[0].vy) if ab.shots else 0
+        chk("명중 %+d: 탄 빠르기 × %.2f (그대로)" % (acc, mult), abs(v - AM.kit(DEX, "WATERGUN")["speed"] * mult) < 0.01,
+            v)
 
 
 # ---------------------------------------------------------------- 쿨타임 · PP · 버퍼
@@ -684,9 +766,8 @@ def t_rush():
     press(ab, "a", "m0")
     ev = run_until(ab, lambda e: of(e, "hit", v="b"), 1.0)
     walk(ab, "b", 1, 0)
-    press(ab, "b", "dodge")
     ev += run(ab, 1.0)
-    chk("  첫 대의 경직 동안엔 못 피해 둘째 대도 맞는다", len(of(ev, "hit", v="b", k="DOUBLEKICK")) == 2,
+    chk("  첫 대 뒤 걸어 나가도 경직 때문에 둘째 대도 맞는다", len(of(ev, "hit", v="b", k="DOUBLEKICK")) == 2,
         [e["e"] for e in ev])
     ab = fight([("HITMONLEE", ["DOUBLEKICK"])], [("SNORLAX", ["TACKLE"])])
     place(ab, "b", 650, 450)
@@ -1060,8 +1141,9 @@ def t_views():
     s = ab.snapshot("a")
     chk("snapshot 모양", s["t"] == "s" and s["ph"] == "fight" and s["n"] == ab.tick and set(s["f"]) == {"a", "b"},
         sorted(s))
-    hidden = {"hp", "mhp", "cd", "pp", "dcd", "scd", "spd", "need"}
-    chk("내 F 에는 체력 · 쿨타임 · PP", hidden <= set(s["f"]["a"]), sorted(s["f"]["a"]))
+    hidden = {"hp", "mhp", "cd", "pp", "scd", "spd", "need"}
+    chk("내 F 에는 체력 · 쿨타임 · PP (피하기 대기 dcd 는 없다)", hidden == set(s["f"]["a"]) - set(s["f"]["b"])
+        and "dcd" not in s["f"]["a"], sorted(s["f"]["a"]))
     chk("상대 F 에는 없다", not (hidden & set(s["f"]["b"])), sorted(s["f"]["b"]))
     chk("공통 F 열쇠", {"i", "x", "y", "d", "st", "sm", "sp", "s", "c", "stg", "inv", "hpr", "team"}
         <= set(s["f"]["b"]), sorted(s["f"]["b"]))
@@ -1243,7 +1325,8 @@ def main():
     t_pick()
     t_walk()
     t_shot()
-    t_dodge()
+    t_no_dodge()
+    t_eva_walk()
     t_cooldown()
     t_status()
     t_clash()

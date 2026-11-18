@@ -24,8 +24,8 @@
     <h2>상대 팀</h2>
     <div class="cards foes" data-foe></div>
     <footer class="pick-foot">
-      <span class="keys">이동 <kbd>방향키</kbd> · 기술 <kbd>Z</kbd><kbd>X</kbd><kbd>C</kbd><kbd>V</kbd> · 피하기 <kbd>Shift</kbd> · 교체 <kbd>1 2 3</kbd>
-        <span class="alt">· 왼손이 편하면 <kbd>W A S D</kbd> · <kbd>J K U I</kbd> · <kbd>Space</kbd> 도 된다</span></span>
+      <span class="keys">이동 <kbd>방향키</kbd> · 기술 <kbd>Z</kbd><kbd>X</kbd><kbd>C</kbd><kbd>V</kbd> · 교체 <kbd>1 2 3</kbd>
+        <span class="alt">· 왼손이 편하면 <kbd>W A S D</kbd> · <kbd>J K U I</kbd> 도 된다</span></span>
       <span class="status" data-status></span>
       <button type="button" class="go" data-go tabindex="-1">나가기 (Enter)</button>
     </footer>
@@ -56,18 +56,18 @@
 <section id="help" class="layer" hidden>
   <div class="box help">
     <h1>액션 배틀</h1>
-    <p>직접 움직여 피하고 때린다. 기술은 쓰는 순간 상대 쪽을 향한다 - <b>피하기가 명중률이다.</b>
+    <p>직접 걸어 다니며 비키고 때린다. 기술은 쓰는 순간 상대 쪽을 향한다 - <b>걸어서 비키는 것이 명중률이다.</b>
       준비 동작 · 바닥 표시를 보고 비킨다. 날아가는 기술끼리 부딪히면 센 쪽이 남는다.</p>
     <table>
       <tr><th>이동</th><td><kbd>← ↑ → ↓</kbd> <span class="alt">또는 <kbd>W A S D</kbd></span></td></tr>
       <tr><th>기술 1 · 2 · 3 · 4</th><td><kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd> <span class="alt">또는 <kbd>J K U I</kbd></span></td></tr>
-      <tr><th>피하기</th><td><kbd>Shift</kbd> <span class="alt">또는 <kbd>Space</kbd></span> · 0.2초 무적, 대기 1.6초</td></tr>
       <tr><th>교체</th><td><kbd>1 2 3</kbd> · 0.6초 걸리고 대기 6초</td></tr>
       <tr><th>기권</th><td><kbd>Esc</kbd> → 확인</td></tr>
       <tr><th>도움말</th><td><kbd>H</kbd></td></tr>
     </table>
     <p class="hint">상대 셋을 다 쓰러뜨리면 이긴다. <b data-fight>2분</b>이 지나면 남은 마리 수 → 남은 체력으로 가른다.
-      쓸 수 없는 칸(대기 중 · PP 없음)을 누르면 칸이 흔들리고 보내지 않는다.</p>
+      쓸 수 없는 칸(대기 중 · PP 없음)을 누르면 칸이 흔들리고 보내지 않는다.
+      회피 랭크(그림자분신 · 작아지기 …)는 한 단계마다 걸음이 6% 빨라진다 (떨어지면 느려진다, ±36% 까지).</p>
     <div class="row"><button type="button" data-close tabindex="-1">닫기 (Esc)</button></div>
   </div>
 </section>

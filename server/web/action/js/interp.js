@@ -114,7 +114,7 @@ function viewAt(s0, s1, t, since) {
 
 // 내 쪽(w === 나)의 이 이벤트는 받자마자 낸다 - 내 몸은 가장 새 모습으로 그리므로 (내 이동 먼저) 80ms 뒤에 내면
 // 누른 것이 늦게 보인다. 상대 것과 맞음(hit) · 쓰러짐은 상대 몸 · 탄과 같은 뒤 시각에 둔다.
-const OWN_NOW = new Set(['cast', 'dodge', 'swap', 'status', 'cure', 'stat', 'heal', 'need']);
+const OWN_NOW = new Set(['cast', 'swap', 'status', 'cure', 'stat', 'heal', 'need']);
 // 상대 기술에 맞아 생긴 것 (화상 · 랭크 내림 · 풀죽음) 은 그 hit 와 같이 - 맞기도 전에 걸리면 이상하다
 const RIDES_HIT = new Set(['status', 'cure', 'stat']);
 
@@ -186,7 +186,7 @@ export class SnapBuffer {
 const SMOOTH = 0.1;          // 서버와의 어긋남을 줄이는 시간 상수 (초)
 const SNAP_DIST = 150;       // 이보다 멀면 바로 옮긴다 (교체 · 순간 이동)
 const MAX_PENDING = 120;     // ack 가 안 와도 이보다 많이 쌓지 않는다
-// 마음대로 걷는 때. 그 밖(기술 준비 · 발동 · 피하기 · 잠듦 · 교체 …)에는 서버가 몸을 옮기거나 세우므로
+// 마음대로 걷는 때. 그 밖(기술 준비 · 발동 · 잠듦 · 교체 …)에는 서버가 몸을 옮기거나 세우므로
 // 가장 새 서버 자리를 따른다 - 꼴마다 다른 이동 배율을 화면이 따로 들고 있지 않는다.
 const FREE_STATES = new Set(['idle', 'walk']);
 

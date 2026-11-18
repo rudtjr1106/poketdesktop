@@ -7,14 +7,18 @@ drain_events() 를 붙여 보낸다. 판정은 전부 여기서 한다 - 웹 화
     ab = ActionBattle(dex, team_a, team_b, seed, names=("가", "나"))
     ab.pick("a", [0, 2, 3])                  # 고르기 (pick 단계)
     ab.set_move("a", 1.0, 0.0, seq)          # 이동 의도 (-1~1)
-    ab.press("a", "m0", seq)                 # m0~m3 기술 · dodge 피하기 · sw0~sw2 교체 (바쁘면 BUFFER_SEC 들고 있다)
+    ab.press("a", "m0", seq)                 # m0~m3 기술 · sw0~sw2 교체 (바쁘면 BUFFER_SEC 들고 있다)
     ab.step() ; ab.drain_events() ; ab.snapshot("a") ; ab.intro("a")
 
 본가에서 그대로 가져오는 것: 능력치 (성격 · 개체값 · 노력치 · 도구 배율 - battle.Fighter) · 데미지 공식 (battle.damage
 × DAMAGE_SCALE) · 상성 · 자속 · 급소 · 난수 · 화상 반감 · 날씨 · 필드 · 장막 (판이 field.Field 하나를 갖는다) ·
 추가 효과 확률 (능력 랭크 · 상태이상 · 풀죽음 · 흡수 · 반동). 특성은 끈다 (Fighter.ability_on 그대로 False).
-**명중률은 굴리지 않는다 - 피하기가 명중률이다.** 명중 · 회피 랭크는 이렇게 바꿔 쓴다: 명중 랭크 = 내 탄의 빠르기,
-회피 랭크 = 피하기 대기시간.
+**명중률은 굴리지 않는다 - 걸어서 비키는 것이 명중률이다.** 명중 · 회피 랭크는 이렇게 바꿔 쓴다: 명중 랭크 = 내 탄의
+빠르기, 회피 랭크 = 걷는 빠르기 (한 랭크에 EVA_WALK 6% · +6 이면 +36%, -6 이면 -36% - _walk_speed 의 공식 뒤에 곱한다).
+
+피하기 없음 (2026-11-19 사용자: "회피 기능은 빼도 될 것 같아 너무 사기다")
+    Space · Shift 대시 (무적 0.2초 · 대기 1.6초) 를 뺐다. 'dodge' 키는 없다 (모르는 키처럼 버린다). 걷기와 교체로만
+    비킨다. 무적은 나올 때 (SPAWN_PROTECT) 뿐.
 
 좌표 · 시간
     아레나 ARENA_W × ARENA_H (u), y 는 아래로. 판 시각 t = step 수 × TICK (초).
@@ -53,7 +57,7 @@ drain_events() 를 붙여 보낸다. 판정은 전부 여기서 한다 - 웹 화
           이미 밀리는 중이거나 달려드는 중(근접 · 돌진 발동)이면 그대로 둔다 (탄 하나로 달리기를 끊지 않는다).
           근접 · 돌진도 상성 0 이면 안 민다.
     경직: 기술 데미지(상성 > 0, 1 이상)를 받으면 HITSTUN_SEC (급소 · 효과가 굉장하면 HITSTUN_BIG) 동안 못 걷고
-          새로 못 한다 (기술 · 피하기 · 교체 - 누른 키는 BUFFER_SEC 동안 들고 있다가 풀리면 쓴다). 하던 기술은 그대로
+          새로 못 한다 (기술 · 교체 - 누른 키는 BUFFER_SEC 동안 들고 있다가 풀리면 쓴다). 하던 기술은 그대로
           (준비도 안 끊긴다 - 끊는 것은 풀죽음의 휘청), 무적 없음. 독 · 화상 · 씨뿌리기 · 함정 · 반동 · 되돌림(카운터)은
           경직이 없다.
           겹쳐 맞으면 더하지 않고 새로 잰다 (끝 = 늦은 쪽). 어느 1초(HITSTUN_WINDOW) 창에서도 합쳐 HITSTUN_CAP 을
@@ -93,18 +97,15 @@ READY_SEC = 3
 FIGHT_SEC = 120             # 2026-11-19 180 → 120
 KO_PICK_SEC = 5
 SPAWN_PROTECT = 1.0
-DODGE_SEC = 0.18
-DODGE_IFRAME = 0.2
-DODGE_CD = 1.6
-DODGE_MULT = 3.2
 SWITCH_SEC = 0.6
 SWITCH_CD = 6.0
 
 # ---------------------------------------------------------------- 손맛
-KEYS = ("m0", "m1", "m2", "m3", "dodge", "sw0", "sw1", "sw2")
+KEYS = ("m0", "m1", "m2", "m3", "sw0", "sw1", "sw2")
 SPAWN = {"a": (320.0, 450.0), "b": (1280.0, 450.0)}
 BUFFER_SEC = 0.25           # 바쁠 때 누른 키를 이만큼 들고 있다
 REC_MOVE = 0.5              # 회복 중 이동 배율
+EVA_WALK = 0.06             # 회피 랭크 하나에 걷는 빠르기 ± 이만큼 (±6 → ±36%)
 CLASH_PUSH = 140            # 맞부딪히면 튕기는 거리
 PUSH_SEC = 0.2              # 튕김 · 밀려남에 걸리는 시간
 DASH_REACH = 30             # 돌진이 몸 바깥 이만큼 안을 지나면 맞는다 (2026-11-18 4 → 30)
@@ -143,7 +144,7 @@ SCREEN_KEYS = tuple(SM.SCREENS.values())
 STAGE_MSG = {"copy": "상대의 능력 변화를 베꼈다!", "swap": "서로의 능력 변화를 맞바꿨다!",
              "invert": "상대의 능력 변화가 뒤집혔다!"}
 
-Push = collections.namedtuple("Push", "vx vy t0 t1 dodge")       # 피하기 · 튕김 · 밀려남 (t1 틱까지)
+Push = collections.namedtuple("Push", "vx vy t0 t1")             # 튕김 · 밀려남 (t1 틱까지)
 Stun = collections.namedtuple("Stun", "t0 t1 why")               # why: flinch 풀죽음 · jolt 저림 · knock 튕김
 Swap = collections.namedtuple("Swap", "to t0 t1")
 
@@ -322,7 +323,7 @@ class Side(object):
         self.hs = []                            # 경직 구간 [(시작, 끝)..] - 지난 HITSTUN_WINDOW 안의 것, 끝이 마지막
         self.swap = None
         self.inv_until = 0.0
-        self.dodge_ready = self.swap_ready = 0.0
+        self.swap_ready = 0.0
         self.need_until = None                  # 쓰러진 뒤 다음을 고를 때까지
         self.cnf_until = self.trap_until = 0.0
         self.seed = None                        # [끝, 다음 빨림, 심은 쪽]
@@ -671,16 +672,14 @@ class ActionBattle(object):
         """키 하나를 지금 해 본다. 했으면 True."""
         if key.startswith("sw"):
             return self._switch(s, int(key[2]))
-        if key == "dodge":
-            return self._free(s, dodge=True) and self._dodge(s)
         return self._free(s) and self._use(s, int(key[1]))
 
-    def _free(self, s, dodge=False):
-        """아무것도 안 하고 있다. 피하기는 회복을 끊고 할 수 있다."""
+    def _free(self, s):
+        """아무것도 안 하고 있다."""
         m = s.mon
         if m is None or m.ko or s.need_until is not None or s.swap or s.push or self._held(s):
             return False
-        return s.cast is None or (dodge and s.cast.stage == "rec")
+        return s.cast is None
 
     def _use(self, s, slot):
         m = s.mon
@@ -699,20 +698,6 @@ class ActionBattle(object):
         else:
             m.ready[slot] = self.t + kt["cd"]
         self._start(s, slot, key, AM.move_of(self.dex, key), kt)
-        return True
-
-    def _dodge(self, s):
-        if not self._past(s.dodge_ready) or self._before(s.trap_until):
-            return False
-        self._cancel(s)                         # 회복을 끊고 피한다
-        ix, iy = self._intent(s)
-        ang = math.degrees(math.atan2(iy, ix)) if (ix or iy) else _facing(s.d)
-        vx, vy = _polar(ang, self._walk_speed(s) * DODGE_MULT)
-        s.push = Push(vx, vy, self.t, self.t + DODGE_SEC, True)
-        s.inv_until = max(s.inv_until, self.t + DODGE_IFRAME)
-        s.dodge_ready = self.t + DODGE_CD / B.stage_mult(s.mon.f.stages["eva"], "acc")    # 회피 랭크
-        s.d = _dir(ang)
-        self._emit("dodge", w=s.name)
         return True
 
     def _switch(self, s, i):
@@ -1066,12 +1051,14 @@ class ActionBattle(object):
         return c.kit["lock"] if c.stage == "wind" else REC_MOVE if c.stage == "rec" else 0.0
 
     def _walk_speed(self, s):
-        """180 + 0.9 × clamp(스피드, 20, 250). 순풍이면 스피드 2배, 트릭룸이면 느린 쪽이 빠르다."""
+        """(180 + 0.9 × clamp(스피드, 20, 250)) × (1 + EVA_WALK × 회피 랭크). 순풍이면 스피드 2배, 트릭룸이면 느린 쪽이
+        빠르다. 회피 랭크는 ±6 에서 멈춘다 (±36% - 그림자분신 · 작아지기 ...)."""
         spe = s.mon.f.stat("spe") * (2 if self._side_has(s, "tailwind") else 1)
         spe = _clamp(spe, 20, 250)
         if self.field.room("trickroom"):
             spe = 270 - spe
-        return 180 + 0.9 * spe
+        eva = _clamp(s.mon.f.stages.get("eva", 0), B.STAGE_MIN, B.STAGE_MAX)
+        return (180 + 0.9 * spe) * (1 + EVA_WALK * eva)
 
     def _intent(self, s):
         """이동 의도. 혼란이면 반대."""
@@ -1114,7 +1101,7 @@ class ActionBattle(object):
         """ang 쪽으로 dist 만큼 밀려난다 (그동안 휘청)."""
         self._stun(s, PUSH_SEC, "knock")
         vx, vy = _polar(ang, dist / PUSH_SEC)
-        s.push = Push(vx, vy, self.t, self.t + PUSH_SEC, False)
+        s.push = Push(vx, vy, self.t, self.t + PUSH_SEC)
 
     def _bump(self, s, ang, by):
         """근접 · 돌진에 맞아 ang 쪽으로 BUMP_DIST 를 BUMP_SEC 동안 밀린다.
@@ -1126,12 +1113,12 @@ class ActionBattle(object):
 
     def _shove(self, s, ang, dist, sec):
         """ang 쪽으로 dist 를 sec (틱으로 반올림) 동안 밀린다 - 무적 없음, 벽에서 멈춘다 (_walk 가 막는다), 밀리는 동안은
-        새로 못 한다 (_free). 이미 밀리는 중(밀어내기 기술 · 튕김 · 피하기)이면 그대로 둔다."""
+        새로 못 한다 (_free). 이미 밀리는 중(밀어내기 기술 · 튕김)이면 그대로 둔다."""
         if not self._present(s) or s.push is not None:
             return
         n = max(1, int(round(sec / TICK)))
         vx, vy = _polar(ang, dist / (n * TICK))
-        s.push = Push(vx, vy, self.t, self.t + n * TICK, False)
+        s.push = Push(vx, vy, self.t, self.t + n * TICK)
 
     def _stun(self, s, sec, why):
         self._cancel(s)
@@ -1259,7 +1246,7 @@ class ActionBattle(object):
     def _hit(self, by, vic, key, mv, scale=1.0):
         """by(때린 한 마리)의 기술이 vic(자리)에 닿았다. "pass" 지나감 · "block" 막힘 · "hit" 맞음.
 
-        무적(등장 · 피하기) · 숨음 · 쓰러짐이면 지나간다. 방어는 막고, 카운터 류는 막고 되돌린다.
+        무적(등장) · 숨음 · 쓰러짐이면 지나간다. 방어는 막고, 카운터 류는 막고 되돌린다.
         부른 뒤 self._struck 는 이번에 기술 데미지가 들어갔으면 상성 (> 0), 아니면 0 - 밀어내기가 본다."""
         self._struck = 0
         if not self._solid(vic) or self._before(vic.inv_until):
@@ -1641,7 +1628,7 @@ class ActionBattle(object):
         if mine:
             t = self.t
             v.update(hp=m.f.hp, mhp=m.f.maxhp, cd=[_r1(max(0.0, r - t)) for r in m.ready[:len(m.keys)]],
-                     pp=list(m.pp), dcd=_r1(max(0.0, s.dodge_ready - t)), scd=_r1(max(0.0, s.swap_ready - t)),
+                     pp=list(m.pp), scd=_r1(max(0.0, s.swap_ready - t)),
                      spd=_r1(self._walk_speed(s) * self._walk_mult(s)), need=s.need_until is not None)
         return v
 
@@ -1662,8 +1649,6 @@ class ActionBattle(object):
             return "stun", _progress(t, s.stun.t0, s.stun.t1)
         if self._staggered(s):                  # 경직도 stun - 하던 기술은 sm 에 그대로
             return "stun", _progress(t, s.hs[-1][0], s.hs[-1][1])
-        if s.push is not None and s.push.dodge:
-            return "dodge", _progress(t, s.push.t0, s.push.t1)
         if c is not None:
             if c.stage == "act" and c.kind in ("guard", "counter"):
                 return "guard", _progress(t, c.start, c.end)

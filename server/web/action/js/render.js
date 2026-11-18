@@ -248,8 +248,7 @@ export class Body {
     }
     if (f.st === 'ko') return { anim, t: now - this.koAt, loop: false, proc: null };
     if (!frozen(f)) this.frozenT = (ac - this.since) * rate;           // 얼면 그 장에서 멈춘다
-    const fast = f.st === 'dodge' ? 2 : 1;
-    return { anim, t: this.frozenT * fast, loop, proc };
+    return { anim, t: this.frozenT, loop, proc };
   }
 }
 

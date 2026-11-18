@@ -9,7 +9,7 @@
      4. 이벤트는 그 모습을 그리는 때가 되어야 나온다 (한 번만).
      5. 내 이동: 누른 순간부터 F.spd 로 먼저 움직이고, ack 를 받으면 서버 자리에서 아직 안 받은 입력을
         다시 굴린다. 서버와 같은 길이면 튀지 않는다. 벽에 막힌다. 혼란이면 반대로 간다.
-     6. 내 쪽 이벤트 (쓰기 · 피하기 · 교체 · 내 상태 · 랭크) 는 받자마자 나온다 - 내 몸은 가장 새 모습으로 그리니까.
+     6. 내 쪽 이벤트 (쓰기 · 교체 · 내 상태 · 랭크) 는 받자마자 나온다 - 내 몸은 가장 새 모습으로 그리니까.
         상대 것 · 맞음 · 쓰러짐은 80ms 뒤 그대로. 상대 기술에 맞아 걸린 상태는 그 hit 와 같이 (먼저 걸리지 않게). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -212,8 +212,8 @@ test('예측 - 혼란이면 반대로 간다', () => {
   assert.ok(near(pr.pos(10.5).x, 700));
 });
 
-test('예측 - 마음대로 걷는 때(서 있기 · 걷기)가 아니면 서버 자리 그대로 (기술 · 피하기 · 잠듦 · 교체 …)', () => {
-  const held = ['wind', 'act', 'rec', 'guard', 'dodge', 'stun', 'sleep', 'frz', 'swap', 'ko', 'hide'];
+test('예측 - 마음대로 걷는 때(서 있기 · 걷기)가 아니면 서버 자리 그대로 (기술 · 잠듦 · 교체 …)', () => {
+  const held = ['wind', 'act', 'rec', 'guard', 'stun', 'sleep', 'frz', 'swap', 'ko', 'hide'];
   for (const extra of [...held.map((st) => ({ st })), { spd: 0 }]) {
     const pr = new Predictor();
     pr.server(F(800, 400, { spd: 200, ...extra }), 0, 10.0, 0.1);
@@ -238,13 +238,14 @@ test('예측 - 쌓인 입력은 받은 만큼 버린다', () => {
 test('내 쪽 이벤트는 받자마자, 상대 것 · 맞음은 그릴 때가 되어야', () => {
   const b = new SnapBuffer('a');
   b.push(snap(1.0, F(0, 0), F(0, 0), { ev: [
-    { e: 'cast', w: 'a', m: 0 }, { e: 'cast', w: 'b', m: 1 }, { e: 'dodge', w: 'a' }, { e: 'hit', w: 'a', v: 'b' },
+    { e: 'cast', w: 'a', m: 0 }, { e: 'cast', w: 'b', m: 1 }, { e: 'swap', w: 'a', fr: 0, to: 2 }, { e: 'hit', w: 'a', v: 'b' },
     { e: 'stat', w: 'a', st: 'atk', d: 2 }, { e: 'swap', w: 'b', fr: 0, to: 1 }, { e: 'ko', w: 'a', i: 0 },
   ] }));
   // 그릴 시각이 아직 한참 앞이어도
-  assert.deepEqual(b.events(0.5).map((e) => e.e + ':' + e.w), ['cast:a', 'dodge:a', 'stat:a']);
+  assert.deepEqual(b.events(0.5).map((e) => e.e + ':' + e.w), ['cast:a', 'swap:a', 'stat:a']);
   assert.deepEqual(b.events(0.6), [], '한 번만');
   assert.deepEqual(b.events(1.0).map((e) => e.e + ':' + e.w), ['cast:b', 'hit:a', 'swap:b', 'ko:a']);
+  assert.equal(ownEvent({ e: 'dodge', w: 'a' }, 'a'), false, '옛 서버의 dodge 는 내 것이어도 먼저 내지 않는다 (fx 가 넘긴다)');
 });
 
 test('상대 기술에 맞아 걸린 내 상태는 그 hit 와 같이 (먼저 나오지 않는다)', () => {

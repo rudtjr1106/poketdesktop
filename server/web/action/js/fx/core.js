@@ -102,7 +102,6 @@ export const PLAIN = palette(...DEFAULT_FX);
 export const SHINE = palette(WHITE, '#cfe0ff');
 export const GOLDEN = palette(GOLD, '#ff9a1f');
 export const HEAL = palette('#b6ffc4', '#38c060');
-export const DODGE = palette('#e4f4ff', '#7fb4ff');
 export const BALL = palette(WHITE, '#ff4a4a');
 export const COUNTER = palette('#ffd0a0', '#ff7a2e');
 export const SOOT = palette('#5a5266', '#1e1a26');

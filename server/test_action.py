@@ -488,8 +488,11 @@ def main():
     eng.calls.clear()
     say({"t": "act", "s": 6, "k": "m9"})
     say({"t": "act", "s": -1, "k": "m0"})
-    say({"t": "act", "s": 7, "k": "dodge"})
-    chk("모르는 키 · 틀린 번호는 버린다", eng.calls == [("press", "a", "dodge", 7)], eng.calls)
+    say({"t": "act", "s": 8, "k": "sw1"})
+    say({"t": "act", "s": 9, "k": "dodge"})
+    chk("모르는 키 (이제 없는 dodge 도) · 틀린 번호는 버린다", eng.calls == [("press", "a", "sw1", 8)], eng.calls)
+    chk("  버린 누름은 입력 번호도 안 올린다", room.seq["a"] == 8, room.seq)
+    chk("서버 KEYS = 엔진 KEYS", action_ws.KEYS == action_ws._engine().KEYS, (action_ws.KEYS, action_ws._engine().KEYS))
     eng.calls.clear()
     say({"t": "pick", "slots": [0]})
     chk("고른 것은 선봉으로 적어 둔다", room.picks == {"a": [0]} and room.lead("a") == "피카츄" and room.lead("b") == "이브이",

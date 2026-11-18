@@ -4,8 +4,9 @@
    맞고 안 맞고는 서버가 정한다. 그래서 보기 좋으면 되는데, 상대가 쓴 장판(표시)만은 **언제 · 어디에** 떨어지는지
    또렷해야 한다: 어떤 바닥에서도 보이는 테두리, t1 쪽으로 차오르는 채움, 떨어지기 직전의 깜박임.
 
-     event(ev, world)        이벤트 하나 (cast · hit · clash · dodge · status · cure · stat · heal · guard · counter ·
+     event(ev, world)        이벤트 하나 (cast · hit · clash · status · cure · stat · heal · guard · counter ·
                              swap · ko · phase · over). need · txt 는 화면 칸(hud)이 맡는다 - 받기만 하고 그리지 않는다.
+                             모르는 것 (옛 서버의 dodge 같은 것) 은 그냥 넘긴다.
      update(dt)              초. 입자 · 움직이는 그림 · 글씨 · 흔들림을 나이 먹인다
      drawProjectile(ctx, p, x, y)   탄 P 를 보간된 자리에
      drawZone(ctx, z, now)   장판 Z (now = 보간된 서버 시각)
@@ -39,7 +40,7 @@
    달리는 동안 몸(world.pos)을 따라가며 모양의 rush · swing 훅을 부른다 (없으면 body.js 의 GENERIC). */
 import { ARENA_W, ARENA_H, BODY_R, FONT, STATUS_KR, COND_KR, STAT_KR } from './consts.js';
 import {
-  ARROW_DOWN, ARROW_UP, BALL, COLORS, CONFETTI, COUNTER, DEBRIS, DIZZY, DODGE, DOWN, DUST, FIZZLE, GOLD, GOLDEN, HEAL,
+  ARROW_DOWN, ARROW_UP, BALL, COLORS, CONFETTI, COUNTER, DEBRIS, DIZZY, DOWN, DUST, FIZZLE, GOLD, GOLDEN, HEAL,
   HEX_PTS, HURT, INK, Ink, MOTES, MUZZLE, PLAIN, PLUSES, POOL_MAX, PUFF, Particles, SCREEN, SHINE, SHOT_R, SLEEP, SOOT,
   TAU, Trail, UP, WHITE, ZONE_R, BEAM_LEN, clamp01, colorsOf, debrisSpec, defaultCanvas, easeOut, lens, line, num, own,
   ring, rnd, seedOf, shape, spikes, tone,
@@ -85,7 +86,6 @@ const IMPACT_SEC = 0.2;
 const KO_SEC = 0.8;
 const KO_PULL = 0.4;             // 쓰러짐: 이만큼 줄어든 뒤 터진다
 const TRAIL_LIFE = 0.26;
-const DODGE_TRAIL = 0.22;
 
 // 근접 · 돌진. cast 는 준비를 시작할 때 온다 - 몸이 빨라지는 때를 재서 달리기 시작으로 본다 (못 재면 준비 어림 뒤)
 const RUSH_LEN = 200;            // cast 에 len 이 없을 때
@@ -182,7 +182,7 @@ function rushDraw(fx, ctx, a) {
 // a: {kind, side(따라갈 쪽, 없으면 그 자리), x, y, ang, c, sty, life, delay, age, k(크기), crit, seed, px, py}
 // draw(fx, ctx, a, t) - t 는 0~1 진행. drawUnder/Over 가 하나마다 save/restore 로 감싼다.
 
-// 지나온 길에 잔상 줄 + 옅은 몸 빛 (피하기 · 뛰어오르기)
+// 지나온 길에 잔상 줄 + 옅은 몸 빛 (뛰어오르기)
 function trailTick(fx, a) {
   const p = fx.pos(a.side);
   if (!p) return;
@@ -443,12 +443,6 @@ const ON = {
     fx.burst(at.x, at.y, DEBRIS.spark, SHINE, 1.6);
     fx.burst(at.x, at.y, DEBRIS.spark, GOLDEN, 1);
     fx.kick(0.22, 0.06, 0.08);
-  },
-  dodge(fx, ev) {
-    const at = fx.at(ev, ev.w);
-    fx.anim('trail', ev.w, at, 0, DODGE, '', DODGE_TRAIL);
-    fx.burst(at.x, at.y, DUST, DODGE, 0.8);
-    fx.wave(at.x, at.y, DODGE.light, 46, 0.25, 3);
   },
   status(fx, ev) {
     const at = fx.at(ev, ev.w), [c, debris] = own(STATUS_LOOK, ev.s) || [PLAIN, 'spark'];

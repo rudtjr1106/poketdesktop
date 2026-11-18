@@ -11,7 +11,7 @@
      3. 그리고 나면 ctx 상태(save 짝 · 알파 · 혼합 · 점선)가 받은 그대로다.
      4. 그라디언트는 색마다 한 번 - 화면 ctx 에서는 아예 만들지 않는다.
      5. update 가 입자를 나이 먹여 지운다. 풀은 600 을 넘지 않고, 넘치면 가장 먼저 만든 것부터 덮는다.
-     6. 계획의 모든 이벤트를 받는다 (world 가 없어도, 칸이 빠져도).
+     6. 계획의 모든 이벤트를 받는다 (world 가 없어도, 칸이 빠져도). 옛 서버의 dodge (피하기는 뺐다) 는 그리지 않고 넘긴다.
      7. 맞음: 효과 굉장 · 별로 · 없음 · 급소 글씨와 데미지 숫자.
      8. 표시(tele)는 t1 쪽으로 차오르고, 떨어지면 먼지가 한 번 인다. 설치 함정은 기술마다 제 무늬 (압정뿌리기는
         모양 키가 rock 이어도 압정, 스텔스록만 떠 있는 돌).
@@ -174,7 +174,6 @@ const EVENTS = [
   { e: 'hit', w: 'a', v: 'b', k: 'VINEWHIP', ty: 'GRASS', hpr: 600, eff: 0.5, crit: false, x: 1200, y: 450 },
   { e: 'hit', w: 'a', v: 'b', k: 'SHADOWBALL', ty: 'GHOST', hpr: 600, eff: 0, crit: false, x: 1200, y: 450 },
   { e: 'clash', x: 800, y: 450, k1: 'SHADOWBALL', k2: 'FLAMETHROWER' },
-  { e: 'dodge', w: 'a' },
   ...['brn', 'psn', 'tox', 'par', 'slp', 'frz', 'cnf', 'seed', 'trap', 'flinch', 'scr', 'zzz'].map((s) => ({ e: 'status', w: 'b', s })),
   { e: 'cure', w: 'b', s: 'brn' },
   { e: 'cure', w: 'b', s: 'flinch' },
@@ -441,6 +440,19 @@ test('계획의 모든 이벤트를 받는다 (world 가 없어도 · 칸이 빠
   fx.event(null, world);
   fx.event({ e: 'cast', w: 'a', kind: 'melee' }, { pos: () => undefined, now: 0, you: 'a' });
   for (let f = 0; f < 60; f++) frame(fx, ctx, 0.05);
+});
+
+test('옛 서버의 dodge 이벤트는 던지지 않고 넘긴다 (피하기는 뺐다 - 2026-11-19)', () => {
+  const { fx } = newFx();
+  const ctx = new RecCtx();
+  const world = makeWorld();
+  fx.event({ e: 'dodge', w: 'a' }, world);
+  fx.event({ e: 'dodge', w: 'b', x: 1200, y: 450 }, world);
+  fx.event({ e: 'dodge' });
+  assert.deepEqual(fx.counts(), { particles: 0, anims: 0, texts: 0 }, '아무것도 그리지 않는다');
+  assert.equal(fx.hitstop.active, false, '멈추지도 않는다');
+  frame(fx, ctx);
+  assert.deepEqual(fx.shake(), { x: 0, y: 0 }, '흔들지도 않는다');
 });
 
 test('맞음: 효과 글씨 · 급소 · 데미지 숫자', () => {

@@ -6,7 +6,7 @@
 
    누른 것은 바로 보인다: 칸이 눌리고 (못 쓰면 흔들리고 안 보낸다), 쓸 수 있는 기술이면 서버를 기다리지 않고 준비
    몸짓 · 빛을 먼저 시작한다 (서버의 cast 가 오면 이어 가고, 0.25초 안에 안 오면 사그라든다). 내 쪽 이벤트(쓰기 ·
-   피하기 · 교체 · 내 상태)는 80ms 를 기다리지 않는다 (SnapBuffer). */
+   교체 · 내 상태)는 80ms 를 기다리지 않는다 (SnapBuffer). */
 import { Fx } from './fx.js';
 import { parseFragment, wsUrl, closeReason, Net } from './net.js';
 import { Clock, SnapBuffer, Predictor } from './interp.js';

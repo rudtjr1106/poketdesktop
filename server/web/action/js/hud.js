@@ -1,7 +1,7 @@
 /* 화면 칸 (캔버스에 그린다, 아레나 단위 1600×900).
 
      위 왼쪽  내 포켓몬 이름 · 체력 · 상태 · 랭크 · 팀 셋        위 가운데  남은 시간        위 오른쪽  상대 (체력은 비율)
-     아래 한 줄 (조작 띠)   [Shift 피하기] [Z] [X] [C] [V] 기술 네 칸 (가운데) [1] [2] [3] 교체
+     아래 한 줄 (조작 띠)   [Z] [X] [C] [V] 기술 네 칸 · [1] [2] [3] 교체 (띠 전체가 가운데)
      아래 왼쪽 구석  이동 키 · Esc 기권 · H 도움말 · 핑
    가운데에는 3 · 2 · 1, 다음 포켓몬 고르기, 서버의 한 줄 알림. 데미지 숫자 · 효과 글씨는 fx 가 그린다.
    대기는 마지막 모습의 남은 초에서 그 뒤 흐른 시간을 빼서 매 장 줄인다.
@@ -9,7 +9,7 @@
    키를 누르면 그 칸이 바로 눌린다 (서버를 기다리지 않는다). 못 쓰는 칸은 흔들리고 까닭이 위에 뜬다 - 그런 키는
    보내지도 않는다 (pressVerdict). 대기가 거의 끝났으면 보낸다 - 서버가 잠깐 들고 있다가 쓴다. */
 import {
-  ARENA_W, ARENA_H, LEVEL, DODGE_CD, SWITCH_CD, STRUGGLE_CD, FONT, SLOT_KEYS, DODGE_KEY, MOVE_HINT, PRESS_GRACE,
+  ARENA_W, ARENA_H, LEVEL, SWITCH_CD, STRUGGLE_CD, FONT, SLOT_KEYS, MOVE_HINT, PRESS_GRACE,
   TYPE_COLOR, TYPE_KR, KIND_KR, STATUS_KR, STATUS_COLOR, COND_KR, STAT_KR, UI,
 } from './consts.js';
 import { slotOf, teamSlotOf } from './input.js';
@@ -80,10 +80,6 @@ export function pressVerdict(act, s) {
     if (!soon(l)) return NO('대기 중');
     return { send: true, ok: true, reason: '', predict: l <= 0 && free, kind: move.kind, ty: move.type };
   }
-  if (act === 'dodge') {
-    if (me.need) return NO('교체 먼저');
-    return soon(left(me.dcd)) ? { send: true, ok: true, reason: '', predict: false } : NO('대기 중');
-  }
   const j = teamSlotOf(act);
   if (j >= 0) {
     const t = (me.team || [])[j];
@@ -93,7 +89,7 @@ export function pressVerdict(act, s) {
     if (!me.need && !soon(left(me.scd))) return NO('대기 중');
     return { send: true, ok: true, reason: '', predict: false };
   }
-  return { send: true, ok: true, reason: '', predict: false };
+  return NO('');                       // 모르는 동작 (옛 'dodge' 같은 것) 은 보내지 않는다
 }
 
 export const PRESS_FLASH = 0.16;     // 눌린 칸이 반짝이는 시간
@@ -120,27 +116,25 @@ const SIDE_W = 380;
 const TOAST_SEC = 2.4;
 const READY_FLASH = 0.3;     // 대기가 끝난 칸이 반짝이는 시간
 
-/* 아래 조작 띠. 기술 네 칸이 가운데, 왼쪽에 피하기 (Shift 는 Z 왼쪽 키), 오른쪽에 교체 셋. */
+/* 아래 조작 띠. 기술 네 칸 (Z X C V) 다음에 교체 셋 (1 2 3), 띠 전체가 가운데. */
 const SLOT_W = 206;
 const SLOT_H = 116;
 const SLOT_GAP = 10;
 const STRIP_GAP = 12;
 const STRIP_Y = ARENA_H - 14 - SLOT_H;
-const DODGE_W = 116;
 const CARD_W = 108;
 const CARD_GAP = 8;
 const MOVES_W = SLOT_W * 4 + SLOT_GAP * 3;
-const MOVES_X = (ARENA_W - MOVES_W) / 2;
 
-/** 조작 띠의 칸 자리 (아레나 단위). 기술 칸 m 0~3 (Z X C V 차례) · 피하기 · 교체 칸 j 0~2. */
+/** 조작 띠의 칸 자리 (아레나 단위). 기술 칸 m 0~3 (Z X C V 차례) · 교체 칸 j 0~2. */
 export function stripLayout(team = 3) {
-  const moves = [0, 1, 2, 3].map((m) => ({ x: MOVES_X + m * (SLOT_W + SLOT_GAP), y: STRIP_Y, w: SLOT_W, h: SLOT_H }));
-  const dodge = { x: MOVES_X - STRIP_GAP - DODGE_W, y: STRIP_Y, w: DODGE_W, h: SLOT_H };
-  const x0 = MOVES_X + MOVES_W + STRIP_GAP;
+  const cardsW = team > 0 ? STRIP_GAP + team * CARD_W + (team - 1) * CARD_GAP : 0;
+  const x = Math.round((ARENA_W - MOVES_W - cardsW) / 2);
+  const moves = [0, 1, 2, 3].map((m) => ({ x: x + m * (SLOT_W + SLOT_GAP), y: STRIP_Y, w: SLOT_W, h: SLOT_H }));
+  const x0 = x + MOVES_W + STRIP_GAP;
   const cards = Array.from({ length: team }, (_, j) => ({ x: x0 + j * (CARD_W + CARD_GAP), y: STRIP_Y, w: CARD_W, h: SLOT_H }));
-  const all = [dodge, ...moves, ...cards];
-  const box = { x: dodge.x, y: STRIP_Y, w: Math.max(...all.map((r) => r.x + r.w)) - dodge.x, h: SLOT_H };
-  return { moves, dodge, cards, box };
+  const box = { x, y: STRIP_Y, w: MOVES_W + cardsW, h: SLOT_H };
+  return { moves, cards, box };
 }
 
 function font(size, weight = 700) {
@@ -324,7 +318,7 @@ export class Hud {
     this.toasts = [];
     this.needSince = null;
     this.fightSince = null;
-    this.presses = {};           // 동작 ('m0' · 'dodge' · 'sw1' …) → {at, ok, reason}
+    this.presses = {};           // 동작 ('m0' · 'sw1' …) → {at, ok, reason}
     this.held = new Set();       // 누르고 있는 동작 키
     this.cool = {};              // 칸 → 지난 장의 대기 비율 (끝나는 순간 반짝)
     this.readyAt = {};
@@ -412,13 +406,12 @@ export class Hud {
     return age < READY_FLASH ? 1 - age / READY_FLASH : 0;
   }
 
-  /** 아래 조작 띠 한 줄: 피하기 · 기술 넷 · 교체 셋. 몸이 띠 뒤에 있으면 옅게. */
+  /** 아래 조작 띠 한 줄: 기술 넷 · 교체 셋. 몸이 띠 뒤에 있으면 옅게. */
   drawStrip(ctx, s) {
     const team = s.me.team || [];
     const L = stripLayout(team.length);
     ctx.save();
     if ((s.bodies || []).some((p) => behind(L.box, p, 30))) ctx.globalAlpha = 0.45;
-    this.drawDodge(ctx, s, L.dodge);
     this.drawMoves(ctx, s, L.moves);
     this.drawSwitch(ctx, s, L.cards);
     ctx.restore();
@@ -493,26 +486,6 @@ export class Hud {
     if (active) glowEdge(ctx, r, UI.gold, 1, 3);
     glowEdge(ctx, r, '#ffffff', Math.max(look.flash, ready) * 0.9, 3);
     ctx.restore();
-    reasonTag(ctx, look.reason, r0.x + r0.w / 2, r0.y - 18, look.reasonA);
-  }
-
-  drawDodge(ctx, s, r0) {
-    const look = pressLook(this.presses.dodge, s.now);
-    const r = { ...r0, x: r0.x + look.dx };
-    const left = (s.me.dcd || 0) - s.age;
-    const frac = coolFrac(left, DODGE_CD);
-    const ready = this.cooled('dodge', frac, s.now);
-    panel(ctx, r.x, r.y, r.w, r.h, 12, UI.panel);
-    keyCap(ctx, r.x + 12, r.y + 18, r.w - 24, 40, DODGE_KEY, 19, { pressed: this.held.has('dodge'), flash: look.flash });
-    text(ctx, '피하기', r.x + r.w / 2, r.y + 78, 17, UI.fg, 'center', 800);
-    text(ctx, '무적 0.2초', r.x + r.w / 2, r.y + 98, 11, UI.faint, 'center', 600);
-    if (frac > 0) {
-      sweep(ctx, r, frac);
-      text(ctx, fmtCd(left), r.x + r.w / 2, r.y + 38, 24, UI.gold, 'center', 800);
-    } else {
-      glowEdge(ctx, r, UI.gold, 0.45, 2);
-    }
-    glowEdge(ctx, r, '#ffffff', Math.max(look.flash, ready) * 0.9, 3);
     reasonTag(ctx, look.reason, r0.x + r0.w / 2, r0.y - 18, look.reasonA);
   }
 

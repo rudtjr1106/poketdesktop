@@ -217,7 +217,7 @@ export function animFor(have, st, moving, hurt) {
   if (st === 'ko') return first('Faint');
   if (hurt || st === 'stun') return first('Hurt');
   if (st === 'sleep') return first('Sleep', 'Idle');
-  if (moving || st === 'walk' || st === 'dodge') return 'Walk';
+  if (moving || st === 'walk') return 'Walk';
   return first('Idle');
 }
 

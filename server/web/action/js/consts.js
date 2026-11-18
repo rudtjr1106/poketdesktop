@@ -5,7 +5,6 @@ export const ARENA_H = 900;
 export const BODY_R = 26;
 export const TEAM = 3;
 export const LEVEL = 50;
-export const DODGE_CD = 1.6;
 export const SWITCH_CD = 6;
 // 발버둥의 대기 (초) - common/action_moves.kit(dex, 'STRUGGLE')['cd'] 와 같아야 한다. 쓰면 네 칸이 같이 막힌다.
 export const STRUGGLE_CD = 3.15;
@@ -17,8 +16,9 @@ export const INTERP_DELAY = 0.08;
 export const FONT = "'Apple SD Gothic Neo','Malgun Gothic',sans-serif";
 
 /* 키 배치 (v1 은 못 바꾼다). event.code - 물리 키 자리라 한글 입력 상태여도 같다.
-   기본은 방향키 + Z X C V (기술) · Shift (피하기) · 1 2 3 (교체) - 화면 칸에는 이것만 적는다.
-   W A S D · J K U I · Space 도 똑같이 되고, 도움말(H) · 고르기 화면 아래에만 '이것도 된다' 로 적는다. */
+   기본은 방향키 + Z X C V (기술) · 1 2 3 (교체) - 화면 칸에는 이것만 적는다.
+   W A S D · J K U I 도 똑같이 되고, 도움말(H) · 고르기 화면 아래에만 '이것도 된다' 로 적는다.
+   피하기(Space · Shift)는 뺐다 (2026-11-19) - 걸어서 비킨다. 두 키는 아무 일도 안 한다. */
 export const MOVE_KEYS = {
   KeyW: 'up', KeyA: 'left', KeyS: 'down', KeyD: 'right',
   ArrowUp: 'up', ArrowLeft: 'left', ArrowDown: 'down', ArrowRight: 'right',
@@ -26,7 +26,6 @@ export const MOVE_KEYS = {
 export const ACT_KEYS = {
   KeyJ: 'm0', KeyK: 'm1', KeyU: 'm2', KeyI: 'm3',
   KeyZ: 'm0', KeyX: 'm1', KeyC: 'm2', KeyV: 'm3',
-  Space: 'dodge', ShiftLeft: 'dodge', ShiftRight: 'dodge',
   Digit1: 'sw0', Digit2: 'sw1', Digit3: 'sw2',
   Numpad1: 'sw0', Numpad2: 'sw1', Numpad3: 'sw2',
 };
@@ -34,7 +33,6 @@ export const UI_KEYS = { Escape: 'menu', KeyH: 'help', Slash: 'help' };
 // 기술 칸에 크게 적는 글자 (기본 벌) 와 같은 일을 하는 다른 벌 (도움말에만)
 export const SLOT_KEYS = ['Z', 'X', 'C', 'V'];
 export const SLOT_ALT = ['J', 'K', 'U', 'I'];
-export const DODGE_KEY = 'Shift';
 export const MOVE_HINT = '방향키';
 // 엔진이 바쁠 때 · 대기 중에 누른 키를 들고 있는 시간 (common/action_battle.BUFFER_SEC) - 대기가 이만큼(+왕복) 안 남았으면
 // 보낸다 (서버가 들고 있다가 쓴다). 그보다 많이 남았으면 안 보내고 칸만 흔든다.

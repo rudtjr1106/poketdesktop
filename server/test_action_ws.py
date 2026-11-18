@@ -12,6 +12,7 @@ POKET_ACTION_JOIN_SEC 를 5~10 으로 서버와 같이 주면 '아무도 안 온
   2. 입장권은 **첫 메시지로만** (주소 쿼리 · 머리말 없이), 한 번만. 틀리면 · 다시 쓰면 · 5초 안에 안 보내면 4401.
   3. 둘 다 들어오면 hello -> 고르기 -> 3 2 1 -> 싸움 스냅숏 (30번/초). 먼저 온 쪽은 wait. 누르면 cast 가 둘 다에게.
      시계 맞추기 png/pong · ping/pong. 상대의 체력 · 쿨타임 · PP · 기술 · 남이 맞은 데미지는 안 온다.
+     'dodge' 는 없는 키 (2026-11-19 피하기를 뺐다) - 버리고, dodge 이벤트 · dcd 는 안 온다.
   4. disconnect_forfeit: 한쪽 창을 닫으면 GRACE 뒤 남은 쪽이 기권승 (over), 방이 닫히고 전적이 한 번.
   5. 기권(ff) -> 상대 승. 시간이 다 되면 over timeout. 끝난 판의 입장권은 409.
   6. 첫 메시지가 MSG_MAX 를 넘으면 읽지 않고 4401 (입장권은 안 쓴 채로 남는다).
@@ -260,6 +261,16 @@ def main():
     pong = until(sa, kind("pong"), 2, seen_a)
     chk("시계 맞추기 png -> pong (c 그대로, ts 판 시각)", pong and pong["c"] == 12.5
         and isinstance(pong.get("ts"), (int, float)), pong)
+    seen_b = []                                         # b 쪽으로 본다 (b 가 밀린 스냅숏도 같이 읽어 둔다)
+    sb.send(json.dumps({"t": "act", "s": 50, "k": "dodge"}))
+    sb.send(json.dumps({"t": "in", "s": 4, "x": 0, "y": 0}))
+    back = until(sb, lambda m: kind("s")(m) and m.get("ack", 0) >= 4, 3, seen_b)
+    chk("'dodge' 는 없는 키 - 버리고 (ack 가 50 으로 안 뛴다) 끊지 않는다", isinstance(back, dict) and back["ack"] == 4,
+        back if not isinstance(back, dict) else back.get("ack"))
+    mine = [m["f"]["b"] for m in seen_b if isinstance(m, dict) and (m.get("f") or {}).get("b")]
+    chk("  dodge 이벤트 · st dodge · dcd 가 한 번도 안 온다", mine and not any(
+        e.get("e") == "dodge" for m in seen_a + seen_b if isinstance(m, dict) for e in m.get("ev") or [])
+        and not any(f.get("st") == "dodge" or "dcd" in f for f in mine), len(mine))
     time.sleep(0.5)
     hits = [e for m in seen_a if isinstance(m, dict) for e in m.get("ev") or [] if e.get("e") == "hit"]
     chk("남이 맞은 데미지(hit.dmg)는 안 온다", all("dmg" not in e for e in hits if e.get("v") != "a"), hits[:5])
