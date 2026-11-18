@@ -9,7 +9,9 @@
   · **피하기가 명중률이다.** 무적 중에는 탄이 지나간다 · 예고(광선 · 내려찍기)를 보고 비키면 안 맞는다.
   · **상대에게 숨기는 것.** 상대 F 에 체력 · 쿨타임 · PP 가 없고, 상대 팀 보기에 기술 · 도구가 없다.
   · **같은 시드 · 같은 입력 = 같은 판.**
-  · **판 길이.** 마주 보고 기술만 쏟아붓는 봇끼리 한 마리를 쓰러뜨리는 데 8~60초 (DAMAGE_SCALE 0.3).
+  · **판 길이.** 마주 보고 기술만 쏟아붓는 봇끼리 한 마리를 쓰러뜨리는 데 4~30초 (DAMAGE_SCALE 0.42),
+    3 대 3 한 판은 FIGHT_SEC (120초) 안에 쓰러뜨려 끝난다 (2026-11-19 '루즈하다' → 0.3 · 8~60초 · 180초에서 줄였다).
+  · **손맛.** 맞으면 잠깐 경직 (하던 준비는 안 끊긴다, 1초에 0.35초까지) · 탄도 조금 민다 · 근접은 70 민다.
 """
 import json
 import math
@@ -218,7 +220,8 @@ def t_shot():
     chk("맞은 탄은 사라진다", ab.snapshot("a")["p"] == [])
     dmg = hits[0]["dmg"]
     f_a, f_b = ab.sides["a"].mon.f, ab.sides["b"].mon.f
-    chk("데미지는 본가 공식 × 0.3 언저리", 1 <= dmg <= f_b.maxhp * 0.12, (dmg, f_b.maxhp, f_a.stat("spa")))
+    chk("데미지는 본가 공식 × %.2f 언저리" % AB.DAMAGE_SCALE, 1 <= dmg <= f_b.maxhp * 0.4 * AB.DAMAGE_SCALE,
+        (dmg, f_b.maxhp, f_a.stat("spa")))
 
 
 def t_dodge():
@@ -625,7 +628,7 @@ def t_rush():
     chk("가만히 있으면 상대 쪽으로 달려든다", c and c[0]["ang"] == round(-math.pi / 2, 3), c)
     chk("  맞히면 그 자리에서 멈춘다 (몸을 뚫고 지나가지 않는다)", len(hit) == 1 and a.x == 500
         and abs(a.y - (250 + reach)) < 0.5, (hit, a.y, 250 + reach))
-    chk("  맞은 쪽은 기술 방향으로 %d 밀려난다 (휘청 · 무적 없음)" % AB.BUMP_DIST,
+    chk("  맞은 쪽은 기술 방향으로 %d 밀려난다 (무적 없음)" % AB.BUMP_DIST,
         abs((250 - b.y) - AB.BUMP_DIST) < 0.5 and b.x == 500 and not me(ab, "b")["inv"], (b.x, b.y))
 
     for off, want in ((70, True), (140, False)):
@@ -683,7 +686,22 @@ def t_rush():
     walk(ab, "b", 1, 0)
     press(ab, "b", "dodge")
     ev += run(ab, 1.0)
+    chk("  첫 대의 경직 동안엔 못 피해 둘째 대도 맞는다", len(of(ev, "hit", v="b", k="DOUBLEKICK")) == 2,
+        [e["e"] for e in ev])
+    ab = fight([("HITMONLEE", ["DOUBLEKICK"])], [("SNORLAX", ["TACKLE"])])
+    place(ab, "b", 650, 450)
+    press(ab, "a", "m0")
+    ev = run_until(ab, lambda e: of(e, "hit", v="b"), 1.0)
+    place(ab, "b", 1000, 450)
+    ev += run(ab, 1.0)
     chk("  멀어지면 남은 대는 안 맞는다", len(of(ev, "hit", v="b", k="DOUBLEKICK")) == 1, [e["e"] for e in ev])
+    ab = fight([("SNORLAX", ["TACKLE"])], [("GENGAR", ["LICK"])])
+    place(ab, "b", 650, 450)
+    press(ab, "a", "m0")
+    ev = run(ab, 1.0)
+    hit = of(ev, "hit", v="b", k="TACKLE")
+    chk("  상성 0 이면 안 밀리고 경직도 없다", hit and hit[0]["eff"] == 0 and ab.sides["b"].x == 650
+        and not ab.sides["b"].hs, (hit, ab.sides["b"].x))
 
     ek = AM.kit(DEX, "EXTREMESPEED")
     for off, want in ((75, True), (95, False)):
@@ -710,6 +728,111 @@ def t_rush():
     walk(ab, "b", 0, 0)
     ev += run(ab, 1.0)
     chk("서로 등지고 달려들면 맞부딪히지 않는다", not of(ev, "clash"), [e["e"] for e in ev])
+
+
+# ---------------------------------------------------------------- 손맛: 경직 · 탄 밀림
+def stun_len(hit):
+    return AB.HITSTUN_BIG if (hit["crit"] or hit["eff"] >= 2) else AB.HITSTUN_SEC
+
+
+def t_feel():
+    print("== 손맛: 맞으면 경직 · 탄도 민다")
+    ab = fight([("BLASTOISE", ["WATERGUN"])], [("SNORLAX", ["TACKLE"])])
+    b = ab.sides["b"]
+    press(ab, "a", "m0")
+    ev = run_until(ab, lambda e: of(e, "hit", v="b"), 2.0)
+    hit = of(ev, "hit", v="b")[0]
+    t_hit, want = ab.t, stun_len(hit)
+    f = me(ab, "b")
+    chk("기술에 맞으면 경직 (st stun · 못 걷는다 · 무적 없음)", f["st"] == "stun" and f["spd"] == 0 and not f["inv"], f)
+    chk("  경직 길이 %.2f초 (급소 · 효과가 굉장하면 %.2f)" % (AB.HITSTUN_SEC, AB.HITSTUN_BIG),
+        b.hs and abs(b.hs[-1][0] - t_hit) < 1e-9 and abs(b.hs[-1][1] - (t_hit + want)) < 1e-9, (b.hs, t_hit, want))
+    walk(ab, "b", 0, 1)
+    press(ab, "b", "m0")
+    y0, casts, n = b.y, [], 0
+    while ab.t + AB.TICK + 1e-9 < t_hit + want:         # 다음 틱도 아직 경직
+        casts += of(run(ab, AB.TICK), "cast", w="b")
+        n += 1
+    chk("  경직 동안(%d틱)엔 못 걷고 못 쓴다 (누른 키는 들고 있다)" % n, n >= 2 and b.y == y0 and not casts,
+        (n, b.y, y0, casts))
+    ev = run(ab, AB.TICK)
+    chk("  풀리면 바로 걷고 들고 있던 키를 쓴다", b.y > y0 and of(ev, "cast", w="b", k="TACKLE"), (b.y, y0, ev))
+    chk("탄에 맞으면 탄이 날던 쪽으로 %d 밀린다" % AB.SHOT_PUSH, abs(b.x - 900 - AB.SHOT_PUSH) < 0.5, b.x)
+
+    # 준비 중에 맞아도 준비는 안 끊긴다 (끊는 것은 풀죽음)
+    ab = fight([("BLASTOISE", ["WATERGUN"])], [("LAPRAS", ["ICEBEAM"])])
+    b = ab.sides["b"]
+    press(ab, "a", "m0")
+    run_until(ab, lambda _: ab.shots and ab.shots[0].x >= b.x - 150, 2.0)
+    press(ab, "b", "m0")
+    ev = run_until(ab, lambda e: of(e, "hit", v="b"), 1.0)
+    f = me(ab, "b")
+    chk("준비 중에 맞으면: 보이기는 stun · 쓰던 칸은 그대로", of(ev, "hit", v="b") and f["st"] == "stun" and f["sm"] == 0
+        and b.cast is not None and b.cast.stage == "wind", (f, [e["e"] for e in ev]))
+    ev = run(ab, 1.5)
+    chk("  준비는 안 끊기고 광선이 나간다", of(ev, "hit", v="a", k="ICEBEAM"), [e["e"] for e in ev])
+
+    # 겹쳐 맞으면 새로 잴 뿐 더하지 않는다 · 1초에 0.35초까지
+    ab = fight([("SNORLAX", ["TACKLE"])], [("SNORLAX", ["TACKLE"])])
+    b = ab.sides["b"]
+    ab._hitstun(b, AB.HITSTUN_SEC)
+    ab._hitstun(b, AB.HITSTUN_SEC)
+    chk("같은 때 두 번 맞아도 한 번 길이", len(b.hs) == 1 and abs(b.hs[0][1] - b.hs[0][0] - AB.HITSTUN_SEC) < 1e-9, b.hs)
+    t0 = ab.t
+    run(ab, AB.TICK)
+    ab._hitstun(b, AB.HITSTUN_SEC)
+    chk("  조금 뒤 또 맞으면 끝만 그때부터 다시 잰다", len(b.hs) == 1
+        and abs(b.hs[0][1] - (t0 + AB.TICK + AB.HITSTUN_SEC)) < 1e-9, (b.hs, t0))
+    ab._hitstun(b, 0.05)
+    chk("  짧은 것은 남은 경직을 줄이지 않는다", abs(b.hs[0][1] - (t0 + AB.TICK + AB.HITSTUN_SEC)) < 1e-9, b.hs)
+
+    ab = fight([("SNORLAX", ["TACKLE"])], [("SNORLAX", ["TACKLE"])])
+    b = ab.sides["b"]
+    spans, held, t0 = {}, 0, ab.t
+    for _ in range(int(round(3.0 / AB.TICK))):
+        ab._hitstun(b, AB.HITSTUN_BIG)              # 틱마다 맞는다 (가장 나쁜 연속기)
+        for a0, a1 in b.hs:
+            spans[round(a0, 6)] = max(a1, spans.get(round(a0, 6), 0.0))
+        run(ab, AB.TICK)
+        held += ab._staggered(b)
+    worst = 0.0
+    for k in range(int(3.0 / 0.01)):
+        w0 = t0 + k * 0.01
+        worst = max(worst, sum(max(0.0, min(a1, w0 + AB.HITSTUN_WINDOW) - max(a0, w0)) for a0, a1 in spans.items()))
+    chk("틱마다 맞아도 어느 1초 창에서든 경직 합 %.2f초 이하 (가장 무거운 창 %.3f)" % (AB.HITSTUN_CAP, worst),
+        AB.HITSTUN_CAP - 0.02 <= worst <= AB.HITSTUN_CAP + 1e-6, worst)
+    chk("  끝없이 묶이지 않는다 (3초 중 움직일 수 있던 틱 %d / %d)" % (90 - held, 90), held <= 0.4 * 90, held)
+
+    # 경직은 기술 데미지만: 화상 · 상성 0 · 막음은 경직도 밀림도 없다
+    ab = fight([("SNORLAX", ["TACKLE"])], [("SNORLAX", ["TACKLE"])])
+    b = ab.sides["b"]
+    ab._inflict(b, "burn", ab.sides["a"].mon)
+    ev = run_until(ab, lambda e: of(e, "hit", v="b", k="brn"), 2.5)
+    chk("화상으로 깎여도 경직이 없다", of(ev, "hit", v="b", k="brn") and not b.hs and me(ab, "b")["st"] != "stun", b.hs)
+
+    ab = fight([("PIKACHU", ["THUNDERSHOCK"])], [("GOLEM", ["TACKLE"])])
+    b = ab.sides["b"]
+    press(ab, "a", "m0")
+    ev = run(ab, 1.5)
+    hit = of(ev, "hit", v="b")
+    chk("상성 0 인 탄은 안 밀고 경직도 없다", hit and hit[0]["eff"] == 0 and b.x == 900 and not b.hs, (hit, b.x, b.hs))
+
+    ab = fight([("BLASTOISE", ["WATERGUN"])], [("SNORLAX", ["PROTECT"])])
+    b = ab.sides["b"]
+    press(ab, "a", "m0")
+    run_until(ab, lambda _: ab.shots and ab.shots[0].x >= b.x - 200, 2.0)
+    press(ab, "b", "m0")
+    ev = run(ab, 0.8)
+    chk("방어로 막으면 안 밀고 경직도 없다", of(ev, "guard", w="b") and b.x == 900 and not b.hs, (b.x, b.hs))
+
+    ab = fight([("BRELOOM", ["BULLETSEED"])], [("SNORLAX", ["TACKLE"])])
+    b = ab.sides["b"]
+    place(ab, "b", 640, 450)
+    press(ab, "a", "m0")
+    ev = run(ab, 1.0)
+    hits = of(ev, "hit", v="b", k="BULLETSEED")
+    chk("연발이 한꺼번에 맞아도 한 번만 민다 (%d발 맞음 · 마지막 발의 쪽으로)" % len(hits), len(hits) >= 2
+        and abs(math.hypot(b.x - 640, b.y - 450) - AB.SHOT_PUSH) < 0.5 and b.x > 640, (len(hits), b.x, b.y))
 
 
 # ---------------------------------------------------------------- 대가 (체력을 깎는 기술 · 풍선)
@@ -1039,7 +1162,8 @@ def ko_time(a, b, seed):
 
 
 def t_length():
-    print("== 판 길이 (봇끼리 한 마리 쓰러뜨리기, DAMAGE_SCALE %.1f)" % AB.DAMAGE_SCALE)
+    print("== 판 길이 (봇끼리 한 마리 쓰러뜨리기 4~30초 · 3 대 3 은 %d초 안에, DAMAGE_SCALE %.2f)"
+          % (AB.FIGHT_SEC, AB.DAMAGE_SCALE))
     pairs = [
         (("SNORLAX", ["BODYSLAM", "CRUNCH", "EARTHQUAKE", "HEAVYSLAM"]),
          ("SNORLAX", ["BODYSLAM", "CRUNCH", "EARTHQUAKE", "HEAVYSLAM"])),
@@ -1052,8 +1176,14 @@ def t_length():
     ]
     for a, b in pairs:
         times = [ko_time(a, b, seed) for seed in (1, 2, 3)]
-        chk("%s vs %s: 한 마리 8~60초 %s" % (a[0], b[0], [t and round(t, 1) for t in times]),
-            all(t is not None and 8 <= t <= 60 for t in times), times)
+        chk("%s vs %s: 한 마리 4~30초 %s" % (a[0], b[0], [t and round(t, 1) for t in times]),
+            all(t is not None and 4 <= t <= 30 for t in times), times)
+    for seed in (1, 2, 3):
+        ab = fight(TEAM_A, TEAM_B, seed=seed, fight_sec=AB.FIGHT_SEC)
+        t0 = ab.t
+        play(ab, AB.FIGHT_SEC + 1)
+        chk("3 대 3 (seed %d): %d초 안에 쓰러뜨려 끝난다 (%.1f초)" % (seed, AB.FIGHT_SEC, ab.t - t0),
+            ab.result is not None and ab.result["reason"] == "ko", ab.result)
 
 
 def t_every_move():
@@ -1120,6 +1250,7 @@ def main():
     t_telegraph()
     t_kinds()
     t_rush()
+    t_feel()
     t_costs()
     t_switch()
     t_faint()

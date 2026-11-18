@@ -15,7 +15,8 @@
      9. 연결이 끊긴 뒤에는 싸우는 중이어도 움직이지 않는다. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { keyAction, InputState, MoveSender, bindInput, canAct } from '../js/input.js';
+import { keyAction, InputState, MoveSender, bindInput, canAct, slotOf, teamSlotOf } from '../js/input.js';
+import { SLOT_KEYS } from '../js/consts.js';
 
 const ev = (code, extra = {}) => ({
   code, key: extra.key ?? code, repeat: !!extra.repeat,
@@ -244,4 +245,17 @@ test('이동 보내기 - reset 뒤에는 다시 처음부터', () => {
   m.poll(1.0, { x: 1, y: 0 });
   m.reset();
   assert.deepEqual(m.poll(1.001, { x: 1, y: 0 }), { x: 1, y: 0 });
+});
+
+test('기본 키 Z X C V → 기술 칸 0~3 (칸에 적는 글자도 그 차례)', () => {
+  const codes = ['KeyZ', 'KeyX', 'KeyC', 'KeyV'];
+  codes.forEach((c, m) => {
+    assert.equal(slotOf(keyAction(c).act), m);
+    assert.equal('Key' + SLOT_KEYS[m], c, '칸 ' + m + ' 의 글자');
+  });
+  assert.equal(slotOf('dodge'), -1);
+  assert.equal(slotOf('m4'), -1);
+  assert.equal(slotOf(undefined), -1);
+  assert.equal(teamSlotOf(keyAction('Digit2').act), 1);
+  assert.equal(teamSlotOf('m1'), -1);
 });

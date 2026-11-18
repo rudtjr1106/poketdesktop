@@ -112,16 +112,41 @@ function viewAt(s0, s1, t, since) {
   };
 }
 
-/** 받은 모습을 시각 순으로 들고 있다가, 그릴 시각의 모습을 이어서 준다. 이벤트는 그 시각이 되어야 내준다. */
+// 내 쪽(w === 나)의 이 이벤트는 받자마자 낸다 - 내 몸은 가장 새 모습으로 그리므로 (내 이동 먼저) 80ms 뒤에 내면
+// 누른 것이 늦게 보인다. 상대 것과 맞음(hit) · 쓰러짐은 상대 몸 · 탄과 같은 뒤 시각에 둔다.
+const OWN_NOW = new Set(['cast', 'dodge', 'swap', 'status', 'cure', 'stat', 'heal', 'need']);
+// 상대 기술에 맞아 생긴 것 (화상 · 랭크 내림 · 풀죽음) 은 그 hit 와 같이 - 맞기도 전에 걸리면 이상하다
+const RIDES_HIT = new Set(['status', 'cure', 'stat']);
+
+/** 이 이벤트를 받자마자 낼까 (내 쪽 것). hitOnMe = 같은 모습에 나를 맞힌 hit 가 있다. */
+export function ownEvent(ev, you, hitOnMe = false) {
+  if (!you || !ev || ev.w !== you || !OWN_NOW.has(ev.e)) return false;
+  return !(hitOnMe && RIDES_HIT.has(ev.e));
+}
+
+/** 받은 모습을 시각 순으로 들고 있다가, 그릴 시각의 모습을 이어서 준다. 이벤트는 그 시각이 되어야 내준다 -
+    내 쪽 것(ownEvent)만 받자마자. you 를 모르면 (setYou 전) 다 뒤 시각에. */
 export class SnapBuffer {
-  constructor() {
+  constructor(you = null) {
     this.list = [];
     this.queue = [];
+    this.now = [];
+    this.you = you;
+  }
+
+  setYou(you) {
+    this.you = you;
   }
 
   push(s) {
-    for (const e of s.ev || []) this.queue.push({ ts: s.ts, e });
+    const evs = s.ev || [];
+    const hitOnMe = !!this.you && evs.some((e) => e && e.e === 'hit' && e.v === this.you);
+    for (const e of evs) {
+      if (ownEvent(e, this.you, hitOnMe)) this.now.push(e);
+      else this.queue.push({ ts: s.ts, e });
+    }
     if (this.queue.length > EVENT_CAP) this.queue.splice(0, this.queue.length - EVENT_CAP);
+    if (this.now.length > EVENT_CAP) this.now.splice(0, this.now.length - EVENT_CAP);
     const last = this.latest();
     if (last && s.ts <= last.ts) return;
     this.list.push(s);
@@ -149,11 +174,12 @@ export class SnapBuffer {
     return viewAt(s0, s1, t, rt - s0.ts);
   }
 
-  /** 판 시각 rt 까지 온 이벤트 (한 번만). */
+  /** 내 쪽 것(받은 대로 다) + 판 시각 rt 까지 온 나머지 (한 번만). */
   events(rt) {
     let n = 0;
     while (n < this.queue.length && this.queue[n].ts <= rt) n += 1;
-    return this.queue.splice(0, n).map((q) => q.e);
+    const late = this.queue.splice(0, n).map((q) => q.e);
+    return this.now.length ? this.now.splice(0).concat(late) : late;
   }
 }
 

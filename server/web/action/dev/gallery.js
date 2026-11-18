@@ -92,7 +92,10 @@ class Sim {
   hit(w, v) {
     const [eff, crit] = EFFS[this.hits % EFFS.length], f = this.f[v];
     this.hits += 1;
-    this.emit({ e: 'hit', w, v, k: this.k, ty: this.ty, dmg: Math.round(20 + 40 * eff), hpr: 600, eff, crit, x: f.x, y: f.y });
+    // 게임처럼: 맞은 쪽이 나(a)면 정확한 데미지, 상대(b)면 main 이 hpr 로 적는 pct (최대 체력의 %)
+    const dmg = Math.round(20 + 40 * eff);
+    this.emit({ e: 'hit', w, v, k: this.k, ty: this.ty, ...(v === 'a' ? { dmg } : {}), pct: dmg / 4, hpr: 600, eff, crit,
+      x: f.x, y: f.y });
   }
 
   zone(w, kind, geo, wind, act) {
@@ -366,7 +369,7 @@ function name(g, f, side) {
 }
 
 function drawCell(L, dpr) {
-  const { cell, s } = L, { fx, sim } = cell, sh = fx.shake();
+  const { cell, s } = L, { fx, sim } = cell, sh = fx.shake(), zm = fx.zoom();
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.beginPath();
@@ -376,6 +379,11 @@ function drawCell(L, dpr) {
   const ox = ZOOM > 1 ? L.x + L.w / 2 - num(Q.get('cx'), W / 2) * k : L.x;
   const oy = ZOOM > 1 ? L.y + L.h / 2 - num(Q.get('cy'), H / 2) * k : L.y;
   ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * (ox + sh.x * k), dpr * (oy + sh.y * k));
+  if (zm.k > 1) {                                  // 급소 · 효과 굉장 · 쓰러짐에 살짝 다가간다 (render.toArena 와 같은 셈)
+    ctx.translate(zm.x, zm.y);
+    ctx.scale(zm.k, zm.k);
+    ctx.translate(-zm.x, -zm.y);
+  }
   ctx.drawImage(FLOOR, 0, 0, W, H);
   for (const z of sim.z) fx.drawZone(ctx, z, sim.now);
   fx.drawUnder(ctx);

@@ -8,10 +8,12 @@
      3. 탄은 같은 id 끼리 잇고, 다음 모습에 없으면 속도대로 조금만 더 간다.
      4. 이벤트는 그 모습을 그리는 때가 되어야 나온다 (한 번만).
      5. 내 이동: 누른 순간부터 F.spd 로 먼저 움직이고, ack 를 받으면 서버 자리에서 아직 안 받은 입력을
-        다시 굴린다. 서버와 같은 길이면 튀지 않는다. 벽에 막힌다. 혼란이면 반대로 간다. */
+        다시 굴린다. 서버와 같은 길이면 튀지 않는다. 벽에 막힌다. 혼란이면 반대로 간다.
+     6. 내 쪽 이벤트 (쓰기 · 피하기 · 교체 · 내 상태 · 랭크) 는 받자마자 나온다 - 내 몸은 가장 새 모습으로 그리니까.
+        상대 것 · 맞음 · 쓰러짐은 80ms 뒤 그대로. 상대 기술에 맞아 걸린 상태는 그 hit 와 같이 (먼저 걸리지 않게). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Clock, SnapBuffer, Predictor, clampArena } from '../js/interp.js';
+import { Clock, SnapBuffer, Predictor, clampArena, ownEvent } from '../js/interp.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 const F = (x, y, extra = {}) => ({ i: 0, x, y, d: 0, st: 'idle', sm: -1, sp: 0, s: null, c: [], hpr: 1000, ...extra });
@@ -231,4 +233,45 @@ test('예측 - 쌓인 입력은 받은 만큼 버린다', () => {
   assert.equal(pr.pending(), 10);
   pr.server(F(800, 400, { spd: 200 }), 7, 10.2, 0.1);
   assert.equal(pr.pending(), 3);
+});
+
+test('내 쪽 이벤트는 받자마자, 상대 것 · 맞음은 그릴 때가 되어야', () => {
+  const b = new SnapBuffer('a');
+  b.push(snap(1.0, F(0, 0), F(0, 0), { ev: [
+    { e: 'cast', w: 'a', m: 0 }, { e: 'cast', w: 'b', m: 1 }, { e: 'dodge', w: 'a' }, { e: 'hit', w: 'a', v: 'b' },
+    { e: 'stat', w: 'a', st: 'atk', d: 2 }, { e: 'swap', w: 'b', fr: 0, to: 1 }, { e: 'ko', w: 'a', i: 0 },
+  ] }));
+  // 그릴 시각이 아직 한참 앞이어도
+  assert.deepEqual(b.events(0.5).map((e) => e.e + ':' + e.w), ['cast:a', 'dodge:a', 'stat:a']);
+  assert.deepEqual(b.events(0.6), [], '한 번만');
+  assert.deepEqual(b.events(1.0).map((e) => e.e + ':' + e.w), ['cast:b', 'hit:a', 'swap:b', 'ko:a']);
+});
+
+test('상대 기술에 맞아 걸린 내 상태는 그 hit 와 같이 (먼저 나오지 않는다)', () => {
+  const b = new SnapBuffer('a');
+  b.push(snap(2.0, F(0, 0), F(0, 0), { ev: [
+    { e: 'hit', w: 'b', v: 'a', dmg: 20 }, { e: 'status', w: 'a', s: 'brn' }, { e: 'stat', w: 'a', st: 'def', d: -1 },
+  ] }));
+  assert.deepEqual(b.events(1.9), []);
+  assert.deepEqual(b.events(2.0).map((e) => e.e), ['hit', 'status', 'stat']);
+  // 내가 건 것 (잠듦 · 칼춤) 은 바로
+  b.push(snap(2.1, F(0, 0), F(0, 0), { ev: [{ e: 'status', w: 'a', s: 'slp' }, { e: 'stat', w: 'a', st: 'atk', d: 2 }] }));
+  assert.deepEqual(b.events(1.9).map((e) => e.e), ['status', 'stat']);
+});
+
+test('나를 모르면 (hello 전) 다 뒤 시각에 · ownEvent 규칙', () => {
+  const b = new SnapBuffer();
+  b.push(snap(1.0, F(0, 0), F(0, 0), { ev: [{ e: 'cast', w: 'a' }] }));
+  assert.deepEqual(b.events(0.5), []);
+  b.setYou('a');
+  b.push(snap(1.1, F(0, 0), F(0, 0), { ev: [{ e: 'cast', w: 'a' }] }));
+  assert.deepEqual(b.events(0.5).map((e) => e.e), ['cast']);
+  assert.equal(ownEvent({ e: 'cast', w: 'a' }, 'a'), true);
+  assert.equal(ownEvent({ e: 'cast', w: 'b' }, 'a'), false);
+  assert.equal(ownEvent({ e: 'hit', w: 'a', v: 'b' }, 'a'), false, '맞음은 상대 몸과 같이');
+  assert.equal(ownEvent({ e: 'ko', w: 'a' }, 'a'), false);
+  assert.equal(ownEvent({ e: 'heal', w: 'a' }, 'a', true), true, '회복은 맞음과 상관없이');
+  assert.equal(ownEvent({ e: 'status', w: 'a' }, 'a', true), false);
+  assert.equal(ownEvent(null, 'a'), false);
+  assert.equal(ownEvent({ e: 'cast', w: 'a' }, null), false);
 });

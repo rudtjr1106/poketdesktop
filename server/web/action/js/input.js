@@ -15,6 +15,18 @@ export function keyAction(code) {
   return null;
 }
 
+/** 'm0'..'m3' → 기술 칸 0~3, 그 밖은 −1. */
+export function slotOf(act) {
+  const m = /^m([0-3])$/.exec(act || '');
+  return m ? Number(m[1]) : -1;
+}
+
+/** 'sw0'..'sw2' → 팀 칸 0~2, 그 밖은 −1. */
+export function teamSlotOf(act) {
+  const m = /^sw([0-2])$/.exec(act || '');
+  return m ? Number(m[1]) : -1;
+}
+
 /** 누르고 있는 이동 키. 같은 방향 키 두 개(W 와 ↑)는 따로 들고 있다가 둘 다 떼야 선다. */
 export class InputState {
   constructor() {

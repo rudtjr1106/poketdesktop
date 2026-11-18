@@ -1,6 +1,6 @@
 /* 고르기 화면 (DOM): 내 팀 6마리 중 3마리를 고른 순서대로. 1~6 으로 고르고(다시 누르면 뺀다) Enter 로 낸다.
    안 고르고 시간이 다 되면 서버가 앞 3마리를 낸다. 상대 팀은 종 · 타입만 보인다. */
-import { TEAM, TYPE_COLOR, TYPE_KR, KIND_KR, CAT_KR } from './consts.js';
+import { TEAM, TYPE_COLOR, TYPE_KR, KIND_KR, CAT_KR, SLOT_KEYS } from './consts.js';
 
 /** 고른 칸 목록에 i 를 넣거나 뺀다 (고른 순서를 지킨다). max 를 넘으면 그대로. */
 export function togglePick(sel, i, max) {
@@ -90,13 +90,13 @@ export class PickScreen {
     head.append(el('span', 'key', String(i + 1)), el('span', 'order'));
     const name = el('div', 'name', m.kr);
     const moves = el('ul', 'moves');
-    for (const mv of m.moves || []) {
+    (m.moves || []).forEach((mv, j) => {
       const li = el('li', mv.ok ? '' : 'off');
-      const dot = el('i');
+      const dot = el('i', '', SLOT_KEYS[j] || '');       // 그 기술의 키 (Z X C V) 를 타입 색 칸에
       dot.style.background = TYPE_COLOR[mv.type] || '#666';
       li.append(dot, el('span', 'mv', mv.kr), el('span', 'kind', mv.ok ? moveLine(mv) : mv.why));
       moves.append(li);
-    }
+    });
     b.append(head, this.icon(m, ICON), name, typeChips(m.types), el('div', 'item', m.item ? '도구 · ' + m.item : ''), moves);
     return b;
   }

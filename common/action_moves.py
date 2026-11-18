@@ -30,6 +30,11 @@ hazard 설치 · status 상태 걸기 · none 못 씀).
     누르는 쪽으로 range = 160 + 0.6 × 위력 (240 까지) 만큼 RUSH_SEC(0.18초) 동안 달려들며, 지나는 길에서
     w/2 + 몸 반지름 안의 상대를 친다 (w = MELEE_W 120). act = RUSH_SEC + 0.1 × (타수 − 1).
     앞쪽 64 · 부채꼴 110° 일 때보다 훨씬 잘 맞으므로 대기 배율을 1.7 → 2.0 (날리기와 같다) 으로 늘렸다 (test_action_battle 판 길이).
+
+빠르기 (2026-11-19 사용자: "전투가 좀 길어지는 것 같아서 약간 루즈해지는 감이 있는 것 같아")
+    대기시간 전부 × CD_SCALE (0.85): 때리는 기술의 꼴 배율 CD_MULT 와 변화기 대기 (6~14초 → 5.1~11.9초). 바닥(한 번 쓰는
+    시간 + 0.2초)은 그대로. 준비 × FAST_WIND (0.75): 날리기 · 근접 · 돌진 · 부채꼴 · 주변 폭발 · 상태 걸기만. 광선 · 내려찍기 ·
+    뛰어내리기 (모으는 기술 · 일격기 포함) 는 예고를 보고 비켜야 하니 그대로.
 """
 import math
 import weakref
@@ -54,9 +59,17 @@ SELF_TARGETS = (3, 4, 5, 7, 13, 14, 15)
 LOCK = {"proj": 0.35, "melee": 0.35, "burst": 0.35, "cone": 0.35, "strike": 0.35, "self": 0.35, "hazard": 0.35,
         "status": 0.35}
 # 대기시간 = (0.6 + 위력/40) × 꼴 배율. 근접은 달려들며 넓게 치므로 (2026-11-18) 1.7 → 2.0.
-CD_MULT = {"proj": 2.0, "melee": 2.0, "dash": 1.8, "beam": 2.6, "burst": 2.4, "cone": 2.2, "strike": 2.4,
-           "leap": 2.5}
-CD_STATUS = (6.0, 14.0)
+# 2026-11-19 판이 늘어진다 → 대기 전부 × CD_SCALE (꼴 배율 · 변화기 대기 · 그 범위).
+CD_SCALE = 0.85
+CD_MULT = dict((k, round(v * CD_SCALE, 3)) for k, v in (
+    ("proj", 2.0), ("melee", 2.0), ("dash", 1.8), ("beam", 2.6), ("burst", 2.4), ("cone", 2.2), ("strike", 2.4),
+    ("leap", 2.5)))
+STATUS_CD_RANGE = (6.0, 14.0)           # 변화기 대기 범위 (× CD_SCALE 전)
+CD_STATUS = (round(STATUS_CD_RANGE[0] * CD_SCALE, 2), round(STATUS_CD_RANGE[1] * CD_SCALE, 2))     # 5.1 ~ 11.9
+# 준비 × FAST_WIND (2026-11-19). 광선 · 내려찍기 · 뛰어내리기는 예고를 읽어야 하니 빼고, 일격기(내려찍기) ·
+# 모으는 기술(광선 · 뛰어내리기)도 꼴로 같이 빠진다.
+FAST_WIND = 0.75
+FAST_WIND_KINDS = ("proj", "melee", "dash", "cone", "burst", "status")
 HOME = 90.0                 # 반드시 맞는 기술(도감 명중 0)이 꺾는 빠르기
 BODY_W = 52                 # 몸 지름 (action_battle.BODY_R × 2) - 돌진의 굵기
 # 근접 달려들기: 거리 = MELEE_REACH[0] + 위력 × MELEE_REACH[1] (MELEE_REACH[2] 까지), RUSH_SEC 동안.
@@ -312,12 +325,13 @@ def _status_numbers(kind, mv):
 
 
 def _cooldown(kind, k, mv, spend):
-    """다시 쓸 때까지. 때리는 기술은 0.6 + 위력/40 (여러 번 치면 평균 타수만큼) × 꼴 배율, 변화기는 6~14초.
-    한 번 쓰는 시간(spend)보다 짧지 않다."""
+    """다시 쓸 때까지. 때리는 기술은 0.6 + 위력/40 (여러 번 치면 평균 타수만큼) × 꼴 배율 (CD_SCALE 이 들어 있다),
+    변화기는 아래 값 × CD_SCALE 을 CD_STATUS (5.1~11.9초) 안으로. 한 번 쓰는 시간(spend) + 0.2초보다 짧지 않다."""
     if kind in ATTACK_KINDS and mv.get("cat") != "status":
         lo, hi = _hits(mv)
         cd = (0.6 + nominal_power(mv) * (lo + hi) / 2.0 / 40.0) * CD_MULT[kind]
-    elif kind == "guard":
+        return max(cd, spend + 0.2)
+    if kind == "guard":
         cd = 6.0
     elif kind == "counter":
         cd = 7.0
@@ -328,11 +342,12 @@ def _cooldown(kind, k, mv, spend):
     elif kind == "status":
         cd = 14.0 if mv.get("ail") == "sleep" else 10.0
     elif kind == "self" and k in FIELD_MOVES:
-        cd = CD_STATUS[1]
+        cd = STATUS_CD_RANGE[1]
     elif kind in ("self", "cone", "burst"):
         cd = 6 + 1.5 * sum(abs(c) for _, c in (mv.get("stat") or [])) + (2 if mv.get("cond") else 0)
     else:
-        cd = CD_STATUS[0]
+        cd = STATUS_CD_RANGE[0]
+    cd *= CD_SCALE
     if mv.get("cat") == "status":
         cd = min(CD_STATUS[1], max(CD_STATUS[0], cd))
     return max(cd, spend + 0.2)
@@ -361,6 +376,8 @@ def _build(dex, key):
         nums = _attack_numbers(kind, key, mv)
     else:
         nums = _status_numbers(kind, mv)
+    if kind in FAST_WIND_KINDS and key not in SM.CHARGE2 and key not in MC.OHKO:
+        nums["wind"] *= FAST_WIND               # 손으로 정한 준비(OVERRIDES)는 아래에서 그대로 덮는다
     nums.update((f, v) for f, v in over.items() if f != "kind")
     return _finish(kind, why, mv, nums, key)
 

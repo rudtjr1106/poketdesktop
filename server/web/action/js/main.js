@@ -2,14 +2,20 @@
 
    주소 조각(#m=..&t=..)에서 입장권을 읽자마자 지우고, /ws/action 을 열어 첫 메시지로 보낸다. 판정은 전부 서버가
    한다 - 화면은 누른 키만 보내고, 받은 모습을 80ms 뒤에서 이어 그린다 (내 이동만 먼저). 게임 시계는 서버 것이고
-   rAF 는 그리기만 한다. */
+   rAF 는 그리기만 한다.
+
+   누른 것은 바로 보인다: 칸이 눌리고 (못 쓰면 흔들리고 안 보낸다), 쓸 수 있는 기술이면 서버를 기다리지 않고 준비
+   몸짓 · 빛을 먼저 시작한다 (서버의 cast 가 오면 이어 가고, 0.25초 안에 안 오면 사그라든다). 내 쪽 이벤트(쓰기 ·
+   피하기 · 교체 · 내 상태)는 80ms 를 기다리지 않는다 (SnapBuffer). */
 import { Fx } from './fx.js';
 import { parseFragment, wsUrl, closeReason, Net } from './net.js';
 import { Clock, SnapBuffer, Predictor } from './interp.js';
-import { InputState, MoveSender, bindInput, canAct } from './input.js';
+import { InputState, MoveSender, bindInput, canAct, keyAction, slotOf } from './input.js';
 import { SpriteBank, dirOf } from './sprites.js';
-import { Renderer } from './render.js';
-import { Hud } from './hud.js';
+import { Renderer, PREDICT_SEC } from './render.js';
+import { Hud, pressVerdict } from './hud.js';
+import { HpTracker } from './feel.js';
+import { STRUGGLE_KIND } from './consts.js';
 import { PickScreen } from './pick.js';
 import { Dialogs } from './dialogs.js';
 
@@ -32,6 +38,8 @@ class Game {
     this.clock = new Clock();
     this.buffer = new SnapBuffer();
     this.predictor = new Predictor();
+    this.hp = new HpTracker();       // 맞은 비율 (상대는 hpr 만 온다)
+    this.pre = null;                 // 누르자마자 시작한 준비 몸짓 {m, ang, until}
     this.net = null;
     this.intro = null;
     this.you = null;
@@ -45,12 +53,14 @@ class Game {
     this.closedAt = null;        // 소켓이 닫힌 때 - 시계 · 대기가 거기서 멈춘다
     this.resultShown = false;
     this.drawn = {};             // 쪽 → 이번 장에 그린 몸 가운데
-    // fx 는 이 world 를 들고 있다가 그릴 때마다 pos 를 다시 묻는다 (몸을 따라가는 그림) - 그래서 한 벌을 계속 쓴다
-    this.world = { pos: (side) => this.drawn[side] || null, now: 0, you: null };
+    // fx 는 이 world 를 들고 있다가 그릴 때마다 pos 를 다시 묻는다 (몸을 따라가는 그림) - 그래서 한 벌을 계속 쓴다.
+    // 몸이 멈춤(hitstop) · 미끄러짐으로 그려진 자리를 따라간다
+    this.world = { pos: (side) => this.renderer.posOf(side) || this.drawn[side] || null, now: 0, you: null };
+    this.fx.world = this.world;      // 첫 이벤트 전에도 (누르자마자 빛이 몸을 따라가게)
     this.last = clockNow();
     bindInput(window, document, {
       key: (e, a) => this.onKey(e, a),
-      keyup: (e) => this.keys.keyup(e),
+      keyup: (e) => this.onKeyUp(e),
       clear: () => this.release(),
       live: () => this.live(),
     });
@@ -94,7 +104,9 @@ class Game {
     this.you = m.you;
     this.them = m.you === 'a' ? 'b' : 'a';
     this.world.you = m.you;
+    this.buffer.setYou(m.you);
     this.status = null;
+    this.dialogs.setLimits(m.limits || {});
   }
 
   onSnap(s, now) {
@@ -104,6 +116,7 @@ class Game {
     this.snapAt = now;
     this.status = null;
     this.clock.snap(s.ts, now);
+    this.hp.annotate(s);             // hit 에 pct (최대 체력의 몇 %) - 받은 차례대로
     this.buffer.push(s);
     const me = s.f && s.f[this.you];
     if (me) this.predictor.server(me, s.ack, now, this.clock.rtt ?? DEFAULT_RTT);
@@ -154,9 +167,39 @@ class Game {
       this.dialogs.toggleHelp();
     } else {
       const fresh = this.keys.keydown(e);
-      if (fresh && fresh.act && this.canAct()) this.send({ t: 'act', s: (this.seq += 1), k: fresh.act });
+      if (fresh && fresh.act && this.canAct()) this.act(fresh.act);
     }
     return true;
+  }
+
+  /** 동작 키 하나: 칸을 바로 누르고, 쓸 수 있어 보이면 보낸다. 바로 쓸 수 있는 기술이면 준비 몸짓을 먼저. */
+  act(k) {
+    const now = clockNow();
+    const st = this.hudState(now);
+    const v = pressVerdict(k, { me: st.me, moves: st.moves, age: st.age, rtt: this.clock.rtt });
+    this.hud.press(k, v, now);
+    if (!v.send) return;
+    this.send({ t: 'act', s: (this.seq += 1), k });
+    if (v.predict) this.prewind(slotOf(k), v.kind, v.ty, now);
+  }
+
+  /** 누르자마자 준비 몸짓 · 빛 (서버가 받기 전). 근접 · 돌진은 누르는 쪽, 그 밖은 상대 쪽을 겨눈다 (엔진 _aim). */
+  prewind(m, kind, ty, now) {
+    const me = this.drawn[this.you];
+    if (m < 0 || !me) return;
+    const v = this.keys.vector();
+    const foe = this.drawn[this.them];
+    const rush = kind === 'melee' || kind === 'dash';
+    const ang = rush && (v.x || v.y) ? Math.atan2(v.y, v.x) : foe ? Math.atan2(foe.y - me.y, foe.x - me.x) : Math.PI / 2;
+    this.pre = { m, ang, until: now + PREDICT_SEC };
+    this.renderer.predict(this.you, m, kind || STRUGGLE_KIND, ang, now);
+    this.fx.prewind(this.you, ty);
+  }
+
+  onKeyUp(e) {
+    this.keys.keyup(e);
+    const a = keyAction(e.code);
+    if (a && a.act) this.hud.release(a.act);
   }
 
   /** 이동 의도: 바뀌면 바로, 움직이는 동안은 0.1초마다 (MoveSender). 싸울 때가 아니면 멈춤으로 친다. */
@@ -168,6 +211,7 @@ class Game {
   /** 창이 포커스를 잃었다: 눌린 키를 비우고, 걷고 있었으면 멈춤을 바로 보낸다 (숨은 창은 rAF 가 돌지 않는다). */
   release() {
     this.keys.clear();
+    this.hud.releaseAll();
     const now = clockNow();
     const v = this.mover.stop(now);
     if (v) this.sendIntent(v, now);
@@ -196,9 +240,18 @@ class Game {
     const p = this.snap.ph === 'fight' && this.predictor.ready() && !this.net.done ? this.predictor.pos(now) : f;
     const v = this.canAct() ? this.keys.vector() : ZERO;
     const flip = (f.c || []).includes('cnf') ? -1 : 1;
-    const d = dirOf(v.x * flip, v.y * flip);
-    const face = d >= 0 && (f.st === 'idle' || f.st === 'walk') ? { ...f, d } : f;
-    return { side: this.you, f: face, mon: this.mon(this.you, f.i), x: p.x, y: p.y, mine: true };
+    const free = f.st === 'idle' || f.st === 'walk';
+    // 누르자마자 준비 몸짓 중이면 겨눈 쪽을 본다 (서버가 받으면 서버의 d 가 같은 쪽)
+    if (this.pre && now > this.pre.until) this.pre = null;
+    const d = free && this.pre ? dirOf(Math.cos(this.pre.ang), Math.sin(this.pre.ang)) : dirOf(v.x * flip, v.y * flip);
+    if (!free) this.pre = null;
+    const face = d >= 0 && free ? { ...f, d } : f;
+    const mon = this.mon(this.you, f.i);
+    const kindOf = (m) => {
+      const mv = mon && mon.moves && mon.moves[m];
+      return mv && mv.kind !== 'none' ? mv.kind : STRUGGLE_KIND;
+    };
+    return { side: this.you, f: face, mon, x: p.x, y: p.y, mine: true, kindOf };
   }
 
   /** 이번 장에 그릴 것. 그릴 판 시각까지 온 이벤트를 fx · 몸 · 칸에 나눠 준다. */
@@ -244,6 +297,7 @@ class Game {
       now,
       rtt: this.clock.rtt,
       status: this.status,
+      bodies: Object.values(this.renderer.drawnAt),
     };
   }
 

@@ -38,13 +38,27 @@ drain_events() 를 붙여 보낸다. 판정은 전부 여기서 한다 - 웹 화
           멈춘다 (미끄러지지 않는다). 달리는 동안엔 방향키가 안 듣는다.
     맞음: 이번 틱에 달린 길(선분)에서 상대 가운데까지가 근접 kit w/2 + BODY_R, 돌진 2·BODY_R + DASH_REACH 안이면
           맞는다. 처음 맞힌 자리에서 멈춘다 (몸을 뚫고 지나가지 않는다). 무적인 상대에겐 몸이 닿는 자리에서 멈춘다.
-          맞은 쪽은 BUMP_DIST 만큼 BUMP_SEC 동안 기술 방향으로 밀린다 (휘청 · 무적 없음, 벽에서 멈춘다. 쓴 쪽보다 뒤에
-          있었으면 쓴 쪽에서 멀어지는 쪽으로).
+          맞은 쪽은 BUMP_DIST 만큼 BUMP_SEC 동안 기술 방향으로 밀린다 (준비를 끊는 휘청 · 무적은 없다 - 경직은 아래
+          '손맛', 벽에서 멈춘다. 쓴 쪽보다 뒤에 있었으면 쓴 쪽에서 멀어지는 쪽으로).
     연속 근접(n > 1): 첫 대를 맞힌 뒤 제자리에서 MULTI_GAP 마다 한 대씩, 상대가 w/2 + BODY_R 안에 있는 동안.
           밀어내기는 마지막 대에만.
     맞부딪힘: 둘 다 달리는 중(아직 안 맞힘) · 서로 마주 보고(각 90° 안) · 어느 한쪽 길이 상대에 닿으면.
     cast 이벤트 덧붙임: len 달려드는 거리 (벽까지 줄인 것, u) · r 길 가운데에서 맞는 너비의 반 (근접 w/2 ·
           돌진 DASH_REACH - 돌진은 몸 반지름 바깥으로 이만큼). x · y 는 쓰기 시작한 자리, ang 은 라디안.
+
+손맛 · 빠르기 (2026-11-19 사용자: "손맛이 조금 부족한 것 같아 ... 전투가 좀 길어지는 것 같아서 약간 루즈해지는 감이")
+    DAMAGE_SCALE 0.3 → 0.42 · FIGHT_SEC 180 → 120 · 대기 × 0.85 · 준비 × 0.75 (action_moves 의 CD_SCALE · FAST_WIND).
+    밀림: 근접 · 돌진 BUMP_DIST 45 → 70 (BUMP_SEC 그대로). 탄도 맞히면 탄이 날던 쪽으로 SHOT_PUSH 를 SHOT_PUSH_SEC
+          동안 민다 - 한 틱에 여러 발(연발)이 맞아도 한 번 (마지막 발의 쪽으로). 상성 0 · 막음 · 무적이면 안 밀고,
+          이미 밀리는 중이거나 달려드는 중(근접 · 돌진 발동)이면 그대로 둔다 (탄 하나로 달리기를 끊지 않는다).
+          근접 · 돌진도 상성 0 이면 안 민다.
+    경직: 기술 데미지(상성 > 0, 1 이상)를 받으면 HITSTUN_SEC (급소 · 효과가 굉장하면 HITSTUN_BIG) 동안 못 걷고
+          새로 못 한다 (기술 · 피하기 · 교체 - 누른 키는 BUFFER_SEC 동안 들고 있다가 풀리면 쓴다). 하던 기술은 그대로
+          (준비도 안 끊긴다 - 끊는 것은 풀죽음의 휘청), 무적 없음. 독 · 화상 · 씨뿌리기 · 함정 · 반동 · 되돌림(카운터)은
+          경직이 없다.
+          겹쳐 맞으면 더하지 않고 새로 잰다 (끝 = 늦은 쪽). 어느 1초(HITSTUN_WINDOW) 창에서도 합쳐 HITSTUN_CAP 을
+          넘지 않는다 (그만큼에서 자른다 - 연속기로 끝없이 묶지 못한다). 보이기: F.st "stun" (sp 는 그 진행) - 준비 중에
+          맞아도 그동안은 "stun", sm 은 하던 기술 칸 그대로.
 
 이벤트 (drain_events) 덧붙임
     hit            w 때린 쪽 · v 맞은 쪽. w == v 면 스스로 다친 것 (반동 · 발버둥은 k 가 그 기술, 화상 · 독은 brn psn tox).
@@ -73,10 +87,10 @@ ARENA_W, ARENA_H = 1600, 900
 BODY_R = 26
 LEVEL = 50
 TEAM = 3
-DAMAGE_SCALE = 0.3
+DAMAGE_SCALE = 0.42         # 2026-11-19 0.3 → 0.42 (판이 늘어진다)
 PICK_SEC = 15
 READY_SEC = 3
-FIGHT_SEC = 180
+FIGHT_SEC = 120             # 2026-11-19 180 → 120
 KO_PICK_SEC = 5
 SPAWN_PROTECT = 1.0
 DODGE_SEC = 0.18
@@ -94,8 +108,14 @@ REC_MOVE = 0.5              # 회복 중 이동 배율
 CLASH_PUSH = 140            # 맞부딪히면 튕기는 거리
 PUSH_SEC = 0.2              # 튕김 · 밀려남에 걸리는 시간
 DASH_REACH = 30             # 돌진이 몸 바깥 이만큼 안을 지나면 맞는다 (2026-11-18 4 → 30)
-BUMP_DIST = 45              # 근접 · 돌진에 맞으면 기술 방향으로 밀리는 거리
+BUMP_DIST = 70              # 근접 · 돌진에 맞으면 기술 방향으로 밀리는 거리 (2026-11-19 45 → 70)
 BUMP_SEC = 0.12             #   그 시간 (틱으로 반올림 - 4틱)
+SHOT_PUSH = 22              # 탄에 맞으면 탄이 날던 쪽으로 밀리는 거리 (2026-11-19)
+SHOT_PUSH_SEC = 0.08        #   그 시간 (틱으로 반올림 - 2틱)
+HITSTUN_SEC = 0.10          # 기술에 맞으면 경직 (못 걷고 새로 못 한다, 하던 기술은 그대로)
+HITSTUN_BIG = 0.16          #   급소 · 효과가 굉장하면
+HITSTUN_CAP = 0.35          #   어느 HITSTUN_WINDOW 창에서도 경직은 합쳐 이만큼까지
+HITSTUN_WINDOW = 1.0
 RUSH_KINDS = ("melee", "dash")
 OHKO_FRAC = 0.45            # 일격기: 상대 최대 체력의 이만큼
 STRUGGLE = "STRUGGLE"
@@ -299,6 +319,7 @@ class Side(object):
         self.cast = None
         self.push = None
         self.stun = None
+        self.hs = []                            # 경직 구간 [(시작, 끝)..] - 지난 HITSTUN_WINDOW 안의 것, 끝이 마지막
         self.swap = None
         self.inv_until = 0.0
         self.dodge_ready = self.swap_ready = 0.0
@@ -405,6 +426,7 @@ class ActionBattle(object):
         self.timed = {}                 # 판에 건 것 ("weather" · "room:gravity" · "a:reflect" ...) -> (끝, 건 쪽)
         self._ev = []
         self._ids = 0
+        self._struck = 0                # 마지막 _hit 에서 들어간 기술 데미지의 상성 (안 들어갔으면 0)
 
     # ---- 밖에서 부르는 것 ----
     def pick(self, side, slots):
@@ -586,8 +608,12 @@ class ActionBattle(object):
         return self._present(s) and not self._hidden(s)
 
     def _held(self, s):
-        """저림 · 풀죽음 · 튕김 · 잠듦 · 얼음 - 아무것도 못 한다."""
-        return s.stun is not None or s.mon.f.status in ("sleep", "freeze")
+        """저림 · 풀죽음 · 튕김 · 잠듦 · 얼음 · 경직 - 걷지도 새로 하지도 못한다."""
+        return s.stun is not None or self._staggered(s) or s.mon.f.status in ("sleep", "freeze")
+
+    def _staggered(self, s):
+        """맞아서 경직 중 (HITSTUN_SEC). 하던 기술은 그대로 간다."""
+        return bool(s.hs) and self._before(s.hs[-1][1])
 
     def _side_has(self, s, name):
         return bool(self.field.side(FIELD_SIDE[s.name]).get(name))
@@ -708,6 +734,7 @@ class ActionBattle(object):
         self._leave(s, s.mon)
         s.cur = i
         s.swap = s.push = s.stun = s.need_until = None
+        s.hs = []
         if forced:
             s.x, s.y = SPAWN[s.name]
         s.inv_until = self.t + SPAWN_PROTECT
@@ -938,7 +965,7 @@ class ActionBattle(object):
                 res = self._hit(c.by, foe, c.key, c.mv)
                 if res != "pass":
                     c.hits, c.rush = 1, 0.0
-                    if res == "hit" and c.kit["n"] == 1:
+                    if res == "hit" and self._struck and c.kit["n"] == 1:
                         self._bump(foe, c.ang, s)
             if c.rush <= EPS:
                 c.rush = None
@@ -952,7 +979,7 @@ class ActionBattle(object):
         c.hits += 1
         last = c.hits >= c.kit["n"]
         near = self._solid(foe) and math.hypot(foe.x - s.x, foe.y - s.y) <= _reach(c) + 0.01
-        if near and self._hit(c.by, foe, c.key, c.mv) == "hit" and last:
+        if near and self._hit(c.by, foe, c.key, c.mv) == "hit" and self._struck and last:
             self._bump(foe, c.ang, s)
         if last or not near:
             c.next, c.end = None, self.t        # 다 쳤다 · 상대가 멀어졌다
@@ -1090,20 +1117,56 @@ class ActionBattle(object):
         s.push = Push(vx, vy, self.t, self.t + PUSH_SEC, False)
 
     def _bump(self, s, ang, by):
-        """근접 · 돌진에 맞아 ang 쪽으로 BUMP_DIST 밀린다 (휘청 · 무적 없음, 벽에서 멈춘다 - _walk 가 막는다).
-        쓴 쪽(by)보다 뒤에 있었으면 by 에서 멀어지는 쪽으로. 이미 밀리는 중(밀어내기 기술)이면 그대로 둔다."""
-        if not self._present(s) or s.push is not None:
-            return
+        """근접 · 돌진에 맞아 ang 쪽으로 BUMP_DIST 를 BUMP_SEC 동안 밀린다.
+        쓴 쪽(by)보다 뒤에 있었으면 by 에서 멀어지는 쪽으로."""
         away = math.degrees(math.atan2(s.y - by.y, s.x - by.x))
         if abs(_turn(ang, away)) > 90:
             ang = away
-        n = max(1, int(round(BUMP_SEC / TICK)))
-        vx, vy = _polar(ang, BUMP_DIST / (n * TICK))
+        self._shove(s, ang, BUMP_DIST, BUMP_SEC)
+
+    def _shove(self, s, ang, dist, sec):
+        """ang 쪽으로 dist 를 sec (틱으로 반올림) 동안 밀린다 - 무적 없음, 벽에서 멈춘다 (_walk 가 막는다), 밀리는 동안은
+        새로 못 한다 (_free). 이미 밀리는 중(밀어내기 기술 · 튕김 · 피하기)이면 그대로 둔다."""
+        if not self._present(s) or s.push is not None:
+            return
+        n = max(1, int(round(sec / TICK)))
+        vx, vy = _polar(ang, dist / (n * TICK))
         s.push = Push(vx, vy, self.t, self.t + n * TICK, False)
 
     def _stun(self, s, sec, why):
         self._cancel(s)
         s.stun = Stun(self.t, self.t + sec, why)
+
+    def _hitstun(self, s, sec):
+        """기술에 맞아 sec 동안 경직 (모듈 설명 '손맛'). 하던 기술은 안 끊는다. 겹치면 끝을 늦은 쪽으로 새로 잴 뿐
+        더하지 않고, 이 끝에서 끝나는 HITSTUN_WINDOW 창 안의 경직이 HITSTUN_CAP 을 넘으면 그만큼에서 자른다.
+        (구간을 시간 순으로만 늘리므로 그 창이 가장 무겁다 - 어느 창에서도 CAP 을 넘지 않는다.)"""
+        t = self.t
+        spans = [sp for sp in s.hs if sp[1] > t - HITSTUN_WINDOW + EPS]
+        start = max(t, spans[-1][1]) if spans else t        # 지금 경직 중이면 그 끝에서부터 늘린다
+        end = t + sec
+        if end > start + EPS:
+
+            def load(e):
+                """e 에서 끝나는 창 안의 경직 (start ~ e 로 늘릴 몫 포함). e 가 늘면 줄지 않는다."""
+                lo = e - HITSTUN_WINDOW
+                return sum(max(0.0, min(b, start) - max(a, lo)) for a, b in spans) + (e - start)
+
+            if load(end) > HITSTUN_CAP:
+                lo_e, hi_e = start, end
+                for _ in range(30):
+                    mid = (lo_e + hi_e) / 2.0
+                    if load(mid) <= HITSTUN_CAP:
+                        lo_e = mid
+                    else:
+                        hi_e = mid
+                end = lo_e
+            if end > start + EPS:
+                if spans and spans[-1][1] >= start - EPS:
+                    spans[-1] = (spans[-1][0], end)             # 이어서 늘린다
+                else:
+                    spans.append((start, end))
+        s.hs = spans
 
     # ---- 탄 · 장판 ----
     def _fly(self):
@@ -1119,14 +1182,22 @@ class ActionBattle(object):
             if p.left <= 0 or not (0 <= p.x <= ARENA_W and 0 <= p.y <= ARENA_H):
                 p.dead = True
         self._clash_shots()
+        shove = {}                              # 맞은 쪽 -> 이번 틱에 데미지를 준 마지막 탄 (연발이어도 한 번만 민다)
         for p in self.shots:
             if p.dead:
                 continue
             vic = self.sides[_other(p.o)]
             if _seg_dist(vic.x, vic.y, p.x - p.vx * TICK, p.y - p.vy * TICK, p.x, p.y) <= p.r + BODY_R:
                 scale = p.power / p.base if p.base else 1.0
-                if self._hit(p.by, vic, p.k, p.mv, scale) != "pass":
+                res = self._hit(p.by, vic, p.k, p.mv, scale)
+                if res != "pass":
                     p.dead = True
+                if res == "hit" and self._struck:
+                    shove[vic.name] = p
+        for name, p in sorted(shove.items()):
+            vic = self.sides[name]
+            if not (vic.cast is not None and vic.cast.rush):        # 달려드는 중이면 안 민다 (달리기를 안 끊는다)
+                self._shove(vic, math.degrees(math.atan2(p.vy, p.vx)), SHOT_PUSH, SHOT_PUSH_SEC)
         self.shots = [p for p in self.shots if not p.dead]
 
     def _steer(self, p, vic):
@@ -1188,7 +1259,9 @@ class ActionBattle(object):
     def _hit(self, by, vic, key, mv, scale=1.0):
         """by(때린 한 마리)의 기술이 vic(자리)에 닿았다. "pass" 지나감 · "block" 막힘 · "hit" 맞음.
 
-        무적(등장 · 피하기) · 숨음 · 쓰러짐이면 지나간다. 방어는 막고, 카운터 류는 막고 되돌린다."""
+        무적(등장 · 피하기) · 숨음 · 쓰러짐이면 지나간다. 방어는 막고, 카운터 류는 막고 되돌린다.
+        부른 뒤 self._struck 는 이번에 기술 데미지가 들어갔으면 상성 (> 0), 아니면 0 - 밀어내기가 본다."""
+        self._struck = 0
         if not self._solid(vic) or self._before(vic.inv_until):
             return "pass"
         vc = vic.cast
@@ -1252,6 +1325,9 @@ class ActionBattle(object):
             self._effects(by, att, vic, key, mv, lost)
         if dst.f.hp <= 0 and not dst.ko:
             self._faint(vic)
+        self._struck = eff if (lost and eff) else 0
+        if self._struck and not dst.ko and vic.mon is dst:
+            self._hitstun(vic, HITSTUN_BIG if (crit or eff >= 2) else HITSTUN_SEC)
         if eff and att.mon is by and not by.ko:
             if key == "CHLOROBLAST":
                 self._self_half(att, by, key, ty)       # 맞혔을 때만 깎인다 (본가 그대로)
@@ -1410,6 +1486,7 @@ class ActionBattle(object):
         m.ko, m.f.hp = True, 0
         self._cancel(s)
         s.swap = s.push = s.stun = s.buf = None
+        s.hs = []
         self._emit("ko", w=s.name, i=s.cur)
         if self.left(s.name):
             s.need_until = self.t + KO_PICK_SEC
@@ -1583,6 +1660,8 @@ class ActionBattle(object):
             return "sleep", 0.0
         if s.stun is not None:
             return "stun", _progress(t, s.stun.t0, s.stun.t1)
+        if self._staggered(s):                  # 경직도 stun - 하던 기술은 sm 에 그대로
+            return "stun", _progress(t, s.hs[-1][0], s.hs[-1][1])
         if s.push is not None and s.push.dodge:
             return "dodge", _progress(t, s.push.t0, s.push.t1)
         if c is not None:

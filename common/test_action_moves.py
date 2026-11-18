@@ -142,11 +142,36 @@ def named():
         and AM.kit(DEX, "DOUBLEKICK")["act"] > AM.kit(DEX, "DRAGONCLAW")["act"], AM.kit(DEX, "DOUBLEKICK"))
     chk("돌진은 근접보다 길고 빠르다", AM.kit(DEX, "QUICKATTACK")["range"] > 240
         and AM.kit(DEX, "QUICKATTACK")["speed"] > max(AM.kit(DEX, k)["speed"] for k in melee))
-    chk("변화기 대기는 6~14초", all(6 <= AM.kit(DEX, k)["cd"] <= 14 for k in
-                                ("SWORDSDANCE", "THUNDERWAVE", "STEALTHROCK", "REFLECT", "LEER", "RECOVER",
-                                 "SHELLSMASH", "SPORE")))
+    lo, hi = AM.CD_STATUS
+    chk("변화기 대기는 %.1f~%.1f초 (6~14 × %.2f)" % (lo, hi, AM.CD_SCALE),
+        (lo, hi) == (5.1, 11.9) and all(lo <= AM.kit(DEX, k)["cd"] <= hi for k in
+                                        ("SWORDSDANCE", "THUNDERWAVE", "STEALTHROCK", "REFLECT", "LEER", "RECOVER",
+                                         "SHELLSMASH", "SPORE")), AM.CD_STATUS)
     chk("PP 절반: 파괴광선 5 → 3, 화염방사 15 → 8",
         AM.kit(DEX, "HYPERBEAM")["pp"] == 3 and AM.kit(DEX, "FLAMETHROWER")["pp"] == 8)
+
+
+def pacing():
+    print("== 빠르기 (2026-11-19: 대기 × 0.85 · 준비 × 0.75)")
+    chk("꼴 배율 = 예전 × 0.85", AM.CD_MULT == {"proj": 1.7, "melee": 1.7, "dash": 1.53, "beam": 2.21, "burst": 2.04,
+                                              "cone": 1.87, "strike": 2.04, "leap": 2.125}, AM.CD_MULT)
+    cd = {k: AM.kit(DEX, k)["cd"] for k in ("HYDROPUMP", "PROTECT", "SWORDSDANCE", "SPORE", "COUNTER")}
+    chk("대기 = 예전 × 0.85 (하이드로펌프 · 방어 · 칼춤 · 버섯포자 · 카운터)",
+        abs(cd["HYDROPUMP"] - (0.6 + 110 / 40.0) * 2.0 * 0.85) < 0.006 and cd["PROTECT"] == 5.1
+        and cd["SWORDSDANCE"] == 7.65 and cd["SPORE"] == 11.9 and cd["COUNTER"] == 5.95, cd)
+    floor = [k for k in sorted(DEX.moves) if AM.kit(DEX, k)["cd"] + 0.006 < AM.kit(DEX, k)["wind"]
+             + AM.kit(DEX, k)["act"] + AM.kit(DEX, k)["rec"] + 0.2]
+    chk("대기는 한 번 쓰는 시간 + 0.2초보다 짧지 않다 (바닥 그대로)", not floor, floor[:5])
+    want = {"WATERGUN": 0.16 + 40 / 700.0, "TACKLE": 0.14 + 40 / 1000.0, "QUICKATTACK": 0.08,
+            "HEATWAVE": 0.3 + 95 / 1000.0, "EARTHQUAKE": 0.4 + 100 / 1000.0, "THUNDERWAVE": 0.3, "LEER": 0.3,
+            "EXPLOSION": 0.9}
+    off = [(k, AM.kit(DEX, k)["wind"], round(v * 0.75, 3)) for k, v in sorted(want.items())
+           if abs(AM.kit(DEX, k)["wind"] - round(v * 0.75, 3)) > 1e-9]
+    chk("날리기 · 근접 · 돌진 · 부채꼴 · 주변 폭발 · 상태 걸기는 준비 × 0.75 (%d개)" % len(want), not off, off)
+    keep = {"ICEBEAM": 0.55 + 90 / 600.0, "THUNDER": 0.8 + 110 / 1000.0, "FLY": 0.95, "DIG": 0.95,
+            "SOLARBEAM": 1.1, "SKYATTACK": 0.95, "FISSURE": 1.5, "SHEERCOLD": 1.5, "SWORDSDANCE": 0.35, "RECOVER": 0.6}
+    off = [(k, AM.kit(DEX, k)["wind"], v) for k, v in sorted(keep.items()) if abs(AM.kit(DEX, k)["wind"] - v) > 1e-9]
+    chk("광선 · 내려찍기 · 뛰어내리기 · 모으기 · 일격기 · 강화 · 회복은 준비 그대로", not off, off)
 
 
 def styles():
@@ -178,6 +203,7 @@ def main():
     contract()
     every_move()
     named()
+    pacing()
     styles()
     move_data()
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))

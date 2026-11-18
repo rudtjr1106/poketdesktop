@@ -146,13 +146,22 @@ button.danger { background: #c9424f; color: #fff; border-color: #c9424f; }
 .moves { list-style: none; margin: 4px 0 0; padding: 0; align-self: stretch; text-align: left; }
 .moves li {
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr);
+  grid-template-columns: 18px minmax(0, 1fr);
   column-gap: 6px;
   align-items: center;
   font-size: 12px;
   padding: 2px 0;
 }
-.moves li i { width: 8px; height: 8px; border-radius: 50%; }
+/* 기술의 키 (Z X C V) 를 타입 색 네모에 */
+.moves li i {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font: 800 11px/18px var(--font);
+  font-style: normal;
+  text-align: center;
+  color: #10131c;
+}
 .moves .mv { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .moves .kind { grid-column: 2; font-size: 10.5px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .moves li.off { opacity: 0.5; }
@@ -165,7 +174,10 @@ button.danger { background: #c9424f; color: #fff; border-color: #c9424f; }
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
-.pick-foot .keys { font-size: 12px; color: var(--faint); flex: 1; line-height: 1.9; }
+.pick-foot .keys { font-size: 12px; color: var(--dim); flex: 1; line-height: 1.9; }
+.pick-foot .keys kbd + kbd { margin-left: 2px; }
+.alt { color: var(--faint); }
+.alt kbd { opacity: 0.75; }
 .pick-foot .status { font-size: 13px; color: var(--dim); font-weight: 700; }
 
 /* ---------------------------------------------------------------- 결과 · 도움말 */

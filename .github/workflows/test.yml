@@ -863,7 +863,7 @@ jobs:
           POKET_EVENT_RESPAWN: "0"
           # 친구 집에 놀러 가기: 끊긴 뒤 끝내기까지 기다리는 초 (운영은 20초 - 검사는 짧게)
           POKET_VISIT_GRACE: "2"
-          # 액션 배틀 한 판을 짧게 (운영: 고르기 15 · 준비 3 · 싸움 180 · 끊김 15초)
+          # 액션 배틀 한 판을 짧게 (운영: 고르기 15 · 준비 3 · 싸움 120 · 끊김 15초)
           POKET_ACTION_PICK_SEC: "1"
           POKET_ACTION_READY_SEC: "0.5"
           POKET_ACTION_FIGHT_SEC: "8"

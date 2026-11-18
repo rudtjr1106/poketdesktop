@@ -9,12 +9,16 @@ export const DODGE_CD = 1.6;
 export const SWITCH_CD = 6;
 // 발버둥의 대기 (초) - common/action_moves.kit(dex, 'STRUGGLE')['cd'] 와 같아야 한다. 쓰면 네 칸이 같이 막힌다.
 export const STRUGGLE_CD = 3.15;
+// 발버둥의 꼴 (몸짓 고르기)
+export const STRUGGLE_KIND = 'melee';
 // 서버 모습을 이만큼 뒤에서 그린다 (초). 두 모습 사이를 이어 그릴 여유다.
 export const INTERP_DELAY = 0.08;
 
 export const FONT = "'Apple SD Gothic Neo','Malgun Gothic',sans-serif";
 
-/* 키 배치 (v1 은 못 바꾼다). event.code - 물리 키 자리라 한글 입력 상태여도 같다. */
+/* 키 배치 (v1 은 못 바꾼다). event.code - 물리 키 자리라 한글 입력 상태여도 같다.
+   기본은 방향키 + Z X C V (기술) · Shift (피하기) · 1 2 3 (교체) - 화면 칸에는 이것만 적는다.
+   W A S D · J K U I · Space 도 똑같이 되고, 도움말(H) · 고르기 화면 아래에만 '이것도 된다' 로 적는다. */
 export const MOVE_KEYS = {
   KeyW: 'up', KeyA: 'left', KeyS: 'down', KeyD: 'right',
   ArrowUp: 'up', ArrowLeft: 'left', ArrowDown: 'down', ArrowRight: 'right',
@@ -27,8 +31,14 @@ export const ACT_KEYS = {
   Numpad1: 'sw0', Numpad2: 'sw1', Numpad3: 'sw2',
 };
 export const UI_KEYS = { Escape: 'menu', KeyH: 'help', Slash: 'help' };
-// 기술 칸에 적는 글자 (왼손+오른손 · 방향키 벌)
-export const SLOT_KEYS = [['J', 'Z'], ['K', 'X'], ['U', 'C'], ['I', 'V']];
+// 기술 칸에 크게 적는 글자 (기본 벌) 와 같은 일을 하는 다른 벌 (도움말에만)
+export const SLOT_KEYS = ['Z', 'X', 'C', 'V'];
+export const SLOT_ALT = ['J', 'K', 'U', 'I'];
+export const DODGE_KEY = 'Shift';
+export const MOVE_HINT = '방향키';
+// 엔진이 바쁠 때 · 대기 중에 누른 키를 들고 있는 시간 (common/action_battle.BUFFER_SEC) - 대기가 이만큼(+왕복) 안 남았으면
+// 보낸다 (서버가 들고 있다가 쓴다). 그보다 많이 남았으면 안 보내고 칸만 흔든다.
+export const PRESS_GRACE = 0.25;
 
 /* 타입 색. TYPE_FX 는 이펙트의 (밝은색, 어두운색) - client/poketdesktop/battle_fx.py 의 것을 옮겼다.
    TYPE_COLOR 는 칸 · 글씨 바탕 (ui_common.TYPE_COLOR). */

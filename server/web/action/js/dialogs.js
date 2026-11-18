@@ -16,6 +16,15 @@ export function resultText(over, you) {
   return { title, why: draw && over.reason !== 'timeout' ? '' : why, mood };
 }
 
+/** 초 → '2분' · '1분 30초' · '45초' (도움말의 판 길이). */
+export function fmtLimit(sec) {
+  const n = Math.max(0, Math.round(Number(sec) || 0));
+  const m = Math.floor(n / 60);
+  const r = n % 60;
+  if (!m) return r + '초';
+  return r ? m + '분 ' + r + '초' : m + '분';
+}
+
 export class Dialogs {
   constructor(doc, onForfeit) {
     this.confirm = doc.getElementById('confirm');
@@ -26,6 +35,12 @@ export class Dialogs {
     this.confirm.querySelector('[data-no]').onclick = () => this.hide(this.confirm);
     this.result.querySelector('[data-close]').onclick = () => this.closeWindow();
     this.help.querySelector('[data-close]').onclick = () => this.hide(this.help);
+  }
+
+  /** 판 길이를 도움말에 (intro.limits). */
+  setLimits(limits) {
+    const el = this.help.querySelector('[data-fight]');
+    if (el && limits.fight > 0) el.textContent = fmtLimit(limits.fight);
   }
 
   /** 게임 키를 막는 창이 떠 있나 (도움말은 막지 않는다). */

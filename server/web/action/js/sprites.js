@@ -6,14 +6,17 @@
      - 동작마다 칸 크기가 다르다. 칸 한가운데를 같은 자리에 두고, 배율은 걷기에서 정한 하나만 쓴다
        (동작마다 맞추면 공격할 때만 작아진다).
      - 걷는 도트가 없는 종은 배틀 도트(/api/sprite) 첫 장. 배틀 도트는 왼쪽을 본다.
-     - 이로치가 고른 색(tint)은 받은 시트의 색조를 돌려 만든다 (PIL HSV 8비트 셈 그대로 - client sprite_tint). */
+     - 이로치가 고른 색(tint)은 받은 시트의 색조를 돌려 만든다 (PIL HSV 8비트 셈 그대로 - client sprite_tint).
+     - 기술을 쓸 때는 SpriteCollab 의 Attack (근접 · 돌진) · Shoot (날리기 · 부채꼴 · 상태 걸기 · 광선 쏘는 순간) ·
+       Charge (광선 · 내려찍기 · 강화 · 회복 · 방어의 준비) 를 쓴다. 없는 종(걷기만 있는 출처)은 손으로 만든 몸짓
+       (앞으로 내밀기 · 누르기/늘이기, procPose) 으로 대신한다. */
 
 // 방향 0~7 의 이름 - 서버 F.d 순서이자 도트 rowmap 의 열쇠
 const DIR_KEYS = ['down', 'downright', 'right', 'upright', 'up', 'upleft', 'left', 'downleft'];
 // 대각선 그림이 없는 시트(4방향)에서 대신 쓸 옆 방향
 const DIAG_ALT = { 1: 2, 3: 2, 5: 6, 7: 6 };
-// 걷기 말고 받아 쓰는 동작 (모든 종에 있지는 않다)
-const ANIMS = ['Idle', 'Hurt', 'Faint', 'Sleep'];
+// 걷기 말고 받아 쓰는 동작 (모든 종에 있지는 않다). 뒤의 셋은 기술 쓰는 몸짓 (서버 main.ANIM_NAMES 에 있는 것)
+const ANIMS = ['Idle', 'Hurt', 'Faint', 'Sleep', 'Attack', 'Charge', 'Shoot'];
 // 걷기밖에 없는 출처 - 다른 동작을 묻지 않는다 (서버도 ok:false 를 준다)
 const WALK_ONLY = ['follow', 'ow'];
 const HUES = [45, 90, 135, 180, 225, 270, 315];
@@ -218,6 +221,46 @@ export function animFor(have, st, moving, hurt) {
   return first('Idle');
 }
 
+// 기술의 꼴 → [준비 동안, 발동 동안] 몸짓. 없는 시트는 FALLBACK 차례로, 끝내 없으면 손으로 만든 몸짓 (PROC)
+const POSE = {
+  melee: ['Attack', 'Attack'], dash: ['Attack', 'Attack'], leap: ['Charge', 'Attack'], burst: ['Charge', 'Attack'],
+  counter: ['Charge', 'Attack'],
+  proj: ['Shoot', 'Shoot'], cone: ['Shoot', 'Shoot'], status: ['Shoot', 'Shoot'], hazard: ['Shoot', 'Shoot'],
+  beam: ['Charge', 'Shoot'], strike: ['Charge', 'Shoot'],
+  self: ['Charge', 'Charge'], heal: ['Charge', 'Charge'], guard: ['Charge', 'Charge'],
+};
+const FALLBACK = { Attack: ['Attack', 'Shoot'], Shoot: ['Shoot', 'Attack'], Charge: ['Charge'] };
+const PROC = { Attack: 'lunge', Shoot: 'shoot', Charge: 'charge' };
+
+/** 기술 쓰는 몸짓. stage 'wind' 준비 · 'act' 발동 (그 밖은 null). 모르는 꼴은 날리기로.
+    {anim: 시트 이름 | null (없으면 proc 로 그린다), loop: 준비 모으기(Charge)만 돈다, proc: 'lunge' | 'shoot' | 'charge'} */
+export function attackPose(have, kind, stage) {
+  if (stage !== 'wind' && stage !== 'act') return null;
+  const pair = POSE[kind] || POSE.proj;
+  const want = stage === 'wind' ? pair[0] : pair[1];
+  const anim = FALLBACK[want].find((n) => have.has(n)) || null;
+  return { anim, loop: anim === 'Charge', proc: PROC[want] };
+}
+
+const easeOut = (u) => 1 - (1 - u) * (1 - u);
+const unit = (u) => (u > 0 ? (u < 1 ? u : 1) : 0);
+
+/** 도트가 없을 때 손으로 만드는 몸짓. u 그 단계 진행 0~1 · t 초 (모으는 떨림).
+    {push: 겨눈 쪽으로 옮김 (아레나 단위, 뒤로 빼면 음수), along · across: 겨눈 쪽 · 그 옆으로 늘이는 배율, shake: 떨림 폭} */
+export function procPose(proc, stage, u, t = 0) {
+  u = unit(u);
+  if (proc === 'charge') {
+    const b = Math.sin(t * 20) * 0.035;
+    return { push: 0, along: 1 - 0.06 * u + b, across: 1 + 0.04 * u - b, shake: 1 + 1.5 * u };
+  }
+  if (proc === 'lunge') {
+    if (stage === 'wind') return { push: -9 * easeOut(u), along: 1 - 0.14 * u, across: 1 + 0.08 * u, shake: 0 };
+    return { push: 14 * Math.sin(Math.PI * unit(u * 1.25)), along: 1.16 - 0.16 * u, across: 0.92 + 0.08 * u, shake: 0 };
+  }
+  if (stage === 'wind') return { push: -5 * u, along: 1 - 0.1 * u, across: 1 + 0.06 * u, shake: 0 };
+  return { push: -7 * (1 - u), along: 1.12 - 0.12 * u, across: 0.94 + 0.06 * u, shake: 0 };
+}
+
 /* ---------------------------------------------------------------- 브라우저에서 받고 그리기 */
 
 async function fetchJson(url) {
@@ -311,7 +354,8 @@ export class SpriteBank {
     return (info.walk && await sheetLook(info, this.load)) || stillLook(info, this.load);
   }
 
-  /** 몸 하나. o = {x, y, d, anim, t, loop, right, alpha, k(크기 배율), wash: 덮을 색 | null}.
+  /** 몸 하나. o = {x, y, d, anim, t, loop, right, alpha, k(크기 배율), wash: 덮을 색 | null,
+      warps: [{ang, a, c}] - 몸 가운데를 두고 ang 쪽으로 a 배 · 그 옆으로 c 배 (맞아 눌림 · 기술 몸짓)}.
       (x, y) 가 몸 가운데. 배틀 도트(still)는 right 면 뒤집는다. */
   draw(ctx, look, o) {
     const sh = look.sheets[o.anim] || look.sheets.Walk;
@@ -324,6 +368,13 @@ export class SpriteBank {
     const sy = o.wash ? 0 : row * sh.fh;
     ctx.save();
     ctx.globalAlpha *= o.alpha ?? 1;
+    for (const w of o.warps || []) {
+      ctx.translate(o.x, o.y);
+      ctx.rotate(w.ang);
+      ctx.scale(w.a, w.c);
+      ctx.rotate(-w.ang);
+      ctx.translate(-o.x, -o.y);
+    }
     if (look.still && o.right) {
       ctx.translate(2 * o.x, 0);
       ctx.scale(-1, 1);

@@ -13,7 +13,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dirOf, rowFor, frameAt, skinOf, tintPixels, cellBox, lookGeometry, placeCell,
-  animUrl, spriteUrl, resolveLook, animFor,
+  animUrl, spriteUrl, resolveLook, animFor, attackPose, procPose,
 } from '../js/sprites.js';
 
 const PMD = { down: 0, downright: 1, right: 2, upright: 3, up: 4, upleft: 5, left: 6, downleft: 7 };
@@ -233,4 +233,65 @@ test('동작 고르기 - 없는 동작은 있는 것으로 대신', () => {
   assert.equal(animFor(all, 'ko', false, false), 'Faint');
   assert.equal(animFor(walkOnly, 'ko', false, false), 'Walk');
   assert.equal(animFor(all, 'stun', false, false), 'Hurt');
+});
+
+test('기술 몸짓 - 꼴마다 Attack · Shoot · Charge, 없으면 비슷한 것, 끝내 없으면 손으로 만든 몸짓', () => {
+  const all = new Set(['Walk', 'Idle', 'Attack', 'Charge', 'Shoot']);
+  const walkOnly = new Set(['Walk']);
+  const pose = (have, kind, stage) => {
+    const p = attackPose(have, kind, stage);
+    return p && [p.anim, p.loop, p.proc];
+  };
+  // 근접 · 돌진: 준비부터 Attack 한 번 (돌지 않는다)
+  assert.deepEqual(pose(all, 'melee', 'wind'), ['Attack', false, 'lunge']);
+  assert.deepEqual(pose(all, 'dash', 'act'), ['Attack', false, 'lunge']);
+  // 날리기 · 부채꼴 · 상태 걸기: Shoot
+  for (const k of ['proj', 'cone', 'status']) assert.deepEqual(pose(all, k, 'wind'), ['Shoot', false, 'shoot'], k);
+  // 광선 · 내려찍기: Charge 로 모았다가 Shoot 으로 쏜다
+  assert.deepEqual(pose(all, 'beam', 'wind'), ['Charge', true, 'charge']);
+  assert.deepEqual(pose(all, 'beam', 'act'), ['Shoot', false, 'shoot']);
+  assert.deepEqual(pose(all, 'strike', 'wind'), ['Charge', true, 'charge']);
+  // 강화 · 회복 · 방어: Charge
+  for (const k of ['self', 'heal', 'guard']) assert.deepEqual(pose(all, k, 'act'), ['Charge', true, 'charge'], k);
+  // 비슷한 것으로: Shoot 이 없으면 Attack, Attack 이 없으면 Shoot
+  assert.deepEqual(pose(new Set(['Walk', 'Attack']), 'proj', 'wind'), ['Attack', false, 'shoot']);
+  assert.deepEqual(pose(new Set(['Walk', 'Shoot']), 'melee', 'act'), ['Shoot', false, 'lunge']);
+  // Charge 는 대신하지 않는다 (치는 몸짓으로 모으면 이상하다) - 손으로
+  assert.deepEqual(pose(new Set(['Walk', 'Attack', 'Shoot']), 'heal', 'wind'), [null, false, 'charge']);
+  // 걷기만 있는 출처: 손으로 만든 몸짓
+  assert.deepEqual(pose(walkOnly, 'melee', 'wind'), [null, false, 'lunge']);
+  assert.deepEqual(pose(walkOnly, 'beam', 'act'), [null, false, 'shoot']);
+  // 모르는 꼴은 날리기로 · 준비 · 발동이 아니면 몸짓 없음
+  assert.deepEqual(pose(all, 'zzz', 'wind'), ['Shoot', false, 'shoot']);
+  assert.equal(attackPose(all, 'melee', 'rec'), null);
+  assert.equal(attackPose(all, 'melee', null), null);
+});
+
+test('손으로 만든 몸짓 - 근접은 뒤로 뺐다 내밀고, 모으기는 떨린다, 값은 늘 유한', () => {
+  const wind = procPose('lunge', 'wind', 1);
+  const hit = procPose('lunge', 'act', 0.4);
+  assert.ok(wind.push < 0 && wind.along < 1, '준비: 뒤로 빼며 눌린다');
+  assert.ok(hit.push > 0 && hit.along > 1, '발동: 앞으로 내밀며 늘어난다');
+  assert.ok(procPose('charge', 'wind', 0.5, 1.2).shake > 0);
+  assert.ok(procPose('shoot', 'act', 0).push < 0, '쏘면 살짝 밀린다');
+  for (const proc of ['lunge', 'shoot', 'charge']) {
+    for (const stage of ['wind', 'act']) {
+      for (const u of [-1, 0, 0.5, 1, 2, NaN]) {
+        const p = procPose(proc, stage, u, 3);
+        for (const v of Object.values(p)) assert.ok(Number.isFinite(v), proc + stage + u);
+        assert.ok(p.along > 0.5 && p.across > 0.5);
+      }
+    }
+  }
+});
+
+test('도트 고르기 - 기술 몸짓 (Attack · Charge · Shoot) 도 받는다', async () => {
+  const s = fakeServer({
+    '/api/anim/25/Walk.json': meta(),
+    '/api/anim/25/Attack.json': meta({ frameW: 64 }),
+    '/api/anim/25/Shoot.json': meta(),
+  });
+  const look = await resolveLook(25, { shiny: false, hue: 0 }, s.getJson);
+  assert.deepEqual(Object.keys(look.anims).sort(), ['Attack', 'Shoot']);
+  assert.ok(s.asked.includes('/api/anim/25/Charge.json'));
 });

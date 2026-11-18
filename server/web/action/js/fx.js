@@ -11,6 +11,12 @@
      drawZone(ctx, z, now)   장판 Z (now = 보간된 서버 시각)
      drawUnder / drawOver    몸 아래 · 위
      shake()                 화면 흔들림 {x, y}
+     zoom()                  화면이 다가간 정도 {k (1 ~ 1.03), x, y} - 급소 · 효과 굉장 · 쓰러짐
+     hitstop                 맞는 순간의 멈춤 (feel.HitStop) - render 가 같은 것을 읽어 몸 도트 · 자리를 같은 길이로 멈춘다
+     prewind(side, ty)       누르자마자 (서버의 cast 전) 몸에 작게 모이는 빛 - cast 가 오면 넘겨받는다 (두 번 모이지 않게)
+
+   데미지 숫자. 내가 맞으면 정확한 데미지 (hit.dmg), 상대가 맞으면 최대 체력의 % (hit.pct - main 이 hpr 이 줄어든 만큼을
+   적는다). 상성으로 색 · 크기, 급소면 '급소!' 띠. 같은 쪽이 잇달아 맞으면 숫자 하나에 더해 다시 튀긴다.
 
    파일 나눔.
      fx.js                   이 Fx (이벤트 · 움직이는 그림 · 글씨 · 흔들림) - 바깥은 이 파일만 부른다
@@ -41,6 +47,7 @@ import {
 import { FIRES, paintZone, shapeZone } from './fx/zones.js';
 import { STYLE_KEYS, hookOf, styleDef } from './fx/styles/index.js';
 import { AURA } from './fx/styles/body.js';
+import { HitStop, STOP_MAX, damageLabel, hitstopSec, isChip, mergeTarget } from './feel.js';
 
 export { POOL_MAX, Particles };
 
@@ -62,6 +69,11 @@ const MAX_DT = 0.1;              // 탭을 오래 비웠다 돌아와도 입자�
 const SHAKE_MAX = 16;            // 흔들림 최대 (아레나 단위). 세기(trauma 0~1)의 제곱에 비례
 const SHAKE_DECAY = 1.6;         // 세기가 1초에 줄어드는 양
 const HITSTOP_SLOW = 0.08;       // 맞는 순간 이펙트 시간을 이만큼으로 늦춘다 (판은 서버 것이라 그대로)
+const PUNCH_MAX = 0.03;          // 화면이 다가가는 배율 (급소 · 효과 굉장 · 쓰러짐)
+const PUNCH_IN = 0.05;           // 다가가는 데 (초)
+const PUNCH_OUT = 0.28;          // 돌아오는 데 (초)
+const PRE_SEC = 0.25;            // 누르자마자 그리는 준비 빛 - 이 안에 서버의 cast 가 안 오면 사그라든다
+const PRE_FADE = 0.12;
 const FLASH_DECAY = 1.8;
 const FLASH_PAD = 60;            // 흔들려도 가장자리가 비지 않게
 
@@ -87,8 +99,9 @@ const RUSH_V = 500;              // 이보다 빠르면 (u/s) 달리기 시작�
 const RUSH_GAP = 8;              // 지나온 자리 점 간격
 const STY_MAX = 32;              // (쪽, 기술) → 모양 키를 기억하는 수
 
-const TEXT_LIFT = 64;            // 글씨는 몸 위 이만큼에서 시작한다
-const TEXT_GAP = 30;             // 같은 쪽 글씨끼리 적어도 이만큼 띄운다
+const TEXT_LIFT = 90;            // 글씨는 몸 위 이만큼에서 시작한다 (머리 위 이름 · 체력 막대 위 - 깎이는 막대를 가리지 않게)
+const CONTACT = 18;              // 맞은 번쩍임은 몸 가운데가 아니라 때린 쪽으로 이만큼 (몸이 하얗게 · 붉게 번쩍이는 것이 보이게)
+const TEXT_GAP = 30;             // 같은 쪽 글씨끼리 적어도 이만큼 띄운다 (큰 숫자는 제 크기만큼)
 const TEXT_UP = 70;              // 처음 떠오르는 빠르기 (u/s) - 점점 느려진다
 const TEXT_DRAG = 2.5;
 const MERGE_SEC = 0.5;           // 같은 말이 이 안에 또 오면 하나로
@@ -189,6 +202,12 @@ const ANIMS = {
     ctx.globalCompositeOperation = 'lighter';
     ring(ctx, a.c.light, 0.25 + 0.6 * t, 2 + 3 * t, a.x, a.y, (64 * (1 - t) + 14) * a.k);
     fx.ink.core(ctx, a.c.light, a.x, a.y, (10 + 24 * t) * a.k, 0.4 + 0.6 * t);
+  } },
+  pre: { layer: 1, draw(fx, ctx, a) {         // 누르자마자 (서버가 받기 전) - 몸에 작게 모이는 빛. cast 가 오면 넘겨준다
+    const u = clamp01(a.age / PRE_SEC), fade = a.age > PRE_SEC ? 1 - clamp01((a.age - PRE_SEC) / PRE_FADE) : 1;
+    ctx.globalCompositeOperation = 'lighter';
+    ring(ctx, a.c.light, 0.5 * fade, 2.5, a.x, a.y, 46 - 22 * u);
+    fx.ink.core(ctx, a.c.light, a.x, a.y, 12 + 12 * u, (0.35 + 0.4 * u) * fade);
   } },
   rush: { layer: 1, tick: rushTick, draw: rushDraw },
   trail: { layer: 1, tick: trailTick },
@@ -334,37 +353,54 @@ const STATUS_LOOK = {
   seed: [COLORS.GRASS, 'leaf'], trap: [COLORS.GROUND, 'pebble'], flinch: [PLAIN, 'spark'], scr: [SCREEN, 'glint'],
 };
 
+// 맞은 숫자: 내가 맞으면 정확한 데미지, 상대가 맞으면 최대 체력의 % (상대 체력은 비율만 온다 - main 이 pct 를 적는다)
+function numberOf(fx, ev) {
+  if (fx.mine(ev.v) && Number.isFinite(ev.dmg)) return { value: ev.dmg, unit: '' };
+  if (Number.isFinite(ev.pct) && ev.pct > 0) return { value: ev.pct, unit: '%' };
+  return null;
+}
+
 function onHit(fx, ev) {
   const at = fx.at(ev, ev.v), c = colorsOf(ev.ty), crit = !!ev.crit, me = fx.mine(ev.v);
   const eff = Number.isFinite(ev.eff) ? ev.eff : 1;
-  if (Number.isFinite(ev.dmg)) fx.say(ev.v, at, String(Math.round(ev.dmg)), LOOK.dmg);
+  const chip = isChip(ev), pct = Number.isFinite(ev.pct) ? ev.pct : null;
+  const shown = eff === 0 ? null : numberOf(fx, ev);
   if (eff === 0) {                              // 막혔다 - 작게 튕기기만
     fx.burst(at.x, at.y, FIZZLE, PLAIN, 1);
     fx.say(ev.v, at, '효과가 없다', LOOK.none);
     return;
   }
   const k = eff > 1 ? 1.35 : eff < 1 ? 0.75 : 1;
-  const a = fx.anim('impact', null, at, 0, c, '', IMPACT_SEC);
+  // 번쩍임 · 고리 · 조각은 닿은 자리 (때린 쪽 몸 가장자리). 멈춤 동안 이펙트 시간이 거의 서므로 가운데에 크게 두면
+  // 맞은 몸 (하얗게 → 붉게 · 눌림) 이 안 보인다
+  const from = chip ? null : fx.pos(ev.w), d = from ? Math.hypot(from.x - at.x, from.y - at.y) : 0;
+  const hit = d > 1 ? { x: at.x + ((from.x - at.x) / d) * CONTACT, y: at.y + ((from.y - at.y) / d) * CONTACT } : at;
+  const a = fx.anim('impact', null, hit, 0, c, '', IMPACT_SEC);
   a.k = k;
   a.crit = crit;
-  fx.spawn('core', at.x, at.y, 0, 0, 0.16, 40 * k, c.light).size1 = 70 * k;
-  fx.wave(at.x, at.y, c.light, 90 * k, 0.32, 8);
-  fx.wave(at.x, at.y, c.dark, 60 * k, 0.4, 5);
-  fx.burst(at.x, at.y, debrisSpec(null, ev.ty), c, k);
-  fx.burst(at.x, at.y, DEBRIS.spark, SHINE, 0.6 * k);
-  if (crit) fx.burst(at.x, at.y, DEBRIS.spark, GOLDEN, 1);
-  // 세게 맞을수록 · 내가 맞을수록 크게 흔들리고 오래 멈춘다
-  fx.kick(0.14 * k + (crit ? 0.1 : 0) + (me ? 0.12 : 0), eff > 1 || crit ? 0.085 : 0.045,
-    me ? 0.14 : eff > 1 ? 0.08 : 0, me ? HURT : WHITE);
+  fx.spawn('core', hit.x, hit.y, 0, 0, 0.16, 26 * k, c.light).size1 = 56 * k;
+  fx.wave(hit.x, hit.y, c.light, 90 * k, 0.32, 8);
+  fx.wave(hit.x, hit.y, c.dark, 60 * k, 0.4, 5);
+  fx.burst(hit.x, hit.y, debrisSpec(null, ev.ty), c, k);
+  fx.burst(hit.x, hit.y, DEBRIS.spark, SHINE, 0.6 * k);
+  if (crit) fx.burst(hit.x, hit.y, DEBRIS.spark, GOLDEN, 1);
+  // 세게 맞을수록 오래 멈춘다 (멈춤은 render 와 같은 하나 - feel.hitstopSec). 흔들림은 내가 맞으면 크게, 내가 때리면 작게.
+  // 저절로 깎이는 것(독 · 반동)은 멈추지 않고 살짝만
+  const p = pct ?? 8, big = eff > 1 || crit;
+  const shake = chip ? 0.05 : me ? 0.26 + 0.012 * Math.min(p, 40) + (big ? 0.12 : 0) : 0.08 + 0.004 * Math.min(p, 40) + (big ? 0.06 : 0);
+  fx.kick(shake, chip ? 0 : hitstopSec({ pct: p, eff, crit }), chip ? 0 : me ? 0.14 : eff > 1 ? 0.08 : 0, me ? HURT : WHITE);
+  if (big && !chip) fx.punch(0.02, at.x, at.y);
   if (eff > 1) fx.say(ev.v, at, '효과가 굉장했다!', LOOK.great);
   else if (eff < 1) fx.say(ev.v, at, '효과가 별로인 듯하다…', LOOK.weak);
-  if (crit) fx.say(ev.v, at, '급소!', LOOK.crit);
+  if (crit && !shown) fx.say(ev.v, at, '급소!', LOOK.crit);   // 숫자가 있으면 숫자에 붙는다
+  // 숫자는 효과 글씨 다음에 - 새 글씨가 아래(몸 가까이)에 오므로 숫자가 몸 바로 위, 효과 글씨가 그 위
+  if (shown) fx.number(ev.v, at, shown.value, shown.unit, eff, crit, me);
   // 모양의 덧그림 - hit 에는 sty 가 없으므로 cast 때 기억한 (쪽, 기술) 의 것
   const sty = typeof ev.sty === 'string' ? ev.sty : fx.styOf(ev.w, ev.k);
   const hook = sty !== undefined ? styleDef(sty).impact : null;
   if (hook) {
-    const from = fx.pos(ev.w), ang = from ? Math.atan2(at.y - from.y, at.x - from.x) : 0;
-    hook(fx, at.x, at.y, Number.isFinite(ang) ? ang : 0, c,
+    const src = fx.pos(ev.w), ang = src ? Math.atan2(at.y - src.y, at.x - src.x) : 0;
+    hook(fx, hit.x, hit.y, Number.isFinite(ang) ? ang : 0, c,
       { why: 'hit', k: ev.k, ty: ev.ty, sty, eff, crit, s: k, r: 0, len: 0 });
   }
 }
@@ -387,7 +423,15 @@ const ON = {
   cast(fx, ev) {
     const at = fx.at(ev, ev.w), ang = Number.isFinite(ev.ang) ? ev.ang : fx.aim(ev.w, at);
     fx.remember(ev.w, ev.k, ev.sty);
+    // 누르자마자 그린 준비 빛이 있으면 넘겨받는다 - 새 준비 빛은 그만큼 지난 데서 시작한다 (두 번 모이지 않게)
+    const pre = fx.claimPre(ev.w), from = fx.anims.length;
     (own(CAST, ev.kind) || CAST.proj)(fx, ev, at, colorsOf(ev.ty), ang);
+    if (pre > 0) {
+      for (let i = from; i < fx.anims.length; i++) {
+        const a = fx.anims[i];
+        if (a.kind === 'charge') a.age = Math.min(pre, a.life * 0.6);
+      }
+    }
   },
   hit: onHit,
   clash(fx, ev) {                               // 힘겨루기 - 흰 섬광 + 흰 · 금 고리
@@ -454,7 +498,8 @@ const ON = {
     fx.anim('ko', null, at, 0, PLAIN, '', KO_SEC);
     fx.burst(at.x, at.y, PUFF, SOOT, 1.4, 0, TAU, 0, 30);
     fx.burst(at.x, at.y, DEBRIS.glint, SHINE, 1.2);
-    fx.kick(0.4, 0.12, 0.18, fx.mine(ev.w) ? HURT : WHITE);
+    fx.kick(fx.mine(ev.w) ? 0.45 : 0.3, STOP_MAX, 0.18, fx.mine(ev.w) ? HURT : WHITE);
+    fx.punch(PUNCH_MAX, at.x, at.y);
   },
   phase(fx, ev) {
     if (ev.ph === 'fight') fx.kick(0, 0, 0.12);
@@ -468,10 +513,21 @@ const ON = {
 // ---------------------------------------------------------------- 글씨
 // px 글씨 크기 · life 초 · pop 처음 커지는 배율 · merge 같은 말이 잇달아 오면 하나로 (데미지 숫자는 하나씩)
 function look(px, fill, edge, life, pop, merge = true) {
-  return { font: `800 ${px}px ${FONT}`, fill, edge, lw: Math.max(3, px / 7), life, pop, merge };
+  return { font: `800 ${px}px ${FONT}`, px, fill, edge, lw: Math.max(3, px / 7), life, pop, merge };
 }
+// 데미지 숫자 - 상성으로 색 · 크기 (효과 굉장 주황 금색 크게 · 별로 회색 작게). 내가 맞은 숫자는 테두리가 붉다
+const NUM_LIFE = 1.0;
+const NUM = {
+  great: [56, '#ffb22e'], plain: [44, WHITE], weak: [32, '#b9c1d1'],
+};
+const NUM_EDGE = { me: '#8c0f24', foe: '#17121f', weak: '#1c2333' };
+function numberLook(eff, me) {
+  const [px, fill] = eff > 1 ? NUM.great : eff < 1 ? NUM.weak : NUM.plain;
+  return look(px, fill, eff < 1 ? NUM_EDGE.weak : me ? NUM_EDGE.me : NUM_EDGE.foe, NUM_LIFE, 0.32, false);
+}
+const BADGE_FONT = `800 15px ${FONT}`;
+
 const LOOK = {
-  dmg: look(40, WHITE, '#a3102a', 0.9, 0.7, false),
   great: look(28, GOLD, '#5a2a00', 1.2, 0.5),
   weak: look(24, '#c8d2e6', '#1c2333', 1.1, 0.3),
   none: look(24, '#a6acb8', '#1c2333', 1.1, 0.3),
@@ -495,9 +551,18 @@ export class Fx {
     this.clock = 0;                             // 이펙트 시계 (초) - 깜박임 · 흔들림
     this.dt = 0;                                // 마지막 update 의 dt - 탄 꼬리 입자 수를 맞춘다
     this.trauma = 0;                            // 흔들림 세기 0~1
-    this.stop = 0;                              // 남은 멈춤 (초)
+    // 맞는 순간의 멈춤 - render 도 이것 하나를 본다 (몸 도트 · 자리를 같은 길이로 멈춘다). opts.hitstop 으로 넘겨받을 수 있다
+    this.hitstop = opts.hitstop || new HitStop();
     this.flash = 0;
     this.flashColor = WHITE;
+    this.punchK = 0;                            // 화면이 다가간 배율 (0 ~ PUNCH_MAX)
+    this.punchAge = Infinity;
+    this.punchAt = { x: ARENA_W / 2, y: ARENA_H / 2 };
+  }
+
+  /** 남은 멈춤 (초) - 옛 이름. */
+  get stop() {
+    return this.hitstop.left;
   }
 
   // ------------------------------------------------ 바깥에서 부르는 것
@@ -511,8 +576,9 @@ export class Fx {
     dt = dt > 0 ? Math.min(dt, MAX_DT) : 0;
     this.clock += dt;
     this.dt = dt;
-    const t = this.stop > 0 ? dt * HITSTOP_SLOW : dt;
-    this.stop = Math.max(0, this.stop - dt);
+    const t = this.hitstop.active ? dt * HITSTOP_SLOW : dt;
+    this.hitstop.update(dt);
+    this.punchAge += dt;
     this.trauma = Math.max(0, this.trauma - dt * SHAKE_DECAY);
     this.flash = Math.max(0, this.flash - dt * FLASH_DECAY);
     this.parts.update(t);
@@ -571,6 +637,14 @@ export class Fx {
       x: m * (Math.sin(t * 71) * 0.6 + Math.sin(t * 43 + 1.7) * 0.4),
       y: m * (Math.sin(t * 59 + 0.6) * 0.6 + Math.sin(t * 37 + 2.9) * 0.4),
     };
+  }
+
+  /** 화면이 다가간 정도 {k: 배율 (1 ~ 1 + PUNCH_MAX), x, y: 다가가는 점}. render 가 흔들림과 같이 건다. */
+  zoom() {
+    const a = this.punchAge;
+    if (!(this.punchK > 0) || a >= PUNCH_IN + PUNCH_OUT) return { k: 1, x: this.punchAt.x, y: this.punchAt.y };
+    const e = a < PUNCH_IN ? easeOut(a / PUNCH_IN) : 1 - easeOut((a - PUNCH_IN) / PUNCH_OUT);
+    return { k: 1 + this.punchK * clamp01(e), x: this.punchAt.x, y: this.punchAt.y };
   }
 
   /** 지금 살아 있는 것의 수 (검사 · 디버그). */
@@ -683,14 +757,66 @@ export class Fx {
     this.texts.push({ s, side, x: at.x, y: at.y - TEXT_LIFT, vy: -TEXT_UP, age: 0, look, fill });
   }
 
+  /** 데미지 숫자. 같은 쪽이 MERGE_SEC 안에 또 맞으면 (여러 번 치는 기술) 있던 숫자에 더해 다시 튀긴다 - 쌓이지 않는다.
+      unit '' 정확한 데미지 (내가 맞았을 때) · '%' 최대 체력의 % (상대가 맞았을 때). 급소면 숫자에 '급소!' 가 붙는다. */
+  number(side, at, value, unit, eff, crit, me) {
+    const same = mergeTarget(this.texts, side, unit);
+    if (same) {
+      same.value += value;
+      same.crit = same.crit || crit;
+      same.eff = Math.max(same.eff, eff);
+      same.hits += 1;
+      same.look = numberLook(same.eff, same.me);
+      same.fill = same.look.fill;
+      same.s = damageLabel(same.value, unit);
+      same.age = 0;
+      same.vy = Math.min(same.vy, -TEXT_UP * 0.4);
+      return same;
+    }
+    if (this.texts.length >= TEXT_MAX) this.texts.shift();
+    const lk = numberLook(eff, me);
+    const t = { s: damageLabel(value, unit), side, x: at.x, y: at.y - TEXT_LIFT, vy: -TEXT_UP, age: 0, look: lk, fill: lk.fill,
+      num: true, unit, value, eff, crit, me, hits: 1 };
+    this.texts.push(t);
+    return t;
+  }
+
   // 흔들림 · 멈춤 · 화면 번쩍
   kick(shake, stop = 0, flash = 0, color = WHITE) {
     this.trauma = Math.min(1, this.trauma + shake);
-    this.stop = Math.max(this.stop, stop);
+    this.hitstop.kick(stop);
     if (flash > this.flash) {
       this.flash = flash;
       this.flashColor = color;
     }
+  }
+
+  /** 화면이 (x, y) 쪽으로 살짝 다가갔다 돌아온다 (k 는 PUNCH_MAX 까지). 더 센 것이 오면 새로 시작한다. */
+  punch(k, x, y) {
+    const cur = this.zoom().k - 1;
+    if (!(k > cur)) return;
+    this.punchK = Math.min(PUNCH_MAX, k);
+    this.punchAge = 0;
+    this.punchAt = { x: num(x, ARENA_W / 2), y: num(y, ARENA_H / 2) };
+  }
+
+  /** 누르자마자 (서버의 cast 가 오기 전) 내 몸에 작게 모이는 빛. PRE_SEC 안에 cast 가 오면 claimPre 가 넘겨받는다. */
+  prewind(side, ty) {
+    this.claimPre(side);
+    const p = this.pos(side) || { x: ARENA_W / 2, y: ARENA_H / 2 };
+    this.anim('pre', side, p, 0, colorsOf(ty), '', PRE_SEC + PRE_FADE);
+  }
+
+  /** side 의 누르자마자 빛을 끝내고 그 나이를 돌려준다 (없으면 0). */
+  claimPre(side) {
+    let age = 0;
+    for (const a of this.anims) {
+      if (a.kind !== 'pre' || a.side !== side || a.age >= a.life) continue;
+      if (a.age <= PRE_SEC) age = Math.max(age, a.age);
+      a.life = a.age;                           // tickAnims 가 다음 장에 지운다 (그리기도 멈춘다)
+      a.gone = true;
+    }
+    return age;
   }
 
   // ------------------------------------------------ 탄 · 장판 기록 (칸은 fx/core.js 맨 위)
@@ -815,20 +941,24 @@ export class Fx {
       this.texts[n++] = t;
     }
     this.texts.length = n;
-    // 같은 쪽 글씨는 새것부터 아래에서 위로, TEXT_GAP 씩 띄운다 (늦게 뜬 것이 빨리 올라와도 겹치지 않게)
+    // 같은 쪽 글씨는 새것부터 아래에서 위로, 적어도 TEXT_GAP (큰 숫자는 두 글씨 크기만큼) 씩 띄운다
+    // (늦게 뜬 것이 빨리 올라와도 겹치지 않게)
     const floor = this.textFloor;
     floor.clear();
     for (let i = n - 1; i >= 0; i--) {
       const t = this.texts[i], below = floor.get(t.side);
-      if (below !== undefined && t.y > below - TEXT_GAP) t.y = below - TEXT_GAP;
-      floor.set(t.side, t.y);
+      if (below !== undefined) {
+        const gap = Math.max(TEXT_GAP, (below.px + t.look.px) * 0.5);
+        if (t.y > below.y - gap) t.y = below.y - gap;
+      }
+      floor.set(t.side, { y: t.y, px: t.look.px });
     }
   }
 
   drawAnims(ctx, layer) {
     for (const a of this.anims) {
       const { draw, layer: at } = ANIMS[a.kind];
-      if (!draw || at !== layer || a.age < a.delay) continue;
+      if (!draw || at !== layer || a.age < a.delay || a.gone) continue;
       const p = a.side ? this.pos(a.side) : null;   // 몸을 따라간다
       if (p) {
         a.x = p.x;
@@ -848,7 +978,10 @@ export class Fx {
     ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';
     for (const t of this.texts) {
-      const k = t.age / t.look.life, sc = k < POP_K ? 1 + t.look.pop * (1 - k / POP_K) : 1;
+      const k = t.age / t.look.life;
+      // 숫자는 통통 튄다 (커졌다 줄며 한두 번 출렁) - 합쳐질 때마다 나이가 0 이 되어 다시 튄다
+      const sc = t.num ? 1 + t.look.pop * Math.exp(-t.age * 11) * Math.cos(t.age * 26)
+        : k < POP_K ? 1 + t.look.pop * (1 - k / POP_K) : 1;
       ctx.save();
       ctx.translate(t.x, t.y);
       ctx.scale(sc, sc);
@@ -859,8 +992,26 @@ export class Fx {
       ctx.strokeText(t.s, 0, 0);
       ctx.fillStyle = t.fill;
       ctx.fillText(t.s, 0, 0);
+      if (t.num && t.crit) this.drawBadge(ctx, t);
       ctx.restore();
     }
+  }
+
+  // 숫자 오른쪽 위에 붙는 '급소!' 띠 (글자 폭은 어림 - 숫자는 글자 크기의 0.6 쯤)
+  drawBadge(ctx, t) {
+    const px = t.look.px, w = 52, h = 22, x = t.s.length * px * 0.3 + 4, y = -px * 0.5 - h / 2;
+    ctx.beginPath();
+    ctx.arc(x + h / 2, y + h / 2, h / 2, Math.PI / 2, Math.PI * 1.5);
+    ctx.arc(x + w - h / 2, y + h / 2, h / 2, -Math.PI / 2, Math.PI / 2);
+    ctx.closePath();
+    ctx.fillStyle = GOLD;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#6a1a00';
+    ctx.stroke();
+    ctx.font = BADGE_FONT;
+    ctx.fillStyle = '#3a1400';
+    ctx.fillText('급소!', x + w / 2, y + h / 2 + 1);
   }
 
   drawFlash(ctx) {

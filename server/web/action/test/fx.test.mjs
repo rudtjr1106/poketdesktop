@@ -21,6 +21,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Fx, Particles, STYLES, POOL_MAX, charge } from '../js/fx.js';
 import { TYPE_FX } from '../js/consts.js';
+import { HitStop } from '../js/feel.js';
 
 // 계획 (design-notes/2026-11-18-action-battle-plan.md) 의 STYLES · KINDS · Z.kind
 const PLAN_STYLES = ['orb', 'flame', 'jet', 'zap', 'leaf', 'shard', 'psy', 'rock', 'ghost', 'dark', 'fairy',
@@ -460,7 +461,7 @@ test('맞음: 효과 글씨 · 급소 · 데미지 숫자', () => {
   assert.deepEqual(said({ ...hit, v: 'a', dmg: 37, crit: true }), ['37', '급소!']);
 });
 
-test('글씨: 같은 말은 하나로, 다른 글씨는 겹치지 않게 쌓는다', () => {
+test('글씨: 같은 말 · 잇단 숫자는 하나로, 다른 글씨는 겹치지 않게 쌓는다', () => {
   const { fx } = newFx();
   const world = makeWorld('b');
   const hit = { e: 'hit', w: 'a', v: 'b', ty: 'FIRE', hpr: 500, eff: 2, crit: false, dmg: 10, x: 1200, y: 450 };
@@ -468,7 +469,14 @@ test('글씨: 같은 말은 하나로, 다른 글씨는 겹치지 않게 쌓는�
     fx.event(hit, world);
     fx.update(0.05);
   }
-  assert.equal(fx.counts().texts, 4, '숫자 셋 + 효과 글씨 하나');
+  assert.equal(fx.counts().texts, 2, '여러 번 친 숫자는 하나 (10 → 20 → 30) + 효과 글씨 하나');
+  assert.ok(fx.texts.some((t) => t.num && t.s === '30' && t.hits === 3), JSON.stringify(fx.texts.map((t) => t.s)));
+  // 떨어져 맞으면 (합치는 때가 지나면) 숫자가 따로 뜨고, 서로 겹치지 않게 쌓인다
+  for (let i = 0; i < 3; i++) {
+    for (let f = 0; f < 40; f++) fx.update(1 / 60);
+    fx.event({ ...hit, eff: [1, 0.5, 2][i] }, world);
+  }
+  assert.ok(fx.texts.filter((t) => t.num).length >= 2, '숫자가 따로');
   for (let f = 0; f < 60; f++) {
     fx.update(1 / 60);
     const ctx = new RecCtx();
@@ -477,6 +485,112 @@ test('글씨: 같은 말은 하나로, 다른 글씨는 겹치지 않게 쌓는�
     assert.equal(ys.length, fx.counts().texts);
     for (let i = 1; i < ys.length; i++) assert.ok(ys[i] - ys[i - 1] >= 30 - 1e-9, `겹친다: ${ys}`);
   }
+});
+
+test('데미지 숫자: 상대가 맞으면 %, 내가 맞으면 정확한 수 - 상성으로 색 · 크기, 급소는 띠', () => {
+  const nums = (ev, you) => {
+    const { fx } = newFx();
+    fx.event(ev, makeWorld(you));
+    return fx.texts.filter((t) => t.num);
+  };
+  const hit = { e: 'hit', w: 'a', v: 'b', k: 'X', ty: 'FIRE', hpr: 500, eff: 1, crit: false, x: 1200, y: 450 };
+  // 때린 쪽(a): 상대 체력은 비율만 - main 이 적은 pct 로 '%'
+  const mine = nums({ ...hit, pct: 12.4 }, 'a');
+  assert.deepEqual(mine.map((t) => t.s), ['12%']);
+  assert.equal(nums({ ...hit, pct: 0.2 }, 'a')[0].s, '1%', '깎였으면 적어도 1%');
+  assert.deepEqual(nums({ ...hit, dmg: 33 }, 'a'), [], '상대의 정확한 데미지는 (와도) 안 쓴다');
+  // 맞은 쪽(b): 정확한 데미지
+  assert.deepEqual(nums({ ...hit, dmg: 33, pct: 12 }, 'b').map((t) => t.s), ['33']);
+  // 상성: 굉장 크고 주황 금색 · 별로 작고 회색
+  const [great] = nums({ ...hit, pct: 30, eff: 2 }, 'a');
+  const [plain] = nums({ ...hit, pct: 30 }, 'a');
+  const [weak] = nums({ ...hit, pct: 30, eff: 0.5 }, 'a');
+  assert.ok(great.look.px > plain.look.px && plain.look.px > weak.look.px);
+  assert.notEqual(great.fill, plain.fill);
+  assert.notEqual(weak.fill, plain.fill);
+  // 급소: 숫자에 '급소!' 띠가 붙는다 (따로 뜨는 글씨가 아니다)
+  const { fx } = newFx();
+  fx.event({ ...hit, pct: 20, crit: true }, makeWorld('a'));
+  fx.update(0.02);
+  const ctx = new RecCtx();
+  fx.drawOver(ctx);
+  assert.deepEqual(ctx.texts, ['20%', '급소!']);
+  assert.equal(fx.counts().texts, 1);
+  // 막혔으면 숫자 없음
+  assert.deepEqual(nums({ ...hit, pct: 10, eff: 0 }, 'a'), []);
+});
+
+test('맞음: 멈춤은 render 와 같은 하나 (feel.hitstopSec) - 세게 · 급소 · 효과 굉장일수록 길게, 저절로 깎이는 것은 안 멈춘다', () => {
+  const stopOf = (ev, you = 'a') => {
+    const { fx } = newFx();
+    fx.event(ev, makeWorld(you));
+    return fx.hitstop.left;
+  };
+  const hit = { e: 'hit', w: 'a', v: 'b', k: 'X', ty: 'FIRE', hpr: 500, eff: 1, crit: false, x: 1200, y: 450 };
+  const small = stopOf({ ...hit, pct: 3 }), big = stopOf({ ...hit, pct: 30 }), crit = stopOf({ ...hit, pct: 30, eff: 2, crit: true });
+  assert.ok(small >= 0.05 - 1e-9 && small < big && big < crit && crit <= 0.11 + 1e-9, [small, big, crit].join(' '));
+  assert.equal(stopOf({ ...hit, pct: 30, eff: 0 }), 0, '막혔다');
+  assert.equal(stopOf({ ...hit, w: 'b', v: 'b', k: 'LIFEORB', pct: 10 }), 0, '반동');
+  assert.equal(stopOf({ ...hit, w: 'b', v: 'b', k: 'brn', pct: 6 }), 0, '화상');
+  assert.equal(stopOf({ e: 'ko', w: 'b', i: 0 }), 0.11, '쓰러뜨리면 가장 길게');
+  // 넘겨받은 멈춤을 쓴다 (render 와 하나)
+  const shared = new HitStop();
+  const fx = new Fx({ canvas: null, hitstop: shared });
+  fx.event({ ...hit, pct: 20 }, makeWorld('a'));
+  assert.ok(shared.active && shared.left === fx.hitstop.left);
+  fx.update(0.2);
+  assert.equal(shared.active, false);
+});
+
+test('맞음: 내가 맞으면 크게, 내가 때리면 작게 흔들린다 · 급소 · 효과 굉장 · 쓰러짐은 화면이 살짝 다가간다', () => {
+  const peak = (ev, you) => {
+    const { fx } = newFx();
+    fx.event(ev, makeWorld(you));
+    let m = 0, z = 1;
+    for (let f = 0; f < 30; f++) {
+      fx.update(1 / 60);
+      const s = fx.shake();
+      m = Math.max(m, Math.hypot(s.x, s.y));
+      z = Math.max(z, fx.zoom().k);
+    }
+    return { shake: m, zoom: z };
+  };
+  const hit = { e: 'hit', w: 'a', v: 'b', k: 'X', ty: 'FIRE', hpr: 500, eff: 1, crit: false, pct: 15, x: 1200, y: 450 };
+  const dealt = peak(hit, 'a'), taken = peak({ ...hit, w: 'b', v: 'a', dmg: 40 }, 'a');
+  assert.ok(taken.shake > dealt.shake * 2, `맞으면 ${taken.shake} · 때리면 ${dealt.shake}`);
+  assert.equal(dealt.zoom, 1, '보통 맞음은 다가가지 않는다');
+  const crit = peak({ ...hit, crit: true }, 'a').zoom, ko = peak({ e: 'ko', w: 'b', i: 0, x: 1200, y: 450 }, 'a').zoom;
+  assert.ok(crit > 1 && crit <= 1.03 + 1e-9, String(crit));
+  assert.ok(ko > 1 && ko <= 1.03 + 1e-9, String(ko));
+  const { fx } = newFx();
+  fx.event({ ...hit, eff: 2 }, makeWorld('a'));
+  for (let f = 0; f < 40; f++) fx.update(1 / 60);
+  assert.equal(fx.zoom().k, 1, '돌아온다');
+});
+
+test('누르자마자 준비 빛: cast 가 오면 넘겨받고 (두 번 모이지 않게), 안 오면 0.25초 뒤 사그라든다', () => {
+  const { fx } = newFx();
+  const world = makeWorld('a');
+  fx.event({ e: 'phase', ph: 'fight' }, world);
+  fx.prewind('a', 'FIRE');
+  assert.equal(fx.anims.filter((a) => a.kind === 'pre').length, 1);
+  for (let f = 0; f < 6; f++) fx.update(1 / 60);
+  fx.event({ e: 'cast', w: 'a', m: 0, k: 'EMBER', kind: 'proj', ty: 'FIRE', sty: 'flame', x: 400, y: 450, ang: 0 }, world);
+  const charge = fx.anims.find((a) => a.kind === 'charge');
+  assert.ok(charge && charge.age > 0.05, '준비 빛이 처음부터 다시 시작하지 않는다 (' + (charge && charge.age) + ')');
+  fx.update(1 / 60);
+  assert.equal(fx.anims.filter((a) => a.kind === 'pre').length, 0, '누르자마자 빛은 끝난다');
+  // 안 오면
+  const lone = newFx().fx;
+  lone.event({ e: 'phase', ph: 'fight' }, world);
+  lone.prewind('a', 'WATER');
+  for (let f = 0; f < 12; f++) lone.update(1 / 60);
+  assert.equal(lone.anims.filter((a) => a.kind === 'pre').length, 1, '0.25초 안');
+  for (let f = 0; f < 20; f++) lone.update(1 / 60);
+  assert.equal(lone.anims.filter((a) => a.kind === 'pre').length, 0, '사그라든다');
+  const ctx = new RecCtx();
+  lone.prewind('b', 'ZZZ');
+  frame(lone, ctx);
 });
 
 test('능력 랭크: 단계만큼 화살이 늘고 크기는 그대로', () => {
