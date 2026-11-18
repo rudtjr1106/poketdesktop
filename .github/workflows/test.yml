@@ -174,7 +174,8 @@ jobs:
       - name: 액션 배틀 웹 화면 (node)
         run: |
           node --test server/web/action/test/
-          for f in server/web/action/js/*.js; do node --check "$f"; done
+          for f in server/web/action/js/*.js server/web/action/js/fx/*.js server/web/action/js/fx/styles/*.js \
+                   server/web/action/dev/*.js; do node --check "$f"; done
       # 게으름·독치장 같은 특성과 역린류·2턴 기술, 속이기의 '첫 턴에만'.
       - name: 특성·턴제 기술 (엔진)
         run: python common/test_new_abilities.py

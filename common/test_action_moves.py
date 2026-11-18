@@ -129,7 +129,19 @@ def named():
         and AM.kit(DEX, "SHADOWBALL")["speed"] < AM.kit(DEX, "DARKPULSE")["speed"])
     chk("센 기술일수록 대기가 길다", AM.kit(DEX, "HYDROPUMP")["cd"] > AM.kit(DEX, "WATERGUN")["cd"])
     chk("돌진은 길게 달린다", AM.kit(DEX, "EXTREMESPEED")["range"] > AM.kit(DEX, "QUICKATTACK")["range"] >= 300)
-    chk("근접은 짧게 파고든다", AM.kit(DEX, "TACKLE")["range"] <= 100)
+    melee = [k for k in sorted(DEX.moves) if AM.kit(DEX, k)["kind"] == "melee"]
+    off = [(k, AM.kit(DEX, k)["range"], AM.kit(DEX, k)["w"]) for k in melee
+           if not (160 <= AM.kit(DEX, k)["range"] <= 240 and AM.kit(DEX, k)["w"] == AM.MELEE_W)]
+    chk("근접은 앞으로 달려들며 친다: 거리 160~240 · 너비 %d (%d개)" % (AM.MELEE_W, len(melee)), melee and not off,
+        off[:5])
+    chk("센 근접일수록 멀리 달린다", AM.kit(DEX, "DRAGONCLAW")["range"] > AM.kit(DEX, "SCRATCH")["range"],
+        (AM.kit(DEX, "DRAGONCLAW")["range"], AM.kit(DEX, "SCRATCH")["range"]))
+    slow = [k for k in melee if abs(AM.kit(DEX, k)["range"] / AM.kit(DEX, k)["speed"] - AM.RUSH_SEC) > 0.01]
+    chk("근접 달려들기는 %.2f초 만에 끝난다" % AM.RUSH_SEC, not slow, slow[:5])
+    chk("발동 시간은 달려들기 + 연속 타격", AM.kit(DEX, "DRAGONCLAW")["act"] >= AM.RUSH_SEC
+        and AM.kit(DEX, "DOUBLEKICK")["act"] > AM.kit(DEX, "DRAGONCLAW")["act"], AM.kit(DEX, "DOUBLEKICK"))
+    chk("돌진은 근접보다 길고 빠르다", AM.kit(DEX, "QUICKATTACK")["range"] > 240
+        and AM.kit(DEX, "QUICKATTACK")["speed"] > max(AM.kit(DEX, k)["speed"] for k in melee))
     chk("변화기 대기는 6~14초", all(6 <= AM.kit(DEX, k)["cd"] <= 14 for k in
                                 ("SWORDSDANCE", "THUNDERWAVE", "STEALTHROCK", "REFLECT", "LEER", "RECOVER",
                                  "SHELLSMASH", "SPORE")))

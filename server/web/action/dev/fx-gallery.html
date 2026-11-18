@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이펙트 갤러리</title>
+<style>
+  :root { color-scheme: dark; --ink: #0b0e15; --fg: #f2f4fb; --dim: #a9b1c9; --gold: #ffc043; --bad: #ff6b6b; }
+  html, body { margin: 0; height: 100%; background: var(--ink); color: var(--fg); overflow: hidden;
+    font: 13px/1.4 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; }
+  #cap { position: fixed; left: 10px; top: 8px; z-index: 2; padding: 6px 10px; border-radius: 6px;
+    background: rgba(11, 14, 21, 0.78); border: 1px solid rgba(255, 255, 255, 0.1); pointer-events: auto; max-width: calc(100% - 40px); }
+  #cap b { color: var(--gold); font-weight: 700; }
+  #cap .dim { color: var(--dim); }
+  #cap .bad { color: var(--bad); white-space: pre-wrap; }
+  #cap a { color: var(--gold); }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="cap"></div>
+<script type="module" src="./gallery.js"></script>
+</body>
+</html>

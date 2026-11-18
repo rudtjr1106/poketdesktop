@@ -13,11 +13,11 @@ kit 열쇠 (초 · u · u/s · 도)
     kind           KINDS 중 하나
     wind act rec   준비 · 발동 · 회복 시간          cd    다시 쓸 수 있을 때까지 (쓰기 시작한 때부터)
     pp             본가 PP 의 절반 (올림)
-    range          탄이 날아가는 거리 · 근접이 닿는 거리(내 가운데에서 상대 몸 끝까지) · 돌진 거리 ·
+    range          탄이 날아가는 거리 · 근접 · 돌진이 달려드는 거리 ·
                    고리 · 부채꼴 반지름 · 광선 길이 · 내려찍기 · 함정 · 뛰어내리기를 놓을 수 있는 거리
-    w              탄 지름 · 광선 굵기 · 표시(내려찍기 · 함정 · 뛰어내리기) 지름
-    speed          탄 · 돌진 · 파고들기(근접) 속도
-    n              탄 · 타격 수         spread  펼친 각 (탄 여러 발 · 근접 · 부채꼴)
+    w              탄 지름 · 광선 굵기 · 표시(내려찍기 · 함정 · 뛰어내리기) 지름 · 근접이 치는 너비 · 돌진은 몸 지름
+    speed          탄 · 돌진 · 근접 달려들기 속도
+    n              탄 · 타격 수         spread  펼친 각 (탄 여러 발 · 부채꼴)
     home           탄이 상대 쪽으로 꺾는 빠르기 (도/초, 0 = 곧게)
     lock           준비 중 이동 배율 (0 = 못 움직인다)
     sty            이펙트 모양          ok · why   쓸 수 있나 · 못 쓰면 한국어 까닭 (쓸 수 있으면 "")
@@ -25,6 +25,11 @@ kit 열쇠 (초 · u · u/s · 도)
 꼴마다 무엇을 하는지는 action_battle 이 정한다 (proj 날리기 · beam 광선 · melee 근접 · dash 돌진 · burst 주변 폭발 ·
 cone 부채꼴 · strike 내려찍기 · leap 뛰어올랐다 내려찍기 · self 강화 · heal 회복 · guard 방어 · counter 되돌리기 ·
 hazard 설치 · status 상태 걸기 · none 못 씀).
+
+근접 (2026-11-18 사용자: "할퀴기, 드래곤클로 ... 몸통박치기, 전광석화처럼 내가 가는 방향으로 이동하면서 범위 공격으로")
+    누르는 쪽으로 range = 160 + 0.6 × 위력 (240 까지) 만큼 RUSH_SEC(0.18초) 동안 달려들며, 지나는 길에서
+    w/2 + 몸 반지름 안의 상대를 친다 (w = MELEE_W 120). act = RUSH_SEC + 0.1 × (타수 − 1).
+    앞쪽 64 · 부채꼴 110° 일 때보다 훨씬 잘 맞으므로 대기 배율을 1.7 → 2.0 (날리기와 같다) 으로 늘렸다 (test_action_battle 판 길이).
 """
 import math
 import weakref
@@ -48,12 +53,17 @@ SELF_TARGETS = (3, 4, 5, 7, 13, 14, 15)
 # 준비 중 이동 배율. 없는 꼴(광선 · 돌진 · 뛰어내리기 · 회복 · 방어 · 카운터)은 못 움직인다.
 LOCK = {"proj": 0.35, "melee": 0.35, "burst": 0.35, "cone": 0.35, "strike": 0.35, "self": 0.35, "hazard": 0.35,
         "status": 0.35}
-# 대기시간 = (0.6 + 위력/40) × 꼴 배율
-CD_MULT = {"proj": 2.0, "melee": 1.7, "dash": 1.8, "beam": 2.6, "burst": 2.4, "cone": 2.2, "strike": 2.4,
+# 대기시간 = (0.6 + 위력/40) × 꼴 배율. 근접은 달려들며 넓게 치므로 (2026-11-18) 1.7 → 2.0.
+CD_MULT = {"proj": 2.0, "melee": 2.0, "dash": 1.8, "beam": 2.6, "burst": 2.4, "cone": 2.2, "strike": 2.4,
            "leap": 2.5}
 CD_STATUS = (6.0, 14.0)
 HOME = 90.0                 # 반드시 맞는 기술(도감 명중 0)이 꺾는 빠르기
 BODY_W = 52                 # 몸 지름 (action_battle.BODY_R × 2) - 돌진의 굵기
+# 근접 달려들기: 거리 = MELEE_REACH[0] + 위력 × MELEE_REACH[1] (MELEE_REACH[2] 까지), RUSH_SEC 동안.
+MELEE_REACH = (160.0, 0.6, 240.0)
+MELEE_W = 120               # 근접이 치는 너비 (길 가운데에서 양쪽 60 + 상대 몸 반지름)
+RUSH_SEC = 0.18
+MULTI_GAP = 0.1             # 연속 근접: 첫 대 뒤 제자리에서 이만큼마다 한 대
 
 # 이름으로 고르는 꼴 (규칙보다 먼저 본다)
 CONE_MOVES = frozenset((
@@ -255,8 +265,10 @@ def _attack_numbers(kind, k, mv):
                     w=18 if hi > 1 else min(56.0, 22 + p / 6.0 + (12 if ball else 0)), speed=min(1150.0, speed),
                     n=hi, spread=min(50, 10 * (hi - 1)))
     if kind == "melee":
-        return dict(wind=0.14 + p / 1000.0, act=0.16 + 0.1 * (hi - 1), rec=0.18 + p / 1000.0 + rec_more, range=64,
-                    w=64, speed=360, n=hi, spread=110)
+        lo_r, per, hi_r = MELEE_REACH
+        reach = min(hi_r, lo_r + per * p)
+        return dict(wind=0.14 + p / 1000.0, act=RUSH_SEC + MULTI_GAP * (hi - 1), rec=0.18 + p / 1000.0 + rec_more,
+                    range=reach, w=MELEE_W, speed=reach / RUSH_SEC, n=hi, spread=0)
     if kind == "dash":
         reach = min(520, 340 + 90 * (pri - 1))
         return dict(wind=0.08, act=reach / 1500.0, rec=0.25, range=reach, w=BODY_W, speed=1500, n=1, spread=0)

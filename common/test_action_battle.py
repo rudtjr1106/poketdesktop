@@ -572,6 +572,146 @@ def t_kinds():
     chk("리플렉터: 장막 (c scr)", "scr" in me(ab, "a")["c"], me(ab, "a")["c"])
 
 
+# ---------------------------------------------------------------- 근접 · 돌진: 달려들며 길 위를 친다
+def act_path(ab, w, sec=1.5):
+    """발동(act) 동안 움직인 길: (처음 자리, 끝 자리, 이벤트). 발동이 시작한 틱의 걸음부터 끝난 틱 전까지."""
+    s = ab.sides[w]
+    ev, p0 = [], None
+    for _ in range(int(round(sec / AB.TICK))):
+        before = (s.x, s.y)
+        ab.step()
+        ev.extend(ab.drain_events())
+        acting = s.cast is not None and s.cast.stage == "act"
+        if p0 is None and acting:
+            p0 = before
+        elif p0 is not None and not acting:
+            return p0, before, ev
+    return p0, (s.x, s.y), ev
+
+
+def rush(a_move, a_xy, b_xy, hold=(0, 0), a_mon="GARCHOMP", keep=False, sec=1.2):
+    """a 가 hold 를 누른 채 기술을 쓴다 (keep 이 아니면 쓰기 시작한 다음 손을 뗀다). (판, 쓴 자리, 이벤트)."""
+    ab = fight([(a_mon, [a_move])], [("SNORLAX", ["TACKLE"])])
+    place(ab, "a", *a_xy)
+    place(ab, "b", *b_xy)
+    walk(ab, "a", *hold)
+    press(ab, "a", "m0")
+    ev = run(ab, AB.TICK)
+    s = ab.sides["a"]
+    at = (s.x, s.y)
+    if not keep:
+        walk(ab, "a", 0, 0)
+    return ab, at, ev + run(ab, sec)
+
+
+def t_rush():
+    print("== 근접 · 돌진: 누르는 쪽으로 달려들며 길 위를 친다")
+    kt = AM.kit(DEX, "DRAGONCLAW")
+    reach = kt["w"] / 2.0 + AB.BODY_R
+
+    ab, (x0, y0), ev = rush("DRAGONCLAW", (500, 450), (500, 250), hold=(1, 0))
+    a = ab.sides["a"]
+    c = of(ev, "cast", w="a")
+    chk("근접: 누르고 있는 쪽으로 달려든다 (오른쪽 · 상대는 위)", c and c[0]["ang"] == 0 and not of(ev, "hit", v="b"),
+        (c, [e["e"] for e in ev]))
+    chk("  달려든 거리 = range (%s)" % kt["range"], abs(a.x - x0 - kt["range"]) < 0.5 and a.y == y0,
+        (a.x - x0, a.y - y0))
+    chk("  cast 에 len · r (근접 r = w/2)", c and c[0]["len"] == kt["range"] and c[0]["r"] == kt["w"] / 2.0, c)
+
+    ab, (x0, y0), ev = rush("DRAGONCLAW", (500, 450), (500, 250))
+    a, b = ab.sides["a"], ab.sides["b"]
+    c = of(ev, "cast", w="a")
+    hit = of(ev, "hit", v="b", k="DRAGONCLAW")
+    chk("가만히 있으면 상대 쪽으로 달려든다", c and c[0]["ang"] == round(-math.pi / 2, 3), c)
+    chk("  맞히면 그 자리에서 멈춘다 (몸을 뚫고 지나가지 않는다)", len(hit) == 1 and a.x == 500
+        and abs(a.y - (250 + reach)) < 0.5, (hit, a.y, 250 + reach))
+    chk("  맞은 쪽은 기술 방향으로 %d 밀려난다 (휘청 · 무적 없음)" % AB.BUMP_DIST,
+        abs((250 - b.y) - AB.BUMP_DIST) < 0.5 and b.x == 500 and not me(ab, "b")["inv"], (b.x, b.y))
+
+    for off, want in ((70, True), (140, False)):
+        ab, _, ev = rush("DRAGONCLAW", (500, 450), (650, 450 - off), hold=(1, 0))
+        chk("근접 길에서 옆으로 %d 떨어진 상대는 %s" % (off, "맞는다" if want else "안 맞는다"),
+            bool(of(ev, "hit", v="b")) == want and of(ev, "cast", w="a")[0]["ang"] == 0, [e["e"] for e in ev])
+
+    ab, (x0, y0), ev = rush("DRAGONCLAW", (100, 450), (1300, 450), hold=(-1, 0))
+    a = ab.sides["a"]
+    c = of(ev, "cast", w="a")[0]
+    chk("벽에서 멈춘다", a.x == AB.BODY_R and a.y == y0, (a.x, a.y))
+    chk("  cast len 은 벽까지 줄인 길이", abs(c["len"] - (c["x"] - AB.BODY_R)) < 0.15, c)
+    ab, (x0, y0), ev = rush("DRAGONCLAW", (100, 60), (1300, 450), hold=(-1, -1))
+    a = ab.sides["a"]
+    chk("  비스듬히 벽에 닿으면 미끄러지지 않고 그 자리에서", a.y == AB.BODY_R and abs(a.x - (x0 - (y0 - AB.BODY_R))) < 0.5,
+        (a.x, a.y, x0, y0))
+
+    ab = fight([("GARCHOMP", ["DRAGONCLAW"])], [("SNORLAX", ["TACKLE"])])
+    place(ab, "b", 1300, 800)
+    walk(ab, "a", 1, 0)
+    press(ab, "a", "m0")
+    run(ab, AB.TICK)
+    walk(ab, "a", 0, 1)
+    (px, py), (qx, qy), _ = act_path(ab, "a")
+    chk("달려드는 동안엔 방향키로 못 꺾는다", qy == py and abs(qx - px - kt["range"]) < 0.5, (qx - px, qy - py))
+    slow = kt["lock"] * ab._walk_speed(ab.sides["a"]) * (kt["wind"] + AB.TICK)
+    chk("  준비 중엔 천천히 걸린다 (%.2f)" % kt["lock"], kt["lock"] == 0.35 and 450 < py <= 450 + slow + 0.5,
+        (py - 450, slow))
+
+    ab, _, ev = rush("DRAGONCLAW", (500, 200), (500, 40))
+    chk("밀려나도 벽을 넘지 않는다", of(ev, "hit", v="b") and ab.sides["b"].y == AB.BODY_R, ab.sides["b"].y)
+
+    # 앞으로 달려 나가면 등 뒤는 안 맞는다 (붙어 있던 상대에게서 떨어지려고 쓸 수 있다)
+    ab, (x0, y0), ev = rush("DRAGONCLAW", (500, 450), (440, 450), hold=(1, 0))
+    a = ab.sides["a"]
+    chk("등 뒤에 붙은 상대는 안 맞는다", not of(ev, "hit", v="b"), [e["e"] for e in ev])
+    chk("  그 상대 때문에 멈추지도 않는다 (range 다 달린다)", abs(a.x - x0 - kt["range"]) < 0.5, a.x - x0)
+    ab, _, ev = rush("DRAGONCLAW", (500, 450), (500, 380), hold=(1, 0))
+    chk("  바로 옆(몸 반 안쪽 뒤)은 길에 닿으니 맞는다", of(ev, "hit", v="b"), [e["e"] for e in ev])
+
+    ab, _, ev = rush("AERIALACE", (500, 450), (700, 450), hold=(-1, 0), a_mon="PIDGEOT", keep=True)
+    c = of(ev, "cast", w="a")
+    chk("제비반환(반드시 맞음)은 뒤로 걸어도 상대를 노린다", c and c[0]["ang"] == 0 and of(ev, "hit", v="b"),
+        (c, [e["e"] for e in ev]))
+
+    ab, _, ev = rush("DOUBLEKICK", (500, 450), (650, 450), a_mon="HITMONLEE")
+    b = ab.sides["b"]
+    hits = of(ev, "hit", v="b", k="DOUBLEKICK")
+    chk("연속 근접(두번치기): 붙어 있으면 두 대 다 맞는다", len(hits) == 2, [e["e"] for e in ev])
+    chk("  마지막 대에만 밀려난다 (한 번 %d)" % AB.BUMP_DIST, abs(b.x - 650 - AB.BUMP_DIST) < 0.5, b.x)
+    ab = fight([("HITMONLEE", ["DOUBLEKICK"])], [("SNORLAX", ["TACKLE"])])
+    place(ab, "b", 650, 450)
+    press(ab, "a", "m0")
+    ev = run_until(ab, lambda e: of(e, "hit", v="b"), 1.0)
+    walk(ab, "b", 1, 0)
+    press(ab, "b", "dodge")
+    ev += run(ab, 1.0)
+    chk("  멀어지면 남은 대는 안 맞는다", len(of(ev, "hit", v="b", k="DOUBLEKICK")) == 1, [e["e"] for e in ev])
+
+    ek = AM.kit(DEX, "EXTREMESPEED")
+    for off, want in ((75, True), (95, False)):
+        ab, _, ev = rush("EXTREMESPEED", (500, 300), (500 + off, 600), hold=(0, 1), a_mon="ARCANINE")
+        c = of(ev, "cast", w="a")
+        chk("돌진도 누르는 쪽으로 · 길에서 %d 떨어진 상대는 %s (몸 둘 + %d)" % (off, "맞는다" if want else "안 맞는다",
+                                                                  AB.DASH_REACH),
+            c and c[0]["ang"] == round(math.pi / 2, 3) and bool(of(ev, "hit", v="b")) == want, (c, of(ev, "hit")))
+    chk("  돌진 cast 에 len · r (r = %d)" % AB.DASH_REACH, c and c[0]["len"] == ek["range"]
+        and c[0]["r"] == AB.DASH_REACH, c)
+    ab, _, ev = rush("WATERGUN", (500, 450), (900, 450), a_mon="BLASTOISE")
+    c = of(ev, "cast", w="a")
+    chk("  날리기 cast 에는 len · r 이 없다", c and "len" not in c[0] and "r" not in c[0], c)
+
+    ab = fight([("SNORLAX", ["TACKLE"])], [("SNORLAX", ["TACKLE"])])
+    place(ab, "a", 700, 450)
+    place(ab, "b", 760, 450)
+    walk(ab, "a", -1, 0)
+    walk(ab, "b", 1, 0)
+    press(ab, "a", "m0")
+    press(ab, "b", "m0")
+    ev = run(ab, AB.TICK)
+    walk(ab, "a", 0, 0)
+    walk(ab, "b", 0, 0)
+    ev += run(ab, 1.0)
+    chk("서로 등지고 달려들면 맞부딪히지 않는다", not of(ev, "clash"), [e["e"] for e in ev])
+
+
 # ---------------------------------------------------------------- 대가 (체력을 깎는 기술 · 풍선)
 def t_costs():
     print("== 대가 (체력을 깎는 기술 · 풍선)")
@@ -979,6 +1119,7 @@ def main():
     t_clash()
     t_telegraph()
     t_kinds()
+    t_rush()
     t_costs()
     t_switch()
     t_faint()

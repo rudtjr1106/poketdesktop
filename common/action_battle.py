@@ -31,6 +31,21 @@ drain_events() 를 붙여 보낸다. 판정은 전부 여기서 한다 - 웹 화
     t0 · t1  생긴 시각 · 터지는 시각. 예고(tele · beam · cone · ring)는 준비 동안 보이고 t1 에 맞은 뒤
              발동 동안 잠깐 더 남는다 (now < t1 '곧 온다', now ≥ t1 '터졌다'). 함정(haz)은 t1 에 사라진다.
 
+근접 · 돌진 (2026-11-18 사용자: "몸통박치기, 전광석화처럼 내가 가는 방향으로 이동하면서 범위 공격으로")
+    방향: 쓰기 시작할 때 누르고 있는 쪽 (혼란이면 뒤집힌 쪽). 안 누르면 상대 쪽, 상대가 없으면 보는 쪽.
+          반드시 맞는 근접(kit home > 0, 제비반환)은 늘 상대 쪽 (준비 동안 살짝 따라간다).
+    발동: 그 각으로 kit range 만큼 달려든다 (근접 kit speed = range / 0.18초, 돌진 1500 u/s). 벽에 닿으면 그 자리에서
+          멈춘다 (미끄러지지 않는다). 달리는 동안엔 방향키가 안 듣는다.
+    맞음: 이번 틱에 달린 길(선분)에서 상대 가운데까지가 근접 kit w/2 + BODY_R, 돌진 2·BODY_R + DASH_REACH 안이면
+          맞는다. 처음 맞힌 자리에서 멈춘다 (몸을 뚫고 지나가지 않는다). 무적인 상대에겐 몸이 닿는 자리에서 멈춘다.
+          맞은 쪽은 BUMP_DIST 만큼 BUMP_SEC 동안 기술 방향으로 밀린다 (휘청 · 무적 없음, 벽에서 멈춘다. 쓴 쪽보다 뒤에
+          있었으면 쓴 쪽에서 멀어지는 쪽으로).
+    연속 근접(n > 1): 첫 대를 맞힌 뒤 제자리에서 MULTI_GAP 마다 한 대씩, 상대가 w/2 + BODY_R 안에 있는 동안.
+          밀어내기는 마지막 대에만.
+    맞부딪힘: 둘 다 달리는 중(아직 안 맞힘) · 서로 마주 보고(각 90° 안) · 어느 한쪽 길이 상대에 닿으면.
+    cast 이벤트 덧붙임: len 달려드는 거리 (벽까지 줄인 것, u) · r 길 가운데에서 맞는 너비의 반 (근접 w/2 ·
+          돌진 DASH_REACH - 돌진은 몸 반지름 바깥으로 이만큼). x · y 는 쓰기 시작한 자리, ang 은 라디안.
+
 이벤트 (drain_events) 덧붙임
     hit            w 때린 쪽 · v 맞은 쪽. w == v 면 스스로 다친 것 (반동 · 발버둥은 k 가 그 기술, 화상 · 독은 brn psn tox).
                    씨뿌리기(k seed) · 함정 · 카운터로 되돌린 것은 w 가 그것을 건 쪽.
@@ -76,11 +91,12 @@ KEYS = ("m0", "m1", "m2", "m3", "dodge", "sw0", "sw1", "sw2")
 SPAWN = {"a": (320.0, 450.0), "b": (1280.0, 450.0)}
 BUFFER_SEC = 0.25           # 바쁠 때 누른 키를 이만큼 들고 있다
 REC_MOVE = 0.5              # 회복 중 이동 배율
-LUNGE_SEC = 0.16            # 근접이 발동 첫머리에 앞으로 파고드는 시간
-CLASH_REACH = 12            # 근접끼리 몸 바깥 이만큼 안이면 맞부딪힌다
 CLASH_PUSH = 140            # 맞부딪히면 튕기는 거리
 PUSH_SEC = 0.2              # 튕김 · 밀려남에 걸리는 시간
-DASH_REACH = 4              # 돌진이 몸 바깥 이만큼 안을 지나면 맞는다
+DASH_REACH = 30             # 돌진이 몸 바깥 이만큼 안을 지나면 맞는다 (2026-11-18 4 → 30)
+BUMP_DIST = 45              # 근접 · 돌진에 맞으면 기술 방향으로 밀리는 거리
+BUMP_SEC = 0.12             #   그 시간 (틱으로 반올림 - 4틱)
+RUSH_KINDS = ("melee", "dash")
 OHKO_FRAC = 0.45            # 일격기: 상대 최대 체력의 이만큼
 STRUGGLE = "STRUGGLE"
 EPS = 1e-6
@@ -167,6 +183,32 @@ def _seg_dist(px, py, ax, ay, bx, by):
     return math.hypot(px - ax - u * dx, py - ay - u * dy)
 
 
+def _wall_frac(x, y, dx, dy):
+    """(x, y) 에서 (dx, dy) 만큼 갈 때 마당 안에 머무는 몫 0~1 (벽에서 그 길 위에 멈춘다)."""
+    f = 1.0
+    for p, d, hi in ((x, dx, ARENA_W - BODY_R), (y, dy, ARENA_H - BODY_R)):
+        if d > EPS:
+            f = min(f, (hi - p) / d)
+        elif d < -EPS:
+            f = min(f, (BODY_R - p) / d)
+    return _clamp(f, 0.0, 1.0)
+
+
+def _touch(wx, wy, dx, dy, r):
+    """(wx, wy) = 나 − 상대. (dx, dy) 쪽으로 갈 때 상대 가운데가 처음 r 안에 드는 몫 (0 = 이미 안). 안 들면 None.
+    이미 r 안이어도 상대에게서 멀어지는 쪽이면 None - 등 뒤에 붙은 상대 때문에 멈추지 않는다."""
+    a, b = dx * dx + dy * dy, wx * dx + wy * dy
+    c0 = wx * wx + wy * wy - r * r
+    if c0 <= 0:
+        return 0.0 if b < 0 else None
+    if a <= 0 or b >= 0:
+        return None
+    disc = b * b - a * c0
+    if disc < 0:
+        return None
+    return (-b - math.sqrt(disc)) / a
+
+
 def _part(maxhp, num, den):
     """최대 체력의 num/den (정수 셈, 적어도 1)."""
     return max(1, maxhp * num // den)
@@ -189,7 +231,12 @@ def _type_blocks(ail, types):
 
 def _swinging(c):
     """근접 · 돌진이 발동 중이고 아직 안 맞혔다 (맞부딪힐 수 있다)."""
-    return c is not None and c.stage == "act" and c.kind in ("melee", "dash") and not c.hits
+    return c is not None and c.stage == "act" and c.kind in RUSH_KINDS and not c.hits
+
+
+def _reach(c):
+    """근접 · 돌진이 지나는 길에서 상대 가운데까지 이만큼 안이면 맞는다."""
+    return c.kit["w"] / 2.0 + BODY_R if c.kind == "melee" else 2 * BODY_R + DASH_REACH
 
 
 def _meet(p, q):
@@ -266,8 +313,12 @@ class Side(object):
 
 
 class Cast(object):
-    """쓰고 있는 기술 하나: 준비(wind) → 발동(act) → 회복(rec)."""
-    __slots__ = ("slot", "key", "mv", "kit", "ty", "by", "ang", "stage", "start", "end", "zone", "hits")
+    """쓰고 있는 기술 하나: 준비(wind) → 발동(act) → 회복(rec).
+
+    근접 · 돌진의 발동: rush 남은 달릴 거리 (None = 안 달린다 · 끝을 정했다, 0 = 이번 틱에 다 달렸다) ·
+    lane 이번 틱에 달린 길 (x0, y0, x1, y1) · next 연속 근접의 다음 한 대 시각. 둘 중 하나가 남아 있으면 발동이 이어진다."""
+    __slots__ = ("slot", "key", "mv", "kit", "ty", "by", "ang", "stage", "start", "end", "zone", "hits", "rush",
+                 "lane", "next")
 
     def __init__(self, slot, key, mv, kit, by, ang, t):
         self.slot, self.key, self.mv, self.kit, self.by, self.ang = slot, key, mv, kit, by, ang
@@ -275,6 +326,11 @@ class Cast(object):
         self.stage, self.start, self.end = "wind", t, t + kit["wind"]
         self.zone = None
         self.hits = 0
+        self.rush = self.lane = self.next = None
+
+    def busy(self):
+        """발동이 아직 안 끝났다 (달리는 중 · 연속 근접이 남았다)."""
+        return self.rush is not None or self.next is not None
 
     @property
     def kind(self):
@@ -673,13 +729,28 @@ class ActionBattle(object):
     # ---- 기술: 준비 → 발동 → 회복 ----
     def _start(self, s, slot, key, mv, kt):
         foe = self._foe(s)
-        ang = math.degrees(math.atan2(foe.y - s.y, foe.x - s.x)) if self._present(foe) else _facing(s.d)
+        ang = self._aim(s, kt, foe)
         c = Cast(slot, key, mv, kt, s.mon, ang, self.t)
         s.cast = c
         s.d = _dir(ang)
+        extra = {}
+        if c.kind in RUSH_KINDS:
+            dx, dy = _polar(ang, kt["range"])
+            extra = {"len": _r1(kt["range"] * _wall_frac(s.x, s.y, dx, dy)),
+                     "r": _r1(kt["w"] / 2.0 if c.kind == "melee" else float(DASH_REACH))}
         self._emit("cast", w=s.name, m=slot, k=key, kind=kt["kind"], ty=c.ty, sty=kt["sty"], x=_r1(s.x), y=_r1(s.y),
-                   ang=_rad(ang))
+                   ang=_rad(ang), **extra)
         c.zone = self._telegraph(s, c, foe)
+
+    def _aim(self, s, kt, foe):
+        """쓰기 시작할 때의 각. 근접 · 돌진은 누르고 있는 쪽 (반드시 맞는 것은 빼고), 그 밖엔 상대 쪽 · 보는 쪽."""
+        if kt["kind"] in RUSH_KINDS and not kt["home"]:
+            ix, iy = self._intent(s)
+            if ix or iy:
+                return math.degrees(math.atan2(iy, ix))
+        if self._present(foe):
+            return math.degrees(math.atan2(foe.y - s.y, foe.x - s.x))
+        return _facing(s.d)
 
     def _telegraph(self, s, c, foe):
         """준비 동안 상대에게 보이는 예고 장판. 없는 꼴이면 None."""
@@ -723,6 +794,8 @@ class ActionBattle(object):
                 c.stage, c.start, c.end = "act", c.end, c.end + c.kit["act"]
                 self._activate(s, c)
             elif c.stage == "act":
+                if c.busy():
+                    break                       # 달리기 · 연속 근접이 끝을 정할 때까지
                 c.stage, c.start, c.end = "rec", c.end, c.end + c.kit["rec"]
             else:
                 s.cast = None
@@ -764,11 +837,15 @@ class ActionBattle(object):
     _on_status = _on_proj
 
     def _on_melee(self, s, c):
-        """반드시 맞는 근접(제비반환 ...)은 준비하는 동안 상대 쪽으로 살짝 돈다."""
+        """달려들기 시작. 반드시 맞는 근접(제비반환 ...)은 준비하는 동안 상대 쪽으로 살짝 돈다."""
         foe = self._foe(s)
         if c.kit["home"] and self._solid(foe):
             lim = c.kit["home"] * c.kit["wind"]
             c.ang += _clamp(_turn(c.ang, math.degrees(math.atan2(foe.y - s.y, foe.x - s.x))), -lim, lim)
+        c.rush = float(c.kit["range"])
+
+    def _on_dash(self, s, c):
+        c.rush = float(c.kit["range"])
 
     def _on_beam(self, s, c):
         z, foe = c.zone, self._foe(s)
@@ -842,35 +919,56 @@ class ActionBattle(object):
         self._zone(c, "haz", x, y, end, end, r=c.kit["w"] / 2.0)
 
     def _cast_tick(self, s):
-        """발동 동안 틱마다: 근접 타격 · 돌진 부딪힘 · 광선이 탄 지우기."""
+        """발동 동안 틱마다: 근접 · 돌진이 지난 길 위를 치기 · 연속 근접 · 광선이 탄 지우기."""
         c = s.cast
         if c is None or c.stage != "act":
             return
-        if c.kind == "melee":
-            self._melee_hits(s, c)
-        elif c.kind == "dash":
-            self._dash_hit(s, c)
+        if c.kind in RUSH_KINDS:
+            self._rush_tick(s, c)
         elif c.kind == "beam":
             self._beam_sweep(s, c)
 
-    def _melee_hits(self, s, c):
-        """n 대를 발동 시간에 고르게 나눠 친다. 그 자리에 상대가 없으면 다음 틱에 다시 본다."""
-        kt = c.kit
-        if c.hits >= kt["n"] or self.t + EPS < c.start + c.hits * kt["act"] / kt["n"]:
-            return
+    def _rush_tick(self, s, c):
+        """이번 틱에 달린 길에 상대가 닿았으면 친다 (처음 맞힌 자리에서 멈춘다). 다 달렸으면 끝을 정한다.
+        연속 근접은 그 뒤 MULTI_GAP 마다 제자리에서 한 대씩, 상대가 닿는 데 있는 동안."""
         foe = self._foe(s)
-        if self._in_cone(s, foe, c.ang, kt["range"], kt["spread"]):
-            c.hits += 1
-            self._hit(c.by, foe, c.key, c.mv)
+        if c.rush is not None:
+            lane, c.lane = c.lane, None
+            if lane is not None and not c.hits and self._lane_hits(s, c, foe, lane):
+                res = self._hit(c.by, foe, c.key, c.mv)
+                if res != "pass":
+                    c.hits, c.rush = 1, 0.0
+                    if res == "hit" and c.kit["n"] == 1:
+                        self._bump(foe, c.ang, s)
+            if c.rush <= EPS:
+                c.rush = None
+                if c.hits and c.kit["n"] > 1:
+                    c.next = self.t + AM.MULTI_GAP
+                else:
+                    c.end = self.t              # 다 달렸다 · 맞혔다 → 다음 틱에 회복
+            return
+        if c.next is None or not self._past(c.next):
+            return
+        c.hits += 1
+        last = c.hits >= c.kit["n"]
+        near = self._solid(foe) and math.hypot(foe.x - s.x, foe.y - s.y) <= _reach(c) + 0.01
+        if near and self._hit(c.by, foe, c.key, c.mv) == "hit" and last:
+            self._bump(foe, c.ang, s)
+        if last or not near:
+            c.next, c.end = None, self.t        # 다 쳤다 · 상대가 멀어졌다
+        else:
+            c.next += AM.MULTI_GAP
 
-    def _dash_hit(self, s, c):
-        foe = self._foe(s)
-        if c.hits or not self._solid(foe):
-            return
-        if _seg_dist(foe.x, foe.y, s.px, s.py, s.x, s.y) <= 2 * BODY_R + DASH_REACH:
-            c.hits = 1
-            c.end = self.t                      # 부딪히면 멈춘다 → 다음 틱에 회복
-            self._hit(c.by, foe, c.key, c.mv)
+    def _lane_hits(self, s, c, foe, lane=None):
+        """이번 틱에 달린 길(없으면 지금 자리)이 foe 의 가운데에 닿는다. 길 시작보다 몸 반 넘게 뒤에 있는 상대는
+        안 맞는다 - 앞으로 달려 나가는 기술이 등 뒤를 치지 않게."""
+        x0, y0, x1, y1 = lane or c.lane or (s.x, s.y, s.x, s.y)
+        if not self._solid(foe):
+            return False
+        ux, uy = _polar(c.ang, 1.0)
+        if (foe.x - x0) * ux + (foe.y - y0) * uy < -BODY_R:
+            return False
+        return _seg_dist(foe.x, foe.y, x0, y0, x1, y1) <= _reach(c) + 0.01
 
     def _beam_sweep(self, s, c):
         z = c.zone
@@ -883,6 +981,12 @@ class ActionBattle(object):
     # ---- 이동 ----
     def _walk(self, s):
         s.px, s.py = s.x, s.y
+        c = s.cast
+        if c is not None and c.rush:
+            if s.push is None and self._present(s):
+                self._rush_step(s, c)
+                return
+            c.rush = 0.0                        # 밀려나면 달리기가 끊긴다
         vx, vy = self._velocity(s)
         s.vx, s.vy = vx, vy
         if vx or vy:
@@ -894,15 +998,32 @@ class ActionBattle(object):
         if c is not None and c.stage == "wind" and c.zone is not None and c.zone.kind in ("cone", "ring"):
             c.zone.x, c.zone.y = s.x, s.y       # 부채꼴 · 고리 예고는 쓰는 쪽을 따라간다
 
+    def _rush_step(self, s, c):
+        """근접 · 돌진이 한 틱 달린다: 고정한 각으로 kit speed (남은 거리까지). 벽에 닿으면 그 길 위에서 멈추고,
+        상대에게 닿을 자리(맞는 거리, 무적이면 몸이 닿는 거리)에서 멈춘다 - 맞았는지는 _rush_tick 이 본다."""
+        step = min(c.kit["speed"] * TICK, c.rush)
+        dx, dy = _polar(c.ang, step)
+        f = _wall_frac(s.x, s.y, dx, dy)
+        stop = f < 1.0 - EPS
+        foe = self._foe(s)
+        if self._solid(foe):
+            open_ = not self._before(foe.inv_until)
+            u = _touch(s.x - foe.x, s.y - foe.y, dx, dy, _reach(c) if open_ else 2 * BODY_R)
+            if u is not None and u <= f:
+                f = u
+                stop = stop or not open_        # 무적인 몸에 부딪히면 멈춘다
+        x = _clamp(s.x + dx * f, BODY_R, ARENA_W - BODY_R)
+        y = _clamp(s.y + dy * f, BODY_R, ARENA_H - BODY_R)
+        s.vx, s.vy = (x - s.x) / TICK, (y - s.y) / TICK
+        c.lane = (s.x, s.y, x, y)
+        s.x, s.y = x, y
+        c.rush = 0.0 if stop else max(0.0, c.rush - step * f)
+
     def _velocity(self, s):
         if not self._present(s):
             return 0.0, 0.0
         if s.push is not None:
             return s.push.vx, s.push.vy
-        c = s.cast
-        if c is not None and c.stage == "act":
-            if (c.kind == "dash" and not c.hits) or (c.kind == "melee" and self._before(c.start + LUNGE_SEC)):
-                return _polar(c.ang, c.kit["speed"])        # 돌진 · 근접 파고들기
         sp = self._walk_speed(s) * self._walk_mult(s)
         ix, iy = self._intent(s)
         return ix * sp, iy * sp
@@ -948,12 +1069,16 @@ class ActionBattle(object):
             s.y = _clamp(s.y + sign * dy / d * half, BODY_R, ARENA_H - BODY_R)
 
     def _melee_clash(self):
-        """근접(돌진)끼리 둘 다 발동 중에 맞닿으면 둘 다 튕긴다 - 데미지 없음."""
+        """근접(돌진)끼리 둘 다 달리는 중에 마주 보고 부딪히면 (어느 한쪽 길이 상대에 닿으면) 둘 다 튕긴다 - 데미지 없음."""
         a, b = self.sides["a"], self.sides["b"]
         ca, cb = a.cast, b.cast
-        if not (_swinging(ca) and _swinging(cb)) or math.hypot(a.x - b.x, a.y - b.y) > 2 * BODY_R + CLASH_REACH:
+        if not (_swinging(ca) and _swinging(cb)):
             return
         ang = math.degrees(math.atan2(b.y - a.y, b.x - a.x))
+        if abs(_turn(ca.ang, ang)) > 90 or abs(_turn(cb.ang, ang + 180)) > 90:
+            return                              # 등지고 달린다
+        if not (self._lane_hits(a, ca, b) or self._lane_hits(b, cb, a)):
+            return
         self._emit("clash", x=_r1((a.x + b.x) / 2), y=_r1((a.y + b.y) / 2), k1=ca.key, k2=cb.key)
         self._knock(a, ang + 180, CLASH_PUSH)
         self._knock(b, ang, CLASH_PUSH)
@@ -963,6 +1088,18 @@ class ActionBattle(object):
         self._stun(s, PUSH_SEC, "knock")
         vx, vy = _polar(ang, dist / PUSH_SEC)
         s.push = Push(vx, vy, self.t, self.t + PUSH_SEC, False)
+
+    def _bump(self, s, ang, by):
+        """근접 · 돌진에 맞아 ang 쪽으로 BUMP_DIST 밀린다 (휘청 · 무적 없음, 벽에서 멈춘다 - _walk 가 막는다).
+        쓴 쪽(by)보다 뒤에 있었으면 by 에서 멀어지는 쪽으로. 이미 밀리는 중(밀어내기 기술)이면 그대로 둔다."""
+        if not self._present(s) or s.push is not None:
+            return
+        away = math.degrees(math.atan2(s.y - by.y, s.x - by.x))
+        if abs(_turn(ang, away)) > 90:
+            ang = away
+        n = max(1, int(round(BUMP_SEC / TICK)))
+        vx, vy = _polar(ang, BUMP_DIST / (n * TICK))
+        s.push = Push(vx, vy, self.t, self.t + n * TICK, False)
 
     def _stun(self, s, sec, why):
         self._cancel(s)
