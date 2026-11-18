@@ -331,7 +331,8 @@ def main():
             chk("경로에 일반구가 띄어 써진다", "부천시 원미구" in texts(gw.crumb), texts(gw.crumb))
         if who == "지우":
             ph = gw.photos.get("trainer")
-            chk("지우 카드: 새 도트를 그대로 크기로", ph and (ph.width(), ph.height()) == (113, 146),
+            # 시즌 5 챔피언 관장 지우 (동대문구): 연구실 그림 93x150 (따라큐 포함) 을 그대로 크기로
+            chk("지우 카드: 새 도트를 그대로 크기로", ph and (ph.width(), ph.height()) == (93, 150),
                 ph and (ph.width(), ph.height()))
         if who == "나여조경석":
             ph = gw.photos.get("trainer")

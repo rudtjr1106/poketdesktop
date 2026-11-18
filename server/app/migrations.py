@@ -693,6 +693,31 @@ def _gym_swap_reset(conn):
     return "클리어 %d줄 지움 · 하던 판 %d개 접음" % (cleared, fights)
 
 
+# 시즌 5 챔피언 지우(본인 캐릭터)가 청주시 상당구(43111) -> 동대문구(11230)로 이사하고, 동대문구의 동백(melli)이
+# 청주시 상당구로 갔다 (tools/build_gyms.py FIXED movedFrom). 클리어 기록은 관장을 따라간다 (사용자 11/18):
+#   - 동대문구에서 동백을 이긴 기록 -> 청주시 상당구 동백을 이긴 것으로 옮긴다 (같은 사람을 이겼다)
+#   - 새 동대문구 지우는 모두가 다시 깬다 - 청주시 상당구에서 옛 지우를 이긴 기록도 지운다 (첫 승리 상금도 다시)
+GYM_MOVES = [("11230", "43111", "melli")]  # (떠나는 자리, 가는 자리, 옮겨 가는 관장)
+
+
+def _gym_move_jiwoo(conn):
+    """관장이 자리를 옮긴 만큼 클리어 기록을 옮기고, 새 관장 자리는 모두 미클리어로.
+
+    가는 자리(43111)의 옛 기록(옛 지우)은 먼저 지우고, 떠나는 자리(11230)에서 옮겨 가는 관장(동백)을 이긴 기록만
+    가는 자리로 옮긴다. 떠나는 자리에 남은 기록(그 전 배치의 다른 관장)도 지운다 - 거기는 이제 새 지우다.
+    두 자리에서 하던 판은 접는다 (상대가 바뀌었다). 관장 몇 곳 이겼나는 동백을 이긴 사람은 그대로(옮겨 갔다),
+    옛 지우를 이긴 사람은 하나 빠진다. 챔피언리그 참가 자격은 한 번 얻으면 그대로다 (champion.qualify).
+    """
+    moved = dropped = fights = 0
+    for src, dst, who in GYM_MOVES:
+        fights += conn.execute("UPDATE gym_battle SET state='done', result='expired'"
+                               " WHERE state='active' AND region IN (?, ?)", (src, dst)).rowcount
+        dropped += conn.execute("DELETE FROM gym_clear WHERE region=?", (dst,)).rowcount
+        moved += conn.execute("UPDATE gym_clear SET region=? WHERE region=? AND trainer=?", (dst, src, who)).rowcount
+        dropped += conn.execute("DELETE FROM gym_clear WHERE region=?", (src,)).rowcount
+    return "클리어 %d줄 옮김 · %d줄 지움 · 하던 판 %d개 접음" % (moved, dropped, fights)
+
+
 # 버전 2 감사의 선물 (게시판 공지 10/30 '업데이트와 동시에 모든 분께 기본 이펙트(발자국)를 하나씩').
 PAW_GIFT = "fx_paw"
 PAW_GIFT_TITLE = "감사의 선물"
@@ -1011,6 +1036,8 @@ ONCE = [
     ("0360-gym-swap-reset", _gym_swap_reset),
     # 시즌 6 (2026-11-16, 2.5.0). **서버가 이 판으로 뜨는 순간 시즌 5 가 닫힌다** - 자정에 맞춰 배포한다.
     ("0370-season6-open", _season6_open),
+    # 시즌 5 챔피언 지우가 동대문구로 이사, 동백은 청주시 상당구로 - 동백 기록은 따라가고 새 지우는 모두 다시.
+    ("0380-gym-move-jiwoo", _gym_move_jiwoo),
 ]
 
 

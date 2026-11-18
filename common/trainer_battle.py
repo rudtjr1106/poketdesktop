@@ -77,6 +77,12 @@ def give_mega_stone(dex, team, level):
     """
     if int(level or 0) < MEGA_TRAINER_LEVEL:
         return None
+    # 자기 메가스톤을 이미 쥔 포켓몬이 있으면 그 자리 (시즌 챔피언 관장 - 신청한 도구 그대로).
+    # 앞자리의 다른 포켓몬(예: 기합의띠 킬라플로르)에게 스톤을 덮어씌우지 않는다.
+    for i, f in enumerate(team):
+        forms = (getattr(dex, "mega_of", None) or {}).get(f.mon.get("species")) or []
+        if f.mon.get("held") and any(m.get("megaStone") == f.mon.get("held") for m in forms):
+            return i
     for i, f in enumerate(team):
         forms = (getattr(dex, "mega_of", None) or {}).get(f.mon.get("species")) or []
         stone = next((m.get("megaStone") for m in forms if m.get("megaStone")), None)
