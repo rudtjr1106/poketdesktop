@@ -318,11 +318,20 @@ def is_status(move):
 
 
 def has_secondary(move):
-    # 조이기류의 묶기(trap)는 주 효과라 부가효과로 세지 않는다 - 우격다짐이 위력을 올리지도 지우지도 않는다 (#664)
+    """우격다짐이 붙는 기술인가 - 부가효과(쇼다운 secondary)가 있다. 붙으면 위력 1.3배, 부가효과가 다 사라지고
+    '맞힌 뒤' 효과(생명의구슬 반동 · 레드카드 · 발끈 ...)도 안 움직인다 (sheer_force).
+
+    도감의 sec 를 그대로 따른다 (tools/build_pokedex - 쇼다운 자료). 인파이트 · 용성군 · 오버히트처럼 자기 능력을
+    내리는 것, 쑥쑥봄버의 씨뿌리기, 조이기류의 묶기는 기술 자체의 효과라 sec 가 False 다 (11/19 - 전에는 인파이트도
+    1.3배를 받고 자기 하락까지 지워졌다). attackfx 가 따로 거는 부가효과(트라이어택 · 소금절이 · 앵커샷의 묶기 ...)도
+    sec 가 True 이고, 그쪽에서 secondary_blocked 를 본다.
+    """
+    if "sec" in move:
+        return bool(move["sec"])
+    # sec 가 안 적힌 기술(Z기술 · 손으로 넣은 기술)은 칸으로 짐작한다. 조이기류의 묶기(trap)는 주 효과다 (#664).
     return bool((move.get("ail") and move.get("ailChance") and move.get("ail") != "trap")
                 or (move.get("stat") and move.get("statChance"))
                 or move.get("flinch"))
-
 
 def key_of(move):
     """기술 dict 에 이름 키가 없어서 영어 이름으로 되짚는다."""
@@ -512,8 +521,8 @@ def attack_mult(user, target, move, mtype, eff):
         m *= 1.5
     if a == "RECKLESS" and (move.get("drain") or 0) < 0:
         m *= 1.2
-    if a == "SHEERFORCE" and has_secondary(move):
-        m *= 1.3
+    if a == "SHEERFORCE" and (has_secondary(move) or move.get("sfBoost")):
+        m *= 1.3                    # sfBoost: 일렉트릭샷 · 지휘는 부가효과가 없는데 위력만 오른다 (쇼다운 hasSheerForceBoost)
     if a in PINCH and mtype == PINCH[a] and user.hp * 3 <= user.maxhp:
         m *= 1.5
     if a == "TINTEDLENS" and 0 < eff < 1:
@@ -959,6 +968,9 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
     # 방호패드 (1.13): 닿아도 다치지 않는다 (까칠한피부·정전기·미라 …)
     contact = is_contact(move, user) and getattr(user, "held", None) != "PROTECTIVEPADS"
     rng = bt.rng
+    # 우격다짐이 붙은 기술이면 '맞힌 뒤' 특성(나쁜손버릇 · 변색 · 발끈 · 분노의껍질 · 위기회피 · 도망태세)이 안 움직인다
+    # (쇼다운 suppressingSecondaries - AfterMoveSecondary · EmergencyExit). 접촉 반응(정전기 · 까칠한피부 ...)은 그대로다.
+    sf = sheer_force(user, move)
     # ---- 맞는 쪽이 접촉에 반응
     if contact and on(target) and user.alive():
         t = target.ability
@@ -1009,7 +1021,7 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
             user.ability, target.ability = t, user.ability
             ev.append({"t": "msg", "who": uwho,
                        "text": "%s 와(과) %s 의 특성이 서로 바뀌었다!" % (user.name, target.name)})
-        elif t == "PICKPOCKET" and target.alive() and not MC.item_on(target) and MC.item_on(user) \
+        elif t == "PICKPOCKET" and not sf and target.alive() and not MC.item_on(target) and MC.item_on(user) \
                 and not _is_mega_stone(user._held) and not has(user, "STICKYHOLD"):
             # 나쁜손버릇: 닿은 상대의 도구를 훔친다 (이 판에서만)
             pop(bt, target, twho, ev)
@@ -1085,7 +1097,7 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
             pop(bt, target, twho, ev)
             bt.field.terrain, bt.field.terrain_turns = "grassy", 5
             ev.append({"t": "msg", "who": twho, "text": "발밑에 풀이 무성해졌다!"})
-        elif t == "COLORCHANGE" and target.alive() and mtype \
+        elif t == "COLORCHANGE" and not sf and target.alive() and mtype \
                 and target.types() != [mtype] and not getattr(target, "tera", None):    # 테라스탈하면 안 바뀐다
             pop(bt, target, twho, ev)
             target.types_override = [mtype]
@@ -1151,14 +1163,14 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
         pop(bt, target, twho, ev)
         target.ab["charged"] = True
         ev.append({"t": "msg", "who": twho, "text": "%s 은(는) 전기를 모았다!" % target.name})
-    elif t == "BERSERK" and crossed:
+    elif t == "BERSERK" and crossed and not sf:
         pop(bt, target, twho, ev)
         bt._change_stat(target, "spa", 1, ev, twho, source=target)
-    elif t == "ANGERSHELL" and crossed:
+    elif t == "ANGERSHELL" and crossed and not sf:
         pop(bt, target, twho, ev)
         for s, c in (("def", -1), ("spd", -1), ("atk", 1), ("spa", 1), ("spe", 1)):
             bt._change_stat(target, s, c, ev, twho, source=target)
-    elif t in ("EMERGENCYEXIT", "WIMPOUT") and crossed and bt.kind != "wild":
+    elif t in ("EMERGENCYEXIT", "WIMPOUT") and crossed and not sf and bt.kind != "wild":
         # 위기회피·도망태세: 체력이 절반 아래로 내려가면 스스로 물러난다 (바꿀 동료가 있을 때)
         from . import statusmoves as SM
         if SM._team_others(bt, twho, target):
@@ -1199,8 +1211,28 @@ def secondary_mult(user):
 
 
 def secondary_off(user, target):
-    """(내 부가효과가 사라지나, 상대에게 거는 해로운 부가효과가 막히나)"""
+    """(내 부가효과가 사라지나, 상대에게 거는 해로운 부가효과가 막히나)
+
+    우격다짐은 부가효과가 있는 기술(has_secondary)에만 붙는다 - 그 기술이면 부가효과가 다 사라지고, 아니면
+    기술 자체의 효과(인파이트의 자기 하락 ...)를 그대로 둔다. 쓰는 쪽이 has_secondary 와 같이 본다.
+    """
     return has(user, "SHEERFORCE"), guard(user, target) == "SHIELDDUST"
+
+
+def sheer_force(user, move):
+    """우격다짐이 이 기술에 붙었나 (위력 1.3배 · 부가효과와 생명의구슬 반동이 없다)."""
+    return has(user, "SHEERFORCE") and has_secondary(move)
+
+
+def secondary_blocked(user, target, move):
+    """기술의 부가효과가 지워지나: 우격다짐 · 인분(틀깨기면 무시) · 은밀망토 (특성이 꺼진 판에서도).
+    battle._use 의 sec_off · sec_shield 와 같은 판정이다. attackfx 가 따로 거는 부가효과(앵커샷의 묶기)가 쓴다."""
+    if not has_secondary(move):
+        return False
+    from . import held as H
+    if target is not user and bool(target.held) and H.cloaked(target):
+        return True
+    return has(user, "SHEERFORCE") or guard(user, target) == "SHIELDDUST"
 
 
 def flinch_immune(user, target):

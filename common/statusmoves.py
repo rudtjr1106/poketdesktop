@@ -1777,7 +1777,8 @@ def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev, landed=
     """때리고 난 뒤 (고속스핀·끌어내기·유턴·필드 부수기·떨어뜨리기·탁쳐서떨구기).
 
     total 은 실제로 깎은 체력, landed 는 한 대라도 맞았는지다 (탈·아이스페이스가 대신 맞으면 total 0 · landed True)."""
-    if k in SPINNERS and user.alive() and total:
+    if k in SPINNERS and user.alive() and total and not A.sheer_force(user, move):
+        # 우격다짐이 붙으면 치우지 않는다 (쇼다운 - 고속스핀 · 킬러스핀의 onAfterHit 가 hasSheerForce 를 본다)
         side = bt.field.side(who)
         gone = [hz for hz in FD.HAZARDS if side.pop(hz, None)]
         if user.seeded:

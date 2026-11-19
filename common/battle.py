@@ -2228,6 +2228,9 @@ class Battle(object):
         if abil:
             sec_mult = A.secondary_mult(user)
             sec_off, sec_shield = A.secondary_off(user, target)
+            # 우격다짐은 부가효과가 있는 기술에만 붙는다 - 인파이트 · 용성군의 자기 하락은 기술 자체의 효과라
+            # 그대로 남는다 (11/19 - 전에는 그것까지 지웠다)
+            sec_off = sec_off and A.has_secondary(move)
         cloak = target is not user and bool(target.held) and H.cloaked(target)    # 은밀망토 (1.13)
         sec_shield = sec_shield or cloak
 
@@ -2301,8 +2304,12 @@ class Battle(object):
         if fl and target.alive() and not sub_hit and self.rng.uniform(0, 100) < fl:
             target.flinched = True
         if user.held:
-            if not cloak:
-                H.flinch(self, user, target, move)      # 왕의징표석·예리한이빨 (은밀망토면 안 걸린다)
+            # 왕의징표석 · 예리한이빨의 10% 풀죽음도 부가효과다 (쇼다운이 기술에 secondary 로 붙인다): 인분 · 은밀망토가
+            # 막고, 정신력이면 안 풀죽고, 대타가 맞으면 안 붙는다. 하늘의은총이면 두 배. 악취의 10% 와는 하나만 굴린다
+            # (11/19 - 전에는 은밀망토만 봤다)
+            if not sec_shield and not sub_hit \
+                    and not (abil and (A.flinch_immune(user, target) or A.stench(user, move))):
+                H.flinch(self, user, target, move, sec_mult)
             H.note_move(user, key)                      # 구애 잠금·메트로놈
             if user is not self.fighter(who):
                 user.locked = None                      # 유턴 · 볼트체인지로 이미 물러났다 - 물러나면 구애 잠금은 풀린다

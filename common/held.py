@@ -571,14 +571,22 @@ def on_incoming(bt, target, who_t, move, eff, dmg, ev):
     return dmg
 
 
+def _sheer(user, move):
+    """우격다짐이 붙은 기술인가 - 그러면 '맞힌 뒤' 도구가 안 움직인다 (쇼다운 suppressingSecondaries)."""
+    from . import abilities as A
+    return A.sheer_force(user, move)
+
+
 def after_hit(bt, user, who, target, who_t, move, eff, total, ev):
     """기술이 다 맞은 뒤. 공격한 쪽과 맞은 쪽 도구를 차례로 본다."""
     h = user.held
     if h and total > 0:
-        if h == "LIFEORB" and user.alive():
+        # 우격다짐이 붙은 기술이면 생명의구슬 반동도 조개껍질방울 회복도 없다 (쇼다운 AfterMoveSecondarySelf)
+        sf = _sheer(user, move)
+        if h == "LIFEORB" and user.alive() and not sf:
             _chip(user, who, user.maxhp // 10, ev,
                   "%s 은(는) 생명의구슬로 체력이 조금 깎였다!" % user.name)
-        elif h == "SHELLBELL":
+        elif h == "SHELLBELL" and not sf:
             _heal(user, who, total // 8, ev,
                   "%s 은(는) 조개껍질방울로 체력을 조금 회복했다!" % user.name)
     ht = target.held
@@ -599,10 +607,11 @@ def after_hit(bt, user, who, target, who_t, move, eff, total, ev):
             _react(bt, user, who, target, who_t, move, eff, ev)
 
 
-def flinch(bt, user, target, move):
-    """왕의징표석·예리한이빨. 기술에 이미 풀죽음이 있으면 안 겹친다."""
+def flinch(bt, user, target, move, mult=1.0):
+    """왕의징표석·예리한이빨: 10% (mult - 하늘의은총이면 두 배). 기술에 이미 풀죽음이 있으면 안 겹친다 - 우격다짐이
+    그 풀죽음을 지웠으면 붙는다 (쇼다운: 우격다짐이 먼저 지우고 왕의징표석이 붙인다). 막는 것은 battle._use 가 본다."""
     if user.held in FLINCH_10 and target.alive() and MC.attacks(move) \
-            and not move.get("flinch") and bt.rng.random() < 0.1:
+            and (not move.get("flinch") or _sheer(user, move)) and bt.rng.random() < 0.1 * mult:
         target.flinched = True
 
 
@@ -784,6 +793,9 @@ def _react(bt, user, who, target, who_t, move, eff, ev):
     ht = target.held
     mtype, cat = move.get("type"), move.get("cat")
     fixed = move.get("_fixed") is not None or MC.key(move) in MC.FIXED
+    # 우격다짐이 붙은 기술이면 악키 · 타라프열매 · 탈출버튼 · 레드카드가 안 움직인다 (쇼다운 AfterMoveSecondary).
+    # 약점보험 · 구근 · 충전지 …는 맞은 것만 보므로 그대로다 (DamagingHit).
+    sf = _sheer(user, move)
     if ht == "WEAKNESSPOLICY" and eff > 1 and not fixed:
         _consume(target)
         _say(ev, who_t, "%s 의 약점보험이 발동했다!" % target.name)
@@ -793,15 +805,15 @@ def _react(bt, user, who, target, who_t, move, eff, ev):
         _consume(target)
         _say(ev, who_t, _josa("%s의 %s이(가) 반응했다!" % (target.name, name(ht))))
         _stat_up(bt, target, who_t, HIT_TYPE_BOOST[ht][1], 1, ev)
-    elif ht in HIT_CAT_BERRY and cat == HIT_CAT_BERRY[ht][0]:
+    elif ht in HIT_CAT_BERRY and cat == HIT_CAT_BERRY[ht][0] and not sf:
         _consume(target)
         _say(ev, who_t, "%s 은(는) %s를 먹었다!" % (target.name, name(ht)))
         _stat_up(bt, target, who_t, HIT_CAT_BERRY[ht][1], 1, ev)
-    elif ht == "EJECTBUTTON" and _can_leave(bt):
+    elif ht == "EJECTBUTTON" and not sf and _can_leave(bt):
         _consume(target)
         target.cond["eject"] = "out"               # 기술이 끝난 뒤에 물러난다 (settle)
         _say(ev, who_t, "%s 은(는) 탈출버튼으로 돌아가려 한다!" % target.name)
-    elif ht == "REDCARD" and user.alive() and _can_leave(bt):
+    elif ht == "REDCARD" and not sf and user.alive() and _can_leave(bt):
         _consume(target)
         user.cond["eject"] = "drag"                # 때린 쪽이 끌려 나간다 (settle)
         _say(ev, who_t, "%s 은(는) %s 에게 레드카드를 내밀었다!" % (target.name, user.name))
@@ -845,9 +857,9 @@ def on_miss(bt, user, who, ev):
 
 
 def after_move(bt, user, who, move, ev):
-    """기술을 다 쓴 뒤. 목스프레이: 소리 기술을 쓰면 특수공격 +1 (한 번)."""
+    """기술을 다 쓴 뒤. 목스프레이: 소리 기술을 쓰면 특수공격 +1 (한 번). 우격다짐이 붙은 기술이면 안 움직인다."""
     if user.held == "THROATSPRAY" and not user.used and user.alive() \
-            and "sound" in (move.get("flags") or ()):
+            and "sound" in (move.get("flags") or ()) and not _sheer(user, move):
         _consume(user)
         _say(ev, who, "%s 의 목스프레이가 발동했다!" % user.name)
         _stat_up(bt, user, who, "spa", 1, ev)
