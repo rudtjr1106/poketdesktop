@@ -24,6 +24,7 @@
 도트 위에 작은 체력바만 띄우고, 나머지는 도트의 움직임과 이펙트,
 급소/효과 같은 짧은 글씨로 보여준다.
 """
+import time
 import traceback
 
 from common.korean import natural
@@ -46,6 +47,9 @@ CAUGHT_MS = 1500           # 잡은 뒤 '○○을 잡았다!' · '+exp' 를 읽
 HOLD_MS = 10000            # 잡기 모드로 멈췄다가 다시 싸우기까지
 HINT_MS = 2500             # 멈춘 동안 '지금 던지세요' 를 다시 띄우는 간격
 AUTO_GAP_MS = 350          # 잡힐 때까지 계속 던지기 (2.1.3): 놓친 턴을 다 그린 뒤 다음 볼까지
+NO_BALL_COLOR = "#ff8a8a"  # '볼이 없습니다' (게시판 #711)
+NO_BALL_MS = 1400
+NO_BALL_GAP = 1.0          # 광클해도 같은 글은 이 초 안에 한 번만 (글씨가 겹쳐 쌓이지 않게)
 # 한 번 이어 던지는 최대 개수는 설정 autoThrowMax (볼 메뉴 '최대 N개까지', 2.2.1 게시판 #460) - ball_menu.auto_max
 
 
@@ -63,6 +67,15 @@ def on_screen(pet):
         return bool(pet.win.winfo_viewable())
     except Exception:                                       # noqa: BLE001
         return False
+
+
+def ball_gone(err):
+    """서버가 '그 볼이 없다' 로 거절했나 (409 '○○ 이(가) 없습니다.' - battle_routes · main 의 _take_ball).
+
+    같은 409 라도 '데리고 있는 포켓몬이 없습니다.' · '이미 끝난 배틀입니다.' 는 아니다.
+    """
+    msg = getattr(err, "message", None) or str(err or "")
+    return getattr(err, "status", 0) == 409 and "이(가) 없습니다" in msg
 
 
 def flee_news(events):
@@ -473,8 +486,46 @@ class DesktopBattle(object):
         if self.closed or not self.holding or self.menu_open or not self.foe:
             return
         if on_screen(self.foe):
-            self.float_over(self.foe, "지금 던지세요!", "#ffd447")
+            if self._any_ball():
+                self.float_over(self.foe, "지금 던지세요!", "#ffd447")
+            else:
+                # 던질 볼이 하나도 없다 (게시판 #711 사뚱). 예전에는 그래도 '지금 던지세요!' 를 띄워서 두 번 클릭을
+                # 거듭했는데 아무 일도 없다가 10초 뒤 끝까지 싸워 메타몽을 쓰러뜨렸다
+                self._no_ball()
         self.hint_job = self.after(HINT_MS, self._hint)
+
+    # ---------------- 볼이 없을 때 (게시판 #711) ----------------
+    def _any_ball(self):
+        """던질 볼이 하나라도 있나 (몬스터볼 · 메뉴의 다른 볼 · 마스터볼)."""
+        if int(self.app.balls or 0) > 0:
+            return True
+        return any(int(o.get("count") or 0) > 0 for o in self.ball_opts or ())
+
+    def _pick_ball(self):
+        """볼을 안 고르고 던졌다 (두 번 클릭): 마지막에 쓴 볼. **그 볼이 떨어졌으면 몬스터볼** (wild_ui.last_ball 과
+        같다). 예전에는 개수를 안 보고 마지막 볼을 보내서, 슈퍼볼을 다 쓴 뒤에는 서버가 409 로 거절할 뿐이었다."""
+        want = self.app.settings.get("lastBall") or "POKEBALL"
+        for o in self.ball_opts or ():
+            if o.get("id") == want and int(o.get("count") or 0) > 0:
+                return want
+        return "POKEBALL"
+
+    def _no_ball(self, text=None):
+        """볼이 없다고 야생 머리 위에 띄운다. notify 는 화면에 안 뜬다 (app.notify). 같은 글은 NO_BALL_GAP 안에 한 번만."""
+        if text is None:
+            other = any(int(o.get("count") or 0) > 0 and o.get("id") != "POKEBALL" for o in self.ball_opts or ())
+            if other and int(self.app.balls or 0) <= 0:
+                text = "몬스터볼이 없습니다 · 오른쪽 클릭으로 다른 볼"
+            else:
+                text = "볼이 없습니다" + (" · 왼쪽 클릭하면 싸웁니다" if self.holding else "")
+        now = time.time()
+        last = getattr(self, "_no_ball_said", None)
+        if last and last[0] == text and now - last[1] < NO_BALL_GAP:
+            return
+        self._no_ball_said = (text, now)
+        pet = self.foe if (self.foe and on_screen(self.foe)) else (self.mine or self.foe)
+        if pet is not None:
+            self.float_over(pet, text, NO_BALL_COLOR, ms=NO_BALL_MS)
 
     def _cancel_hold_jobs(self):
         for name in ("hold_job", "hint_job"):
@@ -596,6 +647,9 @@ class DesktopBattle(object):
                 head += "  " + natural("%s 을(를) 주웠다!" % drop["kr"])
                 if self.mine:
                     self.float_over(self.mine, drop["kr"], "#ffd447")
+                changed = getattr(self.app, "bag_changed", None)
+                if changed is not None:
+                    changed()               # 열어 둔 가방에도 (게시판 #711)
             tm = result.get("tmDrop")
             if tm:
                 head += "  " + natural("%s 을(를) 주웠다!" % tm["label"])
@@ -760,21 +814,30 @@ class DesktopBattle(object):
         if self.closed:
             # 볼 메뉴가 열린 사이에 판이 끝났다 (맥은 메뉴가 열려 있어도 턴이 돈다). 말없이 버리지 않는다 (#280).
             return self._late_ball("배틀이 끝나서 볼을 던지지 않았다")
-        ball = ball or (self.app.settings.get("lastBall") or "POKEBALL")
+        ball = ball or self._pick_ball()
         if not _auto:
-            # 사람이 던졌다 (메뉴 · 두 번 클릭): 계속 던지기가 켜져 있으면 이 볼로 잡힐 때까지 (마스터볼은 한 번)
+            # 사람이 던졌다 (메뉴 · 두 번 클릭): 하던 계속 던지기는 멈춘다
             self.stop_auto()
-            if self._auto_setting() and ball != ball_menu.MASTER:
-                self.auto_ball, self.auto_n = ball, 0
-                if not self.holding:
-                    # **싸우는 중에 던져도** 그때부터 싸움을 멈추고 잡힐 때까지 던진다 (2.2.1, 게시판 #466 우가우가).
-                    # 예전에는 '지금 던지세요!' 로 멈춘 동안에만 이어 던져서, 싸우다 던지면 한 번 던지고 다시 싸웠다
-                    # (이미 잡은 종 · 잡기 모드를 끈 사람은 멈추는 때가 없다). 끝까지 싸우기도 푼다 - 잡을 생각이다
-                    self.holding = True
-                    self.finish = False
-                    self._cancel_hold_jobs()
         if ball == "POKEBALL" and self.app.balls <= 0:
-            return self.app.notify("몬스터볼이 없습니다.")
+            # **볼을 먼저 본다** (게시판 #711). 예전에는 아래 계속 던지기가 멈춤(holding)을 켜고 10초 타이머를 지운
+            # 뒤에 여기서 돌아가, 배틀이 안내도 타이머도 없이 멈춰 있었다. 볼이 없으면 멈춤 · 타이머를 건드리지
+            # 않는다 - 싸우던 판은 그대로 싸우고, 멈춘 중이면 10초가 그대로 흐른다 (왼쪽 클릭하면 바로 싸운다)
+            self.stop_auto()
+            self.app.notify("몬스터볼이 없습니다.")
+            self._no_ball()
+            if self.holding and self.hold_job is None and not self.menu_open and not self.busy and not self.playing:
+                self.start_hold(None)       # 계속 던지기가 지운 10초를 다시 건다 (그사이 볼이 떨어졌다)
+            return
+        if not _auto and self._auto_setting() and ball != ball_menu.MASTER:
+            # 계속 던지기가 켜져 있으면 이 볼로 잡힐 때까지 (마스터볼은 한 번)
+            self.auto_ball, self.auto_n = ball, 0
+            if not self.holding:
+                # **싸우는 중에 던져도** 그때부터 싸움을 멈추고 잡힐 때까지 던진다 (2.2.1, 게시판 #466 우가우가).
+                # 예전에는 '지금 던지세요!' 로 멈춘 동안에만 이어 던져서, 싸우다 던지면 한 번 던지고 다시 싸웠다
+                # (이미 잡은 종 · 잡기 모드를 끈 사람은 멈추는 때가 없다). 끝까지 싸우기도 푼다 - 잡을 생각이다
+                self.holding = True
+                self.finish = False
+                self._cancel_hold_jobs()
         if self.busy or self.playing:
             # 서버를 기다리거나 이번 턴을 그리는 중이다. 버리지 않고 턴이 끝나면 던진다.
             self.pending_ball = ball
@@ -789,6 +852,14 @@ class DesktopBattle(object):
                 return
             if err:
                 self.app.notify(getattr(err, "message", str(err)))
+                if ball_gone(err):
+                    # 그 볼이 없다 (가진 줄 알았던 마지막 볼 · 다른 PC 에서 썼다). 화면에 띄우고, 다음 두 번 클릭이
+                    # 같은 볼로 또 거절당하지 않게 그 볼을 0개로 적어 둔다 (게시판 #711)
+                    self.ball_opts = [dict(o, count=0) if o.get("id") == ball else o for o in self.ball_opts or ()]
+                    if ball == "POKEBALL":
+                        self.app.balls = 0
+                    self._no_ball(natural(getattr(err, "message", "") or "볼이 없습니다").rstrip(".")
+                                  + (" · 왼쪽 클릭하면 싸웁니다" if self.holding else ""))
                 # 못 던졌어도 판은 이어져야 한다 (멈춘 중이면 다시 기다린다)
                 return self.turn_done({})
             self.playing = True             # 볼 연출이 끝나면 after_ball -> turn_done 이 푼다
@@ -796,6 +867,9 @@ class DesktopBattle(object):
             if r.get("ballOptions") is not None:
                 self.ball_opts = r["ballOptions"]
             self.app.refresh_tray()
+            changed = getattr(self.app, "bag_changed", None)
+            if changed is not None:
+                changed()                   # 열어 둔 가방의 볼 개수도 (게시판 #711)
             self.app.wild.play_catch(
                 r, on_done=lambda: self._safe(self.after_ball, r))
         run_async(self.root,

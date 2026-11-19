@@ -216,6 +216,19 @@ def main():
     chk("도구 칸이 다시 보인다", tabs.holders["items"].winfo_ismapped()
         and not tabs.holders["tms"].winfo_ismapped())
 
+    print("\n=== 가방 속이 바뀌면 다시 볼 때 읽는다 (게시판 #711) ===")
+    n_shop = api.calls.count(("GET", "/api/shop"))
+    hub.show("bag")                                   # 이미 그 탭 - on_shown 만
+    settle(root, 0.2)
+    chk("방금 읽었고 바뀐 것이 없으면 다시 안 읽는다", api.calls.count(("GET", "/api/shop")) == n_shop)
+    tabs.bag.stale = True                             # 볼을 던졌다 (app.bag_changed)
+    hub.show("bag")
+    chk("바뀌었으면(stale) 다시 볼 때 읽는다", wait(root, lambda: api.calls.count(("GET", "/api/shop")) > n_shop))
+    chk("  조용히 - 여는 중 표시를 안 덮는다", tabs.bag._wait is None)
+    chk("  다 읽으면 표시가 꺼진다", wait(root, lambda: not tabs.bag._loading) and not tabs.bag.stale
+        and tabs.bag._loaded_at > 0 and tabs.bag is bag_before)
+    settle(root, 0.2)
+
     print("\n=== 탭 묶음 (2026-10-25) ===")
     chk("위 탭은 묶음 일곱 개 (11/08 이벤트)", [g[1] for g in ui_hub.GROUPS]
         == ["포켓몬", "가방", "상점", "모험", "커뮤니티", "이벤트", "마이페이지"]

@@ -20,6 +20,7 @@
   이 창은 목록이 둘이라 어느 쪽을 굴릴지 그때그때 정해야 한다.
 """
 import datetime
+import time
 import tkinter as tk
 from tkinter import ttk
 
@@ -721,6 +722,13 @@ class BagWindow(object):
         self.stat_needed = False
         self._pending = None     # 다시 불러온 뒤에 띄울 말
         self._wait = None        # 여는 중 표시
+        # 가방을 다시 읽을 때 (게시판 #711). 이 칸은 처음 열 때 읽은 개수를 계속 보여 줬다 - 볼을 던지고 잡고
+        # 사도 그대로였다. 바뀌면 앱이 stale 을 켜고(app.bag_changed) 다시 볼 때 가방 탭이 읽는다 (BagTabs.on_shown)
+        self.stale = False       # 읽은 뒤에 가방 속이 바뀌었다
+        self._loaded_at = 0.0    # 마지막으로 다 읽은 때 (time.time)
+        self._loading = False    # 서버에서 읽는 중
+        self._load_n = 0         # 몇 번째로 읽기 시작했나 - 앞서 시작한 것의 답이 늦게 오면 버린다
+        self._stale_job = None   # 보고 있을 때 잠깐 뒤 다시 읽기 (app.bag_changed 가 건다 - 한 번에 하나)
         self._states = {}        # {포켓몬id: (good, blocked, note, color)} — 고른 도구 기준
         self._mon_ids = set()
         self._view = []          # 오른쪽 목록에 보이는 포켓몬 - 찾는 말로 거르고 줄 세운 것 (1.13.1)
@@ -1009,14 +1017,21 @@ class BagWindow(object):
         return next((m for m in self.mons if m["id"] == self.mon_id), None)
 
     # ---------------- 데이터 ----------------
-    def reload(self):
+    def reload(self, quiet=False):
+        """서버에서 가방을 다시 읽는다. quiet: 저절로 다시 읽기 (게시판 #711 - 볼을 쓴 뒤 · 다시 볼 때) - 여는 중 표시를
+        안 덮고 아래 줄의 말도 그대로 둔다. 보던 것이 그 자리에서 새 개수로 바뀐다."""
         if not self.app.api:
             return self.say("로그인이 필요합니다.", U.DANGER, U.DANGER)
         # 여는 중 표시가 이미 떠 있으면 하나 더 띄우지 않는다. 겹쳐 띄우면
         # 먼저 온 답이 나중 것만 걷고, 먼저 띄운 것은 창을 덮은 채 남는다.
-        if not self._pending and self._wait is None:
+        if not quiet and not self._pending and self._wait is None:
             self.say("가방을 여는 중...", U.FG_FAINT)
             self._wait = ui_loading.Overlay(self.win, "가방을 여는 중")
+        # 읽기 시작할 때 stale 을 끈다 - 읽는 사이에 또 바뀌면 다시 켜져서 다음에 또 읽는다
+        self.stale = False
+        self._loading = True
+        self._load_n += 1
+        n = self._load_n
         api = self.app.api
 
         def work():
@@ -1053,19 +1068,28 @@ class BagWindow(object):
             except Exception:                           # noqa: BLE001
                 pass
             return shop, mons, thumbs, deco
-        U.run_async(self.root, work, self._loaded)
+        U.run_async(self.root, work, lambda r, err: self._loaded(r, err, n, quiet))
 
-    def _loaded(self, r, err):
+    def _loaded(self, r, err, n=None, quiet=False):
+        if n is not None and n != self._load_n:
+            # 그사이 다시 읽기 시작했다 (저절로 다시 읽기와 팔기 · 쓰기가 겹쳤다). 먼저 보낸 것의 답은 그 전의
+            # 가방일 수 있어 버린다 - 나중 것의 답이 그린다 (여는 중 표시도 그쪽이 걷는다)
+            return
+        self._loading = False
         w, self._wait = self._wait, None
         if not self.alive:
             if w:
                 w.close()
             return
         if err:
+            self.stale = True                  # 못 읽었다 - 다시 볼 때 또 읽는다
             if w:
                 w.close()
+            if quiet:
+                return                         # 저절로 읽은 것이 실패했다고 보던 칸에 빨간 말을 띄우지 않는다
             return self.say(getattr(err, "message", str(err)), U.DANGER,
                             U.DANGER)
+        self._loaded_at = time.time()
         shop, mons, thumbs, deco = r
         self.items = list(shop.get("items") or [])
         self.bag = dict(shop.get("bag") or {})
@@ -1110,7 +1134,7 @@ class BagWindow(object):
             text, color = self._pending
             self._pending = None
             self.say(text, color)
-        else:
+        elif not quiet:
             self.say("")
 
         if w:
@@ -1957,6 +1981,12 @@ class BagWindow(object):
     # ---------------- 끝내기 ----------------
     def close(self):
         self.alive = False
+        job, self._stale_job = getattr(self, "_stale_job", None), None
+        if job is not None:
+            try:
+                self.root.after_cancel(job)
+            except Exception:                               # noqa: BLE001
+                pass
         if getattr(self.app, "bag_window", None) is self:
             self.app.bag_window = None
         try:

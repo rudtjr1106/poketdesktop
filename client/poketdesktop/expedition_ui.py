@@ -237,6 +237,9 @@ class Desk(object):
             # 가방이 바뀌었다 - 열려 있는 가방·상점·관리 창이 새 값을 보게 한다
             self.app.balls = r.get("balls", self.app.balls)
             self.app.money = r.get("money", self.app.money)
+            changed = getattr(self.app, "bag_changed", None)
+            if changed is not None:
+                changed()                    # 열어 둔 가방 도구 칸도 다시 읽게 (게시판 #711 - 전에는 app 값만 바꿨다)
             tms = sum(1 for g in got if g.get("tm"))
             got_tm = getattr(self.app, "got_tm", None)
             if tms and got_tm:

@@ -297,6 +297,47 @@ def run():
     chk("서버가 거절하면(사라짐) 멈춘다", w.auto_ball is None and "사라졌습니다" in app.notes[-1]
         and len(app.api.thrown) == 2, app.notes[-1:])
 
+    print("\n=== 볼이 없을 때 (게시판 #711 사뚱)")
+    # notify 는 화면에 안 뜬다. 두 번 클릭을 거듭해도 아무 일도 없어 보였다 - 야생 머리 위에 띄운다
+    app = App([], balls=0, auto=False)
+    floats = []
+    app.float_at = lambda x, y, text, color="", ms=0: floats.append((x, y, text))
+    w = ctl(app, [dict(o, count=0) for o in OPTS])
+    w.throw_ball()
+    chk("몬스터볼이 0개면 두 번 클릭에 '몬스터볼이 없습니다' 를 야생 위에", floats == [(120.0, 94, "몬스터볼이 없습니다")]
+        and app.api.thrown == [] and app.notes[-1] == "몬스터볼이 없습니다.", (floats, app.notes[-1:]))
+    for _ in range(4):
+        w.throw_ball()
+    chk("  광클해도 1초 안에는 한 번만 (글씨가 쌓이지 않는다)", len(floats) == 1, floats)
+    w.ball_options = [dict(o, count=0) if o["id"] == "POKEBALL" else o for o in OPTS]
+    w.throw_ball()
+    chk("  다른 볼이 있으면 오른쪽 클릭으로 고르라고", floats[-1][2] == "몬스터볼이 없습니다 · 오른쪽 클릭으로 다른 볼"
+        and app.api.thrown == [], floats[-1:])
+
+    class NoBall(Exception):
+        status = 409
+        message = "슈퍼볼 이(가) 없습니다."
+    app = App([NoBall()])
+    floats = []
+    app.float_at = lambda x, y, text, color="", ms=0: floats.append(text)
+    w = ctl(app, OPTS)
+    w.throw_ball("GREATBALL")
+    chk("서버가 '슈퍼볼 이(가) 없습니다.' 로 거절해도 야생 위에", floats == ["슈퍼볼이 없습니다"]
+        and app.notes[-1] == "슈퍼볼 이(가) 없습니다.", (floats, app.notes[-1:]))
+    app = App([miss(10)])
+    floats, changed = [], []
+    app.float_at = lambda x, y, text, color="", ms=0: floats.append(text)
+    app.bag_changed = lambda: changed.append(1)
+    w = ctl(app, OPTS)
+    w.throw_ball("GREATBALL")
+    chk("다른 거절이나 놓침은 그런 말이 없고, 던지면 가방에 알린다 (열어 둔 가방의 개수)", floats == [] and changed == [1],
+        (floats, changed))
+    app = App([caught(10)])
+    app.bag_changed = lambda: changed.append(2)
+    w = ctl(app, OPTS)
+    w.throw_ball("GREATBALL")
+    chk("  잡아도 알린다 (주운 도구 · 기술머신)", changed == [1, 2, 2], changed)
+
 
 if __name__ == "__main__":
     sys.exit(main())

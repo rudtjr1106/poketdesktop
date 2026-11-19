@@ -897,6 +897,9 @@ class ShopWindow(object):
             self._paint_money()
             self._refresh_counts()
             self.say(res.get("message") or "됐습니다.", U.GOOD)
+            changed = getattr(self.app, "bag_changed", None)
+            if changed is not None:
+                changed()                   # 열어 둔 가방도 새 개수로 (게시판 #711)
             # 트레이의 몬스터볼 수를 서버 값과 맞춘다.
             try:
                 self.app.request_sync()
