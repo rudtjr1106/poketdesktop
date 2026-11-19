@@ -241,6 +241,9 @@ class App(object):
         # tk.Tk() **뒤에** 불러야 한다 (Tk 이 정책을 되돌려 놓는다).
         PLAT.hide_from_dock()
         PLAT.dpi_aware()
+        # 켤 때의 tk scaling 을 붙잡는다 (윈도우만, 게시판 #707): 켜 둔 사이 화면 배율이 바뀌면 새 글꼴만 커져서
+        # 바탕화면에 떠 있던 글꼴(FONT_S)과 크기가 섞였다. 글꼴을 만들기 전에 건다.
+        PLAT.pin_tk_scaling(self.root)
         U.init_fonts(self.root)
         apply_theme(self.root)
         # 포커스 지키기 (2.1.3, 게시판 #444): 바탕화면의 도트 · 이름표 · 연출 창이 떠도 쓰던 창의 포커스를 안
