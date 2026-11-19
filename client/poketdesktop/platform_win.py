@@ -443,6 +443,11 @@ def pin_tk_scaling(root, every_ms=500):
 
     dpi_aware 를 tk.Tk() 앞으로 옮기면 안 된다 - 켤 때부터 글꼴이 1.5배가 되는데 칸 · 줄 높이(h() · COLS)는
     픽셀 그대로라 모든 창이 넘친다.
+
+    비교는 **상대 1%** 다 (절대 1e-3 이 아니다). Tk 은 scaling 을 화면 폭의 정수 mm 로 들고 있다 (tkCmds.c:
+    읽기 25.4/72*W/mm, 쓰기 mm=(int)(25.4/72/v*W+0.5)). WM_DISPLAYCHANGE 는 새 폭 W 로 mm 를 다시 잰다.
+    그래서 W 가 켤 때와 다르면 want 를 넣고 다시 읽어도 0.5/mm 만큼(1920 폭에서 약 0.1%) 어긋난다 - 절대 1e-3 이면
+    0.5초마다 '되돌림' 을 끝없이 남겼다 (하루 17만 줄). 해상도만 바뀐 100% 화면도 그랬다. 진짜 배율은 25% 씩 바뀐다.
     """
     import tkinter as tk
     have = getattr(root, "_pin_tk_scaling", None)
@@ -457,7 +462,7 @@ def pin_tk_scaling(root, every_ms=500):
         """지금 값이 켤 때와 다르면 되돌린다. 계속 볼 수 있으면 True (root 가 없어졌으면 False)."""
         try:
             now = float(root.tk.call("tk", "scaling"))
-            if abs(now - want) > 1e-3:
+            if abs(now - want) > want * 0.01:               # mm 반올림(폭이 바뀌면 생김)은 넘기고 배율만 본다
                 root.tk.call("tk", "scaling", want)
                 from . import config
                 config.log("tk scaling %.3f -> %.3f 되돌림 (화면 배율이 바뀜, 게시판 #707)" % (now, want))
