@@ -53,6 +53,9 @@ single_release = _M.single_release
 data_dir = _M.data_dir
 machine_raw = _M.machine_raw
 dpi_aware = _M.dpi_aware
+# 켤 때의 tk scaling 을 붙잡는다 (윈도우만, 게시판 #707). **getattr 로** - platform_mac 은 platform_base 를
+# import 하지 않아서 _M.pin_tk_scaling 로 쓰면 맥이 import 에서 죽는다. 맥 aqua 는 pt 글꼴이 scaling 을 안 따른다.
+pin_tk_scaling = getattr(_M, "pin_tk_scaling", lambda root, every_ms=500: None)
 before_tk = getattr(_M, "before_tk", lambda: None)
 gui_ready = getattr(_M, "gui_ready", lambda: True)
 hide_from_dock = _M.hide_from_dock

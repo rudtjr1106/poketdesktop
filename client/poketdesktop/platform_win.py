@@ -430,6 +430,57 @@ def dpi_aware():
         pass
 
 
+def pin_tk_scaling(root, every_ms=500):
+    """켤 때의 tk scaling 을 붙잡아 둔다. 바뀌면 되돌린다 (게시판 #707). 확인 함수를 돌려준다.
+
+    tk.Tk() 가 dpi_aware() 보다 먼저라 Tk 은 96 DPI(1.333)로 잡힌다. 켜 둔 사이 WM_DISPLAYCHANGE 가 오면
+    (모니터 절전 · 연결 · 해상도 - 추정) Tk 이 그때는 실제 DPI 로 다시 재서 150% 화면이면 2.0 이 된다. 그 뒤 새로
+    만드는 글꼴만 커지고, 바탕화면에 떠 있던 글꼴(FONT_S = FONT_TIP)은 캐시에 옛 크기로 남아 섞였다.
+
+    0.5초마다 보고 다르면 켤 때 값으로 되돌린다. 되돌릴 때마다 로그에 남긴다 (언제 바뀌는지 보려고).
+    확인 함수는 root._pin_tk_scaling 에 둔다 - style_window 가 창을 만들 때 한 번 더 부른다 (0.5초 틈).
+    Tk 만 부른다 - 윈도우 API 를 안 쓰니 맥에서도 돈다 (검사가 맥에서 돈다). 맥은 platform_os 가 안 건다.
+
+    dpi_aware 를 tk.Tk() 앞으로 옮기면 안 된다 - 켤 때부터 글꼴이 1.5배가 되는데 칸 · 줄 높이(h() · COLS)는
+    픽셀 그대로라 모든 창이 넘친다.
+    """
+    import tkinter as tk
+    have = getattr(root, "_pin_tk_scaling", None)
+    if have is not None:                                    # 두 번 불러도 고리는 하나
+        return have
+    try:
+        want = float(root.tk.call("tk", "scaling"))
+    except (tk.TclError, ValueError):
+        return None
+
+    def check():
+        """지금 값이 켤 때와 다르면 되돌린다. 계속 볼 수 있으면 True (root 가 없어졌으면 False)."""
+        try:
+            now = float(root.tk.call("tk", "scaling"))
+            if abs(now - want) > 1e-3:
+                root.tk.call("tk", "scaling", want)
+                from . import config
+                config.log("tk scaling %.3f -> %.3f 되돌림 (화면 배율이 바뀜, 게시판 #707)" % (now, want))
+            return True
+        except (tk.TclError, ValueError):
+            return False
+
+    def tick():
+        if not check():
+            return
+        try:
+            root.after(every_ms, tick)
+        except tk.TclError:
+            pass
+
+    root._pin_tk_scaling = check
+    try:
+        root.after(every_ms, tick)
+    except tk.TclError:
+        return None
+    return check
+
+
 # ---------------------------------------------------------------- 글꼴
 def font_candidates():
     return ["맑은 고딕", "Malgun Gothic"]
