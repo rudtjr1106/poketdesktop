@@ -425,6 +425,52 @@ def behave(root, dex):
         pass
 
 
+def reload_switch(root, dex):
+    """다 써서 다른 도구로 넘어가는 사이 '직접 고름' 이 되살아나지 않는다 (#704 리뷰).
+
+    은색 1 · 이상한사탕 1. 은색으로 따라큐를 직접 눌러 쓴다 -> 다 써서 이상한사탕으로 넘어가고 따라큐를 이어받는다
+    -> 그사이 은색을 새로 얻는다(상점 등) -> 이어받은 따라큐에게 이상한사탕을 그대로 쓴다 -> 다 써서 다시 은색으로.
+    이때 따라큐가 저절로 골라지면 안 된다 (이어받은 것이지 은색으로 직접 누른 것이 아니다)."""
+    print("9. 다 써서 도구가 바뀌어 가도 직접 고름이 되살아나지 않는다")
+    raw = json.load(open(os.path.join(DATA, "items.json"), encoding="utf-8"))["items"]
+    api = Api(account(dex), [dict(raw[k]) for k in ("BOTTLECAP", "RARECANDY")])
+    api.bag = {"BOTTLECAP": 1, "RARECANDY": 1}
+    app = App(root, api, dex)
+    top = tk.Toplevel(root)
+    top.geometry("1040x640+30+30")
+    tabs = ui_bag_tabs.BagTabs(root, app, top)
+    tabs.win.pack(fill="both", expand=True)
+    w = tabs.bag
+    BL.wait(root, lambda: bool(w.mons) and w._wait is None, 15)
+    settle(root, 0.5)
+    real_confirm = ui_box.confirm
+    ui_box.confirm = lambda *a, **k: True
+    try:
+        click_item(w, "BOTTLECAP")
+        settle(root, 0.2)
+        click_mon(w, MIMIKYU)
+        settle(root, 0.2)
+        w.pick_stat("spe")
+        w.do_use()
+        BL.wait(root, lambda: len(api.used) >= 1 and w._wait is None, 8)
+        settle(root, 0.4)
+        chk("  은색을 다 쓰면 이상한사탕으로 넘어가고 따라큐를 이어받는다", w.item_id == "RARECANDY"
+            and w.mon_id == MIMIKYU, (w.item_id, w.mon_id))
+        api.bag["BOTTLECAP"] = 1                 # 다른 탭(상점)에서 새로 샀다 - 가방은 아직 안 불러옴
+        w.do_use()                               # 이어받은 따라큐에게 이상한사탕 (누르지 않음)
+        BL.wait(root, lambda: len(api.used) >= 2 and w._wait is None, 8)
+        settle(root, 0.4)
+        chk("  다시 은색으로 넘어가도 따라큐가 저절로 골라지지 않는다", w.item_id == "BOTTLECAP"
+            and w.mon_id is None and not w.use_btn.enabled, (w.item_id, w.mon_id, w.use_btn.enabled))
+    finally:
+        ui_box.confirm = real_confirm
+    tabs.close()
+    try:
+        top.destroy()
+    except tk.TclError:
+        pass
+
+
 def main():
     dex = P.Pokedex(json.load(open(os.path.join(DATA, "pokedex.json"), encoding="utf-8")))
     if SKIN == "default":
@@ -436,6 +482,7 @@ def main():
     U.init_fonts(root)
     U.apply_theme(root)
     behave(root, dex)
+    reload_switch(root, dex)
     try:
         root.destroy()
     except tk.TclError:

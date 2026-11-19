@@ -1136,6 +1136,10 @@ class BagWindow(object):
             target = keep_item
         else:
             target = self._first_item()
+        if target != keep_item:
+            # 다 써서 다른 도구로 넘어간다 - 앞 도구 때 직접 누른 포켓몬은 새 도구의 '직접 고름' 이 아니다 (게시판 #704).
+            # (그대로 두면 은색병뚜껑 -> 이상한사탕 -> 다시 은색병뚜껑 으로 넘어가는 사이 이어받은 포켓몬이 되살아난다)
+            self._user_pick = None
         self.item_id = target
         self._fill_items()
         self._fill_mons()
@@ -1312,8 +1316,9 @@ class BagWindow(object):
         if prev != item_id:
             if prev is not None:
                 # 다른 도구로 옮겼다 - 앞 도구 때 누른 포켓몬은 새 도구의 '직접 고름' 이 아니다 (게시판 #704).
-                # 다시 불러올 때(_loaded)는 앞 도구를 None 으로 비우고 부르므로 그대로 남는다 - 같은 포켓몬에게
-                # 은색병뚜껑을 이어서 쓸 때 또 누르지 않아도 된다.
+                # 다시 불러올 때(_loaded)는 앞 도구를 None 으로 비우고 부르므로, **같은 도구로 다시 불러올 때만**
+                # 그대로 남는다 - 같은 포켓몬에게 은색병뚜껑을 이어서 쓸 때 또 누르지 않아도 된다 (도구가 바뀌면
+                # _loaded 가 지운다).
                 self._user_pick = None
             self._repaint_items()            # 보이는 줄만 다시 칠한다 (고름은 줄이 self.item_id 를 본다)
         it = self.current_item()
