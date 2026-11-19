@@ -1575,6 +1575,8 @@ class TrainerBattle(object):
             "mega": bool(f.mega),
             # 테라스탈한 타입 (2.5.0). 안 했으면 None. 상대 것도 보인다 - 본가처럼 드러난다.
             "tera": f.tera, "teraKr": dex.type_name(f.tera) if f.tera else None,
+            # 조이기류에 붙잡혀 있나 {move, moveKr, turns} (게시판 #664). 남은 턴은 내가 건 것만 - statusmoves.bound_view
+            "bound": SM.bound_view(self.bt, f, mine),
         }
         if mine or f.ab.get("shown"):
             out["ability"] = f.ability
@@ -1616,8 +1618,14 @@ class TrainerBattle(object):
             "canMega": bool(not self.over and not self.need_switch
                             and self.bt.can_mega("me")),
             "megaUsed": "me" in self.mega_done,
-            "me": {"slot": self.mi, "team": [self.side(f, True) for f in self.me_team]},
-            "foe": {"slot": self.fi, "team": foe_team},
+            # trapped: 교체가 막혔나 · noSwitch: 지금 스스로 바꿀 수 없는 까닭(화면 문구, 바꿀 수 있으면 None).
+            # 앱은 noSwitch 가 있으면 교체 단추를 잠근다 (게시판 #664 - 단추가 켜져 있어 묶기가 안 걸린 줄 알았다).
+            # 상대 쪽 trapped 는 보이는 것만으로 본다 (아름다운허물 · 특성끼리의 판정은 빼고).
+            "me": {"slot": self.mi, "team": [self.side(f, True) for f in self.me_team],
+                   "trapped": self.me.alive() and SM.trapped(self.bt, self.me),
+                   "noSwitch": None if (self.over or self.need_switch) else SM.switch_block(self.bt, self.me)},
+            "foe": {"slot": self.fi, "team": foe_team,
+                    "trapped": self.foe.alive() and SM.trap_kind(self.bt, self.foe, hidden=False) is not None},
             # 테라스탈 · Z기술 단추 (2.5.0 · 시즌 4): canTera(타입) · teraUsed · zMoves(무엇이 되는지) · zUsed
             "gimmick": B.gimmick_view(self.bt, "me", not self.over and not self.need_switch),
         }

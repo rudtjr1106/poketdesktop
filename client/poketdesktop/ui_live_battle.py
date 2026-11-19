@@ -31,6 +31,7 @@ from common import tint as T
 from common.korean import natural
 
 from . import battle_fx as FX
+from . import battle_trap as TR
 from . import effects, skins, sprite_cache, sprites
 from . import sendout_fx as SO
 from . import battle_zoom as Z
@@ -477,6 +478,8 @@ class LiveBattleWindow(Z.Resizable):
             bits.append(ui_gimmick.tera_tag(mon))      # 테라스탈한 동안 (2.5.0)
         if mon.get("statusKr"):
             bits.append(mon["statusKr"])
+        if TR.bound_tag(mon):
+            bits.append(TR.bound_tag(mon))             # 조이기류에 붙잡혀 있다 (게시판 #664)
         kr = {"atk": "공", "def": "방", "spa": "특공", "spd": "특방",
               "spe": "스피드", "acc": "명중", "eva": "회피"}
         for k, v in (mon.get("stages") or {}).items():
@@ -964,7 +967,8 @@ class LiveBattleWindow(Z.Resizable):
             return ("wait", self.view.get("phase"))
         if self.sent or me.get("chosen"):
             return ("sent",)
-        return ("act", self.view.get("phase"), me.get("slot"))
+        # 교체가 잠겼다 · 풀렸다도 다시 그릴 일이다 (게시판 #664 - 단추 · 글상자의 까닭)
+        return ("act", self.view.get("phase"), me.get("slot"), me.get("noSwitch"))
 
     def _paint_timer(self):
         left = max(0, int(self._deadline - time.time())) if self._deadline else 0
@@ -1029,10 +1033,11 @@ class LiveBattleWindow(Z.Resizable):
         if self.view.get("phase") == "switch":
             return self.open_switch(forced=True)
         moves = [self.gim.decorate(m) for m in (me.get("moves") or [])[:4]]
-        self._paint_moves(moves, bool(me.get("switches")))
+        # 붙잡혀 있으면 서버가 switches 를 비우고 noSwitch 에 까닭을 싣는다 (게시판 #664) - 잠그고 까닭을 띄운다
+        self._paint_moves(moves, bool(me.get("switches")) and not TR.locked(me))
         team = me.get("team") or []
         mon = team[me.get("slot", 0)] if team else {}
-        self.say("%s 은(는) 무엇을 할까?" % (mon.get("name") or ""))
+        self.say(TR.prompt(mon.get("name") or "", me))
 
     def _paint_wait(self, title, note):
         """고를 것이 없다 - 상대를 기다린다 (테마마다 그리는 곳). note 는 아랫줄 (없으면 None)."""
@@ -1110,6 +1115,8 @@ class LiveBattleWindow(Z.Resizable):
 
     def open_switch(self, forced=False):
         forced = forced or self.view.get("phase") == "switch"
+        if not forced and TR.locked(self.view.get("me")):
+            return self.show_commands()      # 붙잡혀 있다 - 교체 칸을 열지 않는다 (단추는 잠겨 있다)
         self.zoom_use()
         self._switching = not forced         # (스스로 연 교체 칸은 창 크기를 바꿔도 그대로 둔다)
         me = self.view.get("me") or {}
@@ -1179,8 +1186,9 @@ class LiveBattleWindow(Z.Resizable):
                 return
             if err:
                 self.sent = False
-                self.say(getattr(err, "message", str(err)))
-                return self.show_commands()
+                # 다시 그린 뒤에 거절한 까닭을 띄운다 (먼저 띄우면 '무엇을 할까?' 로 곧바로 덮인다)
+                self.show_commands()
+                return self.say(getattr(err, "message", str(err)))
             got = step_of(r)
             if kind == "forfeit" and r.get("state") == "done":
                 return self._leave_after_forfeit(r)

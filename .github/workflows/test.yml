@@ -160,6 +160,9 @@ jobs:
       # 쪽만 다음을 골라야 한다.
       - name: 실시간 배틀 (엔진)
         run: python common/test_live_battle.py
+      # 게시판 #664 뒤 (11/19): 붙잡혀 있는 것(조이기류 · 검은눈빛 …)을 view 에 싣는다 - 교체 잠금의 까닭 · 남은 턴(내가 건 것만)
+      - name: 붙잡힘 표시 (엔진 view)
+        run: python common/test_trap_view.py
       # 게으름·독치장 같은 특성과 역린류·2턴 기술, 속이기의 '첫 턴에만'.
       - name: 특성·턴제 기술 (엔진)
         run: python common/test_new_abilities.py
@@ -332,6 +335,10 @@ jobs:
       - name: 실시간 배틀 화면 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/test_live_ui.py
+      # 게시판 #664 뒤 (11/19): 붙잡히면 교체 단추를 잠그고 까닭 · 이름표 꼬리표를 띄운다 (관장 · 실시간, 기본 + DP 계열 테마)
+      - name: 붙잡힘 표시 · 교체 잠금 (진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_trap_ui.py
       # 배틀 창 크기 (1.10.3): 배틀 창을 끌어서 키우고 줄일 때 장면·도트·글자가 함께 따라가는지,
       # 어느 크기에서도 눌리는 것이 없는지, 판(고르던 칸·재생)이 그대로인지, 바꾼 크기를 기억하는지
       - name: 배틀 창 크기 (끌어서 바꿔 본다)
@@ -683,6 +690,8 @@ jobs:
           python client/test_auto_throw.py     # 2.1.1: 잡힐 때까지 계속 던지기 (#425)
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
+      - name: 붙잡힘 표시 · 교체 잠금 (진짜 Tk)
+        run: python client/test_trap_ui.py
       - name: 챔피언리그 독도 (진짜 Tk)
         run: python client/test_champion_ui.py
       # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
