@@ -3,6 +3,7 @@
 import os
 import random
 import sys
+import time
 import tkinter as tk
 
 from common import deco as DECO                # noqa: E402
@@ -773,6 +774,8 @@ class App(object):
                 return
             mons, paths, me, walks, friends = r
             if me:
+                if me.get("balls", self.balls) != self.balls:
+                    self.bag_changed()      # 선물 · 다른 PC 에서 쓴 볼 - 열어 둔 가방도 맞춘다 (게시판 #711)
                 self.balls = me.get("balls", self.balls)
                 self.money = me.get("money", self.money)
                 # 포켓몬과 집중하기: 진행 중인 집중을 이어 받는다 (다른 PC · 다시 켠 앱). 아래 알림보다 먼저
@@ -988,6 +991,36 @@ class App(object):
         self.bag_window = self.tm_window = pane
         if pane is not None:
             pane.show("tms")
+
+    # 가방 속이 바뀌었을 때 (게시판 #711 사뚱). 가방 탭의 도구 칸은 처음 열 때 읽은 개수를 그대로 보여 줘서, 볼을 다
+    # 던진 뒤에도 열어 둔 가방에는 볼이 남아 보였다. 볼을 던지거나 잡거나 사고팔거나 탐험 보상을 받으면 여기를 부른다.
+    BAG_RELOAD_MS = 1500      # 보고 있을 때 바뀐 뒤 이만큼 기다렸다 다시 읽는다 (이어 던지기 - 바뀐 것을 모아 한 번에)
+    BAG_RELOAD_GAP = 8.0      # 저절로 다시 읽기는 이보다 자주 안 한다 (초) - 읽기 한 번이 상점 · 포켓몬 목록 · 그림이라 무겁다
+
+    def bag_changed(self):
+        """가방 속이 바뀌었다. 열어 둔 도구 칸에 표시(stale)해 두면 다시 볼 때 가방 탭이 읽는다 (BagTabs.on_shown).
+        지금 그 칸을 보고 있으면 잠깐 뒤 **한 번만** 다시 읽는다 - 예약이 걸려 있으면 더 걸지 않는다."""
+        hub = self.hub
+        tabs = hub.panes.get("bag") if hub else None
+        pane = getattr(tabs, "bag", None) if tabs is not None else None
+        if pane is None or not getattr(pane, "alive", False):
+            return
+        pane.stale = True
+        if (hub.current != "bag" or getattr(tabs, "current", None) != "items"
+                or getattr(pane, "_stale_job", None) is not None):
+            return
+
+        def go():
+            pane._stale_job = None
+            if not pane.alive or not pane.stale:
+                return
+            if getattr(pane, "_loading", False):
+                # 읽는 중이다 (팔기 · 쓰기 뒤). 그것이 끝난 뒤에 다시 본다 - 읽기 시작한 뒤에 바뀐 것은 stale 로 남는다
+                pane._stale_job = self.root.after(self.BAG_RELOAD_MS, go)
+                return
+            pane.reload(quiet=True)
+        wait = (getattr(pane, "_loaded_at", 0.0) + self.BAG_RELOAD_GAP - time.time()) * 1000
+        pane._stale_job = self.root.after(int(max(self.BAG_RELOAD_MS, wait)), go)
 
     def open_board(self, post=None, kind=None):
         """게시판을 연다. post 가 있으면 그 글로, kind 가 있으면 그 칸으로."""

@@ -1002,6 +1002,24 @@ class WildController(object):
             got = got.get("id")
         return got or self.last_ball()
 
+    NO_BALL_GAP = 1.0                 # 광클해도 같은 '볼이 없습니다' 는 이 초 안에 한 번만 (글씨가 겹쳐 쌓이지 않게)
+
+    def _no_ball(self, text):
+        """볼이 없다고 야생 머리 위에 띄운다 (게시판 #711). 배틀 밖이라 앱의 층(app.float_at)을 잠깐 연다."""
+        now = time.time()
+        last = getattr(self, "_no_ball_said", None)
+        if last and last[0] == text and now - last[1] < self.NO_BALL_GAP:
+            return
+        self._no_ball_said = (text, now)
+        pet = self.pet
+        float_at = getattr(self.app, "float_at", None)
+        if pet is None or float_at is None:
+            return
+        try:
+            float_at(pet.x + pet.fw / 2.0, pet.y - 6, text, "#ff8a8a", ms=1600)
+        except Exception:                                   # noqa: BLE001
+            pass
+
     def throw_ball(self, ball=None, _auto=False):
         # **배틀이 걸려 있으면 배틀 안에서 던진다** (1.10.4, 게시판 #174 '퀵볼로 잡으면 전투 중
         # 판정이 유지된다'). 볼 메뉴를 연 뒤에 배틀이 시작됐을 때, 메뉴에서 고른 볼이 이 길
@@ -1016,6 +1034,9 @@ class WildController(object):
         if ball == "POKEBALL" and self.app.balls <= 0:
             self.stop_auto()
             self.app.notify("몬스터볼이 없습니다.")
+            # notify 는 화면에 안 뜬다 - 두 번 클릭을 거듭해도 아무 일도 없어 보였다 (게시판 #711). 야생 머리 위에 띄운다
+            other = any(int(o.get("count") or 0) > 0 and o.get("id") != "POKEBALL" for o in self.ball_options or ())
+            self._no_ball("몬스터볼이 없습니다" + (" · 오른쪽 클릭으로 다른 볼" if other else ""))
             return
         if not _auto:                         # 사람이 던졌다: 켜져 있으면 이 볼로 이어 던지기를 시작한다
             self.stop_auto()
@@ -1035,11 +1056,18 @@ class WildController(object):
                 self.throwing = False
                 self.stop_auto()
                 self.app.notify(getattr(err, "message", str(err)))
+                from .desktop_battle import ball_gone
+                if ball_gone(err):
+                    # '○○ 이(가) 없습니다.' (409) 도 화면에 (게시판 #711)
+                    self._no_ball(natural(getattr(err, "message", "") or "볼이 없습니다").rstrip("."))
                 self.check()
                 return
             self.app.balls = r.get("balls", self.app.balls)
             self.set_ball_options(r.get("ballOptions"))
             self.app.refresh_tray()
+            changed = getattr(self.app, "bag_changed", None)
+            if changed is not None:
+                changed()                     # 열어 둔 가방의 볼 개수도 (게시판 #711)
             self.play_throw(r)
         run_async(self.app.root,
                   lambda: self.app.api.wild_catch(wid, ball), done)
@@ -1113,6 +1141,9 @@ class WildController(object):
                     self.app.request_sync()
                 if self.app.box_window:
                     self.app.box_window.reload()
+                changed = getattr(self.app, "bag_changed", None)
+                if changed is not None:
+                    changed()                # 주운 도구 · 기술머신 - 열어 둔 가방에도 (게시판 #711)
                 self.check()
             else:
                 self.show_wild_sprite()

@@ -393,6 +393,12 @@ class ArcheBattleWindow(GymBattleWindow):
                 refresh()
             except Exception:                              # noqa: BLE001
                 pass
+        changed = getattr(self.app, "bag_changed", None)
+        if changed is not None:
+            try:
+                changed()                                  # 열어 둔 가방의 볼 개수도 (게시판 #711)
+            except Exception:                              # noqa: BLE001
+                pass
 
     def _after_ball(self, r):
         if not self.alive:

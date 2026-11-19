@@ -386,6 +386,11 @@ jobs:
       - name: 가방 탭 합치기 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/test_bag_tabs.py
+      # 게시판 #711: 가방 속이 바뀌면(볼 · 상점 · 탐험) 열어 둔 도구 칸을 다시 읽는다 - 다시 볼 때 · 보고 있으면 한 번만.
+      # 창은 안 띄운다 (app 을 불러와서 트레이 준비물이 있는 여기서 돈다). 배틀 중 '볼이 없습니다' 는 test_battle_ui
+      - name: 가방 다시 읽기 (볼을 쓴 뒤 · 다시 볼 때)
+        if: matrix.shard == 1
+        run: python client/test_bag_stale.py
       # 1.13.1: 가방 · 기술머신의 '누구에게' 목록 찾기 · 가나다순 · 레벨순
       - name: 가방·기술머신 포켓몬 찾기 (진짜 Tk)
         if: matrix.shard == 2
