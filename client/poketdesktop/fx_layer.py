@@ -41,10 +41,25 @@ def screen_origin(root):
         return 0, 0
 
 
-def open_layer(root, area):
-    """이펙트 레이어를 연다. 클릭이 통과하지 않으면 None 을 돌려준다."""
+def set_alpha(win, alpha):
+    """테두리 없는 창 전체를 alpha 만큼 비치게 (1.0 · None 이면 손대지 않는다 - 예전과 똑같은 창). 바꿨으면 True."""
+    if alpha is None or alpha >= 1.0:
+        return False
     try:
-        layer = FxLayer(root, area)
+        win.attributes("-alpha", max(0.01, float(alpha)))
+        return True
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
+def open_layer(root, area, alpha=None):
+    """이펙트 레이어를 연다. 클릭이 통과하지 않으면 None 을 돌려준다.
+
+    alpha: 레이어 전체(기술 연출 · 글씨 · 체력바)를 이만큼 비치게 한다 - 공습이 '포켓몬 투명도' 를 따른다.
+    None 이나 1.0 이면 예전 그대로 (야생 · 투기장 배틀은 글을 읽으라고 또렷하게 둔다).
+    """
+    try:
+        layer = FxLayer(root, area, alpha)
     except Exception:                                       # noqa: BLE001
         return None
     if not layer.click_through:
@@ -57,7 +72,7 @@ def open_layer(root, area):
 class FxLayer(object):
     """이펙트를 그리는 캔버스. 좌표는 화면 좌표로 주고받는다."""
 
-    def __init__(self, root, area):
+    def __init__(self, root, area, alpha=None):
         self.root = root
         x1, y1, x2, y2 = area
         # 이펙트가 활동 영역 밖으로 조금 튀어도 잘리지 않게 넉넉히
@@ -87,6 +102,9 @@ class FxLayer(object):
             # 만들다 만 창을 남기지 않는다 - 투명한 빈 창이 화면에 떠서 클릭을 먹는다 (open_layer 는 None 을 준다)
             self.destroy()
             raise
+        # 투명도는 클릭 통과보다 **먼저** 건다 - 윈도우는 -alpha 를 걸 때 창 모양을 다시 걸면서 클릭 통과가
+        # 풀릴 수 있다 (deco_fx)
+        self.alpha = alpha if set_alpha(self.win, alpha) else 1.0
         PLAT.raise_above(self.win)
         self.click_through = make_click_through(self.win)
         # 지금 떠 있는 짧은 글씨들. 새로 뜨는 것이 겹치지 않게 이걸 본다
