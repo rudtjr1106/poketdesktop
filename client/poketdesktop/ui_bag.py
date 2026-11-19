@@ -729,6 +729,7 @@ class BagWindow(object):
         self._loading = False    # 서버에서 읽는 중
         self._load_n = 0         # 몇 번째로 읽기 시작했나 - 앞서 시작한 것의 답이 늦게 오면 버린다
         self._stale_job = None   # 보고 있을 때 잠깐 뒤 다시 읽기 (app.bag_changed 가 건다 - 한 번에 하나)
+        self._said_err = False   # 아래 줄에 읽기 오류가 떠 있다 - 조용히 다시 읽어 성공하면 지운다
         self._states = {}        # {포켓몬id: (good, blocked, note, color)} — 고른 도구 기준
         self._mon_ids = set()
         self._view = []          # 오른쪽 목록에 보이는 포켓몬 - 찾는 말로 거르고 줄 세운 것 (1.13.1)
@@ -1005,6 +1006,7 @@ class BagWindow(object):
 
     # ---------------- 거들기 ----------------
     def say(self, text, color=U.GOOD, fg=None):
+        self._said_err = False          # 다른 말이 읽기 오류를 덮었다 (_loaded 를 보라)
         try:
             U.set_status(self.status, natural(text or ""), color, fg)
         except tk.TclError:
@@ -1087,8 +1089,9 @@ class BagWindow(object):
                 w.close()
             if quiet:
                 return                         # 저절로 읽은 것이 실패했다고 보던 칸에 빨간 말을 띄우지 않는다
-            return self.say(getattr(err, "message", str(err)), U.DANGER,
-                            U.DANGER)
+            self.say(getattr(err, "message", str(err)), U.DANGER, U.DANGER)
+            self._said_err = True              # 아래 줄에 읽기 오류가 남았다 - 나중에 조용히 읽어 성공해도 지운다
+            return
         self._loaded_at = time.time()
         shop, mons, thumbs, deco = r
         self.items = list(shop.get("items") or [])
@@ -1134,8 +1137,11 @@ class BagWindow(object):
             text, color = self._pending
             self._pending = None
             self.say(text, color)
-        elif not quiet:
+        elif not quiet or getattr(self, "_said_err", False):
+            # 조용히 읽어도 앞서 실패한 읽기의 빨간 말은 지운다 (게시판 #711 검토 - 가방을 처음 열 때 서버가 잠깐 끊겨
+            # '서버에 연결할 수 없습니다' 가 뜨면, 다시 볼 때 읽어 목록이 채워져도 그 말이 그대로 남았다)
             self.say("")
+        self._said_err = False
 
         if w:
             # **다 그리고 나서 걷는다.** 맨 앞에서 걷으면 줄을 만드는 동안

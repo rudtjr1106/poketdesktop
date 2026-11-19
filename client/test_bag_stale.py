@@ -11,6 +11,7 @@ Tk 창은 안 띄운다: 칸 · 허브 · after 를 가짜로 끼우고 판단�
   1. BagTabs.on_shown: 바뀌었거나 오래됐을 때만, 도구 칸만, 읽는 중이면 안 읽는다. 테마 가방 탭도 같은 것을 쓴다.
   2. app.bag_changed: 표시는 늘, 다시 읽기는 보고 있을 때만 - 예약은 한 번만 (이어 던지기 30번에 30번 읽지 않게).
   3. BagWindow.reload · _loaded: 조용히 읽기 (여는 중 표시 · 빨간 말 없음), 앞서 보낸 것의 늦은 답은 버린다.
+     조용히 읽어 성공하면 앞서 실패한 새로고침의 빨간 말은 지운다.
 """
 import importlib
 import os
@@ -264,6 +265,21 @@ def bag_window():
     return w
 
 
+def filled(w):
+    """읽기가 성공했을 때 그리는 것 (목록 · 돈 · 고른 도구) 은 건너뛴다 - 아래 줄의 말만 본다."""
+    w._said_err = False
+    w.item_id = None
+    w._paint_money = lambda *a: None
+    w._fill_items = w._fill_mons = lambda: None
+    w._first_item = lambda: None
+    w.pick_item = lambda _t: None
+    return w
+
+
+def 가방_답():
+    return ({"items": [], "bag": {"POKEBALL": 3}, "money": 100}, [], {}, None)
+
+
 def check_reload():
     print("\n=== 3. 가방 칸의 다시 읽기 (BagWindow.reload · _loaded)")
     calls = []
@@ -299,6 +315,29 @@ def check_reload():
         w.reload(quiet=True)
         calls[-1](None, Err())
         chk("창을 닫은 뒤 온 답은 아무것도 안 그린다", w.said == [], w.said)
+
+        # 게시판 #711 검토: 처음 (조용하지 않게) 읽기가 실패해 빨간 말이 떴는데, 다시 볼 때 조용히 읽어 성공해도 지우지
+        # 않았다 - 목록 · 개수는 채워졌는데 '서버에 연결할 수 없습니다' 가 그대로 남았다
+        w = filled(bag_window())
+        w.reload()
+        calls[-1](None, Err())
+        chk("새로고침이 실패하면 빨간 말을 띄우고 적어 둔다", w.said[-1:] == ["서버가 답하지 않습니다"]
+            and w._said_err is True and w.stale is True, (w.said, getattr(w, "_said_err", None)))
+        w.reload(quiet=True)
+        calls[-1](가방_답(), None)
+        chk("  다시 볼 때 조용히 읽어 성공하면 그 빨간 말을 지운다", w.said[-1:] == [""] and w._said_err is False
+            and w.stale is False and w._loaded_at > 0, (w.said, w._said_err))
+        n = len(w.said)
+        w.reload(quiet=True)
+        calls[-1](가방_답(), None)
+        chk("  오류가 없었으면 조용히 읽기는 아래 줄을 그대로 둔다 (판 말 · 쓴 말을 안 지운다)", len(w.said) == n, w.said)
+
+        w = filled(bag_window())
+        w.reload(quiet=True)
+        calls[-1](None, Err())
+        w.reload(quiet=True)
+        calls[-1](가방_답(), None)
+        chk("조용히 읽기만 실패했으면(빨간 말 없음) 성공해도 아래 줄을 안 건드린다", w.said == [], w.said)
     finally:
         ui_bag.U.run_async, ui_bag.ui_loading.Overlay = real_async, real_overlay
 

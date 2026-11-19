@@ -338,7 +338,11 @@ class DesktopBattle(object):
             return
         if self.pending_ball is not None:
             ball, self.pending_ball = self.pending_ball, None
-            return self._do_throw(ball or None)
+            if self._do_throw(ball or None) is not False or self.closed or self.holding:
+                return
+            # 예약해 둔 볼이 그사이 떨어졌다 (광클 - 앞의 볼을 기다리는 동안 마지막 볼로 또 두 번 클릭). 싸우는 중이면
+            # 이번 턴을 그대로 보낸다 (게시판 #711 검토). 예전에는 '볼이 없습니다' 만 띄우고 돌아가 다음 턴 · 10초 ·
+            # stalled 가 다 없어 배틀이 굳었다. 멈춘 중이면 _do_throw 가 10초를 다시 걸었다
         if self.menu_open or self.holding:
             self.stalled = True             # 풀릴 때 다시 부른다
             return
@@ -827,7 +831,7 @@ class DesktopBattle(object):
             self._no_ball()
             if self.holding and self.hold_job is None and not self.menu_open and not self.busy and not self.playing:
                 self.start_hold(None)       # 계속 던지기가 지운 10초를 다시 건다 (그사이 볼이 떨어졌다)
-            return
+            return False                    # 못 던졌다 - next_turn 이 예약해 둔 볼이었으면 그대로 턴을 보낸다
         if not _auto and self._auto_setting() and ball != ball_menu.MASTER:
             # 계속 던지기가 켜져 있으면 이 볼로 잡힐 때까지 (마스터볼은 한 번)
             self.auto_ball, self.auto_n = ball, 0

@@ -139,6 +139,7 @@ class BagWindow(Scene, PocketDial, Plates, Band, B.BagWindow):
         self._soon()
 
     def say(self, text, color=U.GOOD, fg=None):
+        self._said_err = False          # 다른 말이 읽기 오류를 덮었다 (기본 가방의 _loaded 를 보라)
         self._toast(natural(text or ""), fg if fg else (color if color == U.DANGER else None))
 
     def shown_items(self):
