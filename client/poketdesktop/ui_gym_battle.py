@@ -28,6 +28,7 @@ from common import tint as T
 from common.korean import natural
 
 from . import battle_fx as FX
+from . import battle_trap as TR
 from . import effects, skins, sprite_cache, sprites
 from . import sendout_fx as SO
 from . import battle_zoom as Z
@@ -509,6 +510,8 @@ class GymBattleWindow(Z.Resizable):
         bits = [st] if st else []
         if ui_gimmick.tera_tag(mon):
             bits.insert(0, ui_gimmick.tera_tag(mon))     # 테라스탈한 동안 (2.5.0)
+        if TR.bound_tag(mon):
+            bits.append(TR.bound_tag(mon))               # 조이기류에 붙잡혀 있다 (게시판 #664)
         kr = {"atk": "공", "def": "방", "spa": "특공", "spd": "특방", "spe": "스피드", "acc": "명중", "eva": "회피"}
         for k, v in stages.items():
             bits.append("%s%+d" % (kr.get(k, k), v))
@@ -1030,9 +1033,12 @@ class GymBattleWindow(Z.Resizable):
         self.mega.show(self.view.get("canMega"))
         self.gim.show(self.view.get("gimmick"))
         shown = [self.gim.decorate(m) for m in (moves[:4] if len(moves) <= 4 else moves[-1:])]
-        can_switch = any(not x.get("fainted") for i, x in enumerate(side["team"]) if i != side["slot"])
+        # 붙잡혀 있거나 반동으로 쉬는 턴이면(서버가 noSwitch 로 까닭을 싣는다) 교체를 잠그고 까닭을 띄운다 (게시판 #664 -
+        # 단추가 켜져 있어서 회오리불꽃이 안 걸린 줄 알았다). 옛 서버는 그 칸이 없다 - 예전처럼 켠다.
+        can_switch = any(not x.get("fainted") for i, x in enumerate(side["team"]) if i != side["slot"]) \
+            and not TR.locked(side)
         self._paint_moves(shown, can_switch)
-        self.say("%s 은(는) 무엇을 할까?" % mon.get("name", ""))
+        self.say(TR.prompt(mon.get("name", ""), side))
 
     def _paint_moves(self, moves, can_switch):
         """기술 칸 넷과 교체 · 기권 단추를 그린다 (테마마다 그리는 곳). moves 는 Z기술까지 입힌 것."""
@@ -1092,6 +1098,8 @@ class GymBattleWindow(Z.Resizable):
     def open_switch(self, forced=False):
         # 쓰러져서 바꿔야 하는 순간에는 어디서 열어도 '돌아가기' 가 없어야 한다
         forced = forced or bool(self.view.get("needSwitch"))
+        if not forced and TR.locked(self.view.get("me")):
+            return self.show_commands()      # 붙잡혀 있다 - 교체 칸을 열지 않는다 (단추는 잠겨 있다)
         self.zoom_use()
         self.mode = "switch"
         side = self.view["me"]
@@ -1210,14 +1218,16 @@ class GymBattleWindow(Z.Resizable):
                     self.say(getattr(err, "message", str(err)))
                     return self.later(1500, self.close)
                 self.say(getattr(err, "message", str(err)))
-                return self._reload()
+                return self._reload(note=getattr(err, "message", str(err)))
             self.play(r.get("events") or [], r)
 
         run_async(self.root, lambda: self.app.api.gym_act(self.bid, kind, move, slot,
                                                          **ui_gimmick.act_kwargs(mega, z, tera)),
                   done)
 
-    def _reload(self):
+    def _reload(self, note=None):
+        """서버의 판을 다시 받아 명령 칸을 그린다. note: 그린 뒤 글상자에 남길 말 (서버가 거절한 까닭 -
+        예전에는 다시 그리며 '무엇을 할까?' 로 곧바로 덮여서 왜 안 됐는지 못 봤다)."""
         def done(r, err):
             if not self.alive:
                 return
@@ -1232,6 +1242,8 @@ class GymBattleWindow(Z.Resizable):
                 self.open_switch(forced=True)
             else:
                 self.show_commands()
+            if note:
+                self.say(note)
         run_async(self.root, lambda: self.app.api.gym_battle(), done)
 
     def use_move(self, key):

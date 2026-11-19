@@ -746,13 +746,62 @@ def trapped(bt, f):
     검은눈빛·블록·문어굳히기·조이기·뿌리박기·페어리록과, 상대의 특성
     (그림자밟기·개미지옥·자력). 고스트 타입은 무엇에도 안 걸린다.
     """
-    if "GHOST" in f.types() or H.shed_shell(f):
-        return False                    # 아름다운허물 (1.13): 붙잡혀 있어도 바꿀 수 있다
+    return trap_kind(bt, f) is not None
+
+
+def trap_kind(bt, f, hidden=True):
+    """붙잡힌 까닭 하나 - bound · octolock · trapped · ingrain · fairylock · ability. 안 붙잡혔으면 None.
+
+    trapped() 와 같은 판정이다 (그것이 이것을 부른다). 화면에 까닭을 띄우려고 나눴다 (게시판 #664).
+    hidden=False 면 상대가 모르는 것(아름다운허물 · 특성끼리의 판정)은 빼고 본다 - 상대 쪽 화면에 싣는 값.
+    """
+    if "GHOST" in f.types() or (hidden and H.shed_shell(f)):
+        return None                     # 아름다운허물 (1.13): 붙잡혀 있어도 바꿀 수 있다
     c = f.cond
-    if bool(c.get("trapped") or c.get("octolock") or c.get("bound") or c.get("ingrain")
-            or bt.field.room("fairylock")):
-        return True
-    return trapped_by_foe(bt, f)
+    for k in ("bound", "octolock", "trapped", "ingrain"):
+        if c.get(k):
+            return k
+    if bt.field.room("fairylock"):
+        return "fairylock"
+    if hidden and trapped_by_foe(bt, f):
+        return "ability"
+    return None
+
+
+def bound_view(bt, f, mine):
+    """나와 있는 포켓몬이 조이기류에 붙잡혀 있으면 {move, moveKr, turns}, 아니면 None (화면에 싣는다, 게시판 #664).
+
+    **남은 턴은 내가 건 것(상대 포켓몬, mine=False)만 보인다.** 조이기류는 건 쪽이 끈기갈고리손톱이면 8턴(아니면 5~6)이라,
+    상대가 건 것의 턴 수를 보이면 상대의 지닌 도구가 드러난다. 본가도 턴 수를 안 보인다.
+    """
+    b = f.cond.get("bound") if f.alive() else None
+    if not b:
+        return None
+    k = b.get("move") or "BIND"
+    return {"move": k, "moveKr": bt.move_name(k), "turns": None if mine else b.get("turns")}
+
+
+def switch_block(bt, f):
+    """지금 스스로 교체할 수 없는 까닭 (화면에 띄울 문구). 바꿀 수 있으면 None.
+
+    act/choose 가 교체를 거절하는 두 갈래(trapped · must_stay)와 같다. 다음 포켓몬을 골라야 할 때는 부르지 않는다.
+    """
+    if not f.alive():
+        return None
+    kind = trap_kind(bt, f)
+    if kind is None:
+        return must_stay(f)
+    if kind == "bound":
+        why = "%s에 붙잡혀 있어" % bt.move_name(f.cond["bound"].get("move") or "BIND")
+    elif kind == "octolock":
+        why = "%s에 붙잡혀 있어" % bt.move_name("OCTOLOCK")
+    elif kind == "ingrain":
+        why = "뿌리를 박고 있어"
+    elif kind == "fairylock":
+        why = "%s 때문에" % bt.move_name("FAIRYLOCK")
+    else:
+        why = "붙잡혀 있어"             # 검은눈빛·블록 ... · 상대의 특성 (어느 특성인지는 말하지 않는다)
+    return "%s 은(는) %s 교체할 수 없다!" % (f.name, why)
 
 
 def trapped_by_foe(bt, f):
