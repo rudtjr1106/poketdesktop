@@ -79,6 +79,10 @@ def public(t, dex, full=False):
            "battleSprite": t.get("battleSprite") or t["sprite"],
            "level": t["level"], "type": main_type(t, dex),
            "region": t.get("region"), "why": t.get("why") or ""}
+    if t.get("entrySprite"):
+        # 등장 연출 그림 이름 (시즌 챔피언 관장). 카드를 볼 때 앱이 미리 받아 두어, 도전하자마자 연출이
+        # 나오게 한다 (11/19 지우 - 2.4MB 를 도전한 뒤에 받느라 서 있는 그림이 먼저 보였다).
+        out["entrySprite"] = t["entrySprite"]
     out["typeKr"] = dex.type_name(out["type"]) if out["type"] else None
     if full:
         team = []

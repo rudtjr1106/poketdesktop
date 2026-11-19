@@ -122,6 +122,19 @@ def main():
         "jiwoo" not in keys and all(k and os.path.exists(os.path.join(HERE, "data", "trainer_sprites", k + ".png")) for k in keys),
         keys)
 
+    # 11/19: 도전한 뒤에 2.4MB 연출을 받느라 서 있는 그림이 먼저 보였다. 카드 자료에 연출 그림 이름을 실어
+    # 앱이 카드를 볼 때 미리 받게 하고, 그림은 무손실로 줄였다 (장 픽셀 · 길이 · loop 그대로).
+    from app import gym as G                     # (app.deps 는 fastapi 를 부른다 - 이 검사는 fastapi 없이 돈다)
+    from common import pokelogic as P
+    dex = P.Pokedex.load(os.environ["POKET_POKEDEX"])
+    pub = {k: G.public(by[k], dex) for k in ("jiwoo", "whitesna", "melli")}
+    chk("카드 자료에 등장 연출 그림 이름이 실린다 (지우 · WhiteSna, 동백은 없음)",
+        pub["jiwoo"].get("entrySprite") == by["jiwoo"]["entrySprite"]
+        and pub["whitesna"].get("entrySprite") == by["whitesna"]["entrySprite"]
+        and "entrySprite" not in pub["melli"], {k: v.get("entrySprite") for k, v in pub.items()})
+    size = os.path.getsize(os.path.join(HERE, "data", "trainer_sprites", by["jiwoo"]["entrySprite"] + ".png"))
+    chk("지우 등장 연출 그림이 1MB 를 넘지 않는다 (처음 받는 시간)", size < 1_000_000, size)
+
     print("\n  합계  OK %d   FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0
 

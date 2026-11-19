@@ -43,6 +43,7 @@ import math
 import os
 import random
 import time
+import threading
 import tkinter as tk
 import tkinter.font as tkfont
 
@@ -170,19 +171,54 @@ def shade(hexcolor, k):
     return "#%02x%02x%02x" % tuple(max(0, min(255, int(v * k))) for v in (r, g, b))
 
 
+# 그림 이름마다 잠금 하나. 카드를 볼 때 등장 연출을 미리 받는 중(prefetch_trainer)에 도전해 배틀 창이 같은
+# 그림을 찾으면, 두 번 받지 않고 앞의 받기가 끝나기를 기다렸다가 그 파일을 바로 쓴다 (같은 '.part' 에 두
+# 스레드가 쓰다가 os.replace 가 어긋나는 일도 막는다).
+_FILE_LOCKS = {}
+_FILE_LOCKS_GUARD = threading.Lock()
+# 그림 이름마다 마지막으로 받기에 실패한 시각. 잠금을 기다린 쪽은 앞의 받기가 방금 실패했으면 다시 받지 않는다 -
+# 느린 망에서 미리 받기가 timeout(20초)으로 실패한 뒤 배틀 창이 또 20초를 기다리지 않게 (연출 없이 바로 시작).
+_FILE_FAILED = {}
+_RETRY_AFTER = 10.0
+
+
 def _trainer_file(api, key):
     """트레이너 그림 파일을 받아 이 PC 에 남기고 그 경로를 준다 (못 받으면 None). 작업 스레드에서."""
     d = os.path.join(config.data_dir(), "trainers")
     os.makedirs(d, exist_ok=True)
     p = os.path.join(d, "%s.png" % key)
-    if not os.path.exists(p) or os.path.getsize(p) == 0:
-        raw = api.gym_sprite(key)
-        if not raw:
-            return None
-        with open(p + ".part", "wb") as f:
-            f.write(raw)
-        os.replace(p + ".part", p)
+    with _FILE_LOCKS_GUARD:
+        lock = _FILE_LOCKS.setdefault(key, threading.Lock())
+    waited = lock.locked()
+    with lock:
+        if not os.path.exists(p) or os.path.getsize(p) == 0:
+            if waited and time.time() - _FILE_FAILED.get(key, 0) < _RETRY_AFTER:
+                return None                      # 바로 앞에서 받다가 실패했다 - 또 기다리지 않는다
+            try:
+                raw = api.gym_sprite(key)
+            except Exception:
+                _FILE_FAILED[key] = time.time()
+                raise
+            if not raw:
+                _FILE_FAILED[key] = time.time()
+                return None
+            with open(p + ".part", "wb") as f:
+                f.write(raw)
+            os.replace(p + ".part", p)
+            _FILE_FAILED.pop(key, None)
     return p
+
+
+def prefetch_trainer(root, api, key):
+    """트레이너 그림을 뒤에서 미리 받아 둔다 (이미 있으면 아무것도 안 한다). 결과는 쓰지 않는다.
+
+    시즌 챔피언 관장의 등장 연출(2.4MB 였던 지우)을 카드를 볼 때 받아 두면, 도전하자마자 연출이 나온다
+    (게시판 · 11/19 - 도전한 뒤에 받느라 서 있는 배틀 그림이 먼저 보였다). 못 받아도 조용히 넘어간다 -
+    배틀 창이 다시 받아 본다.
+    """
+    if not key:
+        return
+    run_async(root, lambda: _trainer_file(api, key), lambda _r, _e: None)
 
 
 def trainer_frames(api, key):
@@ -1519,6 +1555,8 @@ class GymWindow(object):
                 self._clear_card()
                 return self.say("불러오지 못했습니다. %s" % getattr(err, "message", err), U.RED)
             self._trainer_card(code, *r)
+            # 등장 연출이 있는 관장(시즌 챔피언)은 카드를 보는 동안 연출 그림을 받아 둔다 - 도전하면 바로 나온다
+            prefetch_trainer(self.root, self.app.api, r[0].get("entrySprite"))
 
         run_async(self.root, work, done)
 

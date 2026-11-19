@@ -911,9 +911,14 @@ class GymBattleWindow(Z.Resizable):
             return cont()
         self.busy = True
         self.hide_commands()
-        # src: 받은 장(1배), photos: 지금 배율로 키운 장, k: 그 배율, i: 지금 장
-        self._entry = {"cont": cont, "item": None, "photos": [], "src": None, "k": None, "i": 0,
+        # src: 받은 장(1배), photos: 지금 배율로 키운 장 {장 번호: PhotoImage} (보일 때 한 장씩 만든다),
+        # k: 그 배율, i: 지금 장
+        self._entry = {"cont": cont, "item": None, "photos": {}, "src": None, "k": None, "i": 0,
                        "foot": t.get("entryFoot"), "done": False}
+        # **서 있는 배틀 그림을 먼저 보이지 않는다** (11/19 지우). 연출 첫 장은 다른 자세(책상 앞)라, 연출 그림을
+        # 받는 동안 배틀 그림이 보이면 '서 있다가 -> 연출 -> 다시 서 있기' 가 된다. 끝나거나 못 받으면
+        # _entry_end 가 다시 보인다 (마지막 장이 배틀 그림과 같은 자세라 넘어갈 때 튀지 않는다).
+        self.cv.itemconfigure(self.trainer_item, state="hidden")
 
         def done(frames, err):
             if not self.alive or self._entry is None or self._entry["done"]:
@@ -924,32 +929,47 @@ class GymBattleWindow(Z.Resizable):
             e["src"] = frames
             if not e["foot"]:
                 e["foot"] = [frames[0][0].width / 2.0, frames[0][0].height]
-            self._entry_place()
             # 장마다 끝나는 시각 (시작부터 초). 재생은 시계를 보고 장을 고른다 - after(ms) 를 이어 걸면
             # 윈도우 타이머가 15.6ms 단위로 올림해 장마다 늦어지고(66ms -> 78ms) 들쭉날쭉해진다.
             acc, e["ends"] = 0.0, []
-            for _ph, ms in e["photos"]:
+            for _im, ms in frames:
                 acc += ms / 1000.0
                 e["ends"].append(acc)
+            self._entry_place()
             e["t0"] = time.monotonic()
             self._entry_step(0)
         run_async(self.root, lambda: trainer_frames(self.app.api, key), done)
+
+    def _entry_photo(self, i):
+        """i 번째 장을 이 창의 배율로 키운 PhotoImage. 보일 때 한 장씩 만들고 들고 있는다.
+
+        예전에는 시작할 때 89장을 tk 스레드에서 한꺼번에 만들어(0.1~0.4초) 그동안 연출이 늦게 떴다 (11/19 지우).
+        배율은 전역 Z.K 가 아니라 **이 창의 배율(self.zoom)** 이다 - 다른 배틀 창이 zoom_use() 로 전역을
+        바꿔도 재생 중인 장의 크기가 흔들리지 않는다. 창 크기를 바꿔 배율이 바뀌면 그때부터 새로 만든다.
+        """
+        e = self._entry
+        k = self.zoom
+        if e["k"] != k:
+            e["photos"], e["k"] = {}, k
+        ph = e["photos"].get(i)
+        if ph is None:
+            im = e["src"][i][0]
+            if k != 1.0:
+                from PIL import Image
+                im = im.resize((max(1, int(round(im.width * k))), max(1, int(round(im.height * k)))),
+                               Image.NEAREST)
+            ph = e["photos"][i] = ImageTk.PhotoImage(im)
+        return ph
 
     def _entry_place(self):
         """연출 그림을 지금 장면의 배틀 그림 자리 · 배율에 놓는다. 창 크기를 바꿔 장면을 새로 지으면 다시 부른다
         (창은 열리자마자 한 번 제 크기를 잡기도 한다 - 그때 연출이 끊기지 않고 새 자리에서 이어진다)."""
         e = self._entry
-        k = Z.K
-        if e["k"] != k:
-            from PIL import Image
-            e["photos"] = [(ImageTk.PhotoImage(im if k == 1.0 else im.resize(
-                (max(1, int(round(im.width * k))), max(1, int(round(im.height * k)))), Image.NEAREST)), ms)
-                for im, ms in e["src"]]
-            e["k"] = k
+        k = self.zoom
         x, y = self.cv.coords(self.trainer_item)[:2]
         fx, fy = e["foot"]
         e["item"] = self.cv.create_image(int(round(x - fx * k)), int(round(y - fy * k)), anchor="nw",
-                                         image=e["photos"][min(e["i"], len(e["photos"]) - 1)][0])
+                                         image=self._entry_photo(min(e["i"], len(e["src"]) - 1)))
         self.cv.tag_raise(e["item"], self.trainer_item)
         self.cv.itemconfigure(self.trainer_item, state="hidden")
 
@@ -967,7 +987,7 @@ class GymBattleWindow(Z.Resizable):
             return self._entry_end()
         if i != e["i"] or _i == 0:
             e["i"] = i
-            self.cv.itemconfigure(e["item"], image=e["photos"][i][0])
+            self.cv.itemconfigure(e["item"], image=self._entry_photo(i))
         self.later(max(1, int((ends[i] - el) * 1000)), self._entry_step)
 
     def _entry_end(self):
@@ -982,7 +1002,7 @@ class GymBattleWindow(Z.Resizable):
             self.cv.itemconfigure(self.trainer_item, state="normal")
         except tk.TclError:
             pass
-        e["photos"] = []
+        e["photos"] = {}
         if self.alive:
             e["cont"]()
 
@@ -990,9 +1010,13 @@ class GymBattleWindow(Z.Resizable):
         """창 크기를 바꿔 다시 지은 화면을, 들고 있던 것으로 되돌린다 (battle_zoom.Resizable)."""
         self._load_trainer()
         e = getattr(self, "_entry", None)
-        if e and not e["done"] and e["src"]:
-            # 등장 연출 도중에 장면을 새로 지었다 (연출 그림도 지워졌다) - 새 자리 · 배율로 다시 놓고 이어 간다
-            self._entry_place()
+        if e and not e["done"]:
+            if e["src"]:
+                # 등장 연출 도중에 장면을 새로 지었다 (연출 그림도 지워졌다) - 새 자리 · 배율로 다시 놓고 이어 간다
+                self._entry_place()
+            else:
+                # 연출 그림을 받는 중에 장면을 새로 지었다 - 새 배틀 그림도 연출이 시작될 때까지 숨겨 둔다
+                self.cv.itemconfigure(self.trainer_item, state="hidden")
         for who in ("me", "foe"):
             self.set_mon(who, self.shown.get(who))
         self._balls(self.view)
@@ -1381,6 +1405,8 @@ class GymBattleWindow(Z.Resizable):
         for who in ("me", "foe"):
             self._stop_anim(who)
         self.sendout.close()                 # 볼 연출이 쥔 그림을 여기서(Tk 스레드에서) 놓는다
+        if getattr(self, "_entry", None):    # 등장 연출 도중에 닫았다 - 만들어 둔 장도 Tk 스레드에서 놓는다
+            self._entry["photos"] = {}
         for j in self.jobs:
             try:
                 self.root.after_cancel(j)
