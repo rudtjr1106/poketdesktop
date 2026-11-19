@@ -271,8 +271,10 @@ class Sprite(object):
     거두지 않고 빈 그림을 건다 - 거뒀다 띄우면 맥에서 '항상 위' 와 클릭 통과가 풀린다.
     """
 
-    def __init__(self, root, key, box):
+    def __init__(self, root, key, box, alpha=None):
+        """alpha: 창 전체를 이만큼 비치게 (공습의 낙하산 - '포켓몬 투명도'). None 이나 1.0 이면 그대로."""
         from PIL import Image
+        from .fx_layer import set_alpha
         self.key, self.box = key, box
         self.at = None                # 발의 화면 자리
         self.shown = None             # 지금 걸린 그림 (검사가 본다)
@@ -280,6 +282,7 @@ class Sprite(object):
         self.win.overrideredirect(True)
         self.win.geometry("+%d+%d" % (-4000, -4000))        # 자리를 잡기 전에는 화면 밖에
         bg = PLAT.transparent_window(self.win, "#%02x%02x%02x" % key)
+        set_alpha(self.win, alpha)                          # 클릭 통과보다 먼저 (fx_layer.FxLayer 와 같은 까닭)
         self.view = PLAT.SpriteView(self.win, bg, box[0], box[1])
         self.blank = self.load([Image.new("RGBA", box, (0, 0, 0, 0))])[0]
         self.view.show(self.blank)

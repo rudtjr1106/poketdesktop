@@ -32,6 +32,7 @@ from poketdesktop import airraid as RC                      # noqa: E402
 from poketdesktop import airraid_art as ART                 # noqa: E402
 from poketdesktop import airraid_show as RS                 # noqa: E402
 from poketdesktop import config                             # noqa: E402
+from poketdesktop import fx_layer as FL                     # noqa: E402
 from poketdesktop import overlay, sprite_cache, walk_cache  # noqa: E402
 from poketdesktop import platform_os as PLAT                # noqa: E402
 from poketdesktop import ui_common as U                     # noqa: E402
@@ -324,6 +325,60 @@ def show_part(root, ov, app, dex):
 
 
 # ---------------------------------------------------------------- 3. 예약 · 막힘
+def alpha_part(root, ov, app, dex):
+    """공습은 '포켓몬 투명도' 를 처음부터 끝까지 따른다 (사용자 11/19) - 도트 · 낙하산 창 · 레이어(연출 · 글씨 · 체력바)."""
+    print("=== 투명도 ===")
+
+    def alpha_of(win):
+        try:
+            return round(float(win.attributes("-alpha")), 2)
+        except Exception:                                   # noqa: BLE001
+            return None
+    old = ov.settings.get("petOpacity", 100)
+    RS.SPEED = 6.0
+    try:
+        ov.settings["petOpacity"] = 10
+        show = RS.AirRaidShow(app, make_view(dex, ["MEWTWO", "MEWTWO"], 70, seed=5), on_done=lambda: None)
+        show.start()
+        seen = {"chute": [], "pet": []}
+
+        def look():
+            for r in show.raiders:
+                if r.chute is not None:
+                    seen["chute"].append(alpha_of(r.chute.win))
+                if r.pet is not None:
+                    seen["pet"].append(alpha_of(r.pet.win))
+            return show.phase == "fight"
+        pump(root, look, 10)
+        chk("투명도 10%: 레이어(기술 연출 · 글씨 · 체력바)도 10%", show.layer is not None
+            and alpha_of(show.layer.win) == 0.1, show.layer and alpha_of(show.layer.win))
+        chk("  낙하산 창도 10%", seen["chute"] and all(a == 0.1 for a in seen["chute"]), sorted(set(seen["chute"])))
+        chk("  공습 포켓몬 도트도 10% (원래 따른다)", seen["pet"] and all(a == 0.1 for a in seen["pet"]),
+            sorted(set(seen["pet"])))
+        show.cleanup()
+        settle(root, 0.2)
+        ov.settings["petOpacity"] = 100
+        show2 = RS.AirRaidShow(app, make_view(dex, ["PIKACHU"], 30, seed=9, ids=(1,)), on_done=lambda: None)
+        show2.start()
+        chutes = []
+        pump(root, lambda: (chutes.extend(alpha_of(r.chute.win) for r in show2.raiders if r.chute is not None)
+                            or show2.phase == "fight"), 10)
+        chk("투명도 그대로(100%)면 레이어 · 낙하산 창은 예전 그대로 (알파를 안 건다)", show2.layer is not None
+            and alpha_of(show2.layer.win) == 1.0 and chutes and all(a == 1.0 for a in chutes),
+            (show2.layer and alpha_of(show2.layer.win), sorted(set(chutes))))
+        show2.cleanup()
+        settle(root, 0.2)
+        ov.settings["petOpacity"] = 10
+        layer = FL.open_layer(root, ov.area())
+        chk("다른 바탕화면 배틀의 레이어(alpha 를 안 주면)는 투명도 10% 여도 또렷하게 그대로",
+            layer is not None and alpha_of(layer.win) == 1.0, layer and alpha_of(layer.win))
+        if layer is not None:
+            layer.destroy()
+    finally:
+        ov.settings["petOpacity"] = old
+        settle(root, 0.2)
+
+
 def controller_part(root, ov, app, dex):
     print("=== 예약 ===")
     c = app.airraid
@@ -483,6 +538,7 @@ def main():
     try:
         art_part()
         show_part(root, ov, app, dex)
+        alpha_part(root, ov, app, dex)
         controller_part(root, ov, app, dex)
     finally:
         app.airraid.clear()
