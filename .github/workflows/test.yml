@@ -394,6 +394,11 @@ jobs:
       - name: 기술머신 뽑기권·랭크 보상 표 화면 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/test_reward_tickets.py
+      # 게시판 #704 (11/20): 되돌릴 수 없는 도구(은색 · 금색병뚜껑, 이로치사탕)는 앞 도구의 고름을 이어받지 않고 직접 누른
+      # 포켓몬에게만 쓴다. 쓰기 전에 이름 · 바뀔 능력을 적어 묻는다 (기본 + DP 계열 테마 여섯)
+      - name: 병뚜껑 · 이로치사탕 대상 고르기 · 확인 창 (진짜 Tk, 테마 일곱)
+        if: matrix.shard == 1
+        run: python client/test_bag_bottlecap.py
       # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
       - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         if: matrix.shard == 2
