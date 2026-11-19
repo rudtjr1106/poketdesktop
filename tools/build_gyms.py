@@ -249,6 +249,8 @@ SPECIAL = {
         "team": [("DREDNAW", []), ("GRIMMSNARL", []), ("HATTERENE", []), ("FROSMOTH", []),
                  ("DURALUDON", []), ("INTELEON", [])]},
     # 지우는 원작 지우가 아니라 본인이 정한 캐릭터다 (도트도 본인이 준 그림).
+    # 2026-11: 시즌 5 챔피언 관장이 되어 동대문구로 이사했다 (FIXED "11230", movedFrom). 여기 자료(id ash-ketchum)는
+    # 전체를 다시 만들 때 자리(청주시 상당구)를 잡는 데만 쓰이고, apply_fixed 가 빼고 동백을 그 자리에 앉힌다.
     # 종족값이 낮은 둘은 조금 올렸다 - 마임맨(460)은 팀 평균(1461)에, 에이스 따라큐(476)는
     # 마스카나(1507)에 맞춰 능력치를 1.07·1.08배. 개체값은 Lv.100 이라 이미 31(최대)이다.
     "Ash Ketchum": {
@@ -306,14 +308,69 @@ FIXED = {
             _fixed_mon("EXCADRILL", "SANDFORCE", "NAIVE", "CHOICESCARF",
                        ["ROCKSLIDE", "ROCKTOMB", "EARTHQUAKE", "IRONHEAD"], _ATK, "M"),
         ]},
+    # 시즌 5 챔피언 지우 (2026-11-18). 청주시 상당구의 지우(본인 캐릭터, 아래 "Ash Ketchum")가
+    # 동대문구로 이사한다 - movedFrom: 그 자리의 옛 지우는 빠지고, 동대문구에 있던 동백이 청주시 상당구로 간다.
+    # 그림: 식품 포장 연구실 대학원생. 등장 연출 = 따라큐가 건넨 FTIR 결과지(몬스터볼)를 받아 읽으며 일어난다.
+    # 그림 이름은 jiwoo 가 아니라 jiwoo-lab - 앱은 트레이너 그림을 이름으로 PC 에 남겨 두고 다시 받지 않아서
+    # (ui_gym._trainer_file), 옛 지우(jiwoo.png)를 본 사람에게는 같은 이름이면 옛 그림이 그대로 나온다.
+    "11230": {
+        "id": "jiwoo", "name": "지우", "en": "Jiwoo", "role": "연구실 지킴이",
+        "sprite": "jiwoo-lab", "battleSprite": "jiwoo-lab-solo",
+        "entrySprite": "jiwoo-lab-entry", "entryFoot": [142, 152],
+        "level": 100, "type": "GHOST", "zring": True,
+        "why": "[시즌 5 챔피언] - PEER REVIEWED",
+        "movedFrom": ("43111", "ash-ketchum"),      # (예전 자리, 그 자리의 옛 지우 id)
+        # 순서는 시즌 5 랭크 파티 그대로 (킬라플로르 선봉). 에이스는 따라큐.
+        # 메가는 지가르데 (지가르데나이트를 쥐었으니 앞자리 킬라플로르에게 스톤을 주지 않는다 - give_mega_stone).
+        # 특성 · 성격 · 도구 · 기술 · 노력치 · 성별은 그 사람 포켓몬 그대로 (2026-11-18 정보 화면). 레벨은 100.
+        # 이로치는 지가르데 하나 (기본 이로치 색).
+        "ace": "MIMIKYU",
+        "team": [
+            _fixed_mon("GLIMMORA", "TOXICDEBRIS", "MODEST", "FOCUSSASH",
+                       ["STEALTHROCK", "POWERGEM", "DAZZLINGGLEAM", "SLUDGEWAVE"],
+                       {"hp": 2, "atk": 1, "def": 2, "spa": 252, "spd": 1, "spe": 252}, "M"),
+            _fixed_mon("ZYGARDE", "AURABREAK", "NAIVE", "ZYGARDITE",
+                       ["COREENFORCER", "DRACOMETEOR", "FOCUSBLAST", "SCORCHINGSANDS"],
+                       {"atk": 2, "def": 4, "spa": 252, "spe": 252}, "N", True),
+            _fixed_mon("MIMIKYU", "DISGUISE", "IMPISH", "MIMIKIUMZ",
+                       ["SHADOWCLAW", "SHADOWSNEAK", "PLAYROUGH", "SWORDSDANCE"],
+                       {"hp": 5, "atk": 252, "spd": 1, "spe": 252}, "M"),
+            _fixed_mon("GHOLDENGO", "GOODASGOLD", "HASTY", "CHOICESCARF",
+                       ["SHADOWBALL", "MAKEITRAIN", "DAZZLINGGLEAM", "FOCUSBLAST"],
+                       {"atk": 2, "def": 3, "spa": 252, "spd": 1, "spe": 252}, "N"),
+            _fixed_mon("KINGAMBIT", "DEFIANT", "NAUGHTY", "LIFEORB",
+                       ["KOWTOWCLEAVE", "SWORDSDANCE", "SUCKERPUNCH", "IRONHEAD"],
+                       {"atk": 252, "def": 4, "spd": 2, "spe": 252}, "F"),
+            _fixed_mon("HIPPOWDON", "SANDSTREAM", "ADAMANT", "CHOICEBAND",
+                       ["EARTHQUAKE", "STONEEDGE", "ICEFANG", "FIREFANG"],
+                       {"hp": 252, "atk": 252, "def": 2, "spa": 4}, "M"),
+        ]},
 }
 
 
 def apply_fixed(trainers, regions):
-    """FIXED 의 자리에 그 트레이너를 앉힌다 (그 자리에 있던 사람은 뺀다)."""
+    """FIXED 의 자리에 그 트레이너를 앉힌다 (그 자리에 있던 사람은 뺀다).
+
+    movedFrom = (예전 자리, 옛 모습 id) 가 있으면 이사다: 예전 자리의 옛 모습은 빼고, 이 자리에 있던 사람은
+    빼지 않고 예전 자리로 옮긴다. 예전 자리에 옛 모습이 아닌 사람이 있으면 멈춘다 (엉뚱한 사람을 빼지 않게).
+    이미 적용된 gyms.json 에 다시 돌려도 같다.
+    """
     for code, t in FIXED.items():
+        t = dict(t)
+        moved = t.pop("movedFrom", None)
         old = regions.get(code)
-        trainers[:] = [x for x in trainers if x["id"] not in (old, t["id"])]
+        if moved and old != t["id"]:
+            src, old_self = moved
+            prev = regions.get(src)
+            if prev != old_self:
+                raise SystemExit("FIXED %s movedFrom: %s 자리에 %s 가 아니라 %s 가 있습니다" % (code, src, old_self, prev))
+            trainers[:] = [x for x in trainers if x["id"] not in (prev, t["id"])]
+            for x in trainers:
+                if x["id"] == old:
+                    x["region"] = src
+            regions[src] = old
+        else:
+            trainers[:] = [x for x in trainers if x["id"] not in (old, t["id"])]
         trainers.append(dict(t, region=code))
         regions[code] = t["id"]
     return trainers, regions

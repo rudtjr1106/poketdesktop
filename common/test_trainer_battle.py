@@ -385,7 +385,7 @@ def t_로스터(dex, gyms):
     six = [t["name"] for t in gyms["trainers"] if len(t["team"]) != 6]
     chk("모두 여섯 마리", not six, six[:5])
 
-    # 능력치 배율: 이스터에그 렌트라는 전설 평균만큼, 지우의 마임맨·따라큐는 조금
+    # 능력치 배율: 이스터에그 렌트라는 전설 평균만큼
     egg = next(t for t in gyms["trainers"] if t["id"] == "easter-egg")
     tb = TB.TrainerBattle(dex, [mon(dex, "PIKACHU", 50, "STATIC", ["THUNDERBOLT"])], egg, random.Random(1))
     lux = tb.foe_team[-1]
@@ -399,12 +399,20 @@ def t_로스터(dex, gyms):
     plain = B.Fighter(dex, dict(TB.trainer_mon(egg["team"][-1]), statBoost=None))
     chk("배율이 없으면 원래 능력치", sum(plain.base.values()) < sum(lux.base.values()) * 0.85,
         (sum(plain.base.values()), sum(lux.base.values())))
-    ash = next(t for t in gyms["trainers"] if t["id"] == "ash-ketchum")
-    chk("지우 팀", [m["species"] for m in ash["team"]] ==
-        ["MEOWSCARADA", "ALAKAZAM", "MRMIME", "GENGAR", "DRIFBLIM", "MIMIKYU"], [m["species"] for m in ash["team"]])
-    chk("지우: 종족값 낮은 둘만 조금 올렸다", {m["species"]: m.get("boost") for m in ash["team"] if m.get("boost")}
-        == {"MRMIME": 1.07, "MIMIKYU": 1.08})
-    boosted = [t["name"] for t in gyms["trainers"] if t["id"] not in ("easter-egg", "ash-ketchum")
+    # 지우 (시즌 5 챔피언 관장): 청주시 상당구에서 동대문구로 이사, 동백은 청주시 상당구로
+    jw = next(t for t in gyms["trainers"] if t["id"] == "jiwoo")
+    chk("지우 팀 · 자리", [m["species"] for m in jw["team"]] ==
+        ["GLIMMORA", "ZYGARDE", "MIMIKYU", "GHOLDENGO", "KINGAMBIT", "HIPPOWDON"] and jw["region"] == "11230",
+        ([m["species"] for m in jw["team"]], jw["region"]))
+    chk("옛 지우는 빠지고 동백이 청주시 상당구로", not any(t["id"] == "ash-ketchum" for t in gyms["trainers"])
+        and gyms["regions"].get("43111") == "melli"
+        and next(t for t in gyms["trainers"] if t["id"] == "melli")["region"] == "43111", gyms["regions"].get("43111"))
+    # 자기 메가스톤을 이미 쥔 포켓몬이 메가진화한다 - 앞자리 킬라플로르(메가 있음)에게 스톤을 덮어씌우지 않는다
+    tb = TB.TrainerBattle(dex, [mon(dex, "PIKACHU", 50, "STATIC", ["THUNDERBOLT"])], jw, random.Random(1))
+    chk("지우: 메가는 지가르데, 킬라플로르는 기합의띠 그대로",
+        tb.keystone["foe"] and tb.foe_team[0].held == "FOCUSSASH" and tb.foe_team[1].held == "ZYGARDITE",
+        (tb.keystone["foe"], tb.foe_team[0].held, tb.foe_team[1].held))
+    boosted = [t["name"] for t in gyms["trainers"] if t["id"] != "easter-egg"
                and any(m.get("boost") for m in t["team"])]
     chk("다른 트레이너에게는 배율이 없다", not boosted, boosted)
 
@@ -529,13 +537,15 @@ def t_상대_AI(dex, gyms):
              if not any((dex.move(k) or {}).get("power") for k in m["moves"])]
     chk("모두 때리는 기술이 있다", not nohit, nohit[:5])
     chk("개체값은 모두 31", all(m["iv"] == 31 for t in gyms["trainers"] for m in t["team"]))
-    # 시즌 챔피언 관장(2.0.3 WhiteSna, 역할 '트레이너의 정점')은 신청서 그대로라 노력치도 그 사람 것 (252/252) - 합만 본가 상한 안
-    made = [t for t in gyms["trainers"] if t.get("role") != "트레이너의 정점"]
+    # 시즌 챔피언 관장(2.0.3 WhiteSna, 시즌 5 지우)은 신청서 그대로라 노력치도 그 사람 것 (252/252) - 합만 본가 상한 안.
+    # 챔피언 관장은 칭호가 제각각이라 칭호 대신 자료로 안다: 에이스(ace)를 직접 적은 건 tools/build_gyms.py 의 FIXED 뿐이다.
+    is_champ = lambda t: bool(t.get("ace"))          # noqa: E731
+    made = [t for t in gyms["trainers"] if not is_champ(t)]
     lo20 = [sum(m["evs"].values()) for t in made if t["level"] == 20 for m in t["team"]]
     hi100 = [sum(m["evs"].values()) for t in made if t["level"] == 100 for m in t["team"]]
     chk("노력치: Lv.20 은 0, Lv.100 은 절반쯤", max(lo20) == 0 and 240 <= min(hi100) and max(hi100) <= 256,
         (max(lo20), min(hi100), max(hi100)))
-    champ = [sum(m["evs"].values()) for t in gyms["trainers"] if t.get("role") == "트레이너의 정점" for m in t["team"]]
+    champ = [sum(m["evs"].values()) for t in gyms["trainers"] if is_champ(t) for m in t["team"]]
     chk("  시즌 챔피언 관장의 노력치 합은 510 이하", all(n <= 510 for n in champ), champ)
     natures = collections.Counter(m["nature"] for t in gyms["trainers"] for m in t["team"])
     chk("성격을 포켓몬에 맞춘다 (무보정 없음)", "HARDY" not in natures and len(natures) >= 4, natures)
