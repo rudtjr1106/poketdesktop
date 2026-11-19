@@ -847,6 +847,9 @@ def window_part(root, ov, app):
     chk("이벤트 탭: 종목 일곱 줄 · 날짜 · 상태", sum(1 for e in O.EVENTS if e["kr"] in blob) == 7
         and "11/16(월)" in blob and "11/24(화)" in blob and "신청 중" in blob and "끝" in blob, blob[:400])
     chk("이벤트 탭: 그날 응원 타입", "그날 응원 타입" in blob and "페어리" not in blob.split("100m 달리기")[0], blob[:200])
+    chk("이벤트 탭: 특기 · 특성에도 더해 주는 만큼 (+5% · +3%) - 응원(+5%)과 견줄 수 있게 (게시판 #618)",
+        "특기 전기 (+%d%%)" % round(O.TYPE_B * 100) in blob and "특성 속보 (+%d%%)" % round(O.ABIL_B * 100) in blob
+        and "그날 응원 타입 (+%d%%)" % round(O.CHEER_B * 100) in blob, blob[:300])
     chk("이벤트 탭: 내 신청 · 내 결과(순위 · 간 라운드 · 메달) · 다시 보기", "신청: 피카츄 · 안정" in blob
         and "3위 / 120명" in blob and "결승" in blob and "동메달!" in blob and "다시 보기" in blob, blob[:600])
     chk("이벤트 탭: 내 메달 · 종목별 메달", "내 메달" in blob and "종목별 메달" in blob)
