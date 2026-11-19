@@ -29,7 +29,7 @@ from common import deco as DECO
 from common import held as H
 from common import pokelogic as P
 from common import tint as T
-from common.korean import natural
+from common.korean import josa, natural
 
 from . import config
 from . import sprite_cache, sprites
@@ -74,6 +74,10 @@ USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket", "
           "lure", "rename", "arche")       # 테라피스는 2.5.1 부터 지니는 도구 ("held") - 따로 쓰는 길이 없다
 # **대상 포켓몬이 없는 도구.** 고를 것이 없으니 목록을 띄우지 않고 바로 쓴다.
 NO_TARGET = ("ticket", "tmticket", "decopick", "lure", "rename", "arche")
+# **되돌릴 수 없는 도구** (은색 · 금색병뚜껑, 이로치사탕). 앞 도구에서 골라져 있던 포켓몬을 이어받지 않고, 저절로
+# 고르지도 않는다 - 이 도구를 고른 뒤 사용자가 직접 누른 포켓몬에게만 쓴다. 쓰기 전에 대상 이름을 적어 한 번 묻는다.
+# (게시판 #704: 가방을 열면 맨 앞 가디안나이트와 함께 가디안이 골라지고, 금색병뚜껑으로 바꿔도 그대로 남아 가디안에게 갔다)
+BY_HAND = ("iv", "shiny")
 
 ROW_BG = "#10131c"      # 목록 한 줄 바탕
 SEL_BG = "#2b2417"      # 고른 줄
@@ -432,6 +436,36 @@ def unusable_note(item):
     return "이 도구는 아직 쓸 수 없다."
 
 
+def hyper_left(info):
+    """병뚜껑으로 아직 단련할 수 있는 능력 [(열쇠, 이름)] - STAT_ROWS 순서.
+
+    개체값이 31 미만이고 아직 단련 안 한 것. 금색병뚜껑은 이것을 한꺼번에 다 단련한다 (서버 _use_iv 와 같은 식).
+    """
+    ivs = info.get("ivs") or {}
+    hyper = info.get("hyper") or {}
+    return [(s, label) for s, label in STAT_ROWS
+            if int(ivs.get(s, 0)) < P.IV_MAX and not hyper.get(s)]
+
+
+def hyper_ask(it, mon, stat=""):
+    """병뚜껑을 쓰기 전에 묻는 말 - 누구(이름 · 레벨)에게 무엇을 쓰고 어느 능력이 31 로 단련되나 (게시판 #704).
+
+    은색병뚜껑은 고른 능력 하나, 금색병뚜껑(count 6)은 남은 능력 모두.
+    """
+    info = mon.get("info") or {}
+    name = info.get("name") or "이 포켓몬"
+    if int((it.get("effect") or {}).get("count", 1)) >= 6:
+        labels = [label for _s, label in hyper_left(info)]
+    else:
+        labels = [STAT_KR.get(stat, stat)] if stat else []
+    text = "%s(Lv.%d)에게 %s을(를) 씁니다. " % (name, int(mon.get("level", 0)), it["kr"])
+    if labels:
+        last = labels[-1]
+        # 'HP' 는 '에이치피' 로 읽는다 - 받침을 영문 글자로 보면 'HP이' 가 된다
+        text += "%s%s 31로 단련됩니다. " % (" · ".join(labels), "가" if last == "HP" else josa(last, "이"))
+    return natural(text + "되돌릴 수 없습니다.")
+
+
 def _scrollable(cv):
     """이 캔버스가 실제로 굴러갈 데가 있나."""
     try:
@@ -717,6 +751,9 @@ class BagWindow(object):
         self.photos = {}         # {포켓몬id: PhotoImage} — 한 번 만들면 계속 쓴다
         self.item_id = None
         self.mon_id = None
+        # (도구 id, 포켓몬 id) - 그 도구를 고른 뒤 사용자가 직접 누른 포켓몬. 되돌릴 수 없는 도구(BY_HAND)는
+        # 이것과 맞을 때만 대상으로 친다 (게시판 #704). 다른 도구를 고르면 지운다.
+        self._user_pick = None
         self.stat = None         # 병뚜껑으로 단련할 능력
         self.stat_needed = False
         self._pending = None     # 다시 불러온 뒤에 띄울 말
@@ -1273,6 +1310,11 @@ class BagWindow(object):
         self.item_id = item_id
         self.stat = None
         if prev != item_id:
+            if prev is not None:
+                # 다른 도구로 옮겼다 - 앞 도구 때 누른 포켓몬은 새 도구의 '직접 고름' 이 아니다 (게시판 #704).
+                # 다시 불러올 때(_loaded)는 앞 도구를 None 으로 비우고 부르므로 그대로 남는다 - 같은 포켓몬에게
+                # 은색병뚜껑을 이어서 쓸 때 또 누르지 않아도 된다.
+                self._user_pick = None
             self._repaint_items()            # 보이는 줄만 다시 칠한다 (고름은 줄이 self.item_id 를 본다)
         it = self.current_item()
         if not it:
@@ -1327,12 +1369,15 @@ class BagWindow(object):
                     first_ok is None or (self._is_good(m["id"]) and not self._is_good(first_ok))):
                 first_ok = m["id"]
         self._repaint_mons()
-        # 고르고 있던 포켓몬이 이 도구로는 못 쓰는 대상이거나 찾기에 가려졌으면 옮겨 준다
         cur = self._states.get(self.mon_id)
-        if cur is None or cur[1] or not any(m["id"] == self.mon_id for m in self._view):
-            self.pick_mon(first_ok, quiet=True)
-        else:
-            self.pick_mon(self.mon_id, quiet=True)
+        ok = cur is not None and not cur[1] and any(m["id"] == self.mon_id for m in self._view)
+        if kind in BY_HAND:
+            # 되돌릴 수 없는 도구는 **저절로 고르지도, 앞 도구의 고름을 이어받지도 않는다** - 이 도구를 고른 뒤
+            # 직접 누른 포켓몬만 (게시판 #704). 아니면 아무도 안 고르고 쓰기 단추는 꺼진다.
+            mine = ok and self._user_pick == (it["id"], self.mon_id)
+            return self.pick_mon(self.mon_id if mine else None, quiet=True)
+        # 고르고 있던 포켓몬이 이 도구로는 못 쓰는 대상이거나 찾기에 가려졌으면 옮겨 준다
+        self.pick_mon(self.mon_id if ok else first_ok, quiet=True)
 
     def _is_good(self, pid):
         st = self._states.get(pid)
@@ -1373,10 +1418,7 @@ class BagWindow(object):
         if kind == "iv":
             if level < HYPER_MIN_LEVEL:
                 return False, True, "Lv.%d 부터" % HYPER_MIN_LEVEL, U.FG_FAINT
-            ivs = info.get("ivs") or {}
-            hyper = info.get("hyper") or {}
-            left = [s for s, _l in STAT_ROWS
-                    if int(ivs.get(s, 0)) < P.IV_MAX and not hyper.get(s)]
+            left = hyper_left(info)
             if not left:
                 return False, True, "이미 다 단련됨", U.FG_FAINT
             return False, False, "%d곳 남음" % len(left), U.SHINY
@@ -1462,6 +1504,9 @@ class BagWindow(object):
         return True, False, "지금: %s" % (now or "원래 모습"), U.GOOD
 
     def pick_mon(self, pid, quiet=False):
+        """포켓몬을 고른다. quiet=False 는 사용자가 줄 · 판을 직접 누른 것 (MonRow._click, 테마의 _plate_click) -
+        못 쓰는 대상이면 까닭을 알리고, 쓸 수 있으면 '이 도구로 직접 고름' 으로 적어 둔다 (BY_HAND, 게시판 #704).
+        quiet=True 는 창이 저절로 고르는 것이다."""
         # 줄이 아직 안 만들어졌을 수 있어서 데이터(self._states)로 본다.
         st = self._states.get(pid)
         if st is not None and st[1]:
@@ -1471,6 +1516,8 @@ class BagWindow(object):
             return
         prev = self.mon_id
         self.mon_id = pid if pid in self._mon_ids else None
+        if not quiet:
+            self._user_pick = (self.item_id, self.mon_id)
         if prev != self.mon_id:
             self._repaint_mons()             # 보이는 줄만 다시 칠한다
         self.stat = None
@@ -1697,6 +1744,12 @@ class BagWindow(object):
                     self.win, "이로치사탕",
                     "%s에게 이로치사탕을 먹입니다. 몸 색이 이로치로 바뀌고 "
                     "되돌릴 수 없습니다." % name, danger=False, ok_text="먹이기"):
+                return
+        # 병뚜껑도 되돌릴 수 없다 (금색은 귀하다). 누구에게 쓰고 어느 능력이 바뀌는지 적어 한 번 묻는다 -
+        # 쓰기 단추에는 대상 이름이 없어 엉뚱한 포켓몬에게 간 것을 몰랐다 (게시판 #704).
+        if (it.get("effect") or {}).get("kind") == "iv":
+            if not ui_box.confirm(self.win, it["kr"], hyper_ask(it, mon, self.stat or ""),
+                                  danger=False, ok_text="쓰기"):
                 return
 
         form = ""
