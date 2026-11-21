@@ -20,6 +20,9 @@
     7. 지금 나와 있는 상대에게 효과 없는 공격 기술은 점수가 비슷할 때 뒤로 민다 (게시판 #404 - 이미 나와 있는 따라큐에게
        인파이트). 셈이 비기면 한 번도 안 고른다. 길드전 AI 는 그대로다.
     8. #404 장면(실제 두 팀 · 남은 HP, 메가엘레이드 23 HP 대 탈이 그대로인 따라큐)에서 인파이트를 안 고른다.
+    9. 효과 있는 공격 기술이 하나라도 있으면 효과 없는 공격 기술은 아예 안 고른다 (2026-11-21 게시판 #764 - 두 턴째 나와 있는
+       하마돈에게 볼트체인지). 셈이 무효 기술을 크게 쳐 줘도 빼고, 공격이 다 무효면 그대로 둔다 (WAR_NOEFFECT_DROP).
+   10. 불가사의부적(효과가 굉장하지 않으면 막는다)도 무효로 본다 - 테라스탈로 바뀐 타입으로.
 """
 import os
 import sys
@@ -299,6 +302,7 @@ def t_무효(dex):
                 m.bt.turn_no = m.turn
                 if not on:
                     m.WAR_NOEFFECT_PEN = 0.0
+                    m.WAR_NOEFFECT_DROP = False        # 9 의 빼기도 끈다 (감점만의 몫을 보려고)
                 m.rng.seed(seed)
                 opt = m._war_search(("move", "-"))
                 k = opt[1] if opt[0] == "move" else "교체"
@@ -307,6 +311,67 @@ def t_무효(dex):
         TB.TrainerBattle._eval_v2 = real
     chk("7. 셈이 비기면 효과 없는 기술은 안 고른다 (40번)", "CLOSECOMBAT" not in got[True], got[True])
     chk("7. (견줌) 감점을 끄면 비긴 셈에서 인파이트가 뽑힌 적이 있다", got[False].get("CLOSECOMBAT", 0) > 0, got[False])
+
+
+def t_무효_빼기(dex):
+    """9 · 10: 효과 있는 공격이 있으면 효과 없는 공격은 아예 안 고른다 · 불가사의부적도 무효로 본다 (게시판 #764)."""
+    print("\n=== 랭크 AI: 효과 없는 공격 빼기 (게시판 #764) · 불가사의부적 ===")
+    # 9. 셈이 무효 기술 쪽을 크게 쳐 줘도 (운영의 판: 다음 턴에 어차피 쓰러져 모든 공격의 값이 같고, '상대가 교체해 오면'
+    #    갈래와 최악 섞기가 볼트체인지에 0.5 남짓을 더했다 - 감점 0.3 보다 컸다) 빼고 고른다. 끄면 뽑힌다.
+    real, real_act = TB.TrainerBattle._eval_v2, TB.TrainerBattle.act
+
+    def act(self, *a, **kw):                           # 사본이 셈하는 수를 적어 둔다 (act 가 _forced 를 비운다)
+        if getattr(self, "_forced", None) is not None:
+            self._probe = self._forced
+        return real_act(self, *a, **kw)
+    TB.TrainerBattle.act = act
+    TB.TrainerBattle._eval_v2 = lambda self: 1.0 if getattr(self, "_probe", None) == ("move", "VOLTSWITCH") else 0.0
+    got = {True: {}, False: {}}
+    try:
+        for on in (True, False):
+            for seed in range(12):
+                a = [mon("HIPPOWDON", ["EARTHQUAKE", "SLACKOFF"]), mon("CORVIKNIGHT", ["BRAVEBIRD"])]
+                b = [mon("MIRAIDON", ["VOLTSWITCH", "DRACOMETEOR", "OVERHEAT", "DRAGONPULSE"]),
+                     mon("GARCHOMP", ["EARTHQUAKE"])]
+                pb, bt = fresh(dex, a, b, seed)
+                pb.turns = 3
+                pb.in_at = {"me": 1, "foe": 1}
+                m = pb._mirror("foe")
+                m.turn += 1
+                m.bt.turn_no = m.turn
+                m.WAR_NOEFFECT_DROP = on
+                m.rng.seed(seed)
+                opt = m._war_search(("move", "DRAGONPULSE"))
+                k = opt[1] if opt[0] == "move" else "교체"
+                got[on][k] = got[on].get(k, 0) + 1
+    finally:
+        TB.TrainerBattle._eval_v2, TB.TrainerBattle.act = real, real_act
+    chk("9. 볼트체인지는 하마돈(땅)에게 효과 없음", m._no_effect("VOLTSWITCH"))
+    chk("9. 셈이 볼트체인지를 쳐 줘도 빼고 고른다 (12번)", "VOLTSWITCH" not in got[True], got[True])
+    chk("9. (견줌) 빼기를 끄면 셈대로 볼트체인지를 고른다", got[False].get("VOLTSWITCH", 0) > 0, got[False])
+
+    # 9. 공격이 다 무효면 빼지 않는다 (변화기 · 교체와 겨룬다 - 감점은 그대로)
+    a = [mon("HIPPOWDON", ["EARTHQUAKE"])]
+    b = [mon("PIKACHU", ["THUNDERBOLT", "VOLTSWITCH", "THUNDERWAVE"])]
+    pb, bt = fresh(dex, a, b)
+    m = pb._mirror("foe")
+    opts = [("move", "THUNDERBOLT"), ("move", "VOLTSWITCH"), ("move", "THUNDERWAVE")]
+    chk("9. 공격이 다 무효면 선택지를 그대로 둔다", m._drop_no_effect(opts) == opts, m._drop_no_effect(opts))
+
+    # 10. 불가사의부적: 효과가 굉장하지 않으면 막는다 - 테라스탈로 타입이 바뀌어도 그 타입으로 본다
+    a = [mon("SHEDINJA", ["SHADOWCLAW"], ability="WONDERGUARD")]
+    b = [mon("KINGAMBIT", ["SUCKERPUNCH", "IRONHEAD", "KOWTOWCLEAVE", "SWORDSDANCE"])]
+    pb, bt = fresh(dex, a, b)
+    m = pb._mirror("foe")
+    chk("10. 껍질몬(벌레/고스트)에게 기습 · 도각참(악)은 효과가 굉장하다", not m._no_effect("SUCKERPUNCH")
+        and not m._no_effect("KOWTOWCLEAVE"))
+    chk("10. 아이언헤드(강철)는 불가사의부적에 막힌다", m._no_effect("IRONHEAD"))
+    m.WAR_NOEFFECT_DROP = False
+    chk("10. (견줌) 끄면 예전처럼 불가사의부적을 모른다", not m._no_effect("IRONHEAD"))
+    m.WAR_NOEFFECT_DROP = True
+    m.me.tera = "ELECTRIC"                             # 운영의 그 껍질몬 (전기 테라스탈 - 약점이 땅 하나)
+    chk("10. 전기로 테라스탈한 껍질몬에게는 기습 · 도각참도 막힌다",
+        m._no_effect("SUCKERPUNCH") and m._no_effect("KOWTOWCLEAVE"), m.me.types())
 
 
 def t_묶은_쪽이_쓰러지면(dex):
@@ -335,6 +400,7 @@ def main():
     t_날뛰기(dex)
     t_랭크(dex)
     t_무효(dex)
+    t_무효_빼기(dex)
     t_묶은_쪽이_쓰러지면(dex)
     print("\n합계 OK %d · FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0

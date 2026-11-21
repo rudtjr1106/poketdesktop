@@ -702,6 +702,13 @@ class TrainerBattle(object):
     # 지금 AI 와 맞붙여 50.0% 그대로. ('쓰러뜨릴 수 있는 상대는 안 바꾼다' 로 교체 갈래를 빼 보았으나 무효는 거의 그대로에
     # 교체만 판마다 0.5 늘어 뺐다.) 2026-11-01 길드전도 켠다 - 사람 대역 상대 600판에 판 100개당 8.5 -> 2.5번.
     WAR_NOEFFECT_PEN = 0.3
+    # 효과 있는 공격 기술이 하나라도 있으면 지금 상대에게 효과 없는 공격 기술은 **아예 고르지 않는다** (2026-11-21, 게시판 #764
+    # 우가우가 - 미라이돈(21 HP)이 두 턴째 나와 있는 하마돈에게 볼트체인지를 썼다). 감점 0.3 은 비슷할 때만 밀어서, 다음 턴에
+    # 어차피 쓰러지는 판(모든 공격의 값이 같아짐)에서는 '상대가 교체해 오면' 갈래(WAR_REPLY 0.20)와 최악 섞기(WAR2_RISK)가
+    # 0.5 남짓을 더해 무효 기술이 뽑혔다. 랭크 575판(11/20~21)에 이미 보이는 상대에게 새로 고른 무효 공격이 112번 (58판).
+    # 불가사의부적(효과가 굉장하지 않으면 막는다)도 무효로 본다 - 예전 _no_effect 는 타입 무효 · 막는 특성만 보아서 테라스탈한
+    # 껍질몬에게 기습 · 문포스 · 아이언헤드를 계속 썼다. 끄면(False) 예전 그대로 (감점만, 불가사의부적은 모름).
+    WAR_NOEFFECT_DROP = True
     # 헛수(지금 쓰면 아무 일도 없는 변화기)에 매기는 감점 (2026-11-01, 사용자 '아 멍청하네 하는 느낌이 없으면'). 깔기를
     # 또 깔기 · 벽을 또 세우기 · 방어 연달아 · 체력이 가득한데 회복 · 랭크가 꽉 찼는데 또 올리기, 그 밖에 관장 AI 가
     # '소용없다(0)' 고 보는 것 (이미 혼란인 상대에게 이상한빛 · 넘길 것 없는 배턴터치 ...). 사본에서는 한 턴을 그냥 넘긴
@@ -899,9 +906,11 @@ class TrainerBattle(object):
             opts = [("move", k) for k in kos]
             if len(opts) == 1:
                 return opts[0]
+        if self.WAR_NOEFFECT_DROP:
+            opts = self._drop_no_effect(opts)
         replies = self._human_replies()
         if len(opts) <= 1 or not replies:
-            return opts[0] if kos else plain
+            return opts[0] if (kos or plain not in opts) else plain
         blob, self._war_pre = getattr(self, "_war_pre", None) or json.dumps(self.dump()), None
         seeds = [[self.rng.randrange(1 << 30) for _s in range(self.WAR2_SEEDS)] for _ in replies]
         t0 = time.time()
@@ -955,7 +964,15 @@ class TrainerBattle(object):
             self._war_log("사본 오류 %d개 (첫 오류 %r)" % (errs, first_err))
         if cut or took > self.WAR2_SLOW:
             self._war_log("셈 %dms (선택지 %d/%d%s)" % (took * 1000, seen, len(opts), ", 비상 상한" if cut else ""))
-        return best or plain
+        return best or (plain if plain in opts else opts[0])
+
+    def _drop_no_effect(self, opts):
+        """효과 있는 공격 기술이 남으면 효과 없는 공격 기술을 뺀다 (WAR_NOEFFECT_DROP). 변화기 · 교체는 그대로."""
+        bad = [o for o in opts if o[0] == "move" and self._no_effect(o[1])]
+        if not bad:
+            return opts
+        good = [o for o in opts if o[0] == "move" and o not in bad and MC.attacks(self.bt.move_of(o[1]) or {})]
+        return [o for o in opts if o not in bad] if good else opts
 
     def _switch_cost(self, slot):
         """교체 수에 붙이는 값 - 길드전은 0 (시즌 5 랭크의 거울 판 _RankedWar 만 덮어쓴다)."""
@@ -969,7 +986,11 @@ class TrainerBattle(object):
         if A.would_block(self.foe, self.me, md):
             return True
         _d, _crit, eff = B.damage(self.dex, md, self.foe, self.me, B.EST_RNG, crit=False)
-        return eff == 0
+        if eff == 0:
+            return True
+        # 불가사의부적 - 진짜 판(Battle 의 공격)과 같은 조건 (몸부림은 막지 못한다)
+        return bool(self.WAR_NOEFFECT_DROP and MC.key(md) != B.STRUGGLE
+                    and (self.foe.ability_on or self.me.ability_on) and A.wonder_guard_blocks(self.foe, self.me, eff, md))
 
     def _wasted(self, key):
         """AI 의 이 변화기가 지금 헛수인가 (WAR_WASTE_PEN). 공격 기술은 _no_effect 가 본다."""
