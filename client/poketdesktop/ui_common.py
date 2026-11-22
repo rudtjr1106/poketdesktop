@@ -708,6 +708,19 @@ def dialog_bar(win, title, danger=False):
     return bar
 
 
+def _keep_tk_scaling(win):
+    """화면 배율이 바뀐 직후(0.5초 안)에 여는 창도 켤 때 배율로 그리게 한 번 확인한다 (게시판 #707).
+
+    PLAT.pin_tk_scaling 이 root 에 둔 확인 함수를 부른다. 없으면(맥 · 검사) 아무것도 안 한다.
+    """
+    try:
+        fn = getattr(win._root(), "_pin_tk_scaling", None)
+        if fn is not None:
+            fn()
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
 def style_window(win, title, w=None, h=None):
     """창을 꾸미고 크기를 잡는다. **화면(작업 영역) 밖으로 나가지 않게 줄인다.**
 
@@ -719,6 +732,7 @@ def style_window(win, title, w=None, h=None):
     자리도 작업 영역 기준으로 잡는다 - 맥 메뉴 막대·윈도우 작업 표시줄
     아래로 들어가지 않게.
     """
+    _keep_tk_scaling(win)
     win.title(title)
     win.configure(bg=BG)
     window_icon(win)

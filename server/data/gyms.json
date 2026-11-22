@@ -1,12 +1,12 @@
 {
- "digest": "4fb420e534ca5a41",
+ "digest": "c3ac53507ebc39ec",
  "regions": {
   "11110": "cynthia",
   "11140": "rose",
   "11170": "lenora",
   "11200": "sabrina",
   "11215": "giacomo",
-  "11230": "melli",
+  "11230": "jiwoo",
   "11260": "jacq",
   "11290": "burgh",
   "11305": "grant",
@@ -147,7 +147,7 @@
   "41800": "guzma",
   "41820": "volo",
   "41830": "viola",
-  "43111": "ash-ketchum",
+  "43111": "melli",
   "43112": "caitlin",
   "43113": "rei",
   "43114": "shauntal",
@@ -11176,141 +11176,6 @@
     }
    ],
    "type": "FIRE",
-   "why": ""
-  },
-  {
-   "en": "Ash Ketchum",
-   "id": "ash-ketchum",
-   "level": 100,
-   "name": "지우",
-   "region": "43111",
-   "role": "월드 챔피언",
-   "sprite": "jiwoo",
-   "team": [
-    {
-     "ability": "PROTEAN",
-     "evs": {
-      "atk": 126,
-      "hp": 3,
-      "spe": 126
-     },
-     "gender": "M",
-     "held": null,
-     "iv": 31,
-     "level": 100,
-     "moves": [
-      "FLOWERTRICK",
-      "KNOCKOFF",
-      "PLAYROUGH",
-      "UTURN"
-     ],
-     "nature": "JOLLY",
-     "species": "MEOWSCARADA"
-    },
-    {
-     "ability": "MAGICGUARD",
-     "evs": {
-      "hp": 3,
-      "spa": 126,
-      "spe": 126
-     },
-     "gender": "M",
-     "held": null,
-     "iv": 31,
-     "level": 100,
-     "moves": [
-      "PSYCHIC",
-      "SHADOWBALL",
-      "FOCUSBLAST",
-      "ENERGYBALL"
-     ],
-     "nature": "TIMID",
-     "species": "ALAKAZAM"
-    },
-    {
-     "ability": "FILTER",
-     "boost": 1.07,
-     "evs": {
-      "hp": 3,
-      "spa": 126,
-      "spe": 126
-     },
-     "gender": "F",
-     "held": null,
-     "iv": 31,
-     "level": 100,
-     "moves": [
-      "PSYCHIC",
-      "DAZZLINGGLEAM",
-      "THUNDERBOLT",
-      "NASTYPLOT"
-     ],
-     "nature": "TIMID",
-     "species": "MRMIME"
-    },
-    {
-     "ability": "CURSEDBODY",
-     "evs": {
-      "hp": 3,
-      "spa": 126,
-      "spe": 126
-     },
-     "gender": "F",
-     "held": null,
-     "iv": 31,
-     "level": 100,
-     "moves": [
-      "SHADOWBALL",
-      "SLUDGEBOMB",
-      "FOCUSBLAST",
-      "THUNDERBOLT"
-     ],
-     "nature": "TIMID",
-     "species": "GENGAR"
-    },
-    {
-     "ability": "UNBURDEN",
-     "evs": {
-      "hp": 3,
-      "spa": 126,
-      "spe": 126
-     },
-     "gender": "F",
-     "held": null,
-     "iv": 31,
-     "level": 100,
-     "moves": [
-      "SHADOWBALL",
-      "AIRSLASH",
-      "THUNDERBOLT",
-      "WILLOWISP"
-     ],
-     "nature": "TIMID",
-     "species": "DRIFBLIM"
-    },
-    {
-     "ability": "DISGUISE",
-     "boost": 1.08,
-     "evs": {
-      "atk": 126,
-      "hp": 3,
-      "spe": 126
-     },
-     "gender": "F",
-     "held": null,
-     "iv": 31,
-     "level": 100,
-     "moves": [
-      "PLAYROUGH",
-      "SHADOWCLAW",
-      "SWORDSDANCE",
-      "DRAINPUNCH"
-     ],
-     "nature": "JOLLY",
-     "species": "MIMIKYU"
-    }
-   ],
-   "type": "GHOST",
    "why": ""
   },
   {
@@ -26595,7 +26460,7 @@
    "id": "melli",
    "level": 60,
    "name": "동백",
-   "region": "11230",
+   "region": "43111",
    "role": "히스이 지킴이",
    "sprite": "melli",
    "team": [
@@ -33508,6 +33373,157 @@
    ],
    "type": "GHOST",
    "why": "[시즌 2, 3, 4 챔피언] - THREEPEAT 1 DYNASTY",
+   "zring": true
+  },
+  {
+   "ace": "MIMIKYU",
+   "battleSprite": "jiwoo-lab-solo",
+   "en": "Jiwoo",
+   "entryFoot": [
+    142,
+    152
+   ],
+   "entrySprite": "jiwoo-lab-entry",
+   "id": "jiwoo",
+   "level": 100,
+   "name": "지우",
+   "region": "11230",
+   "role": "연구실 지킴이",
+   "sprite": "jiwoo-lab",
+   "team": [
+    {
+     "ability": "TOXICDEBRIS",
+     "evs": {
+      "atk": 1,
+      "def": 2,
+      "hp": 2,
+      "spa": 252,
+      "spd": 1,
+      "spe": 252
+     },
+     "gender": "M",
+     "held": "FOCUSSASH",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "STEALTHROCK",
+      "POWERGEM",
+      "DAZZLINGGLEAM",
+      "SLUDGEWAVE"
+     ],
+     "nature": "MODEST",
+     "species": "GLIMMORA"
+    },
+    {
+     "ability": "AURABREAK",
+     "evs": {
+      "atk": 2,
+      "def": 4,
+      "spa": 252,
+      "spe": 252
+     },
+     "gender": "N",
+     "held": "ZYGARDITE",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "COREENFORCER",
+      "DRACOMETEOR",
+      "FOCUSBLAST",
+      "SCORCHINGSANDS"
+     ],
+     "nature": "NAIVE",
+     "shiny": true,
+     "species": "ZYGARDE"
+    },
+    {
+     "ability": "DISGUISE",
+     "evs": {
+      "atk": 252,
+      "hp": 5,
+      "spd": 1,
+      "spe": 252
+     },
+     "gender": "M",
+     "held": "MIMIKIUMZ",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "SHADOWCLAW",
+      "SHADOWSNEAK",
+      "PLAYROUGH",
+      "SWORDSDANCE"
+     ],
+     "nature": "IMPISH",
+     "species": "MIMIKYU"
+    },
+    {
+     "ability": "GOODASGOLD",
+     "evs": {
+      "atk": 2,
+      "def": 3,
+      "spa": 252,
+      "spd": 1,
+      "spe": 252
+     },
+     "gender": "N",
+     "held": "CHOICESCARF",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "SHADOWBALL",
+      "MAKEITRAIN",
+      "DAZZLINGGLEAM",
+      "FOCUSBLAST"
+     ],
+     "nature": "HASTY",
+     "species": "GHOLDENGO"
+    },
+    {
+     "ability": "DEFIANT",
+     "evs": {
+      "atk": 252,
+      "def": 4,
+      "spd": 2,
+      "spe": 252
+     },
+     "gender": "F",
+     "held": "LIFEORB",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "KOWTOWCLEAVE",
+      "SWORDSDANCE",
+      "SUCKERPUNCH",
+      "IRONHEAD"
+     ],
+     "nature": "NAUGHTY",
+     "species": "KINGAMBIT"
+    },
+    {
+     "ability": "SANDSTREAM",
+     "evs": {
+      "atk": 252,
+      "def": 2,
+      "hp": 252,
+      "spa": 4
+     },
+     "gender": "M",
+     "held": "CHOICEBAND",
+     "iv": 31,
+     "level": 100,
+     "moves": [
+      "EARTHQUAKE",
+      "STONEEDGE",
+      "ICEFANG",
+      "FIREFANG"
+     ],
+     "nature": "ADAMANT",
+     "species": "HIPPOWDON"
+    }
+   ],
+   "type": "GHOST",
+   "why": "[시즌 5 챔피언] - PEER REVIEWED",
    "zring": true
   }
  ],

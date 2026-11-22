@@ -171,10 +171,14 @@ def main():
     chk("나여조경석 소개 문구", ec.get("why") == "이스터에그 — 포스크탑 개발자", ec.get("why"))
     jw = next(r for r in g["regions"] if r["name"] == "지우")
     st, jc = call("GET", "/api/gym/trainer/%s" % jw["region"], token=token)
-    chk("지우: 새 도트와 팀 (에이스 따라큐)", jc.get("sprite") == "jiwoo" and jc["team"][-1]["species"] == "MIMIKYU",
-        (jc.get("sprite"), [m["species"] for m in jc.get("team", [])]))
-    st, png, _h = call("GET", "/api/gym/sprite/jiwoo", raw=True)
-    chk("지우 도트", st == 200 and png[:4] == b"\x89PNG", st)
+    # 그림 이름은 옛 지우(jiwoo)와 달라야 한다 - 앱이 트레이너 그림을 이름으로 PC 에 남겨 두고 다시 받지 않는다
+    chk("지우: 동대문구의 시즌 5 챔피언 관장 (에이스 따라큐, 새 그림 이름)",
+        jw["region"] == "11230" and jc.get("sprite") == "jiwoo-lab" and jc.get("battleSprite") == "jiwoo-lab-solo"
+        and jc["team"][jc.get("ace", -1)]["species"] == "MIMIKYU",
+        (jw["region"], jc.get("sprite"), jc.get("battleSprite"), [m["species"] for m in jc.get("team", [])]))
+    for key in ("jiwoo-lab", "jiwoo-lab-solo", "jiwoo-lab-entry"):
+        st, png, _h = call("GET", "/api/gym/sprite/%s" % key, raw=True)
+        chk("지우 도트 %s" % key, st == 200 and png[:4] == b"\x89PNG", st)
     chk("이스터에그: 카드 그림과 배틀 그림이 따로", ec.get("sprite") == "easter-egg"
         and ec.get("battleSprite") == "easter-egg-solo", (ec.get("sprite"), ec.get("battleSprite")))
     for key in ("easter-egg", "easter-egg-solo"):

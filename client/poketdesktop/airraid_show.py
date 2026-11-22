@@ -265,6 +265,7 @@ class AirRaidShow(object):
         self.gap = EV_GAP
         self.scale = 1.0
         self.stop_plate = None
+        self.alpha = 1.0            # '포켓몬 투명도' - _setup 이 설정에서 읽는다 (레이어 · 낙하산 창에 입힌다)
         self.bar_job = None
         self._names_ov = None
         self.result_ev = None
@@ -333,6 +334,13 @@ class AirRaidShow(object):
         """재생 중 무엇이 터졌다 - 그만 틀고 정리한다 (결과 · 보상은 서버에 이미 있다)."""
         self.cleanup()
 
+    def _pet_alpha(self, ov):
+        """설정의 '포켓몬 투명도' (바탕화면 도트와 같은 값). 못 읽으면 1.0 (예전 그대로)."""
+        try:
+            return float(ov.alpha())
+        except Exception:                                   # noqa: BLE001
+            return config.pet_alpha(getattr(self.app, "settings", None))
+
     # ---------------- 시작 ----------------
     def start(self):
         try:
@@ -366,7 +374,11 @@ class AirRaidShow(object):
         wl, wt, wr, wb = self.work
         rect = (max(wl, int(min(xs)) - 80), max(wt, int(min(ys)) - 160), min(wr, int(max(xs)) + 80),
                 min(wb, int(max(ys)) + 10))
-        self.layer = FL.open_layer(self.root, rect)
+        # 공습은 처음부터 끝까지 '포켓몬 투명도' 를 따른다 (사용자 11/19): 포켓몬 도트는 원래 따르고, 레이어(기술 연출 ·
+        # 체력바 · 글씨)와 낙하산 창도 같은 값으로. 야생 · 투기장과 달리 글을 읽을 일이 없다 - 공습은 알아서 돌고
+        # 결과는 서버에 남는다.
+        self.alpha = self._pet_alpha(ov)
+        self.layer = FL.open_layer(self.root, rect, alpha=self.alpha)
         # 그만 보기(×)는 두지 않는다 - 공습은 중간에 취소할 수 없다 (사용자 11/08). 끝나는 길은 끝 · 마감 · 로그아웃뿐
         self._tick()
         # 멈춤 감시 (독립 검토): 기술 연출 한 단계가 끝을 안 알리면 다음 턴을 영영 기다린다 - 그동안 바쁨이라 풀숲 ·
@@ -533,7 +545,7 @@ class AirRaidShow(object):
         try:
             from .duel_scene import Sprite
             img = ART.scaled(ART.parachute(r.i), CHUTE_K)
-            r.chute = Sprite(self.root, CHUTE_KEY, img.size)
+            r.chute = Sprite(self.root, CHUTE_KEY, img.size, alpha=self.alpha)
             r.chute_img = r.chute.load([img])[0]
             r.chute.show(r.chute_img)
         except Exception as e:                              # noqa: BLE001

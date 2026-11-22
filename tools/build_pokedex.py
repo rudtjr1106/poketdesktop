@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 from common.ability_kr import DESC as ABILITY_KR  # noqa: E402
 from common.ability_kr import OVERRIDE as ABILITY_OVERRIDE  # noqa: E402
+from common.ability_kr import NAME as ABILITY_NAME  # noqa: E402
 from common.move_kr import DESC as MOVE_KR  # noqa: E402
 
 CSV_BASE = "https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv"
@@ -222,6 +223,17 @@ def meta_from_showdown(v):
     return out
 
 
+def secondary_from_showdown(v):
+    """Showdown 기술 하나에 부가효과(secondary)가 있나 -> 도감의 sec.
+
+    우격다짐이 위력을 1.3배로 올리고 지우는 것, 인분 · 은밀망토가 막는 것이 이것이다 (abilities.has_secondary).
+    기술 자체의 효과(self)는 아니다 - 인파이트 · 용성군의 자기 능력 하락, 쑥쑥봄버의 씨뿌리기, 조이기류의 묶기.
+    PokeAPI 자료로는 둘을 못 가른다: 인파이트도 파워업펀치도 '자기 능력 변화 100%' 로만 적혀 있다.
+    빈 secondary({}, 암석액스 · 비검천중파)도 있는 것이다 - 쇼다운이 우격다짐을 받게 하려고 둔 것이다.
+    """
+    return v.get("secondary") is not None or bool(v.get("secondaries"))
+
+
 def flags_from_showdown(v, known):
     out = set()
     for k in (v.get("flags") or {}):
@@ -331,7 +343,7 @@ def build():
     for aid, ident in abil_ident.items():
         key = norm(ident)
         d = {"id": aid, "en": ident.title(),
-             "kr": abil_kr.get(aid, ident.title())}
+             "kr": abil_kr.get(aid) or ABILITY_NAME.get(key) or ident.title()}   # 한국어 이름이 없으면 손으로 적은 것
         # **9세대 특성 47개에는 PokeAPI 에 한국어 줄이 아예 없다.**
         # 그대로 두면 영어가 화면에 나온다(찌리비의 풍력발전이 그랬다).
         # 손으로 적어 둔 것이 있으면 그걸 쓴다. 저쪽에 한국어가 들어오면
@@ -455,6 +467,13 @@ def build():
             # (튀어오르기 같은 것)까지 바꾸면 안 된다.
             if sd and not move_out[ident]["flags"]:
                 move_out[ident]["flags"] = flags_from_showdown(sd, known_flags)
+        # 부가효과가 있나 (우격다짐 · 인분 · 은밀망토). 공격기에만 적는다 - 효과 표가 있든 없든 쇼다운에서 본다.
+        sd = sd_moves.get(ident.lower())
+        if sd and move_out[ident]["cat"] != "status":
+            move_out[ident]["sec"] = secondary_from_showdown(sd)
+            if sd.get("hasSheerForceBoost"):
+                # 부가효과가 없는데 우격다짐이 위력만 올린다 (일렉트릭샷 · 지휘). 지울 것이 없고 생명의구슬 반동도 든다.
+                move_out[ident]["sfBoost"] = True
 
     for ident, fix in MOVE_FIXES.items():
         if ident in move_out:

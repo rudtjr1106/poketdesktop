@@ -650,6 +650,8 @@ class LiveBattle(object):
             "fainted": not f.alive(),
             "mega": bool(f.mega),
             "tera": f.tera, "teraKr": dex.type_name(f.tera) if f.tera else None,    # 2.5.0
+            # 조이기류에 붙잡혀 있나 {move, moveKr, turns} (게시판 #664). 남은 턴은 내가 건 것만 - statusmoves.bound_view
+            "bound": SM.bound_view(self.bt, f, mine),
         }
         if mine or f.ab.get("shown"):
             out["ability"] = f.ability
@@ -680,9 +682,20 @@ class LiveBattle(object):
                         "pp": 1, "maxpp": 1, "desc": "", "blocked": None})
         return out
 
+    def no_switch(self, who):
+        """지금 스스로 교체할 수 없는 까닭 (화면 문구). 바꿀 수 있거나 고를 차례가 아니면 None. (게시판 #664)
+
+        choose 가 교체를 거절하는 갈래와 같다 - 다음 포켓몬을 고를 때(phase=switch)는 붙잡혀 있어도 고른다.
+        """
+        p = self.side(who)
+        if self.over or self.phase() != "choose" or not p.playing():
+            return None
+        return SM.switch_block(self.bt, p.mon)
+
     def view(self, who):
         """그 사람 시점의 판 상태. me 가 늘 자기 쪽이다."""
         me, foe = self.side(who), self.side(self.other(who))
+        no_switch = self.no_switch(who)
         return {
             "turn": self.turn, "step": self.step, "maxTurns": self.max_turns,
             "over": self.over, "result": self.outcome(who), "reason": self.reason,
@@ -697,12 +710,17 @@ class LiveBattle(object):
             "me": {"name": me.name, "slot": me.slot,
                    "team": [self.view_mon(f, True) for f in me.team],
                    "moves": self.moves_of(who),
-                   "switches": self.valid_switches(who),
+                   # 붙잡혀 있으면(noSwitch) 빈 목록 - 옛 앱도 이것만 보고 교체 단추를 잠근다 (게시판 #664)
+                   "switches": [] if no_switch else self.valid_switches(who),
+                   "trapped": me.mon.alive() and SM.trapped(self.bt, me.mon),
+                   "noSwitch": no_switch,
                    "chosen": me.choice is not None,
                    "needSwitch": me.need_switch,
                    "left": len(me.alive_slots())},
             "foe": {"name": foe.name, "slot": foe.slot,
                     "team": [self.view_mon(f, False) for f in foe.team],
+                    # 보이는 것만으로 (상대의 아름다운허물 · 특성끼리의 판정은 빼고)
+                    "trapped": foe.mon.alive() and SM.trap_kind(self.bt, foe.mon, hidden=False) is not None,
                     "chosen": foe.choice is not None,
                     "needSwitch": foe.need_switch,
                     "left": len(foe.alive_slots())},

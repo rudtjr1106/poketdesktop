@@ -28,6 +28,7 @@ from common import tint as T
 from common.korean import natural
 
 from . import battle_fx as FX
+from . import battle_trap as TR
 from . import effects, skins, sprite_cache, sprites
 from . import sendout_fx as SO
 from . import battle_zoom as Z
@@ -509,6 +510,8 @@ class GymBattleWindow(Z.Resizable):
         bits = [st] if st else []
         if ui_gimmick.tera_tag(mon):
             bits.insert(0, ui_gimmick.tera_tag(mon))     # 테라스탈한 동안 (2.5.0)
+        if TR.bound_tag(mon):
+            bits.append(TR.bound_tag(mon))               # 조이기류에 붙잡혀 있다 (게시판 #664)
         kr = {"atk": "공", "def": "방", "spa": "특공", "spd": "특방", "spe": "스피드", "acc": "명중", "eva": "회피"}
         for k, v in stages.items():
             bits.append("%s%+d" % (kr.get(k, k), v))
@@ -908,9 +911,14 @@ class GymBattleWindow(Z.Resizable):
             return cont()
         self.busy = True
         self.hide_commands()
-        # src: 받은 장(1배), photos: 지금 배율로 키운 장, k: 그 배율, i: 지금 장
-        self._entry = {"cont": cont, "item": None, "photos": [], "src": None, "k": None, "i": 0,
+        # src: 받은 장(1배), photos: 지금 배율로 키운 장 {장 번호: PhotoImage} (보일 때 한 장씩 만든다),
+        # k: 그 배율, i: 지금 장
+        self._entry = {"cont": cont, "item": None, "photos": {}, "src": None, "k": None, "i": 0,
                        "foot": t.get("entryFoot"), "done": False}
+        # **서 있는 배틀 그림을 먼저 보이지 않는다** (11/19 지우). 연출 첫 장은 다른 자세(책상 앞)라, 연출 그림을
+        # 받는 동안 배틀 그림이 보이면 '서 있다가 -> 연출 -> 다시 서 있기' 가 된다. 끝나거나 못 받으면
+        # _entry_end 가 다시 보인다 (마지막 장이 배틀 그림과 같은 자세라 넘어갈 때 튀지 않는다).
+        self.cv.itemconfigure(self.trainer_item, state="hidden")
 
         def done(frames, err):
             if not self.alive or self._entry is None or self._entry["done"]:
@@ -921,32 +929,47 @@ class GymBattleWindow(Z.Resizable):
             e["src"] = frames
             if not e["foot"]:
                 e["foot"] = [frames[0][0].width / 2.0, frames[0][0].height]
-            self._entry_place()
             # 장마다 끝나는 시각 (시작부터 초). 재생은 시계를 보고 장을 고른다 - after(ms) 를 이어 걸면
             # 윈도우 타이머가 15.6ms 단위로 올림해 장마다 늦어지고(66ms -> 78ms) 들쭉날쭉해진다.
             acc, e["ends"] = 0.0, []
-            for _ph, ms in e["photos"]:
+            for _im, ms in frames:
                 acc += ms / 1000.0
                 e["ends"].append(acc)
+            self._entry_place()
             e["t0"] = time.monotonic()
             self._entry_step(0)
         run_async(self.root, lambda: trainer_frames(self.app.api, key), done)
+
+    def _entry_photo(self, i):
+        """i 번째 장을 이 창의 배율로 키운 PhotoImage. 보일 때 한 장씩 만들고 들고 있는다.
+
+        예전에는 시작할 때 89장을 tk 스레드에서 한꺼번에 만들어(0.1~0.4초) 그동안 연출이 늦게 떴다 (11/19 지우).
+        배율은 전역 Z.K 가 아니라 **이 창의 배율(self.zoom)** 이다 - 다른 배틀 창이 zoom_use() 로 전역을
+        바꿔도 재생 중인 장의 크기가 흔들리지 않는다. 창 크기를 바꿔 배율이 바뀌면 그때부터 새로 만든다.
+        """
+        e = self._entry
+        k = self.zoom
+        if e["k"] != k:
+            e["photos"], e["k"] = {}, k
+        ph = e["photos"].get(i)
+        if ph is None:
+            im = e["src"][i][0]
+            if k != 1.0:
+                from PIL import Image
+                im = im.resize((max(1, int(round(im.width * k))), max(1, int(round(im.height * k)))),
+                               Image.NEAREST)
+            ph = e["photos"][i] = ImageTk.PhotoImage(im)
+        return ph
 
     def _entry_place(self):
         """연출 그림을 지금 장면의 배틀 그림 자리 · 배율에 놓는다. 창 크기를 바꿔 장면을 새로 지으면 다시 부른다
         (창은 열리자마자 한 번 제 크기를 잡기도 한다 - 그때 연출이 끊기지 않고 새 자리에서 이어진다)."""
         e = self._entry
-        k = Z.K
-        if e["k"] != k:
-            from PIL import Image
-            e["photos"] = [(ImageTk.PhotoImage(im if k == 1.0 else im.resize(
-                (max(1, int(round(im.width * k))), max(1, int(round(im.height * k)))), Image.NEAREST)), ms)
-                for im, ms in e["src"]]
-            e["k"] = k
+        k = self.zoom
         x, y = self.cv.coords(self.trainer_item)[:2]
         fx, fy = e["foot"]
         e["item"] = self.cv.create_image(int(round(x - fx * k)), int(round(y - fy * k)), anchor="nw",
-                                         image=e["photos"][min(e["i"], len(e["photos"]) - 1)][0])
+                                         image=self._entry_photo(min(e["i"], len(e["src"]) - 1)))
         self.cv.tag_raise(e["item"], self.trainer_item)
         self.cv.itemconfigure(self.trainer_item, state="hidden")
 
@@ -964,7 +987,7 @@ class GymBattleWindow(Z.Resizable):
             return self._entry_end()
         if i != e["i"] or _i == 0:
             e["i"] = i
-            self.cv.itemconfigure(e["item"], image=e["photos"][i][0])
+            self.cv.itemconfigure(e["item"], image=self._entry_photo(i))
         self.later(max(1, int((ends[i] - el) * 1000)), self._entry_step)
 
     def _entry_end(self):
@@ -979,7 +1002,7 @@ class GymBattleWindow(Z.Resizable):
             self.cv.itemconfigure(self.trainer_item, state="normal")
         except tk.TclError:
             pass
-        e["photos"] = []
+        e["photos"] = {}
         if self.alive:
             e["cont"]()
 
@@ -987,9 +1010,13 @@ class GymBattleWindow(Z.Resizable):
         """창 크기를 바꿔 다시 지은 화면을, 들고 있던 것으로 되돌린다 (battle_zoom.Resizable)."""
         self._load_trainer()
         e = getattr(self, "_entry", None)
-        if e and not e["done"] and e["src"]:
-            # 등장 연출 도중에 장면을 새로 지었다 (연출 그림도 지워졌다) - 새 자리 · 배율로 다시 놓고 이어 간다
-            self._entry_place()
+        if e and not e["done"]:
+            if e["src"]:
+                # 등장 연출 도중에 장면을 새로 지었다 (연출 그림도 지워졌다) - 새 자리 · 배율로 다시 놓고 이어 간다
+                self._entry_place()
+            else:
+                # 연출 그림을 받는 중에 장면을 새로 지었다 - 새 배틀 그림도 연출이 시작될 때까지 숨겨 둔다
+                self.cv.itemconfigure(self.trainer_item, state="hidden")
         for who in ("me", "foe"):
             self.set_mon(who, self.shown.get(who))
         self._balls(self.view)
@@ -1030,9 +1057,12 @@ class GymBattleWindow(Z.Resizable):
         self.mega.show(self.view.get("canMega"))
         self.gim.show(self.view.get("gimmick"))
         shown = [self.gim.decorate(m) for m in (moves[:4] if len(moves) <= 4 else moves[-1:])]
-        can_switch = any(not x.get("fainted") for i, x in enumerate(side["team"]) if i != side["slot"])
+        # 붙잡혀 있거나 반동으로 쉬는 턴이면(서버가 noSwitch 로 까닭을 싣는다) 교체를 잠그고 까닭을 띄운다 (게시판 #664 -
+        # 단추가 켜져 있어서 회오리불꽃이 안 걸린 줄 알았다). 옛 서버는 그 칸이 없다 - 예전처럼 켠다.
+        can_switch = any(not x.get("fainted") for i, x in enumerate(side["team"]) if i != side["slot"]) \
+            and not TR.locked(side)
         self._paint_moves(shown, can_switch)
-        self.say("%s 은(는) 무엇을 할까?" % mon.get("name", ""))
+        self.say(TR.prompt(mon.get("name", ""), side))
 
     def _paint_moves(self, moves, can_switch):
         """기술 칸 넷과 교체 · 기권 단추를 그린다 (테마마다 그리는 곳). moves 는 Z기술까지 입힌 것."""
@@ -1092,6 +1122,8 @@ class GymBattleWindow(Z.Resizable):
     def open_switch(self, forced=False):
         # 쓰러져서 바꿔야 하는 순간에는 어디서 열어도 '돌아가기' 가 없어야 한다
         forced = forced or bool(self.view.get("needSwitch"))
+        if not forced and TR.locked(self.view.get("me")):
+            return self.show_commands()      # 붙잡혀 있다 - 교체 칸을 열지 않는다 (단추는 잠겨 있다)
         self.zoom_use()
         self.mode = "switch"
         side = self.view["me"]
@@ -1210,14 +1242,16 @@ class GymBattleWindow(Z.Resizable):
                     self.say(getattr(err, "message", str(err)))
                     return self.later(1500, self.close)
                 self.say(getattr(err, "message", str(err)))
-                return self._reload()
+                return self._reload(note=getattr(err, "message", str(err)))
             self.play(r.get("events") or [], r)
 
         run_async(self.root, lambda: self.app.api.gym_act(self.bid, kind, move, slot,
                                                          **ui_gimmick.act_kwargs(mega, z, tera)),
                   done)
 
-    def _reload(self):
+    def _reload(self, note=None):
+        """서버의 판을 다시 받아 명령 칸을 그린다. note: 그린 뒤 글상자에 남길 말 (서버가 거절한 까닭 -
+        예전에는 다시 그리며 '무엇을 할까?' 로 곧바로 덮여서 왜 안 됐는지 못 봤다)."""
         def done(r, err):
             if not self.alive:
                 return
@@ -1232,6 +1266,8 @@ class GymBattleWindow(Z.Resizable):
                 self.open_switch(forced=True)
             else:
                 self.show_commands()
+            if note:
+                self.say(note)
         run_async(self.root, lambda: self.app.api.gym_battle(), done)
 
     def use_move(self, key):
@@ -1369,6 +1405,8 @@ class GymBattleWindow(Z.Resizable):
         for who in ("me", "foe"):
             self._stop_anim(who)
         self.sendout.close()                 # 볼 연출이 쥔 그림을 여기서(Tk 스레드에서) 놓는다
+        if getattr(self, "_entry", None):    # 등장 연출 도중에 닫았다 - 만들어 둔 장도 Tk 스레드에서 놓는다
+            self._entry["photos"] = {}
         for j in self.jobs:
             try:
                 self.root.after_cancel(j)

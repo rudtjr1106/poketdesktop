@@ -813,7 +813,8 @@ class 잡기판(object):
     for _name in ("next_turn", "play", "turn_done", "start_hold", "_hint", "_cancel_hold_jobs",
                   "fight_on", "_menu_opened", "_menu_closed", "throw_ball", "_do_throw",
                   "after_ball", "after", "_safe", "abort", "_late_ball",
-                  "_auto_setting", "stop_auto", "_ball_left", "_auto_again", "_auto_throw"):
+                  "_auto_setting", "stop_auto", "_ball_left", "_auto_again", "_auto_throw",
+                  "_any_ball", "_pick_ball", "_no_ball"):
         locals()[_name] = getattr(DB.DesktopBattle, _name)
 
     def render(self, ev, done):
@@ -927,6 +928,7 @@ def t_바쁠_때_던진_볼은_턴이_끝나고_던진다():
         chk("볼을 던지는 동안 턴을 끼워 보내지 않았다", d.app.api.moves == [], d.app.api.moves)
 
         d.playing = True
+        d.ball_opts = [{"id": "POKEBALL", "count": 5}, {"id": "ULTRABALL", "count": 2}]   # 하이퍼볼이 아직 남았다
         d._do_throw(None)
         chk("연출 중에 두 번 클릭해도 예약 (마지막에 쓴 하이퍼볼)", d.pending_ball == "ULTRABALL", d.pending_ball)
         d.next_turn()
@@ -1151,6 +1153,213 @@ def t_싸우는_중에_던져도_이어_던진다():
         n = len(d.app.api.balls)
         d.root.advance(1500)
         chk("  올라오면 이어 던진다", len(d.app.api.balls) > n and d.holding, (len(d.app.api.balls), n, d.holding))
+    finally:
+        undo()
+
+
+class 볼없음(Exception):
+    """서버의 409 '○○ 이(가) 없습니다.' (battle_routes._take_ball)."""
+    status = 409
+
+    def __init__(self, kr):
+        Exception.__init__(self, kr)
+        self.message = "%s 이(가) 없습니다." % kr
+
+
+def 볼없음_준비(mode="new"):
+    """잡기_준비 + 시계를 판의 시계로 (같은 글을 1초 안에 한 번만 띄우는지 보려고) · 서버 오류를 err 로 넘긴다."""
+    d, menus, undo = 잡기_준비(mode)
+    real_time, real_async = DB.time, DB.run_async
+    DB.time = type("가짜시각", (), {"time": staticmethod(lambda: d.root.now / 1000.0)})
+
+    def run_async(root, fn, cb):
+        try:
+            r = fn()
+        except Exception as e:                              # noqa: BLE001
+            return cb(None, e)
+        cb(r, None)
+    DB.run_async = run_async
+
+    def 되돌리기():
+        DB.time, DB.run_async = real_time, real_async
+        undo()
+    return d, menus, 되돌리기
+
+
+def t_볼이_없으면_야생_위에_띄우고_10초는_그대로():
+    """게시판 #711 (사뚱): 잡기 모드로 멈춘 동안 몬스터볼이 0개인데 두 번 클릭하면 notify 만 하고 끝났다. notify 는 화면에
+    안 뜨고 '지금 던지세요!' 는 계속 떠서, 광클하는 사이 10초가 지나 끝까지 싸워 메타몽을 쓰러뜨렸다."""
+    d, _m, undo = 볼없음_준비()
+    try:
+        d.app.balls = 0
+        d.ball_opts = [{"id": "POKEBALL", "count": 0}, {"id": "GREATBALL", "count": 0}]
+        d.app.api.move_answers = [{"events": [], "hold": "low", "battle": {"id": 7, "over": False}}]
+        d.next_turn()
+        job = d.hold_job
+        chk("멈춘다 (10초 타이머)", d.holding and job is not None, (d.holding, job))
+        chk("  던질 볼이 하나도 없으면 '지금 던지세요!' 대신 '볼이 없습니다'", "지금 던지세요!" not in d.떠오른글씨
+            and d.떠오른글씨 == ["볼이 없습니다 · 왼쪽 클릭하면 싸웁니다"], d.떠오른글씨)
+        d.root.advance(1500)
+        d.throw_ball()                                  # 두 번 클릭
+        chk("두 번 클릭하면 야생 위에 '볼이 없습니다' 를 띄운다", d.떠오른글씨[-1:] == ["볼이 없습니다 · 왼쪽 클릭하면 싸웁니다"]
+            and len(d.떠오른글씨) == 2 and d.app.api.balls == [], (d.떠오른글씨, d.app.api.balls))
+        chk("  기록에도 남긴다", d.app.말[-1] == "몬스터볼이 없습니다.", d.app.말[-1:])
+        chk("  10초 타이머는 그대로 (지우지도 새로 세지도 않는다)", d.holding and d.hold_job == job, (d.holding, d.hold_job))
+        for _ in range(5):
+            d.throw_ball()                              # 광클
+        chk("  광클해도 1초 안에는 한 번만 (글씨가 쌓이지 않는다)", len(d.떠오른글씨) == 2, d.떠오른글씨)
+        d.root.advance(1100)
+        d.throw_ball()
+        chk("  1초가 지나면 다시 띄운다", len(d.떠오른글씨) == 3, d.떠오른글씨)
+        d.root.advance(7700)
+        chk("10초가 지나면 예전처럼 끝까지 싸운다 (멈춰서 굳지 않는다)", d.app.api.moves[-1:] == [("new", True)]
+            and not d.holding, d.app.api.moves)
+    finally:
+        undo()
+
+    d, _m, undo = 볼없음_준비()
+    try:
+        d.app.balls = 0
+        d.ball_opts = [{"id": "POKEBALL", "count": 0}, {"id": "ULTRABALL", "count": 2}]
+        d.app.api.move_answers = [{"events": [], "hold": "low", "battle": {"id": 7, "over": False}}]
+        d.next_turn()
+        chk("몬스터볼만 없고 다른 볼이 있으면 '지금 던지세요!' 그대로", d.떠오른글씨 == ["지금 던지세요!"], d.떠오른글씨)
+        d.throw_ball()
+        chk("  두 번 클릭은 '몬스터볼이 없습니다 · 오른쪽 클릭으로 다른 볼'", d.떠오른글씨[-1]
+            == "몬스터볼이 없습니다 · 오른쪽 클릭으로 다른 볼" and d.app.api.balls == [], d.떠오른글씨)
+    finally:
+        undo()
+
+
+def t_계속_던지기를_켜도_볼이_없으면_멈추지_않는다():
+    """게시판 #711 검토: 계속 던지기가 켜져 있으면 볼 수를 보기 전에 멈춤(holding)을 켜고 10초 타이머를 지웠다. 그 뒤
+    0개라 돌아가면 다음 턴은 멈춘 중이라 안 나가고, 10초도 '지금 던지세요' 도 없이 왼쪽 클릭할 때까지 배틀이 굳었다."""
+    d, _m, undo = 볼없음_준비()
+    try:
+        d.app.settings["autoThrow"] = True
+        d.app.balls = 0
+        d.ball_opts = [{"id": "POKEBALL", "count": 0}]
+        d.next_turn()                                   # 싸우는 중 (서버가 멈추라고 안 했다)
+        d.throw_ball()                                  # 두 번 클릭
+        chk("볼이 없으면 멈춤을 켜지 않는다 (계속 던지기도 안 건다)", not d.holding and d.auto_ball is None
+            and d.app.api.balls == [], (d.holding, d.auto_ball))
+        chk("  야생 위에 '볼이 없습니다'", d.떠오른글씨 == ["볼이 없습니다"], d.떠오른글씨)
+        d.root.advance(700)
+        chk("  싸움은 그대로 이어진다", len(d.app.api.moves) == 2, d.app.api.moves)
+    finally:
+        undo()
+
+    d, _m, undo = 볼없음_준비()
+    try:
+        d.app.settings["autoThrow"] = True
+        d.app.api.move_answers = [{"events": [], "hold": "low", "battle": {"id": 7, "over": False}}]
+        d.next_turn()
+        d._do_throw("POKEBALL")                         # 놓쳤다 -> 0.35초 뒤 같은 볼을 다시 던진다 (10초 타이머는 지웠다)
+        chk("계속 던지기 중", d.auto_ball == "POKEBALL" and d.hold_job is None and d.app.api.balls == ["POKEBALL"],
+            (d.auto_ball, d.hold_job, d.app.api.balls))
+        d.app.balls = 0                                 # 그사이 몬스터볼이 떨어졌다 (다른 PC · 동기화)
+        d.root.advance(400)
+        chk("  다음 볼이 없으면 멈추고 10초 타이머를 다시 건다 (굳지 않는다)", d.auto_ball is None and d.holding
+            and d.hold_job is not None and d.app.api.balls == ["POKEBALL"], (d.auto_ball, d.hold_job, d.app.api.balls))
+        d.root.advance(10100)
+        chk("  10초 뒤 끝까지 싸운다", d.app.api.moves[-1:] == [("new", True)], d.app.api.moves)
+    finally:
+        undo()
+
+
+def t_마지막에_쓴_볼이_떨어졌으면_몬스터볼로_던진다():
+    """게시판 #711 검토: 배틀의 두 번 클릭은 마지막에 쓴 볼(lastBall)을 개수를 안 보고 보냈다. 슈퍼볼을 다 쓰면 서버가 409 로
+    거절할 뿐이었다 (그것도 notify 만). 배틀 밖(wild_ui.last_ball)처럼 그 볼이 남았을 때만 쓰고 아니면 몬스터볼."""
+    d, _m, undo = 볼없음_준비()
+    try:
+        d.app.settings["lastBall"] = "GREATBALL"
+        d.ball_opts = [{"id": "POKEBALL", "count": 5}, {"id": "GREATBALL", "count": 0}]
+        d.throw_ball()
+        chk("마지막에 쓴 슈퍼볼이 0개면 몬스터볼로 던진다", d.app.api.balls == ["POKEBALL"], d.app.api.balls)
+    finally:
+        undo()
+    d, _m, undo = 볼없음_준비()
+    try:
+        d.app.settings["lastBall"] = "GREATBALL"
+        d.ball_opts = [{"id": "POKEBALL", "count": 5}, {"id": "GREATBALL", "count": 2}]
+        d.throw_ball()
+        chk("  남아 있으면 예전처럼 슈퍼볼", d.app.api.balls == ["GREATBALL"], d.app.api.balls)
+    finally:
+        undo()
+
+    # 메뉴는 남았다고 했는데 서버가 없다고 했다 (다른 PC 에서 썼다) - 409
+    d, _m, undo = 볼없음_준비()
+    try:
+        d.app.settings["lastBall"] = "GREATBALL"
+        d.ball_opts = [{"id": "POKEBALL", "count": 5}, {"id": "GREATBALL", "count": 1}]
+        d.app.api.move_answers = [{"events": [], "hold": "low", "battle": {"id": 7, "over": False}}]
+        d.next_turn()
+        d.떠오른글씨[:] = []
+
+        def battle_ball(bid, ball):
+            d.app.api.balls.append(ball)
+            if ball == "GREATBALL":
+                raise 볼없음("슈퍼볼")
+            return {"caught": False, "balls": 4, "events": [], "battle": {"id": bid, "over": False}}
+        d.app.api.battle_ball = battle_ball
+        d.throw_ball()
+        chk("서버가 '슈퍼볼 이(가) 없습니다.' 로 거절하면 야생 위에 띄운다", d.떠오른글씨[:1]
+            == ["슈퍼볼이 없습니다 · 왼쪽 클릭하면 싸웁니다"], d.떠오른글씨)
+        chk("  멈춘 채 다시 기다린다 (10초)", d.holding and d.hold_job is not None)
+        d.root.advance(1100)
+        d.throw_ball()
+        chk("  다음 두 번 클릭은 같은 볼로 또 거절당하지 않고 몬스터볼", d.app.api.balls == ["GREATBALL", "POKEBALL"],
+            d.app.api.balls)
+        chk("다른 409 는 '볼이 없습니다' 가 아니다", not DB.ball_gone(type("E", (Exception,), {
+            "status": 409, "message": "데리고 있는 포켓몬이 없습니다."})()) and not DB.ball_gone(볼없음.__base__("x"))
+            and DB.ball_gone(볼없음("몬스터볼")))
+    finally:
+        undo()
+
+
+def t_예약한_볼이_떨어져도_판은_이어진다():
+    """게시판 #711 검토: 싸우는 중에 광클하면 앞의 볼을 기다리는(그리는) 사이 마지막 몬스터볼로 또 두 번 클릭해 볼이
+    예약된다(pending_ball). 앞의 볼을 놓치고 턴이 끝나면 next_turn 이 그 볼을 던지려다 0개라 '볼이 없습니다' 만 띄우고
+    돌아갔다 - 다음 턴도 10초도 stalled 도 없어 배틀이 영원히 굳었다 (왼쪽 클릭은 멈춘 중에만 먹는다)."""
+    d, _m, undo = 볼없음_준비()
+    try:
+        d.app.balls = 1
+        d.ball_opts = [{"id": "POKEBALL", "count": 1}]
+        d.playing = True                                # 앞의 볼(마지막 몬스터볼)을 놓친 연출을 그리는 중
+        d.throw_ball()                                  # 또 두 번 클릭
+        chk("싸우는 중 · 연출 중이면 예약만 한다", d.pending_ball == "POKEBALL" and d.app.api.balls == []
+            and not d.holding, (d.pending_ball, d.holding))
+        d.app.balls = 0                                 # 앞의 볼이 마지막이었다
+        d.playing = False
+        d.turn_done({"battle": {"id": 7, "over": False}})
+        d.root.advance(200)
+        chk("예약한 볼이 떨어졌으면 '볼이 없습니다' 를 띄우고 던지지 않는다", d.떠오른글씨 == ["볼이 없습니다"]
+            and d.app.api.balls == [] and d.pending_ball is None, (d.떠오른글씨, d.app.api.balls))
+        chk("  싸우던 판은 그 턴을 그대로 보낸다 (굳지 않는다)", len(d.app.api.moves) == 1 and not d.holding
+            and not d.stalled, (d.app.api.moves, d.holding, d.stalled))
+        d.root.advance(3000)
+        chk("  그 뒤로도 턴이 이어진다 (두 번씩 나가지 않는다)", len(d.app.api.moves) == 5, d.app.api.moves)
+    finally:
+        undo()
+
+    d, _m, undo = 볼없음_준비()
+    try:
+        d.app.balls = 1
+        d.ball_opts = [{"id": "POKEBALL", "count": 1}]
+        d.playing = True
+        d.throw_ball()
+        d.app.balls = 0
+        d.playing = False
+        d.turn_done({"hold": "low", "battle": {"id": 7, "over": False}})      # 이번 턴에 서버가 멈추라고 했다
+        d.root.advance(200)
+        chk("멈추라고 했으면 예약한 볼이 떨어져도 10초를 걸고 기다린다", d.holding and d.hold_job is not None
+            and d.app.api.moves == [] and d.app.api.balls == [], (d.holding, d.hold_job, d.app.api.moves))
+        chk("  야생 위에 '볼이 없습니다 · 왼쪽 클릭하면 싸웁니다'", d.떠오른글씨[:1]
+            == ["볼이 없습니다 · 왼쪽 클릭하면 싸웁니다"], d.떠오른글씨)
+        d.root.advance(9700)
+        chk("  10초가 차기 전에는 턴을 안 보낸다", d.app.api.moves == [], d.app.api.moves)
+        d.root.advance(400)
+        chk("  10초 뒤 끝까지 싸운다", d.app.api.moves[:1] == [("new", True)] and not d.holding, d.app.api.moves)
     finally:
         undo()
 
@@ -1506,6 +1715,8 @@ def main():
                t_놓친_뒤_야생이_숨으면_멈추지_않고_넘긴다,
                t_배틀_중에도_잡힐_때까지_계속_던진다,
                t_싸우는_중에_던져도_이어_던진다,
+               t_볼이_없으면_야생_위에_띄우고_10초는_그대로, t_계속_던지기를_켜도_볼이_없으면_멈추지_않는다,
+               t_마지막에_쓴_볼이_떨어졌으면_몬스터볼로_던진다, t_예약한_볼이_떨어져도_판은_이어진다,
                t_볼이_흔들리는_동안_왼쪽_클릭은_싸우기가_아니다, t_두_번_클릭의_두_번째_뗌은_싸우기가_아니다,
                t_잡으면_끝낸다, t_볼을_기다리던_턴에_판이_끝나면_말없이_버리지_않는다, t_배틀을_접으면_서버에_알린다,
                t_상대_이름표는_두_줄이다,

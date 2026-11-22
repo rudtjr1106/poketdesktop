@@ -20,6 +20,7 @@
   이 창은 목록이 둘이라 어느 쪽을 굴릴지 그때그때 정해야 한다.
 """
 import datetime
+import time
 import tkinter as tk
 from tkinter import ttk
 
@@ -29,7 +30,7 @@ from common import deco as DECO
 from common import held as H
 from common import pokelogic as P
 from common import tint as T
-from common.korean import natural
+from common.korean import josa, natural
 
 from . import config
 from . import sprite_cache, sprites
@@ -74,6 +75,10 @@ USABLE = ("ev", "iv", "level", "stone", "noevolve", "held", "shiny", "ticket", "
           "lure", "rename", "arche")       # 테라피스는 2.5.1 부터 지니는 도구 ("held") - 따로 쓰는 길이 없다
 # **대상 포켓몬이 없는 도구.** 고를 것이 없으니 목록을 띄우지 않고 바로 쓴다.
 NO_TARGET = ("ticket", "tmticket", "decopick", "lure", "rename", "arche")
+# **되돌릴 수 없는 도구** (은색 · 금색병뚜껑, 이로치사탕). 앞 도구에서 골라져 있던 포켓몬을 이어받지 않고, 저절로
+# 고르지도 않는다 - 이 도구를 고른 뒤 사용자가 직접 누른 포켓몬에게만 쓴다. 쓰기 전에 대상 이름을 적어 한 번 묻는다.
+# (게시판 #704: 가방을 열면 맨 앞 가디안나이트와 함께 가디안이 골라지고, 금색병뚜껑으로 바꿔도 그대로 남아 가디안에게 갔다)
+BY_HAND = ("iv", "shiny")
 
 ROW_BG = "#10131c"      # 목록 한 줄 바탕
 SEL_BG = "#2b2417"      # 고른 줄
@@ -432,6 +437,36 @@ def unusable_note(item):
     return "이 도구는 아직 쓸 수 없다."
 
 
+def hyper_left(info):
+    """병뚜껑으로 아직 단련할 수 있는 능력 [(열쇠, 이름)] - STAT_ROWS 순서.
+
+    개체값이 31 미만이고 아직 단련 안 한 것. 금색병뚜껑은 이것을 한꺼번에 다 단련한다 (서버 _use_iv 와 같은 식).
+    """
+    ivs = info.get("ivs") or {}
+    hyper = info.get("hyper") or {}
+    return [(s, label) for s, label in STAT_ROWS
+            if int(ivs.get(s, 0)) < P.IV_MAX and not hyper.get(s)]
+
+
+def hyper_ask(it, mon, stat=""):
+    """병뚜껑을 쓰기 전에 묻는 말 - 누구(이름 · 레벨)에게 무엇을 쓰고 어느 능력이 31 로 단련되나 (게시판 #704).
+
+    은색병뚜껑은 고른 능력 하나, 금색병뚜껑(count 6)은 남은 능력 모두.
+    """
+    info = mon.get("info") or {}
+    name = info.get("name") or "이 포켓몬"
+    if int((it.get("effect") or {}).get("count", 1)) >= 6:
+        labels = [label for _s, label in hyper_left(info)]
+    else:
+        labels = [STAT_KR.get(stat, stat)] if stat else []
+    text = "%s(Lv.%d)에게 %s을(를) 씁니다. " % (name, int(mon.get("level", 0)), it["kr"])
+    if labels:
+        last = labels[-1]
+        # 'HP' 는 '에이치피' 로 읽는다 - 받침을 영문 글자로 보면 'HP이' 가 된다
+        text += "%s%s 31로 단련됩니다. " % (" · ".join(labels), "가" if last == "HP" else josa(last, "이"))
+    return natural(text + "되돌릴 수 없습니다.")
+
+
 def _scrollable(cv):
     """이 캔버스가 실제로 굴러갈 데가 있나."""
     try:
@@ -717,10 +752,21 @@ class BagWindow(object):
         self.photos = {}         # {포켓몬id: PhotoImage} — 한 번 만들면 계속 쓴다
         self.item_id = None
         self.mon_id = None
+        # (도구 id, 포켓몬 id) - 그 도구를 고른 뒤 사용자가 직접 누른 포켓몬. 되돌릴 수 없는 도구(BY_HAND)는
+        # 이것과 맞을 때만 대상으로 친다 (게시판 #704). 다른 도구를 고르면 지운다.
+        self._user_pick = None
         self.stat = None         # 병뚜껑으로 단련할 능력
         self.stat_needed = False
         self._pending = None     # 다시 불러온 뒤에 띄울 말
         self._wait = None        # 여는 중 표시
+        # 가방을 다시 읽을 때 (게시판 #711). 이 칸은 처음 열 때 읽은 개수를 계속 보여 줬다 - 볼을 던지고 잡고
+        # 사도 그대로였다. 바뀌면 앱이 stale 을 켜고(app.bag_changed) 다시 볼 때 가방 탭이 읽는다 (BagTabs.on_shown)
+        self.stale = False       # 읽은 뒤에 가방 속이 바뀌었다
+        self._loaded_at = 0.0    # 마지막으로 다 읽은 때 (time.time)
+        self._loading = False    # 서버에서 읽는 중
+        self._load_n = 0         # 몇 번째로 읽기 시작했나 - 앞서 시작한 것의 답이 늦게 오면 버린다
+        self._stale_job = None   # 보고 있을 때 잠깐 뒤 다시 읽기 (app.bag_changed 가 건다 - 한 번에 하나)
+        self._said_err = False   # 아래 줄에 읽기 오류가 떠 있다 - 조용히 다시 읽어 성공하면 지운다
         self._states = {}        # {포켓몬id: (good, blocked, note, color)} — 고른 도구 기준
         self._mon_ids = set()
         self._view = []          # 오른쪽 목록에 보이는 포켓몬 - 찾는 말로 거르고 줄 세운 것 (1.13.1)
@@ -997,6 +1043,7 @@ class BagWindow(object):
 
     # ---------------- 거들기 ----------------
     def say(self, text, color=U.GOOD, fg=None):
+        self._said_err = False          # 다른 말이 읽기 오류를 덮었다 (_loaded 를 보라)
         try:
             U.set_status(self.status, natural(text or ""), color, fg)
         except tk.TclError:
@@ -1009,14 +1056,21 @@ class BagWindow(object):
         return next((m for m in self.mons if m["id"] == self.mon_id), None)
 
     # ---------------- 데이터 ----------------
-    def reload(self):
+    def reload(self, quiet=False):
+        """서버에서 가방을 다시 읽는다. quiet: 저절로 다시 읽기 (게시판 #711 - 볼을 쓴 뒤 · 다시 볼 때) - 여는 중 표시를
+        안 덮고 아래 줄의 말도 그대로 둔다. 보던 것이 그 자리에서 새 개수로 바뀐다."""
         if not self.app.api:
             return self.say("로그인이 필요합니다.", U.DANGER, U.DANGER)
         # 여는 중 표시가 이미 떠 있으면 하나 더 띄우지 않는다. 겹쳐 띄우면
         # 먼저 온 답이 나중 것만 걷고, 먼저 띄운 것은 창을 덮은 채 남는다.
-        if not self._pending and self._wait is None:
+        if not quiet and not self._pending and self._wait is None:
             self.say("가방을 여는 중...", U.FG_FAINT)
             self._wait = ui_loading.Overlay(self.win, "가방을 여는 중")
+        # 읽기 시작할 때 stale 을 끈다 - 읽는 사이에 또 바뀌면 다시 켜져서 다음에 또 읽는다
+        self.stale = False
+        self._loading = True
+        self._load_n += 1
+        n = self._load_n
         api = self.app.api
 
         def work():
@@ -1053,19 +1107,29 @@ class BagWindow(object):
             except Exception:                           # noqa: BLE001
                 pass
             return shop, mons, thumbs, deco
-        U.run_async(self.root, work, self._loaded)
+        U.run_async(self.root, work, lambda r, err: self._loaded(r, err, n, quiet))
 
-    def _loaded(self, r, err):
+    def _loaded(self, r, err, n=None, quiet=False):
+        if n is not None and n != self._load_n:
+            # 그사이 다시 읽기 시작했다 (저절로 다시 읽기와 팔기 · 쓰기가 겹쳤다). 먼저 보낸 것의 답은 그 전의
+            # 가방일 수 있어 버린다 - 나중 것의 답이 그린다 (여는 중 표시도 그쪽이 걷는다)
+            return
+        self._loading = False
         w, self._wait = self._wait, None
         if not self.alive:
             if w:
                 w.close()
             return
         if err:
+            self.stale = True                  # 못 읽었다 - 다시 볼 때 또 읽는다
             if w:
                 w.close()
-            return self.say(getattr(err, "message", str(err)), U.DANGER,
-                            U.DANGER)
+            if quiet:
+                return                         # 저절로 읽은 것이 실패했다고 보던 칸에 빨간 말을 띄우지 않는다
+            self.say(getattr(err, "message", str(err)), U.DANGER, U.DANGER)
+            self._said_err = True              # 아래 줄에 읽기 오류가 남았다 - 나중에 조용히 읽어 성공해도 지운다
+            return
+        self._loaded_at = time.time()
         shop, mons, thumbs, deco = r
         self.items = list(shop.get("items") or [])
         self.bag = dict(shop.get("bag") or {})
@@ -1099,6 +1163,10 @@ class BagWindow(object):
             target = keep_item
         else:
             target = self._first_item()
+        if target != keep_item:
+            # 다 써서 다른 도구로 넘어간다 - 앞 도구 때 직접 누른 포켓몬은 새 도구의 '직접 고름' 이 아니다 (게시판 #704).
+            # (그대로 두면 은색병뚜껑 -> 이상한사탕 -> 다시 은색병뚜껑 으로 넘어가는 사이 이어받은 포켓몬이 되살아난다)
+            self._user_pick = None
         self.item_id = target
         self._fill_items()
         self._fill_mons()
@@ -1110,8 +1178,11 @@ class BagWindow(object):
             text, color = self._pending
             self._pending = None
             self.say(text, color)
-        else:
+        elif not quiet or getattr(self, "_said_err", False):
+            # 조용히 읽어도 앞서 실패한 읽기의 빨간 말은 지운다 (게시판 #711 검토 - 가방을 처음 열 때 서버가 잠깐 끊겨
+            # '서버에 연결할 수 없습니다' 가 뜨면, 다시 볼 때 읽어 목록이 채워져도 그 말이 그대로 남았다)
             self.say("")
+        self._said_err = False
 
         if w:
             # **다 그리고 나서 걷는다.** 맨 앞에서 걷으면 줄을 만드는 동안
@@ -1273,6 +1344,12 @@ class BagWindow(object):
         self.item_id = item_id
         self.stat = None
         if prev != item_id:
+            if prev is not None:
+                # 다른 도구로 옮겼다 - 앞 도구 때 누른 포켓몬은 새 도구의 '직접 고름' 이 아니다 (게시판 #704).
+                # 다시 불러올 때(_loaded)는 앞 도구를 None 으로 비우고 부르므로, **같은 도구로 다시 불러올 때만**
+                # 그대로 남는다 - 같은 포켓몬에게 은색병뚜껑을 이어서 쓸 때 또 누르지 않아도 된다 (도구가 바뀌면
+                # _loaded 가 지운다).
+                self._user_pick = None
             self._repaint_items()            # 보이는 줄만 다시 칠한다 (고름은 줄이 self.item_id 를 본다)
         it = self.current_item()
         if not it:
@@ -1327,12 +1404,15 @@ class BagWindow(object):
                     first_ok is None or (self._is_good(m["id"]) and not self._is_good(first_ok))):
                 first_ok = m["id"]
         self._repaint_mons()
-        # 고르고 있던 포켓몬이 이 도구로는 못 쓰는 대상이거나 찾기에 가려졌으면 옮겨 준다
         cur = self._states.get(self.mon_id)
-        if cur is None or cur[1] or not any(m["id"] == self.mon_id for m in self._view):
-            self.pick_mon(first_ok, quiet=True)
-        else:
-            self.pick_mon(self.mon_id, quiet=True)
+        ok = cur is not None and not cur[1] and any(m["id"] == self.mon_id for m in self._view)
+        if kind in BY_HAND:
+            # 되돌릴 수 없는 도구는 **저절로 고르지도, 앞 도구의 고름을 이어받지도 않는다** - 이 도구를 고른 뒤
+            # 직접 누른 포켓몬만 (게시판 #704). 아니면 아무도 안 고르고 쓰기 단추는 꺼진다.
+            mine = ok and self._user_pick == (it["id"], self.mon_id)
+            return self.pick_mon(self.mon_id if mine else None, quiet=True)
+        # 고르고 있던 포켓몬이 이 도구로는 못 쓰는 대상이거나 찾기에 가려졌으면 옮겨 준다
+        self.pick_mon(self.mon_id if ok else first_ok, quiet=True)
 
     def _is_good(self, pid):
         st = self._states.get(pid)
@@ -1373,10 +1453,7 @@ class BagWindow(object):
         if kind == "iv":
             if level < HYPER_MIN_LEVEL:
                 return False, True, "Lv.%d 부터" % HYPER_MIN_LEVEL, U.FG_FAINT
-            ivs = info.get("ivs") or {}
-            hyper = info.get("hyper") or {}
-            left = [s for s, _l in STAT_ROWS
-                    if int(ivs.get(s, 0)) < P.IV_MAX and not hyper.get(s)]
+            left = hyper_left(info)
             if not left:
                 return False, True, "이미 다 단련됨", U.FG_FAINT
             return False, False, "%d곳 남음" % len(left), U.SHINY
@@ -1462,6 +1539,9 @@ class BagWindow(object):
         return True, False, "지금: %s" % (now or "원래 모습"), U.GOOD
 
     def pick_mon(self, pid, quiet=False):
+        """포켓몬을 고른다. quiet=False 는 사용자가 줄 · 판을 직접 누른 것 (MonRow._click, 테마의 _plate_click) -
+        못 쓰는 대상이면 까닭을 알리고, 쓸 수 있으면 '이 도구로 직접 고름' 으로 적어 둔다 (BY_HAND, 게시판 #704).
+        quiet=True 는 창이 저절로 고르는 것이다."""
         # 줄이 아직 안 만들어졌을 수 있어서 데이터(self._states)로 본다.
         st = self._states.get(pid)
         if st is not None and st[1]:
@@ -1471,6 +1551,8 @@ class BagWindow(object):
             return
         prev = self.mon_id
         self.mon_id = pid if pid in self._mon_ids else None
+        if not quiet:
+            self._user_pick = (self.item_id, self.mon_id)
         if prev != self.mon_id:
             self._repaint_mons()             # 보이는 줄만 다시 칠한다
         self.stat = None
@@ -1697,6 +1779,12 @@ class BagWindow(object):
                     self.win, "이로치사탕",
                     "%s에게 이로치사탕을 먹입니다. 몸 색이 이로치로 바뀌고 "
                     "되돌릴 수 없습니다." % name, danger=False, ok_text="먹이기"):
+                return
+        # 병뚜껑도 되돌릴 수 없다 (금색은 귀하다). 누구에게 쓰고 어느 능력이 바뀌는지 적어 한 번 묻는다 -
+        # 쓰기 단추에는 대상 이름이 없어 엉뚱한 포켓몬에게 간 것을 몰랐다 (게시판 #704).
+        if (it.get("effect") or {}).get("kind") == "iv":
+            if not ui_box.confirm(self.win, it["kr"], hyper_ask(it, mon, self.stat or ""),
+                                  danger=False, ok_text="쓰기"):
                 return
 
         form = ""
@@ -1957,6 +2045,12 @@ class BagWindow(object):
     # ---------------- 끝내기 ----------------
     def close(self):
         self.alive = False
+        job, self._stale_job = getattr(self, "_stale_job", None), None
+        if job is not None:
+            try:
+                self.root.after_cancel(job)
+            except Exception:                               # noqa: BLE001
+                pass
         if getattr(self.app, "bag_window", None) is self:
             self.app.bag_window = None
         try:

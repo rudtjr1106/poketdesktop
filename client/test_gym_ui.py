@@ -34,6 +34,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 
 os.environ.setdefault("POKET_HOME", os.path.join(tempfile.gettempdir(), "poket-test-gym"))
@@ -50,6 +51,7 @@ from PIL import Image, ImageDraw                            # noqa: E402
 
 from common import pokelogic as P                           # noqa: E402
 from common import trainer_battle as TB                     # noqa: E402
+from poketdesktop import config                             # noqa: E402
 from poketdesktop import platform_os as PLAT                # noqa: E402
 from poketdesktop import ui_common as U                     # noqa: E402
 from poketdesktop import ui_gym                             # noqa: E402
@@ -104,7 +106,8 @@ class FakeApi(object):
                 "region": t["region"], "why": t.get("why") or "",
                 "cleared": t["region"] in self.cleared, "wins": 1 if t["region"] in self.cleared else 0,
                 "bestTurns": 9 if t["region"] in self.cleared else None,
-                "today": t["region"] in self.today}
+                "today": t["region"] in self.today,
+                **({"entrySprite": t["entrySprite"]} if t.get("entrySprite") else {})}   # 서버 gym.public 과 같게
 
     def gym(self):
         self.calls.append("gym")
@@ -331,7 +334,8 @@ def main():
             chk("경로에 일반구가 띄어 써진다", "부천시 원미구" in texts(gw.crumb), texts(gw.crumb))
         if who == "지우":
             ph = gw.photos.get("trainer")
-            chk("지우 카드: 새 도트를 그대로 크기로", ph and (ph.width(), ph.height()) == (113, 146),
+            # 시즌 5 챔피언 관장 지우 (동대문구): 연구실 그림 93x150 (따라큐 포함) 을 그대로 크기로
+            chk("지우 카드: 새 도트를 그대로 크기로", ph and (ph.width(), ph.height()) == (93, 150),
                 ph and (ph.width(), ph.height()))
         if who == "나여조경석":
             ph = gw.photos.get("trainer")
@@ -966,6 +970,112 @@ def main():
     chk("  그다음 기술을 고른다", nb.mode == "moves" and not nb.busy, (nb.mode, nb.busy))
     nb.close()
     api.tb = None
+
+    print("\n=== 등장 연출: 서 있는 배틀 그림을 먼저 보이지 않는다 (11/19 지우) ===")
+    # 지우는 연출 첫 장이 책상 앞에 앉은 모습이다. 연출 그림을 받는 동안 서 있는 배틀 그림이 보이면
+    # '서 있다가 -> 연출 -> 다시 서 있기' 가 된다. 받아 둔 연출 그림을 지우고, 받기를 일부러 늦춘다.
+    jt = api.by_region[name_of["지우"]]
+    entry_key = jt.get("entrySprite")
+    chk("지우에게 등장 연출이 있다", bool(entry_key), entry_key)
+    entry_file = os.path.join(config.data_dir(), "trainers", "%s.png" % entry_key)
+    if os.path.exists(entry_file):
+        os.remove(entry_file)
+    gate = threading.Event()
+    real_sprite = api.gym_sprite
+    fetched = []
+
+    def slow_sprite(key):
+        if key == entry_key:
+            fetched.append(key)
+            gate.wait(5.0)
+        return real_sprite(key)
+    api.gym_sprite = slow_sprite
+    try:
+        api.region = name_of["지우"]
+        api.tb = TB.TrainerBattle(dex, [dict(m) for m in party], jt, random.Random(3))
+        eb = GB.GymBattleWindow(app, api._out(api.tb.start()))
+        st = lambda: eb.cv.itemcget(eb.trainer_item, "state")   # noqa: E731
+        chk("창을 연 직후 배틀 그림이 숨겨져 있다", st() == "hidden", st())
+        pump(root, lambda: bool(eb.cv.itemcget(eb.trainer_item, "image")), 5)
+        chk("  배틀 그림이 먼저 와도 숨긴 채다", bool(eb.cv.itemcget(eb.trainer_item, "image")) and st() == "hidden",
+            (eb.cv.itemcget(eb.trainer_item, "image"), st()))
+        w0, h0 = eb.win.winfo_width(), eb.win.winfo_height()
+        eb.win.geometry("%dx%d" % (w0 - 120, h0 - 80))         # 받는 중에 창 크기를 바꿔 장면을 새로 짓는다
+        pump(root, lambda: False, 0.6)
+        chk("  받는 중에 장면을 새로 지어도 숨긴 채다", st() == "hidden", st())
+        gate.set()
+        chk("연출이 시작된다", pump(root, lambda: eb._entry is not None and eb._entry["item"] is not None, 10))
+        e = eb._entry
+        chk("  장을 한꺼번에 만들지 않는다 (보일 때 한 장씩)", 0 < len(e["photos"]) < len(e["src"]),
+            (len(e["photos"]), len(e["src"]) if e["src"] else None))
+        chk("  재생 중에도 배틀 그림은 숨긴 채다", st() == "hidden", st())
+        chk("  연출이 끝나고 판이 시작된다", pump(root, lambda: not eb.busy, 30), eb.busy)
+        chk("  끝나면 배틀 그림이 다시 보인다", st() in ("normal", ""), st())
+        chk("  연출 그림은 한 번만 받았다", fetched == [entry_key], fetched)
+        eb.close()
+    finally:
+        gate.set()
+        api.gym_sprite = real_sprite
+        api.tb = None
+
+    print("\n=== 등장 연출 그림 미리 받기 (카드를 볼 때) ===")
+    # 미리 받는 중에 배틀 창이 같은 그림을 찾으면 두 번 받지 않고 앞의 받기를 기다린다 (그림 이름마다 잠금)
+    if os.path.exists(entry_file):
+        os.remove(entry_file)
+    gate2 = threading.Event()
+    calls2 = []
+
+    def gated_sprite(key):
+        calls2.append(key)
+        gate2.wait(5.0)
+        return real_sprite(key)
+    api.gym_sprite = gated_sprite
+    try:
+        ui_gym.prefetch_trainer(root, api, entry_key)
+        pump(root, lambda: bool(calls2), 3)
+        got = []
+        th = threading.Thread(target=lambda: got.append(ui_gym._trainer_file(api, entry_key)))
+        th.start()
+        pump(root, lambda: False, 0.3)
+        gate2.set()
+        th.join(10)
+        pump(root, lambda: False, 0.3)
+        chk("미리 받는 중에 또 찾아도 한 번만 받는다", calls2 == [entry_key], calls2)
+        chk("  기다린 쪽도 받은 파일을 쓴다", got == [entry_file] and os.path.getsize(entry_file) > 0, got)
+        ui_gym.prefetch_trainer(root, api, None)        # 연출이 없는 관장 - 아무것도 안 한다
+        pump(root, lambda: False, 0.2)
+        chk("  연출이 없으면 받지 않는다", calls2 == [entry_key], calls2)
+    finally:
+        gate2.set()
+        api.gym_sprite = real_sprite
+
+    # 미리 받기가 실패하면(느린 망 timeout 등) 기다리던 배틀 창은 또 받지 않고 바로 연출 없이 시작한다
+    if os.path.exists(entry_file):
+        os.remove(entry_file)
+    gate3 = threading.Event()
+    calls3 = []
+
+    def failing_sprite(key):
+        calls3.append(key)
+        gate3.wait(5.0)
+        return None
+    api.gym_sprite = failing_sprite
+    try:
+        ui_gym.prefetch_trainer(root, api, entry_key)
+        pump(root, lambda: bool(calls3), 3)
+        got3 = []
+        th = threading.Thread(target=lambda: got3.append(ui_gym._trainer_file(api, entry_key)))
+        th.start()
+        pump(root, lambda: False, 0.3)
+        gate3.set()
+        th.join(10)
+        chk("미리 받기가 방금 실패했으면 기다린 쪽은 다시 받지 않는다", calls3 == [entry_key] and got3 == [None],
+            (calls3, got3))
+    finally:
+        gate3.set()
+        api.gym_sprite = real_sprite
+        ui_gym._FILE_FAILED.clear()
+    chk("카드 자료에 연출 그림 이름이 실린다", api.gym_trainer(name_of["지우"]).get("entrySprite") == entry_key)
 
     print("\n=== 쓰러진 채 닫았다가 이어 하기 ===")
     api.region = name_of["지우"]

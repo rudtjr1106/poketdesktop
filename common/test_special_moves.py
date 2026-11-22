@@ -364,6 +364,15 @@ def t_씨뿌리기(dex):
     chk("턴 끝에 최대 체력의 1/8 을 빼앗는다", before_foe - foe.hp == d, (before_foe, foe.hp, d))
     chk("빼앗은 만큼 맞은편이 회복한다", me.hp - before_me == d, (before_me, me.hp))
     chk("화면이 그리는 이벤트(chip·heal)로 나간다", [e["t"] for e in ev][:2] == ["chip", "heal"], [e["t"] for e in ev])
+    # 게시판 #657: 심은 쪽이 쓰러져 그 자리가 비면 그 턴 끝에는 빼앗지 않는다 (본가 · 쇼다운과 같다 - 받을 포켓몬이 없다)
+    me.hp = 0
+    before_foe = foe.hp
+    ev = []
+    bt._end_of_turn(ev)
+    chk("심은 쪽이 쓰러졌으면 턴 끝에 빼앗지 않는다 (#657)", foe.hp == before_foe
+        and "씨뿌리기가" not in texts(ev), (before_foe, foe.hp, texts(ev)))
+    chk("  씨앗은 그대로 남는다 (다음에 나온 포켓몬이 받는다)", foe.seeded)
+    me.hp = me.maxhp
 
     back = B.Fighter(dex, foe.mon, foe.hp, foe.pp, foe.status)
     back.load_volatile(json.loads(json.dumps(foe.volatile())))

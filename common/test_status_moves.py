@@ -341,6 +341,49 @@ def t_헤롱헤롱과_잠김(dex):
     chk("김밥말이: 붙잡고 턴마다 1/8", foe.cond.get("bound") and hp - foe.hp == foe.maxhp // 8, (hp, foe.hp))
     SM.on_leave(bt, "me")
     chk("건 쪽이 물러나면 풀린다", not foe.cond.get("bound"))
+    # 몇 번 깎이나 (게시판 #664 을 보다 찾음): 본가 · 쇼다운은 4~5번. 전에는 마지막 턴이 데미지 없이 풀려서 3~4번이었다.
+    seen = set()
+    for s in range(40):
+        bt, me, foe = fight(dex, mon(dex, "ARBOK", 50, ["WRAP"]), mon(dex, "SNORLAX", 50, ["TACKLE"]), rng=Sure(s))
+        use(bt, "me", "WRAP")
+        if not foe.cond.get("bound"):
+            continue
+        ticks = 0
+        for _ in range(12):
+            hp = foe.hp
+            eot(bt)
+            ticks += hp > foe.hp
+            if not foe.cond.get("bound"):
+                break
+        seen.add(ticks)
+    chk("조이기류는 4~5번 깎고 풀린다 (본가와 같다)", seen == {4, 5}, sorted(seen))
+    # 게시판 #664: 묶기는 부가효과가 아니라 주 효과다 (쇼다운 partiallytrapped - secondary 가 아니다). 전에는 인분 ·
+    # 은밀망토 · 우격다짐이 부가효과처럼 지워서 지속 데미지도 교체 봉인도 문구 없이 빠졌다 (관장의 모스노우 · 비비용 · 에리본).
+    for label, uab, tab, held in (("인분", None, "SHIELDDUST", None), ("은밀망토", None, "ICESCALES", "COVERTCLOAK"),
+                                  ("우격다짐", "SHEERFORCE", "ICESCALES", None)):
+        bt, me, foe = fight(dex, mon(dex, "CHARIZARD", 50, ["FIRESPIN"], ability=uab),
+                            mon(dex, "FROSMOTH", 50, ["TACKLE"], ability=tab, held=held), abilities=True)
+        use(bt, "me", "FIRESPIN")
+        hp = foe.hp
+        eot(bt)
+        chk("%s 이어도 회오리불꽃이 묶고 턴 끝에 깎는다 (#664)" % label,
+            foe.cond.get("bound") and SM.trapped(bt, foe) and hp > foe.hp, (foe.cond.get("bound"), hp, foe.hp))
+    sf = B.Fighter(dex, mon(dex, "CHARIZARD", 50, ["FIRESPIN"], ability="SHEERFORCE"))
+    bl = B.Fighter(dex, mon(dex, "CHARIZARD", 50, ["FIRESPIN"], ability="BLAZE"))
+    tg = B.Fighter(dex, mon(dex, "SNORLAX", 50, ["TACKLE"]))
+    sf.ability_on = bl.ability_on = tg.ability_on = True
+    d_sf = B.damage(dex, dex.move("FIRESPIN"), sf, tg, B.MAX_RNG, crit=False)[0]
+    d_bl = B.damage(dex, dex.move("FIRESPIN"), bl, tg, B.MAX_RNG, crit=False)[0]
+    chk("  우격다짐은 조이기류의 위력을 올리지 않는다 (지울 부가효과가 없다)", d_sf == d_bl, (d_sf, d_bl))
+    bt, me, foe = fight(dex, mon(dex, "CHARIZARD", 50, ["FLAMETHROWER"]),
+                        mon(dex, "FROSMOTH", 50, ["TACKLE"], ability="SHIELDDUST"), abilities=True)
+    burned = 0
+    for s in range(30):
+        bt.rng = random.Random(s)
+        foe.status, foe.hp = None, foe.maxhp
+        use(bt, "me", "FLAMETHROWER")
+        burned += foe.status == "burn"
+    chk("  인분은 진짜 부가효과(화염방사의 화상)는 여전히 막는다", burned == 0, burned)
 
 
 def t_특성과_타입(dex):

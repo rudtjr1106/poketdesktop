@@ -2228,6 +2228,9 @@ class Battle(object):
         if abil:
             sec_mult = A.secondary_mult(user)
             sec_off, sec_shield = A.secondary_off(user, target)
+            # 우격다짐은 부가효과가 있는 기술에만 붙는다 - 인파이트 · 용성군의 자기 하락은 기술 자체의 효과라
+            # 그대로 남는다 (11/19 - 전에는 그것까지 지웠다)
+            sec_off = sec_off and A.has_secondary(move)
         cloak = target is not user and bool(target.held) and H.cloaked(target)    # 은밀망토 (1.13)
         sec_shield = sec_shield or cloak
 
@@ -2267,7 +2270,9 @@ class Battle(object):
         if ail and ail not in HANDLED_STATUS and ail not in ("leech-seed", "protect", "bad-poison") \
                 and target.alive():
             chance = move.get("ailChance") or 0
-            if chance and (sec_off or sec_shield):
+            # 조이기류의 묶기(trap)는 부가효과가 아니라 주 효과다 (쇼다운 partiallytrapped). 인분 · 은밀망토 · 우격다짐이
+            # 지우지 않는다 - 전에는 지워서 지속 데미지도 교체 봉인도 문구 없이 빠졌다 (게시판 #664).
+            if chance and (sec_off or sec_shield) and ail != "trap":
                 chance = -1
             if chance == 0 or (chance > 0 and self.rng.uniform(0, 100) < chance * sec_mult):
                 SM.apply_ail(self, ail, move, user, target, who, tw, ev)
@@ -2299,8 +2304,12 @@ class Battle(object):
         if fl and target.alive() and not sub_hit and self.rng.uniform(0, 100) < fl:
             target.flinched = True
         if user.held:
-            if not cloak:
-                H.flinch(self, user, target, move)      # 왕의징표석·예리한이빨 (은밀망토면 안 걸린다)
+            # 왕의징표석 · 예리한이빨의 10% 풀죽음도 부가효과다 (쇼다운이 기술에 secondary 로 붙인다): 인분 · 은밀망토가
+            # 막고, 정신력이면 안 풀죽고, 대타가 맞으면 안 붙는다. 하늘의은총이면 두 배. 악취의 10% 와는 하나만 굴린다
+            # (11/19 - 전에는 은밀망토만 봤다)
+            if not sec_shield and not sub_hit \
+                    and not (abil and (A.flinch_immune(user, target) or A.stench(user, move))):
+                H.flinch(self, user, target, move, sec_mult)
             H.note_move(user, key)                      # 구애 잠금·메트로놈
             if user is not self.fighter(who):
                 user.locked = None                      # 유턴 · 볼트체인지로 이미 물러났다 - 물러나면 구애 잠금은 풀린다
@@ -2800,12 +2809,14 @@ class Battle(object):
             p = raid.players[f.seed_by] if f.seed_by < len(raid.players) else None
             if p is not None and p.mon is not None and p.mon.alive():
                 other, other_who, tag = p.mon, "me", f.seed_by
+        if not other.alive():
+            # 받을 포켓몬이 없으면(심은 쪽이 쓰러져 자리가 비었다) 빼앗지도 않는다 - 본가 · 쇼다운과 같다 (게시판 #657).
+            # 전에는 체력만 빼앗고 줄 데가 없어 버렸다. 씨앗은 남는다 - 다음에 나온 포켓몬이 받는다.
+            return
         d = min(f.hp, max(1, f.maxhp // 8))
         f.hp -= d
         ev.append({"t": "chip", "who": who, "damage": d, "hp": f.hp, "maxhp": f.maxhp,
                    "text": "씨뿌리기가 %s 의 체력을 빼앗는다!" % f.name})
-        if not other.alive():
-            return
         amount = max(1, int(d * H.drain_mult(other))) if other.held else d
         if A.has(f, "LIQUIDOOZE"):
             other.hp = max(0, other.hp - amount)

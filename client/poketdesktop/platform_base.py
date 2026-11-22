@@ -310,6 +310,11 @@ def dpi_aware():
     pass
 
 
+def pin_tk_scaling(root, every_ms=500):
+    """켤 때의 tk scaling 붙잡기 (윈도우만, 게시판 #707). 여기서는 아무것도 안 한다."""
+    return None
+
+
 def before_tk():
     """`tk.Tk()` 를 만들기 직전에 할 일. 대개 아무것도 없다."""
     pass

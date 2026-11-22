@@ -534,6 +534,11 @@ class PartyBattle(object):
         # a 가 먼저 (지금 b 를 보고) 고르고, 그다음 b 가 (새 a 를 보고)
         # 고른다. 완전히 공평하진 않지만 **결정적**이고, 서로를 보고
         # 무한히 다시 고르는 것을 피한다.
+        # 쓰러진 쪽이 상대에게 걸어 둔 것(조이기 · 검은눈빛 · 문어굳히기 · 헤롱헤롱)을 푼다 - 라운드마다 판을 새로 세워서
+        # 안 풀면 묶기가 다음에 나온 상대에게까지 이어졌다 (11/19, 게시판 #664 검토). 관장 판의 _switch 와 같다.
+        for who in (("me", "foe") if side == "both" else (side,)):
+            if self.bt is not None:
+                SM.on_leave(self.bt, who)
         if side in ("me", "both"):
             self._retire(self.a[self.ia])
             nxt = self._pick_against(self.a, self.b[self.ib])
@@ -776,6 +781,8 @@ class PartyBattle(object):
         down = ("me", "foe") if side == "both" else (side,)
         for who in down:                                 # 물러나는 쪽부터 정리한다 (예전 판과 같은 차례)
             team = self.a if who == "me" else self.b
+            if self.bt is not None:
+                SM.on_leave(self.bt, who)                # 걸어 둔 조이기 · 검은눈빛 ... 을 푼다 (_advance 와 같다, #664 검토)
             self._retire(team[self.ia if who == "me" else self.ib])
         picks = {}
         for who in down:

@@ -555,6 +555,15 @@ class GBDuel(GBLower):
             cv.create_rectangle(x, ry - th // 2, x + tw, ry + th // 2, fill=col, outline="", tags=tg)
             cv.create_text(x + tw // 2, ry, text=tera, fill=kit.look_of(col)[3], font=f, anchor="center", tags=tg)
             x += tw + s(6)
+        bound = DB.bound_tag(mon)
+        if bound:
+            # 조이기류에 붙잡혀 있다 (게시판 #664): 같은 꼴의 네모 꼬리표 '회오리불꽃에 붙잡힘'
+            col = DB.BOUND_COLOR
+            tw = kit.tkfont_of(cv, f).measure(bound) + s(12)
+            th = kit.tkfont_of(cv, f).metrics("linespace") + s(2)
+            cv.create_rectangle(x, ry - th // 2, x + tw, ry + th // 2, fill=col, outline="", tags=tg)
+            cv.create_text(x + tw // 2, ry, text=bound, fill=kit.look_of(col)[3], font=f, anchor="center", tags=tg)
+            x += tw + s(6)
         kr = {"atk": "공", "def": "방", "spa": "특공", "spd": "특방", "spe": "스피드", "acc": "명중", "eva": "회피"}
         bits = ["%s%+d" % (kr.get(k, k), v) for k, v in (mon.get("stages") or {}).items()]
         if bits:

@@ -176,6 +176,9 @@ jobs:
           node --test server/web/action/test/
           for f in server/web/action/js/*.js server/web/action/js/fx/*.js server/web/action/js/fx/styles/*.js \
                    server/web/action/dev/*.js; do node --check "$f"; done
+      # 게시판 #664 뒤 (11/19): 붙잡혀 있는 것(조이기류 · 검은눈빛 …)을 view 에 싣는다 - 교체 잠금의 까닭 · 남은 턴(내가 건 것만)
+      - name: 붙잡힘 표시 (엔진 view)
+        run: python common/test_trap_view.py
       # 게으름·독치장 같은 특성과 역린류·2턴 기술, 속이기의 '첫 턴에만'.
       - name: 특성·턴제 기술 (엔진)
         run: python common/test_new_abilities.py
@@ -353,6 +356,10 @@ jobs:
       - name: 액션 배틀 (앱 쪽, 진짜 Tk)
         if: matrix.shard == 3
         run: python client/test_action_ui.py
+      # 게시판 #664 뒤 (11/19): 붙잡히면 교체 단추를 잠그고 까닭 · 이름표 꼬리표를 띄운다 (관장 · 실시간, 기본 + DP 계열 테마)
+      - name: 붙잡힘 표시 · 교체 잠금 (진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_trap_ui.py
       # 배틀 창 크기 (1.10.3): 배틀 창을 끌어서 키우고 줄일 때 장면·도트·글자가 함께 따라가는지,
       # 어느 크기에서도 눌리는 것이 없는지, 판(고르던 칸·재생)이 그대로인지, 바꾼 크기를 기억하는지
       - name: 배틀 창 크기 (끌어서 바꿔 본다)
@@ -400,6 +407,11 @@ jobs:
       - name: 가방 탭 합치기 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/test_bag_tabs.py
+      # 게시판 #711: 가방 속이 바뀌면(볼 · 상점 · 탐험) 열어 둔 도구 칸을 다시 읽는다 - 다시 볼 때 · 보고 있으면 한 번만.
+      # 창은 안 띄운다 (app 을 불러와서 트레이 준비물이 있는 여기서 돈다). 배틀 중 '볼이 없습니다' 는 test_battle_ui
+      - name: 가방 다시 읽기 (볼을 쓴 뒤 · 다시 볼 때)
+        if: matrix.shard == 1
+        run: python client/test_bag_stale.py
       # 1.13.1: 가방 · 기술머신의 '누구에게' 목록 찾기 · 가나다순 · 레벨순
       - name: 가방·기술머신 포켓몬 찾기 (진짜 Tk)
         if: matrix.shard == 2
@@ -408,6 +420,11 @@ jobs:
       - name: 기술머신 뽑기권·랭크 보상 표 화면 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/test_reward_tickets.py
+      # 게시판 #704 (11/20): 되돌릴 수 없는 도구(은색 · 금색병뚜껑, 이로치사탕)는 앞 도구의 고름을 이어받지 않고 직접 누른
+      # 포켓몬에게만 쓴다. 쓰기 전에 이름 · 바뀔 능력을 적어 묻는다 (기본 + DP 계열 테마 여섯)
+      - name: 병뚜껑 · 이로치사탕 대상 고르기 · 확인 창 (진짜 Tk, 테마 일곱)
+        if: matrix.shard == 1
+        run: python client/test_bag_bottlecap.py
       # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
       - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         if: matrix.shard == 2
@@ -602,6 +619,10 @@ jobs:
       - name: 새 기술머신 표시 (진짜 Tk)
         if: matrix.shard == 2
         run: python client/test_tm_new.py
+      # 게시판 #707: 켜 둔 사이 화면 배율이 바뀌면 글씨 크기가 섞였다 - 켤 때의 tk scaling 을 붙잡고 되돌린다
+      - name: 켤 때의 화면 배율 붙잡기 (진짜 Tk)
+        if: matrix.shard == 1
+        run: python client/test_tk_scaling.py
       - name: 길드전 칸 (진짜 Tk)
         if: matrix.shard == 3
         run: python client/test_guild_war_ui.py
@@ -704,6 +725,8 @@ jobs:
           python client/test_auto_throw.py     # 2.1.1: 잡힐 때까지 계속 던지기 (#425)
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
+      - name: 붙잡힘 표시 · 교체 잠금 (진짜 Tk)
+        run: python client/test_trap_ui.py
       - name: 챔피언리그 독도 (진짜 Tk)
         run: python client/test_champion_ui.py
       # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
@@ -733,6 +756,10 @@ jobs:
       # 2.5.0 (게시판 #533): 포켓몬을 다른 창 뒤로 - 맥은 NSWindow 층을 내리고 orderBack 한다 (platform_mac.send_back)
       - name: 포켓몬을 다른 창 뒤로 (진짜 Tk)
         run: python client/test_pet_behind.py
+      # 게시판 #707: 화면 배율 붙잡기는 윈도우만 건다 - 맥은 platform_os.pin_tk_scaling 이 import 에서 안 죽고
+      # 아무것도 안 하는지 본다 (platform_mac 은 platform_base 를 import 하지 않는다)
+      - name: 켤 때의 화면 배율 붙잡기 (진짜 Tk)
+        run: python client/test_tk_scaling.py
       # **검은 테두리 검사(smoke_anim_resize.py)는 여기서 안 돌린다.**
       # 그건 윈도우의 투명색 창(-transparentcolor)이 새로 드러난 자리를
       # 검게 합성하는 것이고, 맥은 platform_mac.py 에 SpriteView 를 따로

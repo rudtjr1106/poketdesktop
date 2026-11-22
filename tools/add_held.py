@@ -58,6 +58,13 @@ FORM_ITEMS = {"gracidea": "GRACIDEA", "reveal-glass": "REVEALGLASS", "prison-bot
 NECTARS = {"REDNECTAR", "YELLOWNECTAR", "PINKNECTAR", "PURPLENECTAR"}
 # 원본에 한국어 이름이 비어 있는 것
 KR_FIX = {"ROSELIBERRY": "로셀열매"}
+# 원본 설명만으로는 오해하는 것 (게시판 #689 11/19: 지가르데큐브를 강해지는 도구로 알고 5만원에 샀다 - 10%폼은
+# 약해지는 쪽이고 퍼펙트폼과는 관계없다). 켜기/끄기 안내는 앱이 덧말(ui_bag.form_note)로 따로 붙이니 여기는 뺀다.
+DESC_FIX = {
+    "ZYGARDECUBE": "포켓몬 지가르데의 코어와 셀이 모여있는 도구. 10%폼은 50%폼보다 빠르지만 HP와 방어, 특수공격, "
+                   "특수방어는 낮다. 퍼펙트폼과는 관계없다 (퍼펙트폼은 지가르데나이트를 지닌 지가르데가 배틀에서 "
+                   "체력 절반 이하로 턴을 마치면 된다).",
+}
 
 
 def _rows(name):
@@ -122,7 +129,7 @@ def build(items):
 
     def entry(iid, r, cat, cost, effect):
         kr = KR_FIX.get(iid) or ko.get(r["id"]) or H.KR.get(iid) or iid
-        desc = (flavor.get(r["id"]) or (0, ""))[1] or H.effect_note(iid)
+        desc = DESC_FIX.get(iid) or (flavor.get(r["id"]) or (0, ""))[1] or H.effect_note(iid)
         if not desc:
             notes.append("설명 없음: %s" % iid)
         return {"id": iid, "ident": r["identifier"].split("--")[0], "kr": kr, "en": en.get(r["id"]) or iid.title(),

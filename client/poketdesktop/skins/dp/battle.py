@@ -36,6 +36,7 @@ from common import tint as T
 
 from ... import battle_zoom as Z
 from ... import sprite_cache, sprites
+from ...battle_trap import COLOR as BOUND_COLOR, bound_tag
 from ...ui_common import TYPE_COLOR, run_async
 from ...ui_gimmick import tera_tag
 from . import BEZEL, CUR, DIM, FONT, INK, INK2, MSG_FRAME, WHITE, kit
@@ -1036,6 +1037,16 @@ class DPDuel(DPLower):
             th = kit.tkfont_of(cv, f).metrics("linespace") + U.h(2)
             kit.rrect(cv, x, y - th // 2, x + tw, y + th // 2, U.h(4), fill=col, tags=("st_" + who, items["tag"]))
             cv.create_text(x + tw // 2, y, text=tera, fill=kit.look_of(col)[3], font=f, anchor="center",
+                           tags=("st_" + who, items["tag"]))
+            x += tw + U.h(6)
+        bound = bound_tag(mon)
+        if bound:
+            # 조이기류에 붙잡혀 있다 (게시판 #664): 녹슨 주황 꼬리표 '회오리불꽃에 붙잡힘' (내가 건 것은 ' 3턴' 까지)
+            col = BOUND_COLOR
+            tw = kit.tkfont_of(cv, f).measure(bound) + U.h(12)
+            th = kit.tkfont_of(cv, f).metrics("linespace") + U.h(2)
+            kit.rrect(cv, x, y - th // 2, x + tw, y + th // 2, U.h(4), fill=col, tags=("st_" + who, items["tag"]))
+            cv.create_text(x + tw // 2, y, text=bound, fill=kit.look_of(col)[3], font=f, anchor="center",
                            tags=("st_" + who, items["tag"]))
             x += tw + U.h(6)
         kr = {"atk": "공", "def": "방", "spa": "특공", "spd": "특방", "spe": "스피드", "acc": "명중", "eva": "회피"}

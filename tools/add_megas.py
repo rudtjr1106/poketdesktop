@@ -68,6 +68,13 @@ STAT = {"1": "hp", "2": "atk", "3": "def", "4": "spa", "5": "spd", "6": "spe"}
 SKIP = {"tatsugiri-droopy-mega", "tatsugiri-stretchy-mega", "magearna-original-mega"}
 STONE_RE = re.compile(r"ite(-[xyz])?$")
 NOT_STONES = {"meteorite", "eviolite"}
+# 메가스톤 설명이 '메가진화할 수 있다' 만으로는 모자란 것. 지가르데나이트는 먼저 퍼펙트폼이 되어야 메가진화하고,
+# 이 게임에서는 그 스톤을 지닌 것이 퍼펙트폼이 되는 길이다 (11/09 #497 · abilities.zygarde_complete).
+# 게시판 #689 11/19: 퍼펙트폼이 되는 법을 게임 안 어디에서도 알 수 없었다.
+STONE_DESC_FIX = {
+    "ZYGARDE": "지가르데에게 지니게 하면 배틀에서 체력 절반 이하로 턴을 마칠 때 퍼펙트폼이 되고, 그 뒤에 메가진화할 수 있다. "
+               "메가진화는 키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다.",
+}
 KO = "3"            # PokeAPI 언어 번호: 한국어
 
 
@@ -182,9 +189,10 @@ def build(dex, items):
                     "cat": "megastone", "cost": 0, "sell": 0, "chance": 0, "weight": 0,
                     "rarity": "legendary", "effect": {"kind": "held"},
                     "megaFor": base["internal"],
-                    "desc": "%s에게 지니게 하면 배틀 중에 메가진화할 수 있다. "
+                    "desc": STONE_DESC_FIX.get(base["internal"]) or (
+                            "%s에게 지니게 하면 배틀 중에 메가진화할 수 있다. "
                             "키스톤이 있어야 하고, 한 판에 한 번만 쓸 수 있다."
-                            % base["kr"],
+                            % base["kr"]),
                 }
         if entry.get("megaStone"):
             # 엔진(common)은 items.json 을 안 읽는다. 메시지에 스톤 이름을 쓰려고 싣는다.

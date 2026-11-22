@@ -96,6 +96,9 @@ BAD_POISON = {"TOXIC", "POISONFANG", "MALIGNANTCHAIN"}
 IF_ROSE = {"BURNINGJEALOUSY": "burn", "ALLURINGVOICE": "confusion"}
 # 타입에 따라 두 배
 SALT_WEAK = ("WATER", "STEEL")
+# 비밀의힘의 부가효과 (30%): 필드마다 다르다 (쇼다운 secretpower.onModifyMove). 필드가 없으면 마비.
+SECRET_POWER = {None: ("status", "paralysis"), "electric": ("status", "paralysis"), "grassy": ("status", "sleep"),
+                "misty": ("stat", "spa"), "psychic": ("stat", "spe")}
 # 맞은 상대의 얼음을 녹이는 기술 (불꽃 타입 공격기는 다 녹인다. 이쪽은 불꽃이 아닌데 녹이는 것)
 THAW_TARGET = {"SCALD", "STEAMERUPTION", "SCORCHINGSANDS", "HYDROSTEAM", "MATCHAGOTCHA"}
 # 작아지기를 쓴 상대에게 두 배로 들어가고 반드시 맞는다
@@ -505,16 +508,22 @@ def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
     """때리고 난 뒤의 고유 효과. statusmoves.after_attack 과 나란히 불린다."""
     alive = target.alive()
     landed = bool(total) and not sub_hit        # 대타가 대신 맞았으면 상대에게는 안 붙는다
+    # 아래의 부가효과(쇼다운 secondary)는 우격다짐 · 인분 · 은밀망토가 지운다 (battle._use 의 sec_off · sec_shield 와 같다).
+    # sf 는 우격다짐만 지우는 것 - '맞힌 뒤' 효과(장판 깔기 · 고속스핀 · 옛노래 · 열탕류의 얼음 녹이기)다.
+    blocked = A.secondary_blocked(user, target, move)
+    sf = A.sheer_force(user, move)
+    sg = A.secondary_mult(user)                 # 하늘의은총이면 확률이 두 배
 
     # 얼어붙은 상대는 불꽃 기술(과 열탕류)을 맞으면 녹는다. 타입은 스킨 특성·송전까지 본 것이다.
+    # 열탕류(불꽃이 아닌 것)는 우격다짐이 붙으면 안 녹인다 (쇼다운 frz.onAfterMoveSecondary - 불꽃은 맞기만 하면 녹는다).
     if landed and alive and target.status == "freeze":
         mt = move_type(move, user) or (A.move_type(user, move) if user.ability_on
                                        else move.get("type")) or move.get("type")
-        if mt == "FIRE" or k in THAW_TARGET:
+        if mt == "FIRE" or (k in THAW_TARGET and not sf):
             target.status = None
             ev.append({"t": "cure", "who": tw, "text": "%s 의 얼음이 녹았다!" % target.name})
     if k == "RELICSONG" and total and user.alive() and (user.mon or {}).get("species") == "MELOETTA" \
-            and not user.cond.get("transformed") and not user.mega:
+            and not user.cond.get("transformed") and not user.mega and not sf:
         # 옛노래: 메로엣타가 보이스폼과 스텝폼을 오간다 (물러나면 보이스폼으로 돌아온다)
         if user.cond.get("pirouette"):
             user.cond.pop("pirouette", None)
@@ -527,14 +536,15 @@ def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
         target.cond["smackdown"] = True
         target.cond.pop("magnetrise", None)
         target.cond.pop("telekinesis", None)
-    if k == "SALTCURE" and landed and alive and not target.cond.get("saltcure"):
+    if k == "SALTCURE" and landed and alive and not blocked and not target.cond.get("saltcure"):
         target.cond["saltcure"] = True
         say(ev, tw, "%s 은(는) 소금에 절여졌다!" % target.name)
-    if k == "SYRUPBOMB" and landed and alive and not target.cond.get("syrup"):
+    if k == "SYRUPBOMB" and landed and alive and not blocked and not target.cond.get("syrup"):
         target.cond["syrup"] = 3
         say(ev, tw, "%s 은(는) 끈적한 시럽을 뒤집어썼다!" % target.name)
     if k in TRAP_HIT and landed and alive and not target.cond.get("trapped") \
-            and "GHOST" not in target.types():
+            and "GHOST" not in target.types() and not blocked:
+        # 앵커샷 · 그림자꿰매기의 묶기는 부가효과다 - 우격다짐 · 인분 · 은밀망토가 지운다 (사우전드웨이브는 주 효과)
         target.cond["trapped"] = who
         say(ev, tw, "%s 은(는) 이제 도망칠 수 없다!" % target.name)
     if k == "JAWLOCK" and landed and alive and user.alive():
@@ -551,29 +561,43 @@ def after_attack(bt, k, move, who, user, target, tw, total, sub_hit, ev):
             and not target.cond.get("gastro") and target.ability not in SM.ABILITY_FIXED:
         target.cond["gastro"] = True
         say(ev, tw, "%s 의 특성이 사라졌다!" % target.name)
-    if k == "EERIESPELL" and landed and alive:
+    if k == "EERIESPELL" and landed and alive and not blocked:
         last = target.cond.get("lastMove")
         if last and target.pp.get(last, 0) > 0:
             target.pp[last] = max(0, target.pp[last] - 3)
             say(ev, tw, "%s 의 %s PP 가 줄었다!" % (target.name, bt.move_name(last)))
-    if k == "PSYCHICNOISE" and landed and alive and not target.cond.get("healblock") \
+    if k == "PSYCHICNOISE" and landed and alive and not blocked and not target.cond.get("healblock") \
             and not (A.has(target, "AROMAVEIL") and not A.breaks(user)):
         target.cond["healblock"] = 2
         say(ev, tw, "%s 은(는) 회복할 수 없게 되었다!" % target.name)
-    if k == "SPARKLINGARIA" and landed and alive and target.status == "burn":
+    if k == "SPARKLINGARIA" and landed and alive and not blocked and target.status == "burn":
         target.status = None
         ev.append({"t": "cure", "who": tw, "text": "%s 의 화상이 나았다!" % target.name})
-    if k == "DIRECLAW" and landed and alive and not target.status and bt.rng.random() < 0.5:
+    if k == "DIRECLAW" and landed and alive and not blocked and not target.status and bt.rng.random() < 0.5 * sg:
         bt._apply_status(target, bt.rng.choice(["poison", "paralysis", "sleep"]), ev,
                          source=user, by_move=True)
-    if k in IF_ROSE and landed and alive and target.cond.get("rose"):
+    if k == "TRIATTACK" and landed and alive and not blocked and not target.status and bt.rng.random() < 0.2 * sg:
+        # 트라이어택: 20% 로 화상 · 마비 · 얼음 중 하나 (11/19 - 전에는 도감에 상태이상 칸이 없어 아예 안 걸렸다)
+        bt._apply_status(target, bt.rng.choice(["burn", "paralysis", "freeze"]), ev,
+                         source=user, by_move=True)
+    if k in IF_ROSE and landed and alive and not blocked and target.cond.get("rose"):
         if IF_ROSE[k] == "burn":
             bt._apply_status(target, "burn", ev, source=user, by_move=True)
         else:
             SM.confuse(bt, target, tw, ev, source=user, quiet=True)
-    if k == "SECRETPOWER" and landed and alive and not target.status and bt.rng.random() < 0.3:
-        bt._apply_status(target, "paralysis", ev, source=user, by_move=True)
-    if k in HAZARD_HIT and total:
+    if k == "SECRETPOWER" and landed and alive and not blocked:
+        # 필드마다 다르다 (11/19 - 전에는 늘 마비였다): 일렉트릭 마비 · 그래스 잠듦 · 미스트 특수공격 -1 · 사이코 스피드 -1
+        kind, what = SECRET_POWER.get(bt.field.terrain, SECRET_POWER[None])
+        if (kind == "stat" or not target.status) and bt.rng.random() < 0.3 * sg:
+            if kind == "status":
+                bt._apply_status(target, what, ev, source=user, by_move=True)
+            else:
+                bt._change_stat(target, what, -1, ev, tw, source=user)
+    if k == "GENESISSUPERNOVA" and (total or sub_hit) and not sf:
+        # 오리진즈슈퍼노바 (뮤Z): 맞히면 사이코필드. 자기 쪽 부가효과(쇼다운 secondary.self)라 인분 · 은밀망토는 못 막고
+        # 우격다짐만 지운다 (11/19 - 전에는 필드를 안 깔았다)
+        SM.set_terrain(bt, "psychic", ev, who)
+    if k in HAZARD_HIT and total and not sf:     # 우격다짐이면 안 깔린다 (쇼다운 - 인분 · 은밀망토와는 상관없다)
         side = bt.field.side(tw)
         hz = HAZARD_HIT[k]
         cap = 3 if hz == "spikes" else 1

@@ -191,7 +191,14 @@ def t_field_items():
         use(bt, "me", "WRAP")
         if foe.cond.get("bound"):
             break
-    chk("끈기갈고리손톱: 조이기 7턴", (foe.cond.get("bound") or {}).get("turns") == 7, foe.cond.get("bound"))
+    ticks = 0
+    for _ in range(12):
+        hp = foe.hp
+        eot(bt)
+        ticks += hp > foe.hp
+        if not foe.cond.get("bound"):
+            break
+    chk("끈기갈고리손톱: 조이기 데미지 7번 (본가와 같다)", ticks == 7, ticks)
     bt, me, foe = fight(mon("SNORLAX", 50, ["WRAP"], held="BINDINGBAND"), mon("SNORLAX", 50))
     for _ in range(5):
         use(bt, "me", "WRAP")

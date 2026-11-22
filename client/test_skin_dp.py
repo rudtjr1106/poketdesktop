@@ -1245,7 +1245,11 @@ def main():
         bag.pick_item("BOTTLECAP")
         TBL.settle(root, 0.3)
         chk("은색병뚜껑 - 능력을 골라야 한다", bag.stat_needed and bag._stat is not None)
-        chk("쓰기 단추는 능력을 고르기 전엔 꺼져 있다", not bag.use_btn.enabled)
+        # 되돌릴 수 없는 도구는 앞 도구 때 골라진 포켓몬을 이어받지 않는다 - 판을 먼저 누른다 (게시판 #704)
+        chk("  병뚜껑을 고르기만 하면 대상이 비어 있다", bag.mon_id is None, bag.mon_id)
+        bag._plate_click(next(m for m in bag._view if not bag._states[m["id"]][1]))
+        TBL.settle(root, 0.2)
+        chk("쓰기 단추는 능력을 고르기 전엔 꺼져 있다", bag.mon_id is not None and not bag.use_btn.enabled, bag.mon_id)
         bag.pick_stat("spe")
         chk("능력을 고르면 쓰기 단추가 켜진다", bag.use_btn.enabled and "은색병뚜껑" in bag.use_btn.text,
             bag.use_btn.text)

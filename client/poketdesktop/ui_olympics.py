@@ -259,9 +259,12 @@ class OlympicsPane(object):
             b = U.PushButton(btns, "바꾸기" if e.get("entry") else "신청",
                              lambda k=e["key"]: EntryWindow(self.app, k, self), height=26, font=U.FONT_S)
             b.pack(side="right", padx=(0, 6))
-        tip = "%s · 특기 %s%s · %dkg 안팎이 알맞아요" % (
-            e["statKr"], "·".join(e.get("types") or []),
-            (" · 특성 %s" % "·".join(e.get("abil") or [])) if e.get("abil") else "", e.get("kg0") or 0)
+        # 특기 · 특성도 응원처럼 얼마나 더해 주는지 적는다 (게시판 #618 - '특기와 응원 중 무엇이 더 중요한가' 헷갈렸다.
+        # 특기 +5% · 응원 +5% 로 같고, 둘 다 맞으면 합쳐진다)
+        tip = "%s · 특기 %s (+%d%%)%s · %dkg 안팎이 알맞아요" % (
+            e["statKr"], "·".join(e.get("types") or []), round(O.TYPE_B * 100),
+            (" · 특성 %s (+%d%%)" % ("·".join(e.get("abil") or []), round(O.ABIL_B * 100))) if e.get("abil") else "",
+            e.get("kg0") or 0)
         tk.Label(card, text=tip, bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w", justify="left"
                  ).pack(fill="x", padx=12)
         if O.TITLE.get(e["key"]):                       # 1~3위 상 (목에 거는 메달 + 그 종목 칭호)
@@ -270,8 +273,8 @@ class OlympicsPane(object):
         if e.get("cheer") and e.get("status") != "done":
             row = tk.Frame(card, bg=U.BG2)
             row.pack(fill="x", padx=12, pady=(3, 0))
-            tk.Label(row, text="그날 응원 타입 (+5%)", bg=U.BG2, fg=U.FG_DIM, font=U.FONT_XS).pack(side="left",
-                                                                                         padx=(0, 6))
+            tk.Label(row, text="그날 응원 타입 (+%d%%)" % round(O.CHEER_B * 100), bg=U.BG2, fg=U.FG_DIM,
+                     font=U.FONT_XS).pack(side="left", padx=(0, 6))
             for c in e["cheer"]:
                 U.chip(row, c["kr"], U.TYPE_COLOR.get(c["type"], U.BG3), font=U.FONT_XS, padx=6,
                        pady=0).pack(side="left", padx=(0, 4))
