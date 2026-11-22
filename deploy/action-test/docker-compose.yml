@@ -1,0 +1,65 @@
+# 액션 배틀 시험 서버 - 운영 서버 옆에 따로 띄운다 (main 에 합치지 않고 친구와 시험할 때만, 11/22 사용자).
+#
+# 운영 서버(poketdesktop-server)와 DB · 컨테이너가 따로다. 운영 DB 는 건드리지 않는다.
+# 밖에서는 운영 Caddy 를 거쳐 들어온다 - 운영 Caddyfile 에 아래 덩어리를 넣고 caddy reload (끊기지 않는다):
+#
+#     route {
+#         @actiontest header Cookie *poket_test=1*
+#         reverse_proxy /action-test* poket-action-test:8080
+#         reverse_proxy @actiontest poket-action-test:8080
+#     }
+#
+#   /action-test?k=<열쇠> 로 들어오면 시험 서버가 쿠키(poket_test=1)를 굽고 판으로 보낸다. 그 뒤 그 브라우저의
+#   /action/play · /action/static · /ws/action · /api/anim 은 시험 서버로 간다. 앱(데스크톱)은 쿠키를 안 보내므로
+#   늘 운영 서버로 간다.
+#
+# 띄우기 (서버에서, 이 폴더가 있는 기능 브랜치 체크아웃 안에서):
+#     POKET_ACTION_TEST_KEY=<열쇠> docker compose -p poket-action-test -f deploy/action-test/docker-compose.yml up -d --build
+# 끄기:
+#     docker compose -p poket-action-test -f deploy/action-test/docker-compose.yml down
+#
+# POKET_NET = 운영 Caddy 가 붙어 있는 도커 네트워크 (docker network ls 로 확인, 운영 compose 기본은 deploy_default).
+
+services:
+  poket-action-test:
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile
+    image: poketdesktop-action-test:latest
+    container_name: poket-action-test
+    restart: "no"
+    expose:
+      - "8080"
+    volumes:
+      - actiontest:/data
+    environment:
+      POKET_DB: /data/poket.db
+      POKET_POKEDEX: /app/data/pokedex.json
+      POKET_ITEMS: /app/data/items.json
+      POKET_SPRITE_DIR: /data/sprites
+      POKET_ALLOW_ADD_EXP: "0"
+      POKET_ALLOW_FORCE_WILD: "0"
+      POKET_WARM_SPRITES: "0"
+      POKET_RELEASE_WATCH: "0"
+      POKET_TRUST_PROXY: "1"
+      POKET_REQUIRE_IP: "0"
+      # 시험 로비 (server/app/action_test.py). 열쇠가 없으면 로비는 없는 것처럼 404.
+      POKET_ACTION_TEST_KEY: ${POKET_ACTION_TEST_KEY:?POKET_ACTION_TEST_KEY 를 주세요}
+      # 링크를 친구에게 보내는 사이 판이 접히지 않게 넉넉히
+      POKET_ACTION_JOIN_SEC: "600"
+      POKET_ACTION_TICKET_SEC: "600"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+    networks:
+      - edge
+
+volumes:
+  actiontest:
+
+networks:
+  edge:
+    external: true
+    name: ${POKET_NET:-deploy_default}

@@ -205,6 +205,24 @@ def invite(uid, other, now=None):
     return get(cur.lastrowid)
 
 
+def open_direct(a, b, now=None):
+    """도전 · 받기 없이 바로 판을 연다 (시험 로비 action_test 만 부른다). 친구 · 접속 · 앱 능력은 안 본다 - 부르는 쪽이
+    정한다. 둘 중 하나라도 다른 판(액션 · 실시간 · 챔피언)에 있으면 ValueError. 열린 판(state=open)을 돌려준다."""
+    expire_old(now)
+    if a == b:
+        raise ValueError("자기 자신과는 싸울 수 없습니다.")
+    if live.my_match(a) or live.my_match(b):
+        raise ValueError("둘 중 한 사람이 다른 배틀을 하고 있습니다.")
+    cur = db.run(
+        "INSERT INTO action_match (a_id, b_id, a_name, b_name, state, created_at, updated_at)"
+        " SELECT ?,?,?,?,'invited',?,? WHERE NOT EXISTS (SELECT 1 FROM action_match"
+        " WHERE state IN ('invited','open','fighting') AND (a_id IN (?,?) OR b_id IN (?,?)))",
+        (a, b, _name(a), _name(b), _iso(now), _iso(now), a, b, a, b))
+    if cur.rowcount != 1:
+        raise ValueError("둘 중 한 사람이 이미 액션 배틀 중입니다.")
+    return _accept(get(cur.lastrowid), now)
+
+
 def _team(uid):
     """이 판에서 쓸 팀: 랭크 팀(없으면 바탕화면 파티)의 앞 TEAM_MAX 마리를 Lv.50 으로. 개체값 · 노력치 · 성격 ·
     도구 · 기술은 그대로다. 같은 도구는 앞의 한 마리만 지닌 셈으로 (live._team 과 같다)."""

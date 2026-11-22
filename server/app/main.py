@@ -32,7 +32,7 @@ from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
-from . import (achievements, action, action_routes, action_ws, airraid, arche, arche_routes, auth, avatar, battle_routes, board, board_routes, boosts, champion, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
+from . import (achievements, action, action_routes, action_test, action_ws, airraid, arche, arche_routes, auth, avatar, battle_routes, board, board_routes, boosts, champion, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
                expedition, focus, item_routes, olympics, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
@@ -69,6 +69,7 @@ app.include_router(arche_routes.router)         # 아르케의 여섯 봉인 (2.
 app.include_router(troubles.router)             # 앱이 배틀을 접은 까닭 (1.13.3)
 app.include_router(stats.router)                # 밖에 보여 주는 숫자 셋 - 가입자 · 접속 중 · 최대 동시 접속 (인증 없음)
 app.include_router(action_routes.router)        # 액션 배틀 (2.6.0) - 도전 · 입장권 · 웹 화면 (/action/play)
+app.include_router(action_test.router)          # 액션 배틀 시험 로비 - 시험 서버에서만 (열쇠가 없으면 404)
 app.include_router(action_ws.router)            # 액션 배틀의 판 (/ws/action, 30번/초)
 app.mount("/action/static", action_routes.static_files(), name="action_static")   # 웹 화면의 js · css
 

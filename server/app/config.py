@@ -406,3 +406,5 @@ ACTION_READY_SEC = _float_or_none("POKET_ACTION_READY_SEC")
 ACTION_FIGHT_SEC = _float_or_none("POKET_ACTION_FIGHT_SEC")
 # 웹 화면 (server/web/action). 서버가 내보낸다 - 고칠 때 앱을 다시 내지 않아도 된다
 ACTION_WEB = os.environ.get("POKET_ACTION_WEB", os.path.join(ROOT, "web", "action"))
+# 시험 로비 (action_test, 11/22) - 따로 띄운 시험 서버에서만 준다. 비어 있으면 /action-test 는 없는 것처럼 404
+ACTION_TEST_KEY = os.environ.get("POKET_ACTION_TEST_KEY", "")
