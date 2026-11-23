@@ -1675,6 +1675,21 @@
    "sell": 1500,
    "weight": 0
   },
+  "BURNINGBOOST": {
+   "buyable": false,
+   "cat": "misc",
+   "cost": 0,
+   "desc": "쓰면 2시간 동안 풀숲이 2~3분마다 돋는다 (보통은 5~7분). 켜져 있을 때 또 쓰면 시간이 늘어난다 (3시간까지). 상점에서는 팔지 않는다.",
+   "effect": {
+    "kind": "burn",
+    "minutes": 120
+   },
+   "en": "Burning Boost",
+   "id": "BURNINGBOOST",
+   "ident": "burning-boost",
+   "kr": "버닝 부스터",
+   "sell": 0
+  },
   "CALCIUM": {
    "cat": "ev",
    "cost": 10000,

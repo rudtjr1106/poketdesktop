@@ -404,7 +404,7 @@ jobs:
       - name: 병뚜껑 · 이로치사탕 대상 고르기 · 확인 창 (진짜 Tk, 테마 일곱)
         if: matrix.shard == 1
         run: python client/test_bag_bottlecap.py
-      # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름)
+      # 2.1.1: 타입 스프레이(타입 고르기) · 닉네임 변경권(이름 묻기 · 세션 이름) · 2.5.3 버닝 부스터
       - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         if: matrix.shard == 2
         run: python client/test_boost_items.py
@@ -834,7 +834,7 @@ jobs:
           python test_forms.py           # 1.13: 폼 도구 (켜고 끄기·고르기·꽃꿀)
           python test_errors.py          # 1.13.1: 서버 오류 기록에 문구·역추적이 남는다
           python test_tm_ticket.py       # 1.13.1: 랭크 보상 - 기술머신 뽑기권
-          python test_boosts.py          # 2.1.1: 타입 스프레이 (출현 · 3시간까지 · 풀숲 간격은 그대로)
+          python test_boosts.py          # 2.1.1 타입 스프레이 · 2.5.3 버닝 부스터 (2시간 · 선물로만 · 풀숲 간격 2~3분)
           python test_rename.py          # 2.1.1: 닉네임 변경권 (규칙 · 한 트랜잭션 · 로그인)
           python test_client_ip.py       # 2.1.1: cf-connecting-ip 는 Cloudflare 가 앞에 있을 때만 믿는다 (IP 위조)
           python test_account_email.py   # 2.1.1: 마이페이지 이메일 (본인만 보인다, 비우면 지운다)

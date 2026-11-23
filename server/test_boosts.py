@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
-"""풀숲 부스트 검사 (2.1.1, app/boosts.py): 타입 스프레이. 서버를 띄우지 않는다.
+"""풀숲 부스트 검사 (2.1.1, app/boosts.py): 타입 스프레이 · 버닝 부스터. 서버를 띄우지 않는다.
 
     python server/test_boosts.py
 
 못 박는 것:
 
-  1. 타입 스프레이가 있고 상점(10,000원)에서만 판다 - 길드 코인 상점 · 드랍 표에는 없다. 버닝 부스터는 없다
-     (만들었다가 11/04 사용자 결정으로 뺐다).
+  1. 도구 둘이 있다. 타입 스프레이는 상점(10,000원)에서만 팔고, 버닝 부스터는 어디서도 안 판다 (2.5.3 - 선물로만,
+     11/23 서버 장애 보상). 길드 코인 상점 · 드랍 표에는 둘 다 없다.
   2. 타입 스프레이: 타입을 안 골랐거나 없는 타입(스텔라 포함)이면 거절하고 **도구는 그대로**.
      쓰면 1시간, 같은 타입이면 더하고(3시간까지 - 넘으면 거절하고 도구는 그대로), 다른 타입이면 바꾸고 다시 1시간.
   3. 스프레이가 켜져 있으면 실제 풀숲(main._make_grass)에 그 타입이 훨씬 자주 나온다. 끝나면 평소대로.
-  4. 풀숲 간격은 스프레이를 켜도 그대로 5~7분. 거의 동시에 여러 번 켜져도 3시간을 넘지 않는다.
+  4. 버닝 부스터 (2.5.3 에 2시간짜리로 다시): 쓰면 2시간, 풀숲 간격이 2~3분 (main._cooldown · battle_routes.reschedule
+     둘 다). 이미 5~7분 뒤로 잡힌 다음 풀숲을 2~3분 안으로 당긴다. 3시간까지만 쌓인다 (2시간이 남았으면 또 못 쓰고,
+     1시간 아래로 남았으면 더한다). 끝나면 5~7분으로 돌아온다.
   5. /api/wild · /api/me · /api/shop 답에 남은 시간이 실린다.
 """
 import datetime
@@ -81,16 +83,20 @@ def next_in(uid):
 
 def catalog():
     print("-- 1. 도구")
-    sp = items.get("TYPESPRAY")
-    chk("타입 스프레이가 있다 (타입을 고른다)", sp and sp["effect"]["kind"] == "lure" and sp["effect"].get("pickType"))
-    chk("  버닝 부스터는 없다", items.get("BURNINGBOOST") is None
-        and not any((it.get("effect") or {}).get("kind") == "burn" for it in items.catalog().values()))
-    chk("  상점 값 10,000원 · 되팔면 0원", items.buy_price("TYPESPRAY") == 10000 and sp["sell"] == 0)
+    sp, bn = items.get("TYPESPRAY"), items.get("BURNINGBOOST")
+    chk("타입 스프레이 · 버닝 부스터가 있다", sp and bn and sp["effect"]["kind"] == "lure"
+        and bn["effect"]["kind"] == "burn" and sp["effect"].get("pickType"))
+    chk("  타입 스프레이는 상점 10,000원 · 되팔면 0원", items.buy_price("TYPESPRAY") == 10000 and sp["sell"] == 0)
+    pub = dict((r["id"], r) for r in items.public_list())
+    chk("  버닝 부스터는 상점에서 안 판다 (선물로만) · 되팔면 0원", items.buy_price("BURNINGBOOST") == 0
+        and bn.get("buyable") is False and bn["sell"] == 0 and pub["BURNINGBOOST"]["buyable"] is False,
+        (items.buy_price("BURNINGBOOST"), pub.get("BURNINGBOOST")))
+    chk("  버닝 부스터는 2시간짜리", bn["effect"].get("minutes") == 120, bn["effect"])
     rows = dict((r["id"], r) for r in guild.shop(mkuser("상점구경"))["items"])
-    chk("  길드 코인 상점에는 없다 (사용자 결정 - 상점에서만)", "TYPESPRAY" not in rows
-        and guild.coin_price("TYPESPRAY") == 0, sorted(rows)[:5])
+    chk("  길드 코인 상점에는 없다 (사용자 결정 - 상점에서만)", "TYPESPRAY" not in rows and "BURNINGBOOST" not in rows
+        and guild.coin_price("TYPESPRAY") == 0 == guild.coin_price("BURNINGBOOST"), sorted(rows)[:5])
     drops = set(i for i, _w in items.data()["dropTable"])
-    chk("  드랍 표에는 없다", not drops & {"TYPESPRAY", "RENAMETICKET"})
+    chk("  드랍 표에는 없다", not drops & {"TYPESPRAY", "BURNINGBOOST", "RENAMETICKET"})
 
 
 def spray():
@@ -118,7 +124,7 @@ def spray():
     s = boosts.state(uid)
     chk("다른 타입이면 바꾸고 다시 1시간", r and s["lureType"] == "FIRE" and 3590 <= s["lureLeft"] <= 3600, s)
     later = now() + datetime.timedelta(seconds=3601)
-    chk("끝나면 꺼진다", boosts.state(uid, later) == {"lureLeft": 0, "lureType": None}
+    chk("끝나면 꺼진다", boosts.state(uid, later) == {"burnLeft": 0, "lureLeft": 0, "lureType": None}
         and boosts.spawn_boost(uid, later) is None, boosts.state(uid, later))
     chk("켜져 있는 동안 출현 boost = ((타입,), 0) - 그 타입 종만", boosts.spawn_boost(uid) == (("FIRE",), 0))
     rng = random.Random(9)
@@ -159,39 +165,83 @@ def grass():
         and all(d.bst(s) <= 410 for s in pool), len(pool))
 
 
-def interval():
-    print("-- 4. 풀숲 간격은 그대로")
+def burn():
+    print("-- 4. 버닝 부스터")
+    uid = mkuser("버닝")
+    items.bag_add(uid, "BURNINGBOOST", 4)
+    rng = random.Random(3)
+    plain = [boosts.cooldown(uid, rng) for _ in range(200)]
+    chk("평소 간격 5~7분", min(plain) >= config.WILD_COOLDOWN_MIN and max(plain) <= config.WILD_COOLDOWN_MAX,
+        (min(plain), max(plain)))
+    db.run("INSERT INTO wild_state (user_id, next_at) VALUES (?,?)",
+           (uid, iso(now() + datetime.timedelta(seconds=400))))
+    r, err = use(uid, "BURNINGBOOST")
+    s = boosts.state(uid)
+    chk("쓰면 2시간", r and 7190 <= s["burnLeft"] <= 7200 and items.bag_count(uid, "BURNINGBOOST") == 3
+        and "2시간" in r["message"], (err, s))
+    left = next_in(uid)
+    chk("  이미 400초 뒤로 잡힌 다음 풀숲을 2~3분 안으로 당긴다 (%.0f초)" % left,
+        left is not None and left <= boosts.BURN_MAX, left)
     from app import main
-    uid = mkuser("간격")
-    boosts.lure(uid, "FIRE", 60)
-    gaps = [main._cooldown() for _ in range(200)]
-    chk("스프레이를 켜도 5~7분", min(gaps) >= config.WILD_COOLDOWN_MIN and max(gaps) <= config.WILD_COOLDOWN_MAX,
-        (min(gaps), max(gaps)))
+    fast = [main._cooldown(uid) for _ in range(200)]
+    chk("켜져 있는 동안 간격 2~3분 (main._cooldown)", min(fast) >= boosts.BURN_MIN and max(fast) <= boosts.BURN_MAX,
+        (min(fast), max(fast)))
     battle_routes.reschedule(uid)
     left = next_in(uid)
-    chk("  배틀 · 잡기 뒤에도 5~7분 (%.0f초)" % left, config.WILD_COOLDOWN_MIN - 2 <= left <= config.WILD_COOLDOWN_MAX,
-        left)
-    u3 = mkuser("동시")
+    chk("  배틀 · 잡기 뒤에도 2~3분 (battle_routes.reschedule, %.0f초)" % left,
+        boosts.BURN_MIN - 2 <= left <= boosts.BURN_MAX, left)
+    later = now() + datetime.timedelta(seconds=7201)
+    back = [boosts.cooldown(uid, rng, later) for _ in range(100)]
+    chk("끝나면 5~7분으로 돌아온다", min(back) >= config.WILD_COOLDOWN_MIN, min(back))
+
+    r, err = use(uid, "BURNINGBOOST")
+    s = boosts.state(uid)
+    chk("2시간이 남았을 때 또 쓰면 3시간을 넘어 거절, 도구는 그대로", r is None and "3시간까지만" in (err or "")
+        and 7180 <= s["burnLeft"] <= 7200 and items.bag_count(uid, "BURNINGBOOST") == 3, (s, err))
+    db.run("UPDATE wild_state SET burn_until=? WHERE user_id=?", (iso(now() + datetime.timedelta(minutes=50)), uid))
+    r, err = use(uid, "BURNINGBOOST")
+    s = boosts.state(uid)
+    chk("1시간 아래로 남았으면 더한다 (50분 + 2시간)", r and 170 * 60 - 10 <= s["burnLeft"] <= 170 * 60
+        and items.bag_count(uid, "BURNINGBOOST") == 2, (s, err))
+
+    u4 = mkuser("버닝곧")
+    items.bag_add(u4, "BURNINGBOOST", 1)
+    db.run("INSERT INTO wild_state (user_id, next_at) VALUES (?,?)", (u4, iso(now() + datetime.timedelta(seconds=30))))
+    use(u4, "BURNINGBOOST")
+    left = next_in(u4)
+    chk("곧 돋을 풀숲은 뒤로 미루지 않는다 (%.0f초)" % left, left <= 30, left)
+
+    u3 = mkuser("버닝동시")
     for _ in range(5):                                      # 거의 동시에 써서 남은 시간 확인을 모두 지났다고 치고
+        boosts.burn(u3, 60, rng)
         boosts.lure(u3, "FIRE", 60)
-    chk("확인을 지나쳐 여러 번 켜져도 3시간을 넘지 않는다", boosts.state(u3)["lureLeft"] <= 3 * 3600, boosts.state(u3))
+    s3 = boosts.state(u3)
+    chk("확인을 지나쳐 여러 번 켜져도 3시간을 넘지 않는다", s3["burnLeft"] <= 3 * 3600 and s3["lureLeft"] <= 3 * 3600, s3)
+
+    u2 = mkuser("버닝새내기")
+    items.bag_add(u2, "BURNINGBOOST", 1)
+    r, err = use(u2, "BURNINGBOOST")
+    left = next_in(u2)
+    chk("풀숲 기록이 없던 사람도 쓴다 (다음 풀숲 %.0f초)" % (left or -1), r and left is not None
+        and left <= boosts.BURN_MAX, err)
 
 
 def answers():
     print("-- 5. 답에 실리는 남은 시간")
     from app import main
     uid = mkuser("답")
+    boosts.burn(uid, 60, random.Random(1))
     boosts.lure(uid, "GHOST", 60)
     w = main.wild_state(me(uid))
-    chk("/api/wild", w["boosts"]["lureLeft"] > 3500 and w["boosts"]["lureType"] == "GHOST", w.get("boosts"))
+    chk("/api/wild", w["boosts"]["burnLeft"] > 3500 and w["boosts"]["lureType"] == "GHOST", w.get("boosts"))
     ctx = me(uid)
     ctx["session"] = {"ip": "", "expires_at": None}
     m = main.me(ctx)
     chk("/api/me", (m.get("boosts") or {}).get("lureType") == "GHOST", m.get("boosts"))
     s = item_routes.shop(me(uid))
-    chk("/api/shop", s["boosts"]["lureLeft"] > 3500, s.get("boosts"))
+    chk("/api/shop", s["boosts"]["burnLeft"] > 3500, s.get("boosts"))
     u2 = mkuser("답없음")
-    chk("안 쓴 사람은 0", item_routes.shop(me(u2))["boosts"] == {"lureLeft": 0, "lureType": None})
+    chk("안 쓴 사람은 0", item_routes.shop(me(u2))["boosts"] == {"burnLeft": 0, "lureLeft": 0, "lureType": None})
 
 
 def main_():
@@ -199,7 +249,7 @@ def main_():
     catalog()
     spray()
     grass()
-    interval()
+    burn()
     answers()
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
