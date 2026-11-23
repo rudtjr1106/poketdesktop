@@ -194,7 +194,7 @@ def t_다시_읽기_장_경계():
     st = AR.state(u, now=OPEN1)
     c1 = ch(st, 1)
     chk("열린 순간: 1장 open · ready True · 폴링 60", st["ready"] and st["chapter"] == 1 and c1["open"]
-        and st["poll"] == 60, st["chapter"])
+        and st["poll"] == AR.POLL == 120 and AR.LEAD > AR.POLL, st["chapter"])
     chk("일지는 after 0 것만", [j["text"] for j in c1["journal"]] == ["첫 일지 글"], c1["journal"])
     chk("새김글 · 사진 · minClient", c1["inscription"] == "시험 새김글" and c1["photo"] == "cave"
         and c1["minClient"] == "2.4.0", c1)
