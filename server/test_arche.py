@@ -741,7 +741,7 @@ def t_발굴지():
     db.run("INSERT INTO arche_progress (user_id, chapter, ritual_at, first) VALUES (?,2,?,0)",
            (u, A.window(2)[0].isoformat()))
     real = AR._digs
-    AR._digs = lambda uid, n, now: (_ for _ in ()).throw(RuntimeError("시험")) if n == 1 else real(uid, n, now)
+    AR._digs = lambda uid, n, now, *a: (_ for _ in ()).throw(RuntimeError("시험")) if n == 1 else real(uid, n, now, *a)
     try:
         st = AR.state(u, now=A.window(2)[0] + datetime.timedelta(hours=1))
     finally:

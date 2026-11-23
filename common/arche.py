@@ -87,15 +87,25 @@ def _kst_midnight(day):
     return datetime.datetime(day.year, day.month, day.day, tzinfo=KST).astimezone(UTC)
 
 
+_WINDOWS = {}
+
+
 def window(n):
-    """n 장이 열려 있는 때 (열림, 닫힘) - UTC aware. 닫힘 순간은 이미 다음 장이다. 모르는 장은 None."""
+    """n 장이 열려 있는 때 (열림, 닫힘) - UTC aware. 닫힘 순간은 이미 다음 장이다. 모르는 장은 None.
+
+    (장 번호, 시작 날) 마다 한 번만 센다 (11/23 부하 줄이기 - /api/arche 한 번에 30번 가까이 불렸다). 시작 날은 그때그때
+    읽으므로 POKET_ARCHE_START 를 바꾸면(검사 · 시연) 새로 센다."""
     c = chapter(n)
     if c is None:
         return None
     first = start_day()
-    opens = _kst_midnight(first + datetime.timedelta(days=c["offset"]))
-    closes = _kst_midnight(first + datetime.timedelta(days=c["offset"] + c["days"]))
-    return opens, closes
+    key = (c["n"], first)
+    got = _WINDOWS.get(key)
+    if got is None:
+        opens = _kst_midnight(first + datetime.timedelta(days=c["offset"]))
+        closes = _kst_midnight(first + datetime.timedelta(days=c["offset"] + c["days"]))
+        got = _WINDOWS[key] = (opens, closes)
+    return got
 
 
 def event_window():

@@ -4,11 +4,15 @@
 main.py 에 두면 battle_routes 가 main 을 import 하고 main 이 다시
 battle_routes 를 import 하는 순환이 생겨서 따로 뺐다.
 """
+import collections
 import datetime
 import json
 import random
+import threading
 
 from fastapi import Header, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import Response
 
 from common import pokelogic as P
 
@@ -382,3 +386,41 @@ def try_evolve(uid, mon_id, hour=None):
     got = evolution.apply(uid, mon, b, d, "")
     return evolution.public(d, before, b["to"],
                             got.get("learned") or [], got.get("pendingIds") or [], form=b.get("form"))
+
+
+# ---------------------------------------------------------------- 자주 오는 요청을 덜 들여 (11/23 부하 줄이기)
+def fast_json(content, status_code=200):
+    """dict 를 바로 JSON 응답으로. FastAPI 가 돌려준 값을 내보내기 전에 거치는 jsonable_encoder 는 값을 하나하나
+    되짚어서, 1분마다 오는 /api/arche · /api/pokemon/desktop 에서는 json.dumps 보다 8~24배 들었다 (운영 DB 복사본:
+    4.1ms 대 0.2ms · 6.1ms 대 0.5ms). JSON 이 받는 값(dict · list · str · 수 · None)만 있으면 바로 쓰고, 아니면
+    (datetime · Row · set ...) 예전처럼 jsonable_encoder 를 거친다 - 응답 글자는 Starlette JSONResponse 와 같다."""
+    try:
+        body = json.dumps(content, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+    except TypeError:
+        body = json.dumps(jsonable_encoder(content), ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+    return Response(body.encode("utf-8"), status_code=status_code, media_type="application/json")
+
+
+_DECO = collections.OrderedDict()
+_DECO_LOCK = threading.Lock()
+DECO_KEEP = 6000                     # 기억해 둘 포켓몬 수 (접속한 사람 수백 명 x 바탕화면 여섯 마리 남짓)
+
+
+def decorate_row(r):
+    """DB 행 하나 -> decorate(row_to_mon(행)). 행 값이 그대로면 지난번 결과를 그대로 준다 (11/23 부하 줄이기 -
+    /api/pokemon/desktop 이 1분마다 바탕화면 포켓몬마다 능력치 · 설명을 새로 셌다, 한 마리 1.3ms).
+    decorate 는 행(과 유대 여부 bonded)과 바뀌지 않는 도감 · 도구 자료만 본다 - 열쇠가 같으면 결과도 같다.
+    돌려준 dict 는 여럿이 같이 쓰니 고치지 말 것 (바로 응답으로 내보내는 곳에서만 쓴다)."""
+    mon = db.row_to_mon(r)
+    key = (tuple(r), bool(mon.get("bonded")))
+    with _DECO_LOCK:
+        got = _DECO.get(key)
+        if got is not None:
+            _DECO.move_to_end(key)
+            return got
+    got = decorate(mon)
+    with _DECO_LOCK:
+        _DECO[key] = got
+        while len(_DECO) > DECO_KEEP:
+            _DECO.popitem(last=False)
+    return got

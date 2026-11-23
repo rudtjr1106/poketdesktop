@@ -835,6 +835,7 @@ jobs:
           python test_errors.py          # 1.13.1: 서버 오류 기록에 문구·역추적이 남는다
           python test_tm_ticket.py       # 1.13.1: 랭크 보상 - 기술머신 뽑기권
           python test_boosts.py          # 2.1.1 타입 스프레이 · 2.5.3 버닝 부스터 (2시간 · 선물로만 · 풀숲 간격 2~3분)
+          python test_perf_1123.py       # 11/23 부하 줄이기: 색인 · 커넥션 설정 · fast_json · decorate 기억 · 아르케 stat 한 번
           python test_rename.py          # 2.1.1: 닉네임 변경권 (규칙 · 한 트랜잭션 · 로그인)
           python test_client_ip.py       # 2.1.1: cf-connecting-ip 는 Cloudflare 가 앞에 있을 때만 믿는다 (IP 위조)
           python test_account_email.py   # 2.1.1: 마이페이지 이메일 (본인만 보인다, 비우면 지운다)

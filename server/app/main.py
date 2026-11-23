@@ -1298,7 +1298,7 @@ def me(ctx=Depends(current)):
     else:
         balls, money = u["balls"], u["money"]
 
-    return {
+    return deps.fast_json({                 # 1분마다 온다 - JSON 을 바로 만든다 (11/23 부하 줄이기, deps.fast_json)
         "user": auth.user_public(u),
         "walked": walked,
         "balls": balls,
@@ -1360,7 +1360,7 @@ def me(ctx=Depends(current)):
         # 아르케의 여섯 봉인 (2.4.0): 이벤트 일주일 전 ~ 끝난 하루 뒤에만. 앱이 이걸 보고 60초 폴링(/api/arche)을 켠다
         "arche": _arche_card(uid),
         "session":{"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
-    }
+    })
 
 
 def _airraid_card(uid):
@@ -1679,7 +1679,10 @@ def set_box_name(body: BoxNameIn, ctx=Depends(current)):
 
 @app.get("/api/pokemon/desktop")
 def list_desktop(ctx=Depends(current)):
-    return {"pokemon": [_decorate(m) for m in _mons(ctx["user"]["id"], True)]}
+    # 1분마다 온다 - 행이 그대로인 포켓몬은 지난번 decorate 를 쓰고(deps.decorate_row), JSON 도 바로 만든다 (11/23)
+    rows = db.q("SELECT * FROM pokemon WHERE user_id=? AND on_desktop=1 ORDER BY on_desktop DESC, slot ASC, id ASC",
+                (ctx["user"]["id"],))
+    return deps.fast_json({"pokemon": [deps.decorate_row(r) for r in rows]})
 
 
 def _own(uid, pid):

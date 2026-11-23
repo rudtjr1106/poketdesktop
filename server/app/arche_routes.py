@@ -31,7 +31,7 @@ class BattleIn(BaseModel):
 @router.get("/api/arche")
 def get_state(ctx=Depends(deps.current)):
     arche.ensure_posts()
-    return arche.state(ctx["user"]["id"])
+    return deps.fast_json(arche.state(ctx["user"]["id"]))   # 1분마다 온다 - JSON 을 바로 (11/23 부하 줄이기)
 
 
 @router.post("/api/arche/key")

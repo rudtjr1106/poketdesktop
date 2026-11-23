@@ -16,6 +16,7 @@
   5. /api/wild · /api/me · /api/shop 답에 남은 시간이 실린다.
 """
 import datetime
+import json
 import os
 import random
 import sys
@@ -239,6 +240,8 @@ def answers():
     ctx = me(uid)
     ctx["session"] = {"ip": "", "expires_at": None}
     m = main.me(ctx)
+    if hasattr(m, "body"):                                 # 11/23: /api/me 는 JSON 응답을 바로 돌려준다 (deps.fast_json)
+        m = json.loads(m.body)
     chk("/api/me", (m.get("boosts") or {}).get("lureType") == "GHOST", m.get("boosts"))
     s = item_routes.shop(me(uid))
     chk("/api/shop", s["boosts"]["burnLeft"] > 3500, s.get("boosts"))

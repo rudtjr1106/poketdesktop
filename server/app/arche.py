@@ -104,6 +104,11 @@ def _parse(s):
 # ---------------------------------------------------------------- 비공개 자료
 _cache = {"key": None, "data": None}
 _cache_lock = threading.Lock()
+# 한 요청 동안 secrets() 를 한 번만 본다 (11/23 부하 줄이기). state() 한 번에 _sec · window · ready 가 secrets() 를
+# 30번 가까이 불러 그때마다 파일을 stat 했다. state() 가 처음 읽은 것을 이 스레드에 꽂아 두고 끝나면 뺀다 - 요청과 요청
+# 사이에는 예전처럼 mtime · 크기를 봐서 운영자 손질이 다음 요청에 든다.
+_pin = threading.local()
+_UNPINNED = object()
 
 
 def _path(*parts):
@@ -111,7 +116,11 @@ def _path(*parts):
 
 
 def secrets():
-    """secrets.json (dict) 또는 None. **mtime · 크기가 바뀌면 다시 읽는다** - 운영자 손질이 다음 요청에 든다."""
+    """secrets.json (dict) 또는 None. **mtime · 크기가 바뀌면 다시 읽는다** - 운영자 손질이 다음 요청에 든다.
+    state() 안에서는 처음 읽은 것을 그대로 쓴다 (_pin)."""
+    pinned = getattr(_pin, "data", _UNPINNED)
+    if pinned is not _UNPINNED:
+        return pinned
     path = _path("secrets.json")
     try:
         st = os.stat(path)
@@ -512,13 +521,18 @@ def _journal(n, now, revealed, digs=()):
     return out
 
 
-def _digs(uid, n, now):
+def _dig_rows(uid):
+    return db.q("SELECT ends_at FROM expedition WHERE user_id=? AND place='arche' AND state='done'"
+                " ORDER BY ends_at", (uid,))
+
+
+def _digs(uid, n, now, rows=None):
     """그 사람이 n 장 동안 '아르케 발굴지' 탐험에서 받아 온 발굴 보고서 [(돌아온 시각 iso, 글)] (받은 것만, 돌아온 차례).
-    탐험 기록은 사람마다 최근 것만 남는다 (expedition.KEEP_DONE) - 그보다 오래된 것은 빠질 수 있다."""
+    탐험 기록은 사람마다 최근 것만 남는다 (expedition.KEEP_DONE) - 그보다 오래된 것은 빠질 수 있다.
+    rows = 미리 읽어 둔 _dig_rows (state 가 장마다 다시 안 읽게)."""
     lo, hi = A.window(n)
     out = []
-    for r in db.q("SELECT ends_at FROM expedition WHERE user_id=? AND place='arche' AND state='done'"
-                  " ORDER BY ends_at", (uid,)):
+    for r in (rows if rows is not None else _dig_rows(uid)):
         at = _parse(r["ends_at"])
         if at is None or not (lo <= at < hi) or at > now:
             continue
@@ -567,7 +581,18 @@ def _num_of(species):
 
 
 def state(uid, now=None):
-    """일지 창 · 컨트롤러가 그리는 것 전부 (계획 'state 모양'). 열린 장의 의식도 여기서 본다 (60초 폴링)."""
+    """일지 창 · 컨트롤러가 그리는 것 전부 (계획 'state 모양'). 열린 장의 의식도 여기서 본다 (60초 폴링).
+    비공개 자료는 이 요청 동안 한 번만 읽는다 (_pin)."""
+    if getattr(_pin, "data", _UNPINNED) is not _UNPINNED:
+        return _state(uid, now)
+    _pin.data = secrets()
+    try:
+        return _state(uid, now)
+    finally:
+        del _pin.data
+
+
+def _state(uid, now=None):
     now = _now(now)
     ok = ready()
     if ok:
@@ -593,6 +618,7 @@ def state(uid, now=None):
         firsts = dict((r["chapter"], r["username"]) for r in db.q(
             "SELECT p.chapter, u.username FROM arche_progress p JOIN users u ON u.id=p.user_id WHERE p.first=1"))
         revealed = _revealed()
+    dig_rows = _dig_rows(uid) if ok else []                 # 발굴 기록은 한 번만 읽고 장마다 거른다 (11/23 - 예전엔 장마다)
     for c in A.CHAPTERS:
         n = c["n"]
         lo, hi = A.window(n)
@@ -608,7 +634,8 @@ def state(uid, now=None):
             continue
         try:
             prog = mine.get(n)
-            row.update({"journal": _journal(n, now, revealed, _digs(uid, n, now)), "inscription": sec.get("inscription"),
+            row.update({"journal": _journal(n, now, revealed, _digs(uid, n, now, dig_rows)),
+                        "inscription": sec.get("inscription"),
                         "photo": sec.get("photo") or c["place"],
                         # 일지 사진: 판에 새긴 아르케 글자 번호 · 사진 아래 한 줄 (비공개 데이터 그대로 - 모두 보는 것)
                         "marks": sec.get("marks"), "caption": sec.get("caption"),

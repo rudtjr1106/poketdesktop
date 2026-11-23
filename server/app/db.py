@@ -116,6 +116,9 @@ CREATE TABLE IF NOT EXISTS pokemon (
     tint           TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_pokemon_user ON pokemon(user_id);
+-- 바탕화면 포켓몬 · 마릿수 세기 (/api/pokemon/desktop · /api/me 가 1분마다). 예전에는 그 사람의 포켓몬 줄을 모두 읽고
+-- 거르느라 많이 가진 사람은 한 번에 15ms 였다 (11/23 부하 줄이기 - 0.07ms · 마릿수는 색인만 읽는다)
+CREATE INDEX IF NOT EXISTS idx_pokemon_desk ON pokemon(user_id, on_desktop, slot);
 
 -- 도감 업적 (시즌 3). 받은 것만 적는다. seen 은 화면이 알렸는가.
 CREATE TABLE IF NOT EXISTS achievement (
@@ -475,6 +478,10 @@ CREATE TABLE IF NOT EXISTS pvp_match (
 );
 CREATE INDEX IF NOT EXISTS idx_pvp_match_a ON pvp_match(a_id, id);
 CREATE INDEX IF NOT EXISTS idx_pvp_match_b ON pvp_match(b_id, id);
+-- 안 본 대전 수 (/api/me 가 1분마다 pvp.unseen_count). a_seen · b_seen 이 큰 log 칸 뒤에 있어서, 위 색인으로 찾으면
+-- 판마다 log 의 넘침 페이지까지 읽었다 - 대전이 많은 사람은 한 번에 31ms (11/23 부하 줄이기 - 색인만 읽어 0.1ms)
+CREATE INDEX IF NOT EXISTS idx_pvp_match_a_seen ON pvp_match(a_id, a_seen);
+CREATE INDEX IF NOT EXISTS idx_pvp_match_b_seen ON pvp_match(b_id, b_seen);
 
 -- 전적. 한 경기에 **사람마다 한 행**을 남긴다. 한 행만 두고
 -- (a=? OR b=?) 로 찾으면 목록을 뽑을 때마다 승패를 뒤집어 계산해야 하고
@@ -1456,7 +1463,26 @@ def _open():
         os.makedirs(d, exist_ok=True)
     conn = sqlite3.connect(config.DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
+    _tune(conn)
     return conn
+
+
+# 커넥션마다 거는 설정 (11/23 부하 줄이기 - CPU 크레딧이 바닥나 30% 로 묶인 서버에서 같은 일을 덜 들여 하려고).
+#   synchronous=NORMAL  WAL 에서는 커밋마다 fsync 하지 않고 체크포인트 때만 한다. 앱이 죽어도 깨지지 않고, 전원이
+#                       나가면 마지막 몇 커밋만 잃을 수 있다 (SQLite 문서가 WAL 에 권하는 값). 커밋 11ms -> 1ms 아래
+#   cache_size          커넥션마다 페이지 캐시 32MB (기본 2MB). 스레드마다 커넥션이라 40개면 최대 1.3GB - 8GB 기계
+#   mmap_size           DB 파일을 메모리 지도로 읽는다 (읽기 복사 · 시스템 호출이 준다, 운영체제 캐시를 커넥션끼리 같이 쓴다)
+#   temp_store          정렬용 임시 B-트리를 메모리에
+TUNE = ("PRAGMA synchronous=NORMAL", "PRAGMA cache_size=-32768", "PRAGMA mmap_size=2147483648",
+        "PRAGMA temp_store=MEMORY")
+
+
+def _tune(conn):
+    for sql in TUNE:
+        try:
+            conn.execute(sql)
+        except Exception as e:                               # noqa: BLE001 - 설정이 안 먹어도 커넥션은 쓴다
+            print("[db] %s 실패: %r" % (sql, e))
 
 
 def connect():
