@@ -60,8 +60,8 @@ def t_indexes():
     p = plan("SELECT COUNT(*) c, SUM(on_desktop) d FROM pokemon WHERE user_id=?", (1,))
     chk("마릿수는 색인만 읽는다 (COVERING)", "COVERING INDEX idx_pokemon_desk" in p, p)
     p = plan("SELECT COUNT(*) c FROM pvp_match WHERE (a_id=? AND a_seen=0) OR (b_id=? AND b_seen=0)", (1, 1))
-    more = {"idx_pokemon_desk_all", "idx_gym_battle_active", "idx_record_user_ended", "idx_live_match_state",
-            "idx_arche_progress_first"}
+    more = {"idx_pokemon_desk_all", "idx_gym_battle_active", "idx_record_user_ended", "idx_live_invited",
+            "idx_live_fighting", "idx_arche_progress_first"}
     chk("2차 색인 다섯 (CPU 표본의 SQL 상위)", more <= names, sorted(more - names))
     p2 = plan("SELECT id FROM gym_battle WHERE state='active' AND region LIKE ? AND (updated_at < ? OR ?)", ("gw:%", "x", 0))
     chk("길드전 판 만료는 active 색인만 본다", "idx_gym_battle_active" in p2, p2)
@@ -69,7 +69,16 @@ def t_indexes():
               " GROUP BY foe_id", (1, "x"))
     chk("최근 만난 상대는 (user_id, ended_at) 색인", "idx_record_user_ended" in p2, p2)
     p2 = plan("SELECT id FROM live_match WHERE state='invited' AND created_at < ?", ("x",))
-    chk("실시간 배틀 만료는 state 색인", "idx_live_match_state" in p2, p2)
+    chk("실시간 배틀 만료(invited)는 부분 색인", "idx_live_invited" in p2, p2)
+    p2 = plan("SELECT id FROM live_match WHERE state='fighting' AND updated_at < ?", ("x",))
+    chk("실시간 배틀 만료(fighting)는 부분 색인", "idx_live_fighting" in p2, p2)
+    chk("(state, ...) 통째 색인은 없다 (11/23 16:02 의 사고)", "idx_live_match_state" not in names, sorted(names))
+    for sql in ("SELECT COUNT(*) c FROM live_match WHERE state='done' AND result IN ('a','b','draw')"
+                " AND ((a_id=? AND a_seen=0) OR (b_id=? AND b_seen=0))",
+                "SELECT * FROM live_match WHERE state='done' AND ((a_id=? AND a_seen=0) OR (b_id=? AND b_seen=0))"
+                " AND result IN ('a','b','draw') ORDER BY id DESC LIMIT 1"):
+        p2 = plan(sql, (1, 1))
+        chk("안 본 결과 질의는 사람별 색인 (idx_live_a · idx_live_b)", "idx_live_a" in p2 and "idx_live_b" in p2, p2)
     chk("안 본 대전 수는 a_seen · b_seen 색인으로 찾는다 (큰 log 칸 앞에서 끝난다)", "idx_pvp_match_a_seen" in p
         and "idx_pvp_match_b_seen" in p, p)
 

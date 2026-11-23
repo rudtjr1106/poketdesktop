@@ -703,8 +703,14 @@ CREATE TABLE IF NOT EXISTS live_match (
 );
 CREATE INDEX IF NOT EXISTS idx_live_a ON live_match(a_id, state);
 CREATE INDEX IF NOT EXISTS idx_live_b ON live_match(b_id, state);
--- 실시간 배틀 만료 (live.expire_old - /api/live 마다 UPDATE 둘). 예전엔 표 전체 6.5ms -> 1.4ms (11/23)
-CREATE INDEX IF NOT EXISTS idx_live_match_state ON live_match(state, created_at);
+-- 실시간 배틀 만료 (live.expire_old - /api/live 마다 UPDATE 둘). 'invited' · 'fighting' 줄만 담는 부분 색인 (11/23).
+-- **(state, ...) 통째 색인은 두지 말 것** - 11/23 16:02 에 live_match(state, created_at) 를 두었더니 '안 본 결과'
+-- 질의(live.unseen · recent: state='done' AND ((a_id=? AND a_seen=0) OR (b_id=? ...)))가 (a_id, state) 색인 대신
+-- state='done' 줄 전부를 훑었다. 재시작으로 소켓이 끊긴 앱들이 /api/live 를 몰아 묻자 서버가 무너졌다 (16:27~16:39).
+-- 부분 색인은 'done' 질의가 쓸 수 없어 그 계획을 안 바꾼다.
+DROP INDEX IF EXISTS idx_live_match_state;
+CREATE INDEX IF NOT EXISTS idx_live_invited ON live_match(created_at) WHERE state='invited';
+CREATE INDEX IF NOT EXISTS idx_live_fighting ON live_match(updated_at) WHERE state='fighting';
 
 -- 챔피언리그 (독도, champion.py) 참가 자격. 관장 256곳을 처음 다 이긴 순간 한 줄 - 그 뒤로는 관장이 바뀌어
 -- 이긴 곳이 255곳이 되어도 빠지지 않는다 (관장을 바꾸면 migrations 가 그 지역 기록을 지운다).
