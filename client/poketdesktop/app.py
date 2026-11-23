@@ -130,6 +130,7 @@ class App(object):
         self.arche = None          # 아르케의 여섯 봉인 (arche.ArcheController - 시즌 6 이벤트, 2.4.0)
         self.alarms = None         # 포켓몬 알림 타이머 (alarm.AlarmController)
         self._syncing = False
+        self._bundle_ok = None     # 서버가 /api/sync(2.5.4) 를 아나 - None 모름 · True · False(옛 서버, 셋을 따로)
         self.hub = None            # 탭 창 하나
         self.box_window = None
         self.shop_window = None
@@ -714,6 +715,35 @@ class App(object):
     def request_sync(self):
         self.root.after(250, self.sync)
 
+    def _sync_fetch(self):
+        """동기화에서 받는 것 (바탕화면 포켓몬, me 또는 None, 친구 또는 None, 묶음으로 받았나). 작업 스레드에서 부른다.
+
+        2.5.4: 셋을 요청 하나(/api/sync)로 받는다 - 요청마다 세션 확인 · HTTPS · 압축이 붙어 서버 부담이었다. 옛 서버(404)면
+        그 뒤로는 예전처럼 따로 (바탕화면 -> me, me 실패는 넘어간다). 묶음이 다른 이유로 실패하면 이번만 따로 부르고 다음
+        동기화에 다시 묶음을 본다. 401(세션 끊김)은 그대로 올린다 - 동기화가 세션 끊김으로 처리한다. 친구는 묶음이 아니면
+        None 으로 돌려주고 부르는 쪽이 따로 받는다 (예전과 같은 차례 - 도트를 받은 뒤).
+        """
+        fn = getattr(self.api, "sync_bundle", None)
+        if fn is not None and self._bundle_ok is not False:
+            bundle = None
+            try:
+                bundle = fn()
+                self._bundle_ok = True
+            except Exception as e:                          # noqa: BLE001
+                if getattr(e, "status", 0) == 401:
+                    raise
+                if getattr(e, "status", 0) == 404:
+                    self._bundle_ok = False
+            if isinstance(bundle, dict) and isinstance(bundle.get("pokemon"), list):
+                return bundle["pokemon"], bundle.get("me") or None, bundle.get("friends") or None, True
+        mons = self.api.desktop()
+        me = None
+        try:
+            me = self.api.me()
+        except Exception:                                   # noqa: BLE001
+            pass
+        return mons, me, None, False
+
     def sync(self):
         """바탕화면에 있어야 할 목록을 서버에서 받아 화면을 맞춘다.
 
@@ -725,12 +755,7 @@ class App(object):
         self._syncing = True
 
         def work():
-            mons = self.api.desktop()
-            me = None
-            try:
-                me = self.api.me()
-            except Exception:
-                pass
+            mons, me, friends, bundled = self._sync_fetch()
             # 메가진화한 모습으로 걷게 해 둔 포켓몬은 그 폼의 도트를 받는다 (1.8.0).
             # 키스톤은 방금 받은 me 로 본다 - 켜자마자의 첫 동기화에서도 맞게.
             stone = self.keystone
@@ -756,11 +781,11 @@ class App(object):
             # 얹어서 같이 받아 온다 - 이걸 위해 폴링을 새로 두지 않는다.
             # 실패해도 동기화 전체를 망치지 않는다(알림은 있으면 좋은
             # 것이고, 없다고 포켓몬이 안 걸어다녀서는 안 된다).
-            friends = None
-            try:
-                friends = self.api.friends()
-            except Exception:                               # noqa: BLE001
-                pass
+            if not bundled:
+                try:
+                    friends = self.api.friends()
+                except Exception:                           # noqa: BLE001
+                    pass
             return mons, paths, me, walks, friends
 
         def done(r, err):

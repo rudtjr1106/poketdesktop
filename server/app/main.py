@@ -37,7 +37,7 @@ from . import (achievements, airraid, arche, arche_routes, auth, avatar, battle_
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws, internal_routes,
-               boss_routes, gym_routes, social_routes, stats, tm_routes, tms, troubles, visit, walk)
+               boss_routes, gym_routes, social, social_routes, stats, tm_routes, tms, troubles, visit, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
@@ -1262,6 +1262,37 @@ def delete_account(body: DeleteIn, ctx=Depends(current)):
 
 @app.get("/api/me")
 def me(ctx=Depends(current)):
+    return deps.json_response(_me_data(ctx))   # 1분마다 온다 - JSON 을 바로 만든다 (11/23 부하 줄이기)
+
+
+@app.get("/api/sync")
+def sync_bundle(ctx=Depends(current)):
+    """앱 동기화 한 번에 (2.5.4, 11/23 부하 줄이기): /api/me + 바탕화면 포켓몬 + 친구 목록.
+
+    앱은 90초마다 이 셋을 따로 불렀다 - 요청마다 세션 확인 · HTTP 처리 · HTTPS · 압축이 붙어 전체 요청의 40% 였다.
+    내용은 따로 부를 때와 같다. me 를 먼저 센다 (다 자란 알이 여기서 깨면 바탕화면 목록에 바로 든다). 옛 앱은 그대로
+    셋을 부르고, 새 앱은 이 주소가 없는 옛 서버면(404) 셋으로 돌아간다. me · 친구가 터지면 그 칸만 null - 따로 부를 때
+    me · 친구 실패를 동기화 실패로 치지 않던 것과 같다. 바탕화면 목록이 터지면 요청 전체가 실패한다 (그때도 같았다).
+    """
+    uid = ctx["user"]["id"]
+    try:
+        me_out = _me_data(ctx)
+    except Exception as e:                                   # noqa: BLE001
+        print("[sync] me 실패 %s: %r" % (uid, e))
+        me_out = None
+    rows = db.q("SELECT * FROM pokemon WHERE user_id=? AND on_desktop=1 ORDER BY on_desktop DESC, slot ASC, id ASC",
+                (uid,))
+    pokemon = [deps.decorate_row(r) for r in rows]
+    try:
+        friends = social.listing(uid)
+    except Exception as e:                                   # noqa: BLE001
+        print("[sync] 친구 실패 %s: %r" % (uid, e))
+        friends = None
+    return deps.json_response({"pokemon": pokemon, "me": me_out, "friends": friends})
+
+
+def _me_data(ctx):
+    """/api/me 의 내용 (dict). /api/me 와 /api/sync 가 같이 쓴다."""
     u = ctx["user"]
     uid = u["id"]
     # 아르케 예약 글 · 장 열림 글 (2.5.0 - 2.4.0 의 나그네 예약 글을 아르케 ensure_posts 하나로 합쳤다, f9dfd1d):
@@ -1298,7 +1329,7 @@ def me(ctx=Depends(current)):
     else:
         balls, money = u["balls"], u["money"]
 
-    return deps.json_response({                 # 1분마다 온다 - JSON 을 바로 만든다 (11/23 부하 줄이기, deps.json_response)
+    return {
         "user": auth.user_public(u),
         "walked": walked,
         "balls": balls,
@@ -1360,7 +1391,7 @@ def me(ctx=Depends(current)):
         # 아르케의 여섯 봉인 (2.4.0): 이벤트 일주일 전 ~ 끝난 하루 뒤에만. 앱이 이걸 보고 60초 폴링(/api/arche)을 켠다
         "arche": _arche_card(uid),
         "session":{"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
-    })
+    }
 
 
 def _airraid_card(uid):

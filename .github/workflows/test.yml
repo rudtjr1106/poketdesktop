@@ -408,6 +408,9 @@ jobs:
       - name: 타입 스프레이·닉네임 변경권 가방 화면 (진짜 Tk)
         if: matrix.shard == 2
         run: python client/test_boost_items.py
+      # 2.5.4: 동기화 묶음 (/api/sync 하나 - 옛 서버 404 면 셋으로 · 401 은 세션 끊김)
+      - name: 동기화 묶음
+        run: python client/test_sync_bundle.py
       # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
       - name: 상점 랜덤 캡슐 띠 (진짜 Tk)
         if: matrix.shard == 2

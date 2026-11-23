@@ -13,6 +13,8 @@
   5. 아르케 state 한 번에 secrets.json 을 한 번만 stat 한다 (예전 30번 가까이). 요청 사이에는 손질이 바로 든다.
   6. 아르케 장 시각(window)은 기억하되 POKET_ARCHE_START 를 바꾸면 새로 센다.
   7. /internal/profile: 서버 안(127.0.0.1)+열쇠로만, 스레드마다 실제로 쓴 CPU 만큼 지금 줄을 센다.
+  8. /api/sync (2.5.4): 바탕화면 · me · 친구가 따로 부를 때와 같다. me 가 터지면 그 칸만 null.
+  9. 원시회귀 날씨(strong_weather) 빠른 길 - 결과는 예전과 같다.
 """
 import datetime
 import json
@@ -224,6 +226,49 @@ def t_profile():
     _t.sleep(0)
 
 
+def t_sync_bundle():
+    print("-- 8. /api/sync (2.5.4 동기화 묶음)")
+    from app import main, social
+    uid = db.q1("SELECT id FROM users WHERE username='데코'")["id"]
+    user = dict(db.q1("SELECT * FROM users WHERE id=?", (uid,)))
+    ctx = {"user": user, "session": {"ip": "1.2.3.4", "expires_at": "2099-01-01T00:00:00+00:00"}, "token": None}
+    out = json.loads(main.sync_bundle(ctx).body)
+    desk = json.loads(main.list_desktop(ctx).body)["pokemon"]
+    me = json.loads(main.me(ctx).body)
+    chk("바탕화면 칸이 /api/pokemon/desktop 과 같다", out["pokemon"] == desk, (len(out["pokemon"]), len(desk)))
+    chk("me 칸이 /api/me 와 같은 모양 (같은 열쇠 · 같은 사람 · 같은 돈)", set(out["me"]) == set(me)
+        and out["me"]["user"] == me["user"] and out["me"]["money"] == me["money"], sorted(set(out["me"]) ^ set(me)))
+    chk("친구 칸이 /api/friends 와 같다", out["friends"] == social.listing(uid))
+    real = main._me_data
+    main._me_data = lambda c: (_ for _ in ()).throw(RuntimeError("시험"))
+    try:
+        out2 = json.loads(main.sync_bundle(ctx).body)
+    finally:
+        main._me_data = real
+    chk("me 가 터지면 그 칸만 null, 바탕화면 · 친구는 그대로", out2["me"] is None and out2["pokemon"] == desk
+        and out2["friends"] is not None, out2.get("me"))
+
+
+def t_weather():
+    print("-- 9. 원시회귀 날씨 빠른 길 (결과는 같다)")
+    from common import abilities as AB
+
+    class F(object):
+        def __init__(self, ability, hp=10):
+            self.ability, self.ability_on, self.cond, self.hp, self.rival = ability, True, {}, hp, None
+
+        def alive(self):
+            return self.hp > 0
+    for a, b, want in (("STATIC", "BLAZE", None), ("PRIMORDIALSEA", "BLAZE", "rain"), ("BLAZE", "DESOLATELAND", "sun"),
+                       ("PRIMORDIALSEA", "DESOLATELAND", "rain")):
+        x, y = F(a), F(b)
+        x.rival, y.rival = y, x
+        chk("%s / %s -> %s" % (a, b, want), AB.strong_weather(x) == want, AB.strong_weather(x))
+    x, y = F("PRIMORDIALSEA", hp=0), F("BLAZE")
+    x.rival, y.rival = y, x
+    chk("쓰러진 시작의바다는 날씨 없음", AB.strong_weather(y) is None)
+
+
 def main():
     db.init()
     t_indexes()
@@ -233,6 +278,8 @@ def main():
     t_arche_stat()
     t_window()
     t_profile()
+    t_sync_bundle()
+    t_weather()
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
 

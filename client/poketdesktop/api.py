@@ -174,6 +174,11 @@ class Api(object):
     def me(self):
         return self._call("GET", "/api/me")
 
+    def sync_bundle(self):
+        """동기화 한 번에 (2.5.4): {"pokemon": 바탕화면, "me": /api/me 또는 None, "friends": 친구 목록 또는 None}.
+        옛 서버는 404 - 부르는 쪽(App.sync)이 셋을 따로 부르는 길로 돌아간다."""
+        return self._call("GET", "/api/sync")
+
     def set_email(self, email):
         """마이페이지 이메일 (2.1.1). 빈 글자면 지운다."""
         return self._call("POST", "/api/mypage/email", body={"email": email})

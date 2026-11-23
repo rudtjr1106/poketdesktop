@@ -576,6 +576,9 @@ def ruin_mult(user, target, atk_key, def_key):
     return a, d
 
 
+_PRIMAL = ("PRIMORDIALSEA", "DESOLATELAND")
+
+
 def strong_weather(f):
     """시작의바다·끝의대지 (원시회귀, 1.13): 그 특성이 나와 있는 동안만 강한 비·강한 햇살.
 
@@ -583,6 +586,10 @@ def strong_weather(f):
     저절로 끝나고, 다른 날씨로 덮이지도 않는다. 둘 다 서 있으면(드물다) 시작의바다가 먼저다.
     """
     pair = (f, getattr(f, "rival", None))
+    # 둘 다 그 특성이 아니면 바로 끝 (has 는 on(...) and ability in keys - 특성 이름이 다르면 늘 거짓). 배틀마다 데미지 셈에서
+    # 수천 번 불려 랭크 · 관장 판 CPU 의 3% 남짓이었다 (11/23 부하 줄이기 - 결과는 같다)
+    if all(getattr(x, "ability", None) not in _PRIMAL for x in pair):
+        return None
     for ab, w in (("PRIMORDIALSEA", "rain"), ("DESOLATELAND", "sun")):
         for x in pair:
             if x is not None and x.alive() and has(x, ab):
