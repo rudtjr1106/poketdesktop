@@ -22,14 +22,14 @@ KEYSTONE_GYMS = 8
 
 def has_keystone(uid):
     try:
-        return len(gym.clears(uid)) >= KEYSTONE_GYMS
+        return gym.clear_count(uid) >= KEYSTONE_GYMS
     except Exception:                                        # noqa: BLE001
         return False
 
 
 def keystone_card(uid):
     """화면에 줄 것: 가졌나, 몇 곳 남았나."""
-    n = len(gym.clears(uid))
+    n = gym.clear_count(uid)
     return {"has": n >= KEYSTONE_GYMS, "gyms": n, "need": KEYSTONE_GYMS}
 
 

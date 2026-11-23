@@ -116,6 +116,12 @@ def clears(uid):
     return {r["region"]: r for r in db.q("SELECT * FROM gym_clear WHERE user_id=?", (uid,))}
 
 
+def clear_count(uid):
+    """이긴 관장 수 - 색인만 읽는다 (11/23 부하 줄이기: 키스톤 카드가 /api/me 마다 clears() 로 두 번 다 읽었다)."""
+    r = db.q1("SELECT COUNT(*) c FROM gym_clear WHERE user_id=?", (uid,))
+    return int(r["c"] or 0) if r else 0
+
+
 def record_win(uid, t, turns, now):
     """이긴 것을 적고 상금을 정한다. (상금, 처음 이겼나)"""
     from . import guild                     # 길드 일일 미션 (1.10.0)

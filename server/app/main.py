@@ -1443,6 +1443,9 @@ def assign_boxes(uid):
     꼴이 된다. **한 번만** 한다 - 0번이 넘치는 동안만 돈다.
     """
     size = config.BOX_SIZE
+    # 이미 나눠 담았으면(0번 아닌 박스가 하나라도) 바로 끝 - 상자를 열 때마다 그 사람 포켓몬을 다 읽었다 (11/23 부하 줄이기)
+    if db.q1("SELECT 1 FROM pokemon WHERE user_id=? AND on_desktop=0 AND box<>0 LIMIT 1", (uid,)) is not None:
+        return False
     rows = db.q("SELECT id, box FROM pokemon WHERE user_id=? AND on_desktop=0"
                 " ORDER BY id ASC", (uid,))
     if len(rows) <= size or any(r["box"] for r in rows):

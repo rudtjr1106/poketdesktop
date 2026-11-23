@@ -119,6 +119,8 @@ CREATE INDEX IF NOT EXISTS idx_pokemon_user ON pokemon(user_id);
 -- 바탕화면 포켓몬 · 마릿수 세기 (/api/pokemon/desktop · /api/me 가 1분마다). 예전에는 그 사람의 포켓몬 줄을 모두 읽고
 -- 거르느라 많이 가진 사람은 한 번에 15ms 였다 (11/23 부하 줄이기 - 0.07ms · 마릿수는 색인만 읽는다)
 CREATE INDEX IF NOT EXISTS idx_pokemon_desk ON pokemon(user_id, on_desktop, slot);
+-- 랭크 상대 고르기의 '바탕화면 포켓몬 전부' (pvp._all_teams). 예전엔 포켓몬 10만 줄을 다 읽었다 - 152ms -> 50ms (11/23)
+CREATE INDEX IF NOT EXISTS idx_pokemon_desk_all ON pokemon(on_desktop, user_id, slot, id, species, level);
 
 -- 도감 업적 (시즌 3). 받은 것만 적는다. seen 은 화면이 알렸는가.
 CREATE TABLE IF NOT EXISTS achievement (
@@ -382,6 +384,8 @@ CREATE TABLE IF NOT EXISTS gym_battle (
     updated_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gym_battle_user ON gym_battle(user_id, state);
+-- 길드전 판 만료 (guild_war.expire 의 UPDATE ... WHERE state='active' AND region LIKE ...). 예전엔 표 전체 55ms -> 0.05ms (11/23)
+CREATE INDEX IF NOT EXISTS idx_gym_battle_active ON gym_battle(region) WHERE state='active';
 
 -- 악당 출현 (시즌 4, boss.py). 그날 그 사람이 어디까지 했나. 언제·어디에·누가 나오는지는
 -- 날짜로 정해져서 따로 적지 않는다.
@@ -518,6 +522,8 @@ CREATE TABLE IF NOT EXISTS battle_record (
 );
 CREATE INDEX IF NOT EXISTS idx_record_user ON battle_record(user_id, id DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_record_once ON battle_record(match_id, user_id);
+-- 최근 만난 상대 (pvp._last_met). 예전엔 그 사람 전적을 다 읽고 묶었다 - 8.4ms -> 0.08ms (11/23)
+CREATE INDEX IF NOT EXISTS idx_record_user_ended ON battle_record(user_id, ended_at, foe_id);
 
 -- 랭킹판. 경기가 끝날 때 갱신해 두고 랭킹 조회는 이 표만 읽는다.
 -- battle_record 를 GROUP BY 로 집계하면 경기가 쌓일수록 느려진다.
@@ -697,6 +703,8 @@ CREATE TABLE IF NOT EXISTS live_match (
 );
 CREATE INDEX IF NOT EXISTS idx_live_a ON live_match(a_id, state);
 CREATE INDEX IF NOT EXISTS idx_live_b ON live_match(b_id, state);
+-- 실시간 배틀 만료 (live.expire_old - /api/live 마다 UPDATE 둘). 예전엔 표 전체 6.5ms -> 1.4ms (11/23)
+CREATE INDEX IF NOT EXISTS idx_live_match_state ON live_match(state, created_at);
 
 -- 챔피언리그 (독도, champion.py) 참가 자격. 관장 256곳을 처음 다 이긴 순간 한 줄 - 그 뒤로는 관장이 바뀌어
 -- 이긴 곳이 255곳이 되어도 빠지지 않는다 (관장을 바꾸면 migrations 가 그 지역 기록을 지운다).
@@ -911,6 +919,8 @@ CREATE TABLE IF NOT EXISTS arche_progress (
     PRIMARY KEY (user_id, chapter)
 );
 CREATE INDEX IF NOT EXISTS idx_arche_progress_ch ON arche_progress(chapter, ritual_at);
+-- 장마다 처음 푼 사람 (아르케 state 마다). 한 장에 한 줄뿐 (11/23)
+CREATE INDEX IF NOT EXISTS idx_arche_progress_first ON arche_progress(chapter) WHERE first=1;
 -- 증명한 열쇠 (말). via = type (일지에 적음) / title (브라우저 창 제목).
 CREATE TABLE IF NOT EXISTS arche_key (
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
