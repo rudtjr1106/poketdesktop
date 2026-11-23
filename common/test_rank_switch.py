@@ -23,6 +23,10 @@
     9. 효과 있는 공격 기술이 하나라도 있으면 효과 없는 공격 기술은 아예 안 고른다 (2026-11-21 게시판 #764 - 두 턴째 나와 있는
        하마돈에게 볼트체인지). 셈이 무효 기술을 크게 쳐 줘도 빼고, 공격이 다 무효면 그대로 둔다 (WAR_NOEFFECT_DROP).
    10. 불가사의부적(효과가 굉장하지 않으면 막는다)도 무효로 본다 - 테라스탈로 바뀐 타입으로.
+   11. 공격 기술이 **다** 막히면 (2026-11-23 게시판 #819 - 워시로토무 대 마중물 트리토돈) 교체나 쓸모 있는 변화기가 남을 때
+       막힌 공격을 다 뺀다 (WAR_ALLBLOCK_DROP). 흡수(마중물 ...)는 '상대를 키운다' 로 따로 안다.
+   12. 그 판의 세 장면(동료 둘 · 혼자 남음)에서 막힌 공격을 안 고른다 - 아픔나누기는 조금이라도 오르면 쳐 준다.
+   13. 쓸 만한 것이 없어도(아픔나누기가 손해) 상대를 키우는 흡수 공격은 안 쓴다 - 그냥 무효인 공격으로.
 """
 import os
 import sys
@@ -374,6 +378,70 @@ def t_무효_빼기(dex):
         m._no_effect("SUCKERPUNCH") and m._no_effect("KOWTOWCLEAVE"), m.me.types())
 
 
+def t_다_막힘(dex):
+    """11 · 12 · 13: 공격 기술이 다 막힐 때 (게시판 #819 - 워시로토무 대 마중물 트리토돈, 랭크 #65364)."""
+    print("\n=== 랭크 AI: 공격이 다 막힐 때 (게시판 #819) ===")
+
+    def rotom():
+        m = mon("ROTOM", ["THUNDERBOLT", "VOLTSWITCH", "HYDROPUMP", "PAINSPLIT"], held="SITRUSBERRY",
+                ability="LEVITATE", nature="MODEST")
+        m["form"] = "WASH"                             # 전기/물
+        return m
+
+    def gastro():
+        return mon("GASTRODON", ["MUDDYWATER", "EARTHQUAKE", "RECOVER", "ICEBEAM"], held="LEFTOVERS",
+                   ability="STORMDRAIN", nature="CALM")
+
+    ATTACKS = ("THUNDERBOLT", "VOLTSWITCH", "HYDROPUMP")
+
+    def plan(mates, rotom_hp, gas_hp, seed, on=True):
+        b = [rotom()] + [mon("AEGISLASH", ["SACREDSWORD", "IRONHEAD"]), mon("MIMIKYU", ["PLAYROUGH"])][:max(1, mates)]
+        pb, bt = fresh(dex, [gastro(), mon("CORVIKNIGHT", ["BODYPRESS", "BRAVEBIRD"])], b, seed)
+        pb.turns = 6
+        pb.in_at = {"me": 1, "foe": 1}
+        pb.b[0].hp, pb.a[0].hp = rotom_hp, gas_hp
+        if not mates:
+            for f in pb.b[1:]:
+                f.hp = 0                               # 로토무 혼자 남았다
+        keep = TB.TrainerBattle.WAR_ALLBLOCK_DROP
+        TB.TrainerBattle.WAR_ALLBLOCK_DROP = on
+        try:
+            slot, key = pb._war_plan("foe")
+            m = pb._mirror("foe")
+        finally:
+            TB.TrainerBattle.WAR_ALLBLOCK_DROP = keep
+        return ("교체" if slot is not None else key), m
+
+    _k, m = plan(2, 82, 81, 0)
+    chk("11. (전제) 셋 다 막힌다: 10만볼트 · 볼트체인지(땅) · 하이드로펌프(마중물)",
+        all(m._no_effect(k) for k in ATTACKS), [m._no_effect(k) for k in ATTACKS])
+    chk("11. 마중물에 먹히는 하이드로펌프만 '상대를 키운다'",
+        m._feeds_foe("HYDROPUMP") and not m._feeds_foe("THUNDERBOLT") and not m._feeds_foe("VOLTSWITCH"))
+    opts = [("move", k) for k in ATTACKS + ("PAINSPLIT",)] + [("switch", 1)]
+    chk("11. 교체나 쓸모 있는 변화기가 남으면 막힌 공격을 다 뺀다",
+        m._drop_no_effect(opts) == [("move", "PAINSPLIT"), ("switch", 1)], m._drop_no_effect(opts))
+
+    for label, mates, rh, gh in (("동료 둘 · 82 대 81 (6라운드)", 2, 82, 81), ("동료 둘 · 46 대 191 (4라운드)", 2, 46, 191),
+                                 ("혼자 · 86 대 110 (8라운드)", 0, 86, 110)):
+        got = {}
+        for seed in range(12):
+            k, _m = plan(mates, rh, gh, seed)
+            got[k] = got.get(k, 0) + 1
+        chk("12. %s: 막힌 공격을 안 고른다 (아픔나누기 · 교체)" % label, not any(k in got for k in ATTACKS), got)
+
+    # 13. 아픔나누기가 손해(내 체력이 더 많다)면 쓸 만한 것이 없다 - 그래도 상대를 키우는 하이드로펌프만은 안 쓴다
+    got, off = {}, {}
+    for seed in range(12):
+        k, m = plan(0, 150, 60, seed)
+        got[k] = got.get(k, 0) + 1
+        k2, _m = plan(0, 150, 60, seed, on=False)
+        off[k2] = off.get(k2, 0) + 1
+    chk("13. (전제) 150 대 60 이면 아픔나누기는 손해다", not m._some_gain("PAINSPLIT"))
+    chk("13. 쓸 만한 것이 없어도 마중물에 하이드로펌프는 안 쏜다 (그냥 무효인 공격으로)",
+        "HYDROPUMP" not in got and "PAINSPLIT" not in got, got)
+    chk("13. (견줌) 끄면 하이드로펌프를 고른 적이 있다", off.get("HYDROPUMP", 0) > 0, off)
+
+
 def t_묶은_쪽이_쓰러지면(dex):
     """조이기류: 묶은 쪽이 쓰러지면 묶기가 풀린다 (본가 · 관장 판과 같다). 랭크는 라운드마다 판을 새로 세워서
     묶인 쪽 cond 의 bound 가 다음 라운드까지 따라가, 새로 나온 상대에게도 데미지와 교체 봉인이 이어졌다 (11/19 #664 검토)."""
@@ -401,6 +469,7 @@ def main():
     t_랭크(dex)
     t_무효(dex)
     t_무효_빼기(dex)
+    t_다_막힘(dex)
     t_묶은_쪽이_쓰러지면(dex)
     print("\n합계 OK %d · FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0

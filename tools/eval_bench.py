@@ -11,6 +11,7 @@
   new    지금 코드 그대로: poke-engine 형세 평가(WAR_PE_EVAL) · 헛수 감점 · 무효 공격 감점 · 길드전 교체 버릇 감점(WAR_SWITCH_HABIT).
   pe     poke-engine 형세 평가만.
   waste  예전 형세 평가 + 헛수 감점들만.
+  noallblock  new 에서 '공격이 다 막힐 때 막힌 공격 빼기'(WAR_ALLBLOCK_DROP, 게시판 #819)만 끈 것.
 
 11/01 기록 (new 를 넣기 전, 예전 식 대비): poke-engine 식은 랭크 1,000판 49.5% · 길드전 깊이 600판 50.4% · 사람 대역 상대
 600판 방어 64.7% -> 64.8% (모두 오차 안), 같은 판에서 수가 8.3% 갈림. 예전 식 + 빠진 항목(대타출동 · 씨뿌리기 · 혼란 ·
@@ -39,12 +40,16 @@ import war_ai_bench as WB                                                    # n
 
 _G = {}
 
-KEYS = ("WAR_PE_EVAL", "WAR_WASTE_PEN", "WAR_NOEFFECT_PEN", "WAR_SWITCH_HABIT")
+KEYS = ("WAR_PE_EVAL", "WAR_WASTE_PEN", "WAR_NOEFFECT_PEN", "WAR_SWITCH_HABIT", "WAR_ALLBLOCK_DROP")
 CONFIGS = {
-    "old": {"WAR_PE_EVAL": False, "WAR_WASTE_PEN": 0.0, "WAR_NOEFFECT_PEN": 0.0, "WAR_SWITCH_HABIT": False},
+    "old": {"WAR_PE_EVAL": False, "WAR_WASTE_PEN": 0.0, "WAR_NOEFFECT_PEN": 0.0, "WAR_SWITCH_HABIT": False,
+            "WAR_ALLBLOCK_DROP": False},
     "new": None,                                                            # 코드의 값 그대로 (_setup 이 채운다)
-    "pe": {"WAR_PE_EVAL": True, "WAR_WASTE_PEN": 0.0, "WAR_NOEFFECT_PEN": 0.0, "WAR_SWITCH_HABIT": False},
-    "waste": {"WAR_PE_EVAL": False, "WAR_WASTE_PEN": 0.3, "WAR_NOEFFECT_PEN": 0.3, "WAR_SWITCH_HABIT": True},
+    "pe": {"WAR_PE_EVAL": True, "WAR_WASTE_PEN": 0.0, "WAR_NOEFFECT_PEN": 0.0, "WAR_SWITCH_HABIT": False,
+           "WAR_ALLBLOCK_DROP": False},
+    "waste": {"WAR_PE_EVAL": False, "WAR_WASTE_PEN": 0.3, "WAR_NOEFFECT_PEN": 0.3, "WAR_SWITCH_HABIT": True,
+              "WAR_ALLBLOCK_DROP": False},
+    "noallblock": None,                                                     # new 에서 '공격이 다 막힐 때' 만 끈 것 (#819)
 }
 
 
@@ -54,6 +59,7 @@ def _setup(root, depth, ai_seeds):
     TB, PB = RB._G["TB"], RB._G["PB"]
     _G.update(A=A, B=B, H=H, MC=MC, SM=SM, TB=TB, PB=PB)
     CONFIGS["new"] = dict((k, getattr(TB.TrainerBattle, k)) for k in KEYS)
+    CONFIGS["noallblock"] = dict(CONFIGS["new"], WAR_ALLBLOCK_DROP=False)
     PB.WAR_MATCH_BUDGET = 10 ** 6          # 판의 시간 상한에 걸려 셈 없이 두는 수가 섞이지 않게
     PB.WAR_TURN_CAP = 30.0
     if depth is not None:
@@ -79,7 +85,12 @@ def dumb_move(bt, dex, user, target, own, opp, key, md):
     if not key or key == B.STRUGGLE or not target.alive():
         return None
     if MC.attacks(md):
-        if A.would_block(user, target, md) or B.damage(dex, md, user, target, B.EST_RNG, crit=False)[2] == 0:
+        if A.would_block(user, target, md):
+            g = A.guard(user, target)
+            if g in A.ABSORB and A.ABSORB[g][1] != "immune" and A.move_type(user, md) == A.ABSORB[g][0]:
+                return "흡수당하는 공격 (상대를 키움)"            # 마중물 · 피뢰침 · 저수 ... (#819)
+            return "효과 없는 공격"
+        if B.damage(dex, md, user, target, B.EST_RNG, crit=False)[2] == 0:
             return "효과 없는 공격"
         return None
     if key in SM.HAZARD_MOVES:

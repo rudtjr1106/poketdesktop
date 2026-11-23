@@ -709,6 +709,15 @@ class TrainerBattle(object):
     # 불가사의부적(효과가 굉장하지 않으면 막는다)도 무효로 본다 - 예전 _no_effect 는 타입 무효 · 막는 특성만 보아서 테라스탈한
     # 껍질몬에게 기습 · 문포스 · 아이언헤드를 계속 썼다. 끄면(False) 예전 그대로 (감점만, 불가사의부적은 모름).
     WAR_NOEFFECT_DROP = True
+    # 공격 기술이 **다** 막힐 때 (2026-11-23, 게시판 #819 우가우가 - 워시로토무가 마중물 트리토돈 앞에서 볼트체인지 3번 ·
+    # 하이드로펌프 4번, 혼자 남아서도 하이드로펌프). WAR_NOEFFECT_DROP 은 효과 있는 공격이 남을 때만 빼서, 10만볼트 · 볼트체인지
+    # (땅) · 하이드로펌프(마중물)가 모두 막히면 셋이 그대로 남았다 - '상대가 교체해 오면' 갈래와 관장 AI 의 수(WAR2_PRIOR)가
+    # 막힌 공격을 밀었다. 흡수는 무효보다도 나쁘다: 마중물 · 피뢰침 · 저수 · 전기엔진 ... 은 상대를 키우거나 회복시킨다
+    # (그 판 탁류 데미지가 23~36 에서 62 · 78 로).
+    #   - 쓸모 있는 변화기(_wasted 가 아닌 것)나 교체가 남으면 막힌 공격을 다 뺀다.
+    #   - 그것도 없으면(막힌 공격 · 헛수만) 상대를 키우는 흡수 공격만 뺀다 - 그냥 무효인 공격은 아무 일도 없다.
+    # 끄면(False) 예전 그대로 (공격이 다 무효면 감점만).
+    WAR_ALLBLOCK_DROP = True
     # 헛수(지금 쓰면 아무 일도 없는 변화기)에 매기는 감점 (2026-11-01, 사용자 '아 멍청하네 하는 느낌이 없으면'). 깔기를
     # 또 깔기 · 벽을 또 세우기 · 방어 연달아 · 체력이 가득한데 회복 · 랭크가 꽉 찼는데 또 올리기, 그 밖에 관장 AI 가
     # '소용없다(0)' 고 보는 것 (이미 혼란인 상대에게 이상한빛 · 넘길 것 없는 배턴터치 ...). 사본에서는 한 턴을 그냥 넘긴
@@ -967,12 +976,45 @@ class TrainerBattle(object):
         return best or (plain if plain in opts else opts[0])
 
     def _drop_no_effect(self, opts):
-        """효과 있는 공격 기술이 남으면 효과 없는 공격 기술을 뺀다 (WAR_NOEFFECT_DROP). 변화기 · 교체는 그대로."""
+        """효과 있는 공격 기술이 남으면 효과 없는 공격 기술을 뺀다 (WAR_NOEFFECT_DROP). 변화기 · 교체는 그대로.
+
+        공격이 다 막혔으면 (WAR_ALLBLOCK_DROP): 쓸모 있는 변화기나 교체가 남을 때 막힌 공격을 다 빼고, 그것도 없으면
+        상대를 키우는 흡수 공격만 뺀다 (게시판 #819).
+        """
         bad = [o for o in opts if o[0] == "move" and self._no_effect(o[1])]
         if not bad:
             return opts
         good = [o for o in opts if o[0] == "move" and o not in bad and MC.attacks(self.bt.move_of(o[1]) or {})]
-        return [o for o in opts if o not in bad] if good else opts
+        if good:
+            return [o for o in opts if o not in bad]
+        if not self.WAR_ALLBLOCK_DROP:
+            return opts
+        rest = [o for o in opts if o not in bad]
+        if any(o[0] == "switch" or not self._wasted(o[1]) or self._some_gain(o[1]) for o in rest):
+            return rest
+        feeds = [o for o in bad if self._feeds_foe(o[1])]
+        return [o for o in opts if o not in feeds] if 0 < len(feeds) < len(bad) else opts
+
+    def _some_gain(self, key):
+        """공격이 다 막혔을 때만 본다 (_drop_no_effect): 관장 AI 가 '공격보다 못하다' 고 헛수로 치는 회복이라도 조금은
+        나아지나. 아픔나누기는 체력이 최대의 20% 넘게 오를 때만 쳐 주는데 (statusmoves), 공격이 아무것도 안 들면
+        +12 라도 막힌 공격보다 낫다 (#819 의 혼자 남은 로토무 86/157 대 트리토돈 110/218). 내 체력이 깎이는 아픔나누기는 아니다."""
+        md = self.bt.move_of(key) or {}
+        user, target = self.foe, self.me
+        if key == "PAINSPLIT":
+            return (user.hp + target.hp) // 2 > user.hp
+        return (md.get("heal") or 0) > 0 and user.hp < user.maxhp and not user.cond.get("healblock")
+
+    def _feeds_foe(self, key):
+        """이 공격이 지금 상대의 흡수 특성에 먹혀 **상대를 키우나** (마중물 · 피뢰침 · 저수 · 전기엔진 · 초식 · 바람타기 ...).
+        타입 무효 · 부유처럼 그냥 안 맞는 것은 아니다."""
+        md = self.bt.move_of(key)
+        if not md or not MC.attacks(md) or not A.would_block(self.foe, self.me, md):
+            return False
+        g = A.guard(self.foe, self.me)
+        if g in A.ABSORB:
+            return A.ABSORB[g][1] != "immune" and A.move_type(self.foe, md) == A.ABSORB[g][0]
+        return g == "WINDRIDER" and A.key_of(md) in A.WIND
 
     def _switch_cost(self, slot):
         """교체 수에 붙이는 값 - 길드전은 0 (시즌 5 랭크의 거울 판 _RankedWar 만 덮어쓴다)."""

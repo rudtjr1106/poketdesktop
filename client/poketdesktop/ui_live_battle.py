@@ -153,6 +153,12 @@ class LiveBattleWindow(Z.Resizable):
             self.busy = True
             self.hide_commands()
             self._pending = data
+        elif (data.get("state") or "") == "done" or self.view.get("over"):
+            # 이미 끝난 판을 다시 연다 (창을 닫아 둔 사이 상대가 기권 · 확인이 '안 본 결과' 로 연다). 바로 결과 칸을
+            # 그리고 봤다고 알린다 (게시판 #822). 명령 칸을 그리면 '상대를 기다리는 중' 에 멈추고, 폴링도 view.over 가
+            # 이미 참이라 결과를 안 튼다 - 서버에 '안 봄' 이 남아 무엇을 누를 때마다 이 창이 다시 떴다.
+            self.sync(data)
+            self.show_result()
         else:
             self.sync(data)
             self.show_commands()

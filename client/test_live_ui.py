@@ -394,6 +394,33 @@ def main():
     chk("'닫기' 를 누르지 않아도 창이 닫힌다", gone and not w3.alive, w3.alive)
     chk("결과 칸을 따로 그리지 않았다", w3._result_shown and not errors, errors[:1])
 
+    print("=== 이미 끝난 판을 다시 열면 (게시판 #822) ===")
+    # 제보 (11/23 나루디루): 친선전 중 창을 닫아 둔 사이 상대가 기권했다. 확인(check_live)이 '안 본 결과' 로 창을
+    # 다시 열었는데, 끝난 판을 처음부터 여는 길은 결과 칸 대신 명령 칸('상대를 기다리는 중입니다' · 기권)을 그렸고
+    # 봤다고 알리지도 않았다 - 폴링도 view.over 가 이미 참이라 결과를 안 틀었다. 서버에는 끝내 '안 봄' 으로 남아
+    # 무엇을 누를 때마다(어느 PC 에서든) 같은 창이 다시 떴다.
+    api6 = FakeApi(dex)
+    api6.live_act("move", "TACKLE")                # 한 턴 지나 있다 (처음 여는 판이 아니다 - step > 0)
+    ev6 = []
+    api6.lb._give_up("b", ev6)                     # 창이 닫혀 있는 동안 상대가 기권
+    api6.state, api6.events = "done", ev6
+    chk("(준비) 끝난 판 · 이겼다 · 한 턴 이상 지났다",
+        api6.match()["outcome"] == "win" and api6.lb.reason == "forfeit" and api6.lb.step > 0,
+        (api6.match().get("outcome"), api6.lb.reason, api6.lb.step))
+    w6 = LUI.LiveBattleWindow(FakeApp(root, api6, dex), api6.match())
+    shown = pump(root, lambda: w6._result_shown and api6.seen >= 1, timeout=15)
+    rest(root, 0.4)
+    t = " ".join(texts(w6.win))
+    chk("결과 칸이 뜬다 (승리)", shown and "승리" in t, t[:200])
+    chk("  '상대를 기다리는 중' 명령 칸이 아니다", "기다리는 중" not in t and "PP" not in t, t[:200])
+    chk("  결과를 봤다고 서버에 알린다 (다시 안 뜨게)", api6.seen == 1, api6.seen)
+    rest(root, 2.0)                                # 폴링이 몇 번 돌아도
+    t = " ".join(texts(w6.win))
+    chk("  폴링이 돌아도 결과 칸 그대로 · 한 번만 알린다", "승리" in t and "기다리는 중" not in t and api6.seen == 1,
+        (api6.seen, t[:120]))
+    w6.close()
+    chk("  '닫기' 로 닫힌다", not w6.alive)
+
     print("=== 관전 N명 (친선전) ===")
     api4 = FakeApi(dex)
     app4 = FakeApp(root, api4, dex)
