@@ -92,6 +92,8 @@ def catalog():
         and bn.get("buyable") is False and bn["sell"] == 0 and pub["BURNINGBOOST"]["buyable"] is False,
         (items.buy_price("BURNINGBOOST"), pub.get("BURNINGBOOST")))
     chk("  버닝 부스터는 2시간짜리", bn["effect"].get("minutes") == 120, bn["effect"])
+    chk("  버닝 부스터는 상점 목록에도 안 보인다 (custom - 앱 상점이 거른다)", pub["BURNINGBOOST"]["custom"] is True,
+        pub.get("BURNINGBOOST"))
     rows = dict((r["id"], r) for r in guild.shop(mkuser("상점구경"))["items"])
     chk("  길드 코인 상점에는 없다 (사용자 결정 - 상점에서만)", "TYPESPRAY" not in rows and "BURNINGBOOST" not in rows
         and guild.coin_price("TYPESPRAY") == 0 == guild.coin_price("BURNINGBOOST"), sorted(rows)[:5])

@@ -529,6 +529,8 @@ def main():
     chk("**운영자가 만든 도구(%d종)는 상점 목록에 없고, 가방에는 있다**" % len(mine),
         len(mine) >= 5 and not set(mine) & set(i["id"] for i in s.items)
         and set(mine) <= set(i["id"] for i in api.shop()["items"]), mine)
+    chk("  버닝 부스터(2.5.3 - 선물로만)도 상점 목록에 안 보인다", "BURNINGBOOST" in mine
+        and "BURNINGBOOST" not in set(i["id"] for i in s.items), mine)
     n_w = widgets(s.win)
     chk("**위젯이 줄 수만큼 늘지 않는다**: %d줄에 위젯 %d개 (예전에는 2,000개)" % (len(s.vl.entries), n_w), n_w < 500
         and len(s.vl.entries) == len(sold) and s.vl.made <= 30, (n_w, s.vl.made))
