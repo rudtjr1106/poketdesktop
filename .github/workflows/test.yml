@@ -183,6 +183,9 @@ jobs:
       # 2.5.0: 본가 규칙의 테라스탈 (한 판 한 번 · 자속 · 위력 60 · 테라버스트 · 타입 바꾸기 막기 · AI 가 쓰는 때)
       - name: 테라스탈 (엔진)
         run: python common/test_tera.py
+      # 11/23 게시판 #800 (나오자마자 스텔스록에 쓰러지면 faint) · #769 (원시회귀 날씨는 다른 날씨에 안 덮인다)
+      - name: 게시판 11/23 (엔진)
+        run: python common/test_board_1123.py
       # Z크리스탈 자료(tools/add_zcrystals.py --check)는 PokeAPI 캐시가 있는 PC 에서만 돈다 (CI 에는 없다).
       - name: 악당 조직 자료가 도구와 같은가
         run: python tools/build_villains.py --check
@@ -411,6 +414,12 @@ jobs:
       # 2.5.4: 동기화 묶음 (/api/sync 하나 - 옛 서버 404 면 셋으로 · 401 은 세션 끊김)
       - name: 동기화 묶음
         run: python client/test_sync_bundle.py
+      # 11/23 게시판 #800: 다시 보기에서 faint 없이 쓰러진(스텔스록) 포켓몬을 ko 에서 쓰러뜨린다
+      - name: 다시 보기 - faint 없는 쓰러짐
+        run: python client/test_arena_silent_faint.py
+      # 2.5.5 게시판 #777: 관장 · 실시간 · 레이드 배틀 도트 키를 도감의 키로 (따라큐가 그란돈만 하게 보였다)
+      - name: 배틀 도트 키
+        run: python client/test_mon_size.py
       # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
       - name: 상점 랜덤 캡슐 띠 (진짜 Tk)
         if: matrix.shard == 2

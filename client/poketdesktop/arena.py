@@ -635,6 +635,7 @@ class Arena(object):
             return
         side = ev.get("target") if ev.get("t") == "hit" else ev.get("who")
         if side in ("me", "foe"):
+            self._hp_now()[side] = ev["hp"]
             bar = self._bar_for(side)
             if bar:
                 bar.set(ev["hp"], ev.get("maxhp") or 1)
@@ -724,6 +725,7 @@ class Arena(object):
         for side in ("me", "foe"):
             bar = self._bar_for(side)
             info = ev.get(side) or {}
+            self._hp_now()[side] = info.get("hp", 1)
             if bar:
                 bar.set(info.get("hp", 1), info.get("maxhp", 1))
                 bar.shown = bar.ratio
@@ -767,15 +769,45 @@ class Arena(object):
                 return i
         return None
 
+    def _hp_now(self):
+        """링에 선 쪽의 마지막으로 본 체력 {"me": hp, "foe": hp} (round · hit · chip ... 의 hp)."""
+        d = getattr(self, "_hp_seen", None)
+        if d is None:
+            d = self._hp_seen = {}
+        return d
+
+    def _fell_silently(self, side):
+        """체력이 0 인데 아직 링에 서 있다 = 'faint' 없이 쓰러졌다.
+
+        나오자마자 스텔스록 · 압정에 쓰러지면 2.5.4 까지의 서버는 'faint' 를 안 냈다 (11/23 게시판 #800). 그 판을
+        다시 보면 쓰러진 포켓몬이 링에 남아 다음 선수와 같이 서 있다가 같이 사라졌다. 턴 상한 무승부("both")는
+        체력이 남아 있으니 여기에 안 걸린다 (쓰러진 게 아니다).
+        """
+        pet = self.active.get(side)
+        return pet is not None and not getattr(pet, "down", False) and self._hp_now().get(side) == 0
+
     def _on_ko(self, ev, done):
-        sides = ("me", "foe") if ev.get("side") == "both" else (ev.get("side"),)
+        sides = [s for s in (("me", "foe") if ev.get("side") == "both" else (ev.get("side"),)) if s in ("me", "foe")]
         for side in sides:
-            if side in ("me", "foe"):
-                if getattr(self, "hiding", None):
-                    self.hiding.forget(side)    # (턴 제한으로 같이 끝났다 - 숨은 채면 링을 비우기 전에 보이게)
+            if getattr(self, "hiding", None):
+                self.hiding.forget(side)    # (턴 제한으로 같이 끝났다 - 숨은 채면 링을 비우기 전에 보이게)
+        fall = [s for s in sides if self._fell_silently(s)]
+
+        def close():
+            for side in sides:
                 self.down[side].add(self.slot[side])
                 self.active[side] = None
-        return self.after(int(ROUND_GAP * self.scale), done)
+            self.after(int(ROUND_GAP * self.scale), done)
+        if not fall:
+            return close()
+        left = [len(fall)]
+
+        def one():
+            left[0] -= 1
+            if left[0] <= 0:
+                close()
+        for side in fall:
+            self._faint(self.active[side], one)
 
     # ---------------- 숨는 기술 (2.0, battle_fx.Hiding · vanish_fx) ----------------
     # 링에 선 도트 창을 숨기고 옮긴다. 키는 "me"/"foe" - 라운드가 바뀌면 _on_round 가 forget 한다.

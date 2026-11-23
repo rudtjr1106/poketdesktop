@@ -41,6 +41,7 @@ from .ui_common import run_async
 from .ui_gym import shade
 from . import ui_spectate as SP
 from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
+from . import mon_size as MS
 from . import ui_gimmick
 from . import ui_mega
 from .ui_mega import MegaToggle
@@ -400,6 +401,7 @@ class LiveBattleWindow(Z.Resizable):
         tera = mon.get("tera")                          # 테라스탈한 타입 (2.5.0) - 결정 모습으로 그린다
         # 이름표에 가려지지 않는 높이까지만 (글자 크기를 키워 장면이 낮아졌을 때 - Z.Resizable.dot_fit)
         size = self.dot_fit(who, U.h(MON_H[who]), U.h(MON_W[who]))
+        size = MS.fit(getattr(self.app, "dex", None), num, size)     # 도감의 키에 맞춘다 (2.5.5, 게시판 #777)
 
         def work():
             path = sprite_cache.ensure(self.app.api, num, shiny)

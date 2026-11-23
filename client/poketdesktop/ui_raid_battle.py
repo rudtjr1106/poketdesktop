@@ -36,6 +36,7 @@ from . import platform_os as PLAT
 from .ui_common import run_async
 from .ui_gym import shade
 from .ui_gym_battle import CAT_COLOR, CAT_KR, FX_SCALE, _FxStage, hp_color
+from . import mon_size as MS
 from . import ui_gimmick
 from . import ui_mega
 from .ui_mega import MegaToggle
@@ -300,6 +301,8 @@ class RaidBattleWindow(Z.Resizable):
         num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
         tera = mon.get("tera")                          # 테라스탈한 타입 (2.5.0) - 결정 모습으로 그린다
         size = U.h(BOSS_H if boss else MON_H)
+        if not boss:
+            size = MS.fit(getattr(self.app, "dex", None), num, size)  # 도감의 키에 맞춘다 (2.5.5, #777) - 보스는 늘 크게
         cap = U.h(BOSS_W if boss else MON_W)
 
         def work():

@@ -593,10 +593,25 @@ TERRAIN_ABILITY = {"ELECTRICSURGE": "electric", "GRASSYSURGE": "grassy", "MISTYS
                    "PSYCHICSURGE": "psychic", "HADRONENGINE": "electric"}
 
 
+def strong_on(bt):
+    """원시회귀의 강한 비 · 강한 햇살(시작의바다 · 끝의대지)이 서 있나.
+
+    서 있는 동안에는 다른 날씨가 못 든다 (본가 - 쾌청 · 비바라기 같은 기술은 실패, 가뭄 · 모래날림 같은 특성은
+    발동하지 않는다). 11/23 게시판 #769 funji: 예전에는 상대의 가뭄 · 모래날림이 '햇살이 강해졌다' 를 띄우며 날씨
+    칸을 덮어써서, 엽록소 · 모래헤치기 같은 특성이 그 날씨를 보고 원시가이오가가 물러난 뒤에도 그 날씨가 남았다.
+    """
+    for f in (getattr(bt, "me", None), getattr(bt, "foe", None)):
+        if f is not None and A.strong_weather(f):
+            return True
+    return False
+
+
 def set_weather(bt, w, ev, who=None):
     fl = bt.field
     if fl.weather == w:
         return False
+    if strong_on(bt):
+        return False                    # 강한 비 · 강한 햇살 동안에는 다른 날씨가 못 든다 (#769)
     fl.weather, fl.weather_turns = w, H.weather_turns(bt.fighter(who) if who else None, w)   # 바위면 8턴
     ev.append({"t": "msg", "who": who, "text": FD.WEATHER_START[w]})
     A.weather_changed(bt, ev)       # 캐스퐁의 모습, 빙큐보의 얼음
@@ -1996,8 +2011,14 @@ def on_enter_abilities(bt, f, who, ev):
     H.on_entry(bt, f, who, ev)
     if not A.on(f) or f.cond.get("gastro"):
         return
+    if f.ability in A._PRIMAL and bt.field.weather and getattr(bt, "raid", None) is None:
+        # 강한 비 · 강한 햇살은 그때까지의 날씨를 걷어 낸다 (본가 - 물러나면 맑음). 예전에는 밑에 깔린 날씨가 남아
+        # 강한 비 동안에도 턴을 세다 '햇살이 원래대로 돌아왔다' 를 띄우거나, 물러난 뒤 다시 살아났다 (11/23 #769).
+        # 레이드는 보스가 판 내내 부르는 날씨라 그대로 둔다 (그 판의 규칙이다).
+        bt.field.weather, bt.field.weather_turns = None, 0
+        A.weather_changed(bt, ev)
     w = WEATHER_ABILITY.get(f.ability)
-    if w and bt.field.weather != w:
+    if w and bt.field.weather != w and not strong_on(bt):   # 강한 비 · 강한 햇살 동안에는 발동 안 함 (#769)
         A.pop(bt, f, who, ev)
         set_weather(bt, w, ev, who)
     t = TERRAIN_ABILITY.get(f.ability)
@@ -2459,8 +2480,8 @@ def value(bt, k, move, user, target, who, base):
         return base * 0.2 if MC.item_on(user) and (user.held or "").endswith("BERRY") else 0.0
     if k in WEATHER_MOVES:
         w = WEATHER_MOVES[k]
-        if fl.weather == w:
-            return 0.0
+        if fl.weather == w or strong_on(bt):
+            return 0.0                  # (강한 비 · 강한 햇살 동안에는 실패한다 - #769)
         good = {"sun": ("FIRE",), "rain": ("WATER",), "sand": ("ROCK",), "hail": ("ICE",), "snow": ("ICE",)}[w]
         bad = {"sun": ("WATER",), "rain": ("FIRE",), "sand": (), "hail": (), "snow": ()}[w]
         score = 0.0

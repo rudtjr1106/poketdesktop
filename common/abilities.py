@@ -243,6 +243,9 @@ def on(f):
 
 
 def _weather(f):
+    strong = strong_weather(f)
+    if strong:
+        return strong       # 강한 비 · 강한 햇살이 서 있으면 그 날씨 (statusmoves.weather 와 같게 - 11/23 #769)
     fl = getattr(f, "field", None)
     return None if fl is None or fl.suppressed else fl.weather
 
@@ -1095,7 +1098,7 @@ def after_hit(bt, user, uwho, target, twho, move, dmg, eff, crit, hp_before, ev)
                 pop(bt, target, twho, ev)
                 ev.append({"t": "msg", "who": uwho,
                            "text": "상대의 발밑에 독압정이 흩어졌다!"})
-        elif t == "SANDSPIT" and bt.field.weather != "sand":
+        elif t == "SANDSPIT" and bt.field.weather != "sand" and not strong_weather(target):   # (#769)
             pop(bt, target, twho, ev)
             bt.field.weather, bt.field.weather_turns = "sand", 5
             ev.append({"t": "weather", "weather": "sand",

@@ -448,6 +448,11 @@ class PartyBattle(object):
         for who in ("me", "foe"):
             if self.entered.get(who):
                 bt.enter(who, self.events)          # 압정·스텔스록 (첫 라운드는 아무것도 없다)
+        if not (bt.me.alive() and bt.foe.alive()):
+            # 나오자마자 스텔스록 · 압정에 쓰러졌다 (11/23 게시판 #800 양양). 이 라운드에는 기술을 쓴 쪽이 없어 아무도
+            # '쓰러졌다' 를 알리지 않았다 - 화면은 그 줄을 봐야 쓰러지는 연출로 링을 비우므로, 쓰러진 포켓몬이 링에 남아
+            # 다음 선수와 같이 서 있다가 다음 공격에 같이 사라졌다. 판(라운드)도 여기서 닫힌다 (while 이 안 돈다).
+            bt._check_faint(self.events)
         self._entry_abilities(bt)
         while not bt.over and bt.me.alive() and bt.foe.alive():
             if self.war_ai:
