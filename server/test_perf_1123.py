@@ -12,6 +12,7 @@
      상자 전체(box_listing)도 이것을 쓰되 겉을 복사한다 - 예전 내용과 같고, 뒤처리가 기억해 둔 것을 안 고친다.
   5. 아르케 state 한 번에 secrets.json 을 한 번만 stat 한다 (예전 30번 가까이). 요청 사이에는 손질이 바로 든다.
   6. 아르케 장 시각(window)은 기억하되 POKET_ARCHE_START 를 바꾸면 새로 센다.
+  7. /internal/profile: 서버 안(127.0.0.1)+열쇠로만, 스레드마다 실제로 쓴 CPU 만큼 지금 줄을 센다.
 """
 import datetime
 import json
@@ -176,6 +177,42 @@ def t_window():
     chk("되돌리면 처음 값", A.window(2) == w1)
 
 
+def t_profile():
+    print("-- 7. /internal/profile (서버가 CPU 를 어디에 쓰나)")
+    import threading
+    import time as _t
+    from fastapi import HTTPException
+    from app import internal_routes as IR
+    IR.make_key()
+
+    class Req(object):
+        def __init__(self, host, key):
+            self.client = type("C", (), {"host": host})()
+            self.headers = {"x-internal-key": key}
+    stop = []
+
+    def spin():                                  # CPU 를 쓰는 스레드 하나
+        while not stop:
+            sum(i * i for i in range(2000))
+    th = threading.Thread(target=spin, daemon=True)
+    th.start()
+    try:
+        out = IR.profile(Req("127.0.0.1", IR._KEY), secs=1.0, hz=50, top=10)
+    finally:
+        stop.append(1)
+        th.join()
+    chk("표본이 모이고 CPU 쓰는 스레드가 맨 위 근처에 잡힌다", out["cpuTicks"] > 0
+        and any("spin" in r["where"] or "genexpr" in r["where"] for r in out["leaf"][:5]), out["leaf"][:3])
+    for host, key in (("10.0.0.1", IR._KEY), ("127.0.0.1", "wrong-key")):
+        try:
+            IR.profile(Req(host, key), secs=1.0)
+            ok = False
+        except HTTPException as e:
+            ok = e.status_code == 404
+        chk("밖에서 · 열쇠가 틀리면 404 (%s)" % host, ok)
+    _t.sleep(0)
+
+
 def main():
     db.init()
     t_indexes()
@@ -184,6 +221,7 @@ def main():
     t_decorate_row()
     t_arche_stat()
     t_window()
+    t_profile()
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0
 
