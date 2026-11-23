@@ -129,6 +129,8 @@ def profile(request: Request, secs: float = 20.0, hz: float = 100.0, top: int = 
         leaf = collections.Counter()      # 맨 끝 줄 (실제로 도는 곳)
         incl = collections.Counter()      # 줄 위 어딘가에 있는 함수 (그 함수 아래에서 쓴 몫)
         app = collections.Counter()       # 앱 코드(app/ · common/) 중 맨 끝 함수
+        sql = collections.Counter()       # DB 질의가 맨 끝일 때 그 SQL
+        sql_by = collections.Counter()    # 그 질의를 부른 앱 함수
         last = {}
         total = 0
         end = time.time() + secs
@@ -147,6 +149,7 @@ def profile(request: Request, secs: float = 20.0, hz: float = 100.0, top: int = 
                     last[tid] = ticks
                 if w <= 0:
                     continue
+                head = f
                 stack = []
                 while f is not None:
                     stack.append(_where(f))
@@ -155,6 +158,12 @@ def profile(request: Request, secs: float = 20.0, hz: float = 100.0, top: int = 
                     continue
                 total += w
                 leaf[stack[0]] += w
+                if stack[0] == "app/db.py:go":
+                    # DB 질의가 맨 끝이면 그 SQL (go 는 q · q1 · run 의 안쪽 함수 - sql 을 품고 있다)과 부른 앱 함수
+                    text = " ".join(str(head.f_locals.get("sql") or "?").split())[:150]
+                    sql[text] += w
+                    who = next((x for x in stack if x.startswith("app/") and not x.startswith("app/db.py")), "?")
+                    sql_by[who] += w
                 for x in set(stack):
                     incl[x] += w
                 for x in stack:
@@ -165,6 +174,7 @@ def profile(request: Request, secs: float = 20.0, hz: float = 100.0, top: int = 
 
         def rows(c):
             return [{"where": k, "cpu": n, "pct": round(100.0 * n / max(1, total), 1)} for k, n in c.most_common(top)]
-        return {"secs": secs, "cpuTicks": total, "leaf": rows(leaf), "app": rows(app), "inclusive": rows(incl)}
+        return {"secs": secs, "cpuTicks": total, "leaf": rows(leaf), "app": rows(app), "inclusive": rows(incl),
+                "sql": rows(sql), "sqlBy": rows(sql_by)}
     finally:
         _PROF_LOCK.release()

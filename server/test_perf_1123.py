@@ -201,6 +201,7 @@ def t_profile():
     finally:
         stop.append(1)
         th.join()
+    chk("SQL 칸이 있다 (DB 질의가 맨 끝일 때의 SQL · 부른 함수)", "sql" in out and "sqlBy" in out, list(out))
     chk("표본이 모이고 CPU 쓰는 스레드가 맨 위 근처에 잡힌다", out["cpuTicks"] > 0
         and any("spin" in r["where"] or "genexpr" in r["where"] for r in out["leaf"][:5]), out["leaf"][:3])
     for host, key in (("10.0.0.1", IR._KEY), ("127.0.0.1", "wrong-key")):
