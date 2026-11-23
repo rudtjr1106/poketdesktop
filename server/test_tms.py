@@ -314,8 +314,10 @@ def fresh_checks(R, Body):
     # /api/me 에 수가 실린다 (가방 탭의 점)
     import inspect
     from app import main as M
-    src = inspect.getsource(M.me)
-    chk("/api/me 에 tmNew 가 실린다", '"tmNew": tms.new_count(uid)' in src)
+    # 2.5.4: /api/me 의 내용은 _me_data 가 만든다 (/api/sync 와 같이 쓴다) - me 는 그것을 JSON 으로 내보내기만
+    src = inspect.getsource(M._me_data)
+    chk("/api/me 에 tmNew 가 실린다", '"tmNew": tms.new_count(uid)' in src
+        and "_me_data(" in inspect.getsource(M.me))
 
 
 def main():
