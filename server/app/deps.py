@@ -11,8 +11,6 @@ import random
 import threading
 
 from fastapi import Header, HTTPException, Request
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import Response
 
 from common import pokelogic as P
 
@@ -389,36 +387,29 @@ def try_evolve(uid, mon_id, hour=None):
 
 
 # ---------------------------------------------------------------- 자주 오는 요청을 덜 들여 (11/23 부하 줄이기)
-def fast_json(content, status_code=200):
-    """dict 를 바로 JSON 응답으로. FastAPI 가 돌려준 값을 내보내기 전에 거치는 jsonable_encoder 는 값을 하나하나
-    되짚어서, 1분마다 오는 /api/arche · /api/pokemon/desktop 에서는 json.dumps 보다 8~24배 들었다 (운영 DB 복사본:
-    4.1ms 대 0.2ms · 6.1ms 대 0.5ms). JSON 이 받는 값(dict · list · str · 수 · None)만 있으면 바로 쓰고, 아니면
-    (datetime · Row · set ...) 예전처럼 jsonable_encoder 를 거친다 - 응답 글자는 Starlette JSONResponse 와 같다."""
-    try:
-        body = json.dumps(content, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-    except TypeError:
-        body = json.dumps(jsonable_encoder(content), ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-    return Response(body.encode("utf-8"), status_code=status_code, media_type="application/json")
-
-
 _DECO = collections.OrderedDict()
 _DECO_LOCK = threading.Lock()
-DECO_KEEP = 6000                     # 기억해 둘 포켓몬 수 (접속한 사람 수백 명 x 바탕화면 여섯 마리 남짓)
+DECO_KEEP = 30000                    # 기억해 둘 포켓몬 수 (바탕화면 수백 명 x 여섯 + 상자를 연 사람들의 수백 마리)
 
 
 def decorate_row(r):
     """DB 행 하나 -> decorate(row_to_mon(행)). 행 값이 그대로면 지난번 결과를 그대로 준다 (11/23 부하 줄이기 -
-    /api/pokemon/desktop 이 1분마다 바탕화면 포켓몬마다 능력치 · 설명을 새로 셌다, 한 마리 1.3ms).
+    /api/pokemon/desktop 이 1분마다 바탕화면 포켓몬마다, /api/pokemon 이 상자 전체(많으면 900마리, 한 번에 0.8초)를
+    능력치 · 설명부터 새로 셌다, 한 마리 1.3ms).
     decorate 는 행(과 유대 여부 bonded)과 바뀌지 않는 도감 · 도구 자료만 본다 - 열쇠가 같으면 결과도 같다.
     돌려준 dict 는 여럿이 같이 쓰니 고치지 말 것 (바로 응답으로 내보내는 곳에서만 쓴다)."""
-    mon = db.row_to_mon(r)
-    key = (tuple(r), bool(mon.get("bonded")))
+    # 열쇠는 행 값 그대로 + 유대 여부 (메가스톤을 지닌 개체만 row_to_mon 처럼 bond 를 본다). 맞으면 row_to_mon(JSON 칸
+    # 다섯 개 풀기)도 건너뛴다 - 상자 900마리면 그것만 수십 ms 였다.
+    bonded = None
+    if r["held"] and db._mega_stone(r["held"]):
+        bonded = bool(db.q1("SELECT 1 FROM bond WHERE pokemon_id=? AND done_at IS NOT NULL", (r["id"],)))
+    key = (tuple(r), bonded)
     with _DECO_LOCK:
         got = _DECO.get(key)
         if got is not None:
             _DECO.move_to_end(key)
             return got
-    got = decorate(mon)
+    got = decorate(db.row_to_mon(r))
     with _DECO_LOCK:
         _DECO[key] = got
         while len(_DECO) > DECO_KEEP:

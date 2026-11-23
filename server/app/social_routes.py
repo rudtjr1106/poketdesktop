@@ -41,7 +41,7 @@ def _too_fast(uid):
 
 @router.get("/api/friends")
 def friends(ctx=Depends(deps.current)):
-    return deps.fast_json(social.listing(ctx["user"]["id"]))   # 1분마다 온다 - JSON 을 바로 (11/23 부하 줄이기)
+    return deps.json_response(social.listing(ctx["user"]["id"]))   # 1분마다 온다 - JSON 을 바로 (11/23 부하 줄이기)
 
 
 @router.get("/api/friends/search")

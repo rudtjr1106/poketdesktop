@@ -6,8 +6,10 @@
   1. 색인: 바탕화면 포켓몬 · 마릿수(pokemon(user_id, on_desktop, slot)), 안 본 대전 수(pvp_match(a_id, a_seen) ·
      (b_id, b_seen)) - 질의 계획이 그 색인을 쓴다 (마릿수는 표를 안 읽는다).
   2. 커넥션 설정: synchronous=NORMAL · cache_size 32MB · temp_store=MEMORY.
-  3. fast_json: JSON 이 받는 값이면 Starlette JSONResponse 와 같은 글자, datetime · Row 같은 것은 예전처럼 jsonable_encoder.
+  3. json_response (1분마다 오는 넷도 이제 이것으로): JSON 이 받는 값이면 Starlette JSONResponse 와 같은 글자,
+     datetime · set 같은 것은 jsonable_encoder.
   4. decorate_row: 행이 그대로면 지난번 결과, 행 · 유대 여부가 바뀌면 새로 센다. 결과는 decorate 와 같다.
+     상자 전체(box_listing)도 이것을 쓰되 겉을 복사한다 - 예전 내용과 같고, 뒤처리가 기억해 둔 것을 안 고친다.
   5. 아르케 state 한 번에 secrets.json 을 한 번만 stat 한다 (예전 30번 가까이). 요청 사이에는 손질이 바로 든다.
   6. 아르케 장 시각(window)은 기억하되 POKET_ARCHE_START 를 바꾸면 새로 센다.
 """
@@ -70,20 +72,20 @@ def t_pragmas():
     chk("WAL 은 그대로", c.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal")
 
 
-def t_fast_json():
-    print("-- 3. fast_json")
+def t_json_response():
+    print("-- 3. json_response")
     for content in ({"a": 1, "b": "한글", "c": [1, 2.5, None, True], "d": {"e": "f"}, 3: "x"},
                     {"pokemon": [{"id": 1, "info": {"stats": {"hp": 10}}, "moves": ["TACKLE"]}]}, []):
-        mine = deps.fast_json(content).body
+        mine = deps.json_response(content).body
         theirs = JSONResponse(content).body
         chk("JSON 이 받는 값은 Starlette 와 같은 글자 (%s)" % type(content).__name__, mine == theirs, (mine[:60], theirs[:60]))
-    r = deps.fast_json({"at": datetime.datetime(2026, 11, 23, 15, 0, tzinfo=datetime.timezone.utc), "s": {1, 2}})
+    r = deps.json_response({"at": datetime.datetime(2026, 11, 23, 15, 0, tzinfo=datetime.timezone.utc), "s": {1, 2}})
     body = json.loads(r.body)
     chk("datetime · set 은 예전처럼 jsonable_encoder 로", body["at"].startswith("2026-11-23T15:00") and sorted(body["s"]) == [1, 2],
         body)
     chk("media_type application/json", r.media_type == "application/json")
     try:
-        deps.fast_json({"x": float("nan")})
+        deps.json_response({"x": float("nan")})
         nan_raised = False
     except ValueError:
         nan_raised = True
@@ -108,6 +110,15 @@ def t_decorate_row():
     db.run("UPDATE pokemon SET level=21, exp=9300 WHERE user_id=?", (uid,))
     c = deps.decorate_row(db.q1("SELECT * FROM pokemon WHERE user_id=?", (uid,)))
     chk("행이 바뀌면 새로 센다 (레벨 21)", c is not a and c["level"] == 21, c.get("level"))
+    # 상자 전체(/api/pokemon)도 기억해 둔 것을 쓰되 겉을 복사해서 뒤처리가 고친다 - 기억해 둔 dict 는 그대로
+    from app import main
+    want = main._dress(uid, main._mons(uid))
+    got = main.box_listing(uid)["pokemon"]
+    chk("상자 전체: 예전 _dress(_mons) 와 같은 내용", json.dumps(got, sort_keys=True, default=str)
+        == json.dumps(want, sort_keys=True, default=str))
+    got[0]["away"] = True
+    chk("  돌려준 dict 를 고쳐도 기억해 둔 것은 그대로 (겉 복사)",
+        "away" not in deps.decorate_row(db.q1("SELECT * FROM pokemon WHERE user_id=?", (uid,))))
     keep = deps.DECO_KEEP
     deps.DECO_KEEP = 1
     try:
@@ -169,7 +180,7 @@ def main():
     db.init()
     t_indexes()
     t_pragmas()
-    t_fast_json()
+    t_json_response()
     t_decorate_row()
     t_arche_stat()
     t_window()

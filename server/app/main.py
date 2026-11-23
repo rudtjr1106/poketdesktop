@@ -1298,7 +1298,7 @@ def me(ctx=Depends(current)):
     else:
         balls, money = u["balls"], u["money"]
 
-    return deps.fast_json({                 # 1분마다 온다 - JSON 을 바로 만든다 (11/23 부하 줄이기, deps.fast_json)
+    return deps.json_response({                 # 1분마다 온다 - JSON 을 바로 만든다 (11/23 부하 줄이기, deps.json_response)
         "user": auth.user_public(u),
         "walked": walked,
         "balls": balls,
@@ -1456,7 +1456,16 @@ def assign_boxes(uid):
 
 def _dress(uid, raw):
     """상자 목록에 싣는 모습 - 도감 정보 · 유대 · 탐험 중 · 리본. 전체 목록과 고친 것만 받기(pick)가 같이 쓴다."""
-    mons = [_decorate(m) for m in raw]
+    return _dress_finish(uid, [_decorate(m) for m in raw])
+
+
+def _dress_rows(uid, rows):
+    """_dress 와 같은데 DB 행에서 - 행이 그대로인 포켓몬은 지난번 decorate 를 쓴다 (deps.decorate_row, 11/23 부하 줄이기).
+    기억해 둔 dict 는 여럿이 같이 쓰므로 겉만 복사해서 뒤처리(유대 · 탐험 중 · 리본)가 고친다."""
+    return _dress_finish(uid, [dict(deps.decorate_row(r)) for r in rows])
+
+
+def _dress_finish(uid, mons):
     # 유대 미션을 마쳤나 (10/22). 가방이 메가스톤을 지닐 수 있는 개체만 밝힌다 - 마치지 않으면 메가진화 못 한다.
     mega.mark_bonded(mons)
     # 탐험에 나가 있는 포켓몬 (1.10.4). 관리 창이 '탐험 중' 으로 적고, 꺼내기·놓아주기를 막는다.
@@ -1484,7 +1493,8 @@ def box_listing(uid):
     assign_boxes(uid)
     # 알은 따로 싣는다. 포켓몬 목록에 섞으면 옛 클라이언트가 알을 포켓몬으로
     # 그리려다 터진다. 새 관리 창이 둘을 합쳐 보여준다.
-    return {"pokemon": _dress(uid, _mons(uid)),
+    rows = db.q("SELECT * FROM pokemon WHERE user_id=? ORDER BY on_desktop DESC, slot ASC, id ASC", (uid,))
+    return {"pokemon": _dress_rows(uid, rows),
             "eggs": eggs.box_list(uid),
             "boxes": _box_info(uid)}
 
@@ -1682,7 +1692,7 @@ def list_desktop(ctx=Depends(current)):
     # 1분마다 온다 - 행이 그대로인 포켓몬은 지난번 decorate 를 쓰고(deps.decorate_row), JSON 도 바로 만든다 (11/23)
     rows = db.q("SELECT * FROM pokemon WHERE user_id=? AND on_desktop=1 ORDER BY on_desktop DESC, slot ASC, id ASC",
                 (ctx["user"]["id"],))
-    return deps.fast_json({"pokemon": [deps.decorate_row(r) for r in rows]})
+    return deps.json_response({"pokemon": [deps.decorate_row(r) for r in rows]})
 
 
 def _own(uid, pid):

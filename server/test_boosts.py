@@ -240,7 +240,7 @@ def answers():
     ctx = me(uid)
     ctx["session"] = {"ip": "", "expires_at": None}
     m = main.me(ctx)
-    if hasattr(m, "body"):                                 # 11/23: /api/me 는 JSON 응답을 바로 돌려준다 (deps.fast_json)
+    if hasattr(m, "body"):                                 # 11/23: /api/me 는 JSON 응답을 바로 돌려준다 (deps.json_response)
         m = json.loads(m.body)
     chk("/api/me", (m.get("boosts") or {}).get("lureType") == "GHOST", m.get("boosts"))
     s = item_routes.shop(me(uid))
