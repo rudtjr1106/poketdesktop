@@ -15,6 +15,13 @@ services:
     image: poketdesktop-server:latest
     container_name: poketdesktop-server
     restart: unless-stopped
+    # 열 수 있는 파일(소켓 포함) 수. 기본 1024 였는데 11/23 CPU 크레딧이 바닥나 응답이 밀리자 Caddy 와의 연결이 700개
+    # 가까이 쌓여 한도를 넘었고, 새 접속을 아예 못 받아(Too many open files) 헬스 체크까지 죽었다. 넉넉히 둔다 -
+    # 느려질 수는 있어도 문을 닫지는 않게.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     expose:
       - "8080"                     # 호스트에 노출하지 않는다
     volumes:
