@@ -67,6 +67,12 @@ def check_username(name):
         pass
     if "  " in name:
         return None, "닉네임에 공백을 이어서 쓸 수 없습니다."
+    # 부적절한 닉네임 (2.5.8, app/names.py): 욕설 · 초성 욕 · 성적인 말 · 혐오 표현 · 운영진 사칭. 어떤 말에 걸렸는지는
+    # 알려 주지 않는다. 운영자 계정 이름(BOARD_ADMINS) 그대로는 통과시킨다 - 그 계정이 처음 가입하는 길이다
+    # (닉네임 변경으로 그 이름을 가져가는 것은 rename.check 가 막는다).
+    from . import names
+    if names.bad(name) and name.lower() not in set(a.lower() for a in config.BOARD_ADMINS if a):
+        return None, "쓸 수 없는 닉네임입니다."
     return name, None
 
 

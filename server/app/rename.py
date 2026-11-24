@@ -16,20 +16,16 @@
 
   · 운영자(config.BOARD_ADMINS)는 바꿀 수 없다 - 운영자는 닉네임으로 정해진다. 바꾸면 권한을 잃고, 비워 둔 운영자
     이름을 남이 가져가면 그 사람이 운영자가 된다. 같은 까닭으로 운영자 이름 · '운영자' 같은 말이 든 이름도 막는다.
+    ('운영자' 같은 말 · 욕설은 2.5.8 부터 auth.check_username 이 가입과 같이 거른다 - app/names.py. 여기에는 운영자
+    계정 이름을 가져가지 못하게 하는 줄만 남았다.)
   · 규칙은 가입과 같다 (auth.check_username: 2~12자, 한글 · 영문 · 숫자 · _ - . · 공백 하나 - 대괄호는 길드 이름표처럼
     보여서 이미 막힌다). 지금과 똑같은 이름은 거절, 대소문자만 바꾸는 것은 된다.
 """
-import re
-
 from fastapi import HTTPException
 
 from . import auth, config, db
 
 TICKET = "RENAMETICKET"
-# 운영진으로 보일 수 있는 이름. 한글 말은 들어 있으면 막고, 영어 말은 **낱말 하나로** 있을 때만 막는다
-# ('GM철수' · 'admin_kim' 은 막고 'Sigma' · 'badminton' 은 둔다).
-BANNED = ("운영자", "운영진", "관리자", "개발자", "포스크탑")
-BANNED_EN = ("admin", "gm")
 
 
 def check(uid, new_name):
@@ -45,10 +41,8 @@ def check(uid, new_name):
         raise HTTPException(403, "운영자 계정은 닉네임을 바꿀 수 없습니다.")
     if name == old:
         raise HTTPException(400, "지금과 같은 닉네임입니다.")
-    low = name.lower()
-    if (low in set(a.lower() for a in config.BOARD_ADMINS if a) or any(b in low for b in BANNED)
-            or set(re.findall(r"[a-z]+", low)) & set(BANNED_EN)):
-        raise HTTPException(400, "쓸 수 없는 닉네임입니다.")
+    if name.lower() in set(a.lower() for a in config.BOARD_ADMINS if a):
+        raise HTTPException(400, "쓸 수 없는 닉네임입니다.")      # 운영자 계정 이름은 가져갈 수 없다
     if db.q1("SELECT 1 FROM users WHERE username=? AND id<>?", (name, uid)):
         raise HTTPException(409, "이미 쓰는 닉네임입니다.")
     return name, old
