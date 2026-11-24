@@ -481,9 +481,15 @@ class Pokedex(object):
         return self.form_for(mon) or self.get((mon or {}).get("species"))
 
     def digest(self):
-        blob = json.dumps(self.raw, ensure_ascii=False,
-                          sort_keys=True, separators=(",", ":")).encode("utf-8")
-        return hashlib.sha256(blob).hexdigest()[:16]
+        """도감 내용의 짧은 해시 (/api/pokedex/meta - 앱이 켜질 때마다 묻는다). **한 번만 셈한다** (11/24 부하 줄이기):
+        도감 전체를 JSON 으로 풀어 해시하느라, 2.5.7 업데이트로 다들 앱을 다시 켠 1분에 서버 CPU 의 11% 를 썼다.
+        도감(raw)은 만든 뒤 바뀌지 않는다."""
+        d = getattr(self, "_digest", None)
+        if d is None:
+            blob = json.dumps(self.raw, ensure_ascii=False,
+                              sort_keys=True, separators=(",", ":")).encode("utf-8")
+            d = self._digest = hashlib.sha256(blob).hexdigest()[:16]
+        return d
 
     def get(self, key):
         if isinstance(key, int):

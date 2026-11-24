@@ -931,6 +931,7 @@ jobs:
           # 도커에서는 둘이 /app 아래 나란히 놓여서 문제가 없었다.
           export PYTHONPATH="${{ github.workspace }}"
           cd server
+          python test_cpu_1124.py       # 11/24 부하 줄이기: 도감 해시 한 번 · 관장 · 실시간 만료 접기 간격
           python test_pvp.py            # + 연습판 (하루 20판 뒤): 양쪽 점수 그대로 · 이기면 100원 · 하루 상한 같이 · 쿨타임 그대로
           python test_held_v5.py        # 시즌 5 랭크 팀 같은 지닌 도구 한 마리 (시즌 4 는 그대로인지도)
           python test_held_all.py       # 2.0.2: 같은 지닌 도구 한 마리를 모든 팀 배틀에 (막기 · 판에서만 빼기 · 시즌 4 그대로)

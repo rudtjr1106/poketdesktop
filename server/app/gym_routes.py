@@ -56,9 +56,25 @@ def _party(uid):
         "SELECT * FROM pokemon WHERE user_id=? AND on_desktop=1 ORDER BY slot, id", (uid,))]
 
 
+EXPIRE_EVERY = 60                # 초 - 사용자마다 이만큼에 한 번만 접는다 (_expire_old)
+_expired_at = {}                 # uid -> 마지막으로 접은 시각 (_now)
+
+
 def _expire_old(uid):
-    """손 놓은 지 오래된 판을 접는다."""
-    cutoff = (_now() - datetime.timedelta(seconds=config.GYM_BATTLE_TTL)).isoformat()
+    """손 놓은 지 오래된 판을 접는다.
+
+    **사용자마다 EXPIRE_EVERY 초에 한 번만** (11/24 부하 줄이기): 관장 턴(act)마다 UPDATE 를 돌려 서버 CPU 의 1~4% 를
+    썼다. 판이 접히는 것은 손 놓은 지 GYM_BATTLE_TTL(1시간) 뒤라 1분 늦게 접혀도 다르지 않다. 시각은 _now 로 잰다 -
+    검사가 시계를 앞으로 돌리면 그대로 접힌다 (시계가 뒤로 가도 접는다).
+    """
+    now = _now()
+    last = _expired_at.get(uid)
+    if last is not None and 0 <= (now - last).total_seconds() < EXPIRE_EVERY:
+        return
+    if len(_expired_at) > 50000:
+        _expired_at.clear()
+    _expired_at[uid] = now
+    cutoff = (now - datetime.timedelta(seconds=config.GYM_BATTLE_TTL)).isoformat()
     db.run("UPDATE gym_battle SET state='done', result='expired'"
            " WHERE user_id=? AND state='active' AND updated_at < ?", (uid, cutoff))
 

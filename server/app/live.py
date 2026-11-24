@@ -135,8 +135,22 @@ def current(uid):
     return my_match(uid) or recent(uid)
 
 
+EXPIRE_EVERY = 5                 # 초 - 이만큼에 한 번만 접는다 (expire_old)
+_expired = {"at": None}
+
+
 def expire_old(now=None):
-    """답 없는 초대와 아무도 안 돌아오는 판을 접는다."""
+    """답 없는 초대와 아무도 안 돌아오는 판을 접는다.
+
+    **EXPIRE_EVERY 초에 한 번만** (11/24 부하 줄이기): /api/live 요청마다(분당 140번 남짓) UPDATE 두 개를 돌렸다.
+    초대는 LIVE_INVITE_SEC, 판은 LIVE_TTL 이 지나야 접히니 몇 초 늦어도 다르지 않다. 시각은 _now(now) 로 잰다 -
+    검사가 now 를 앞으로 주면 그대로 접힌다 (뒤로 가도 접는다).
+    """
+    t = _now(now)
+    last = _expired["at"]
+    if last is not None and 0 <= (t - last).total_seconds() < EXPIRE_EVERY:
+        return
+    _expired["at"] = t
     cut = (_now(now) - datetime.timedelta(seconds=config.LIVE_INVITE_SEC)) \
         .replace(microsecond=0).isoformat()
     db.run("UPDATE live_match SET state='done', result='expired', updated_at=?"
