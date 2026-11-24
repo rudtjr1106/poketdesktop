@@ -1,5 +1,5 @@
 {
- "digest": "fa70a5a8e1e55fbb",
+ "digest": "d0312cdcf849a464",
  "floors": [
   {
    "floor": 1,
@@ -1790,7 +1790,7 @@
       "species": "SKARMORY"
      },
      {
-      "ability": "MAGNETPULL",
+      "ability": "STURDY",
       "evs": {
        "atk": 0,
        "def": 0,
@@ -1799,18 +1799,18 @@
        "spd": 0,
        "spe": 0
       },
-      "gender": "N",
+      "gender": "F",
       "held": "LEFTOVERS",
       "iv": 31,
       "level": 58,
       "moves": [
-       "FLASHCANNON",
-       "DISCHARGE",
+       "POWERGEM",
+       "EARTHPOWER",
        "TRIATTACK",
-       "SPARK"
+       "STONEEDGE"
       ],
       "nature": "MODEST",
-      "species": "MAGNEZONE"
+      "species": "PROBOPASS"
      },
      {
       "ability": "STURDY",
@@ -3280,7 +3280,7 @@
     "sprite": "caitlin",
     "team": [
      {
-      "ability": "MAGICGUARD",
+      "ability": "MAGICBOUNCE",
       "evs": {
        "atk": 0,
        "def": 6,
@@ -3295,20 +3295,20 @@
       "level": 78,
       "moves": [
        "TRICKROOM",
+       "DAZZLINGGLEAM",
        "PSYCHIC",
-       "FOCUSBLAST",
-       "SHADOWBALL"
+       "MYSTICALFIRE"
       ],
       "nature": "QUIET",
-      "species": "REUNICLUS"
+      "species": "HATTERENE"
      },
      {
-      "ability": "PRESSURE",
+      "ability": "MAGICGUARD",
       "evs": {
-       "atk": 252,
+       "atk": 0,
        "def": 6,
        "hp": 252,
-       "spa": 0,
+       "spa": 252,
        "spd": 0,
        "spe": 0
       },
@@ -3318,12 +3318,35 @@
       "level": 78,
       "moves": [
        "TRICKROOM",
-       "SHADOWPUNCH",
-       "EARTHQUAKE",
-       "ICEPUNCH"
+       "PSYCHIC",
+       "FOCUSBLAST",
+       "SHADOWBALL"
+      ],
+      "nature": "QUIET",
+      "species": "REUNICLUS"
+     },
+     {
+      "ability": "HUGEPOWER",
+      "evs": {
+       "atk": 252,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "F",
+      "held": "ASSAULTVEST",
+      "iv": 31,
+      "level": 78,
+      "moves": [
+       "AQUAJET",
+       "PLAYROUGH",
+       "LIQUIDATION",
+       "KNOCKOFF"
       ],
       "nature": "BRAVE",
-      "species": "DUSKNOIR"
+      "species": "AZUMARILL"
      },
      {
       "ability": "GUTS",
@@ -3349,30 +3372,30 @@
       "species": "CONKELDURR"
      },
      {
-      "ability": "REGENERATOR",
+      "ability": "GUTS",
       "evs": {
-       "atk": 0,
+       "atk": 252,
        "def": 6,
        "hp": 252,
-       "spa": 252,
+       "spa": 0,
        "spd": 0,
        "spe": 0
       },
       "gender": "F",
-      "held": "SITRUSBERRY",
+      "held": "TOXICORB",
       "iv": 31,
       "level": 78,
       "moves": [
-       "TRICKROOM",
-       "SCALD",
-       "PSYCHIC",
-       "FLAMETHROWER"
+       "FACADE",
+       "HEADLONGRUSH",
+       "CRUNCH",
+       "ICEPUNCH"
       ],
-      "nature": "QUIET",
-      "species": "SLOWKING"
+      "nature": "BRAVE",
+      "species": "URSALUNA"
      },
      {
-      "ability": "SWARM",
+      "ability": "ADAPTABILITY",
       "evs": {
        "atk": 252,
        "def": 6,
@@ -3386,36 +3409,13 @@
       "iv": 31,
       "level": 78,
       "moves": [
-       "MEGAHORN",
-       "IRONHEAD",
+       "CRABHAMMER",
        "KNOCKOFF",
-       "DRILLRUN"
+       "AQUAJET",
+       "SUPERPOWER"
       ],
       "nature": "BRAVE",
-      "species": "ESCAVALIER"
-     },
-     {
-      "ability": "ROCKHEAD",
-      "evs": {
-       "atk": 252,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 0,
-       "spe": 0
-      },
-      "gender": "F",
-      "held": "THICKCLUB",
-      "iv": 31,
-      "level": 78,
-      "moves": [
-       "EARTHQUAKE",
-       "ROCKSLIDE",
-       "FIREPUNCH",
-       "KNOCKOFF"
-      ],
-      "nature": "BRAVE",
-      "species": "MAROWAK"
+      "species": "CRAWDAUNT"
      }
     ],
     "zring": false
@@ -5298,16 +5298,16 @@
       "iv": 31,
       "level": 100,
       "moves": [
-       "SHELLSMASH",
        "ICICLESPEAR",
        "ROCKBLAST",
-       "DRILLRUN"
+       "DRILLRUN",
+       "LIQUIDATION"
       ],
       "nature": "JOLLY",
       "species": "CLOYSTER"
      },
      {
-      "ability": "FLAMEBODY",
+      "ability": "CHLOROPHYLL",
       "evs": {
        "atk": 0,
        "def": 0,
@@ -5321,36 +5321,13 @@
       "iv": 31,
       "level": 100,
       "moves": [
-       "QUIVERDANCE",
-       "FIERYDANCE",
-       "BUGBUZZ",
-       "GIGADRAIN"
+       "GIGADRAIN",
+       "ENERGYBALL",
+       "PETALDANCE",
+       "HYPERBEAM"
       ],
       "nature": "TIMID",
-      "species": "VOLCARONA"
-     },
-     {
-      "ability": "SHEERFORCE",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "M",
-      "held": "FOCUSSASH",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "DRAGONDANCE",
-       "WATERFALL",
-       "ICEPUNCH",
-       "CRUNCH"
-      ],
-      "nature": "JOLLY",
-      "species": "FERALIGATR"
+      "species": "LILLIGANT"
      },
      {
       "ability": "DISGUISE",
@@ -5367,16 +5344,16 @@
       "iv": 31,
       "level": 100,
       "moves": [
-       "SWORDSDANCE",
        "PLAYROUGH",
        "SHADOWSNEAK",
-       "SHADOWCLAW"
+       "SHADOWCLAW",
+       "DRAINPUNCH"
       ],
       "nature": "JOLLY",
       "species": "MIMIKYU"
      },
      {
-      "ability": "FLASHFIRE",
+      "ability": "SWIFTSWIM",
       "evs": {
        "atk": 252,
        "def": 0,
@@ -5390,16 +5367,39 @@
       "iv": 31,
       "level": 100,
       "moves": [
-       "SWORDSDANCE",
-       "BITTERBLADE",
-       "SHADOWSNEAK",
-       "POLTERGEIST"
+       "LIQUIDATION",
+       "ICEPUNCH",
+       "CRUNCH",
+       "AQUAJET"
       ],
       "nature": "JOLLY",
-      "species": "CERULEDGE"
+      "species": "FLOATZEL"
      },
      {
-      "ability": "ROCKHEAD",
+      "ability": "ILLUSION",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "M",
+      "held": "FOCUSSASH",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "DARKPULSE",
+       "FLAMETHROWER",
+       "SLUDGEBOMB",
+       "FOCUSBLAST"
+      ],
+      "nature": "TIMID",
+      "species": "ZOROARK"
+     },
+     {
+      "ability": "DEFEATIST",
       "evs": {
        "atk": 252,
        "def": 0,
@@ -5413,13 +5413,13 @@
       "iv": 31,
       "level": 100,
       "moves": [
-       "DRAGONDANCE",
-       "HEADSMASH",
+       "ACROBATICS",
+       "STONEEDGE",
        "EARTHQUAKE",
-       "OUTRAGE"
+       "UTURN"
       ],
       "nature": "JOLLY",
-      "species": "TYRANTRUM"
+      "species": "ARCHEOPS"
      }
     ],
     "zring": false
@@ -5620,12 +5620,12 @@
      {
       "ability": "ROUGHSKIN",
       "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
+       "atk": 0,
+       "def": 252,
+       "hp": 252,
        "spa": 0,
-       "spd": 0,
-       "spe": 252
+       "spd": 6,
+       "spe": 0
       },
       "gender": "F",
       "held": "ROCKYHELMET",
@@ -5637,7 +5637,7 @@
        "STEALTHROCK",
        "FIREFANG"
       ],
-      "nature": "JOLLY",
+      "nature": "IMPISH",
       "species": "GARCHOMP"
      },
      {
@@ -5651,20 +5651,20 @@
        "spe": 252
       },
       "gender": "F",
-      "held": "CHOICESCARF",
+      "held": "SOFTSAND",
       "iv": 31,
       "level": 100,
       "moves": [
        "EARTHQUAKE",
-       "OUTRAGE",
-       "STONEEDGE",
+       "DRAGONCLAW",
+       "FIREFANG",
        "POISONJAB"
       ],
       "nature": "JOLLY",
       "species": "GARCHOMP"
      },
      {
-      "ability": "INFILTRATOR",
+      "ability": "CURSEDBODY",
       "evs": {
        "atk": 0,
        "def": 0,
@@ -5674,63 +5674,40 @@
        "spe": 252
       },
       "gender": "F",
-      "held": "CHOICESPECS",
+      "held": "SPELLTAG",
       "iv": 31,
       "level": 100,
       "moves": [
-       "DRACOMETEOR",
        "SHADOWBALL",
-       "FLAMETHROWER",
-       "UTURN"
+       "SLUDGEBOMB",
+       "FOCUSBLAST",
+       "THUNDERBOLT"
       ],
       "nature": "TIMID",
-      "species": "DRAGAPULT"
+      "species": "GENGAR"
      },
      {
-      "ability": "CLEARBODY",
+      "ability": "CURSEDBODY",
       "evs": {
-       "atk": 252,
+       "atk": 0,
        "def": 0,
        "hp": 6,
-       "spa": 0,
+       "spa": 252,
        "spd": 0,
        "spe": 252
       },
       "gender": "F",
-      "held": "LIFEORB",
+      "held": "BLACKSLUDGE",
       "iv": 31,
       "level": 100,
       "moves": [
-       "DRAGONDANCE",
-       "DRAGONDARTS",
-       "PHANTOMFORCE",
-       "SUCKERPUNCH"
+       "SHADOWBALL",
+       "SLUDGEWAVE",
+       "DAZZLINGGLEAM",
+       "WILLOWISP"
       ],
-      "nature": "JOLLY",
-      "species": "DRAGAPULT"
-     },
-     {
-      "ability": "SUPREMEOVERLORD",
-      "evs": {
-       "atk": 252,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 0,
-       "spe": 0
-      },
-      "gender": "F",
-      "held": "BLACKGLASSES",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "SWORDSDANCE",
-       "KOWTOWCLEAVE",
-       "SUCKERPUNCH",
-       "IRONHEAD"
-      ],
-      "nature": "ADAMANT",
-      "species": "KINGAMBIT"
+      "nature": "TIMID",
+      "species": "GENGAR"
      },
      {
       "ability": "DEFIANT",
@@ -5743,17 +5720,40 @@
        "spe": 0
       },
       "gender": "F",
-      "held": "LEFTOVERS",
+      "held": "EVIOLITE",
       "iv": 31,
       "level": 100,
       "moves": [
-       "KOWTOWCLEAVE",
+       "NIGHTSLASH",
        "IRONHEAD",
        "SUCKERPUNCH",
        "LOWKICK"
       ],
       "nature": "ADAMANT",
-      "species": "KINGAMBIT"
+      "species": "BISHARP"
+     },
+     {
+      "ability": "DEFIANT",
+      "evs": {
+       "atk": 252,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "F",
+      "held": "EVIOLITE",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "NIGHTSLASH",
+       "IRONHEAD",
+       "SUCKERPUNCH",
+       "STEALTHROCK"
+      ],
+      "nature": "ADAMANT",
+      "species": "BISHARP"
      }
     ],
     "zring": false
@@ -6100,841 +6100,6 @@
   {
    "floor": 42,
    "kind": "normal",
-   "name": "성도의 개와 호연의 거인",
-   "reward": {
-    "egg": null,
-    "items": [
-     [
-      "RARECANDY",
-      1
-     ]
-    ],
-    "money": 10000
-   },
-   "trainer": {
-    "ai": "war",
-    "id": "tower-42",
-    "keystone": false,
-    "level": 100,
-    "name": "수호",
-    "noMega": true,
-    "orb": false,
-    "role": "수호자",
-    "sprite": "eusine",
-    "team": [
-     {
-      "ability": "PRESSURE",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "LIFEORB",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "THUNDERBOLT",
-       "VOLTSWITCH",
-       "SHADOWBALL",
-       "EXTRASENSORY"
-      ],
-      "nature": "TIMID",
-      "species": "RAIKOU"
-     },
-     {
-      "ability": "PRESSURE",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "HEAVYDUTYBOOTS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "SACREDFIRE",
-       "EXTREMESPEED",
-       "STONEEDGE",
-       "FLAREBLITZ"
-      ],
-      "nature": "JOLLY",
-      "species": "ENTEI"
-     },
-     {
-      "ability": "PRESSURE",
-      "evs": {
-       "atk": 0,
-       "def": 252,
-       "hp": 252,
-       "spa": 0,
-       "spd": 6,
-       "spe": 0
-      },
-      "gender": "N",
-      "held": "LEFTOVERS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "SCALD",
-       "CALMMIND",
-       "ICEBEAM",
-       "REST"
-      ],
-      "nature": "BOLD",
-      "species": "SUICUNE"
-     },
-     {
-      "ability": "CLEARBODY",
-      "evs": {
-       "atk": 0,
-       "def": 252,
-       "hp": 252,
-       "spa": 0,
-       "spd": 6,
-       "spe": 0
-      },
-      "gender": "N",
-      "held": "LEFTOVERS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "STONEEDGE",
-       "EARTHQUAKE",
-       "BODYPRESS",
-       "STEALTHROCK"
-      ],
-      "nature": "IMPISH",
-      "species": "REGIROCK"
-     },
-     {
-      "ability": "CLEARBODY",
-      "evs": {
-       "atk": 0,
-       "def": 6,
-       "hp": 252,
-       "spa": 252,
-       "spd": 0,
-       "spe": 0
-      },
-      "gender": "N",
-      "held": "ASSAULTVEST",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "ICEBEAM",
-       "THUNDERBOLT",
-       "FOCUSBLAST",
-       "FLASHCANNON"
-      ],
-      "nature": "MODEST",
-      "species": "REGICE"
-     },
-     {
-      "ability": "CLEARBODY",
-      "evs": {
-       "atk": 0,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 252,
-       "spe": 0
-      },
-      "gender": "N",
-      "held": "LEFTOVERS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "IRONHEAD",
-       "BODYPRESS",
-       "CURSE",
-       "REST"
-      ],
-      "nature": "CAREFUL",
-      "species": "REGISTEEL"
-     }
-    ],
-    "zring": false
-   }
-  },
-  {
-   "floor": 43,
-   "kind": "normal",
-   "name": "울트라비스트",
-   "reward": {
-    "egg": null,
-    "items": [
-     [
-      "RARECANDY",
-      1
-     ]
-    ],
-    "money": 10000
-   },
-   "trainer": {
-    "ai": "war",
-    "id": "tower-43",
-    "keystone": false,
-    "level": 100,
-    "name": "루자미네",
-    "noMega": true,
-    "orb": false,
-    "role": "에테르재단 대표",
-    "sprite": "lusamine",
-    "team": [
-     {
-      "ability": "BEASTBOOST",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "FOCUSSASH",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "POWERGEM",
-       "SLUDGEWAVE",
-       "THUNDERBOLT",
-       "STEALTHROCK"
-      ],
-      "nature": "TIMID",
-      "species": "NIHILEGO"
-     },
-     {
-      "ability": "BEASTBOOST",
-      "evs": {
-       "atk": 252,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 0,
-       "spe": 0
-      },
-      "gender": "N",
-      "held": "LEFTOVERS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "DRAINPUNCH",
-       "LEECHLIFE",
-       "ICEPUNCH",
-       "EARTHQUAKE"
-      ],
-      "nature": "ADAMANT",
-      "species": "BUZZWOLE"
-     },
-     {
-      "ability": "BEASTBOOST",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "LIFEORB",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "CLOSECOMBAT",
-       "UTURN",
-       "TRIPLEAXEL",
-       "POISONJAB"
-      ],
-      "nature": "JOLLY",
-      "species": "PHEROMOSA"
-     },
-     {
-      "ability": "BEASTBOOST",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "CHOICESCARF",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "THUNDERBOLT",
-       "ENERGYBALL",
-       "DAZZLINGGLEAM",
-       "VOLTSWITCH"
-      ],
-      "nature": "TIMID",
-      "species": "XURKITREE"
-     },
-     {
-      "ability": "BEASTBOOST",
-      "evs": {
-       "atk": 0,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 252,
-       "spe": 0
-      },
-      "gender": "N",
-      "held": "LEFTOVERS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "HEAVYSLAM",
-       "LEECHSEED",
-       "FLAMETHROWER",
-       "PROTECT"
-      ],
-      "nature": "SASSY",
-      "species": "CELESTEELA"
-     },
-     {
-      "ability": "BEASTBOOST",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "CHOICESCARF",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "LEAFBLADE",
-       "SACREDSWORD",
-       "SMARTSTRIKE",
-       "KNOCKOFF"
-      ],
-      "nature": "JOLLY",
-      "species": "KARTANA"
-     }
-    ],
-    "zring": false
-   }
-  },
-  {
-   "floor": 44,
-   "kind": "normal",
-   "name": "패러독스",
-   "reward": {
-    "egg": null,
-    "items": [
-     [
-      "RARECANDY",
-      1
-     ]
-    ],
-    "money": 10000
-   },
-   "trainer": {
-    "ai": "war",
-    "id": "tower-44",
-    "keystone": false,
-    "level": 100,
-    "name": "페퍼",
-    "noMega": true,
-    "orb": false,
-    "role": "라이벌",
-    "sprite": "arven-masters",
-    "team": [
-     {
-      "ability": "PROTOSYNTHESIS",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "BOOSTERENERGY",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "HEADLONGRUSH",
-       "CLOSECOMBAT",
-       "ICESPINNER",
-       "KNOCKOFF"
-      ],
-      "nature": "JOLLY",
-      "species": "GREATTUSK"
-     },
-     {
-      "ability": "PROTOSYNTHESIS",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "BOOSTERENERGY",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "DRAGONDANCE",
-       "ACROBATICS",
-       "KNOCKOFF",
-       "EARTHQUAKE"
-      ],
-      "nature": "JOLLY",
-      "species": "ROARINGMOON"
-     },
-     {
-      "ability": "PROTOSYNTHESIS",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "BOOSTERENERGY",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "MOONBLAST",
-       "SHADOWBALL",
-       "MYSTICALFIRE",
-       "CALMMIND"
-      ],
-      "nature": "TIMID",
-      "species": "FLUTTERMANE"
-     },
-     {
-      "ability": "QUARKDRIVE",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "BOOSTERENERGY",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "CLOSECOMBAT",
-       "SPIRITBREAK",
-       "KNOCKOFF",
-       "SWORDSDANCE"
-      ],
-      "nature": "JOLLY",
-      "species": "IRONVALIANT"
-     },
-     {
-      "ability": "QUARKDRIVE",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "BOOSTERENERGY",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "HYDROPUMP",
-       "FREEZEDRY",
-       "ICEBEAM",
-       "FLIPTURN"
-      ],
-      "nature": "TIMID",
-      "species": "IRONBUNDLE"
-     },
-     {
-      "ability": "QUARKDRIVE",
-      "evs": {
-       "atk": 252,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 0,
-       "spe": 0
-      },
-      "gender": "N",
-      "held": "BOOSTERENERGY",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "DRAINPUNCH",
-       "THUNDERPUNCH",
-       "ICEPUNCH",
-       "EARTHQUAKE"
-      ],
-      "nature": "ADAMANT",
-      "species": "IRONHANDS"
-     }
-    ],
-    "zring": false
-   }
-  },
-  {
-   "floor": 45,
-   "kind": "gate",
-   "name": "테라스탈의 층",
-   "reward": {
-    "egg": null,
-    "items": [
-     [
-      "RANKTICKETTMTYPE",
-      1
-     ]
-    ],
-    "money": 20000
-   },
-   "trainer": {
-    "ai": "war",
-    "id": "tower-45",
-    "keystone": false,
-    "level": 100,
-    "name": "테사",
-    "noMega": true,
-    "orb": true,
-    "role": "챔피언",
-    "sprite": "geeta",
-    "team": [
-     {
-      "ability": "SPEEDBOOST",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "F",
-      "held": "FAIRYTERASHARD",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "LUMINACRASH",
-       "DAZZLINGGLEAM",
-       "CALMMIND",
-       "ROOST"
-      ],
-      "nature": "TIMID",
-      "species": "ESPATHRA"
-     },
-     {
-      "ability": "UNAWARE",
-      "evs": {
-       "atk": 0,
-       "def": 252,
-       "hp": 252,
-       "spa": 0,
-       "spd": 6,
-       "spe": 0
-      },
-      "gender": "M",
-      "held": "WATERTERASHARD",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "TORCHSONG",
-       "SHADOWBALL",
-       "SLACKOFF",
-       "WILLOWISP"
-      ],
-      "nature": "BOLD",
-      "species": "SKELEDIRGE"
-     },
-     {
-      "ability": "TOXICDEBRIS",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "F",
-      "held": "FOCUSSASH",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "POWERGEM",
-       "SLUDGEWAVE",
-       "EARTHPOWER",
-       "STEALTHROCK"
-      ],
-      "nature": "TIMID",
-      "species": "GLIMMORA"
-     },
-     {
-      "ability": "DEFIANT",
-      "evs": {
-       "atk": 0,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 252,
-       "spe": 0
-      },
-      "gender": "F",
-      "held": "LEFTOVERS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "BULKUP",
-       "DRAINPUNCH",
-       "RAGEFIST",
-       "TAUNT"
-      ],
-      "nature": "CAREFUL",
-      "species": "ANNIHILAPE"
-     },
-     {
-      "ability": "GOODASGOLD",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "AIRBALLOON",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "MAKEITRAIN",
-       "SHADOWBALL",
-       "NASTYPLOT",
-       "RECOVER"
-      ],
-      "nature": "TIMID",
-      "species": "GHOLDENGO"
-     },
-     {
-      "ability": "MOLDBREAKER",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "F",
-      "held": "LEFTOVERS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "GIGATONHAMMER",
-       "KNOCKOFF",
-       "PLAYROUGH",
-       "SWORDSDANCE"
-      ],
-      "nature": "JOLLY",
-      "species": "TINKATON"
-     }
-    ],
-    "zring": false
-   }
-  },
-  {
-   "floor": 46,
-   "kind": "normal",
-   "name": "섬의 수호신",
-   "reward": {
-    "egg": null,
-    "items": [
-     [
-      "RARECANDY",
-      1
-     ]
-    ],
-    "money": 10000
-   },
-   "trainer": {
-    "ai": "war",
-    "id": "tower-46",
-    "keystone": false,
-    "level": 100,
-    "name": "하푸우",
-    "noMega": true,
-    "orb": false,
-    "role": "섬퀸",
-    "sprite": "hapu",
-    "team": [
-     {
-      "ability": "ELECTRICSURGE",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "LIFEORB",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "THUNDERBOLT",
-       "DAZZLINGGLEAM",
-       "VOLTSWITCH",
-       "ROOST"
-      ],
-      "nature": "TIMID",
-      "species": "TAPUKOKO"
-     },
-     {
-      "ability": "PSYCHICSURGE",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "N",
-      "held": "CHOICESPECS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "PSYCHIC",
-       "MOONBLAST",
-       "FOCUSBLAST",
-       "SHADOWBALL"
-      ],
-      "nature": "TIMID",
-      "species": "TAPULELE"
-     },
-     {
-      "ability": "GRASSYSURGE",
-      "evs": {
-       "atk": 252,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 0,
-       "spe": 0
-      },
-      "gender": "N",
-      "held": "CHOICEBAND",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "WOODHAMMER",
-       "HORNLEECH",
-       "SUPERPOWER",
-       "STONEEDGE"
-      ],
-      "nature": "ADAMANT",
-      "species": "TAPUBULU"
-     },
-     {
-      "ability": "MISTYSURGE",
-      "evs": {
-       "atk": 0,
-       "def": 252,
-       "hp": 252,
-       "spa": 0,
-       "spd": 6,
-       "spe": 0
-      },
-      "gender": "N",
-      "held": "LEFTOVERS",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "MOONBLAST",
-       "SCALD",
-       "CALMMIND",
-       "TAUNT"
-      ],
-      "nature": "BOLD",
-      "species": "TAPUFINI"
-     },
-     {
-      "ability": "TORRENT",
-      "evs": {
-       "atk": 0,
-       "def": 6,
-       "hp": 252,
-       "spa": 252,
-       "spd": 0,
-       "spe": 0
-      },
-      "gender": "M",
-      "held": "PRIMARIUMZ",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "SPARKLINGARIA",
-       "MOONBLAST",
-       "PSYCHIC",
-       "ENERGYBALL"
-      ],
-      "nature": "MODEST",
-      "species": "PRIMARINA"
-     },
-     {
-      "ability": "LONGREACH",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "M",
-      "held": "SPELLTAG",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "SPIRITSHACKLE",
-       "LEAFBLADE",
-       "SWORDSDANCE",
-       "SHADOWSNEAK"
-      ],
-      "nature": "ADAMANT",
-      "species": "DECIDUEYE"
-     }
-    ],
-    "zring": true
-   }
-  },
-  {
-   "floor": 47,
-   "kind": "normal",
    "name": "무한의 용",
    "reward": {
     "egg": null,
@@ -6948,7 +6113,7 @@
    },
    "trainer": {
     "ai": "war",
-    "id": "tower-47",
+    "id": "tower-42",
     "keystone": true,
     "level": 100,
     "name": "피아나",
@@ -7100,7 +6265,675 @@
    }
   },
   {
-   "floor": 48,
+   "floor": 43,
+   "kind": "normal",
+   "name": "성도의 개와 호연의 거인",
+   "reward": {
+    "egg": null,
+    "items": [
+     [
+      "RARECANDY",
+      1
+     ]
+    ],
+    "money": 10000
+   },
+   "trainer": {
+    "ai": "war",
+    "id": "tower-43",
+    "keystone": false,
+    "level": 100,
+    "name": "수호",
+    "noMega": true,
+    "orb": false,
+    "role": "수호자",
+    "sprite": "eusine",
+    "team": [
+     {
+      "ability": "PRESSURE",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "N",
+      "held": "LIFEORB",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "THUNDERBOLT",
+       "VOLTSWITCH",
+       "SHADOWBALL",
+       "EXTRASENSORY"
+      ],
+      "nature": "TIMID",
+      "species": "RAIKOU"
+     },
+     {
+      "ability": "PRESSURE",
+      "evs": {
+       "atk": 252,
+       "def": 0,
+       "hp": 6,
+       "spa": 0,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "N",
+      "held": "HEAVYDUTYBOOTS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "SACREDFIRE",
+       "EXTREMESPEED",
+       "STONEEDGE",
+       "FLAREBLITZ"
+      ],
+      "nature": "JOLLY",
+      "species": "ENTEI"
+     },
+     {
+      "ability": "PRESSURE",
+      "evs": {
+       "atk": 0,
+       "def": 252,
+       "hp": 252,
+       "spa": 0,
+       "spd": 6,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "LEFTOVERS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "SCALD",
+       "CALMMIND",
+       "ICEBEAM",
+       "REST"
+      ],
+      "nature": "BOLD",
+      "species": "SUICUNE"
+     },
+     {
+      "ability": "CLEARBODY",
+      "evs": {
+       "atk": 0,
+       "def": 252,
+       "hp": 252,
+       "spa": 0,
+       "spd": 6,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "LEFTOVERS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "STONEEDGE",
+       "EARTHQUAKE",
+       "BODYPRESS",
+       "STEALTHROCK"
+      ],
+      "nature": "IMPISH",
+      "species": "REGIROCK"
+     },
+     {
+      "ability": "CLEARBODY",
+      "evs": {
+       "atk": 0,
+       "def": 6,
+       "hp": 252,
+       "spa": 252,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "ASSAULTVEST",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "ICEBEAM",
+       "THUNDERBOLT",
+       "FOCUSBLAST",
+       "FLASHCANNON"
+      ],
+      "nature": "MODEST",
+      "species": "REGICE"
+     },
+     {
+      "ability": "CLEARBODY",
+      "evs": {
+       "atk": 0,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 252,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "LEFTOVERS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "IRONHEAD",
+       "BODYPRESS",
+       "CURSE",
+       "REST"
+      ],
+      "nature": "CAREFUL",
+      "species": "REGISTEEL"
+     }
+    ],
+    "zring": false
+   }
+  },
+  {
+   "floor": 44,
+   "kind": "normal",
+   "name": "섬의 수호신",
+   "reward": {
+    "egg": null,
+    "items": [
+     [
+      "RARECANDY",
+      1
+     ]
+    ],
+    "money": 10000
+   },
+   "trainer": {
+    "ai": "war",
+    "id": "tower-44",
+    "keystone": false,
+    "level": 100,
+    "name": "하푸우",
+    "noMega": true,
+    "orb": false,
+    "role": "섬퀸",
+    "sprite": "hapu",
+    "team": [
+     {
+      "ability": "ELECTRICSURGE",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "N",
+      "held": "LIFEORB",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "THUNDERBOLT",
+       "DAZZLINGGLEAM",
+       "VOLTSWITCH",
+       "ROOST"
+      ],
+      "nature": "TIMID",
+      "species": "TAPUKOKO"
+     },
+     {
+      "ability": "PSYCHICSURGE",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "N",
+      "held": "CHOICESPECS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "PSYCHIC",
+       "MOONBLAST",
+       "FOCUSBLAST",
+       "SHADOWBALL"
+      ],
+      "nature": "TIMID",
+      "species": "TAPULELE"
+     },
+     {
+      "ability": "GRASSYSURGE",
+      "evs": {
+       "atk": 252,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "CHOICEBAND",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "WOODHAMMER",
+       "HORNLEECH",
+       "SUPERPOWER",
+       "STONEEDGE"
+      ],
+      "nature": "ADAMANT",
+      "species": "TAPUBULU"
+     },
+     {
+      "ability": "MISTYSURGE",
+      "evs": {
+       "atk": 0,
+       "def": 252,
+       "hp": 252,
+       "spa": 0,
+       "spd": 6,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "LEFTOVERS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "MOONBLAST",
+       "SCALD",
+       "CALMMIND",
+       "TAUNT"
+      ],
+      "nature": "BOLD",
+      "species": "TAPUFINI"
+     },
+     {
+      "ability": "TORRENT",
+      "evs": {
+       "atk": 0,
+       "def": 6,
+       "hp": 252,
+       "spa": 252,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "M",
+      "held": "PRIMARIUMZ",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "SPARKLINGARIA",
+       "MOONBLAST",
+       "PSYCHIC",
+       "ENERGYBALL"
+      ],
+      "nature": "MODEST",
+      "species": "PRIMARINA"
+     },
+     {
+      "ability": "LONGREACH",
+      "evs": {
+       "atk": 252,
+       "def": 0,
+       "hp": 6,
+       "spa": 0,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "M",
+      "held": "SPELLTAG",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "SPIRITSHACKLE",
+       "LEAFBLADE",
+       "SWORDSDANCE",
+       "SHADOWSNEAK"
+      ],
+      "nature": "ADAMANT",
+      "species": "DECIDUEYE"
+     }
+    ],
+    "zring": true
+   }
+  },
+  {
+   "floor": 45,
+   "kind": "gate",
+   "name": "테라스탈의 층",
+   "reward": {
+    "egg": null,
+    "items": [
+     [
+      "RANKTICKETTMTYPE",
+      1
+     ]
+    ],
+    "money": 20000
+   },
+   "trainer": {
+    "ai": "war",
+    "id": "tower-45",
+    "keystone": false,
+    "level": 100,
+    "name": "테사",
+    "noMega": true,
+    "orb": true,
+    "role": "챔피언",
+    "sprite": "geeta",
+    "team": [
+     {
+      "ability": "TOXICDEBRIS",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "F",
+      "held": "FOCUSSASH",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "POWERGEM",
+       "SLUDGEWAVE",
+       "EARTHPOWER",
+       "STEALTHROCK"
+      ],
+      "nature": "TIMID",
+      "species": "GLIMMORA"
+     },
+     {
+      "ability": "SPEEDBOOST",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "F",
+      "held": "FAIRYTERASHARD",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "LUMINACRASH",
+       "DAZZLINGGLEAM",
+       "CALMMIND",
+       "ROOST"
+      ],
+      "nature": "TIMID",
+      "species": "ESPATHRA"
+     },
+     {
+      "ability": "UNAWARE",
+      "evs": {
+       "atk": 0,
+       "def": 252,
+       "hp": 252,
+       "spa": 0,
+       "spd": 6,
+       "spe": 0
+      },
+      "gender": "M",
+      "held": "WATERTERASHARD",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "TORCHSONG",
+       "SHADOWBALL",
+       "SLACKOFF",
+       "WILLOWISP"
+      ],
+      "nature": "BOLD",
+      "species": "SKELEDIRGE"
+     },
+     {
+      "ability": "DEFIANT",
+      "evs": {
+       "atk": 0,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 252,
+       "spe": 0
+      },
+      "gender": "F",
+      "held": "LEFTOVERS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "BULKUP",
+       "DRAINPUNCH",
+       "RAGEFIST",
+       "TAUNT"
+      ],
+      "nature": "CAREFUL",
+      "species": "ANNIHILAPE"
+     },
+     {
+      "ability": "GOODASGOLD",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "N",
+      "held": "CHOICESPECS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "MAKEITRAIN",
+       "SHADOWBALL",
+       "FOCUSBLAST",
+       "THUNDERBOLT"
+      ],
+      "nature": "TIMID",
+      "species": "GHOLDENGO"
+     },
+     {
+      "ability": "SUPREMEOVERLORD",
+      "evs": {
+       "atk": 252,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "F",
+      "held": "DARKTERASHARD",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "SWORDSDANCE",
+       "KOWTOWCLEAVE",
+       "SUCKERPUNCH",
+       "IRONHEAD"
+      ],
+      "nature": "ADAMANT",
+      "species": "KINGAMBIT"
+     }
+    ],
+    "zring": false
+   }
+  },
+  {
+   "floor": 46,
+   "kind": "normal",
+   "name": "울트라비스트",
+   "reward": {
+    "egg": null,
+    "items": [
+     [
+      "RARECANDY",
+      1
+     ]
+    ],
+    "money": 10000
+   },
+   "trainer": {
+    "ai": "war",
+    "id": "tower-46",
+    "keystone": false,
+    "level": 100,
+    "name": "루자미네",
+    "noMega": true,
+    "orb": false,
+    "role": "에테르재단 대표",
+    "sprite": "lusamine",
+    "team": [
+     {
+      "ability": "BEASTBOOST",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "N",
+      "held": "FOCUSSASH",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "POWERGEM",
+       "SLUDGEWAVE",
+       "THUNDERBOLT",
+       "STEALTHROCK"
+      ],
+      "nature": "TIMID",
+      "species": "NIHILEGO"
+     },
+     {
+      "ability": "BEASTBOOST",
+      "evs": {
+       "atk": 252,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "LEFTOVERS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "DRAINPUNCH",
+       "LEECHLIFE",
+       "ICEPUNCH",
+       "EARTHQUAKE"
+      ],
+      "nature": "ADAMANT",
+      "species": "BUZZWOLE"
+     },
+     {
+      "ability": "BEASTBOOST",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "N",
+      "held": "MAGNET",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "THUNDERBOLT",
+       "ENERGYBALL",
+       "DAZZLINGGLEAM",
+       "VOLTSWITCH"
+      ],
+      "nature": "TIMID",
+      "species": "XURKITREE"
+     },
+     {
+      "ability": "BEASTBOOST",
+      "evs": {
+       "atk": 0,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 252,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "ASSAULTVEST",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "HEAVYSLAM",
+       "FLAMETHROWER",
+       "AIRSLASH",
+       "EARTHQUAKE"
+      ],
+      "nature": "SASSY",
+      "species": "CELESTEELA"
+     },
+     {
+      "ability": "BEASTBOOST",
+      "evs": {
+       "atk": 252,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "LEFTOVERS",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "KNOCKOFF",
+       "DRAGONCLAW",
+       "EARTHQUAKE",
+       "HEAVYSLAM"
+      ],
+      "nature": "ADAMANT",
+      "species": "GUZZLORD"
+     },
+     {
+      "ability": "BEASTBOOST",
+      "evs": {
+       "atk": 252,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "ROCKYHELMET",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "GYROBALL",
+       "STONEEDGE",
+       "EARTHQUAKE",
+       "BODYPRESS"
+      ],
+      "nature": "BRAVE",
+      "species": "STAKATAKA"
+     }
+    ],
+    "zring": false
+   }
+  },
+  {
+   "floor": 47,
    "kind": "normal",
    "name": "네 재앙",
    "reward": {
@@ -7115,7 +6948,7 @@
    },
    "trainer": {
     "ai": "war",
-    "id": "tower-48",
+    "id": "tower-47",
     "keystone": false,
     "level": 100,
     "name": "레포르",
@@ -7141,8 +6974,8 @@
       "moves": [
        "GIGADRAIN",
        "FOULPLAY",
-       "LEECHSEED",
-       "PROTECT"
+       "KNOCKOFF",
+       "BODYPRESS"
       ],
       "nature": "BOLD",
       "species": "WOCHIEN"
@@ -7150,15 +6983,15 @@
      {
       "ability": "SWORDOFRUIN",
       "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
+       "atk": 0,
+       "def": 252,
+       "hp": 252,
        "spa": 0,
-       "spd": 0,
-       "spe": 252
+       "spd": 6,
+       "spe": 0
       },
       "gender": "N",
-      "held": "FOCUSSASH",
+      "held": "LEFTOVERS",
       "iv": 31,
       "level": 100,
       "moves": [
@@ -7167,7 +7000,7 @@
        "SACREDSWORD",
        "ICESHARD"
       ],
-      "nature": "JOLLY",
+      "nature": "IMPISH",
       "species": "CHIENPAO"
      },
      {
@@ -7187,8 +7020,8 @@
       "moves": [
        "EARTHQUAKE",
        "RUINATION",
-       "STEALTHROCK",
-       "WHIRLWIND"
+       "STONEEDGE",
+       "STEALTHROCK"
       ],
       "nature": "IMPISH",
       "species": "TINGLU"
@@ -7204,43 +7037,43 @@
        "spe": 252
       },
       "gender": "N",
-      "held": "CHOICESPECS",
+      "held": "WISEGLASSES",
       "iv": 31,
       "level": 100,
       "moves": [
-       "OVERHEAT",
-       "DARKPULSE",
        "FLAMETHROWER",
-       "PSYCHIC"
+       "DARKPULSE",
+       "PSYCHIC",
+       "WILLOWISP"
       ],
       "nature": "TIMID",
       "species": "CHIYU"
      },
      {
-      "ability": "UNAWARE",
+      "ability": "FLASHFIRE",
       "evs": {
-       "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "atk": 252,
+       "def": 0,
+       "hp": 6,
        "spa": 0,
-       "spd": 252,
-       "spe": 0
+       "spd": 0,
+       "spe": 252
       },
       "gender": "F",
-      "held": "BLACKSLUDGE",
+      "held": "LIFEORB",
       "iv": 31,
       "level": 100,
       "moves": [
-       "EARTHQUAKE",
-       "GUNKSHOT",
-       "RECOVER",
-       "TOXIC"
+       "BITTERBLADE",
+       "SHADOWSNEAK",
+       "POLTERGEIST",
+       "CLOSECOMBAT"
       ],
-      "nature": "CAREFUL",
-      "species": "CLODSIRE"
+      "nature": "JOLLY",
+      "species": "CERULEDGE"
      },
      {
-      "ability": "MOXIE",
+      "ability": "TORRENT",
       "evs": {
        "atk": 252,
        "def": 0,
@@ -7250,17 +7083,184 @@
        "spe": 252
       },
       "gender": "M",
-      "held": "LIFEORB",
+      "held": "SITRUSBERRY",
       "iv": 31,
       "level": 100,
       "moves": [
-       "AQUASTEP",
+       "LIQUIDATION",
        "CLOSECOMBAT",
-       "SWORDSDANCE",
-       "ICESPINNER"
+       "ICESPINNER",
+       "UTURN"
       ],
       "nature": "JOLLY",
       "species": "QUAQUAVAL"
+     }
+    ],
+    "zring": false
+   }
+  },
+  {
+   "floor": 48,
+   "kind": "normal",
+   "name": "패러독스",
+   "reward": {
+    "egg": null,
+    "items": [
+     [
+      "RARECANDY",
+      1
+     ]
+    ],
+    "money": 10000
+   },
+   "trainer": {
+    "ai": "war",
+    "id": "tower-48",
+    "keystone": false,
+    "level": 100,
+    "name": "페퍼",
+    "noMega": true,
+    "orb": false,
+    "role": "라이벌",
+    "sprite": "arven-masters",
+    "team": [
+     {
+      "ability": "PROTOSYNTHESIS",
+      "evs": {
+       "atk": 0,
+       "def": 252,
+       "hp": 252,
+       "spa": 0,
+       "spd": 6,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "BOOSTERENERGY",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "HEADLONGRUSH",
+       "CLOSECOMBAT",
+       "ICESPINNER",
+       "KNOCKOFF"
+      ],
+      "nature": "IMPISH",
+      "species": "GREATTUSK"
+     },
+     {
+      "ability": "PROTOSYNTHESIS",
+      "evs": {
+       "atk": 252,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "BOOSTERENERGY",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "SEEDBOMB",
+       "CRUNCH",
+       "SUCKERPUNCH",
+       "CLOSECOMBAT"
+      ],
+      "nature": "ADAMANT",
+      "species": "BRUTEBONNET"
+     },
+     {
+      "ability": "PROTOSYNTHESIS",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 6,
+       "spa": 252,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "N",
+      "held": "BOOSTERENERGY",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "THUNDERBOLT",
+       "EARTHPOWER",
+       "VOLTSWITCH",
+       "FLASHCANNON"
+      ],
+      "nature": "TIMID",
+      "species": "SANDYSHOCKS"
+     },
+     {
+      "ability": "QUARKDRIVE",
+      "evs": {
+       "atk": 0,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 252
+      },
+      "gender": "N",
+      "held": "BOOSTERENERGY",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "CLOSECOMBAT",
+       "SPIRITBREAK",
+       "KNOCKOFF",
+       "ICEPUNCH"
+      ],
+      "nature": "JOLLY",
+      "species": "IRONVALIANT"
+     },
+     {
+      "ability": "QUARKDRIVE",
+      "evs": {
+       "atk": 0,
+       "def": 252,
+       "hp": 252,
+       "spa": 0,
+       "spd": 6,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "BOOSTERENERGY",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "EARTHQUAKE",
+       "IRONHEAD",
+       "KNOCKOFF",
+       "ICESPINNER"
+      ],
+      "nature": "IMPISH",
+      "species": "IRONTREADS"
+     },
+     {
+      "ability": "QUARKDRIVE",
+      "evs": {
+       "atk": 252,
+       "def": 6,
+       "hp": 252,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "N",
+      "held": "BOOSTERENERGY",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "DRAINPUNCH",
+       "THUNDERPUNCH",
+       "ICEPUNCH",
+       "EARTHQUAKE"
+      ],
+      "nature": "ADAMANT",
+      "species": "IRONHANDS"
      }
     ],
     "zring": false
@@ -7462,23 +7462,23 @@
       "ability": "MARVELSCALE",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 6,
        "hp": 252,
-       "spa": 0,
-       "spd": 6,
+       "spa": 252,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
-      "held": "FLAMEORB",
+      "held": "LEFTOVERS",
       "iv": 31,
       "level": 100,
       "moves": [
-       "SCALD",
-       "RECOVER",
+       "HYDROPUMP",
        "ICEBEAM",
-       "HAZE"
+       "RECOVER",
+       "SCALD"
       ],
-      "nature": "BOLD",
+      "nature": "MODEST",
       "species": "MILOTIC"
      },
      {
@@ -7531,11 +7531,11 @@
       "ability": "FLASHFIRE",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 6,
        "spa": 252,
        "spd": 0,
-       "spe": 0
+       "spe": 252
       },
       "gender": "F",
       "held": "HEATRANITE",
@@ -7547,7 +7547,7 @@
        "FLASHCANNON",
        "STEALTHROCK"
       ],
-      "nature": "MODEST",
+      "nature": "TIMID",
       "species": "HEATRAN"
      },
      {
@@ -7565,10 +7565,10 @@
       "iv": 31,
       "level": 100,
       "moves": [
-       "MOONLIGHT",
-       "PSYCHIC",
+       "CALMMIND",
        "MOONBLAST",
-       "CALMMIND"
+       "PSYSHOCK",
+       "MOONLIGHT"
       ],
       "nature": "BOLD",
       "species": "CRESSELIA"
