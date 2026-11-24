@@ -865,6 +865,7 @@ jobs:
           python test_season5.py         # 시즌 4 -> 5 손질 0350
           python test_season6.py         # 시즌 5 -> 6 손질 0370 (2.5.0, 11/16 - 시즌 5 보상 · 시즌 6 규칙표)
           python test_boss.py
+          python test_tower_data.py      # 배틀타워 (시즌 7): 1~50층 자료 - 레벨 · 마릿수 · 겹친 종/도구 · 보상 합계 · 엔진에 올리기
           python test_guild_war.py
           python test_guild_war_v5.py    # 시즌 5: 조커(길드마다 3명) · 개인 기여 보상 (게시판 #373)
           python test_deco.py            # 버전 2: 꾸미기 - 위치 점 · 끼우기(한 마리만) · 선물 · 길드전 순위 보상
