@@ -148,11 +148,14 @@ class TowerWindow(object):
             self._loading = False
             if not self.alive:
                 return
-            self._loaded_at = time.time()
             if err is not None:
                 if getattr(err, "status", None) == 404:
+                    self._loaded_at = time.time()
                     return self._show_closed(FROM_DEFAULT)      # 배틀타워를 모르는 옛 서버 (머리말)
-                return self.say("불러오지 못했습니다. %s" % getattr(err, "message", err), U.RED)
+                # **불러온 때를 적지 않는다** (관장 탭과 같다) - 적으면 탭을 다시 골라도 STALE_SEC 동안 다시 묻지 않아,
+                # 서버가 바쁜 날 한 번 실패한 탭이 '불러오는 중' 에 2분씩 멈춰 있었다 (검토 11/24).
+                return self._show_error("불러오지 못했습니다. %s" % getattr(err, "message", err))
+            self._loaded_at = time.time()
             if not r.get("open"):
                 return self._show_closed(r.get("from") or FROM_DEFAULT)
             self.closed = False
@@ -166,6 +169,17 @@ class TowerWindow(object):
         if self.alive and not self._loading and time.time() - self._loaded_at > STALE_SEC \
                 and not (self.battle and self.battle.alive):
             self.reload()
+
+    def _show_error(self, text):
+        """불러오지 못했다. 그려 둔 목록이 있으면 그대로 두고 아래 줄에만 알린다 - 없으면 몸통에 까닭을 적는다."""
+        self.say(text, U.RED)
+        if self.data is not None or self.closed:
+            return
+        self._clear_body()
+        tk.Label(self.body, text=text, bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, justify="left",
+                 wraplength=U.wide(W) - 80).pack(pady=(24, 4))
+        tk.Label(self.body, text="이 탭을 다시 고르면 다시 불러옵니다.", bg=U.BG, fg=U.FG_FAINT,
+                 font=U.FONT_XS).pack()
 
     def _show_closed(self, season):
         self.closed = True

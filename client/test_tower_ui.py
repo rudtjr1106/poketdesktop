@@ -80,7 +80,7 @@ class TowerApi(TG.FakeApi):
         self.floors = dict((f["floor"], f) for f in tower["floors"])
         self.items = items
         self.top = 0
-        self.mode = "open"           # open / closed (시즌 6) / 404 (배틀타워를 모르는 옛 서버)
+        self.mode = "open"           # open / closed (시즌 6) / 404 (배틀타워를 모르는 옛 서버) / down (서버가 답이 없다)
         self.fight = None            # 지금 판의 층
 
     # ---- 응답 모양은 server/app/tower.py 와 같다 ----
@@ -95,6 +95,8 @@ class TowerApi(TG.FakeApi):
     def _gate(self):
         if self.mode == "404":
             raise ApiError("Not Found", 404)
+        if self.mode == "down":
+            raise ApiError("서버에 연결할 수 없습니다.")
 
     def tower(self):
         self.calls.append("tower")
@@ -303,6 +305,29 @@ def main():
     TG.pump(root, lambda: api.calls.count("tower") > n0)
     chk("  오래된 것이면 다시 불러온다", api.calls.count("tower") > n0)
     e.close()
+
+    print("\n=== 불러오지 못했을 때 (서버가 바쁜 날 - 검토 11/24) ===")
+    api.mode = "down"
+    d = T.TowerWindow(root, app)
+    TG.pump(root, lambda: not d._loading)
+    root.update()
+    seen = "\n".join(texts(d.win))
+    chk("'불러오는 중' 에 멈춰 있지 않고 까닭을 보여 준다", "불러오는 중" not in seen and "서버에 연결할 수 없습니다." in seen, seen)
+    api.mode = "open"
+    n0 = api.calls.count("tower")
+    d.on_shown()
+    TG.pump(root, lambda: d.data is not None, 5)
+    chk("탭을 다시 고르면 바로 다시 불러온다 (2분을 기다리게 하지 않는다)",
+        api.calls.count("tower") > n0 and len(d.rows) == 50, (api.calls.count("tower") - n0, len(d.rows)))
+    api.mode = "down"
+    d._loaded_at -= T.STALE_SEC + 5
+    d.on_shown()
+    TG.pump(root, lambda: not d._loading)
+    root.update()
+    chk("이미 그려 둔 목록은 다시 불러오다 실패해도 지우지 않는다", len(d.rows) == 50
+        and "서버에 연결할 수 없습니다." in d.status.cget("text"), (len(d.rows), d.status.cget("text")))
+    api.mode = "open"
+    d.close()
 
     chk("콜백 오류 없음", not errors, errors[:2])
     GB.GymBattleWindow.later = orig_later

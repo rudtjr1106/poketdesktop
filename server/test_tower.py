@@ -162,6 +162,12 @@ def core():
     chk("못 넣은 알은 글줄에 없다 (넣은 것만 적는다)", "전설의 포켓몬 알" not in r50["lines"]
         and r50["lines"][:2] == ["상금 30,000원", "타입 확정 기술머신 뽑기권 ×1"], r50["lines"])
     chk("오류가 적혔다", db.q1("SELECT COUNT(*) c FROM server_error WHERE path='tower.on_win'")["c"] == 1)
+    # 한 번뿐인 보상이라, 못 넣은 것은 **누구의 몇 층 무엇인지** 남아야 넣어 줄 수 있다 (검토 11/24)
+    err = db.q1("SELECT detail FROM server_error WHERE path='tower.on_win'")["detail"]
+    chk("  누구의 · 몇 층 · 무엇인지 적혔다", "uid=%d" % u in err and "floor=50" in err and "egg=legendary" in err, err)
+    chk("  사람에게도 알린다 (말없이 줄만 빠지지 않는다)",
+        "일부 보상을 넣지 못했습니다: 전설의 포켓몬 알 - 게시판 문의에 남겨 주세요." in r50["lines"], r50["lines"])
+    chk("  다 넣었으면 그런 줄이 없다", not any("넣지 못했" in ln for ln in r["lines"] + r2["lines"]))
     chk("50층까지의 돈 합계", items.money(u) == 390000, items.money(u))
     chk("가방에 실제로 들어왔다", (bag(u, "GOLDBOTTLECAP"), bag(u, "MASTERBALL"), bag(u, "SHINYCANDY"),
                           bag(u, "RANKTICKETTM"), bag(u, "RANKTICKETTMTYPE")) == (3, 1, 1, 2, 2))

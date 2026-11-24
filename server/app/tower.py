@@ -199,24 +199,32 @@ def start(uid, party, n, zring=False, keystone=False, orb=False, rng=None):
     return region_of(n), trainer["id"], tb, tb.start()
 
 
-def _pay(uid, reward):
-    """보상을 넣고, **실제로 넣은 것만** 글줄로 돌려준다. 하나가 실패해도 나머지는 넣는다."""
-    lines = []
+def _pay(uid, n, reward):
+    """보상을 넣고, **실제로 넣은 것만** 글줄로 돌려준다. 하나가 실패해도 나머지는 넣는다.
 
-    def step(give, line):
+    못 넣은 것은 둘 다 한다 (검토 11/24): **누구의 몇 층 무엇인지** server_error 에 적고(48시간 남는다), 사람에게도 한 줄로
+    알린다. 층 기록은 이미 생겨서 그 보상은 다시 받을 길이 없다 - 말없이 줄만 빠지면 사람은 모르고 운영자는 찾을 수 없다.
+    """
+    lines, missed = [], []
+
+    def step(give, line, what):
         try:
             give()
             lines.append(line)
         except Exception as e:                                # noqa: BLE001
-            errors.record("TOWER", "tower.on_win", e)
+            missed.append(line)
+            errors.record("TOWER", "tower.on_win", e, detail="uid=%s floor=%s %s" % (uid, n, what))
 
     money = int(reward.get("money") or 0)
     if money:
-        step(lambda: items.money_add(uid, money), "상금 %s원" % format(money, ","))
-    for iid, n in reward.get("items") or []:
-        step(lambda iid=iid, n=n: items.bag_add(uid, iid, n), "%s ×%d" % (items.name_of(iid), n))
+        step(lambda: items.money_add(uid, money), "상금 %s원" % format(money, ","), "money=%d" % money)
+    for iid, cnt in reward.get("items") or []:
+        step(lambda iid=iid, cnt=cnt: items.bag_add(uid, iid, cnt), "%s ×%d" % (items.name_of(iid), cnt),
+             "item=%s x%d" % (iid, cnt))
     if reward.get("egg"):
-        step(lambda: eggs.give(uid, reward["egg"]), EGG_LINE)
+        step(lambda: eggs.give(uid, reward["egg"]), EGG_LINE, "egg=%s" % reward["egg"])
+    if missed:
+        lines.append("일부 보상을 넣지 못했습니다: %s - 게시판 문의에 남겨 주세요." % " · ".join(missed))
     return lines
 
 
@@ -238,7 +246,7 @@ def on_win(uid, region, turns, now=None):
                      (uid, n, turns, stamp, stamp))
         if getattr(cur, "rowcount", 1) == 1:
             out["first"] = True
-            out["lines"] = _pay(uid, f["reward"])
+            out["lines"] = _pay(uid, n, f["reward"])
             out["lines"].append("%d층이 열렸다." % (n + 1) if floor(n + 1)
                                 else "지금 열린 층을 모두 올랐다! 다음 층을 기다려 주세요.")
         else:
