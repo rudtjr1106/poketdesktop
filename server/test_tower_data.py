@@ -5,7 +5,7 @@
 
 서버도 DB 도 안 쓴다. 자료는 tools/build_tower.py 가 낸다 - 손으로 고치지 않는다. 못 박는 것:
 
-  1. 1~50층이 빠짐없이 있고, 레벨 · 마릿수 · 관문/층주 · AI 가 층 번호로 정해진다.
+  1. 1~50층이 빠짐없이 있고, 레벨 · 마릿수 · 관문/층주 · AI · 노력치가 층 번호로 정해진다.
        레벨 = min(100, 28 + 2 x 층) · 1~4층 3마리, 5~9층 4, 10~20층 5, 21층~ 6
        5의 배수는 관문(gate), 10의 배수는 층주(boss) · 1~40층 관장 AI, 41~50층 길드전 AI
   2. 층주 다섯은 프런티어 브레인 (나리 · 다슬 · 하인즈 · 리라 · 종수). 한 사람은 한 번만 나온다.
@@ -82,10 +82,16 @@ def main():
         [f["floor"] for f in F if f["floor"] <= 10 and f["kind"] == "normal" and held(f)])
     chk("1구역은 노력치 0 · 무보정", all(not any(m["evs"].values()) and m["nature"] == "HARDY"
                                  for f in F if f["floor"] <= 10 for m in f["trainer"]["team"]))
-    chk("3구역부터는 노력치를 다 준다 (500 이상)", all(sum(m["evs"].values()) >= 500
-                                         for f in F if f["floor"] >= 21 for m in f["trainer"]["team"]),
-        [(f["floor"], m["species"]) for f in F if f["floor"] >= 21 for m in f["trainer"]["team"]
-         if sum(m["evs"].values()) < 500][:5])
+    # 노력치는 구역마다 는다: 0 -> 252(주 능력) -> 378(둘째 능력에 126) -> 378 -> 510. 3 · 4구역을 510 으로 채우면
+    # Lv.100 인 36~40층이 5구역 초입보다 어려운 벽이 된다 (11/24 sim_tower: 4~40% -> 노력치를 줄이면 50~92%).
+    chk("3 · 4구역의 노력치는 378 (252 + 126)", all(sorted(m["evs"].values())[-2:] == [126, 252] and sum(m["evs"].values()) == 378
+                                          for f in F if 21 <= f["floor"] <= 40 for m in f["trainer"]["team"]),
+        [(f["floor"], m["species"], sum(m["evs"].values())) for f in F if 21 <= f["floor"] <= 40
+         for m in f["trainer"]["team"] if sum(m["evs"].values()) != 378][:5])
+    chk("5구역은 노력치를 다 준다 (510)", all(sum(m["evs"].values()) == 510
+                                     for f in F if f["floor"] >= 41 for m in f["trainer"]["team"]),
+        [(f["floor"], m["species"]) for f in F if f["floor"] >= 41 for m in f["trainer"]["team"]
+         if sum(m["evs"].values()) != 510][:5])
     chk("개체값은 전부 31", all(m["iv"] == 31 for f in F for m in f["trainer"]["team"]))
     chk("능력치 배율을 안 쓴다", all(not m.get("boost") for f in F for m in f["trainer"]["team"]))
     megas = [f["floor"] for f in F if f["trainer"]["keystone"]]

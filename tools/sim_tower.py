@@ -6,6 +6,11 @@
     python tools/sim_tower.py 8 --floor 37 한 층만 (팀을 고친 뒤 그 층만 다시 볼 때)
     python tools/sim_tower.py 16 --floor 31-50   층 범위 (--floor 는 여러 번 줄 수 있다)
     python tools/sim_tower.py 12 --floor 21-30 --matched   베테랑을 그 층 레벨로 낮춰서 (3구역의 모양을 볼 때)
+    python tools/sim_tower.py 12 --seeds 4      씨앗 넷을 합쳐서 (한 층 48판) - **눈금은 이걸로 본다**
+
+**씨앗 하나로 맞았다고 믿지 않는다.** 한 층 12판은 한두 판에 8~17%p 가 움직인다 - 처음(11/24)에는 씨앗 하나로
+4구역 52% 를 보고 맞다고 적었는데, 다른 씨앗 셋으로는 42 · 50 · 47% 였다 (검토에서 드러났다). 구역을 판정할 때는
+--seeds 4 이상으로 합쳐서 본다.
 
 봇은 tools/sim_gym.py 의 것이다 - 늘 제일 아픈 기술을 쓰고, 한 방에 쓰러질 판이면 버틸 포켓몬으로 바꾼다.
 사람만큼 영리하진 않고 **한 팀으로 모든 층을 돈다** (사람은 상대를 보고 팀을 바꾼다). 그래서 숫자는 눈금이다 -
@@ -149,14 +154,15 @@ def play(tb, mega=False):
     return tb.result, sum(1 for f in tb.me_team if f.alive())
 
 
-def run(dex, gdex, floors, games, seed=20261124, matched=False):
+def run(dex, gdex, floors, games, seed=20261124, matched=False, seeds=1):
+    """층마다 games x seeds 판. 씨앗은 seed, seed+1, … 이고 승률은 전부 합쳐서 낸다."""
     rows = []
     for f in floors:
         n, t = f["floor"], f["trainer"]
         veteran = BT.zone_of(n) >= 2
         won = left = 0
-        for g in range(games):
-            rng = random.Random("%s-%d-%d" % (seed, n, g))
+        for g in range(games * seeds):
+            rng = random.Random("%s-%d-%d" % (seed + g // games, n, g % games))
             party = (veteran_team(dex, rng, t["level"] if matched else 100) if veteran
                      else S.trained_team(dex, gdex, t["level"], rng))
             tb = TB.TrainerBattle(dex, party, t, random.Random(rng.random()))
@@ -164,7 +170,7 @@ def run(dex, gdex, floors, games, seed=20261124, matched=False):
             won += res == "won"
             left += alive if res == "won" else 0
         rows.append({"floor": n, "name": f["name"], "kind": f["kind"], "bot": "베테랑" if veteran else "키운 유저",
-                     "rate": won / float(games), "left": left / float(won) if won else 0.0})
+                     "rate": won / float(games * seeds), "left": left / float(won) if won else 0.0})
     return rows
 
 
@@ -222,6 +228,8 @@ def main():
     ap.add_argument("--floor", action="append", help="이 층만: 37 또는 31-50 (여러 번 줄 수 있다)")
     ap.add_argument("--tower", default=os.path.join(DATA, "tower.json"))
     ap.add_argument("--matched", action="store_true", help="베테랑을 그 층 레벨로 낮춘다 (모양만 본다 - 구역 눈금은 안 건다)")
+    ap.add_argument("--seed", type=int, default=20261124, help="난수 씨앗 (기본 20261124)")
+    ap.add_argument("--seeds", type=int, default=1, help="씨앗 몇 개를 합칠지 (seed, seed+1, …). 판정은 4 이상으로")
     a = ap.parse_args()
     with open(os.path.join(DATA, "pokedex.json"), encoding="utf-8") as fh:
         raw = json.load(fh)
@@ -238,7 +246,8 @@ def main():
             lo, _dash, hi = part.partition("-")
             want.update(range(int(lo), int(hi or lo) + 1))
         floors = [f for f in floors if f["floor"] in want]
-    bad = report(run(dex, gdex, floors, a.games, matched=a.matched), a.games, zones=not a.matched)
+    bad = report(run(dex, gdex, floors, a.games, seed=a.seed, matched=a.matched, seeds=a.seeds),
+                 a.games * a.seeds, zones=not a.matched)
     return 1 if bad else 0
 
 

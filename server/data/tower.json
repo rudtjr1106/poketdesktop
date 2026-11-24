@@ -1,5 +1,5 @@
 {
- "digest": "d0312cdcf849a464",
+ "digest": "b20b6e3fe84c4405",
  "floors": [
   {
    "floor": 1,
@@ -2615,10 +2615,10 @@
       "ability": "DRIZZLE",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -2639,10 +2639,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "LIFEORB",
@@ -2662,10 +2662,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "CHOICEBAND",
@@ -2685,10 +2685,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "WISEGLASSES",
@@ -2708,10 +2708,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "BLACKSLUDGE",
@@ -2731,10 +2731,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "LEFTOVERS",
@@ -2783,10 +2783,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "HEATROCK",
@@ -2806,10 +2806,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "LIFEORB",
@@ -2829,10 +2829,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "SITRUSBERRY",
@@ -2852,10 +2852,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "FOCUSSASH",
@@ -2875,10 +2875,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "CHOICEBAND",
@@ -2898,10 +2898,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICESPECS",
@@ -2949,10 +2949,10 @@
       "ability": "SANDSTREAM",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -2973,10 +2973,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "LIFEORB",
@@ -2996,10 +2996,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICEBAND",
@@ -3019,10 +3019,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "SILKSCARF",
@@ -3041,10 +3041,10 @@
       "ability": "STORMDRAIN",
       "evs": {
        "atk": 0,
-       "def": 6,
+       "def": 0,
        "hp": 252,
        "spa": 0,
-       "spd": 252,
+       "spd": 126,
        "spe": 0
       },
       "gender": "M",
@@ -3064,8 +3064,8 @@
       "ability": "ROCKHEAD",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -3116,8 +3116,8 @@
       "ability": "SNOWWARNING",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -3140,10 +3140,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "LIFEORB",
@@ -3163,10 +3163,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "SITRUSBERRY",
@@ -3185,10 +3185,10 @@
       "ability": "ICEBODY",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -3209,10 +3209,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "ICYROCK",
@@ -3232,10 +3232,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "N",
       "held": "NEVERMELTICE",
@@ -3283,8 +3283,8 @@
       "ability": "MAGICBOUNCE",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -3306,8 +3306,8 @@
       "ability": "MAGICGUARD",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -3329,8 +3329,8 @@
       "ability": "HUGEPOWER",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -3352,8 +3352,8 @@
       "ability": "GUTS",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -3375,8 +3375,8 @@
       "ability": "GUTS",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -3398,8 +3398,8 @@
       "ability": "ADAPTABILITY",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -3450,10 +3450,10 @@
       "ability": "IRONBARBS",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -3474,10 +3474,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "BLACKSLUDGE",
@@ -3496,10 +3496,10 @@
       "ability": "STURDY",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -3520,10 +3520,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "FOCUSSASH",
@@ -3542,10 +3542,10 @@
       "ability": "INTIMIDATE",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -3565,10 +3565,10 @@
       "ability": "OVERCOAT",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -3617,10 +3617,10 @@
       "ability": "NATURALCURE",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -3641,9 +3641,9 @@
       "evs": {
        "atk": 0,
        "def": 252,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
-       "spd": 252,
+       "spd": 126,
        "spe": 0
       },
       "gender": "F",
@@ -3663,10 +3663,10 @@
       "ability": "UNAWARE",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -3686,10 +3686,10 @@
       "ability": "PRESSURE",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -3709,10 +3709,10 @@
       "ability": "UNAWARE",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -3732,10 +3732,10 @@
       "ability": "PURIFYINGSALT",
       "evs": {
        "atk": 0,
-       "def": 6,
+       "def": 0,
        "hp": 252,
        "spa": 0,
-       "spd": 252,
+       "spd": 126,
        "spe": 0
       },
       "gender": "F",
@@ -3785,10 +3785,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "FOCUSSASH",
@@ -3808,10 +3808,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "FOCUSSASH",
@@ -3831,10 +3831,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "FOCUSSASH",
@@ -3854,10 +3854,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "CHOICESCARF",
@@ -3877,10 +3877,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICESCARF",
@@ -3900,10 +3900,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICESCARF",
@@ -3951,8 +3951,8 @@
       "ability": "ELECTRICSURGE",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -3975,10 +3975,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICESPECS",
@@ -3998,10 +3998,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "CHOICEBAND",
@@ -4021,10 +4021,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "ELECTRICSEED",
@@ -4044,10 +4044,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "PSYCHICSEED",
@@ -4067,10 +4067,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "FOCUSSASH",
@@ -4118,10 +4118,10 @@
       "ability": "TORRENT",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "M",
@@ -4142,10 +4142,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "LIFEORB",
@@ -4165,10 +4165,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "HEAVYDUTYBOOTS",
@@ -4187,8 +4187,8 @@
       "ability": "CLEARBODY",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -4211,10 +4211,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "EXPERTBELT",
@@ -4234,10 +4234,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICESCARF",
@@ -4285,10 +4285,10 @@
       "ability": "WATERABSORB",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "M",
@@ -4309,10 +4309,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "CHOICESPECS",
@@ -4331,8 +4331,8 @@
       "ability": "GUTS",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -4355,10 +4355,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "LIFEORB",
@@ -4377,8 +4377,8 @@
       "ability": "SNOWCLOAK",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -4400,8 +4400,8 @@
       "ability": "PIXILATE",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -4452,8 +4452,8 @@
       "ability": "SANDSTREAM",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -4476,10 +4476,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICESPECS",
@@ -4498,8 +4498,8 @@
       "ability": "SAPSIPPER",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -4522,10 +4522,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "LUMBERRY",
@@ -4545,10 +4545,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "LOADEDDICE",
@@ -4567,8 +4567,8 @@
       "ability": "MULTISCALE",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -4620,20 +4620,20 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "LIFEORB",
       "iv": 31,
       "level": 94,
       "moves": [
-       "SWORDSDANCE",
        "FLAREBLITZ",
        "CLOSECOMBAT",
-       "STONEEDGE"
+       "STONEEDGE",
+       "THUNDERPUNCH"
       ],
       "nature": "ADAMANT",
       "species": "BLAZIKEN"
@@ -4643,10 +4643,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "MIRACLESEED",
@@ -4666,10 +4666,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "EXPERTBELT",
@@ -4688,8 +4688,8 @@
       "ability": "TORRENT",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -4712,10 +4712,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "LEFTOVERS",
@@ -4735,10 +4735,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "HEAVYDUTYBOOTS",
@@ -4787,10 +4787,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "N",
       "held": "LEFTOVERS",
@@ -4809,8 +4809,8 @@
       "ability": "TECHNICIAN",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -4832,10 +4832,10 @@
       "ability": "INTIMIDATE",
       "evs": {
        "atk": 0,
-       "def": 6,
+       "def": 0,
        "hp": 252,
        "spa": 0,
-       "spd": 252,
+       "spd": 126,
        "spe": 0
       },
       "gender": "M",
@@ -4855,8 +4855,8 @@
       "ability": "LEVITATE",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -4879,10 +4879,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICEBAND",
@@ -4902,10 +4902,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "CHOICESCARF",
@@ -4927,7 +4927,7 @@
   {
    "floor": 35,
    "kind": "gate",
-   "name": "메가진화의 층",
+   "name": "띠 부대",
    "reward": {
     "egg": null,
     "items": [
@@ -4941,151 +4941,151 @@
    "trainer": {
     "ai": "gym",
     "id": "tower-35",
-    "keystone": true,
+    "keystone": false,
     "level": 98,
-    "name": "코르니",
-    "noMega": false,
+    "name": "구즈마",
+    "noMega": true,
     "orb": false,
-    "role": "관장",
-    "sprite": "korrina",
+    "role": "스컬단 보스",
+    "sprite": "guzma",
     "team": [
      {
-      "ability": "INNERFOCUS",
+      "ability": "SKILLLINK",
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
-      },
-      "gender": "M",
-      "held": "LUCARIONITE",
-      "iv": 31,
-      "level": 98,
-      "moves": [
-       "SWORDSDANCE",
-       "CLOSECOMBAT",
-       "METEORMASH",
-       "BULLETPUNCH"
-      ],
-      "nature": "JOLLY",
-      "species": "LUCARIO"
-     },
-     {
-      "ability": "NOGUARD",
-      "evs": {
-       "atk": 252,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 0,
-       "spe": 0
-      },
-      "gender": "M",
-      "held": "ASSAULTVEST",
-      "iv": 31,
-      "level": 98,
-      "moves": [
-       "DYNAMICPUNCH",
-       "STONEEDGE",
-       "KNOCKOFF",
-       "BULLETPUNCH"
-      ],
-      "nature": "ADAMANT",
-      "species": "MACHAMP"
-     },
-     {
-      "ability": "PUREPOWER",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
-      "held": "LIFEORB",
+      "held": "FOCUSSASH",
       "iv": 31,
       "level": 98,
       "moves": [
-       "HIGHJUMPKICK",
-       "ZENHEADBUTT",
-       "ICEPUNCH",
-       "BULLETPUNCH"
+       "TAILSLAP",
+       "BULLETSEED",
+       "ROCKBLAST",
+       "TRIPLEAXEL"
       ],
       "nature": "JOLLY",
-      "species": "MEDICHAM"
+      "species": "CINCCINO"
      },
      {
-      "ability": "IRONFIST",
-      "evs": {
-       "atk": 252,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 0,
-       "spe": 0
-      },
-      "gender": "F",
-      "held": "CHOICEBAND",
-      "iv": 31,
-      "level": 98,
-      "moves": [
-       "KNOCKOFF",
-       "DRAINPUNCH",
-       "GUNKSHOT",
-       "BULLETPUNCH"
-      ],
-      "nature": "ADAMANT",
-      "species": "PANGORO"
-     },
-     {
-      "ability": "STEADFAST",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "M",
-      "held": "LUMBERRY",
-      "iv": 31,
-      "level": 98,
-      "moves": [
-       "SWORDSDANCE",
-       "CLOSECOMBAT",
-       "PSYCHOCUT",
-       "NIGHTSLASH"
-      ],
-      "nature": "JOLLY",
-      "species": "GALLADE"
-     },
-     {
-      "ability": "INTIMIDATE",
+      "ability": "CHLOROPHYLL",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
-       "spa": 0,
-       "spd": 252,
-       "spe": 0
+       "def": 0,
+       "hp": 0,
+       "spa": 252,
+       "spd": 0,
+       "spe": 126
       },
       "gender": "F",
-      "held": "LEFTOVERS",
+      "held": "FOCUSSASH",
       "iv": 31,
       "level": 98,
       "moves": [
-       "DRAGONDANCE",
-       "DRAINPUNCH",
-       "KNOCKOFF",
-       "ICEPUNCH"
+       "GIGADRAIN",
+       "ENERGYBALL",
+       "PETALDANCE",
+       "HYPERBEAM"
       ],
-      "nature": "CAREFUL",
-      "species": "SCRAFTY"
+      "nature": "TIMID",
+      "species": "LILLIGANT"
+     },
+     {
+      "ability": "DISGUISE",
+      "evs": {
+       "atk": 252,
+       "def": 0,
+       "hp": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 126
+      },
+      "gender": "F",
+      "held": "FOCUSSASH",
+      "iv": 31,
+      "level": 98,
+      "moves": [
+       "PLAYROUGH",
+       "SHADOWSNEAK",
+       "SHADOWCLAW",
+       "DRAINPUNCH"
+      ],
+      "nature": "JOLLY",
+      "species": "MIMIKYU"
+     },
+     {
+      "ability": "SWIFTSWIM",
+      "evs": {
+       "atk": 252,
+       "def": 0,
+       "hp": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 126
+      },
+      "gender": "F",
+      "held": "FOCUSSASH",
+      "iv": 31,
+      "level": 98,
+      "moves": [
+       "LIQUIDATION",
+       "ICEPUNCH",
+       "CRUNCH",
+       "AQUAJET"
+      ],
+      "nature": "JOLLY",
+      "species": "FLOATZEL"
+     },
+     {
+      "ability": "ILLUSION",
+      "evs": {
+       "atk": 0,
+       "def": 0,
+       "hp": 0,
+       "spa": 252,
+       "spd": 0,
+       "spe": 126
+      },
+      "gender": "M",
+      "held": "FOCUSSASH",
+      "iv": 31,
+      "level": 98,
+      "moves": [
+       "DARKPULSE",
+       "FLAMETHROWER",
+       "SLUDGEBOMB",
+       "FOCUSBLAST"
+      ],
+      "nature": "TIMID",
+      "species": "ZOROARK"
+     },
+     {
+      "ability": "FLASHFIRE",
+      "evs": {
+       "atk": 252,
+       "def": 0,
+       "hp": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 126
+      },
+      "gender": "F",
+      "held": "FOCUSSASH",
+      "iv": 31,
+      "level": 98,
+      "moves": [
+       "FLAREBLITZ",
+       "WILDCHARGE",
+       "HIGHHORSEPOWER",
+       "DRILLRUN"
+      ],
+      "nature": "JOLLY",
+      "species": "RAPIDASH"
      }
     ],
     "zring": false
@@ -5121,10 +5121,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICEBAND",
@@ -5144,10 +5144,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICEBAND",
@@ -5167,10 +5167,10 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICESCARF",
@@ -5190,10 +5190,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "CHOICESCARF",
@@ -5213,10 +5213,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "N",
       "held": "CHOICESPECS",
@@ -5235,8 +5235,8 @@
       "ability": "SCRAPPY",
       "evs": {
        "atk": 0,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
        "spe": 0
@@ -5261,7 +5261,7 @@
   {
    "floor": 37,
    "kind": "normal",
-   "name": "띠 부대",
+   "name": "메가진화의 층",
    "reward": {
     "egg": null,
     "items": [
@@ -5275,151 +5275,151 @@
    "trainer": {
     "ai": "gym",
     "id": "tower-37",
-    "keystone": false,
+    "keystone": true,
     "level": 100,
-    "name": "구즈마",
-    "noMega": true,
+    "name": "코르니",
+    "noMega": false,
     "orb": false,
-    "role": "스컬단 보스",
-    "sprite": "guzma",
+    "role": "관장",
+    "sprite": "korrina",
     "team": [
      {
-      "ability": "SKILLLINK",
+      "ability": "INNERFOCUS",
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
-      "gender": "F",
-      "held": "FOCUSSASH",
+      "gender": "M",
+      "held": "LUCARIONITE",
       "iv": 31,
       "level": 100,
       "moves": [
-       "ICICLESPEAR",
-       "ROCKBLAST",
-       "DRILLRUN",
-       "LIQUIDATION"
+       "SWORDSDANCE",
+       "CLOSECOMBAT",
+       "METEORMASH",
+       "BULLETPUNCH"
       ],
       "nature": "JOLLY",
-      "species": "CLOYSTER"
+      "species": "LUCARIO"
      },
      {
-      "ability": "CHLOROPHYLL",
-      "evs": {
-       "atk": 0,
-       "def": 0,
-       "hp": 6,
-       "spa": 252,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "F",
-      "held": "FOCUSSASH",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "GIGADRAIN",
-       "ENERGYBALL",
-       "PETALDANCE",
-       "HYPERBEAM"
-      ],
-      "nature": "TIMID",
-      "species": "LILLIGANT"
-     },
-     {
-      "ability": "DISGUISE",
+      "ability": "NOGUARD",
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 0
       },
-      "gender": "F",
-      "held": "FOCUSSASH",
+      "gender": "M",
+      "held": "ASSAULTVEST",
       "iv": 31,
       "level": 100,
       "moves": [
-       "PLAYROUGH",
-       "SHADOWSNEAK",
-       "SHADOWCLAW",
+       "DYNAMICPUNCH",
+       "STONEEDGE",
+       "KNOCKOFF",
+       "BULLETPUNCH"
+      ],
+      "nature": "ADAMANT",
+      "species": "MACHAMP"
+     },
+     {
+      "ability": "STEADFAST",
+      "evs": {
+       "atk": 252,
+       "def": 0,
+       "hp": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 126
+      },
+      "gender": "M",
+      "held": "LUMBERRY",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "SWORDSDANCE",
+       "CLOSECOMBAT",
+       "PSYCHOCUT",
+       "NIGHTSLASH"
+      ],
+      "nature": "JOLLY",
+      "species": "GALLADE"
+     },
+     {
+      "ability": "SCRAPPY",
+      "evs": {
+       "atk": 252,
+       "def": 0,
+       "hp": 126,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "gender": "F",
+      "held": "SILKSCARF",
+      "iv": 31,
+      "level": 100,
+      "moves": [
+       "DOUBLEEDGE",
+       "EARTHQUAKE",
+       "SUCKERPUNCH",
        "DRAINPUNCH"
       ],
-      "nature": "JOLLY",
-      "species": "MIMIKYU"
+      "nature": "ADAMANT",
+      "species": "KANGASKHAN"
      },
      {
-      "ability": "SWIFTSWIM",
-      "evs": {
-       "atk": 252,
-       "def": 0,
-       "hp": 6,
-       "spa": 0,
-       "spd": 0,
-       "spe": 252
-      },
-      "gender": "F",
-      "held": "FOCUSSASH",
-      "iv": 31,
-      "level": 100,
-      "moves": [
-       "LIQUIDATION",
-       "ICEPUNCH",
-       "CRUNCH",
-       "AQUAJET"
-      ],
-      "nature": "JOLLY",
-      "species": "FLOATZEL"
-     },
-     {
-      "ability": "ILLUSION",
+      "ability": "TORRENT",
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 126,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 0
       },
       "gender": "M",
-      "held": "FOCUSSASH",
+      "held": "ASSAULTVEST",
       "iv": 31,
       "level": 100,
       "moves": [
+       "HYDROPUMP",
+       "ICEBEAM",
        "DARKPULSE",
-       "FLAMETHROWER",
-       "SLUDGEBOMB",
-       "FOCUSBLAST"
+       "AURASPHERE"
       ],
-      "nature": "TIMID",
-      "species": "ZOROARK"
+      "nature": "MODEST",
+      "species": "BLASTOISE"
      },
      {
-      "ability": "DEFEATIST",
+      "ability": "LIMBER",
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
-      "gender": "M",
-      "held": "FOCUSSASH",
+      "gender": "F",
+      "held": "LIFEORB",
       "iv": 31,
       "level": 100,
       "moves": [
-       "ACROBATICS",
-       "STONEEDGE",
-       "EARTHQUAKE",
+       "HIGHJUMPKICK",
+       "RETURN",
+       "ICEPUNCH",
        "UTURN"
       ],
       "nature": "JOLLY",
-      "species": "ARCHEOPS"
+      "species": "LOPUNNY"
      }
     ],
     "zring": false
@@ -5454,10 +5454,10 @@
       "ability": "REGENERATOR",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -5477,10 +5477,10 @@
       "ability": "REGENERATOR",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -5500,10 +5500,10 @@
       "ability": "REGENERATOR",
       "evs": {
        "atk": 0,
-       "def": 6,
+       "def": 0,
        "hp": 252,
        "spa": 0,
-       "spd": 252,
+       "spd": 126,
        "spe": 0
       },
       "gender": "F",
@@ -5523,10 +5523,10 @@
       "ability": "REGENERATOR",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -5546,10 +5546,10 @@
       "ability": "REGENERATOR",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -5569,10 +5569,10 @@
       "ability": "REGENERATOR",
       "evs": {
        "atk": 0,
-       "def": 252,
+       "def": 126,
        "hp": 252,
        "spa": 0,
-       "spd": 6,
+       "spd": 0,
        "spe": 0
       },
       "gender": "F",
@@ -5620,12 +5620,12 @@
      {
       "ability": "ROUGHSKIN",
       "evs": {
-       "atk": 0,
-       "def": 252,
-       "hp": 252,
+       "atk": 252,
+       "def": 0,
+       "hp": 0,
        "spa": 0,
-       "spd": 6,
-       "spe": 0
+       "spd": 0,
+       "spe": 126
       },
       "gender": "F",
       "held": "ROCKYHELMET",
@@ -5637,7 +5637,7 @@
        "STEALTHROCK",
        "FIREFANG"
       ],
-      "nature": "IMPISH",
+      "nature": "JOLLY",
       "species": "GARCHOMP"
      },
      {
@@ -5645,19 +5645,19 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
-      "held": "SOFTSAND",
+      "held": "CHOICESCARF",
       "iv": 31,
       "level": 100,
       "moves": [
        "EARTHQUAKE",
-       "DRAGONCLAW",
-       "FIREFANG",
+       "OUTRAGE",
+       "STONEEDGE",
        "POISONJAB"
       ],
       "nature": "JOLLY",
@@ -5668,10 +5668,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "SPELLTAG",
@@ -5691,10 +5691,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "BLACKSLUDGE",
@@ -5713,8 +5713,8 @@
       "ability": "DEFIANT",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -5736,8 +5736,8 @@
       "ability": "DEFIANT",
       "evs": {
        "atk": 252,
-       "def": 6,
-       "hp": 252,
+       "def": 0,
+       "hp": 126,
        "spa": 0,
        "spd": 0,
        "spe": 0
@@ -5793,10 +5793,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
       "held": "ALAKAZITE",
@@ -5816,13 +5816,13 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "N",
-      "held": "CHOICEBAND",
+      "held": "SITRUSBERRY",
       "iv": 31,
       "level": 100,
       "moves": [
@@ -5838,10 +5838,10 @@
       "ability": "THICKFAT",
       "evs": {
        "atk": 0,
-       "def": 6,
+       "def": 0,
        "hp": 252,
        "spa": 0,
-       "spd": 252,
+       "spd": 126,
        "spe": 0
       },
       "gender": "M",
@@ -5862,10 +5862,10 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "N",
       "held": "ELECTRIUMZ",
@@ -5885,17 +5885,17 @@
       "evs": {
        "atk": 0,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 252,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "M",
-      "held": "SOULDEW",
+      "held": "LEFTOVERS",
       "iv": 31,
       "level": 100,
       "moves": [
-       "DRACOMETEOR",
+       "DRAGONPULSE",
        "PSYSHOCK",
        "SURF",
        "RECOVER"
@@ -5908,20 +5908,20 @@
       "evs": {
        "atk": 252,
        "def": 0,
-       "hp": 6,
+       "hp": 0,
        "spa": 0,
        "spd": 0,
-       "spe": 252
+       "spe": 126
       },
       "gender": "F",
       "held": "FOCUSSASH",
       "iv": 31,
       "level": 100,
       "moves": [
-       "SWORDSDANCE",
        "ICICLECRASH",
        "KNOCKOFF",
-       "ICESHARD"
+       "ICESHARD",
+       "LOWKICK"
       ],
       "nature": "JOLLY",
       "species": "WEAVILE"

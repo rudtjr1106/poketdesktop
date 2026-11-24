@@ -18,7 +18,12 @@
     마릿수    1~4층 3 · 5~9층 4 · 10~20층 5 · 21층부터 6
     종류      5의 배수 = 관문(gate) · 10의 배수 = 층주(boss) · 나머지 normal
     AI        1~40층 관장 AI (ai="gym", 얕은 셈 · 레벨이 낮으면 실수) · 41층부터 길드전 AI (ai="war", 깊은 셈)
-    노력치    1구역(1~10) 0 · 무보정 / 2구역(11~20) 주 능력 252 / 3구역부터 510 다
+    노력치    1구역(1~10) 0 · 무보정 / 2구역(11~20) 주 능력 252 / 3 · 4구역(21~40) 378 (252 + 126) / 5구역 510
+
+**3 · 4구역을 510 으로 채우지 않는다.** 처음에는 3구역부터 다 채웠는데, Lv.100 인 36~40층이 5구역 초입(전설의 새 ·
+무한의 용)보다 어려운 벽이 됐다 - 베테랑 봇 승률 4~40%, 씨앗 넷 x 12판 (11/24 sim_tower). 종 · 기술 · 도구를 아무리
+덜어도 안 움직였고, 노력치를 줄이니 바로 풀렸다 (주 능력만 주면 50~92%). 관장 자료가 Lv.100 에서도 노력치를 절반만
+주는 것과 같은 까닭이다 (build_gyms.ev_share - 다 채우면 같은 레벨의 잘 키운 팀 승률이 83% 에서 21% 로 떨어진다).
 
 깊은 셈은 서버 CPU 를 먹는다 (11/23~24 부하 줄이기). 41층부터만 쓰는 까닭 - 거기까지 온 사람이 적다.
 
@@ -30,7 +35,8 @@
 
 포켓몬은 M(종, 도구, 특성, 성격, 노력치, 기술). 뒤를 비우면 build_gyms 의 고르는 법(그 레벨까지 배우는 기술 중
 위력 좋은 것 · 기술에 맞춘 성격)으로 채운다 - 1 · 2구역이 그렇다. 3구역부터는 전부 적는다.
-노력치는 "atk/spe" 처럼 적는다 (둘에 252씩, 남는 6은 HP - HP 가 그 둘 안에 있으면 방어 쪽).
+노력치는 "atk/spe" 처럼 적는다 - 앞의 것이 주 능력이다. 5구역은 둘에 252씩 + 남는 6 (HP, HP 가 그 둘 안에 있으면
+방어 쪽), 3 · 4구역은 앞에 252 · 뒤에 126 뿐이다.
 
 ## 엔진이 요구하는 깃발 (자료에 적어 둔다 - 서버는 그대로 넘긴다)
 
@@ -168,7 +174,7 @@ FLOORS = [
         M("STEELIX", "SITRUSBERRY", "STURDY", moves=["EARTHQUAKE", "IRONHEAD", "TOXIC", "ROCKSLIDE"]),
         M("GYARADOS", "LUMBERRY", "INTIMIDATE", moves=["WATERFALL", "THUNDERWAVE", "EARTHQUAKE", "ICEFANG"])]),
 
-    # ===== 3구역 전술 (Lv.70~88) - 노력치 510, 날씨 · 필드 · 트릭룸 =====
+    # ===== 3구역 전술 (Lv.70~88) - 노력치 378 (적은 것의 앞에 252 · 뒤에 126), 날씨 · 필드 · 트릭룸 =====
     (21, "장맛비", "juan", [
         M("POLITOED", "DAMPROCK", "DRIZZLE", "BOLD", "hp/def", ["SCALD", "ICEBEAM", "HYPNOSIS", "ENCORE"]),
         M("LUDICOLO", "LIFEORB", "SWIFTSWIM", "MODEST", "spa/spe", ["HYDROPUMP", "GIGADRAIN", "ICEBEAM", "RAINDANCE"]),
@@ -189,9 +195,9 @@ FLOORS = [
         M("LYCANROC", "CHOICEBAND", "SANDRUSH", "JOLLY", "atk/spe", ["STONEEDGE", "ACCELEROCK", "CLOSECOMBAT", "CRUNCH"]),
         M("STOUTLAND", "SILKSCARF", "SANDRUSH", "ADAMANT", "atk/spe", ["RETURN", "CRUNCH", "PLAYROUGH", "SUPERPOWER"]),
         M("CRADILY", "LEFTOVERS", "STORMDRAIN", "CAREFUL", "hp/spd", ["ROCKSLIDE", "GIGADRAIN", "RECOVER", "TOXIC"]),
-        M("AGGRON", "HARDSTONE", "ROCKHEAD", "ADAMANT", "hp/atk", ["HEADSMASH", "IRONHEAD", "EARTHQUAKE", "ICEPUNCH"])]),
+        M("AGGRON", "HARDSTONE", "ROCKHEAD", "ADAMANT", "atk/hp", ["HEADSMASH", "IRONHEAD", "EARTHQUAKE", "ICEPUNCH"])]),
     (24, "눈보라", "candice", [
-        M("ABOMASNOW", "LIGHTCLAY", "SNOWWARNING", "MODEST", "hp/spa", ["BLIZZARD", "GIGADRAIN", "AURORAVEIL", "ICESHARD"]),
+        M("ABOMASNOW", "LIGHTCLAY", "SNOWWARNING", "MODEST", "spa/hp", ["BLIZZARD", "GIGADRAIN", "AURORAVEIL", "ICESHARD"]),
         M("BEARTIC", "LIFEORB", "SLUSHRUSH", "ADAMANT", "atk/spe", ["ICICLECRASH", "SUPERPOWER", "AQUAJET", "SWORDSDANCE"]),
         M("CETITAN", "SITRUSBERRY", "SLUSHRUSH", "ADAMANT", "atk/spe", ["ICICLECRASH", "EARTHQUAKE", "ICESHARD", "BELLYDRUM"]),
         M("WALREIN", "LEFTOVERS", "ICEBODY", "BOLD", "hp/def", ["SURF", "BLIZZARD", "PROTECT", "TOXIC"]),
@@ -200,12 +206,12 @@ FLOORS = [
     # 관문: 트릭룸. 거는 포켓몬 둘 + 느리고 아픈 넷 (선공기 둘 - 트릭룸이 안 걸려도 맞는다). 처음 구성(텅구리 ·
     # 슈바르고 · 야도킹 · 야느와르몽)은 레벨을 맞춘 봇에게 83% 로 구역에서 가장 쉬웠다 - 11/24 sim_tower --matched
     (25, "뒤틀린 시간", "caitlin", [
-        M("HATTERENE", "LIFEORB", "MAGICBOUNCE", "QUIET", "hp/spa", ["TRICKROOM", "DAZZLINGGLEAM", "PSYCHIC", "MYSTICALFIRE"]),
-        M("REUNICLUS", "LEFTOVERS", "MAGICGUARD", "QUIET", "hp/spa", ["TRICKROOM", "PSYCHIC", "FOCUSBLAST", "SHADOWBALL"]),
-        M("AZUMARILL", "ASSAULTVEST", "HUGEPOWER", "BRAVE", "hp/atk", ["AQUAJET", "PLAYROUGH", "LIQUIDATION", "KNOCKOFF"]),
-        M("CONKELDURR", "FLAMEORB", "GUTS", "BRAVE", "hp/atk", ["DRAINPUNCH", "MACHPUNCH", "KNOCKOFF", "ICEPUNCH"]),
-        M("URSALUNA", "TOXICORB", "GUTS", "BRAVE", "hp/atk", ["FACADE", "HEADLONGRUSH", "CRUNCH", "ICEPUNCH"]),
-        M("CRAWDAUNT", "CHOICEBAND", "ADAPTABILITY", "BRAVE", "hp/atk", ["CRABHAMMER", "KNOCKOFF", "AQUAJET", "SUPERPOWER"])]),
+        M("HATTERENE", "LIFEORB", "MAGICBOUNCE", "QUIET", "spa/hp", ["TRICKROOM", "DAZZLINGGLEAM", "PSYCHIC", "MYSTICALFIRE"]),
+        M("REUNICLUS", "LEFTOVERS", "MAGICGUARD", "QUIET", "spa/hp", ["TRICKROOM", "PSYCHIC", "FOCUSBLAST", "SHADOWBALL"]),
+        M("AZUMARILL", "ASSAULTVEST", "HUGEPOWER", "BRAVE", "atk/hp", ["AQUAJET", "PLAYROUGH", "LIQUIDATION", "KNOCKOFF"]),
+        M("CONKELDURR", "FLAMEORB", "GUTS", "BRAVE", "atk/hp", ["DRAINPUNCH", "MACHPUNCH", "KNOCKOFF", "ICEPUNCH"]),
+        M("URSALUNA", "TOXICORB", "GUTS", "BRAVE", "atk/hp", ["FACADE", "HEADLONGRUSH", "CRUNCH", "ICEPUNCH"]),
+        M("CRAWDAUNT", "CHOICEBAND", "ADAPTABILITY", "BRAVE", "atk/hp", ["CRABHAMMER", "KNOCKOFF", "AQUAJET", "SUPERPOWER"])]),
     (26, "가시밭길", "olivia", [
         M("FERROTHORN", "ROCKYHELMET", "IRONBARBS", "RELAXED", "hp/def", ["SPIKES", "LEECHSEED", "POWERWHIP", "KNOCKOFF"]),
         M("ROSERADE", "BLACKSLUDGE", "NATURALCURE", "TIMID", "spa/spe", ["TOXICSPIKES", "SLUDGEBOMB", "GIGADRAIN", "SPIKES"]),
@@ -230,7 +236,7 @@ FLOORS = [
         M("TALONFLAME", "CHOICESCARF", "GALEWINGS", "JOLLY", "atk/spe", ["BRAVEBIRD", "FLAREBLITZ", "UTURN", "STEELWING"]),
         M("MIENSHAO", "CHOICESCARF", "REGENERATOR", "JOLLY", "atk/spe", ["HIGHJUMPKICK", "UTURN", "KNOCKOFF", "STONEEDGE"])]),
     (29, "필드 술사", "mina", [
-        M("PINCURCHIN", "TERRAINEXTENDER", "ELECTRICSURGE", "MODEST", "hp/spa", ["RISINGVOLTAGE", "SCALD", "SPIKES", "RECOVER"]),
+        M("PINCURCHIN", "TERRAINEXTENDER", "ELECTRICSURGE", "MODEST", "spa/hp", ["RISINGVOLTAGE", "SCALD", "SPIKES", "RECOVER"]),
         M("INDEEDEE", "CHOICESPECS", "PSYCHICSURGE", "TIMID", "spa/spe", ["EXPANDINGFORCE", "HYPERVOICE", "MYSTICALFIRE", "SHADOWBALL"]),
         M("RILLABOOM", "CHOICEBAND", "GRASSYSURGE", "ADAMANT", "atk/spe", ["GRASSYGLIDE", "WOODHAMMER", "KNOCKOFF", "UTURN"]),
         M("HAWLUCHA", "ELECTRICSEED", "UNBURDEN", "JOLLY", "atk/spe", ["ACROBATICS", "CLOSECOMBAT", "SWORDSDANCE", "STONEEDGE"]),
@@ -241,46 +247,48 @@ FLOORS = [
         M("SWAMPERT", "LEFTOVERS", "TORRENT", "RELAXED", "hp/def", ["EARTHQUAKE", "WATERFALL", "STEALTHROCK", "ICEPUNCH"]),
         M("SALAMENCE", "LIFEORB", "INTIMIDATE", "JOLLY", "atk/spe", ["DRAGONDANCE", "DRAGONCLAW", "EARTHQUAKE", "FIREFANG"]),
         M("CHARIZARD", "HEAVYDUTYBOOTS", "BLAZE", "TIMID", "spa/spe", ["FLAMETHROWER", "AIRSLASH", "FOCUSBLAST", "ROOST"]),
-        M("METAGROSS", "ASSAULTVEST", "CLEARBODY", "ADAMANT", "hp/atk", ["METEORMASH", "ZENHEADBUTT", "EARTHQUAKE", "BULLETPUNCH"]),
+        M("METAGROSS", "ASSAULTVEST", "CLEARBODY", "ADAMANT", "atk/hp", ["METEORMASH", "ZENHEADBUTT", "EARTHQUAKE", "BULLETPUNCH"]),
         M("ELECTIVIRE", "EXPERTBELT", "MOTORDRIVE", "JOLLY", "atk/spe", ["WILDCHARGE", "ICEPUNCH", "EARTHQUAKE", "CROSSCHOP"]),
         M("GARDEVOIR", "CHOICESCARF", "TRACE", "TIMID", "spa/spe", ["MOONBLAST", "PSYCHIC", "FOCUSBLAST", "THUNDERBOLT"])]),
 
-    # ===== 4구역 정예 (Lv.90~100) - 실전 세트, 35 · 40층 메가, 40층 Z =====
+    # ===== 4구역 정예 (Lv.90~100) - 실전 세트(노력치는 378), 37 · 40층 메가, 40층 Z =====
     (31, "이브이 일가", "trace", [
         M("VAPOREON", "LEFTOVERS", "WATERABSORB", "BOLD", "hp/def", ["SCALD", "WISH", "PROTECT", "ICEBEAM"]),
         M("JOLTEON", "CHOICESPECS", "VOLTABSORB", "TIMID", "spa/spe", ["THUNDERBOLT", "VOLTSWITCH", "SHADOWBALL", "HYPERVOICE"]),
-        M("FLAREON", "TOXICORB", "GUTS", "ADAMANT", "hp/atk", ["FLAREBLITZ", "FACADE", "SUPERPOWER", "QUICKATTACK"]),
+        M("FLAREON", "TOXICORB", "GUTS", "ADAMANT", "atk/hp", ["FLAREBLITZ", "FACADE", "SUPERPOWER", "QUICKATTACK"]),
         M("LEAFEON", "LIFEORB", "CHLOROPHYLL", "JOLLY", "atk/spe", ["SWORDSDANCE", "LEAFBLADE", "KNOCKOFF", "XSCISSOR"]),
-        M("GLACEON", "NEVERMELTICE", "SNOWCLOAK", "MODEST", "hp/spa", ["ICEBEAM", "FREEZEDRY", "SHADOWBALL", "WATERPULSE"]),
-        M("SYLVEON", "PIXIEPLATE", "PIXILATE", "MODEST", "hp/spa", ["HYPERVOICE", "MYSTICALFIRE", "PSYSHOCK", "CALMMIND"])]),
+        M("GLACEON", "NEVERMELTICE", "SNOWCLOAK", "MODEST", "spa/hp", ["ICEBEAM", "FREEZEDRY", "SHADOWBALL", "WATERPULSE"]),
+        M("SYLVEON", "PIXIEPLATE", "PIXILATE", "MODEST", "spa/hp", ["HYPERVOICE", "MYSTICALFIRE", "PSYSHOCK", "CALMMIND"])]),
     (32, "600족의 방", "lance", [
-        M("TYRANITAR", "SMOOTHROCK", "SANDSTREAM", "ADAMANT", "hp/atk", ["STONEEDGE", "CRUNCH", "EARTHQUAKE", "STEALTHROCK"]),
+        M("TYRANITAR", "SMOOTHROCK", "SANDSTREAM", "ADAMANT", "atk/hp", ["STONEEDGE", "CRUNCH", "EARTHQUAKE", "STEALTHROCK"]),
         M("HYDREIGON", "CHOICESPECS", "LEVITATE", "TIMID", "spa/spe", ["DRACOMETEOR", "DARKPULSE", "FLAMETHROWER", "FLASHCANNON"]),
-        M("GOODRA", "ASSAULTVEST", "SAPSIPPER", "MODEST", "hp/spa", ["DRAGONPULSE", "FLAMETHROWER", "THUNDERBOLT", "SLUDGEBOMB"]),
+        M("GOODRA", "ASSAULTVEST", "SAPSIPPER", "MODEST", "spa/hp", ["DRAGONPULSE", "FLAMETHROWER", "THUNDERBOLT", "SLUDGEBOMB"]),
         M("KOMMOO", "LUMBERRY", "BULLETPROOF", "JOLLY", "atk/spe", ["DRAGONDANCE", "CLOSECOMBAT", "DRAGONCLAW", "POISONJAB"]),
         M("BAXCALIBUR", "LOADEDDICE", "THERMALEXCHANGE", "ADAMANT", "atk/spe", ["ICICLESPEAR", "SCALESHOT", "EARTHQUAKE", "DRAGONDANCE"]),
-        M("DRAGONITE", "WEAKNESSPOLICY", "MULTISCALE", "ADAMANT", "hp/atk", ["DRAGONDANCE", "DRAGONCLAW", "EARTHQUAKE", "EXTREMESPEED"])]),
+        M("DRAGONITE", "WEAKNESSPOLICY", "MULTISCALE", "ADAMANT", "atk/hp", ["DRAGONDANCE", "DRAGONCLAW", "EARTHQUAKE", "EXTREMESPEED"])]),
     (33, "스타팅 올스타", "professor-oak", [
-        M("BLAZIKEN", "LIFEORB", "SPEEDBOOST", "ADAMANT", "atk/spe", ["SWORDSDANCE", "FLAREBLITZ", "CLOSECOMBAT", "STONEEDGE"]),
+        M("BLAZIKEN", "LIFEORB", "SPEEDBOOST", "ADAMANT", "atk/spe", ["FLAREBLITZ", "CLOSECOMBAT", "STONEEDGE", "THUNDERPUNCH"]),
         M("SCEPTILE", "MIRACLESEED", "OVERGROW", "TIMID", "spa/spe", ["LEAFSTORM", "DRAGONPULSE", "FOCUSBLAST", "GIGADRAIN"]),
         M("GRENINJA", "EXPERTBELT", "PROTEAN", "TIMID", "spa/spe", ["HYDROPUMP", "DARKPULSE", "ICEBEAM", "UTURN"]),
-        M("EMPOLEON", "LEFTOVERS", "TORRENT", "MODEST", "hp/spa", ["SCALD", "FLASHCANNON", "ICEBEAM", "STEALTHROCK"]),
+        M("EMPOLEON", "LEFTOVERS", "TORRENT", "MODEST", "spa/hp", ["SCALD", "FLASHCANNON", "ICEBEAM", "STEALTHROCK"]),
         M("SERPERIOR", "LEFTOVERS", "CONTRARY", "TIMID", "spa/spe", ["LEAFSTORM", "DRAGONPULSE", "GLARE", "GIGADRAIN"]),
         M("CINDERACE", "HEAVYDUTYBOOTS", "LIBERO", "JOLLY", "atk/spe", ["PYROBALL", "HIGHJUMPKICK", "UTURN", "SUCKERPUNCH"])]),
     (34, "치고 빠지기", "volkner", [
         M("ROTOM", "LEFTOVERS", "LEVITATE", "TIMID", "spa/spe", ["VOLTSWITCH", "THUNDERBOLT", "SHADOWBALL", "WILLOWISP"]),
-        M("SCIZOR", "CHOICEBAND", "TECHNICIAN", "ADAMANT", "hp/atk", ["UTURN", "BULLETPUNCH", "KNOCKOFF", "SUPERPOWER"]),
+        M("SCIZOR", "CHOICEBAND", "TECHNICIAN", "ADAMANT", "atk/hp", ["UTURN", "BULLETPUNCH", "KNOCKOFF", "SUPERPOWER"]),
         M("INCINEROAR", "HEAVYDUTYBOOTS", "INTIMIDATE", "CAREFUL", "hp/spd", ["UTURN", "FLAREBLITZ", "KNOCKOFF", "EARTHQUAKE"]),
-        M("EELEKTROSS", "ASSAULTVEST", "LEVITATE", "QUIET", "hp/spa", ["VOLTSWITCH", "FLAMETHROWER", "GIGADRAIN", "UTURN"]),
+        M("EELEKTROSS", "ASSAULTVEST", "LEVITATE", "QUIET", "spa/hp", ["VOLTSWITCH", "FLAMETHROWER", "GIGADRAIN", "UTURN"]),
         M("BARRASKEWDA", "CHOICEBAND", "SWIFTSWIM", "ADAMANT", "atk/spe", ["FLIPTURN", "LIQUIDATION", "CLOSECOMBAT", "CRUNCH"]),
         M("MEOWSCARADA", "CHOICESCARF", "PROTEAN", "JOLLY", "atk/spe", ["UTURN", "FLOWERTRICK", "KNOCKOFF", "PLAYROUGH"])]),
-    (35, "메가진화의 층", "korrina", [
-        M("LUCARIO", "LUCARIONITE", "INNERFOCUS", "JOLLY", "atk/spe", ["SWORDSDANCE", "CLOSECOMBAT", "METEORMASH", "BULLETPUNCH"]),
-        M("MACHAMP", "ASSAULTVEST", "NOGUARD", "ADAMANT", "hp/atk", ["DYNAMICPUNCH", "STONEEDGE", "KNOCKOFF", "BULLETPUNCH"]),
-        M("MEDICHAM", "LIFEORB", "PUREPOWER", "JOLLY", "atk/spe", ["HIGHJUMPKICK", "ZENHEADBUTT", "ICEPUNCH", "BULLETPUNCH"]),
-        M("PANGORO", "CHOICEBAND", "IRONFIST", "ADAMANT", "hp/atk", ["KNOCKOFF", "DRAINPUNCH", "GUNKSHOT", "BULLETPUNCH"]),
-        M("GALLADE", "LUMBERRY", "STEADFAST", "JOLLY", "atk/spe", ["SWORDSDANCE", "CLOSECOMBAT", "PSYCHOCUT", "NIGHTSLASH"]),
-        M("SCRAFTY", "LEFTOVERS", "INTIMIDATE", "CAREFUL", "hp/spd", ["DRAGONDANCE", "DRAINPUNCH", "KNOCKOFF", "ICEPUNCH"])]),
+    # 관문: 기합의띠 여섯 (사람 팀에는 막힌 구성 - 10/29). **랭크업 · 잠재우기는 넣지 않는다**: 띠로 번 한 턴에 껍질깨기 ·
+    # 나비춤 · 칼춤을 쌓게 두면 베테랑 봇 승률이 6% 인 벽이었다 (11/24 sim_tower). 여섯 다 '한 번 더 때리는' 것만으로 충분히 맵다.
+    (35, "띠 부대", "guzma", [
+        M("CINCCINO", "FOCUSSASH", "SKILLLINK", "JOLLY", "atk/spe", ["TAILSLAP", "BULLETSEED", "ROCKBLAST", "TRIPLEAXEL"]),
+        M("LILLIGANT", "FOCUSSASH", "CHLOROPHYLL", "TIMID", "spa/spe", ["GIGADRAIN", "ENERGYBALL", "PETALDANCE", "HYPERBEAM"]),
+        M("MIMIKYU", "FOCUSSASH", "DISGUISE", "JOLLY", "atk/spe", ["PLAYROUGH", "SHADOWSNEAK", "SHADOWCLAW", "DRAINPUNCH"]),
+        M("FLOATZEL", "FOCUSSASH", "SWIFTSWIM", "JOLLY", "atk/spe", ["LIQUIDATION", "ICEPUNCH", "CRUNCH", "AQUAJET"]),
+        M("ZOROARK", "FOCUSSASH", "ILLUSION", "TIMID", "spa/spe", ["DARKPULSE", "FLAMETHROWER", "SLUDGEBOMB", "FOCUSBLAST"]),
+        M("RAPIDASH", "FOCUSSASH", "FLASHFIRE", "JOLLY", "atk/spe", ["FLAREBLITZ", "WILDCHARGE", "HIGHHORSEPOWER", "DRILLRUN"])]),
     # 구애 도구 여섯 (머리띠 둘 · 스카프 둘 · 안경 둘)
     (36, "구애 부대", "norman", [
         M("SLAKING", "CHOICEBAND", "TRUANT", "ADAMANT", "atk/spe", ["DOUBLEEDGE", "EARTHQUAKE", "KNOCKOFF", "PLAYROUGH"]),
@@ -288,16 +296,16 @@ FLOORS = [
         M("HAXORUS", "CHOICESCARF", "MOLDBREAKER", "JOLLY", "atk/spe", ["OUTRAGE", "EARTHQUAKE", "POISONJAB", "IRONTAIL"]),
         M("CHANDELURE", "CHOICESCARF", "FLASHFIRE", "TIMID", "spa/spe", ["FIREBLAST", "SHADOWBALL", "ENERGYBALL", "PSYCHIC"]),
         M("PORYGONZ", "CHOICESPECS", "ADAPTABILITY", "TIMID", "spa/spe", ["TRIATTACK", "SHADOWBALL", "ICEBEAM", "THUNDERBOLT"]),
-        M("EXPLOUD", "CHOICESPECS", "SCRAPPY", "MODEST", "hp/spa", ["BOOMBURST", "FLAMETHROWER", "FOCUSBLAST", "SURF"])]),
-    # 기합의띠 여섯 (사람 팀에는 막힌 구성 - 10/29). **랭크업 · 잠재우기는 넣지 않는다**: 띠로 번 한 턴에 껍질깨기 ·
-    # 나비춤 · 칼춤을 쌓게 두면 베테랑 봇 승률이 6% 인 벽이었다 (11/24 sim_tower). 여섯 다 '한 번 더 때리는' 것만으로 충분히 맵다.
-    (37, "띠 부대", "guzma", [
-        M("CLOYSTER", "FOCUSSASH", "SKILLLINK", "JOLLY", "atk/spe", ["ICICLESPEAR", "ROCKBLAST", "DRILLRUN", "LIQUIDATION"]),
-        M("LILLIGANT", "FOCUSSASH", "CHLOROPHYLL", "TIMID", "spa/spe", ["GIGADRAIN", "ENERGYBALL", "PETALDANCE", "HYPERBEAM"]),
-        M("MIMIKYU", "FOCUSSASH", "DISGUISE", "JOLLY", "atk/spe", ["PLAYROUGH", "SHADOWSNEAK", "SHADOWCLAW", "DRAINPUNCH"]),
-        M("FLOATZEL", "FOCUSSASH", "SWIFTSWIM", "JOLLY", "atk/spe", ["LIQUIDATION", "ICEPUNCH", "CRUNCH", "AQUAJET"]),
-        M("ZOROARK", "FOCUSSASH", "ILLUSION", "TIMID", "spa/spe", ["DARKPULSE", "FLAMETHROWER", "SLUDGEBOMB", "FOCUSBLAST"]),
-        M("ARCHEOPS", "FOCUSSASH", "DEFEATIST", "JOLLY", "atk/spe", ["ACROBATICS", "STONEEDGE", "EARTHQUAKE", "UTURN"])]),
+        M("EXPLOUD", "CHOICESPECS", "SCRAPPY", "MODEST", "spa/hp", ["BOOMBURST", "FLAMETHROWER", "FOCUSBLAST", "SURF"])]),
+    # 메가진화는 여기서 처음 나온다. (처음에는 이 층이 35층 관문이었는데 봇 승률 83% 로 뒤의 층들보다 쉬웠다 -
+    # 관문 자리는 띠 부대(48%)에 주고 바꿨다, 11/24)
+    (37, "메가진화의 층", "korrina", [
+        M("LUCARIO", "LUCARIONITE", "INNERFOCUS", "JOLLY", "atk/spe", ["SWORDSDANCE", "CLOSECOMBAT", "METEORMASH", "BULLETPUNCH"]),
+        M("MACHAMP", "ASSAULTVEST", "NOGUARD", "ADAMANT", "atk/hp", ["DYNAMICPUNCH", "STONEEDGE", "KNOCKOFF", "BULLETPUNCH"]),
+        M("GALLADE", "LUMBERRY", "STEADFAST", "JOLLY", "atk/spe", ["SWORDSDANCE", "CLOSECOMBAT", "PSYCHOCUT", "NIGHTSLASH"]),
+        M("KANGASKHAN", "SILKSCARF", "SCRAPPY", "ADAMANT", "atk/hp", ["DOUBLEEDGE", "EARTHQUAKE", "SUCKERPUNCH", "DRAINPUNCH"]),
+        M("BLASTOISE", "ASSAULTVEST", "TORRENT", "MODEST", "spa/hp", ["HYDROPUMP", "ICEBEAM", "DARKPULSE", "AURASPHERE"]),
+        M("LOPUNNY", "LIFEORB", "LIMBER", "JOLLY", "atk/spe", ["HIGHJUMPKICK", "RETURN", "ICEPUNCH", "UTURN"])]),
     # 재생력 다섯 - 야도란 둘 · 뽀록나 둘 (검은진흙 셋)
     (38, "재생력 순환", "siebold", [
         M("SLOWBRO", "ROCKYHELMET", "REGENERATOR", "BOLD", "hp/def", ["SCALD", "SLACKOFF", "PSYCHIC", "THUNDERWAVE"]),
@@ -307,20 +315,20 @@ FLOORS = [
         M("TOXAPEX", "BLACKSLUDGE", "REGENERATOR", "BOLD", "hp/def", ["SCALD", "RECOVER", "TOXIC", "HAZE"]),
         M("ALOMOMOLA", "LEFTOVERS", "REGENERATOR", "IMPISH", "hp/def", ["SCALD", "WISH", "PROTECT", "KNOCKOFF"])]),
     (39, "쌍둥이 에이스", "iris", [
-        M("GARCHOMP", "ROCKYHELMET", "ROUGHSKIN", "IMPISH", "hp/def", ["EARTHQUAKE", "DRAGONCLAW", "STEALTHROCK", "FIREFANG"]),
-        M("GARCHOMP", "SOFTSAND", "ROUGHSKIN", "JOLLY", "atk/spe", ["EARTHQUAKE", "DRAGONCLAW", "FIREFANG", "POISONJAB"]),
+        M("GARCHOMP", "ROCKYHELMET", "ROUGHSKIN", "JOLLY", "atk/spe", ["EARTHQUAKE", "DRAGONCLAW", "STEALTHROCK", "FIREFANG"]),
+        M("GARCHOMP", "CHOICESCARF", "ROUGHSKIN", "JOLLY", "atk/spe", ["EARTHQUAKE", "OUTRAGE", "STONEEDGE", "POISONJAB"]),
         M("GENGAR", "SPELLTAG", "CURSEDBODY", "TIMID", "spa/spe", ["SHADOWBALL", "SLUDGEBOMB", "FOCUSBLAST", "THUNDERBOLT"]),
         M("GENGAR", "BLACKSLUDGE", "CURSEDBODY", "TIMID", "spa/spe", ["SHADOWBALL", "SLUDGEWAVE", "DAZZLINGGLEAM", "WILLOWISP"]),
-        M("BISHARP", "EVIOLITE", "DEFIANT", "ADAMANT", "hp/atk", ["NIGHTSLASH", "IRONHEAD", "SUCKERPUNCH", "LOWKICK"]),
-        M("BISHARP", "EVIOLITE", "DEFIANT", "ADAMANT", "hp/atk", ["NIGHTSLASH", "IRONHEAD", "SUCKERPUNCH", "STEALTHROCK"])]),
+        M("BISHARP", "EVIOLITE", "DEFIANT", "ADAMANT", "atk/hp", ["NIGHTSLASH", "IRONHEAD", "SUCKERPUNCH", "LOWKICK"]),
+        M("BISHARP", "EVIOLITE", "DEFIANT", "ADAMANT", "atk/hp", ["NIGHTSLASH", "IRONHEAD", "SUCKERPUNCH", "STEALTHROCK"])]),
     # 층주 리라 (살롱 메이든): 후딘 · 앤테이 · 잠만보 / 라이코 · 라티오스. 메가 + Z
     (40, "살롱 메이든", "anabel", [
         M("ALAKAZAM", "ALAKAZITE", "MAGICGUARD", "TIMID", "spa/spe", ["PSYCHIC", "SHADOWBALL", "FOCUSBLAST", "CALMMIND"]),
-        M("ENTEI", "CHOICEBAND", "PRESSURE", "ADAMANT", "atk/spe", ["SACREDFIRE", "EXTREMESPEED", "STONEEDGE", "STOMPINGTANTRUM"]),
+        M("ENTEI", "SITRUSBERRY", "PRESSURE", "ADAMANT", "atk/spe", ["SACREDFIRE", "EXTREMESPEED", "STONEEDGE", "STOMPINGTANTRUM"]),
         M("SNORLAX", "LEFTOVERS", "THICKFAT", "CAREFUL", "hp/spd", ["CURSE", "BODYSLAM", "EARTHQUAKE", "REST"]),
         M("RAIKOU", "ELECTRIUMZ", "PRESSURE", "TIMID", "spa/spe", ["THUNDERBOLT", "CALMMIND", "SHADOWBALL", "SCALD"]),
-        M("LATIOS", "SOULDEW", "LEVITATE", "TIMID", "spa/spe", ["DRACOMETEOR", "PSYSHOCK", "SURF", "RECOVER"]),
-        M("WEAVILE", "FOCUSSASH", "PRESSURE", "JOLLY", "atk/spe", ["SWORDSDANCE", "ICICLECRASH", "KNOCKOFF", "ICESHARD"])]),
+        M("LATIOS", "LEFTOVERS", "LEVITATE", "TIMID", "spa/spe", ["DRAGONPULSE", "PSYSHOCK", "SURF", "RECOVER"]),
+        M("WEAVILE", "FOCUSSASH", "PRESSURE", "JOLLY", "atk/spe", ["ICICLECRASH", "KNOCKOFF", "ICESHARD", "LOWKICK"])]),
 
     # ===== 5구역 전설 (Lv.100) - 길드전 AI, 메가 · Z, 45층부터 테라스탈 =====
     # 차례는 tools/sim_tower.py 로 잰 승률 순이다 (11/24). 처음 적은 차례에서는 울트라비스트 · 패러독스가 43 · 44층에서
@@ -421,16 +429,21 @@ def ref():
     return _REF
 
 
-def parse_evs(spec):
-    """"atk/spe" -> 둘에 252씩, 남는 6은 HP (HP 가 그 둘 안에 있으면 방어 쪽). dict 면 그대로."""
+def parse_evs(spec, full=True):
+    """"atk/spe" -> 둘에 252씩, 남는 6은 HP (HP 가 그 둘 안에 있으면 방어 쪽). dict 면 그대로.
+
+    full=False (3 · 4구역): 앞의 것(주 능력)에 252, 뒤의 것에 126 뿐 - 합 378 (머리말).
+    """
     evs = dict((s, 0) for s in P.STATS)
     if isinstance(spec, dict):
         evs.update(spec)
         return evs
     a, b = spec.split("/")
-    evs[a] = evs[b] = 252
-    rest = "hp" if "hp" not in (a, b) else ("spd" if "def" in (a, b) else "def")
-    evs[rest] = 6
+    evs[a] = 252
+    evs[b] = 252 if full else 126
+    if full:
+        rest = "hp" if "hp" not in (a, b) else ("spd" if "def" in (a, b) else "def")
+        evs[rest] = 6
     return evs
 
 
@@ -463,7 +476,9 @@ def fill(spec, n):
         evs = dict((s, 252 if s == main else 0) for s in P.STATS)      # 수련 구역: 주 능력만
     if z >= 1:
         if spec["evs"]:
-            evs = parse_evs(spec["evs"])
+            evs = parse_evs(spec["evs"], full=z >= 4)
+        elif z in (2, 3):
+            raise ValueError("%d층 %s: 3 · 4구역은 노력치를 \"주/둘째\" 로 적는다" % (n, spec["species"]))
         nature = spec["nature"] or nature
     return {"species": spec["species"], "level": level, "iv": 31, "evs": evs, "nature": nature,
             "ability": spec["ability"] or G.ability_of(gdex, sp, None), "moves": moves,

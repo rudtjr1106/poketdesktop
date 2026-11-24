@@ -195,9 +195,11 @@ def core():
     _r, _t, tb41, _e = tower.start(u, gym_routes._party(u), 41)
     _r, _t, tb1, _e = tower.start(u, gym_routes._party(u), 1)
     chk("41층부터 길드전 AI, 그 아래는 관장 AI", tb41.trainer.get("ai") == "war" and tb1.trainer.get("ai") == "gym")
-    _r, _t, tb35, _e = tower.start(u, gym_routes._party(u), 35, keystone=True, zring=True, orb=True)
-    chk("내 키스톤 · Z링 · 테라오브는 서버가 채운 대로", tb35.keystone["me"] and tb35.zring["me"] and tb35.tera_orb["me"])
-    chk("메가스톤을 쥔 층은 상대도 메가진화한다", tb35.keystone["foe"] is True and tb1.keystone["foe"] is False
+    # 메가스톤을 쥔 포켓몬이 있는 관장 AI 층 (층 번호는 자료가 정한다 - 난이도를 재면서 35층에서 37층으로 옮겼다)
+    mega = next(f["floor"] for f in tower.data()["floors"] if f["trainer"]["keystone"] and f["trainer"]["ai"] == "gym")
+    _r, _t, tbm, _e = tower.start(u, gym_routes._party(u), mega, keystone=True, zring=True, orb=True)
+    chk("내 키스톤 · Z링 · 테라오브는 서버가 채운 대로", tbm.keystone["me"] and tbm.zring["me"] and tbm.tera_orb["me"])
+    chk("메가스톤을 쥔 층은 상대도 메가진화한다", tbm.keystone["foe"] is True and tb1.keystone["foe"] is False
         and tb41.keystone["foe"] is False)
     return u
 
