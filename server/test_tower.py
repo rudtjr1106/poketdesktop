@@ -196,9 +196,107 @@ def core():
     return u
 
 
+def detail_of(fn):
+    try:
+        fn()
+    except HTTPException as e:
+        return str(e.detail)
+    return ""
+
+
+def play_out(uid, bid):
+    """판을 끝까지 둔다 - 쓸 수 있는 첫 기술만, 쓰러지면 다음 포켓몬. (마지막 답, 그동안 받은 경험치 줄 수)"""
+    from common import trainer_battle as TB
+    out, gained = None, 0
+    for _turn in range(200):
+        row = db.q1("SELECT * FROM gym_battle WHERE id=?", (bid,))
+        if row["state"] != "active":
+            break
+        tb = TB.TrainerBattle.load(deps.dex(), json.loads(row["data"]))
+        if tb.need_switch:
+            body = gym_routes.ActIn(kind="switch", slot=tb.valid_switches()[0])
+        else:
+            body = gym_routes.ActIn(kind="move", move=tb.bt.usable(tb.me)[0])
+        out = gym_routes.act(bid, body, me(uid))
+        gained += len(out.get("exp") or [])
+    return out, gained
+
+
+def routes():
+    """tower_routes 와, 관장 판(gym_routes · boss_routes · arche)에 얹은 갈림."""
+    from app import arche, boss_routes, gym, tower_routes
+    v = mkuser("visitor")
+    mkmon(v, "GARCHOMP", 60, 0)              # Lv.60 이라 경험치를 받는다 (Lv.100 은 더 안 오른다)
+    mkmon(v, "METAGROSS", 60, 1, moves=("METEORMASH", "EARTHQUAKE"))
+    empty = mkuser("nobody")
+    some_region = sorted(gym.gyms()["regions"])[0]
+
+    print("\n=== 길: 닫힌 시즌 ===")
+    season.SEASON = 6
+    chk("개요는 언제 열리는지만", tower_routes.overview(me(v)) == {"open": False, "from": 7}, tower_routes.overview(me(v)))
+    chk("시작 · 카드는 409 + 까닭", status_of(lambda: tower_routes.start(1, me(v))) == 409
+        and status_of(lambda: tower_routes.card(1, me(v))) == 409
+        and detail_of(lambda: tower_routes.start(1, me(v))) == "배틀타워는 시즌 7에 열립니다.")
+    season.SEASON = 7
+
+    print("\n=== 길: 시작 ===")
+    chk("파티가 없으면 409", status_of(lambda: tower_routes.start(1, me(empty))) == 409)
+    chk("없는 층은 404", [status_of(lambda n=n: tower_routes.start(n, me(v))) for n in (0, 51, -1)] == [404, 404, 404])
+    chk("없는 층의 카드도 404", status_of(lambda: tower_routes.card(51, me(v))) == 404)
+    chk("건너뛰면 409, 판이 안 생긴다", status_of(lambda: tower_routes.start(3, me(v))) == 409
+        and status_of(lambda: tower_routes.card(3, me(v))) == 409
+        and not db.q1("SELECT 1 FROM gym_battle WHERE user_id=?", (v,)))
+    chk("하던 판이 없으면 active 는 없다", tower_routes.overview(me(v))["active"] is None)
+    out = tower_routes.start(1, me(v))
+    chk("1층이 열린다 (관장 판과 같은 꼴)", out["region"] == "tower:1" and out["battle"]["trainer"]["name"] == "민화"
+        and bool(out["events"]) and set(out) >= {"id", "region", "rev", "battle", "events"}, sorted(out))
+    row = db.q1("SELECT * FROM gym_battle WHERE id=?", (out["id"],))
+    chk("gym_battle 에 적힌다", (row["region"], row["trainer"], row["state"]) == ("tower:1", "tower-1", "active"))
+    chk("개요의 active", tower_routes.overview(me(v))["active"] == {"id": out["id"], "floor": 1})
+    chk("다시 누르면 이어서", tower_routes.start(1, me(v)).get("resumed") is True
+        and tower_routes.start(1, me(v))["id"] == out["id"])
+
+    print("\n=== 판은 하나: 다른 승부와 겹치지 않는다 ===")
+    chk("관장 탭은 타워 판을 '하던 승부' 로 안 본다", gym_routes.overview(me(v))["active"] is None,
+        gym_routes.overview(me(v))["active"])
+    chk("타워 판이 있으면 관장 시작은 409 + 이름",
+        detail_of(lambda: gym_routes.start(some_region, me(v))) == "배틀타워 1층 과(와)의 승부가 아직 끝나지 않았습니다.",
+        detail_of(lambda: gym_routes.start(some_region, me(v))))
+    chk("악당도 409 + 이름", status_of(lambda: boss_routes.start(me(v))) == 409
+        and "배틀타워 1층" in detail_of(lambda: boss_routes.start(me(v))), detail_of(lambda: boss_routes.start(me(v))))
+    chk("아르케가 부르는 이름", arche._busy_name("tower:1") == "배틀타워 1층", arche._busy_name("tower:1"))
+    w = mkuser("gymgoer")
+    mkmon(w, "GARCHOMP", 60, 0)
+    gym_routes.start(some_region, me(w))
+    name = gym.trainer_at(some_region)["name"]
+    chk("관장 판이 있으면 타워 시작은 409 + 그 관장 이름", status_of(lambda: tower_routes.start(1, me(w))) == 409
+        and name in detail_of(lambda: tower_routes.start(1, me(w))), detail_of(lambda: tower_routes.start(1, me(w))))
+
+    print("\n=== 끝까지 둔다 ===")
+    res, gained = play_out(v, out["id"])
+    chk("이기면 결과에 타워 보상", res["battle"]["result"] == "won" and res["reward"]["tower"] is True
+        and res["reward"]["first"] is True and res["reward"]["lines"][:2] == ["상금 2,000원", "몬스터볼 ×5"]
+        and res["reward"]["lines"][-1] == "2층이 열렸다.", res.get("reward"))
+    chk("돈 · 볼이 들어왔다", items.money(v) == 2000 and balls(v) == 15, (items.money(v), balls(v)))
+    chk("경험치가 들어온다 (관장과 같다)", gained > 0, gained)
+    chk("관장 기록에는 안 남는다", not db.q1("SELECT 1 FROM gym_clear WHERE user_id=?", (v,)))
+    chk("다음 층이 열렸다", tower_routes.overview(me(v))["top"] == 1 and tower_routes.overview(me(v))["active"] is None
+        and tower_routes.card(2, me(v))["state"] == "next")
+
+    print("\n=== 지거나 그만두면 ===")
+    out2 = tower_routes.start(2, me(v))
+    res2 = gym_routes.act(out2["id"], gym_routes.ActIn(kind="forfeit"), me(v))
+    chk("기권하면 보상도 기록도 없다", res2["battle"]["result"] == "forfeit" and not res2.get("reward")
+        and tower.top(v) == 1 and items.money(v) == 2000, res2.get("reward"))
+    chk("다시 도전할 수 있다 (횟수 제한 없음)", tower_routes.start(2, me(v))["id"] != out2["id"])
+    again = tower_routes.start(1, me(v))
+    chk("다른 층의 타워 판이 있으면 그 판을 이어서 준다", again.get("resumed") is True and again["region"] == "tower:2", again.get("region"))
+
+
 def main():
     db.init()
     core()
+    routes()
     print("\n%d OK, %d FAIL" % (OK, FAIL))
     return 1 if FAIL else 0
 

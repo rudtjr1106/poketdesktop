@@ -37,7 +37,7 @@ from . import (achievements, airraid, arche, arche_routes, auth, avatar, battle_
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws, internal_routes,
-               boss_routes, gym_routes, social, social_routes, stats, tm_routes, tms, troubles, visit, walk)
+               boss_routes, gym_routes, social, social_routes, stats, tm_routes, tms, tower_routes, troubles, visit, walk)
 
 app = FastAPI(title="poketdesktop", version=config.VERSION)
 app.include_router(battle_routes.router)
@@ -47,6 +47,7 @@ app.include_router(social_routes.router)
 app.include_router(tm_routes.router)
 app.include_router(gym_routes.router)
 app.include_router(boss_routes.router)          # 악당 출현 (시즌 4)
+app.include_router(tower_routes.router)         # 배틀타워 (시즌 7 - 차례로 오르는 상시 PvE, 판은 관장 배틀 그대로)
 app.include_router(raid_routes.router)
 app.include_router(live_routes.router)
 app.include_router(board_routes.router)
