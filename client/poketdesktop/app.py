@@ -1565,6 +1565,10 @@ class App(object):
     def open_gym(self):
         self.gym_window = self._tab("gym")
 
+    def open_tower(self):
+        """배틀타워 (시즌 7) - 모험 묶음의 탭."""
+        self.tower_window = self._tab("tower")
+
     def open_expedition(self):
         """탐험 탭 (1.10.4)."""
         self._tab("expedition")

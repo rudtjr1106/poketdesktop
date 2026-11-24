@@ -872,6 +872,20 @@ class Api(object):
     def boss_start(self):
         return self._call("POST", "/api/boss/start", {})
 
+    # ---------------- 배틀타워 (시즌 7) ----------------
+    # 차례로 오르는 상시 PvE. 판 자체는 관장 배틀이다 - 열기만 여기서 하고, 진행은 gym_act 로 한다.
+    # 배틀타워를 모르는 옛 서버는 404 를 준다 (앱이 서버보다 먼저 나간다) - 탭이 '시즌 7에 열립니다' 로 보인다.
+    def tower(self):
+        """층 목록과 내 진행. 닫혀 있으면 {"open": False, "from": 7}."""
+        return self._call("GET", "/api/tower")
+
+    def tower_floor(self, n):
+        """한 층의 트레이너 · 팀(종 · 레벨) · 보상. 다음 층과 이미 이긴 층만 (그 위는 409)."""
+        return self._call("GET", "/api/tower/floor/%d" % int(n))
+
+    def tower_start(self, n):
+        return self._call("POST", "/api/tower/%d/start" % int(n), {})
+
     def gym_act(self, bid, kind, move="", slot=-1, mega=False, z=False, tera=False):
         # mega: 이 기술과 함께 메가진화 (시즌 3). 되는지는 서버가 다시 본다.
         # z: 이 기술을 Z기술로 (시즌 4). tera: 이 턴에 테라스탈 (2.5.0, 켰을 때만 싣는다). 같은 약속이다.

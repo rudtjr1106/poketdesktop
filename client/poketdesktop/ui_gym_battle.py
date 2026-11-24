@@ -175,8 +175,20 @@ def hp_color(frac):
 class GymBattleWindow(Z.Resizable):
     ZOOM_KIND = "gym"
     ZOOM_W, ZOOM_SCENE, ZOOM_MSG, ZOOM_CMD, ZOOM_MIN_SCENE = W, SCENE_H, MSG_H, CMD_H, MIN_SCENE_H
+    # 이 창을 빌려 쓰는 곳(배틀타워)이 바꾸는 글귀 셋. 받은 판에 data["texts"] = {"title", "done", "leave"} 를 얹어 넘기면
+    # **이 창 하나만** 바뀐다 (인스턴스 값). 생성자 인자를 늘리지 않은 까닭: 화면 테마의 배틀 창들이 이 클래스에 섞여
+    # 들어오고(mixin), 끝 단추는 테마가 DONE_TEXT 로 그린다 (skins/dp/battle.py) - 같은 이름을 읽게 맞췄다.
+    TITLE_FMT = "관장 도전 — %s"
+    DONE_TEXT = "지도로 돌아가기"
+    LEAVE_TEXT = "승부는 그대로 남습니다. 지도에서 그 지역을 누르면 이어서 할 수 있어요."
 
     def __init__(self, app, data, on_close=None):
+        texts = data.get("texts") or {}
+        self._title = texts.get("title")          # 완성된 제목 글 (없으면 TITLE_FMT % 트레이너 이름)
+        if texts.get("done"):
+            self.DONE_TEXT = texts["done"]
+        if texts.get("leave"):
+            self.LEAVE_TEXT = texts["leave"]
         self.app = app
         self.root = app.root
         self.on_close = on_close
@@ -207,7 +219,7 @@ class GymBattleWindow(Z.Resizable):
         # 독·작업표시줄을 뺀 자리 안에 놓는다 - 기본 크기가 안 들어가면 장면을 줄인다.
         ww, wh, gx, gy = self.zoom_open()
         self.win = tk.Toplevel(self.root)
-        U.style_window(self.win, "관장 도전 — %s" % t.get("name", ""), ww, wh)
+        U.style_window(self.win, self._title or self.TITLE_FMT % t.get("name", ""), ww, wh)
         self.win.geometry("%dx%d+%d+%d" % (ww, wh, gx, gy))
         U.apply_theme(self.win)
         self.win.configure(bg=U.BG, highlightthickness=2, highlightbackground=U.LINE2)
@@ -1366,7 +1378,7 @@ class GymBattleWindow(Z.Resizable):
         # 단추는 오른쪽 아래에 **먼저** 붙인다. 줄 아래에 두면 창 높이를 그만큼 더 먹는다.
         side = tk.Frame(inner, bg=U.BG2)
         side.pack(side="right", fill="y", padx=(12, 0))
-        U.PushButton(side, "지도로 돌아가기", self.close, height=Z.base_h(38)).pack(side="bottom")
+        U.PushButton(side, self.DONE_TEXT, self.close, height=Z.base_h(38)).pack(side="bottom")
         body = tk.Frame(inner, bg=U.BG2)
         body.pack(side="left", fill="both", expand=True)
         tk.Label(body, text=title, bg=U.BG2, fg=color, font=(U.FAMILY_BLACK, U.pt(20))).pack(anchor="w")
@@ -1378,8 +1390,7 @@ class GymBattleWindow(Z.Resizable):
     def request_close(self):
         if self.alive and not self.view.get("over"):
             from .ui_box import confirm
-            if not confirm(self.win, "나가기", "승부는 그대로 남습니다. 지도에서 그 지역을 누르면 이어서 할 수 있어요.",
-                           danger=False, ok_text="나가기"):
+            if not confirm(self.win, "나가기", self.LEAVE_TEXT, danger=False, ok_text="나가기"):
                 return
         self.close()
 
