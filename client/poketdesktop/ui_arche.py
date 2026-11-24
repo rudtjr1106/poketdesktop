@@ -232,6 +232,33 @@ def entry_head(e, width):
     return fit_text(width, "고고학자의 일지 · " + at, "고고학자 · " + at), False
 
 
+def quiet_text(r):
+    """이벤트 화면을 꺼 두어(설정, 2.5.7) 띄우지 않고 적은 물방울 · 모래바람 · 흔들림의 글. 화면으로 봤다면 직접 셌을
+    수 · 방향을 대신 적는다 (arche._seen quiet). 그런 줄이 아니면 None (예전 글 그대로)."""
+    if not r.get("quiet"):
+        return None
+    kind = r.get("kind")
+    try:
+        d = int(r.get("dir") or 0)
+    except (TypeError, ValueError):
+        d = 0
+    side = "오른쪽" if d > 0 else ("왼쪽" if d < 0 else None)
+    if kind == "drip":
+        try:
+            n = int(r.get("count"))
+        except (TypeError, ValueError):
+            n = None
+        text = "어디선가 물방울이 %d번 떨어졌다." % n if n is not None else "어디선가 물방울이 떨어졌다."
+    elif kind == "sand":
+        text = "모래바람이 바탕화면을 %s으로 쓸고 지나갔다." % side if side else "모래바람이 바탕화면을 쓸고 지나갔다."
+    elif kind == "tremor":
+        text = ("포켓몬들이 무언가에 놀라 몸을 떨더니 %s을 바라봤다." % side if side
+                else "포켓몬들이 무언가에 놀라 몸을 떨었다.")
+    else:
+        return None
+    return text + " (이벤트 화면을 꺼 두어 일지에만 적었다)"
+
+
 def left_blocks(ch, seen, width):
     """왼쪽 쪽에 쌓을 블록들 [(kind, payload, height)]. 쪽 나누기는 높이로 한다."""
     blocks = []
@@ -267,8 +294,9 @@ def left_blocks(ch, seen, width):
             blocks.append(("seen", (head, lines, r), (len(lines) + 1) * LINE_H + star_view(r, width)[2] + 12))
             continue
         else:
-            lines = wrap({"drip": "어디선가 물방울이 떨어졌다.", "sand": "모래바람이 바탕화면을 쓸고 지나갔다.",
-                          "tremor": "포켓몬들이 무언가에 놀라 몸을 떨었다."}.get(kind, "무언가를 봤다."), width - 6)
+            lines = wrap(quiet_text(r) or {"drip": "어디선가 물방울이 떨어졌다.", "sand": "모래바람이 바탕화면을 쓸고 지나갔다.",
+                                           "tremor": "포켓몬들이 무언가에 놀라 몸을 떨었다."}.get(kind, "무언가를 봤다."),
+                         width - 6)
         blocks.append(("seen", (head, lines, r), (len(lines) + 1) * LINE_H + 8))
     if not blocks:
         blocks.append(("entry", ("", wrap("아직 적힌 것이 없다.", width), False), 2 * LINE_H))

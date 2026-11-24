@@ -414,6 +414,12 @@ jobs:
       # 2.5.4: 동기화 묶음 (/api/sync 하나 - 옛 서버 404 면 셋으로 · 401 은 세션 끊김)
       - name: 동기화 묶음
         run: python client/test_sync_bundle.py
+      # 2.5.7 게시판 #839 · #843 · #846: 설정 '이벤트 화면 띄우기' (끄면 아르케 현상 · 일지 저절로 열기 · 올림픽 중계를 안 띄우고
+      # 단서는 일지에) · #830: 박스 안 순서 (잡은 순 · 도감순 · 이름순 · 레벨순)
+      - name: 이벤트 화면 끄기 · 박스 안 순서
+        run: |
+          python client/test_event_popups.py
+          python client/test_box_order.py
       # 11/23 게시판 #800: 다시 보기에서 faint 없이 쓰러진(스텔스록) 포켓몬을 ko 에서 쓰러뜨린다
       - name: 다시 보기 - faint 없는 쓰러짐
         run: python client/test_arena_silent_faint.py

@@ -92,6 +92,7 @@ class SettingsWindow(ST.SettingsWindow):
         self.fr_note = tk.BooleanVar(value=bool(s.get("friendlyNotify", True)))
         self.fr_auto = tk.BooleanVar(value=bool(s.get("friendlyAuto", False)))
         self.cl_note = tk.BooleanVar(value=bool(s.get("championNotify", True)))
+        self.events = tk.BooleanVar(value=bool(s.get("eventPopups", True)))
         self.catch = tk.StringVar(value=config.catch_mode(s))
         from ... import hotkey as HOTKEY
         self.boss = tk.StringVar(value=HOTKEY.clean(s.get("bossKey"))) if HOTKEY.supported() else None
@@ -160,6 +161,11 @@ class SettingsWindow(ST.SettingsWindow):
                  "보이는 자리에서는 그대로 보입니다. 풀숲과 배틀 연출은 그대로 맨 위에 뜹니다.", self._toggle_behind),
                 (self.grass, "풀숲 띄우기", "showGrass", "끄면 야생이 돋지 않습니다. 데려온 포켓몬은 그대로 걸어다닙니다.",
                  self._toggle_grass),
+                # 이벤트 화면 (2.5.7, 게시판 #839 · #843 · #846) - 기본 테마와 같은 줄
+                (self.events, "이벤트 화면 띄우기", "eventPopups",
+                 "끄면 아르케 이벤트의 바탕화면 현상(안농 글자 · 별 · 유물 등)과 올림픽 중계 · 말풍선이 뜨지 않고, 아르케 일지도 "
+                 "저절로 열리지 않습니다. 아르케 단서는 일지의 '내가 본 것' 에 그대로 적히고, 봉인이 풀리면 트레이 메뉴의 "
+                 "'아르케의 일지' 에 표시됩니다. 놓친 올림픽 중계는 올림픽 창에서 다시 볼 수 있습니다.", self._toggle_events),
                 (self.notif, "새 버전·친구 요청·댓글 알림", "notifyImportant",
                  "화면에 자국이 안 남는 이 셋만 알립니다. 게시판은 내 글에 댓글이, 내 댓글에 답글이 달렸을 때입니다. "
                  "잡았다·레벨업 같은 것은 띄우지 않습니다.", self._toggle_plain),

@@ -137,6 +137,19 @@ def t_primal_weather():
     SM.on_enter_abilities(bt, me, "me", [])
     chk("   레이드는 보스 날씨를 그대로 둔다", bt.field.weather == "sun", bt.field.weather)
 
+    # 11/24 (#829 '시작의바다가 작동을 안 해요'): 처음 나와 원시회귀하면 '강한 비가 내리기 시작했다!' 를 한 번 한다
+    bt, me, foe = T.fight(kyogre(), mon("SNORLAX", 50, ["TACKLE"]))
+    said = [e for e in bt.entry if e.get("text") == "강한 비가 내리기 시작했다!"]
+    chk("8. 처음 나와 원시회귀하면 강한 비 문구가 한 번 (특성 알림과 함께)", len(said) == 1 and said[0]["who"] == "me"
+        and any(e.get("t") == "ability" and e.get("who") == "me" for e in bt.entry), texts(bt.entry))
+    ev = []
+    A.on_switch_in(bt, me, "me", ev)
+    SM.on_enter_abilities(bt, me, "me", ev)
+    chk("   이미 원시회귀한 채 다시 나오면 on_switch_in 이 한 번만 말한다 (겹치지 않는다)",
+        [e.get("text") for e in ev].count("강한 비가 내리기 시작했다!") == 1, texts(ev))
+    bt, me, foe = T.fight(mon("GROUDON", 50, ["EARTHQUAKE"], held="REDORB"), mon("SNORLAX", 50, ["TACKLE"]))
+    chk("   원시그란돈도 (햇살이 아주 강해졌다)", "햇살이 아주 강해졌다!" in texts(bt.entry), texts(bt.entry))
+
     bt, me, foe = T.fight(mon("SNORLAX", 50, ["TACKLE"]), mon("TORKOAL", 50, ["SANDSTORM"], ability="DROUGHT"))
     chk("7. 원시회귀가 없으면 가뭄이 그대로", bt.field.weather == "sun", bt.field.weather)
     use(bt, "foe", "SANDSTORM")

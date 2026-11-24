@@ -45,6 +45,7 @@ SKIP_MSG = {
     "stealth": "숨겨 둔 중이라",
     "pvp": "대전을 준비하는 중이라",
     "raid": "공습을 막는 중이라",
+    "events": "이벤트 화면을 꺼 두어",      # 설정 eventPopups (2.5.7) - 말풍선도 안 띄우므로 기록에만 남는다
 }
 
 
@@ -270,6 +271,8 @@ class OlympicsController(object):
         run_async(self.root, lambda: self.app.api.olympics_show(p["round"]), back)
 
     def _due(self, heat, ready=None):
+        if not config.events_shown(self.app):
+            return self._skip(heat, "events")    # 이벤트 화면을 꺼 두었다 (2.5.7) - 놓친 중계로, 올림픽 창에서 다시 볼 수 있다
         why = self.blocked()
         if why:
             return self._skip(heat, why)
@@ -293,8 +296,8 @@ class OlympicsController(object):
         if ready is not None and not ready.get("ok") and waited < READY_WAIT_MS:
             return self._after(500, lambda: gen == self._gen and self._play(heat, replay, ready, waited + 500))
         self._prep = False
-        why = self.blocked()
-        if why:                                 # 기다리는 사이 집중 · 배틀이 시작됐다
+        why = self.blocked() or (None if replay or config.events_shown(self.app) else "events")
+        if why:                                 # 기다리는 사이 집중 · 배틀이 시작됐다 (· 이벤트 화면을 껐다 - 다시 보기는 연다)
             if not replay:
                 self._skip(heat, why)
             return self._next()
@@ -431,6 +434,8 @@ class OlympicsController(object):
     def _tell(self, text, ms=6000):
         self.said.append(text)
         config.log("[올림픽] %s" % text)
+        if not config.events_shown(self.app):
+            return                              # 이벤트 화면을 꺼 두었다 (2.5.7) - 말풍선도 안 띄운다 (기록에만)
         pet = self._target()
         if pet is None or self.busy():
             return

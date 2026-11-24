@@ -1719,7 +1719,31 @@ class BoxWindow(object):
                 "checked": no == self.box_no,
                 "command": (lambda x=no: self.goto_box(x)),
             })
+        # 박스 안 순서 (2.5.7, 게시판 #830 '박스 안에서만 도감순 · 이름순'). 모든 박스에 같이, 이 PC 에 기억한다.
+        cur = self.box_order()
+        rows += [None, {"text": "박스 안 순서", "header": True}]
+        for key, kr in box_filter.BOX_ORDERS:
+            rows.append({"text": kr, "checked": key == cur,
+                         "command": (lambda k=key: self.set_box_order(k))})
         return rows
+
+    def box_order(self):
+        """박스 안 순서 (설정 boxOrder): "" 잡은 순 · num · name · level. 모르는 값이면 잡은 순."""
+        key = (getattr(self.app, "settings", None) or {}).get("boxOrder") or ""
+        return key if key in dict(box_filter.BOX_ORDERS) else ""
+
+    def set_box_order(self, key):
+        """이름표 메뉴에서 박스 안 순서를 골랐다. 모든 박스에 같이 · 이 PC 에 기억 · 어느 박스에 누가 있는지는 그대로."""
+        key = key if key in dict(box_filter.BOX_ORDERS) else ""
+        s = getattr(self.app, "settings", None)
+        if s is None:
+            return
+        if (s.get("boxOrder") or "") == key:
+            return
+        s["boxOrder"] = key
+        self._save_settings()
+        self.say("박스 안을 %s으로 봅니다 (모든 박스)." % dict(box_filter.BOX_ORDERS)[key], U.FG_DIM)
+        self._show(self.sel)
 
     def open_box_menu(self):
         """이름표를 누르면 뜨는 박스 목록. 고르면 그 박스로 바로 간다."""
@@ -2017,6 +2041,9 @@ class BoxWindow(object):
             if row is None:
                 m.add_separator()
                 continue
+            if row.get("header"):
+                m.add_command(label=row["text"], state="disabled")
+                continue
             m.add_command(label=("✓ " if row.get("checked") else "    ")
                           + row["text"], command=row["command"])
         try:
@@ -2183,7 +2210,8 @@ class BoxWindow(object):
             self.rank_page = max(0, min(self.rank_page, self.rank_pages(len(box)) - 1))
             page_box = box[self.rank_page * size:(self.rank_page + 1) * size]
         else:
-            page_box = [m for m in box if int(m.get("box") or 0) == self.box_no]
+            page_box = box_filter.box_order(
+                [m for m in box if int(m.get("box") or 0) == self.box_no], self.app.dex, self.box_order())
         self._paint_page(len(box))
         self._page_ids = [m["id"] for m in page_box]
         return party, box, page_box, box_all, filtered

@@ -62,6 +62,10 @@ OLD_SERVERS = (
 )
 
 DEFAULTS = {
+    # 이벤트 화면 띄우기 (2.5.7, 게시판 #839 · #843 · #846 '업무 중에 이벤트 창 · 단서가 화면을 가린다'). 끄면 아르케 현상
+    # (안농 글자 · 별 · 유물 · 물방울 · 모래바람 · 흔들림) · 아르케 일지가 저절로 열리는 것 · 올림픽 중계와 말풍선을 띄우지
+    # 않는다. 아르케 단서는 일지의 '내가 본 것' 에 그대로 적는다 (events_shown).
+    "eventPopups": True,
     "archeTitle": True,          # 아르케 (2.4.0): 이벤트 동안 윈도우 맨 앞 창 제목에서 단서 표식만 찾는다 (저장 · 전송 안 함)
     "server": SERVER,
     # --- 화면 ---
@@ -95,6 +99,9 @@ DEFAULTS = {
     # 끌어서 바꾸면 여기에 남는다. 비어 있으면(0) 처음 폭 (ui_box.col_layout · detail_width).
     "boxCols": {},
     "boxDetailW": 0,
+    # 박스 안 순서 (2.5.7, 게시판 #830): "" 잡은 순 · "num" 도감순 · "name" 이름순 · "level" 레벨순. 모든 박스에 같이 -
+    # 어느 박스에 누가 있는지는 그대로고 보이는 차례만 바뀐다 (이 PC 에만). 머리글 정렬(전체 보기)과는 따로다.
+    "boxOrder": "",
     # --- 활동 영역 ---
     # 직접 그린 영역 (x1, y1, x2, y2) 절대 좌표. None 이면 아래 areaW/areaH 로
     # 화면 오른쪽 아래에 잡는다. 화면에 끌어서 그린다 (ui_area).
@@ -284,6 +291,13 @@ def catch_for(settings, foe, dex=None):
     if sp.strip().upper() in picked or base_species(sp, dex) in picked:
         return "always"
     return "new"
+
+
+def events_shown(app):
+    """이벤트 화면을 띄우나 (설정 eventPopups, 2.5.7). 끄면 아르케 현상 · 일지 저절로 열기 · 올림픽 중계 · 말풍선을 안 띄운다.
+    공습은 매일 하는 것이라 여기에 들지 않는다 (보상이 그 장면을 열 때 정해진다)."""
+    s = getattr(app, "settings", None) or {}
+    return bool(s.get("eventPopups", True))
 
 
 def load_settings():

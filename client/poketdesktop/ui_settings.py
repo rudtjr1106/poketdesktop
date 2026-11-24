@@ -312,6 +312,7 @@ class SettingsWindow(object):
         self.fr_auto = tk.BooleanVar(value=bool(s.get("friendlyAuto", False)))
         self.cl_note = tk.BooleanVar(value=bool(s.get("championNotify", True)))
         self.arche_title = tk.BooleanVar(value=bool(s.get("archeTitle", True)))
+        self.events = tk.BooleanVar(value=bool(s.get("eventPopups", True)))
         # **알림은 셋만 띄운다** - 새 버전, 친구 요청, 게시판 댓글(1.9.0). 게임 안에서
         # 벌어지는 일(잡았다, 레벨이 올랐다)은 이걸 켜도 안 띄운다.
         # 바탕화면에서 눈으로 보이는 것으로 충분하고, 그런 것까지 화면
@@ -336,6 +337,11 @@ class SettingsWindow(object):
                 (self.grass, "풀숲 띄우기", "showGrass",
                  "끄면 야생이 돋지 않습니다. 데려온 포켓몬은 그대로"
                  " 걸어다닙니다.", self._toggle_grass),
+                # 이벤트 화면 (2.5.7, 게시판 #839 · #843 · #846 - 업무 중에 이벤트 창 · 단서가 화면을 가린다)
+                (self.events, "이벤트 화면 띄우기", "eventPopups",
+                 "끄면 아르케 이벤트의 바탕화면 현상(안농 글자 · 별 · 유물 등)과 올림픽 중계 · 말풍선이 뜨지 않고, 아르케 일지도 "
+                 "저절로 열리지 않습니다. 아르케 단서는 일지의 '내가 본 것' 에 그대로 적히고, 봉인이 풀리면 트레이 메뉴의 "
+                 "'아르케의 일지' 에 표시됩니다. 놓친 올림픽 중계는 올림픽 창에서 다시 볼 수 있습니다.", self._toggle_events),
                 (self.notif, "새 버전·친구 요청·게시판 댓글 알림", "notifyImportant",
                  "화면에 자국이 안 남는 이 셋만 알립니다. 게시판은 내 글에 댓글이,"
                  " 내 댓글에 답글이 달렸을 때입니다. 잡았다·레벨업 같은 것은"
@@ -686,6 +692,17 @@ class SettingsWindow(object):
         """
         self.app.settings[key] = bool(var.get())
         self._save()
+        self.app.refresh_tray()
+
+    def _toggle_events(self, key, var):
+        """이벤트 화면 띄우기 (2.5.7). 끄면 지금 떠 있는 아르케 현상(별은 한 시간까지 떠 있다)도 치운다 - 단서는 일지에
+        적고. 올림픽 중계 · 일지 저절로 열기는 다음 것부터 안 한다 (config.events_shown 을 그때그때 본다)."""
+        self.app.settings[key] = bool(var.get())
+        self._save()
+        if not var.get():
+            a = getattr(self.app, "arche", None)
+            if a is not None and hasattr(a, "hide_shows"):
+                a.hide_shows()
         self.app.refresh_tray()
 
     def _toggle_behind(self, key, var):

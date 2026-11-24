@@ -155,6 +155,22 @@ def sort_by(mons, dex, key):
     return sorted(mons, key=fn) if fn else list(mons)
 
 
+# 박스 안 순서 (2.5.7, 게시판 #830). 박스 이름표 메뉴에서 고른다 - 모든 박스에 같이 (설정 boxOrder).
+BOX_ORDERS = (("", "잡은 순"), ("num", "도감순"), ("name", "이름순"), ("level", "레벨순"))
+
+
+def box_order(mons, dex, key):
+    """한 박스의 줄을 key 순서로 (받은 목록은 그대로). 비었거나 모르는 key 면 받은 순서(잡은 순) 그대로.
+
+    **알은 맨 앞 그대로다** (merge_eggs - 박스에서는 알을 앞에 둔다. sort_by 는 알을 뒤로 보내므로 따로 뺀다).
+    """
+    if key not in dict(BOX_ORDERS) or not key:
+        return list(mons)
+    eggs = [m for m in mons if m.get("isEgg")]
+    rest = [m for m in mons if not m.get("isEgg")]
+    return eggs + sort_by(rest, dex, key)
+
+
 # 가방·기술머신의 '누구에게' 목록 (1.13.1). 박스보다 적게 - 받은 순서·가나다순·레벨순.
 PICK_SORTS = (("", "기본"), ("name", "가나다순"), ("level", "레벨순"))
 

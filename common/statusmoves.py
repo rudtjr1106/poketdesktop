@@ -2006,11 +2006,19 @@ def on_enter_abilities(bt, f, who, ev):
     바뀌므로(시작의바다·끝의대지) 특성보다 먼저다. 도구는 특성이 꺼진 판에서도 돈다.
     """
     primal = getattr(bt, "primal", None)
+    before = f.ability
     if primal is not None:
         primal(f, who, ev)
     H.on_entry(bt, f, who, ev)
     if not A.on(f) or f.cond.get("gastro"):
         return
+    if f.ability in A._PRIMAL and f.ability != before:
+        # 방금 원시회귀했다 - '강한 비가 내리기 시작했다!' 를 여기서 한다. 나올 때의 한마디(A.on_switch_in · ENTRY_SAY)는
+        # 원시회귀보다 먼저 돌아 그때 특성(잔비 · 가뭄)으로 봤으므로 처음 나올 때는 아무 말도 없었다 - 효과는 있었는데
+        # 화면에 비가 안 와 '시작의바다가 작동을 안 한다' 고 보였다 (11/23 게시판 #829). 다시 나올 때는 이미 원시 특성이라
+        # on_switch_in 이 말한다 (여기는 before 가 같아 안 탄다).
+        A.pop(bt, f, who, ev)
+        ev.append({"t": "msg", "who": who, "text": A.ENTRY_SAY[f.ability]})
     if f.ability in A._PRIMAL and bt.field.weather and getattr(bt, "raid", None) is None:
         # 강한 비 · 강한 햇살은 그때까지의 날씨를 걷어 낸다 (본가 - 물러나면 맑음). 예전에는 밑에 깔린 날씨가 남아
         # 강한 비 동안에도 턴을 세다 '햇살이 원래대로 돌아왔다' 를 띄우거나, 물러난 뒤 다시 살아났다 (11/23 #769).

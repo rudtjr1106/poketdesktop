@@ -127,7 +127,34 @@ class ArcheController(object):
     def label(self):
         st = self.state or {}
         n = st.get("chapter") or 0
-        return "아르케의 일지 (제%d장)" % n if n else "아르케의 일지"
+        text = "아르케의 일지 (제%d장)" % n if n else "아르케의 일지"
+        if not config.events_shown(self.app) and self.ready_entry():
+            text += " · 봉인 풀림"          # 이벤트 화면을 꺼 두어 일지가 저절로 안 열린다 (2.5.7) - 여기서 알린다
+        return text
+
+    def ready_entry(self):
+        """봉인이 풀려 전설에게 갈 수 있는데 아직 안 들어간 장 번호 (없으면 None) - _rituals 와 같은 기준."""
+        for c in (self.state or {}).get("chapters") or []:
+            n = int(c.get("n") or 0)
+            if c.get("ritual") and n not in self.local.get("entered", []):
+                if any(e.get("state") == "ready" for e in c.get("encounters") or []):
+                    return n
+        return None
+
+    def hide_shows(self):
+        """이벤트 화면을 방금 껐다 (설정, 2.5.7): 떠 있는 현상(별은 한 시간까지 떠 있다)을 지금 치운다. 아직 '봤다' 가
+        안 된 것은 일지에 조용히 적고 치운다 - 끈 순간 단서를 잃지 않게."""
+        for s in list(self.shows):
+            if getattr(s, "closed", False):
+                continue
+            try:
+                if not getattr(s, "seen_done", False) and getattr(s, "on_seen", None) is not None:
+                    s.seen_done = True
+                    self._seen(getattr(s, "ph", None) or {}, quiet=True)
+                s.cleanup()
+            except Exception as e:                          # noqa: BLE001
+                config.log("아르케 현상 치우기 실패: %s" % e)
+        self.shows = [s for s in self.shows if not getattr(s, "closed", False)]
 
     def blocked(self):
         """지금 바탕화면에 현상을 띄우거나 입장을 열 수 없는 까닭 (공습과 같은 기준). 없으면 None."""
@@ -242,6 +269,15 @@ class ArcheController(object):
         pid = ph.get("id")
         self.pending.pop(pid, None)
         until = _parse(ph.get("until")) or self.now()
+        if not config.events_shown(self.app):
+            # 이벤트 화면을 꺼 두었다 (설정, 2.5.7 - 게시판 #839 · #843 · #846): 바탕화면에 띄우지 않고 일지에만 적는다.
+            # 단서는 그 그림 · 숫자 · 방향이라, 띄우지 않으면 일지가 대신 들고 있어야 혼자 길이 막히지 않는다 (_seen quiet).
+            self._mark_done(pid)
+            try:
+                self._seen(ph, quiet=True)
+            except Exception as e:                          # noqa: BLE001
+                config.log("아르케 기록 실패 (%s): %s" % (ph.get("kind"), e))
+            return
         why = self.blocked()
         if why and ph.get("kind") in self.PASSIVE and why not in self.PASSIVE_STOP:
             why = None
@@ -272,15 +308,26 @@ class ArcheController(object):
             self.local["done"] = done[-500:]
             _save(self.f_local, self.local)
 
-    def _seen(self, ph, img=None):
-        """현상을 실제로 봤다 - 일지의 '내가 본 것' 에 남긴다 (앱 안에만)."""
+    def _seen(self, ph, img=None, quiet=False):
+        """현상을 실제로 봤다 - 일지의 '내가 본 것' 에 남긴다 (앱 안에만).
+
+        quiet = 이벤트 화면을 꺼 두어 띄우지 않고 적는다 (2.5.7). 화면으로 봤다면 직접 세고 봤을 것(물방울 수 · 모래바람과
+        흔들림의 방향)을 일지가 대신 적는다 - 안 그러면 그 단서는 어디에도 안 남는다.
+        """
         data = ph.get("data") or {}
         if data.get("parade"):
             return self._seen_parade(ph, data)
-        row = {"id": ph.get("id"), "kind": ph.get("kind"), "at": time.time() + self.skew,
+        kind = ph.get("kind")
+        row = {"id": ph.get("id"), "kind": kind, "at": time.time() + self.skew,
                "glyph": data.get("glyph"), "text": data.get("text"),
-               "pts": data.get("pts") if ph.get("kind") == "stars" else None,
-               "band": data.get("band") if ph.get("kind") == "stars" else None}
+               "pts": data.get("pts") if kind == "stars" else None,
+               "band": data.get("band") if kind == "stars" else None}
+        if quiet:
+            row["quiet"] = True
+            if kind == "drip":
+                row["count"] = data.get("count")
+            elif kind in ("sand", "tremor"):
+                row["dir"] = data.get("dir")
         if any(r.get("id") == row["id"] for r in self.seen):
             return
         self.seen.append(row)
@@ -378,7 +425,7 @@ class ArcheController(object):
     def _react(self):
         """창 제목이 맞았을 때 바탕화면이 응답한다 (포켓몬들이 잠깐 떨고 한 줄)."""
         self.app.notify("브라우저 너머에서 무언가가 응답했다… 바탕화면의 포켓몬들이 술렁인다.")
-        if self.blocked():
+        if self.blocked() or not config.events_shown(self.app):      # (떨림은 보여 주기만 하는 것 - 꺼 두었으면 없다)
             return
         try:
             from . import arche_desktop
@@ -409,6 +456,13 @@ class ArcheController(object):
 
     def _want_entry(self, n):
         if self.entry_job is not None:
+            return
+        if not config.events_shown(self.app):
+            # 이벤트 화면을 꺼 두었다 (2.5.7): 일지를 저절로 열지 않는다. 트레이 메뉴의 '아르케의 일지' 에 '봉인 풀림' 이 붙고
+            # (label), 일지의 '전설에게 간다' 로 들어간다. entered 에 안 넣으니 다시 켜면 그때 열린다.
+            if n not in self.told_entry:
+                self.told_entry.add(n)
+                self.app.notify("봉인이 풀렸다! 트레이 메뉴의 '아르케의 일지' 에서 전설에게 갈 수 있어요.")
             return
         # 바탕화면 현상은 입장을 막지 않는다 (일지 · 배틀은 창이다). 집중 · 숨기기 · 다른 배틀 같은 것만 기다린다.
         why = self.blocked()
