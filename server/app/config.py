@@ -176,6 +176,11 @@ GYMS_PATH = os.environ.get("POKET_GYMS", os.path.join(ROOT, "data", "gyms.json")
 KOREA_MAP_PATH = os.environ.get("POKET_KOREA_MAP", os.path.join(ROOT, "data", "korea_map.json"))
 # 악당 조직 표 (시즌 4, tools/build_villains.py). 간부의 팀은 gyms.json 의 것을 쓴다.
 VILLAINS_PATH = os.environ.get("POKET_VILLAINS", os.path.join(ROOT, "data", "villains.json"))
+# 배틀타워 (시즌 7, tools/build_tower.py). 층마다 정해진 트레이너와 팀 · 처음 한 번 보상.
+TOWER_PATH = os.environ.get("POKET_TOWER", os.path.join(ROOT, "data", "tower.json"))
+# 이 시즌부터 연다 - tower.is_open 이 부를 때마다 season.SEASON 과 견준다 (시즌을 여는 커밋이 켠다).
+# 시험 서버 · 로컬은 POKET_TOWER_FROM=6 으로 미리 열어 본다.
+TOWER_FROM = _int("POKET_TOWER_FROM", 7)
 # 게시판 이미지 (버전 2). DB 에 넣지 않고 파일로 둔다 - DB 가 커지면 백업이 무거워진다 (10/28 3GB 사고).
 # 운영은 /data 볼륨(DB · 도트 캐시와 같은 곳)에 남는다.
 BOARD_IMG_DIR = os.environ.get("POKET_BOARD_IMG_DIR", "/data/board_img")
