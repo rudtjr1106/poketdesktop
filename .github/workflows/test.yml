@@ -931,6 +931,7 @@ jobs:
           # 도커에서는 둘이 /app 아래 나란히 놓여서 문제가 없었다.
           export PYTHONPATH="${{ github.workspace }}"
           cd server
+          python test_sprite_back.py    # 2.5.8 뒷모습 도트 (?back=true): 받는 곳 · b 이름 · 없으면 404 + 없음 표시 (밖으로 안 나간다)
           python test_cpu_1124.py       # 11/24 부하 줄이기: 도감 해시 한 번 · 관장 · 실시간 만료 접기 간격
           python test_pvp.py            # + 연습판 (하루 20판 뒤): 양쪽 점수 그대로 · 이기면 100원 · 하루 상한 같이 · 쿨타임 그대로
           python test_held_v5.py        # 시즌 5 랭크 팀 같은 지닌 도구 한 마리 (시즌 4 는 그대로인지도)

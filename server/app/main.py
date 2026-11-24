@@ -370,6 +370,106 @@ def _sprite_fetch(num, shiny):
     return None, None
 
 
+# ---------------------------------------------------------------- 뒷모습 도트 (2.5.8, 게시판 #850)
+# 관장 · 실시간 배틀에서 내 포켓몬은 뒷모습으로 선다. 앞모습과 같은 길(처음 요청될 때만 받아 /data/sprites 에 남긴다)
+# 이되 이름에 b 가 붙는다. **대신할 그림은 없다** (아이콘 · 일러스트는 앞모습이다) - 없으면 404 고, 앱은 지금처럼
+# 앞모습을 뒤집어 쓴다. 없는 것을 요청마다 다시 받으러 가지 않게 '없음' 표시(.none)를 남긴다.
+BACK_SOURCES = [
+    ("other/showdown/back/%s%d.gif", ".gif"),                 # 움직이는 뒷모습
+    ("back/%s%d.png", ".png"),                                # 정지 뒷모습 (움직이는 것이 없는 폼)
+]
+BACK_NONE_DAYS = 7                                             # '없음' 표시를 믿는 날 수 - 지나면 다시 받아 본다
+
+
+def _back_path(num, shiny, ext):
+    r = SF.rev(num)
+    return os.path.join(SPRITE_DIR, "%04d%sb%s%s" % (num, "s" if shiny else "", ("-" + r) if r else "", ext))
+
+
+def _back_cached(num, shiny):
+    for ext in (".gif", ".png"):
+        p = _back_path(num, shiny, ext)
+        if os.path.exists(p) and os.path.getsize(p) > 0:
+            return p, ext
+    return None, None
+
+
+def _back_urls(num, shiny):
+    sub = "shiny/" if shiny else ""
+    urls = [("%s/%s" % (SPRITE_BASE, pat % (sub, num)), ext) for pat, ext in BACK_SOURCES]
+    if SF.source(num):                                   # 도트를 바꾼 종 (스토마) - 같은 판의 뒷모습
+        urls.insert(0, ("%s/%s" % (SPRITE_BASE, SF.source(num).replace("%s%d", "back/%s%d") % (sub, num)), ".gif"))
+    site_url, site_ext = SF.site(num, shiny)
+    if site_url:                                         # 쇼다운에서 직접 받는 메가 폼: ani/ -> ani-back/
+        base = site_url[len(SF.SITE_BASE) + 1:]
+        folder, name = base.split("/", 1)
+        folder = folder.replace("ani", "ani-back", 1)
+        urls.insert(0, ("%s/%s/%s" % (SF.SITE_BASE, folder, name), site_ext))
+    return urls
+
+
+def _back_fetch(num, shiny):
+    """뒷모습 도트를 한 번만 받아 디스크에 남긴다. 어디에도 없으면(404) '없음' 표시를 남긴다 - 끊겨서 못 받은 것은
+    표시하지 않는다 (다음에 다시 받아 본다)."""
+    import time
+    import urllib.error
+    import urllib.request
+    os.makedirs(SPRITE_DIR, exist_ok=True)
+    none = _back_path(num, shiny, ".none")
+    try:
+        if time.time() - os.path.getmtime(none) < BACK_NONE_DAYS * 86400:
+            return None, None
+    except OSError:
+        pass
+    gone = True
+    for url, ext in _back_urls(num, shiny):
+        try:
+            target = (urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 poketdesktop"})
+                      if url.startswith(SF.SITE_BASE) else url)
+            with urllib.request.urlopen(target, timeout=8) as r:
+                data = r.read()
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                gone = False
+            continue
+        except (urllib.error.URLError, OSError):
+            gone = False
+            continue
+        if not data:
+            continue
+        p = _back_path(num, shiny, ext)
+        tmp = p + ".part"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, p)
+        return p, ext
+    if gone:
+        try:
+            with open(none, "w"):
+                pass
+        except OSError:
+            pass
+    return None, None
+
+
+def _sprite_back(num, shiny):
+    """뒷모습 도트 응답. 없으면 404 (이로치 뒷모습이 없으면 보통 색 뒷모습 - 앞모습과 같은 규칙)."""
+    p, ext = _back_cached(num, shiny)
+    if not p:
+        p, ext = _back_fetch(num, shiny)
+    if not p and shiny:
+        p, ext = _back_cached(num, False)
+        if not p:
+            p, ext = _back_fetch(num, False)
+    if not p:
+        raise HTTPException(404, "뒷모습 도트가 없습니다.")
+    with open(p, "rb") as f:
+        data = f.read()
+    # X-Sprite-Back: 앱은 이 머리말이 있어야 뒷모습으로 받아들인다 - back 을 모르는 옛 서버는 앞모습을 그대로 준다
+    return Response(data, media_type=CONTENT_TYPE.get(ext, "image/gif"),
+                    headers={"Cache-Control": "public, max-age=604800", "X-Sprite-Ext": ext, "X-Sprite-Back": "1"})
+
+
 def _warm_sprites():
     """빠진 도트를 뒤에서 천천히 받아 둔다.
 
@@ -395,13 +495,15 @@ def _warm_sprites():
 
 
 @app.get("/api/sprite/{num}")
-def sprite(num: int, shiny: bool = False):
-    """정식 도트를 내려준다. 처음 요청될 때만 받아오고 그 뒤로는 캐시."""
+def sprite(num: int, shiny: bool = False, back: bool = False):
+    """정식 도트를 내려준다. 처음 요청될 때만 받아오고 그 뒤로는 캐시. back 이면 뒷모습 (2.5.8, 없으면 404)."""
     # 1~1025 에 더해 메가 폼 번호(10033~)도 받는다 (시즌 3). 도감에 있는
     # 번호만 - 아무 번호나 받으면 남의 서버에 헛걸음을 시킨다.
     mega = dex().by_num.get(num) if num > 1025 else None
     if not (1 <= num <= 1025 or (mega and (mega.get("mega") or mega.get("formOf")))):   # 폼도 (1.13)
         raise HTTPException(404, "그런 도감 번호가 없습니다.")
+    if back:
+        return _sprite_back(num, shiny)
     p, ext = _sprite_cached(num, shiny)
     if not p:
         p, ext = _sprite_fetch(num, shiny)

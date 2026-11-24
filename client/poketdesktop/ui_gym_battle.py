@@ -436,26 +436,40 @@ class GymBattleWindow(Z.Resizable):
         tera = mon.get("tera")                          # 테라스탈한 타입 (2.5.0) - 결정 모습으로 그린다
         # 이름표에 가려지지 않는 높이까지만 (글자 크기를 키워 장면이 낮아졌을 때 - Z.Resizable.dot_fit)
         size = self.dot_fit(who, Z.px(MON_H[who]), U.h(MON_W[who]))
-        size = MS.fit(getattr(self.app, "dex", None), num, size)     # 도감의 키에 맞춘다 (2.5.5, 게시판 #777)
+        # 도감의 키에 맞춘다 (2.5.5, 게시판 #777) · 비행 · 부유는 바닥에서 띄운다 (2.5.8, #850)
+        size, lift = MS.place(getattr(self.app, "dex", None), num, size)
+
+        # 내 포켓몬은 뒷모습으로 선다 (2.5.8, 게시판 #850) - 누르면 앞모습과 바뀐다 (MS.flip_me, 설정 battleBack)
+        want_back = who == "me" and MS.back_view(self.app)
+        MS.bind_flip(self)
+        gens = self.__dict__.setdefault("_dot_gen", {})
+        gen = gens[who] = gens.get(who, 0) + 1
+        self.__dict__.setdefault("lifts", {})[who] = lift
 
         def work():
-            path = sprite_cache.ensure(self.app.api, num, shiny)
+            # 뒷모습 도트가 없는 종(받지 못한 것 · 옛 서버)은 지금처럼 앞모습을 뒤집어 쓴다
+            path = sprite_cache.ensure(self.app.api, num, shiny, True) if want_back else None
+            back = bool(path)
+            if not path:
+                path = sprite_cache.ensure(self.app.api, num, shiny)
             if not path:
                 return None
             anim = sprites.load_animation(path, size, 0.2, 4.0,
                                           max_size=(U.h(MON_W[who]), size))
-            # 쇼다운 도트는 왼쪽을 본다. 내 쪽은 뒤집어 상대를 보게 한다. 투명색 풀기 · 테라스탈한 결정 모습(2.5.0)은
-            # 여기(작업 스레드)에서 - 화면 스레드에서 하면 연출 도중 잠깐 멈칫한다.
-            frames = anim.frames[sprites.LEFT if who == "me" else sprites.RIGHT]
-            return anim, ui_gimmick.tera_look([sprites.to_rgba(f, anim.key) for f in frames], tera)
+            # 쇼다운 앞모습 도트는 왼쪽을 본다 - 내 쪽은 뒤집어 상대를 보게 한다. 뒷모습 도트는 이미 오른쪽 위(상대)를
+            # 보므로 그대로 쓴다. 투명색 풀기 · 테라스탈한 결정 모습(2.5.0) · 띄우기(2.5.8)는 여기(작업 스레드)에서 -
+            # 화면 스레드에서 하면 연출 도중 잠깐 멈칫한다.
+            frames = anim.frames[sprites.LEFT if (who == "me" and not back) else sprites.RIGHT]
+            rgba = ui_gimmick.tera_look([sprites.to_rgba(f, anim.key) for f in frames], tera)
+            return anim, MS.lifted(rgba, lift)
 
         def done(res, err):
             if not self.alive or err or res is None:
                 return
             anim, rgba = res
             cur = self.shown.get(who) or {}
-            if cur.get("num") != num or cur.get("tera") != tera:
-                return
+            if cur.get("num") != num or cur.get("tera") != tera or gens.get(who) != gen:
+                return                                  # (그사이 다른 포켓몬 · 앞뒤를 바꿔 다시 불렀다)
             first = rgba[0]
             photos = [ImageTk.PhotoImage(im) for im in rgba]
             self.anims[who] = (photos, list(anim.durations) or [100])
@@ -605,7 +619,9 @@ class GymBattleWindow(Z.Resizable):
     def _center(self, who):
         bb = self.cv.bbox(self.sprite[who])
         if bb:
-            return ((bb[0] + bb[2]) / 2.0, (bb[1] + bb[3]) / 2.0)
+            # 띄운 포켓몬(2.5.8)은 그림 아래에 띄운 만큼의 빈 띠가 붙어 있다 - 가운데는 몸의 가운데로
+            lift = (getattr(self, "lifts", None) or {}).get(who, 0)
+            return ((bb[0] + bb[2]) / 2.0, (bb[1] + bb[3] - lift) / 2.0)
         x, y = self.foe_pos if who == "foe" else self.me_pos
         return (x, y - Z.px(MON_H[who]) / 2.0)
 

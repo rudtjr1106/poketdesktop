@@ -301,8 +301,10 @@ class RaidBattleWindow(Z.Resizable):
         num, shiny = mon.get("num"), T.skin(mon)       # 이로치가 고른 색까지
         tera = mon.get("tera")                          # 테라스탈한 타입 (2.5.0) - 결정 모습으로 그린다
         size = U.h(BOSS_H if boss else MON_H)
+        lift = 0
         if not boss:
-            size = MS.fit(getattr(self.app, "dex", None), num, size)  # 도감의 키에 맞춘다 (2.5.5, #777) - 보스는 늘 크게
+            # 도감의 키에 맞춘다 (2.5.5, #777) - 보스는 늘 크게. 비행 · 부유는 바닥에서 띄운다 (2.5.8, #850)
+            size, lift = MS.place(getattr(self.app, "dex", None), num, size)
         cap = U.h(BOSS_W if boss else MON_W)
 
         def work():
@@ -313,7 +315,7 @@ class RaidBattleWindow(Z.Resizable):
             # 쇼다운 도트는 왼쪽을 본다. 우리 쪽은 뒤집어 보스를 보게 한다. 투명색 풀기 · 테라스탈한 결정 모습(2.5.0)은
             # 여기(작업 스레드)에서 - 화면 스레드에서 하면 연출 도중 잠깐 멈칫한다.
             frames = anim.frames[sprites.RIGHT if boss else sprites.LEFT]
-            return anim, ui_gimmick.tera_look([sprites.to_rgba(f, anim.key) for f in frames], tera)
+            return anim, MS.lifted(ui_gimmick.tera_look([sprites.to_rgba(f, anim.key) for f in frames], tera), lift)
 
         def done(res, err):
             if not self.alive or err or res is None:

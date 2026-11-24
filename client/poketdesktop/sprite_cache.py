@@ -56,49 +56,49 @@ def sprite_dir():
     return d
 
 
-def _stem(num, shiny):
+def _stem(num, shiny, back=False):
     # 서버에서 도트를 바꾼 종(common/sprite_fix)은 이름에 판을 붙인다. 안 붙이면
-    # 이미 받아 둔 옛 그림(납작한 스토마)을 계속 쓴다.
+    # 이미 받아 둔 옛 그림(납작한 스토마)을 계속 쓴다. 뒷모습(2.5.8)은 b 가 붙는다 - 서버의 이름과 같다.
     r = SF.rev(num)
-    return "%04d%s%s" % (int(num), "s" if shiny else "", ("-" + r) if r else "")
+    return "%04d%s%s%s" % (int(num), "s" if shiny else "", "b" if back else "", ("-" + r) if r else "")
 
 
-def _tinted_path(num, skin):
+def _tinted_path(num, skin, back=False):
     """색조를 돌린 그림을 둘 자리 (이로치가 고른 색, common/tint)."""
     base, _hue = T.split(skin)
-    return os.path.join(sprite_dir(), _stem(num, base) + T.suffix(skin) + ".png")
+    return os.path.join(sprite_dir(), _stem(num, base, back) + T.suffix(skin) + ".png")
 
 
-def find_local(num, shiny=False):
-    """shiny 는 skin 이다: False(기본) / True(이로치) / "s090"(색조를 돌린 것)."""
+def find_local(num, shiny=False, back=False):
+    """shiny 는 skin 이다: False(기본) / True(이로치) / "s090"(색조를 돌린 것). back 이면 뒷모습 (2.5.8)."""
     shiny = T.norm(shiny)
     d = sprite_dir()
     if isinstance(shiny, str):
-        p = _tinted_path(num, shiny)
+        p = _tinted_path(num, shiny, back)
         return p if os.path.exists(p) and os.path.getsize(p) > 0 else None
     for ext in (".gif", ".png"):
-        p = os.path.join(d, _stem(num, shiny) + ext)
+        p = os.path.join(d, _stem(num, shiny, back) + ext)
         if os.path.exists(p) and os.path.getsize(p) > 0:
             return p
     return None
 
 
-def _ensure_tinted(api, num, skin):
+def _ensure_tinted(api, num, skin, back=False):
     """밑그림(이로치/기본)을 마련하고 색조를 돌린 파일을 만든다."""
     from . import sprite_tint
-    p = find_local(num, skin)
+    p = find_local(num, skin, back)
     if p:
         return p
     base, hue = T.split(skin)
-    src = ensure(api, num, base)
+    src = ensure(api, num, base, back)
     if not src:
         # 이로치 도트가 없다. 기본 도트라도 준다 (색은 안 입힌다).
-        return ensure(api, num, False) if base else None
+        return ensure(api, num, False, back) if base else None
     # 이로치 도트를 못 받아서 기본 도트가 대신 왔으면 색을 입히지 않는다.
     # 그걸 이로치 색조 파일로 굳히면 나중에 제대로 받아도 틀린 색이 남는다.
-    if base and not os.path.basename(src).startswith(_stem(num, True)):
+    if base and not os.path.basename(src).startswith(_stem(num, True, back)):
         return src
-    dst = _tinted_path(num, skin)
+    dst = _tinted_path(num, skin, back)
     with _tint_lock:
         if os.path.exists(dst) and os.path.getsize(dst) > 0:
             return dst
@@ -108,32 +108,47 @@ def _ensure_tinted(api, num, skin):
 _tint_lock = threading.Lock()
 
 
-def ensure(api, num, shiny=False):
+NO_BACK_AFTER = 3600.0      # 초. 뒷모습이 없다는 답은 이만큼 믿는다 (그 뒤에 다시 물어본다)
+_no_back = {}               # (번호, 이로치) -> 없다는 답을 받은 시각
+
+
+def ensure(api, num, shiny=False, back=False):
     """그림 파일 경로를 돌려준다. 없으면 서버에서 받아온다.
 
     shiny 는 skin 이다 (common/tint): False / True / "s090" 같은 색조 값.
+    back 이면 뒷모습 (2.5.8, 관장 · 실시간 배틀의 내 포켓몬). **뒷모습이 없으면 None** 이다 - 대신할 그림을 주지
+    않는다 (부르는 쪽이 앞모습을 뒤집어 쓴다). 없다는 답은 한 시간 기억한다 - 뒷모습이 없는 종마다 턴마다 묻지 않게.
     반드시 작업 스레드에서 부를 것. 네트워크를 탄다.
     """
     if not num:
         return None
     shiny = T.norm(shiny)
     if isinstance(shiny, str):
-        return _ensure_tinted(api, num, shiny)
-    p = find_local(num, shiny)
+        return _ensure_tinted(api, num, shiny, back)
+    p = find_local(num, shiny, back)
     if p:
         return p
-    key = (int(num), bool(shiny))
+    key = (int(num), bool(shiny)) if not back else (int(num), bool(shiny), "b")
+    if back:
+        with _lock:
+            t = _no_back.get(key)
+        if t is not None and time.time() - t < NO_BACK_AFTER:
+            return find_local(num, False, True) if shiny else None
     if _still_giving_up(key):
-        return find_local(num, False) if shiny else None
+        return find_local(num, False, back) if shiny else None
     try:
-        data, ext = api.sprite(num, shiny)
+        data, ext = api.sprite(num, shiny, True) if back else api.sprite(num, shiny)
     except Exception:
         _give_up_for_now(key)
-        return find_local(num, False) if shiny else None
+        return find_local(num, False, back) if shiny else None
     if not data:
+        if back:
+            with _lock:
+                _no_back[key] = time.time()
+            return find_local(num, False, True) if shiny else None
         _give_up_for_now(key)
         return None
-    path = os.path.join(sprite_dir(), _stem(num, shiny) + (ext or ".gif"))
+    path = os.path.join(sprite_dir(), _stem(num, shiny, back) + (ext or ".gif"))
     tmp = path + ".part"
     try:
         # 쓰는 것은 드물다. 그사이 누가 폴더를 지웠어도 여기서 다시 만든다.

@@ -122,14 +122,20 @@ class Api(object):
         return self._call("GET", "/api/starters", auth=False,
                           timeout=WAKE_TIMEOUT)
 
-    def sprite(self, num, shiny=False):
-        """정식 도트 원본 바이트. (내용, 확장자) 를 돌려준다."""
-        url = "%s/api/sprite/%d%s" % (self.base, int(num), "?shiny=true" if shiny else "")
+    def sprite(self, num, shiny=False, back=False):
+        """정식 도트 원본 바이트. (내용, 확장자) 를 돌려준다. back 이면 뒷모습 (2.5.8) - 없으면 (None, None).
+
+        **뒷모습은 서버가 X-Sprite-Back 을 붙였을 때만 받아들인다.** back 을 모르는 옛 서버는 그 말을 흘려듣고
+        앞모습을 그대로 주는데, 그것을 뒷모습으로 보관하면 그 PC 에는 틀린 그림이 영영 남는다."""
+        q = [k for k, on in (("shiny=true", shiny), ("back=true", back)) if on]
+        url = "%s/api/sprite/%d%s" % (self.base, int(num), ("?" + "&".join(q)) if q else "")
         try:
             r = self.session.get(url, timeout=40)
         except requests.RequestException as e:
             raise ApiError("도트를 받지 못했습니다: %s" % e)
         if r.status_code != 200:
+            return None, None
+        if back and not r.headers.get("X-Sprite-Back"):
             return None, None
         ext = r.headers.get("X-Sprite-Ext")
         if not ext:
