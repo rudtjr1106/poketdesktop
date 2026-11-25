@@ -980,6 +980,8 @@ class WildController(object):
     def last_ball(self):
         """마지막에 쓴 볼. 없으면 몬스터볼."""
         want = (self.app.settings.get("lastBall") or "POKEBALL")
+        if want == ball_menu.MASTER:
+            want = "POKEBALL"        # 마스터볼은 메뉴에서 골라 확인할 때만 나간다 (2.5.8, #909 - 두 개 이상 가졌을 때)
         for o in self.ball_options or ():
             if o["id"] == want and o["count"] > 0:
                 return want

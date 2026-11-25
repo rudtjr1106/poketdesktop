@@ -798,6 +798,14 @@ class Api(object):
         return self._call("PUT", "/api/pvp/team",
                           {"ids": [int(i) for i in ids]})
 
+    def champion_team(self):
+        """독도 팀 (2.5.8, 랭크 팀과 같은 꼴). 정하지 않았으면 랭크 팀(없으면 바탕화면 파티)이 온다."""
+        return self._call("GET", "/api/champion/team")
+
+    def champion_set_team(self, ids):
+        """독도 팀을 등록한다. 빈 목록이면 등록을 풀고 랭크 팀으로 싸운다."""
+        return self._call("PUT", "/api/champion/team", {"ids": [int(i) for i in ids]})
+
     # 포켓몬 알. 목록은 /api/me 에 실려 온다.
     def egg_seen(self, egg_id):
         """부화를 화면에 알렸다."""

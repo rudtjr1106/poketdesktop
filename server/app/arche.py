@@ -1210,7 +1210,7 @@ def throw_ball(uid, user, row, tb, want, hour=None):
                  " AND state<>'caught'", (1 if mon.get("shiny") else 0, _iso(now), uid, n, slot))
     if getattr(cur, "rowcount", 1) == 0:
         raise HTTPException(409, "이 자리의 전설은 이미 잡았어요.")
-    caught_mon, where = battle_routes.store_caught(uid, mon)
+    caught_mon, where = battle_routes.store_caught(uid, mon, ball)
     db.run("UPDATE arche_mon SET pokemon_id=? WHERE user_id=? AND chapter=? AND slot=?",
            (caught_mon.get("id"), uid, n, slot))
     items.mark_seen(uid, mon["species"], True, auth.now_iso())

@@ -171,10 +171,14 @@ class TeamIn(BaseModel):
 
 
 def _team_view(uid):
-    source = pvp._ranked_source(uid)
+    return team_view(uid, pvp._ranked_source(uid), bool(pvp.team_ids(uid)), "랭크 팀")
+
+
+def team_view(uid, source, registered, label="랭크 팀"):
+    """팀 고르기 창(ui_season.TeamWindow)이 받는 꼴. 랭크 팀 · 독도 팀(2.5.8, champion.get_team)이 같이 쓴다."""
     team, dropped, same = pvp.drop_counts(source)
     dex = deps.dex()
-    out = {"registered": bool(pvp.team_ids(uid)),
+    out = {"registered": registered,
             # 고르는 창에는 제한 전의 팀을 준다 (등록한 그대로 보여야 한다).
             "ids": [m["id"] for m in source],
             "pokemon": [deps.decorate(m) for m in team],
@@ -196,7 +200,8 @@ def _team_view(uid):
         # 바탕화면 파티)은 heldDupIds(뒤의 것)로 표시한다. 시즌 4 응답에는 이 칸이 없다.
         out["sameHeldMax"] = pvp.SAME_HELD_MAX
         out["heldDupIds"] = pvp.same_held_ids(team)
-        out["heldShort"] = pvp.held_short(uid)
+        out["heldShort"] = (pvp.held_short(uid) if label == "랭크 팀"
+                            else (pvp.held_why(team, label) if pvp.same_held(team) else None))
     return out
 
 

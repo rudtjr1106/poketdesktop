@@ -2530,7 +2530,7 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
     if body.exp:
         hour = body.hour if 0 <= body.hour <= 23 else None
         exp = battle_routes.catch_exp(dex(), uid, mon, None, hour)
-    got, where = battle_routes.store_caught(uid, mon)
+    got, where = battle_routes.store_caught(uid, mon, ball_id)
     db.run("DELETE FROM wild WHERE id=?", (wid,))
     # 이 야생에 배틀이 걸려 있었으면 같이 닫는다 (1.10.4). 안 닫으면 야생은 볼에 들어갔는데
     # 배틀 줄만 남아, 내 포켓몬이 계속 '배틀 중' 이라 도구를 못 쓴다 (게시판 #174).

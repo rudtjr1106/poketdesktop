@@ -212,10 +212,26 @@ def invite(uid, other, now=None):
     return get(cur.lastrowid)
 
 
-def _team(uid):
+def team_of(uid, kind="live"):
+    """이 판에서 쓰는 팀 (레벨을 맞추기 전). 챔피언리그(독도) 판은 독도 팀 (2.5.8, 게시판 #858 - 없으면 랭크 팀),
+    그 밖(친구 · 길드 친선전)은 랭크 팀 (없으면 바탕화면 파티)."""
+    if kind == "champion":
+        from . import champion
+        return champion.team(uid)
+    return pvp.ranked_team(uid)
+
+
+def team_label(uid, kind="live"):
+    if kind == "champion":
+        from . import champion
+        return champion.team_label(uid)
+    return "랭크 팀" if pvp.team_ids(uid) else "바탕화면 파티"
+
+
+def _team(uid, kind="live"):
     """이 사람이 이 판에서 쓸 팀. 레벨은 맞춘다. 같은 도구는 앞의 한 마리만 지닌 셈으로 (2.0.2 - 받는 사람이나
     초대한 뒤에 도구를 바꾼 사람은 그 자리에서 막을 수 없어서 판에서만 뺀다, pvp.SAME_HELD_MAX)."""
-    return [LB.leveled(m, config.LIVE_LEVEL) for m in pvp.strip_held(pvp.ranked_team(uid))[0]]
+    return [LB.leveled(m, config.LIVE_LEVEL) for m in pvp.strip_held(team_of(uid, kind))[0]]
 
 
 def accept(uid, mid, now=None):
@@ -225,7 +241,7 @@ def accept(uid, mid, now=None):
         raise LookupError("그런 초대가 없습니다.")
     if row["state"] != "invited":
         raise ValueError("이미 끝난 초대입니다.")
-    a_team, b_team = _team(row["a_id"]), _team(row["b_id"])
+    a_team, b_team = _team(row["a_id"], kind_of(row)), _team(row["b_id"], kind_of(row))
     if not a_team or not b_team:
         db.run("UPDATE live_match SET state='done', result='cancelled',"
                " updated_at=? WHERE id=? AND state='invited'", (_iso(now), mid))
@@ -284,7 +300,7 @@ def open_direct(a, b, now=None, kind="live"):
         raise ValueError("이 트레이너와는 싸울 수 없습니다.")
     if my_match(a) or my_match(b):
         raise ValueError("이미 진행 중인 실시간 배틀이 있습니다.")
-    if not pvp.ranked_team(a) or not pvp.ranked_team(b):
+    if not team_of(a, kind) or not team_of(b, kind):
         raise ValueError("둘 다 데리고 다니는 포켓몬이 있어야 합니다.")
     cur = db.run(
         "INSERT INTO live_match (a_id, b_id, a_name, b_name, state, rev,"
@@ -306,7 +322,7 @@ def answer(uid, mid, ok, now=None):
             raise ValueError("받은 사람만 수락할 수 있습니다.")
         # 수락하는 사람도 그 자리에서 누른다 - 같은 도구가 겹치면 막고 알린다 (2.0.2, 친선전 받기와 같다). 초대는 그대로
         # 둔다 (앱이 까닭을 보여 준 뒤 거절로 정리한다). 초대한 뒤 도구를 바꾼 건 사람은 판에서만 뺀다 (_team)
-        why = pvp.held_why(pvp.ranked_team(uid), "랭크 팀" if pvp.team_ids(uid) else "바탕화면 파티")
+        why = pvp.held_why(team_of(uid, kind_of(row)), team_label(uid, kind_of(row)))
         if why:
             raise ValueError(why)
         out = accept(uid, mid, now)

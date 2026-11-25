@@ -311,7 +311,9 @@ class RaidBattleWindow(Z.Resizable):
             path = sprite_cache.ensure(self.app.api, num, shiny)
             if not path:
                 return None
-            anim = sprites.load_animation(path, size, 0.2, 4.0, max_size=(cap, size))
+            # 우리 쪽: 몸 한 장의 높이를 키에 맞춘다 (2.5.8, #850 - 날갯짓하는 종이 작게 나왔다). 보스는 예전처럼 칸에 다 넣는다
+            anim = sprites.load_animation(path, size, 0.2, 4.0, max_size=(cap, size if boss else int(size * MS.SWING)),
+                                          body=not boss)
             # 쇼다운 도트는 왼쪽을 본다. 우리 쪽은 뒤집어 보스를 보게 한다. 투명색 풀기 · 테라스탈한 결정 모습(2.5.0)은
             # 여기(작업 스레드)에서 - 화면 스레드에서 하면 연출 도중 잠깐 멈칫한다.
             frames = anim.frames[sprites.RIGHT if boss else sprites.LEFT]

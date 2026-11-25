@@ -158,10 +158,33 @@ def rows(options, on_pick, auto=None, on_auto=None, limit=None, on_limit=None):
     return out
 
 
+MASTER_ASK = "마스터볼을 던질까요?\n반드시 잡히지만, 한 번 쓰면 되돌릴 수 없습니다."
+
+
+def ask_master(root):
+    """마스터볼을 정말 던지나 (2.5.8, 게시판 #909 '마스터볼이 어느새 사라졌다'). 야생은 화면 아래 작업 표시줄 곁에 돋아
+    메뉴가 위로 펼쳐지면 맨 아래 마스터볼 줄이 커서 바로 옆에 온다 - 한 번 더 묻는다."""
+    from .ui_box import confirm
+    return confirm(root, "마스터볼", MASTER_ASK, danger=True, ok_text="던지기")
+
+
+def guard(root, on_pick, ask=None):
+    """on_pick 앞에 마스터볼 확인을 끼운다. 다른 볼은 그대로 넘긴다. ask(root) -> bool 은 검사가 바꿔 끼운다."""
+    ask = ask or ask_master
+
+    def pick(ball):
+        if ball == MASTER and not ask(root):
+            return
+        on_pick(ball)
+    return pick
+
+
 def popup(root, event, options, on_pick, on_close=None, auto=None, on_auto=None, limit=None, on_limit=None):
     """on_close: 메뉴가 닫히면(골랐든 안 골랐든) 한 번 부른다. 배틀이 그동안 멈춘다.
-    auto · on_auto: 맨 위 '잡힐 때까지 계속 던지기' 줄 (배틀 밖 야생 · 2.1.3 부터 배틀 중에도)."""
+    auto · on_auto: 맨 위 '잡힐 때까지 계속 던지기' 줄 (배틀 밖 야생 · 2.1.3 부터 배틀 중에도).
+    마스터볼 줄은 한 번 더 묻는다 (guard, 2.5.8) - 야생 · 바탕화면 배틀 · 아르케 배틀이 다 이 길로 연다."""
     from . import platform_os as PLAT
+    on_pick = guard(root, on_pick)
     if not PLAT.NATIVE_MENU:
         # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
         return U.PopupMenu(root, rows(options, on_pick, auto, on_auto, limit, on_limit),

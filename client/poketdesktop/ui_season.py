@@ -72,6 +72,7 @@ class TeamWindow(object):
         load      () -> (팀, 내 포켓몬)        팀은 /api/pvp/team 과 같은 꼴
         save      (ids) -> {"registered", "ids"}
         saved     저장했을 때 띄울 말
+        unreg     등록 풀기 단추를 둘 때 풀고 나서 띄울 말 (2.5.8 독도 팀 - 풀면 랭크 팀으로 싸운다). 없으면 단추가 없다
 
     서버에서 받기 · 고르기 규칙 · 저장은 여기 것을 테마도 그대로 쓴다. 테마는 짓는 고리만 바꾼다:
     _build(창 안) · _row(줄 하나) · _repack(찾기로 바뀐 목록) · _paint_found · _paint_rows · _paint_slots ·
@@ -204,7 +205,7 @@ class TeamWindow(object):
         team, mons = r
         self._take(team or {}, mons)
         self._paint_note(natural(self.note_text()))
-        if self.registered and not self.spec:
+        if self.registered and self._can_unreg():
             self._show_unreg(True)
         for m in self.mons:
             self._row(m)
@@ -670,8 +671,12 @@ class TeamWindow(object):
                             "'등록 풀기' 를 누르세요.", U.ACCENT)
         self._send(list(self.picked), self.spec.get("saved") or "랭크 팀을 등록했습니다.")
 
+    def _can_unreg(self):
+        """'등록 풀기' 를 둘까 - 랭크 팀 창과, spec 이 unreg 를 준 창 (독도 팀)."""
+        return not self.spec or bool(self.spec.get("unreg"))
+
     def unregister(self):
-        self._send([], "등록을 풀었습니다. 바탕화면 파티로 싸웁니다.")
+        self._send([], self.spec.get("unreg") or "등록을 풀었습니다. 바탕화면 파티로 싸웁니다.")
 
     def _send(self, ids, done_text):
         self.say("저장하는 중...", U.FG_FAINT)
@@ -682,7 +687,7 @@ class TeamWindow(object):
             r = r or {}
             self.registered = bool(r.get("registered"))
             self.picked = [int(i) for i in r.get("ids") or []]
-            self._show_unreg(self.registered and not self.spec)
+            self._show_unreg(self.registered and self._can_unreg())
             self._paint()
             self.say(done_text)
             if self.on_saved:

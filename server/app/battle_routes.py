@@ -434,9 +434,9 @@ def foe_only_turn(bt, ev):
     return key
 
 
-def store_caught(uid, mon):
-    """잡은 포켓몬을 파티에 넣는다. 꽉 찼으면 PC 박스로."""
-    mid = db.insert_mon(uid, mon, auth.now_iso())
+def store_caught(uid, mon, ball=None):
+    """잡은 포켓몬을 파티에 넣는다. 꽉 찼으면 PC 박스로. ball = 잡은 볼 열쇠 (2.5.8 - pokemon.ball 에 남는다)."""
+    mid = db.insert_mon(uid, dict(mon, _ball=ball) if ball else mon, auth.now_iso())
     slot = deps.free_slot(uid)
     if slot is not None:
         db.run("UPDATE pokemon SET on_desktop=1, slot=? WHERE id=?", (slot, mid))
@@ -769,7 +769,7 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
     # 잡아도 경험치를 받는다 (절반). 잡은 포켓몬을 파티에 넣기 **전에** 준다.
     if body.exp:
         out["exp"] = catch_exp(d, uid, foe, row["mine_id"], hour)
-    caught_mon, where = store_caught(uid, foe.mon)
+    caught_mon, where = store_caught(uid, foe.mon, ball)
     db.run("UPDATE battle SET state='done', result='caught' WHERE id=?", (row["id"],))
     db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
     db.run("INSERT INTO wild_state (user_id, caught) VALUES (?,1)"

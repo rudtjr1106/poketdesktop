@@ -142,9 +142,20 @@ class Animation(object):
         return len(self.durations)
 
 
+def body_height(frames):
+    """장마다 그림이 차지한 높이의 가운데 값 (2.5.8). 날갯짓 · 둥실거림으로 몸이 위아래로 오르내리는 도트는 장을 다
+    겹친 높이(union_bbox)가 몸보다 훨씬 크다 - 프테라는 겹친 높이 144px 에 몸 85px, 골뱃은 136px 에 68px."""
+    hs = sorted(bb[3] - bb[1] for bb in (f.getbbox() for f in frames) if bb)
+    return hs[len(hs) // 2] if hs else 0
+
+
 def load_animation(path, target_height=48, min_scale=0.25, max_scale=2.5,
-                   max_frames=64, key=None, max_size=None):
+                   max_frames=64, key=None, max_size=None, body=False):
     """max_size=(폭, 높이) 를 주면 그 칸을 넘지 않게 더 줄인다.
+
+    body=True 면 target_height 를 **몸 한 장의 높이**(body_height)에 맞춘다 (2.5.8, 게시판 #850 '프테라처럼 크기가
+    이상한 경우'). 아니면 예전처럼 장을 다 겹친 높이에 맞춘다 - 날갯짓하는 종은 몸이 그만큼 작게 나왔다.
+    오르내리는 폭까지 합친 전체는 max_size 의 높이까지만 (배틀 창은 칸의 1.5배를 준다).
 
     목록의 작은 칸에 넣는 도트가 그렇다. 높이만 맞추면 옆으로 긴 종
     (#564 는 22px 높이에 72px)이 칸 밖으로 나가 잘린다. **min_scale 보다
@@ -155,7 +166,7 @@ def load_animation(path, target_height=48, min_scale=0.25, max_scale=2.5,
     ms = tuple(max_size) if max_size else None
     # max_frames 도 열쇠에 넣는다. 안 넣으면 첫 장만 읽어 둔 것이 모든
     # 프레임을 원하는 쪽에 그대로 건너간다.
-    ck = (path, key, target_height, min_scale, max_scale, max_frames, ms)
+    ck = (path, key, target_height, min_scale, max_scale, max_frames, ms, bool(body))
     if ck in _cache:
         return _cache[ck]
 
@@ -164,7 +175,8 @@ def load_animation(path, target_height=48, min_scale=0.25, max_scale=2.5,
         key = pick_key_color(frames)
     l, t, r, b = union_bbox(frames)
     bw, bh = r - l, b - t
-    scale = float(target_height) / bh if bh else 1.0
+    sh = (body_height(frames) or bh) if body else bh
+    scale = float(target_height) / sh if sh else 1.0
     scale = max(min_scale, min(max_scale, scale))
     if ms:
         if bw:

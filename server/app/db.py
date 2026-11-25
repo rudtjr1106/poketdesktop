@@ -570,6 +570,15 @@ CREATE TABLE IF NOT EXISTS rank_team (
     PRIMARY KEY (user_id, pos)
 );
 
+-- 독도 팀 (2.5.8, 게시판 #858 '랭크 팀과 독도 팀을 따로'). 랭크 팀과 같은 꼴 · 같은 규칙 (pvp.check_team).
+-- 없으면 독도에서도 랭크 팀(없으면 바탕화면 파티)으로 싸운다 (champion.team).
+CREATE TABLE IF NOT EXISTS champion_team (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pos         INTEGER NOT NULL,
+    pokemon_id  INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, pos)
+);
+
 -- 가진 칭호와 명패. 한 번 받으면 시즌이 바뀌어도 남는다.
 CREATE TABLE IF NOT EXISTS user_reward (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -1421,6 +1430,9 @@ MIGRATIONS = [
      "ALTER TABLE pvp_match ADD COLUMN practice INTEGER NOT NULL DEFAULT 0"),
     # 꾸미기 (버전 2): 포켓몬이 쓰고 있는 장식 · 효과 {칸: 열쇠}. 옛 행은 NULL = 아무것도 안 씀
     ("pokemon", "deco", "ALTER TABLE pokemon ADD COLUMN deco TEXT"),
+    # 잡은 볼 (2.5.8, 게시판 #909 '마스터볼이 사라졌다' - 어디에 썼는지 남은 것이 없었다). 잡은 길 셋(야생 볼 · 바탕화면
+    # 배틀 · 아르케 전설)이 적는다. 옛 행 · 볼로 잡지 않은 것(알 · 탐험 · 선물 · 스타팅)은 NULL
+    ("pokemon", "ball", "ALTER TABLE pokemon ADD COLUMN ball TEXT"),
     # 시즌 5 길드전 (게시판 #373 의견): 조커 · 개인 기여 보상. 옛 행은 0 = 조커 아님 · 받은 것 없음
     ("guild_war_team", "joker", "ALTER TABLE guild_war_team ADD COLUMN joker INTEGER NOT NULL DEFAULT 0"),
     ("guild_war_team", "earned", "ALTER TABLE guild_war_team ADD COLUMN earned INTEGER NOT NULL DEFAULT 0"),
@@ -1751,13 +1763,19 @@ def insert_mon(user_id, mon, now):
     cur = run(
         "INSERT INTO pokemon (user_id, species, nickname, level, exp, nature, ability,"
         " hidden_ability, gender, shiny, happiness, ivs, evs, moves, on_desktop, slot,"
-        " met_level, caught_at, hyper, no_evolve, luxury, held)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " met_level, caught_at, hyper, no_evolve, luxury, held, ball)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user_id, mon["species"], mon.get("nickname"), mon["level"], mon["exp"],
          mon["nature"], mon.get("ability"), int(bool(mon.get("hiddenAbility"))),
          mon.get("gender", "N"), int(bool(mon.get("shiny"))), mon.get("happiness", 70),
          json.dumps(mon["ivs"]), json.dumps(mon["evs"]), json.dumps(mon["moves"]),
          0, None, mon["level"], now,
          json.dumps(mon.get("hyper") or {}), int(bool(mon.get("noEvolve"))),
-         int(bool(mon.get("luxury"))), mon.get("held") or None))
+         int(bool(mon.get("luxury"))), mon.get("held") or None, _ball_of(mon)))
     return cur.lastrowid
+
+
+def _ball_of(mon):
+    """잡은 볼 열쇠 (store_caught 가 '_ball' 로 실어 준다). 열쇠 꼴(영문 · 숫자 · _, 24자까지)이 아니면 적지 않는다."""
+    b = str(mon.get("_ball") or "").strip().upper()
+    return b if b and len(b) <= 24 and b.replace("_", "").isalnum() else None

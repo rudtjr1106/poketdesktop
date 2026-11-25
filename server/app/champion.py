@@ -183,10 +183,56 @@ def members():
         " ORDER BY m.qualified_at, m.user_id")]
 
 
+# ---------------------------------------------------------------- 독도 팀 (2.5.8, 게시판 #858)
+# 랭크는 AI 가 대신 싸우고 독도는 직접 싸운다 - 맞는 팀이 다르다 ('랭크 전용 팀으로 독도에 들어갔다가 기권한다').
+# 독도 팀을 따로 둘 수 있다. 규칙은 랭크 팀과 같다 (pvp.check_team). 정하지 않으면 랭크 팀(없으면 바탕화면 파티).
+TEAM_LABEL = "독도 팀"
+
+
+def team_ids(uid):
+    """등록한 독도 팀의 포켓몬 id (자리 순, 내 것만). 없으면 빈 목록."""
+    rows = db.q("SELECT t.pokemon_id FROM champion_team t JOIN pokemon p"
+                " ON p.id=t.pokemon_id AND p.user_id=t.user_id"
+                " WHERE t.user_id=? ORDER BY t.pos", (uid,))
+    return [r["pokemon_id"] for r in rows]
+
+
+def team_source(uid):
+    """전설 · 환상 제한을 걸기 전의 독도 팀. 독도 팀이 없으면 랭크 팀(없으면 바탕화면 파티) - pvp._ranked_source."""
+    ids = team_ids(uid)
+    if not ids:
+        return pvp._ranked_source(uid)
+    marks = ",".join("?" * len(ids))
+    rows = dict((r["id"], r) for r in db.q(
+        "SELECT * FROM pokemon WHERE user_id=? AND id IN (%s)" % marks, (uid,) + tuple(ids)))
+    return [db.row_to_mon(rows[i]) for i in ids if i in rows]
+
+
+def team(uid):
+    """독도에서 실제로 싸우는 팀 (live 의 kind='champion' 판)."""
+    return pvp.restrict(team_source(uid))[0]
+
+
+def team_label(uid):
+    """독도에서 싸우는 팀의 이름 - 문구에 쓴다."""
+    if team_ids(uid):
+        return TEAM_LABEL
+    return "랭크 팀" if pvp.team_ids(uid) else "바탕화면 파티"
+
+
+def set_team(uid, ids):
+    """독도 팀을 등록한다. 빈 목록이면 등록을 푼다 (랭크 팀으로 싸운다)."""
+    clean = pvp.check_team(uid, ids, TEAM_LABEL)
+    db.run("DELETE FROM champion_team WHERE user_id=?", (uid,))
+    for pos, pid in enumerate(clean):
+        db.run("INSERT INTO champion_team (user_id, pos, pokemon_id) VALUES (?,?,?)", (uid, pos, pid))
+    return clean
+
+
 def team_why(uid, mine=True):
     """팀이 챔피언리그 조건을 못 채웠으면 그 까닭 (채웠으면 None). mine=False 면 상대 이야기로."""
-    team = pvp.ranked_team(uid)
-    ok, n = pvp.rank_ready(team)
+    team_ = team(uid)
+    ok, n = pvp.rank_ready(team_)
     if not ok:
         if not mine:
             return "상대의 팀이 챔피언리그 조건(Lv.%d 이상 %d마리)을 못 채웠습니다." % (
@@ -194,7 +240,7 @@ def team_why(uid, mine=True):
         return "챔피언리그는 Lv.%d 이상 포켓몬 %d마리로 팀을 채워야 나갈 수 있습니다 (지금 %d마리)." % (
             pvp.season.RANK_MIN_LEVEL, pvp.season.RANK_MIN_COUNT, n)
     if mine:
-        return pvp.held_why(team, "랭크 팀" if pvp.team_ids(uid) else "바탕화면 파티")
+        return pvp.held_why(team_, team_label(uid))
     return None
 
 
@@ -565,6 +611,8 @@ def state(uid, now=None):
         "waiting": [{"id": u, "name": names.get(u) or _name(u)} for u in waiting if u != uid],
         "online": online, "fights": fights(), "ranking": table[:RANK_SHOW],
         "me": me, "recent": recent(uid, done) if member else [], "pairMax": PAIR_DAY_MAX,
+        # 독도 팀 (2.5.8): 따로 정했나 · 지금 싸우는 팀의 이름 (창의 [독도 팀] 줄)
+        "teamSet": bool(team_ids(uid)), "teamLabel": team_label(uid),
     }
 
 
@@ -597,6 +645,29 @@ class WatchIn(BaseModel):
 @router.get("/api/champion")
 def get_state(ctx=Depends(deps.current)):
     return state(ctx["user"]["id"])
+
+
+class TeamIn(BaseModel):
+    ids: list = []
+
+
+@router.get("/api/champion/team")
+def get_team(ctx=Depends(deps.current)):
+    """독도 팀 (랭크 팀 창과 같은 꼴 - pvp_routes.team_view). 정하지 않았으면 랭크 팀(없으면 바탕화면 파티)이 온다."""
+    from . import pvp_routes
+    uid = ctx["user"]["id"]
+    return pvp_routes.team_view(uid, team_source(uid), bool(team_ids(uid)), TEAM_LABEL)
+
+
+@router.put("/api/champion/team")
+def put_team(body: TeamIn, ctx=Depends(deps.current)):
+    """독도 팀을 등록한다. 빈 목록이면 등록을 풀고 랭크 팀으로 싸운다."""
+    uid = ctx["user"]["id"]
+    try:
+        set_team(uid, body.ids or [])
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e) or "잘못된 팀입니다.")
+    return get_team(ctx)
 
 
 @router.post("/api/champion/seek")

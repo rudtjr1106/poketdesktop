@@ -426,6 +426,11 @@ jobs:
       # 2.5.5 게시판 #777: 관장 · 실시간 · 레이드 배틀 도트 키를 도감의 키로 (따라큐가 그란돈만 하게 보였다)
       - name: 배틀 도트 키
         run: python client/test_mon_size.py
+      # 2.5.8 게시판 #909 · #858: 마스터볼은 한 번 더 묻는다 · 독도 팀 (앱 - 창 없이)
+      - name: 마스터볼 확인 · 독도 팀
+        run: |
+          python client/test_master_ball.py
+          python client/test_champion_team_ui.py
       # 2.1.2: 상점 맨 위 랜덤 캡슐 띠 - 돈으로 1회 · 10회 (기본 테마 + DP 테마), 뽑기 기계 돈 모드
       - name: 상점 랜덤 캡슐 띠 (진짜 Tk)
         if: matrix.shard == 2
@@ -613,6 +618,7 @@ jobs:
           python client/test_sell_groups.py dp
           python client/test_pet_behind.py
           python client/test_box_cols_ui.py
+          python client/test_box_held_icon.py      # 2.5.8 #898: 박스 목록 이름 옆 지닌 도구 그림
       - name: 새 기술머신 표시 (진짜 Tk)
         if: matrix.shard == 2
         run: python client/test_tm_new.py
@@ -932,6 +938,8 @@ jobs:
           export PYTHONPATH="${{ github.workspace }}"
           cd server
           python test_names.py          # 2.5.8 부적절한 닉네임 거르기 (가입 · 확인 · 닉네임 변경)
+          python test_ball_record.py    # 2.5.8 #909 잡은 볼 기록 (pokemon.ball)
+          python test_champion_team.py  # 2.5.8 #858 독도 팀 (랭크 팀과 따로)
           python test_sprite_back.py    # 2.5.8 뒷모습 도트 (?back=true): 받는 곳 · b 이름 · 없으면 404 + 없음 표시 (밖으로 안 나간다)
           python test_cpu_1124.py       # 11/24 부하 줄이기: 도감 해시 한 번 · 관장 · 실시간 만료 접기 간격
           python test_pvp.py            # + 연습판 (하루 20판 뒤): 양쪽 점수 그대로 · 이기면 100원 · 하루 상한 같이 · 쿨타임 그대로

@@ -509,6 +509,8 @@ class DesktopBattle(object):
         """볼을 안 고르고 던졌다 (두 번 클릭): 마지막에 쓴 볼. **그 볼이 떨어졌으면 몬스터볼** (wild_ui.last_ball 과
         같다). 예전에는 개수를 안 보고 마지막 볼을 보내서, 슈퍼볼을 다 쓴 뒤에는 서버가 409 로 거절할 뿐이었다."""
         want = self.app.settings.get("lastBall") or "POKEBALL"
+        if want == "MASTERBALL":
+            want = "POKEBALL"        # 마스터볼은 메뉴에서 골라 확인할 때만 나간다 (2.5.8, #909 - 두 개 이상 가졌을 때)
         for o in self.ball_opts or ():
             if o.get("id") == want and int(o.get("count") or 0) > 0:
                 return want

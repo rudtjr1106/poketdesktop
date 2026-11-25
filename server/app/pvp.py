@@ -509,13 +509,24 @@ def _ranked_source(uid):
 
 def set_team(uid, ids):
     """랭크 팀을 등록한다. 빈 목록이면 등록을 푼다(바탕화면 파티로 싸운다)."""
+    clean = check_team(uid, ids, "랭크 팀")
+    db.run("DELETE FROM rank_team WHERE user_id=?", (uid,))
+    for pos, pid in enumerate(clean):
+        db.run("INSERT INTO rank_team (user_id, pos, pokemon_id) VALUES (?,?,?)",
+               (uid, pos, pid))
+    return clean
+
+
+def check_team(uid, ids, label="랭크 팀"):
+    """등록할 팀의 규칙 (여섯 마리 · 내 것 · 탐험 중이 아님 · 전설 · 환상 · 같은 종 · 같은 도구). 깨끗한 id 목록, 아니면
+    ValueError (문구의 '랭크 팀' 자리에 label - 독도 팀도 같은 규칙이다, 2.5.8 champion.set_team)."""
     clean = []
     for i in ids or []:
         i = int(i)
         if i not in clean:
             clean.append(i)
     if len(clean) > config.MAX_PARTY:
-        raise ValueError("랭크 팀은 최대 %d마리입니다." % config.MAX_PARTY)
+        raise ValueError("%s은 최대 %d마리입니다." % (label, config.MAX_PARTY))
     if clean:
         marks = ",".join("?" * len(clean))
         rows = db.q("SELECT id, species, nickname, held FROM pokemon WHERE user_id=? AND id IN (%s)"
@@ -524,11 +535,11 @@ def set_team(uid, ids):
             raise ValueError("내 포켓몬만 넣을 수 있습니다.")
         from . import expedition                 # 탐험에 나가 있으면 배틀에 못 나간다 (1.10.4)
         if expedition.away_ids(uid) & set(clean):
-            raise ValueError("탐험에 나가 있는 포켓몬은 랭크 팀에 넣을 수 없습니다.")
+            raise ValueError("탐험에 나가 있는 포켓몬은 %s에 넣을 수 없습니다." % label)
         names = restricted_species()
         if sum(1 for r in rows if r["species"] in names) > RESTRICTED_MAX:
-            raise ValueError("랭크 팀에는 전설·환상 포켓몬을 %d마리까지 넣을 수 있습니다."
-                             % RESTRICTED_MAX)
+            raise ValueError("%s에는 전설·환상 포켓몬을 %d마리까지 넣을 수 있습니다."
+                             % (label, RESTRICTED_MAX))
         if too_many_same([r["species"] for r in rows]):
             raise ValueError("같은 포켓몬은 한 팀에 %d마리만 넣을 수 있습니다." % SAME_SPECIES_MAX)
         if held_rule_on():
@@ -536,13 +547,9 @@ def set_team(uid, ids):
             pos = dict((pid, n) for n, pid in enumerate(clean))
             dupes = same_held([dict(r) for r in sorted(rows, key=lambda r: pos[r["id"]])])
             if dupes:
-                raise ValueError("랭크 팀에서는 같은 도구를 %d마리만 지닐 수 있습니다: %s."
+                raise ValueError("%s에서는 같은 도구를 %d마리만 지닐 수 있습니다: %s."
                                  " 하나만 남기고 도구를 바꾸거나 빼 주세요."
-                                 % (SAME_HELD_MAX, same_held_text(dupes)))
-    db.run("DELETE FROM rank_team WHERE user_id=?", (uid,))
-    for pos, pid in enumerate(clean):
-        db.run("INSERT INTO rank_team (user_id, pos, pokemon_id) VALUES (?,?,?)",
-               (uid, pos, pid))
+                                 % (label, SAME_HELD_MAX, same_held_text(dupes)))
     return clean
 
 

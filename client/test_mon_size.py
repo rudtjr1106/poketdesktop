@@ -15,6 +15,8 @@
   7. 뒷모습: 내 쪽만 뒷모습 도트(그대로) · 없으면 앞모습을 뒤집어 · 상대는 늘 앞모습 · 설정을 끄면 앞모습
   8. 내 포켓몬을 누르면 앞뒤가 바뀐다 (설정에 적고 다시 세운다) · 쓰러진 포켓몬은 다시 세우지 않는다
   9. 도트 보관: 뒷모습은 이름에 b · 없다는 답은 기억한다 (다시 안 묻는다) · 옛 서버(머리말 없음)의 답은 버린다
+ 10. 날갯짓하는 도트 (게시판 #850 댓글 '프테라처럼 크기가 이상한 경우'): 키를 몸 한 장의 높이에 맞춘다 - 장을 다 겹친
+     높이에 맞추면 몸이 작게 나왔다. 오르내리는 폭까지 합친 전체는 칸의 1.5배까지 · 레이드 보스는 예전처럼
 """
 import json
 import os
@@ -88,7 +90,7 @@ def run_window(mod, cls, mons, key, settings=None, back_have=(), **kw):
         return "%d%s.gif" % (num, "b" if back else "")
 
     def load(path, size, *a, **k):
-        cur.update(size=size, path=path)
+        cur.update(size=size, path=path, body=k.get("body"), cap=(k.get("max_size") or (0, 0))[1])
         return _Anim(size)
 
     def to_rgba(f, _key):
@@ -260,6 +262,33 @@ def main():
     HEAD[0] = {"X-Sprite-Ext": ".gif"}
     chk("   앞모습 요청은 예전과 같은 주소", client.sprite(25) == (b"IMG", ".gif") and urls[-1] == "http://x/api/sprite/25"
         and client.sprite(25, True)[0] == b"IMG" and urls[-1] == "http://x/api/sprite/25?shiny=true", urls[-2:])
+
+    # 10. 몸 한 장의 높이 - 몸 20px 이 위아래로 20px 오르내리는 도트 (겹친 높이 40px)
+    import tempfile as TF
+    from poketdesktop import sprites as SP
+    frames = []
+    for dy in (0, 10, 20, 10):
+        im = Image.new("RGBA", (30, 60), (0, 0, 0, 0))
+        im.paste((40, 160, 90, 255), (5, 10 + dy, 25, 30 + dy))
+        frames.append(im)
+    gif = os.path.join(TF.mkdtemp(prefix="poket-bob-"), "bob.gif")
+    frames[0].save(gif, save_all=True, append_images=frames[1:], duration=100, loop=0, disposal=2)
+    chk("10. 몸 한 장의 높이 = 20 (겹친 높이는 40)", SP.body_height(SP.read_frames(gif)[0]) == 20, SP.body_height(SP.read_frames(gif)[0]))
+    old = SP.load_animation(gif, 40, 0.2, 4.0)
+    new = SP.load_animation(gif, 40, 0.2, 4.0, body=True)
+    chk("    예전: 겹친 높이를 40 에 맞춰 몸이 20", old.h == 40 and abs(old.scale - 1.0) < 0.01, (old.h, old.scale))
+    chk("    지금: 몸을 40 에 맞춘다 (겹친 높이 80)", new.h == 80 and abs(new.scale - 2.0) < 0.01, (new.h, new.scale))
+    capped = SP.load_animation(gif, 40, 0.2, 4.0, max_size=(1000, 60), body=True)
+    chk("    오르내리는 폭까지 합친 전체는 한도(60)까지", capped.h == 60, capped.h)
+    gyms, _w, _b = run_window(GB, GB.GymBattleWindow, [142], "foe")
+    chk("    관장 배틀: 몸 기준 · 전체 한도는 키 높이의 1.5배", gyms[0]["body"] is True
+        and gyms[0]["cap"] == int(gyms[0]["size"] * MS.SWING), gyms[0])
+    lv, _w, _b = run_window(LB, live_cls, [142], "me")
+    chk("    실시간 배틀도", lv[0]["body"] is True and lv[0]["cap"] == int(lv[0]["size"] * MS.SWING), lv[0])
+    rd, _w, _b = run_window(RB, raid_cls, [142], 0)
+    bs, _w, _b = run_window(RB, raid_cls, [142], 0, boss=True)
+    chk("    레이드 우리 쪽은 몸 기준 · 보스는 예전처럼 칸에 다 넣는다", rd[0]["body"] is True and bs[0]["body"] is False
+        and bs[0]["cap"] == bs[0]["size"], (rd[0], bs[0]))
 
     print("\n%d개 통과, %d개 실패" % (OK, FAIL))
     return 1 if FAIL else 0

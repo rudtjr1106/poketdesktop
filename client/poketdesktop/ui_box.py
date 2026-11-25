@@ -73,6 +73,7 @@ COLS = [("도감", 12, 50, "w"), ("이름", 66, 168, "w"), ("Lv", 240, 34, "cent
 # 머리글의 칸 경계를 끌어서 칸 폭을 바꾼다 (엑셀처럼). 바꾼 폭은 설정 boxCols({제목: 폭})에 남아 껐다 켜도 그대로다.
 # 글자를 크게 해서 이름 · 레벨이 칸에 안 들어가거나 겹칠 때 쓴다. 경계를 두 번 누르면 그 칸만 처음 폭으로.
 # 칸 사이는 처음 배치(COLS)의 간격 그대로 두고 폭만 바꾼다 - 기본 폭이면 예전과 한 픽셀도 다르지 않다.
+HELD_ICON = 16                      # 목록 이름 옆 지닌 도구 그림 (2.5.8, 게시판 #898)
 COL_GAPS = [4, 6, 8, 4, 4, 6]       # 칸 사이 (COLS 의 x 에서 앞 칸 끝을 뺀 것)
 COL_MIN = 24                        # 이보다 좁게는 안 줄인다
 COL_MAX = 480
@@ -140,7 +141,7 @@ def _row_sig(mon):
     return (mon.get("num"), mon.get("species"), mon.get("formKey"), info.get("name"),
             bool(mon.get("shiny")), L.has_hidden(mon), mon.get("gender"), mon.get("level"),
             info.get("nature"), info.get("ivPercent"),
-            bool(mon.get("onDesktop")), bool(mon.get("away")))
+            bool(mon.get("onDesktop")), bool(mon.get("away")), mon.get("held"))
 
 
 # 알 (1.4.1). 목록의 타입 칸과 상세 칸에 적는다.
@@ -348,13 +349,15 @@ class Row(object):
                                (_egg_color(self.legend) if self.legend
                                 else (U.FG if self.party else dim))),
             U.FONT_S)
-        if g:
+        held = None if self.egg else mon.get("held")
+        if g or held:
             # 글자 수로 어림하면 한글에서 어긋난다. 글꼴에 실제 폭을 물어본다.
             try:
                 wpx = _text_width(self.f, name, U.FONT_S)
             except Exception:
                 wpx = len(name) * 11
             self._name_px = wpx
+        if g:
             self.gender = tk.Label(self.f, text=g, bg=base,
                                    fg=U.gender_color(mon.get("gender")),
                                    font=U.FONT_S)
@@ -362,6 +365,20 @@ class Row(object):
             self.cells.append(self.gender)
         else:
             self.gender = None
+        # 지닌 도구 (2.5.8, 게시판 #898 '누구에게 무슨 도구를 지니게 했는지 기억이 안 난다'): 이름 · 성별 뒤에 작은 그림.
+        # 그림이 아직 없으면(처음 보는 도구 - reload 가 받아 둔다) 안 그린다. 마우스를 올리면 도구 이름은 상세 칸에서.
+        self.held_icon = None
+        if held:
+            ph = None
+            try:
+                ph = item_icons.photo(held, U.h(HELD_ICON))
+            except Exception:                               # noqa: BLE001
+                ph = None
+            if ph is not None:
+                self.held_icon = tk.Label(self.f, image=ph, bg=base, bd=0)
+                self.held_icon.image = ph
+                self.held_icon.place(x=self._held_x(), rely=0.5, anchor="w")
+                self.cells.append(self.held_icon)
         self._cell("-" if self.egg else str(mon.get("level", "")), 2,
                    U.FG if self.party else dim, U.FONT_B)
 
@@ -443,6 +460,11 @@ class Row(object):
         """성별 기호 자리 - 이름 바로 뒤, 단 레벨 칸을 넘지 않게."""
         return min(self.cols[1][1] + getattr(self, "_name_px", 0) + 6, self.cols[2][1] - 14)
 
+    def _held_x(self):
+        """지닌 도구 그림 자리 - 이름(과 성별 기호) 바로 뒤, 단 레벨 칸을 넘지 않게 (2.5.8)."""
+        after = self._gender_x() + U.h(14) if self.gender is not None else self.cols[1][1] + getattr(self, "_name_px", 0) + 6
+        return max(self.cols[1][1], min(after, self.cols[2][1] - U.h(HELD_ICON) - 2))
+
     def relayout(self, cols):
         """칸 폭이 바뀌었다 (머리글 경계를 끌었다, 2.5.0) - 칸들을 새 자리 · 폭으로 다시 놓는다. 줄을 다시 만들지 않는다."""
         self.cols = cols
@@ -452,6 +474,8 @@ class Row(object):
                 lb.place_configure(x=x, width=w)
             if self.gender is not None:
                 self.gender.place_configure(x=self._gender_x())
+            if self.held_icon is not None:
+                self.held_icon.place_configure(x=self._held_x())
             self.types.place_configure(x=cols[3][1])
         except tk.TclError:
             pass
@@ -1341,6 +1365,12 @@ class BoxWindow(object):
             mons, eggs, boxes = api.pokemon_boxes()
             sprite_cache.ensure_many(
                 api, [(m.get("num"), T.skin(m)) for m in mons if m.get("onDesktop")])
+            # 목록의 지닌 도구 그림 (2.5.8, #898) - 처음 보는 도구만 받는다 (있으면 디스크에서 바로)
+            for held in sorted(set(m.get("held") for m in mons if m.get("held"))):
+                try:
+                    item_icons.raw(api, held)
+                except Exception:                               # noqa: BLE001
+                    pass
             eggs_ui.fetch_icons(api, eggs)
             # 파티 프리셋 (1.10.3). 옛 서버에는 없다 - 없으면 그 줄을 숨길 뿐이다.
             try:

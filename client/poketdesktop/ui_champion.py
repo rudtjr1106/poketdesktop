@@ -79,6 +79,20 @@ def shape_of(st):
     return json.dumps(st, sort_keys=True, ensure_ascii=False)
 
 
+TEAM_NOTE = ("독도 챔피언리그에서 직접 싸우는 팀입니다. 랭크 팀(AI 가 대신 싸움)과 따로 정할 수 있고, 정하지 않으면 랭크 팀"
+             "(없으면 바탕화면 파티)으로 싸웁니다.\n모두 Lv.50 으로 싸우고, Lv.50 이상 6마리를 채워야 나갈 수 있습니다. 전설·환상 "
+             "포켓몬과 같은 포켓몬은 한 마리까지, 같은 도구는 한 마리만 지닐 수 있습니다.")
+
+
+def team_text(st):
+    """독도 창의 [독도 팀] 줄 (2.5.8): 지금 독도에서 싸우는 팀."""
+    st = st or {}
+    if st.get("teamSet"):
+        return "독도에서는 독도 팀으로 싸웁니다."
+    from common.korean import with_josa
+    return "독도에서는 %s 싸웁니다 (독도 팀을 따로 정할 수 있어요)." % with_josa(st.get("teamLabel") or "랭크 팀", "으로")
+
+
 def seek_label(st):
     """[상대 찾기] 단추 글과 누를 수 있나, 그 옆의 안내."""
     st = st or {}
@@ -468,6 +482,19 @@ class LeagueWindow(object):
         else:
             self._paint_seek()
 
+    def pick_team(self):
+        """독도 팀 짜기 (2.5.8) - 랭크 팀 창을 그대로 쓴다 (길드전 팀과 같은 길, ui_season.TeamWindow spec)."""
+        from .ui_season import TeamWindow
+        api = self.app.api
+
+        def save(ids):
+            r = api.champion_set_team(ids) or {}
+            return {"registered": bool(r.get("registered")), "ids": r.get("ids") or []}
+        self.picker = TeamWindow(self.app, on_saved=self.reload, spec={
+            "title": "독도 팀", "load": lambda: (api.champion_team(), api.pokemon()), "save": save,
+            "saved": "독도 팀을 저장했습니다.", "unreg": "등록을 풀었습니다. 독도에서도 랭크 팀으로 싸웁니다.",
+            "note": TEAM_NOTE})
+
     def _tick(self):
         """기다리는 남은 시간을 제자리에서 센다 (1초마다)."""
         self._tick_job = None
@@ -516,6 +543,14 @@ class LeagueWindow(object):
         self.seek_note = wrap(tk.Label(row, text=note, bg=U.BG, fg=U.ACCENT if st.get("seeking") else U.FG_DIM,
                                        font=U.FONT_S, anchor="w", justify="left", wraplength=wl - U.h(150)))
         self.seek_note.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+        # 독도 팀 (2.5.8, 게시판 #858): 랭크 팀과 따로 정한다 - 정하지 않으면 랭크 팀 (없으면 바탕화면 파티)
+        if "teamLabel" in st:
+            trow = tk.Frame(self.body, bg=U.BG)
+            trow.pack(fill="x", pady=(10, 0))
+            U.ghost_button(trow, "독도 팀 정하기", self.pick_team, height=32).pack(side="right")
+            wrap(tk.Label(trow, text=team_text(st), bg=U.BG, fg=U.FG_DIM, font=U.FONT_S, anchor="w", justify="left",
+                          wraplength=wl - U.h(150))).pack(side="left", fill="x", expand=True, padx=(0, 10))
 
         my_why = st.get("why") if not st.get("seeking") else None
         # 접속 중인 참가자

@@ -425,8 +425,9 @@ class LiveBattleWindow(Z.Resizable):
                 path = sprite_cache.ensure(self.app.api, num, shiny)
             if not path:
                 return None
+            # 몸 한 장의 높이를 키에 맞추고, 날갯짓으로 오르내리는 폭까지 합친 전체는 칸의 MS.SWING 배까지 (2.5.8, #850)
             anim = sprites.load_animation(path, size, 0.2, 4.0,
-                                          max_size=(U.h(MON_W[who]), size))
+                                          max_size=(U.h(MON_W[who]), int(size * MS.SWING)), body=True)
             # 쇼다운 앞모습 도트는 왼쪽을 본다 - 내 쪽은 뒤집어 상대를 보게 한다. 뒷모습 도트는 이미 오른쪽 위(상대)를
             # 보므로 그대로 쓴다. 투명색 풀기 · 테라스탈한 결정 모습(2.5.0) · 띄우기(2.5.8)는 여기(작업 스레드)에서 -
             # 화면 스레드에서 하면 연출 도중 잠깐 멈칫한다.
