@@ -243,6 +243,7 @@ class TrayBase(object):
             Item(lambda: random_label(a), lambda: self.call(a.pvp_random)),
             # 관장 도전은 지도에서 고르는 것이라 탭으로 바로 연다.
             Item("관장 도전", lambda: self.call(a.open_gym)),
+            Item("배틀타워", lambda: self.call(a.open_tower)),     # 시즌 7 (닫혀 있는 동안은 탭이 언제 열리는지 알린다)
             # '레이드' 는 1.10.0 에서 탭과 같이 뺐다 (ui_hub.TABS 를 보라).
             # '받은 대전 보기' 는 1.10.0 에서 뺐다 (app.watch_pending 도 같이).
             # 알림을 안 띄우기로 했으니, 놓치면 안 되는 것은 메뉴에 남는다.

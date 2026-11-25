@@ -31,7 +31,7 @@ from pydantic import BaseModel
 
 from common import trainer_battle as TB
 
-from . import arche, auth, battle_routes, boss, champion, config, db, deps, gimmick, guild_war, gym, items, mega, pvp, watchers
+from . import arche, auth, battle_routes, boss, champion, config, db, deps, gimmick, guild_war, gym, items, mega, pvp, tower, watchers
 
 router = APIRouter()
 
@@ -136,8 +136,8 @@ def overview(ctx=Depends(deps.current)):
         done += row["today"]
         regions.append(row)
     act = _active(uid)
-    if act and (guild_war.is_war(act["region"]) or arche.is_arche(act["region"])):
-        act = None                                    # 길드전 판은 길드 창, 아르케 판은 일지 창에서 이어서 한다
+    if act and (guild_war.is_war(act["region"]) or arche.is_arche(act["region"]) or tower.is_tower(act["region"])):
+        act = None                                    # 길드전 판은 길드 창, 아르케 판은 일지 창, 배틀타워 판은 그 탭에서 이어서 한다
     return {"regions": regions, "cleared": len(mine), "total": len(g["regions"]),
             "today": done, "resetIn": gym.reset_in(),
             "tiers": g["tiers"], "digest": g.get("digest"), "mapDigest": gym.korea_map()[1],
@@ -199,6 +199,8 @@ def start(region: str, ctx=Depends(deps.current)):
                 other = {"name": "길드전 상대"}    # 길드 창의 길드전 칸에서 이어서 한다
             elif arche.is_arche(old["region"]):
                 other = {"name": "아르케의 전설"}  # 일지 창에서 이어서 한다 (2.4.0)
+            elif tower.is_tower(old["region"]):
+                other = {"name": tower.busy_name(old["region"])}   # 배틀타워 탭에서 이어서 한다 (시즌 7)
             raise HTTPException(409, "%s 과(와)의 승부가 아직 끝나지 않았습니다."
                                 % (other.get("name") or "다른 트레이너"))
         tb = TB.TrainerBattle.load(deps.dex(), json.loads(old["data"]))
@@ -313,6 +315,10 @@ def act(bid: int, body: ActIn, ctx=Depends(deps.current)):
     elif tb.over and tb.result == "won" and boss.is_boss(row["region"]):
         # 악당·전설 (시즌 4). 관장 기록에는 안 남는다 - 진행·상금·알은 boss 가 준다.
         extra["reward"] = boss.on_win(uid, row["region"], row["trainer"], tb.trainer.get("level") or 1)
+    elif tb.over and tb.result == "won" and tower.is_tower(row["region"]):
+        # 배틀타워 (시즌 7). 관장 기록에는 안 남는다 - 층 기록 · 처음 한 번 보상은 tower 가 준다.
+        # **관장 갈림보다 앞에 둔다**: 타워 판의 trainer("tower-13")는 관장 자료에 없어 gym.trainer 가 None 이다.
+        extra["reward"] = tower.on_win(uid, row["region"], tb.turn)
     elif tb.over and tb.result == "won":
         t = gym.trainer(row["trainer"])
         prize, first = gym.record_win(uid, t, tb.turn, auth.now_iso())

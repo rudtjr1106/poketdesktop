@@ -33,6 +33,7 @@ from .ui_gym import GymWindow
 from .ui_mypage import MyPageWindow
 from .ui_rank import RankWindow
 from .ui_shop import ShopWindow
+from .ui_tower import TowerWindow
 
 W, H = 1040, 700
 MIN_W, MIN_H = 980, 620
@@ -61,6 +62,9 @@ TABS = [
     ("friends", "친구", FriendsWindow, False),
     ("guild", "길드", GuildWindow, False),            # 1.10.0
     ("gym", "관장", GymWindow, True),
+    # 배틀타워 (시즌 7): 1층부터 차례로 오르는 상시 PvE. 관장 다음에 둔다 - 판은 관장 배틀 그대로다.
+    # 닫혀 있는 동안에도 탭은 보인다 ('시즌 7에 열립니다' - 앱이 서버보다 먼저 나간다).
+    ("tower", "배틀타워", TowerWindow, True),
     # 레이드 탭은 1.10.0 에서 뺐다 (이벤트가 2026-10-06 에 끝났다). 다시 열 때는 여기에
     # ("raid", "레이드", RaidWindow, False) 를 되살리고, 트레이의 '레이드' 줄과
     # app.sync 의 announce_raid 도 같이 되살린다 - 화면(ui_raid*.py)은 그대로 있다.
@@ -80,7 +84,7 @@ GROUPS = [
     ("pokemon", "포켓몬", ["box", "dex"]),
     ("bag", "가방", ["bag"]),
     ("shop", "상점", ["shop"]),
-    ("adventure", "모험", ["gym", "expedition", "rank"]),
+    ("adventure", "모험", ["gym", "tower", "expedition", "rank"]),
     ("community", "커뮤니티", ["friends", "guild", "board"]),
     ("event", "이벤트", ["arche", "olympics"]),
     ("my", "마이페이지", ["my"]),

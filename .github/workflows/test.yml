@@ -601,6 +601,10 @@ jobs:
       - name: 악당 출현 (진짜 Tk)
         if: matrix.shard == 3
         run: python client/test_boss_ui.py
+      # 배틀타워 (시즌 7): 모험 묶음의 탭 · 층 목록 · 층 카드 · 도전(관장 배틀 창 그대로, 글귀만) · 닫힌 시즌/옛 서버
+      - name: 배틀타워 탭 (진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_tower_ui.py
       # 챔피언리그 - 독도: 관장 전국 지도의 독도 · 독도 창(순위 · 상대 찾기 · 도전) · 알림 · 구경
       - name: 챔피언리그 독도 (진짜 Tk)
         if: matrix.shard == 1
@@ -736,6 +740,8 @@ jobs:
           python client/test_auto_throw.py     # 2.1.1: 잡힐 때까지 계속 던지기 (#425)
       - name: 관장 지도·배틀 창 (진짜 Tk)
         run: python client/test_gym_ui.py
+      - name: 배틀타워 탭 (진짜 Tk)
+        run: python client/test_tower_ui.py
       - name: 붙잡힘 표시 · 교체 잠금 (진짜 Tk)
         run: python client/test_trap_ui.py
       - name: 챔피언리그 독도 (진짜 Tk)
@@ -881,6 +887,8 @@ jobs:
           python test_season5.py         # 시즌 4 -> 5 손질 0350
           python test_season6.py         # 시즌 5 -> 6 손질 0370 (2.5.0, 11/16 - 시즌 5 보상 · 시즌 6 규칙표)
           python test_boss.py
+          python test_tower_data.py      # 배틀타워 (시즌 7): 1~50층 자료 - 레벨 · 마릿수 · 겹친 종/도구 · 보상 합계 · 엔진에 올리기
+          python test_tower.py           # 배틀타워: 시즌 문 · 차례로 오르기 · 처음 한 번 보상 · 길 · 관장 판에 얹기
           python test_guild_war.py
           python test_guild_war_v5.py    # 시즌 5: 조커(길드마다 3명) · 개인 기여 보상 (게시판 #373)
           python test_deco.py            # 버전 2: 꾸미기 - 위치 점 · 끼우기(한 마리만) · 선물 · 길드전 순위 보상

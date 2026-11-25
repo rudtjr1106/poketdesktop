@@ -1059,7 +1059,9 @@ def legend_trainer(uid, n, slot, species, level):
 
 
 def _busy_name(region):
-    from . import boss, guild_war, gym
+    from . import boss, guild_war, gym, tower
+    if tower.is_tower(region):
+        return tower.busy_name(region)             # "배틀타워 13층" (시즌 7)
     if is_arche(region):
         return "아르케의 전설"
     if boss.is_boss(region):

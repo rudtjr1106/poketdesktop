@@ -413,6 +413,18 @@ CREATE TABLE IF NOT EXISTS gym_clear (
     PRIMARY KEY (user_id, region)
 );
 
+-- 배틀타워 (시즌 7): 이긴 층. **줄이 처음 생길 때 한 번** 보상을 준다 (tower.on_win - INSERT 의 rowcount 로 가른다).
+-- 가장 높이 이긴 층 = MAX(floor). 시즌이 바뀌어도 지우지 않는다 (층을 계속 붙이는 구조).
+CREATE TABLE IF NOT EXISTS tower_clear (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    floor       INTEGER NOT NULL,
+    wins        INTEGER NOT NULL DEFAULT 1,
+    best_turns  INTEGER,
+    first_at    TEXT NOT NULL,
+    last_at     TEXT NOT NULL,
+    PRIMARY KEY (user_id, floor)
+);
+
 -- 리피트볼이 "이미 잡아본 종" 을 봐야 해서 남긴다. 도감 역할도 겸한다.
 CREATE TABLE IF NOT EXISTS seen (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
