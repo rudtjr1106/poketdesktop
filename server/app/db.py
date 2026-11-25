@@ -1453,6 +1453,8 @@ MIGRATIONS = [
     ("users", "email", "ALTER TABLE users ADD COLUMN email TEXT"),
     # 챔피언리그 (독도, champion.py): 이 실시간 배틀이 어떤 판인가 - 'live'(친구 · 길드) / 'champion'(독도)
     ("live_match", "kind", "ALTER TABLE live_match ADD COLUMN kind TEXT NOT NULL DEFAULT 'live'"),
+    # 판의 형식 (11/25 더블배틀): single = 1:1 · double = 편마다 두 마리 (common/double_battle). 독도만 더블을 연다.
+    ("live_match", "fmt", "ALTER TABLE live_match ADD COLUMN fmt TEXT NOT NULL DEFAULT 'single'"),
     # 길드 깃발 (2.5.0, 시즌 6 - guild.set_flag): 24 x 24 도트 문자열(common/flag.py) · 누가 · 언제 그렸나(운영진이 내렸나).
     # 옛 행은 NULL = 깃발 없음
     ("guild", "flag", "ALTER TABLE guild ADD COLUMN flag TEXT"),

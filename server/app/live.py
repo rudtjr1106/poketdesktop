@@ -33,6 +33,7 @@ import json
 import re
 import random
 
+from common import double_battle as DB2
 from common import live_battle as LB
 
 from . import config, db, deps, pvp, social
@@ -103,6 +104,18 @@ def kind_of(row):
         return (row["kind"] if "kind" in row.keys() else None) or "live"
     except (KeyError, IndexError, TypeError):
         return "live"
+
+
+def fmt_of(row):
+    """판의 형식: 'single'(1:1) / 'double'(편마다 두 마리 - 독도, 11/25). 칸이 없는 옛 DB 는 single."""
+    try:
+        return (row["fmt"] if "fmt" in row.keys() else None) or "single"
+    except (KeyError, IndexError, TypeError):
+        return "single"
+
+
+def turn_sec(fmt):
+    return config.LIVE_TURN_SEC_DOUBLE if fmt == "double" else config.LIVE_TURN_SEC
 
 
 def side_of(row, uid):
@@ -242,14 +255,18 @@ def accept(uid, mid, now=None):
     if row["state"] != "invited":
         raise ValueError("이미 끝난 초대입니다.")
     a_team, b_team = _team(row["a_id"], kind_of(row)), _team(row["b_id"], kind_of(row))
-    if not a_team or not b_team:
+    fmt = fmt_of(row)
+    need = 2 if fmt == "double" else 1           # 더블은 두 마리가 나와야 한다
+    if len(a_team) < need or len(b_team) < need:
         db.run("UPDATE live_match SET state='done', result='cancelled',"
                " updated_at=? WHERE id=? AND state='invited'", (_iso(now), mid))
-        raise ValueError("양쪽 다 데리고 다니는 포켓몬이 있어야 합니다.")
-    lb = LB.LiveBattle(deps.dex(),
-                       (row["a_id"], row["a_name"], a_team),
-                       (row["b_id"], row["b_name"], b_team),
-                       rng=random.Random(), max_turns=config.LIVE_MAX_TURNS)
+        raise ValueError("양쪽 다 포켓몬이 두 마리 이상 있어야 합니다." if fmt == "double"
+                         else "양쪽 다 데리고 다니는 포켓몬이 있어야 합니다.")
+    engine = DB2.DoubleBattle if fmt == "double" else LB.LiveBattle
+    lb = engine(deps.dex(),
+                (row["a_id"], row["a_name"], a_team),
+                (row["b_id"], row["b_name"], b_team),
+                rng=random.Random(), max_turns=config.LIVE_MAX_TURNS)
     # 메가진화 (시즌 3): 두 사람 각자 관장 8곳이면 키스톤
     from . import mega
     lb.keystone["me"] = mega.has_keystone(row["a_id"])
@@ -264,7 +281,7 @@ def accept(uid, mid, now=None):
     cur = db.run(
         "UPDATE live_match SET state='fighting', data=?, events=?, turn=0,"
         " rev=rev+1, deadline=?, updated_at=? WHERE id=? AND rev=? AND state='invited'",
-        (json.dumps(lb.dump()), json.dumps(ev), _deadline(now), _iso(now),
+        (json.dumps(lb.dump()), json.dumps(ev), _deadline(now, fmt), _iso(now),
          mid, row["rev"]))
     if getattr(cur, "rowcount", 1) == 0:
         return get(mid)                      # 사이에 만료됐다
@@ -272,21 +289,22 @@ def accept(uid, mid, now=None):
     return get(mid)
 
 
-def invite_kind(uid, other, kind, now=None):
+def invite_kind(uid, other, kind, now=None, fmt="single"):
     """친구 · 길드 조건 없이 초대 줄만 놓는다 (챔피언리그의 직접 도전 - 참가 자격은 champion.py 가 본다).
 
     수락 · 거절 · 진행은 보통 초대와 같다 (answer -> accept). 부르는 쪽이 둘 다 다른 판이 없는지 봤어야 한다.
+    fmt = 'double' 이면 더블배틀로 열린다 (11/25).
     """
     expire_old(now)
     cur = db.run(
         "INSERT INTO live_match (a_id, b_id, a_name, b_name, state, rev,"
-        " events, turn, created_at, updated_at, kind)"
-        " VALUES (?,?,?,?,'invited',0,'[]',0,?,?,?)",
-        (uid, other, _name(uid), _name(other), _iso(now), _iso(now), kind))
+        " events, turn, created_at, updated_at, kind, fmt)"
+        " VALUES (?,?,?,?,'invited',0,'[]',0,?,?,?,?)",
+        (uid, other, _name(uid), _name(other), _iso(now), _iso(now), kind, fmt))
     return get(cur.lastrowid)
 
 
-def open_direct(a, b, now=None, kind="live"):
+def open_direct(a, b, now=None, kind="live", fmt="single"):
     """초대·수락을 거치지 않고 둘 사이에 바로 판을 연다 (길드 친선전: '상대 구함' 을 누가 받았다 ·
     챔피언리그: 기다리던 두 사람이 만났다 - kind='champion').
 
@@ -304,9 +322,9 @@ def open_direct(a, b, now=None, kind="live"):
         raise ValueError("둘 다 데리고 다니는 포켓몬이 있어야 합니다.")
     cur = db.run(
         "INSERT INTO live_match (a_id, b_id, a_name, b_name, state, rev,"
-        " events, turn, created_at, updated_at, kind)"
-        " VALUES (?,?,?,?,'invited',0,'[]',0,?,?,?)",
-        (a, b, _name(a), _name(b), _iso(now), _iso(now), kind))
+        " events, turn, created_at, updated_at, kind, fmt)"
+        " VALUES (?,?,?,?,'invited',0,'[]',0,?,?,?,?)",
+        (a, b, _name(a), _name(b), _iso(now), _iso(now), kind, fmt))
     return accept(b, cur.lastrowid, now)
 
 
@@ -342,14 +360,30 @@ def answer(uid, mid, ok, now=None):
     return get(mid)
 
 
-def _deadline(now=None):
-    return (_now(now) + datetime.timedelta(seconds=config.LIVE_TURN_SEC)) \
+def _deadline(now=None, fmt="single"):
+    return (_now(now) + datetime.timedelta(seconds=turn_sec(fmt))) \
         .replace(microsecond=0).isoformat()
+
+
+def old_app(row, uid, now=None):
+    """더블을 모르는 앱(GET /api/live 에 double=1 이 없다)이 더블 판을 물었다 (11/25).
+
+    걸려 온 초대면 **그 자리에서 거절로 접는다** - 옛 앱은 더블 판을 그릴 수 없고, 그냥 두면 건 사람이 초대가
+    만료될 때까지 기다린다. 까닭(reason='old_app')을 적어 두면 champion 이 건 사람에게 알린다. 그 밖(진행 중 ·
+    내가 건 초대)은 건드리지 않는다. 어느 쪽이든 옛 앱에는 판을 안 준다 (None).
+    """
+    if row["state"] == "invited" and row["b_id"] == uid:
+        cur = db.run("UPDATE live_match SET state='done', result='declined', reason='old_app', updated_at=?,"
+                     " a_seen=1, b_seen=1 WHERE id=? AND state='invited'", (_iso(now), row["id"]))
+        if getattr(cur, "rowcount", 1):
+            _emit(row["id"])
+    return None
 
 
 # ---------------------------------------------------------------- 진행
 def _load(row):
-    return LB.LiveBattle.load(deps.dex(), json.loads(row["data"]))
+    engine = DB2.DoubleBattle if fmt_of(row) == "double" else LB.LiveBattle
+    return engine.load(deps.dex(), json.loads(row["data"]))
 
 
 def _save(row, lb, ev, now=None):
@@ -359,7 +393,7 @@ def _save(row, lb, ev, now=None):
         " reason=?, rev=rev+1, deadline=?, updated_at=? WHERE id=? AND rev=?",
         (json.dumps(lb.dump()), json.dumps(ev), lb.turn,
          "done" if lb.over else "fighting", lb.result, lb.reason,
-         None if lb.over else _deadline(now), _iso(now), row["id"], row["rev"]))
+         None if lb.over else _deadline(now, fmt_of(row)), _iso(now), row["id"], row["rev"]))
     ok = getattr(cur, "rowcount", 1) != 0
     if ok and lb.over:
         _record(row, lb, now)
@@ -370,6 +404,8 @@ def _save(row, lb, ev, now=None):
 
 def act(uid, kind, value, now=None, mega=False, z=False, tera=False):
     """이번 턴에 할 것을 적는다. 둘 다 모이면 그 자리에서 턴이 돈다.
+
+    더블 판은 kind='picks', value=[두 마리 몫] 으로 한 번에 보낸다 (메가 · Z · 테라는 그 안에 적는다).
 
     **부딪히면 다시 해본다** - 둘이 같은 판을 동시에 두드리므로, rev 가
     어긋났다고 그대로 거절하면 상대가 먼저 눌렀다는 이유로 내 선택이 사라진다.
@@ -474,9 +510,10 @@ def public(row, uid, now=None):
     out = {"id": row["id"], "state": row["state"], "rev": row["rev"],
            "turn": row["turn"], "me": who, "mine": row["a_id"] == uid,
            "foeId": row["%s_id" % foe], "foeName": row["%s_name" % foe],
-           "level": config.LIVE_LEVEL, "turnSec": config.LIVE_TURN_SEC,
+           "level": config.LIVE_LEVEL, "turnSec": turn_sec(fmt_of(row)),
            "inviteSec": config.LIVE_INVITE_SEC,
-           "kind": kind_of(row)}                           # champion = 챔피언리그 (독도)
+           "kind": kind_of(row),                           # champion = 챔피언리그 (독도)
+           "fmt": fmt_of(row)}                             # double = 더블배틀 (11/25)
     if row["state"] == "invited":
         out["inviteLeft"] = max(0, int((
             datetime.datetime.fromisoformat(_add(row["created_at"],
@@ -544,6 +581,13 @@ def spectate(row):
     if not row or not row["data"]:
         return None
     lb = _load(row)
+    if fmt_of(row) == "double":
+        # 더블 판은 아직 관전하지 않는다 (바탕화면 장면이 1:1 이다). 누가 붙었고 몇 마리 남았는지만.
+        done = row["state"] == "done"
+        return {"id": row["id"], "rev": row["rev"], "turn": lb.turn, "step": lb.step, "fmt": "double",
+                "a": {"id": row["a_id"], "name": lb.side("a").name, "left": lb.left("a"), "size": len(lb.side("a").team)},
+                "b": {"id": row["b_id"], "name": lb.side("b").name, "left": lb.left("b"), "size": len(lb.side("b").team)},
+                "events": [], "over": bool(lb.over or done), "result": row["result"] if done else None}
 
     def side(who):
         p = lb.side(who)
@@ -586,6 +630,7 @@ def me_card(uid, now=None):
     out["id"] = row["id"]
     out["state"] = row["state"]
     out["kind"] = kind_of(row)
+    out["fmt"] = fmt_of(row)
     out["foeName"] = row["b_name"] if row["a_id"] == uid else row["a_name"]
     # 걸려온 초대인가 (내가 답해야 하는가)
     out["invited"] = row["state"] == "invited" and row["b_id"] == uid

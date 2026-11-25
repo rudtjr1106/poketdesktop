@@ -55,6 +55,16 @@ live_match.kind 가 'champion' 인 것만 다르다. 배틀 창도 같은 창이
     {"t": "champion", "s": "fight", "id": 판, "a": 이름, "b": 이름}        다른 참가자들의 판이 열렸다 -> [관전]
     {"t": "champion", "s": "turn", "fight": {...}}                          보고 있는 판의 새 모습 (live.spectate + watchers)
     {"t": "champion", "s": "watchers", "id": 판, "n": 수}                   내 판을 보는 사람 수가 바뀌었다
+    {"t": "champion", "s": "declined", "id": 판, "why": 까닭}              내 더블 도전을 상대의 옛 앱이 받지 못했다
+
+## 더블배틀 (11/25 사용자: "더블 배틀 만들어 본가대로 · 순위는 싱글/더블로 탭을 나눠서")
+
+판의 형식(live_match.fmt)이 single / double 둘이다. **대기열 · 전적 · 순위 · 최근 판이 형식마다 따로**다 - 한 사람은
+한 형식만 기다린다. 지금 있던 열쇠(seeking · waiting · ranking · me · recent · fights)는 **싱글 그대로** 두고
+(옛 앱이 읽는다), 더블은 state(double=True) 의 "double" 아래에 싣는다. wait · ask · match 알림에는 fmt 가 붙는다.
+
+옛 앱은 더블 판을 그릴 수 없다: 더블 판은 싱글 목록(fights)에 안 넣고 '판이 열렸다(fight)' 도 안 민다 (관전이 없다).
+더블 초대를 받은 앱이 더블을 모르면 live.old_app 이 거절로 접고, 여기서 건 사람에게 까닭을 민다 (declined).
 """
 import datetime
 import threading
@@ -69,6 +79,8 @@ router = APIRouter()
 
 KST = datetime.timezone(datetime.timedelta(hours=9))
 KIND = "champion"
+FORMATS = ("single", "double")      # 판의 형식 (11/25 더블배틀)
+OLD_APP_WHY = "상대의 앱이 더블배틀을 아직 지원하지 않습니다. (상대가 앱을 업데이트해야 합니다)"
 PAIR_DAY_MAX = 3            # 같은 두 사람의 판이 전적에 드는 것은 하루에 이만큼까지
 NOTIFY_GAP = 180            # 같은 사람이 '기다린다' 는 알림은 이만큼에 한 번 (껐다 켰다 하며 도배하지 않게)
 RANK_SHOW = 50              # 순위표에 싣는 줄
@@ -78,6 +90,7 @@ SYNC_SEC = 300              # 관장 기록에서 참가자를 채우는 간격 
 
 _lock = threading.Lock()
 _wait = {}                  # {uid: 기다리기 시작한 때 (time.monotonic)}
+_wait_fmt = {}              # {uid: 기다리는 형식} - 없으면 single. 한 사람은 한 형식만 기다린다
 _told = {}                  # {uid: 마지막으로 '기다린다' 를 알린 때}
 _announced = set()          # 이미 알린 기다림 (uid, 기다리기 시작한 때)
 _started = set()            # '판이 열렸다' 를 이미 알린 판 번호
@@ -89,6 +102,7 @@ def reset():
     """검사용: 메모리에 든 것을 비운다."""
     with _lock:
         _wait.clear()
+        _wait_fmt.clear()
         _told.clear()
         _announced.clear()
         _started.clear()
@@ -256,19 +270,38 @@ def why_not(uid, now=None):
 
 
 # ---------------------------------------------------------------- 상대 찾기
+def _fmt(fmt):
+    return "double" if fmt == "double" else "single"
+
+
+def _wfmt(uid):
+    """그 사람이 기다리는 형식. _lock 안에서 부른다."""
+    return _wait_fmt.get(uid) or "single"
+
+
+def _drop(uid):
+    """대기열에서 뺀다. _lock 안에서 부른다. 기다리고 있었으면 True."""
+    _wait_fmt.pop(uid, None)
+    return _wait.pop(uid, None) is not None
+
+
 def _sweep(t):
     for u, since in list(_wait.items()):
         if t - since > config.CHAMPION_WAIT_SEC:
-            _wait.pop(u, None)
+            _drop(u)
+    for u in [u for u in _wait_fmt if u not in _wait]:
+        _wait_fmt.pop(u, None)
     for key in [k for k in _announced if _wait.get(k[0]) != k[1]]:
         _announced.discard(key)              # 붙었거나 그만둔 기다림
 
 
-def _pick(uid, now=None):
-    """기다리는 사람 가운데 나와 붙을 사람 (먼저 기다린 순). _lock 안에서 부른다. 사라진 사람은 걷는다."""
+def _pick(uid, now=None, fmt="single"):
+    """같은 형식을 기다리는 사람 가운데 나와 붙을 사람 (먼저 기다린 순). _lock 안에서 부른다. 사라진 사람은 걷는다."""
     for since, other in sorted((s, u) for u, s in _wait.items() if u != uid):
+        if _wfmt(other) != fmt:
+            continue                         # 싱글을 기다리는 사람과 더블을 찾는 사람은 안 붙는다
         if not social.is_online(other) or live.my_match(other) or why_not(other, now):
-            _wait.pop(other, None)           # 껐거나 다른 판에 들어갔거나 팀을 바꿨다 - 더 기다리게 두지 않는다
+            _drop(other)                     # 껐거나 다른 판에 들어갔거나 팀을 바꿨다 - 더 기다리게 두지 않는다
             continue
         if social.blocked_between(uid, other):
             continue
@@ -276,12 +309,14 @@ def _pick(uid, now=None):
     return None
 
 
-def seek(uid, on, now=None):
-    """[상대 찾기] 를 켠다 / 끈다. 켰는데 기다리던 사람이 있으면 그 자리에서 판을 열어 그 행을 돌려준다.
-    아무도 없으면 기다리기 시작하고 None. 못 하면 ValueError(까닭)."""
+def seek(uid, on, now=None, fmt="single"):
+    """[상대 찾기] 를 켠다 / 끈다. 켰는데 **같은 형식을** 기다리던 사람이 있으면 그 자리에서 판을 열어 그 행을 돌려준다.
+    아무도 없으면 기다리기 시작하고 None. 못 하면 ValueError(까닭). fmt = single / double (11/25)."""
+    fmt = _fmt(fmt)
     if not on:
         with _lock:
-            _wait.pop(uid, None)
+            if uid in _wait and _wfmt(uid) == fmt:
+                _drop(uid)                   # 다른 형식을 기다리는 중이면 그대로 둔다 (그 탭의 단추가 끈다)
         return None
     why = why_not(uid, now)
     if why:
@@ -290,15 +325,16 @@ def seek(uid, on, now=None):
     for _ in range(5):
         with _lock:
             _sweep(t)
-            other = _pick(uid, now)
+            other = _pick(uid, now, fmt)
             if other is None:
-                fresh = uid not in _wait
+                fresh = uid not in _wait or _wfmt(uid) != fmt
                 _wait[uid] = t               # 다시 누르면 기다리는 시간이 처음부터
+                _wait_fmt[uid] = fmt         # 한 사람은 한 형식만 기다린다 (형식을 바꾸면 앞의 대기는 사라진다)
                 break
-            _wait.pop(other, None)
-            _wait.pop(uid, None)
+            _drop(other)
+            _drop(uid)
         try:
-            return live.open_direct(other, uid, now, kind=KIND)      # 먼저 기다린 사람이 a
+            return live.open_direct(other, uid, now, kind=KIND, fmt=fmt)      # 먼저 기다린 사람이 a
         except ValueError:
             continue                         # 사이에 그 사람이 다른 판에 들어갔다 - 다음 사람
     else:
@@ -346,13 +382,14 @@ def _announce(uid, t, now=None):
             return False
         _told[uid] = t
         busy = set(_wait)
+        fmt = _wfmt(uid)
     name = _name(uid)
     for other, _n, _q in members():
         if other == uid or other in busy or not social.is_online(other) or live.my_match(other):
             continue
         if social.blocked_between(uid, other):
             continue
-        _push(other, {"t": "champion", "s": "wait", "id": uid, "name": name})
+        _push(other, {"t": "champion", "s": "wait", "id": uid, "name": name, "fmt": fmt})
     return True
 
 
@@ -364,8 +401,10 @@ def wait_left(uid):
     return max(0, int(config.CHAMPION_WAIT_SEC - (time.monotonic() - since)))
 
 
-def challenge(uid, other, now=None):
-    """접속 중인 참가자에게 도전한다. 그 사람이 기다리고 있었으면 바로 시작(행이 fighting), 아니면 초대(invited)."""
+def challenge(uid, other, now=None, fmt="single"):
+    """접속 중인 참가자에게 도전한다. 그 사람이 **같은 형식을** 기다리고 있었으면 바로 시작(행이 fighting),
+    아니면 초대(invited). fmt = single / double (11/25)."""
+    fmt = _fmt(fmt)
     why = why_not(uid, now)
     if why:
         raise ValueError(why)
@@ -385,12 +424,14 @@ def challenge(uid, other, now=None):
     if why:
         raise ValueError(why)
     with _lock:
-        waiting = _wait.pop(other, None) is not None
-        _wait.pop(uid, None)                 # 직접 도전했으면 기다리기는 그만
+        waiting = other in _wait and _wfmt(other) == fmt
+        if waiting:
+            _drop(other)
+        _drop(uid)                           # 직접 도전했으면 기다리기는 그만
     if waiting:
-        return live.open_direct(other, uid, now, kind=KIND)
-    row = live.invite_kind(uid, other, KIND, now)
-    _push(other, {"t": "champion", "s": "ask", "id": row["id"], "name": _name(uid)})
+        return live.open_direct(other, uid, now, kind=KIND, fmt=fmt)
+    row = live.invite_kind(uid, other, KIND, now, fmt=fmt)
+    _push(other, {"t": "champion", "s": "ask", "id": row["id"], "name": _name(uid), "fmt": fmt})
     return row
 
 
@@ -409,6 +450,11 @@ def _on_live(row):
     if not row or live.kind_of(row) != KIND or row["state"] not in ("fighting", "done"):
         return
     mid = row["id"]
+    fmt = live.fmt_of(row)
+    if row["state"] == "done" and row["result"] == "declined" and row["reason"] == "old_app":
+        # 더블 도전을 받은 앱이 더블을 모른다 (live.old_app) - 건 사람이 마냥 기다리지 않게 까닭을 알린다
+        _push(row["a_id"], {"t": "champion", "s": "declined", "id": mid, "why": OLD_APP_WHY})
+        return
     if row["state"] == "fighting":
         with _lock:
             fresh = mid not in _started
@@ -419,12 +465,14 @@ def _on_live(row):
         if fresh:
             players = (row["a_id"], row["b_id"])
             for uid in players:
-                _push(uid, {"t": "champion", "s": "match", "id": mid})
+                _push(uid, {"t": "champion", "s": "match", "id": mid, "fmt": fmt})
             msg = {"t": "champion", "s": "fight", "id": mid, "a": row["a_name"], "b": row["b_name"]}
             for other, _n, _q in members():
-                if other not in players and social.is_online(other):
+                # 더블 판은 관전이 없다 - 옛 앱이 [관전] 을 띄우지 않게 알리지도 않는다 (독도 창의 목록에는 나온다)
+                if fmt == "single" and other not in players and social.is_online(other):
                     _push(other, msg)
-    _feed(row)
+    if fmt == "single":
+        _feed(row)
 
 
 def _feed(row):
@@ -461,6 +509,8 @@ def watch(uid, mid, on=True, now=None):
         raise LookupError("그런 챔피언리그 판이 없습니다.")
     if uid in (row["a_id"], row["b_id"]):
         raise ValueError("내 배틀은 관전하지 않습니다.")
+    if live.fmt_of(row) == "double":
+        raise ValueError("더블배틀은 아직 관전할 수 없습니다.")
     key = watch_key(mid)
     if row["state"] != "fighting":
         if on:
@@ -495,11 +545,12 @@ def _kst_day(iso):
     return t.astimezone(KST).date().isoformat()
 
 
-def finished():
-    """끝난 챔피언리그 판 [(행, 전적에 드나)] - 번호 순. 같은 두 사람의 판은 하루 PAIR_DAY_MAX 판까지만 든다."""
+def finished(fmt="single"):
+    """끝난 챔피언리그 판 [(행, 전적에 드나)] - 번호 순, **그 형식만** (싱글과 더블은 전적 · 순위가 따로다).
+    같은 두 사람의 판은 하루 PAIR_DAY_MAX 판까지만 든다 (형식마다 따로 센다)."""
     rows = db.q("SELECT id, a_id, b_id, a_name, b_name, result, reason, turn, created_at, updated_at"
-                " FROM live_match WHERE kind=? AND state='done' AND result IN ('a','b','draw') ORDER BY id",
-                (KIND,))
+                " FROM live_match WHERE kind=? AND fmt=? AND state='done' AND result IN ('a','b','draw') ORDER BY id",
+                (KIND, _fmt(fmt)))
     seen = {}
     out = []
     for r in rows:
@@ -569,12 +620,15 @@ def recent(uid, done=None):
     return out
 
 
-def fights():
-    """진행 중인 챔피언리그 판 (새 것부터)."""
+def fights(fmt="single"):
+    """진행 중인 챔피언리그 판 (새 것부터) - 그 형식만. 싱글 목록은 옛 앱이 [관전] 을 누르는 곳이라 더블을 안 섞는다."""
+    fmt = _fmt(fmt)
     return [{"id": r["id"], "turn": r["turn"], "a": {"id": r["a_id"], "name": r["a_name"]},
-             "b": {"id": r["b_id"], "name": r["b_name"]}, "watchers": watchers.count(watch_key(r["id"]))}
+             "b": {"id": r["b_id"], "name": r["b_name"]}, "fmt": fmt,
+             "watchers": watchers.count(watch_key(r["id"])) if fmt == "single" else 0}
             for r in db.q("SELECT id, a_id, b_id, a_name, b_name, turn FROM live_match"
-                          " WHERE kind=? AND state='fighting' ORDER BY id DESC LIMIT ?", (KIND, FIGHTS_SHOW))]
+                          " WHERE kind=? AND fmt=? AND state='fighting' ORDER BY id DESC LIMIT ?",
+                          (KIND, fmt, FIGHTS_SHOW))]
 
 
 # ---------------------------------------------------------------- 보여주기
@@ -583,14 +637,18 @@ def brief(uid, now=None):
     return {"member": qualify(uid, now), "open": is_open(now), "opens": open_text()}
 
 
-def state(uid, now=None):
+def state(uid, now=None, double=False):
+    """독도 창에 주는 모습. double=True 면 더블배틀 칸("double")을 얹는다 - 더블을 아는 앱만 묻는다 (11/25).
+    그 밖의 열쇠는 전부 **싱글**이다 (옛 앱이 읽던 그대로)."""
     live.expire_old(now)
     member = qualify(uid, now)
     _due(now=now)                            # (타이머가 못 돌았어도 창이 물어올 때 때가 된 알림을 보낸다)
     t = time.monotonic()
     with _lock:
         _sweep(t)
-        waiting = [u for u, _s in sorted(_wait.items(), key=lambda kv: kv[1])]
+        everyone = [u for u, _s in sorted(_wait.items(), key=lambda kv: kv[1])]
+        waiting = [u for u in everyone if _wfmt(u) == "single"]
+        waiting2 = [u for u in everyone if _wfmt(u) == "double"]
     done = finished()
     table = ranking(done)
     me = next((dict(r) for r in table if r["id"] == uid), None)
@@ -601,12 +659,26 @@ def state(uid, now=None):
         if other == uid or not social.is_online(other) or social.blocked_between(uid, other):
             continue
         online.append({"id": other, "name": r["name"], "waiting": other in waiting,
+                       "waiting2": other in waiting2,       # 더블을 기다린다 (옛 앱은 안 읽는다)
                        "busy": live.my_match(other) is not None})
-    return {
+    extra = {}
+    if double:
+        done2 = finished("double")
+        table2 = ranking(done2)
+        extra["double"] = {
+            "seeking": uid in waiting2, "waitLeft": wait_left(uid) if uid in waiting2 else 0,
+            "waiting": [{"id": u, "name": names.get(u) or _name(u)} for u in waiting2 if u != uid],
+            "fights": fights("double"), "ranking": table2[:RANK_SHOW],
+            "me": next((dict(r) for r in table2 if r["id"] == uid), None),
+            "recent": recent(uid, done2) if member else [],
+            "turnSec": config.LIVE_TURN_SEC_DOUBLE,
+        }
+    out = {
         "open": is_open(now), "startsAt": config.CHAMPION_START, "opens": open_text(),
         "total": total(), "cleared": cleared(uid), "member": member, "members": len(table),
         "why": why_not(uid, now),
-        "seeking": uid in waiting, "waitLeft": wait_left(uid), "waitSec": config.CHAMPION_WAIT_SEC,
+        "seeking": uid in waiting, "waitLeft": wait_left(uid) if uid in waiting else 0,
+        "waitSec": config.CHAMPION_WAIT_SEC,
         "notifySec": config.CHAMPION_NOTIFY_SEC,
         "waiting": [{"id": u, "name": names.get(u) or _name(u)} for u in waiting if u != uid],
         "online": online, "fights": fights(), "ranking": table[:RANK_SHOW],
@@ -614,6 +686,8 @@ def state(uid, now=None):
         # 독도 팀 (2.5.8): 따로 정했나 · 지금 싸우는 팀의 이름 (창의 [독도 팀] 줄)
         "teamSet": bool(team_ids(uid)), "teamLabel": team_label(uid),
     }
+    out.update(extra)
+    return out
 
 
 def fight(mid, uid=None):
@@ -635,6 +709,8 @@ def fight(mid, uid=None):
 # ---------------------------------------------------------------- 라우트
 class SeekIn(BaseModel):
     on: bool = True
+    fmt: str = "single"         # single / double (11/25)
+    double: bool = False        # 답에 더블 칸을 같이 달라 (더블을 아는 앱)
 
 
 class WatchIn(BaseModel):
@@ -643,8 +719,8 @@ class WatchIn(BaseModel):
 
 
 @router.get("/api/champion")
-def get_state(ctx=Depends(deps.current)):
-    return state(ctx["user"]["id"])
+def get_state(ctx=Depends(deps.current), double: int = 0):
+    return state(ctx["user"]["id"], double=bool(double))
 
 
 class TeamIn(BaseModel):
@@ -674,19 +750,19 @@ def put_team(body: TeamIn, ctx=Depends(deps.current)):
 def post_seek(body: SeekIn, ctx=Depends(deps.current)):
     uid = ctx["user"]["id"]
     try:
-        row = seek(uid, bool(body.on))
+        row = seek(uid, bool(body.on), fmt=body.fmt)
     except ValueError as e:
         raise HTTPException(409, str(e))
-    out = state(uid)
+    out = state(uid, double=bool(body.double) or body.fmt == "double")
     out["match"] = live.public(row, uid) if row else None
     return out
 
 
 @router.post("/api/champion/challenge/{other}")
-def post_challenge(other: int, ctx=Depends(deps.current)):
+def post_challenge(other: int, ctx=Depends(deps.current), fmt: str = "single"):
     uid = ctx["user"]["id"]
     try:
-        row = challenge(uid, other)
+        row = challenge(uid, other, fmt=fmt)
     except LookupError as e:
         raise HTTPException(404, str(e))
     except ValueError as e:

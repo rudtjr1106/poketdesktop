@@ -160,6 +160,10 @@ jobs:
       # 쪽만 다음을 골라야 한다.
       - name: 실시간 배틀 (엔진)
         run: python common/test_live_battle.py
+      # 더블배틀 (독도, 11/25): 편마다 두 마리 - 대상 고르기 · 광역기 0.75 · 끌어오기 · 아군 기술 · 빈 자리 고르기 ·
+      # 유턴 멈춤 · 저장/되살리기. 1:1 엔진에 자리를 바꿔 앉히며 돈다 (무작위 120판을 끝까지)
+      - name: 더블배틀 (엔진)
+        run: python common/test_double_battle.py
       # 게시판 #664 뒤 (11/19): 붙잡혀 있는 것(조이기류 · 검은눈빛 …)을 view 에 싣는다 - 교체 잠금의 까닭 · 남은 턴(내가 건 것만)
       - name: 붙잡힘 표시 (엔진 view)
         run: python common/test_trap_view.py
@@ -832,6 +836,8 @@ jobs:
           python test_friendly.py
           # 챔피언리그 (독도): 관장 256곳 자격 · 상대 찾기 · 직접 도전 · 몇전 몇승 몇패 · 승리 순위 · 하루 3판 · 구경
           python test_champion.py
+          # 더블배틀 (독도, 11/25): 판의 형식 · 두 마리 몫을 한 번에 · 45초 · 형식마다 대기열/전적/순위 · 옛 앱 지키기
+          python test_live_double.py
           # 나그네 예약 글 (2.4.0 - 아르케 본체는 2.5.0): 때가 된 나그네 글만 한 번씩 · 계정 로그인 불가 · 이름 막기
           python test_traveler_posts.py
           # 끝난 야생 배틀이 '배틀 중' 으로 남지 않는다 (1.10.4, 게시판 #174 퀵볼)

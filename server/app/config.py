@@ -364,6 +364,8 @@ GUILD_COIN_WON = _int("POKET_GUILD_COIN_WON", 250)
 # 길은 남아 있어야 한다.
 LIVE_LEVEL = _int("POKET_LIVE_LEVEL", 50)        # 양쪽 다 이 레벨로 맞춘다
 LIVE_TURN_SEC = _int("POKET_LIVE_TURN_SEC", 30)  # 한 턴 고르는 시간
+# 더블배틀(독도, 11/25)은 두 마리 몫을 고른다 - 본가 랭크와 같은 45초
+LIVE_TURN_SEC_DOUBLE = _int("POKET_LIVE_TURN_SEC_DOUBLE", 45)
 # 초대가 살아 있는 시간. **90초보다 넉넉해야 한다** - 상대가 초대를 알게
 # 되는 가장 늦은 때가 다음 동기화(syncSeconds, 기본 90초)이기 때문이다.
 # 놀러 가기 소켓에 붙어 있으면 그 자리에서 바로 뜬다 (live._poke, 2.5.0).
