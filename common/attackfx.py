@@ -231,6 +231,8 @@ def damage_mult(k, move, mtype, user, target, eff):
         m *= 2.0
     if move.get("_pb") or (getattr(user, "cond", None) or {}).get("pierce"):
         m *= 0.25                           # 부자유친의 둘째 타격, 관통드릴로 뚫은 방어
+    if "_mult" in move:
+        m *= move["_mult"]                  # 더블배틀이 얹은 것 (광역기 0.75 · 도우미 1.5 · 프렌드가드 ...)
     return m
 
 
@@ -344,7 +346,10 @@ def cant_use(bt, k, move, who, user, target, tw, ev, prev_move=None):
     if k == "CLANGOROUSSOUL" and user.hp * 3 <= user.maxhp:
         return no()
     if k == "COACHING":
-        return no()                         # 같은 편에게 거는 기술이다
+        double = getattr(bt, "double", None)
+        if double is None:
+            return no()                     # 같은 편에게 거는 기술이다
+        return double.ally_move(k, who, user, ev)     # 더블: 아군의 공격 · 방어 (여기서 끝난다)
     if k in ("GEARUP", "MAGNETICFLUX") and not A.has(user, "PLUS", "MINUS"):
         return no()
     if k in DELAYED and bt.field.side(tw).get("future"):

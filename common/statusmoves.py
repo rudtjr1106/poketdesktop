@@ -881,6 +881,9 @@ def _last(f):
 
 # ---- 1:1 에서 실패 / 아무 일도 없음
 def h_singles_fail(bt, move, who, user, target, tw, ev):
+    double = getattr(bt, "double", None)
+    if double is not None:
+        return double.ally_move(key(move), who, user, ev)    # 더블배틀: 도우미 · 날따름 · 사이드체인지 ...
     fail(ev, who)
 
 

@@ -822,6 +822,9 @@ def gimmick_view(bt, who, active=True):
 # ---------------------------------------------------------------- 배틀
 class Battle(object):
     """야생 1:1 전투 한 판."""
+    # 더블배틀(double_battle.DoubleDuel)만 채운다: 광역기가 첫 대상을 끝낸 뒤 나머지 대상을 때리는 곳.
+    # 1:1 에서는 None 이라 아무 일도 없다.
+    spread = None
 
     def __init__(self, dex, mine, foe, rng=None, ai="wild", field=None):
         self.dex = dex
@@ -1766,6 +1769,8 @@ class Battle(object):
         finally:
             user.cond.pop("breaker", None)        # 섀도레이·메테오드라이브·포톤가이저를 쓰는 동안만
             user.cond.pop("pierce", None)         # 관통드릴·Z기술로 방어를 뚫은 한 번만
+        if top and self.spread is not None:
+            self.spread(who, user, key, ev, n0)   # 더블: 광역기의 나머지 대상 (쓰고 난 뒤 처리는 다 때린 뒤 한 번)
         if top:
             self.acted.add(who)
             rg = user.cond.get("rage")

@@ -583,7 +583,7 @@ def after_hit(bt, user, who, target, who_t, move, eff, total, ev):
     if h and total > 0:
         # 우격다짐이 붙은 기술이면 생명의구슬 반동도 조개껍질방울 회복도 없다 (쇼다운 AfterMoveSecondarySelf)
         sf = _sheer(user, move)
-        if h == "LIFEORB" and user.alive() and not sf:
+        if h == "LIFEORB" and user.alive() and not sf and not move.get("_noorb"):   # _noorb: 더블의 광역기는 한 번만
             _chip(user, who, user.maxhp // 10, ev,
                   "%s 은(는) 생명의구슬로 체력이 조금 깎였다!" % user.name)
         elif h == "SHELLBELL" and not sf:
