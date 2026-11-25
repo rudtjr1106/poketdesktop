@@ -370,6 +370,11 @@ def render(stage, zoom=2.0, ss=2, sprites=True):
                     font=_font(size), anchor="mm")
     if ss != 1:
         img = img.resize((W // ss, H // ss), Image.LANCZOS)
+    ov = getattr(stage, "raster_img", None)                  # [시범] 그림 바탕: 연출이 낸 그림 그대로를 얹는다
+    if ov is not None:
+        if ov.size != img.size:
+            ov = ov.resize(img.size, Image.NEAREST)
+        img.paste(ov, (0, 0), ov)
     return img
 
 
@@ -389,11 +394,18 @@ def find_move(moves, name):
     raise SystemExit("기술을 못 찾았습니다: %s" % name)
 
 
-def play(move, flip=False, flat=False, limit_ms=4000, step_ms=FRAME_MS, on_frame=None, style=None, ev=None):
-    """연출 하나를 끝까지 돌린다. (stage, 걸린 ms, 끝났나) 를 돌려준다."""
+def play(move, flip=False, flat=False, limit_ms=4000, step_ms=FRAME_MS, on_frame=None, style=None, ev=None,
+         raster=None, raster_k=2.0):
+    """연출 하나를 끝까지 돌린다. (stage, 걸린 ms, 끝났나) 를 돌려준다.
+
+    raster: [시범] 그림 바탕으로 ({} = 매끈하게, {"pixel": True} = 도트풍). raster_k 는 그릴 배율 (render 의 zoom).
+    """
     from poketdesktop import battle_fx as FX
     me, foe = (FLAT_ME, FLAT_FOE) if flat else (ME, FOE)
     stage = FakeStage(me=me, foe=foe)
+    if raster is not None:
+        stage.raster_img = None
+        stage.fx_raster = dict(raster, k=raster_k, present=lambda im: setattr(stage, "raster_img", im))
     who = "foe" if flip else "me"
     src, dst = (foe, me) if flip else (me, foe)
     state = {"done": None}
@@ -417,6 +429,8 @@ def play(move, flip=False, flat=False, limit_ms=4000, step_ms=FRAME_MS, on_frame
 
 def record(move, zoom=2.0, **kw):
     frames = []
+    if kw.get("raster") is not None:
+        kw["raster_k"] = zoom
     stage, fx, took = play(move, on_frame=lambda st: frames.append(render(st, zoom=zoom)), **kw)
     return frames, fx, took
 
@@ -476,6 +490,8 @@ def main():
     ap.add_argument("--z", action="store_true", help="Z기술 (컷인이 금빛)")
     ap.add_argument("--miss", action="store_true", help="빗나감 (과녁 옆에 떨어진다)")
     ap.add_argument("--light", action="store_true", help="밝은 배경 (풀밭 · 하늘)")
+    ap.add_argument("--raster", action="store_true", help="[시범] 그림 바탕으로 (빛 번짐)")
+    ap.add_argument("--pixel", action="store_true", help="[시범] 그림 바탕, 도트풍")
     a = ap.parse_args()
     global LIGHT
     LIGHT = bool(a.light)
@@ -507,7 +523,8 @@ def main():
         if a.miss:
             hint = {"t": "move", "move": m.get("kr"), "_miss": True}
         frames, fx, took = record(m, zoom=a.zoom, flip=a.flip, flat=a.flat,
-                                  style=a.style if m.get("kr") == a.style else None, ev=hint)
+                                  style=a.style if m.get("kr") == a.style else None, ev=hint,
+                                  raster=({"pixel": True} if a.pixel else {}) if (a.raster or a.pixel) else None)
         tag = "%s  [%s · %s · 위력 %s]  %s" % (
             m.get("kr"), fx.style, m.get("type"), m.get("power"),
             ("%dms" % took) if took is not None else "안 끝남!")

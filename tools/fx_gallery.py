@@ -73,6 +73,7 @@ class Stage(object):
         self.cv = self.raw
         self.hiding = FX.Hiding(self._show)
         self.speed = 1.0
+        self.fx_raster = None                   # [시범] 그림 바탕을 쓸 때 {} / {"pixel": True}
         self._t0 = time.monotonic()
         self._base = 0.0
 
@@ -133,6 +134,7 @@ class App(object):
         self.queue = []
         self.last = None
         self.v = {"who": tk.StringVar(value="내가"), "lay": tk.StringVar(value="배틀 창"),
+                  "base": tk.StringVar(value="도형"),
                   "eff": tk.StringVar(value="보통"), "spd": tk.StringVar(value="1x"),
                   "bg": tk.StringVar(value="어두운"), "crit": tk.BooleanVar(), "z": tk.BooleanVar(),
                   "miss": tk.BooleanVar()}
@@ -161,6 +163,7 @@ class App(object):
         menu("효과", "eff", ("보통", "굉장", "별로"))
         menu("속도", "spd", ("1x", "0.5x", "0.25x"))
         menu("배경", "bg", tuple(BGS))
+        menu("바탕", "base", ("도형", "그림(시범)", "도트풍(시범)"))     # [시범] 그림 바탕 - fx_raster
         for label, key in (("급소", "crit"), ("Z기술", "z"), ("빗나감", "miss")):
             tk.Checkbutton(top, text=label, variable=self.v[key], fg=fg, bg=bg, selectcolor="#232737",
                            activebackground=bg, activeforeground=fg, font=f).pack(side="left", padx=4)
@@ -249,6 +252,8 @@ class App(object):
             return
         if key in ("lay", "bg"):
             self.redraw()
+        if key == "base":                               # [시범] 도형 대신 그림 한 장으로 그린다
+            self.stage.fx_raster = {"도형": None, "그림(시범)": {}, "도트풍(시범)": {"pixel": True}}[self.v["base"].get()]
         self.replay()
 
     def play_cell(self, typ, j):
@@ -302,9 +307,12 @@ class App(object):
 
         def done():
             self.fx = None
-            self.info.configure(text="%s   [%s · %s · 위력 %s]   %d ms" % (
+            took = (time.monotonic() - t0) * 1000
+            n = getattr(fx.surface, "frames", 0)
+            self.info.configure(text="%s   [%s · %s · 위력 %s]   %d ms%s" % (
                 move.get("kr"), fx.style, TYPE_KR.get(move.get("type"), move.get("type")), move.get("power") or "-",
-                (time.monotonic() - t0) * 1000))
+                took, ("   그림 %d장 (초당 %.0f장)" % (n, n * 1000.0 / max(1.0, took))) if n else ""))
+            self.last_stat = (took, n)
             if self.queue:
                 self.root.after(260, self.next)
         fx = self.fx = FX.Effect(self.stage, move, (sx / k, sy / k), (tx / k, ty / k), done, who=who, ev=ev)
@@ -318,8 +326,13 @@ def main():
     if "--selftest" in sys.argv:            # 창이 뜨고 한 편이 끝까지 도는지만 본다 (검사 · CI 용)
         state = {"n": 0}
         names = ["파괴광선", "지진", "칼춤"]
+        if "--raster" in sys.argv or "--pixel" in sys.argv:
+            app.stage.fx_raster = {"pixel": True} if "--pixel" in sys.argv else {}
+            names = ["파괴광선", "화염방사", "섀도볼", "지진"]
 
         def one():
+            if state["n"]:
+                print("  %s  %d ms  그림 %d장" % ((names[state["n"] - 1],) + getattr(app, "last_stat", (0, 0))))
             if state["n"] >= len(names):
                 print("GALLERY OK %d" % state["n"])
                 return app.root.destroy()

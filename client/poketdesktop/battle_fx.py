@@ -515,6 +515,16 @@ class Effect(object):
         self.clock = clk
         self._show = None
         self._geo = None
+        # [시범] 그림 바탕: 무대가 fx_raster 를 주면 도형 대신 그림 한 장으로 그린다 (fx_raster). 안 주면 지금까지 그대로.
+        self.surface = None
+        ras = getattr(stage, "fx_raster", None)
+        if ras is not None and ras is not False:
+            try:
+                from . import fx_raster
+                self.surface = fx_raster.open_surface(self, ras)
+            except Exception:                               # noqa: BLE001
+                if DEBUG:
+                    raise
 
     # ---- 시간표 · 길 ----
     @property
@@ -609,6 +619,12 @@ class Effect(object):
         self.jobs = []
         if self._show is not None:
             self._show.stop()
+        if self.surface is not None:
+            try:
+                self.surface.clear()
+                self.surface.close()
+            except Exception:                               # noqa: BLE001
+                pass
         self.clear()
         # 옮긴 도트를 제자리로, 보임은 숨김 기록대로 (도중에 멈춰도 어긋난 채로 남지 않게)
         for key in list(self.moved):
@@ -641,6 +657,9 @@ class Effect(object):
         # 도트 좌표를 잡아 두고 그리는 것이라 그 사이에 그림이 튄다.
         from . import move_fx
         fn = move_fx.STYLES.get(self.style) or move_fx.STYLES[move_fx.FALLBACK]
+        if self.surface is not None:                # [시범] 그림 바탕에 맞춰 다시 그린 연출이 있으면 그것을
+            from . import fx_raster_demo
+            fn = fx_raster_demo.STYLES.get(self.style, fn)
 
         def go():
             if self.dead:

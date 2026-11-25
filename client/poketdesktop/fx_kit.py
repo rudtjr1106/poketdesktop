@@ -27,6 +27,7 @@
 import math
 import random
 import re
+import time
 
 WHITE = "#ffffff"
 GOLD = "#ffd447"
@@ -336,6 +337,7 @@ class Show(object):
 
     def _step(self):
         fx = self.fx
+        began = time.monotonic()
         now = fx.clock() - self.t0
         self.wipe()
         while self.cues:                                    # 때가 된 신호 - 시간 순서대로, 늦어도 한 번은 꼭
@@ -351,7 +353,8 @@ class Show(object):
             if fx.dead:
                 return
         self.t = now
-        pen = Pen(self.cv, self.frame)
+        sf = fx.surface                                     # [시범] 그림 바탕이면 그림판의 붓으로
+        pen = sf.begin() if sf is not None else Pen(self.cv, self.frame)
         ended = set()
         for a in list(self.acts):
             if now < a[2]:
@@ -362,12 +365,16 @@ class Show(object):
                     a[5]()
             else:
                 a[4](pen, (now - a[2]) / (a[3] - a[2]), now - a[2])
+        if sf is not None:
+            sf.end()
         if ended:                                           # (그리는 동안 새로 넣은 것은 그대로 둔다)
             self.acts = [a for a in self.acts if a[1] not in ended]
         if not self.acts and not self.cues and not self.holds:
             self.on = False
             self.wipe()
             return (self.done or fx.finish)()
+        if sf is not None:                                  # [시범] 그림 바탕: 그리는 데 쓴 시간만큼 다음 장을 당긴다
+            return fx.after(max(1, int(MS - (time.monotonic() - began) * 1000.0)), self._tick)
         fx.after(MS, self._tick)
 
     def stop(self):
@@ -1013,6 +1020,10 @@ def impact(fx, at=0.0, where=None, size=1.0, typ=None, final=True, move=True):
                 ln = 18 * k * (1 - v)
                 streak(p, x + math.cos(a) * r0, y + math.sin(a) * r0 * 0.85, x + math.cos(a) * (r0 + ln),
                        y + math.sin(a) * (r0 + ln) * 0.85, 2.2 * k * (1 - v) + 0.4, c.hot if j % 2 else wave)
+        if getattr(p, "raster", False) and ms < 190:        # (그림 바탕) 터지는 빛이 번졌다 빠르게 꺼진다
+            f = ms / 190.0
+            p.glow(x, y, (26 + 30 * out3(f)) * k, c.base if c.typ not in ("GHOST", "DARK") else c.alt,
+                   (1.0 - f) ** 1.5, 0.85)
         _impact_kind(p, kind, c, x, y, k, u, ms, seed, rnd)
         m.draw(p, ms, paint)
         if cracks and ms < 300:
