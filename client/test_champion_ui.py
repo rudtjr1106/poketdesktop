@@ -559,6 +559,14 @@ def main():
     chk("  [더블 상대 찾기]", lw.seek_btn.label.cget("text") == "더블 상대 찾기" and lw.seek_btn.enabled)
     chk("  더블을 기다리는 사람이 '기다리는 중', 싱글을 기다리는 사람은 '싱글 대기'", "기다리는 중" in t and "싱글 대기" in t,
         [x for x in t if "대기" in x or "기다리는" in x])
+    n_got = len(api.got)
+    press(find_buttons(lw.body, "도전")[0])          # 나래는 싱글을 기다린다 - 더블로는 못 건다 (서버도 막는다)
+    end = time.time() + 0.4
+    while time.time() < end:
+        root.update()
+        time.sleep(0.01)
+    chk("  다른 형식을 기다리는 사람의 [도전] 은 잠겨 있다",
+        not any(x in api.got[n_got:] for x in (("challenge2", 101), ("challenge", 101))), api.got[n_got:])
     chk("  진행 중인 더블 판에는 [관전] 이 없다", "라온  vs  바다 · 5턴" in t and not find_buttons(lw.body, "관전"))
     chk("  최근 더블 판", "내 최근 더블 판" in t and "승 · 마루" in t, [x for x in t if x.startswith("승")])
     chk("  규칙 안내가 더블 것 (45초 · 두 마리씩)", any("45초" in x and "두 마리씩" in x for x in t))

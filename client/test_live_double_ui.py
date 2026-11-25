@@ -95,6 +95,8 @@ class FakeApi(object):
         self.state = "fighting"
         self.auto_foe = True
         self.rev = 1
+        self.steps = []               # 앱이 보내온 '보고 고른 걸음'
+        self.delay = 0.0              # 고른 것의 답이 이만큼 늦게 온다 (초)
 
     def match(self):
         out = {"id": 1, "state": self.state, "rev": self.rev, "turn": self.lb.turn, "step": self.lb.step,
@@ -121,9 +123,21 @@ class FakeApi(object):
     def live_act2(self, picks, step=None):
         self.calls.append("act2")
         self.sent.append([dict(p) for p in picks])
+        self.steps.append(step)
+        if self.delay:
+            time.sleep(self.delay)
+        if step is not None and int(step) != self.lb.step:      # server/app/live.py act() 와 같다
+            raise Rejected("그사이 턴이 넘어갔습니다. 다시 골라 주세요.")
         self.lb.choose("a", "picks", picks)
         self._advance()
         return self.match()
+
+    def timeout(self):
+        """제한 시간이 지났다 - 서버가 안 고른 쪽 것을 대신 골라 턴을 넘긴다 (live.tick)."""
+        self.events = self.lb.resolve()
+        if self.lb.over:
+            self.state = "done"
+        self.rev += 1
 
     def live_act(self, kind, move="", slot=-1, **_kw):
         self.calls.append("act:%s" % kind)
@@ -142,6 +156,13 @@ class FakeApi(object):
 
     def sprite(self, num, shiny=False, back=False):
         return self.png, ".png"
+
+
+class Rejected(Exception):
+    def __init__(self, message):
+        Exception.__init__(self, message)
+        self.message = message
+        self.status = 409
 
 
 class FakeApp(object):
@@ -350,6 +371,100 @@ def main():
     api.foe_moves()                                # 상대가 다음 둘을 냈다
     pump(root, lambda: win.view.get("phase") == "choose" and not win.busy and win.shown.get("foe0"), 15)
     chk("상대가 내보내면 다시 내 차례", "의 행동" in labels(win) and win.shown["foe0"]["name"] == "밀탱크", labels(win)[:60])
+
+    print("=== 검토에서 나온 것 (11/25) ===")
+    # (아무도 안 다치는 판으로 본다 - 누가 쓰러지면 다음 차례가 '다음 포켓몬 고르기' 가 되어 보려는 것이 가려진다)
+    api2 = FakeApi(dex, a=[mon(dex, "SNORLAX", ["PROTECT", "SPLASH"], 31), mon(dex, "PIKACHU", ["SPLASH"], 32),
+                           mon(dex, "MILTANK", ["SPLASH"], 33)],
+                   b=[mon(dex, "CHARIZARD", ["SPLASH"], 35), mon(dex, "BLASTOISE", ["SPLASH"], 36),
+                      mon(dex, "VENUSAUR", ["SPLASH"], 37)])
+    app2 = FakeApp(root, api2, dex)
+    w2 = DUI.DoubleBattleWindow(app2, api2.match())
+    pump(root, lambda: not w2.busy, 15)
+    click(w2, "방어")
+    root.update()
+    chk("한 마리 몫만 골라 둔다", len(w2.picks) == 1 and "(2/2)" in labels(w2), w2.picks)
+    api2.timeout()                                 # 그대로 제한 시간이 지났다 - 서버가 턴을 넘겼다
+    pump(root, lambda: w2.view.get("turn") == 1 and not w2.busy, 15)
+    chk("서버가 턴을 넘기면 고르다 만 것은 버린다 (다음 턴에 섞여 나가지 않는다)", w2.picks == []
+        and w2.await_target is None and "(1/2)" in labels(w2) and not api2.sent, (w2.picks, labels(w2)[:40]))
+    click(w2, "방어")
+    root.update()
+    api2.auto_foe = False
+    click(w2, "튀어오르기")
+    pump(root, lambda: bool(api2.sent) and w2._panel == ("sent",), 5)
+    chk("보낼 때 보고 고른 걸음을 같이 보낸다", api2.steps == [api2.lb.step] and len(api2.sent[-1]) == 2, api2.steps)
+    api2.foe_moves()
+    pump(root, lambda: w2.view.get("turn") == 2 and not w2.busy, 15)
+
+    # 답이 늦게 오는 동안 폴링이 돈다 - 고르는 칸이 다시 열리면 두 번 보내게 된다
+    api2.delay = 0.9
+    n0 = api2.calls.count("act2")
+    polls0 = api2.calls.count("live")
+    click(w2, "방어")
+    root.update()
+    click(w2, "튀어오르기")
+    seen = []
+    end = time.time() + 0.75
+    while time.time() < end:
+        root.update()
+        seen.append(("의 행동" in labels(w2), w2.sent))
+        time.sleep(0.01)
+    chk("답을 기다리는 동안 폴링이 돌아도 고르는 칸이 다시 열리지 않는다", api2.calls.count("live") - polls0 >= 2
+        and not any(opened for opened, _s in seen) and all(sent for _o, sent in seen),
+        (api2.calls.count("live") - polls0, [x for x in seen if x[0] or not x[1]][:2]))
+    pump(root, lambda: not getattr(w2, "_sending", False), 5)
+    chk("  한 번만 간다", api2.calls.count("act2") == n0 + 1, api2.calls.count("act2") - n0)
+    api2.delay = 0.0
+    api2.foe_moves()
+    pump(root, lambda: w2.view.get("turn") == 3 and not w2.busy, 15)
+
+    # 지난 걸음을 보고 고른 것을 서버가 안 받았다 - 까닭을 띄우고 다시 고르게 한다
+    click(w2, "방어")
+    root.update()
+    api2.lb.step += 1                              # (그사이 서버의 걸음이 넘어갔다)
+    click(w2, "튀어오르기")
+    pump(root, lambda: "넘어갔습니다" in w2.msg.cget("text"), 5)
+    chk("서버가 안 받으면 까닭을 띄우고 다시 고르게 한다", "넘어갔습니다" in w2.msg.cget("text") and not w2.sent
+        and w2.picks == [] and "(1/2)" in labels(w2), (w2.msg.cget("text"), w2.sent))
+    api2.lb.step -= 1
+    w2.close()
+
+    zteam = [mon(dex, "GARCHOMP", ["EARTHQUAKE", "TACKLE"], 21), mon(dex, "SNORLAX", ["TACKLE"], 22)]
+    zteam[0]["held"] = "GROUNDIUMZ"
+    api3 = FakeApi(dex, a=zteam)
+    api3.lb.zring["me"] = True
+    app3 = FakeApp(root, api3, dex)
+    w3 = DUI.DoubleBattleWindow(app3, api3.match())
+    pump(root, lambda: not w3.busy, 15)
+    click(w3, "지진")
+    root.update()
+    chk("지진은 대상을 안 묻는다 (나 빼고 전부)", w3.await_target is None and len(w3.picks) == 1, w3.picks)
+    w3.undo()
+    root.update()
+    w3._toggle("z")
+    root.update()
+    zname = next(z["name"] for z in w3._current()["zMoves"])
+    chk("Z기술을 켜면 Z기술 이름으로 보인다", zname in labels(w3) and "● Z기술" in labels(w3), labels(w3)[:80])
+    click(w3, zname)
+    root.update()
+    chk("Z기술로 쓰면 대상을 묻는다 (고른 하나만 때린다)", w3.await_target is not None and "누구에게" in labels(w3)
+        and w3.await_target.get("targets") == ["foe0", "foe1", "ally"], w3.await_target and w3.await_target.get("targets"))
+    w3._pick_move(w3.await_target, "foe1")
+    root.update()
+    chk("  고른 것에 Z 와 대상이 실린다", w3.picks == [{"pos": 0, "kind": "move", "move": "EARTHQUAKE", "target": "foe1",
+                                                "z": True}], w3.picks)
+    click(w3, "몸통박치기")
+    root.update()
+    w3._pick_move(w3.await_target, "foe0")
+    pump(root, lambda: w3.view.get("turn") == 1 and not w3.busy, 15)
+    chk("  서버가 받아서 Z기술이 한 상대에게만 나간다", w3.view["gimmick"]["zUsed"] is True
+        and api3.lb.mon("a", 1).hp == api3.lb.mon("a", 1).maxhp - sum(
+            e.get("damage", 0) for e in api3.events if e.get("t") == "hit" and e.get("to") == "a1" and e.get("at") != "a0"),
+        w3.view["gimmick"])
+    chk("  내 아군은 Z기술에 안 맞았다", not any(e.get("t") == "hit" and e.get("at") == "a0" and e.get("to") == "a1"
+                                    for e in api3.events))
+    w3.close()
 
     print("=== 끝 ===")
     api.auto_foe = True
