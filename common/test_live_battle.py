@@ -337,6 +337,35 @@ def main():
         [f.hp for f in back.b.team] == [f.hp for f in lb.b.team],
         ([f.hp for f in back.b.team], [f.hp for f in lb.b.team]))
 
+    # 트릭으로 받은 구애 도구의 잠금 (11/25): **원래 도구가 없던 포켓몬**은 되살릴 때 잠금이 풀렸다 - 도구 상태를 읽는
+    # 때에는 받은 도구가 아직 안 입혀져서 '도구가 없으니 읽을 것도 없다' 로 넘어갔다. 실시간 배틀은 요청마다 되살린다.
+    def tricked(foe_item):
+        ta = mon("ALAKAZAM", moves=["TRICK", "PSYCHIC"])
+        ta["held"] = "CHOICESCARF"
+        tb = mon("SNORLAX", moves=["TACKLE", "BODYSLAM"])
+        tb["held"] = foe_item
+        x = L.LiveBattle(DEX, (1, "가", [L.leveled(ta, 50)]), (2, "나", [L.leveled(tb, 50)]), rng=random.Random(3))
+        x.start()
+        x.choose("a", "move", "TRICK")
+        x.choose("b", "move", "TACKLE")
+        x.resolve()
+        return x
+    for foe_item, label in ((None, "원래 도구가 없던 포켓몬"), ("LEFTOVERS", "원래 도구가 있던 포켓몬")):
+        lb = tricked(foe_item)
+        chk("트릭: %s 이 구애스카프를 받는다" % label, lb.b.mon.held == "CHOICESCARF", lb.b.mon.held)
+        lb.choose("a", "move", "PSYCHIC")
+        lb.choose("b", "move", "TACKLE")
+        lb.resolve()
+        chk("  쓴 기술에 묶인다", lb.b.mon.locked == "TACKLE", lb.b.mon.locked)
+        back = L.LiveBattle.load(DEX, json.loads(json.dumps(lb.dump())))
+        chk("  되살려도 묶인 채다 (%s)" % label, back.b.mon.held == "CHOICESCARF" and back.b.mon.locked == "TACKLE"
+            and back.view("b")["me"]["team"][0]["locked"] == "TACKLE", (back.b.mon.held, back.b.mon.locked))
+        back.choose("a", "move", "PSYCHIC")
+        back.choose("b", "move", "BODYSLAM")           # 다른 기술을 골라도
+        ev = back.resolve()
+        used = [e.get("move") for e in ev if e.get("t") == "move" and e.get("who") == "foe"]
+        chk("  되살린 판에서 다른 기술을 골라도 묶인 기술이 나간다", used == [DEX.move_name("TACKLE")], used)
+
     print("=== 끝까지 ===")
     wins = {"a": 0, "b": 0, "draw": 0}
     for g in range(6):

@@ -1104,7 +1104,11 @@ def state(f):
 
 
 def load(f, d):
-    if not d or not getattr(f, "_held", f.held):
+    # **지금 도구를 지녔는지는 보지 않는다** (2026-11-25). 저장된 상태(d)가 있다는 것은 저장할 때 도구를 지니고 있었다는
+    # 뜻이다 (state). 여기서 '지금 도구가 없으면 읽을 것도 없다' 로 넘기면, 트릭 · 바꿔치기로 **받은** 도구의 상태를
+    # 잃는다 - 받은 도구(heldNow)는 이 뒤에 load_volatile 이 입히므로, 원래 도구가 없던 포켓몬은 이때 빈손이다.
+    # 그래서 넘겨받은 구애 도구의 잠금이 되살릴 때마다(실시간 · 관장 · 레이드 · 야생은 요청마다 되살린다) 풀렸다.
+    if not d:
         return
     f.used = bool(d.get("used"))
     f.locked = d.get("locked")
