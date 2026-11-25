@@ -515,12 +515,16 @@ class Effect(object):
         self.clock = clk
         self._show = None
         self._geo = None
-        # [시범] 그림 바탕: 무대가 fx_raster 를 주면 도형 대신 그림 한 장으로 그린다 (fx_raster). 안 주면 지금까지 그대로.
+        # 그림 바탕: 도형 대신 그림 한 장으로 그린다 (fx_raster). 못 쓰는 무대는 지금까지처럼 도형으로 그린다.
         self.surface = None
-        ras = getattr(stage, "fx_raster", None)
+        try:
+            from . import fx_raster
+            # 배틀 창의 무대는 fx_raster 로 말한다. 말이 없는 무대(바탕화면 배틀)는 캔버스를 보고 정한다
+            ras = stage.fx_raster if hasattr(stage, "fx_raster") else fx_raster.for_canvas(self.cv)
+        except Exception:                                   # noqa: BLE001
+            ras = None
         if ras is not None and ras is not False:
             try:
-                from . import fx_raster
                 self.surface = fx_raster.open_surface(self, ras)
             except Exception:                               # noqa: BLE001
                 if DEBUG:

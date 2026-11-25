@@ -38,6 +38,26 @@ _RGB = {}
 _FONTS = {}
 
 
+REGION = (130.0, 200.0, 90.0)   # 바탕화면 레이어: 두 도트 둘레로 덮는 만큼 (옆, 위, 아래)
+
+
+def for_canvas(cv):
+    """무대가 따로 말하지 않았을 때: 이 캔버스에 그림 바탕을 쓸까.
+
+    바탕화면 레이어(야생 · 투기장 · 관전 · 공습)는 창 자체가 투명하다. 맥에서는 그 위에 레이어(CALayer)를 얹으면
+    진짜 반투명으로 바탕화면에 겹친다 - 도트가 그렇게 그려진다. 윈도우는 색 하나를 뚫는 창이라 반투명이 안 되므로
+    (빛이 번진 자리가 뚫는 색과 섞여 자홍빛 테가 생긴다) 도형 바탕으로 둔다.
+    """
+    if sys.platform != "darwin" or wanted() is None:
+        return None
+    try:
+        if str(cv.cget("bg")) != "systemTransparent":
+            return None
+    except Exception:                                       # noqa: BLE001
+        return None
+    return {"region": True, "layer_only": True}
+
+
 def wanted():
     """배틀 창이 그림 바탕을 쓸까. {} (쓴다) 나 None (도형 바탕).
 
@@ -111,9 +131,11 @@ class RasterPen(object):
         self.d = ImageDraw.Draw(sf.base)
         self.ld = ImageDraw.Draw(sf.light)
         self.ids = []                           # (도형 바탕의 붓과 모양을 맞춘다 - 여기서는 안 쓴다)
+        self.ox, self.oy = sf.ox, sf.oy         # 그림판의 왼쪽 위 (무대 좌표) - 연출 둘레만 덮는 그림판일 때
 
     def _xy(self, pts, k):
-        return [(pts[i] * k, pts[i + 1] * k) for i in range(0, len(pts) - 1, 2)]
+        ox, oy = self.ox, self.oy
+        return [((pts[i] - ox) * k, (pts[i + 1] - oy) * k) for i in range(0, len(pts) - 1, 2)]
 
     # ---- fx_kit.Pen 과 같은 것 ----
     def poly(self, pts, fill, outline="", width=1, smooth=False):
@@ -143,6 +165,7 @@ class RasterPen(object):
     def oval(self, x, y, rx, ry=None, fill="", outline="", width=1):
         ry = rx if ry is None else ry
         s = self.s
+        x, y = x - self.ox, y - self.oy
         if rx * s < 0.5 or ry * s < 0.5:
             return
         self.d.ellipse([(x - rx) * s, (y - ry) * s, (x + rx) * s, (y + ry) * s],
@@ -151,6 +174,7 @@ class RasterPen(object):
 
     def arc(self, x, y, rx, ry, start, extent, outline, width=2):
         s = self.s
+        x, y = x - self.ox, y - self.oy
         if rx * s < 1 or ry * s < 1:
             return
         if extent < 0:
@@ -160,7 +184,8 @@ class RasterPen(object):
 
     def text(self, x, y, s, fill, font):
         size = (font[1] if isinstance(font, tuple) and len(font) > 1 else 10) * 1.33 * self.s
-        self.d.text((x * self.s, y * self.s), str(s), fill=rgb(fill) + (255,), font=_font(size), anchor="mm")
+        self.d.text(((x - self.ox) * self.s, (y - self.oy) * self.s), str(s), fill=rgb(fill) + (255,),
+                    font=_font(size), anchor="mm")
 
     # ---- 그림 바탕에서만 되는 것: 빛 ----
     def _lit(self, col, a):
@@ -170,6 +195,7 @@ class RasterPen(object):
     def glow(self, x, y, r, col, a=1.0, sy=1.0):
         """부드러운 빛 덩이 (빛 층에 그린다 - 흐려져서 후광이 된다)."""
         g = self.g
+        x, y = x - self.ox, y - self.oy
         if r * g < 0.5:
             return
         # 가운데가 밝고 바깥으로 옅어지게 세 겹으로 (한 겹이면 가장자리가 원반처럼 보인다)
@@ -191,8 +217,9 @@ class RasterPen(object):
 class Surface(object):
     """연출 한 편의 그림판. w, h 는 무대 좌표 크기, k 는 화면 배율 (관장 배틀 창은 2 x 창 크기 배율)."""
 
-    def __init__(self, w, h, k, present, close=None, pixel=False, ss=2):
+    def __init__(self, w, h, k, present, close=None, pixel=False, ss=2, origin=(0.0, 0.0)):
         self.w, self.h, self.k = w, h, k
+        self.ox, self.oy = origin               # 이 그림판이 덮는 자리의 왼쪽 위 (무대 좌표)
         self.size = (max(1, int(round(w * k))), max(1, int(round(h * k))))        # 화면에 올릴 크기
         self.pixel = pixel
         if pixel:                               # 도트풍: 무대 좌표 크기로 그려서 점을 키운다
@@ -271,11 +298,23 @@ def open_surface(fx, opts):
         return None
     if w < 8 or h < 8:
         return None
+    origin = (0.0, 0.0)
+    if opts.get("region"):
+        # 바탕화면 레이어는 화면만큼 크다 - 통째로 그리면 한 장에 0.05초가 든다. 두 도트 둘레만 덮는다
+        # (옆으로 130, 위로 200 - 하늘에서 떨어지는 것 · 아래로 90).
+        (sx, sy), (tx, ty) = fx.src, fx.dst
+        x0, y0 = max(0.0, min(sx, tx) - REGION[0]), max(0.0, min(sy, ty) - REGION[1])
+        x1, y1 = min(w, max(sx, tx) + REGION[0]), min(h, max(sy, ty) + REGION[2])
+        if x1 - x0 < 8 or y1 - y0 < 8:
+            return None
+        origin, w, h = (float(int(x0)), float(int(y0))), float(int(x1 - x0)), float(int(y1 - y0))
     present = opts.get("present")
     if present is not None:
-        return Surface(w, h, k, present, pixel=bool(opts.get("pixel")))
+        return Surface(w, h, k, present, pixel=bool(opts.get("pixel")), origin=origin)
     raw = getattr(cv, "_cv", cv)
-    sf = Surface(w, h, k, None, pixel=bool(opts.get("pixel")))
+    sf = Surface(w, h, k, None, pixel=bool(opts.get("pixel")), origin=origin)
+    if opts.get("layer_only") and sys.platform != "darwin":
+        return None
     # 맥: Tk 의 그림 항목은 큰 그림을 갈아 끼울 때마다 화면에 옮기는 데 0.03~0.05초가 걸린다 (초당 20장이 고작이다).
     # 도트를 그리는 것과 같은 길(CALayer)로 올리면 Tk 는 아무것도 다시 그리지 않는다.
     if sys.platform == "darwin" and opts.get("layer", True):
@@ -284,11 +323,13 @@ def open_surface(fx, opts):
             sf._present, sf._close, sf.how = got[0], got[1], "layer"
             sf.tick_ms = int(opts.get("tick") or LAYER_MS)
             return sf
+    if opts.get("layer_only"):
+        return None                             # (투명 창에는 Tk 그림이 안 그려진다 - 도형 바탕으로)
     # 그 밖 (윈도우 · 레이어를 못 붙인 맥): 캔버스의 그림 항목 하나를 두고 장마다 갈아 끼운다
     from PIL import ImageTk
     sf.how = "photo"
     photo = ImageTk.PhotoImage(Image.new("RGBA", sf.size, (0, 0, 0, 0)))
-    item = raw.create_image(0, 0, image=photo, anchor="nw")
+    item = raw.create_image(int(round(sf.ox * sf.k)), int(round(sf.oy * sf.k)), image=photo, anchor="nw")
     sf._present = photo.paste
 
     def close():
@@ -319,8 +360,8 @@ def _mac_layer(raw, sf):
         root = view.layer()
         if root is None:
             return None
-        x = raw.winfo_rootx() - top.winfo_rootx()
-        y = raw.winfo_rooty() - top.winfo_rooty()
+        x = raw.winfo_rootx() - top.winfo_rootx() + int(round(sf.ox * sf.k))
+        y = raw.winfo_rooty() - top.winfo_rooty() + int(round(sf.oy * sf.k))
         w, h = sf.size
         vh = view.bounds().size.height
         lay = CALayer.layer()

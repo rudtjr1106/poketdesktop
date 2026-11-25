@@ -346,6 +346,26 @@ def main():
             "poketdesktop.fx_raster_demo", fromlist=["STYLES"]).STYLES))
     fx.stop()
     chk("  도중에 멈춰도 그림이 비고 닫힌다", st.raster_img.getbbox() is None and fx.surface._close is None)
+    # 바탕화면 레이어는 화면만큼 커서 두 도트 둘레만 덮는다 - 그림판이 작아지고, 그리는 자리는 그만큼 당겨진다
+    class Wide(PV.FakeCanvas):
+        def __init__(self):
+            PV.FakeCanvas.__init__(self, 1600, 900)
+    got = {}
+    stg = PV.FakeStage(cv=Wide(), me=(700, 520), foe=(960, 520))
+    stg.fx_raster = {"region": True, "k": 1.0, "present": lambda im: got.__setitem__("im", im)}
+    seen_box = []
+    fx = FX.Effect(stg, kr("파괴광선"), (700, 520), (960, 520), lambda: got.__setitem__("done", True), who="me")
+    fx.play()
+    sf = fx.surface
+    while stg.root.now < LIMIT_MS + 600 and not got.get("done"):
+        stg.root.advance(PV.FRAME_MS)
+        if got.get("im") is not None and got["im"].getbbox():
+            seen_box.append(got["im"].getbbox())
+    wide = (sf.size, (sf.ox, sf.oy))
+    chk("바탕화면 레이어: 두 도트 둘레만 덮는 그림판 (화면 전체가 아니다)", got.get("done") and sf.size == (520, 290)
+        and (sf.ox, sf.oy) == (570.0, 320.0) and seen_box and got["im"].getbbox() is None, wide)
+    chk("  투명 창이 아닌 캔버스 · 맥이 아닌 곳에서는 저절로 켜지지 않는다 (윈도우는 색을 뚫는 창이라 반투명이 안 된다)",
+        FR.for_canvas(PV.FakeCanvas()) is None)
     # 느린 PC: 초당 SLOW_FPS 장을 못 채운 편이 거듭되면 그 실행 동안은 도형 바탕으로 돌아간다
     keep = dict(FR.HEALTH)
     try:
