@@ -1690,12 +1690,14 @@ class App(object):
             from .ui_box import confirm
             PLAT.activate()
             league = match.get("kind") == "champion"
+            double = match.get("fmt") == "double"          # 더블배틀 (11/25)
+            what = ("독도에서 챔피언리그 더블배틀을" if double else "독도에서 챔피언리그 배틀을") if league \
+                else "실시간 배틀을"
             ok = confirm(self.root, "챔피언리그 · 독도" if league else "실시간 배틀",
                          "%s 님이 %s 신청했습니다.\n"
                          "수락하면 바로 시작합니다. 양쪽 포켓몬은 모두 Lv.%d 로 "
-                         "맞춰집니다." % (match.get("foeName") or "친구",
-                                          "독도에서 챔피언리그 배틀을" if league else "실시간 배틀을",
-                                          match.get("level") or 50),
+                         "맞춰집니다.%s" % (match.get("foeName") or "친구", what, match.get("level") or 50,
+                                          "\n더블배틀은 두 마리씩 내보냅니다 (팀의 앞 두 마리가 먼저)." if double else ""),
                          danger=False, ok_text="수락")
         except Exception:                                   # noqa: BLE001
             ok = False
@@ -1755,8 +1757,13 @@ class App(object):
         if self.live_battle:
             self.live_battle.focus()
             return self.live_battle
-        from .ui_live_battle import LiveBattleWindow
         PLAT.activate()
+        if match.get("fmt") == "double":
+            # 더블배틀 (독도, 2026-11-25) - 편마다 두 마리. 창이 따로다 (자리 넷 · 대상 고르기)
+            from .ui_live_double import DoubleBattleWindow
+            self.live_battle = DoubleBattleWindow(self, match)
+            return self.live_battle
+        from .ui_live_battle import LiveBattleWindow
         self.live_battle = LiveBattleWindow(self, match)
         return self.live_battle
 

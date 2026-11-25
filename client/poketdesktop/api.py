@@ -933,8 +933,12 @@ class Api(object):
     # 친구끼리 둘 다 켜 있을 때만. 판정은 전부 서버가 하고, 여기서는
     # '무엇을 할지' 를 보내고 창이 열려 있는 동안 자주 물어본다.
     def live(self):
-        """지금 내 판 (초대 · 진행 중 · 아직 안 본 결과)."""
-        return self._call("GET", "/api/live", timeout=RAID_TIMEOUT)
+        """지금 내 판 (초대 · 진행 중 · 아직 안 본 결과).
+
+        double=1: 이 앱은 더블배틀 판을 그릴 줄 안다 (2026-11-25). 안 붙이면 서버가 더블 판을 안 준다 (옛 앱 지키기) -
+        옛 서버는 모르는 물음표 인자를 그냥 넘긴다.
+        """
+        return self._call("GET", "/api/live?double=1", timeout=RAID_TIMEOUT)
 
     def live_can(self, uid):
         """저 친구에게 지금 걸 수 있나. 단추를 흐리게 하는 데 쓴다."""
@@ -953,21 +957,30 @@ class Api(object):
                                  "z": bool(z)}, tera),
                           timeout=RAID_TIMEOUT)
 
+    def live_act2(self, picks):
+        """더블배틀: 두 마리 몫을 한 번에 보낸다. picks = [{pos, kind: move|switch, move, target, slot, mega, z, tera}]"""
+        return self._call("POST", "/api/live/act", {"kind": "picks", "picks": list(picks or [])},
+                          timeout=RAID_TIMEOUT)
+
     def live_seen(self):
         return self._call("POST", "/api/live/seen", {})
 
     # ---------------- 챔피언리그 - 독도 (관장 256곳을 다 이긴 사람끼리 실시간 배틀) ----------------
     def champion(self):
-        """지금 모습: 자격 · 여는 때 · 내 전적 · 기다리는 사람 · 접속 중인 참가자 · 진행 중인 판 · 순위 · 최근 판."""
-        return self._call("GET", "/api/champion")
+        """지금 모습: 자격 · 여는 때 · 내 전적 · 기다리는 사람 · 접속 중인 참가자 · 진행 중인 판 · 순위 · 최근 판.
 
-    def champion_seek(self, on=True):
-        """[상대 찾기] 켜기 / 끄기. 짝이 나면 응답의 match 에 판이 실린다."""
-        return self._call("POST", "/api/champion/seek", {"on": bool(on)})
+        double=1 로 물어 더블배틀 칸("double": 대기 · 순위 · 전적 · 최근 판)도 받는다 (11/25). 옛 서버는 그 칸을 안 준다.
+        """
+        return self._call("GET", "/api/champion?double=1")
 
-    def champion_challenge(self, uid):
-        """접속 중인 참가자에게 도전한다. {match} - 상대가 기다리던 사람이면 바로 fighting."""
-        return self._call("POST", "/api/champion/challenge/%d" % int(uid), {})
+    def champion_seek(self, on=True, fmt="single"):
+        """[상대 찾기] 켜기 / 끄기 (fmt = single / double). 짝이 나면 응답의 match 에 판이 실린다."""
+        return self._call("POST", "/api/champion/seek", {"on": bool(on), "fmt": fmt, "double": True})
+
+    def champion_challenge(self, uid, fmt="single"):
+        """접속 중인 참가자에게 도전한다 (fmt = single / double). {match} - 그 형식을 기다리던 사람이면 바로 fighting."""
+        q = "?fmt=double" if fmt == "double" else ""
+        return self._call("POST", "/api/champion/challenge/%d%s" % (int(uid), q), {})
 
     def champion_fight(self, mid):
         """구경용 판 모습 (참가자만)."""

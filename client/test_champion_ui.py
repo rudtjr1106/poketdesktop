@@ -119,21 +119,23 @@ class LeagueApi(TG.FakeApi):
         self.got.append("state")
         return json.loads(json.dumps(self.st))
 
-    def champion_seek(self, on=True):
-        self.got.append(("seek", on))
+    def champion_seek(self, on=True, fmt="single"):
+        # (싱글은 예전처럼 인자 하나로 온다 - 더블일 때만 형식이 붙는다. 더블 칸은 st["double"] 에)
+        self.got.append(("seek", on) if fmt == "single" else ("seek2", on))
+        tgt = self.st if fmt == "single" else self.st["double"]
         if not on:
-            self.st.update(seeking=False, waitLeft=0)
+            tgt.update(seeking=False, waitLeft=0)
             out = self.champion()
             out["match"] = None
             return out
         m = self.seek_result
-        self.st.update(seeking=m is None, waitLeft=0 if m else 600)
+        tgt.update(seeking=m is None, waitLeft=0 if m else 600)
         out = self.champion()
         out["match"] = m
         return out
 
-    def champion_challenge(self, uid):
-        self.got.append(("challenge", uid))
+    def champion_challenge(self, uid, fmt="single"):
+        self.got.append(("challenge", uid) if fmt == "single" else ("challenge2", uid))
         if isinstance(self.challenge_result, Exception):
             raise self.challenge_result
         return {"match": self.challenge_result}
@@ -521,6 +523,86 @@ def main():
     lg.on_event({"t": "champion", "s": "watchers", "id": 81, "n": 3})
     chk("내 배틀 창의 '관전 N명' 을 고친다", shown == [(81, 3)], shown)
     app.live_battle = None
+
+    print("=== 더블배틀 탭 (2026-11-25) ===")
+    api.st = member_state()
+    lg.open_window()
+    lw = lg.win
+    TG.pump(root, lambda: lw.st is not None)
+    root.update()
+    chk("옛 서버(더블 칸이 없다): 더블 단추가 잠긴다", lw.tab_btn["single"].enabled and not lw.tab_btn["double"].enabled
+        and any("서버가 준비되면" in x for x in label_texts(lw.body)))
+    lw.set_fmt("double")
+    chk("  눌러도 싱글 그대로", lw.fmt == "single")
+    double = {"seeking": False, "waitLeft": 0, "waiting": [{"id": 104, "name": "마루"}],
+              "fights": [{"id": 66, "turn": 5, "fmt": "double", "a": {"id": 103, "name": "라온"},
+                          "b": {"id": 105, "name": "바다"}, "watchers": 0}],
+              "ranking": [dict(r, played=3, wins=3 - i if i < 3 else 0, losses=i if i < 3 else 0, draws=0, rank=i + 1)
+                          for i, r in enumerate(ranking(5))],
+              "recent": [{"id": 12, "foeId": 104, "foeName": "마루", "outcome": "win", "reason": "ko", "turns": 9,
+                          "at": "2026-11-25T12:00:00+00:00", "counted": True}]}
+    double["me"] = dict(next(r for r in double["ranking"] if r["id"] == ME))
+    api.st = member_state(double=double)
+    api.st["online"][2]["waiting2"] = True          # 마루는 더블을 기다린다 (나래는 싱글을 기다린다)
+    lw.reload()
+    TG.pump(root, lambda: "double" in (lw.st or {}))
+    root.update()
+    chk("새 서버: 더블 단추가 열린다 (싱글 탭은 예전 모습 그대로)", lw.tab_btn["double"].enabled
+        and "내 전적  20전 18승 2패 · 3위" in label_texts(lw.body) and "더블 대기" in label_texts(lw.body),
+        [x for x in label_texts(lw.body) if "대기" in x or "내 전적" in x])
+    lw.set_fmt("double")
+    root.update()
+    root.update_idletasks()
+    t = label_texts(lw.body)
+    chk("더블 탭: 내 더블 전적 · 더블 순위", lw.fmt == "double" and "내 더블 전적  3전 1승 2패 · 3위" in t
+        and any(x.startswith("더블 순위") for x in t), [x for x in t if "전적" in x or "순위" in x])
+    chk("  [더블 상대 찾기]", lw.seek_btn.label.cget("text") == "더블 상대 찾기" and lw.seek_btn.enabled)
+    chk("  더블을 기다리는 사람이 '기다리는 중', 싱글을 기다리는 사람은 '싱글 대기'", "기다리는 중" in t and "싱글 대기" in t,
+        [x for x in t if "대기" in x or "기다리는" in x])
+    chk("  진행 중인 더블 판에는 [관전] 이 없다", "라온  vs  바다 · 5턴" in t and not find_buttons(lw.body, "관전"))
+    chk("  최근 더블 판", "내 최근 더블 판" in t and "승 · 마루" in t, [x for x in t if x.startswith("승")])
+    chk("  규칙 안내가 더블 것 (45초 · 두 마리씩)", any("45초" in x and "두 마리씩" in x for x in t))
+    lw._fit()
+    root.update()
+    chk("  눌린 글이 없다", not squeezed(lw.top) and not cramped(lw.body), (squeezed(lw.top)[:2], cramped(lw.body)[:2]))
+    lw.toggle_seek()
+    TG.pump(root, lambda: ((lw.st or {}).get("double") or {}).get("seeking"))
+    root.update()
+    chk("더블로 상대를 찾는다 (서버에 형식이 간다)", ("seek2", True) in api.got and lw.seek_btn.label.cget("text") == "그만 찾기"
+        and lw.seek_note.cget("text").startswith("더블 상대를 찾는 중"), (api.got[-2:], lw.seek_note.cget("text")))
+    chk("  싱글 쪽은 그대로 안 찾는 중", not lw.st.get("seeking"))
+    lw.toggle_seek()
+    TG.pump(root, lambda: not ((lw.st or {}).get("double") or {}).get("seeking"))
+    root.update()
+    api.challenge_result = {"id": 91, "state": "invited", "kind": "champion", "fmt": "double", "foeName": "마루", "mine": True}
+    app.notes[:] = []
+    press(find_buttons(lw.body, "도전")[-1])
+    TG.pump(root, lambda: ("challenge2", 104) in api.got and app.notes)
+    chk("[도전] 도 더블로 건다", ("challenge2", 104) in api.got and any("더블배틀로 도전" in n for n in app.notes),
+        (api.got[-2:], app.notes))
+    lw.close()
+    root.update()
+    lg.open_window()
+    lw = lg.win
+    TG.pump(root, lambda: lw.st is not None)
+    root.update()
+    chk("창을 닫았다 열어도 고른 형식 그대로", lw.fmt == "double" and lw.seek_btn.label.cget("text") == "더블 상대 찾기")
+    lg.on_event({"t": "champion", "s": "declined", "id": 91, "why": "상대의 앱이 더블배틀을 아직 지원하지 않습니다."})
+    chk("더블 도전을 옛 앱이 못 받으면 까닭을 알린다", any("지원하지 않습니다" in n for n in app.notes)
+        and "지원하지 않습니다" in lw.status.cget("text") and app.live_pending is None, app.notes[-1:])
+    lw.set_fmt("single")
+    root.update()
+    chk("싱글로 돌아오면 원래 모습", lw.fmt == "single" and lw.seek_btn.label.cget("text") == "상대 찾기"
+        and "내 전적  20전 18승 2패 · 3위" in label_texts(lw.body) and len(find_buttons(lw.body, "관전")) == 1)
+    lw.close()
+    root.update()
+    lg.fmt = "single"
+    lg.on_event({"t": "champion", "s": "wait", "id": 104, "name": "마루", "fmt": "double"})
+    root.update()
+    card = lg.card
+    chk("'더블 상대를 기다립니다' 알림", card is not None and card.alive and "더블 상대를 기다립니다" in " ".join(label_texts(card.win)),
+        card and label_texts(card.win))
+    lg.close_card()
 
     lg.close()
     gw.close()

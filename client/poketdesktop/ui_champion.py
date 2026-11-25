@@ -17,6 +17,12 @@
     열려 있는 동안 POLL_MS 마다 다시 묻고, **모습이 바뀌었을 때만** 다시 그린다 (기다리는 시간은 제자리에서 센다).
 
 배틀은 실시간 배틀 창(ui_live_battle) 그대로다 - 제목만 '챔피언리그 · 독도'. 점수 · 상금은 없고 전적만 남는다.
+
+## 더블배틀 (2026-11-25 사용자: "순위는 싱글/더블로 탭을 나눠서")
+
+창 머리 아래에 **[싱글 | 더블]** 을 둔다. 상대 찾기 · 기다리는 사람 · 진행 중인 판 · 순위 · 내 전적 · 최근 판이 고른
+형식을 따른다 ([도전] 도 그 형식으로 건다). 서버는 싱글을 지금 열쇠 그대로, 더블을 "double" 아래에 준다 - view_of 가
+고른 형식의 것을 한 모양으로 편다. "double" 이 없으면(옛 서버) 더블 단추는 잠긴다. 더블 판은 관전이 없다.
 """
 import json
 import time
@@ -30,6 +36,23 @@ W = 520
 POLL_MS = 3000              # 창이 열려 있는 동안 다시 묻는 간격
 TITLE = "챔피언리그 · 독도"
 REASON = {"forfeit": "기권", "ko": "", "turns": "턴 끝"}
+FMT_KR = {"single": "싱글", "double": "더블"}
+FMT_KEYS = ("seeking", "waitLeft", "waiting", "fights", "ranking", "me", "recent")   # 형식마다 따로 오는 것
+
+
+def view_of(st, fmt="single"):
+    """고른 형식의 모습을 한 모양으로 편다. 더블이면 st["double"] 의 것을 덮어쓰고, 접속 중인 사람의
+    '기다리는 중' 도 그 형식의 것(waiting2)으로 본다. other = 다른 형식을 기다리는 중."""
+    st = dict(st or {})
+    double = fmt == "double"
+    if double:
+        d = st.get("double") or {}
+        for k in FMT_KEYS:
+            st[k] = d.get(k) if k in d else ([] if k in ("waiting", "fights", "ranking", "recent") else None)
+    st["online"] = [dict(o, waiting=bool(o.get("waiting2" if double else "waiting")),
+                         other=bool(o.get("waiting" if double else "waiting2"))) for o in (st.get("online") or [])]
+    st["fmt"] = "double" if double else "single"
+    return st
 
 
 # ---------------------------------------------------------------- 글 (검사가 직접 본다)
@@ -61,13 +84,14 @@ def outcome_text(r, pair_max=3):
 
 
 def headline(st):
-    """창 위쪽 한 줄: 열리기 전 / 참가자의 전적 / 아직 자격이 없는 사람."""
+    """창 위쪽 한 줄: 열리기 전 / 참가자의 전적 / 아직 자격이 없는 사람. (st 는 view_of 로 편 것이어도 된다)"""
     st = st or {}
     if not st.get("open"):
         return "%s에 열립니다." % (st.get("opens") or "곧")
     if st.get("member"):
         me = st.get("me") or {}
-        return "내 전적  %s · %d위" % (record_text(me), int(me.get("rank") or 0))
+        word = "내 더블 전적" if st.get("fmt") == "double" else "내 전적"
+        return "%s  %s · %d위" % (word, record_text(me), int(me.get("rank") or 0))
     return "관장 %d / %d · 전부 이기면 참가할 수 있습니다." % (int(st.get("cleared") or 0), int(st.get("total") or 256))
 
 
@@ -76,6 +100,9 @@ def shape_of(st):
     st = dict(st or {})
     st.pop("waitLeft", None)
     st.pop("match", None)
+    if isinstance(st.get("double"), dict):
+        st["double"] = dict(st["double"])
+        st["double"].pop("waitLeft", None)
     return json.dumps(st, sort_keys=True, ensure_ascii=False)
 
 
@@ -94,22 +121,26 @@ def team_text(st):
 
 
 def seek_label(st):
-    """[상대 찾기] 단추 글과 누를 수 있나, 그 옆의 안내."""
+    """[상대 찾기] 단추 글과 누를 수 있나, 그 옆의 안내. (더블 탭이면 view_of 로 편 것을 준다)"""
     st = st or {}
+    double = st.get("fmt") == "double"
+    name = "더블 상대 찾기" if double else "상대 찾기"
     if st.get("seeking"):
-        return "그만 찾기", True, "상대를 찾는 중 · %s 남음" % clock_text(st.get("waitLeft"))
+        return "그만 찾기", True, "%s상대를 찾는 중 · %s 남음" % ("더블 " if double else "", clock_text(st.get("waitLeft")))
     if st.get("why"):
-        return "상대 찾기", False, st["why"]
-    return "상대 찾기", True, ("누르면 기다리던 사람과 바로 붙습니다. 아무도 없으면 %d분 기다리고, %d분이 지나도 "
-                              "상대가 없으면 접속 중인 다른 참가자에게 알립니다." % (
-                                  int(st.get("waitSec") or 600) // 60, max(1, int(st.get("notifySec") or 60) // 60)))
+        return name, False, st["why"]
+    return name, True, ("누르면 %s기다리던 사람과 바로 붙습니다. 아무도 없으면 %d분 기다리고, %d분이 지나도 "
+                        "상대가 없으면 접속 중인 다른 참가자에게 알립니다." % (
+                            "더블을 " if double else "", int(st.get("waitSec") or 600) // 60,
+                            max(1, int(st.get("notifySec") or 60) // 60)))
 
 
 def wrap(label):
     """글이 받은 폭에 맞춰 접히게 한다 (처음 wraplength 는 어림값). 창 폭은 테두리 · 여백 · 굴림 막대가 있느냐로
     달라져서 숫자로 맞추면 몇십 px 씩 넘쳐 오른쪽이 잘렸다 - 글꼴을 줄이지 않고 받은 폭으로 접는다."""
     def fit(e):
-        w = max(40, e.width - 2)
+        # 글상자는 글 둘레에 4px(테두리 · 안쪽 여백)을 더 달라고 한다 - 줄이 폭을 꽉 채우면 그만큼 눌렸다 (더블 안내 글)
+        w = max(40, e.width - 6)
         try:
             if abs(int(label.cget("wraplength")) - w) > 1:
                 label.configure(wraplength=w)
@@ -132,6 +163,7 @@ class League(object):
         self.pushed = 0.0             # 마지막으로 판이 밀려온 때 - DesktopDuel 이 보고, 끊기면 스스로 묻는다
         self._asking = False
         self._beat = None             # 관전하는 동안 '아직 본다' 를 알리는 예약
+        self.fmt = "single"           # 독도 창에서 고른 형식 (창을 닫았다 열어도 그대로)
 
     @property
     def me(self):
@@ -153,9 +185,18 @@ class League(object):
         s = (ev or {}).get("s")
         if s == "wait":
             uid, name = ev.get("id"), ev.get("name") or "?"
+            fmt = "double" if ev.get("fmt") == "double" else "single"
             if uid != self.me and self.setting("championNotify", True) and not self._busy():
-                self.notice("%s 님이 독도에서 상대를 기다립니다." % name, "도전",
-                            lambda u=uid, n=name: self.challenge(u, n))
+                self.notice("%s 님이 독도에서 %s상대를 기다립니다." % (name, "더블 " if fmt == "double" else ""), "도전",
+                            lambda u=uid, n=name, f=fmt: self.challenge(u, n, fmt=f))
+        elif s == "declined":
+            # 내 더블 도전을 상대의 옛 앱이 받지 못했다 (서버가 거절로 접었다) - 기다리지 않게 까닭을 알린다
+            why = ev.get("why") or "상대가 도전을 받지 못했습니다."
+            if getattr(self.app, "live_pending", None) is not None:
+                self.app.live_pending = None
+            self._notify(why)
+            if self.win is not None and self.win.alive:
+                self.win.say(why, U.DANGER)
         elif s in ("ask", "match"):
             self.close_card()
             fn = getattr(self.app, "check_live", None)
@@ -212,8 +253,9 @@ class League(object):
             c.close()
 
     # ---- 할 것
-    def challenge(self, uid, name="", then=None):
-        """그 참가자에게 도전한다. 기다리던 사람이면 바로 배틀 창, 아니면 상대가 받을 때까지 기다린다."""
+    def challenge(self, uid, name="", then=None, fmt="single"):
+        """그 참가자에게 도전한다 (fmt = single / double). 그 형식을 기다리던 사람이면 바로 배틀 창, 아니면 상대가
+        받을 때까지 기다린다."""
         api = getattr(self.app, "api", None)
         if api is None:
             return
@@ -230,14 +272,17 @@ class League(object):
                 self.app.open_live_battle(m)
             else:
                 self.app.live_pending = m
-                self._notify("%s 님에게 도전했습니다. 받으면 바로 시작합니다." % (name or m.get("foeName") or "상대"))
+                self._notify("%s 님에게 %s도전했습니다. 받으면 바로 시작합니다." % (
+                    name or m.get("foeName") or "상대", "더블배틀로 " if fmt == "double" else ""))
                 watch = getattr(self.app, "live_watch", None)
                 if watch is not None:
                     watch(2000)
             self.refresh_window()
             if then:
                 then()
-        run_async(self.root, lambda: api.champion_challenge(uid), done)
+        # (싱글은 예전과 같은 꼴로 부른다)
+        run_async(self.root, (lambda: api.champion_challenge(uid, "double")) if fmt == "double"
+                  else (lambda: api.champion_challenge(uid)), done)
 
     # ---- 구경 (DesktopDuel 의 ctl 노릇: app · root · pushed · refresh · stop_watch)
     def watching(self):
@@ -370,6 +415,7 @@ class LeagueWindow(object):
         self._busy = False
         self.seek_btn = None
         self.seek_note = None
+        self.fmt = getattr(league, "fmt", "single")     # 싱글 / 더블 (2026-11-25)
         self.top, f = ui_box._shell(parent or self.root, TITLE, U.wide(W), U.h(320))
         self.top.protocol("WM_DELETE_WINDOW", self.close)
         # 관장 창(부모)을 닫으면 이 창도 같이 사라진다 - 그때 스스로 정리한다 (open_window 를 보라, 게시판 #542)
@@ -473,9 +519,12 @@ class LeagueWindow(object):
         if not isinstance(st, dict):
             return
         self.st = st
-        left = int(st.get("waitLeft") or 0)
-        self._wait_until = time.monotonic() + left if st.get("seeking") and left else None
-        key = shape_of(st)
+        if self.fmt == "double" and "double" not in st:
+            self.fmt = "single"              # 옛 서버 - 더블 칸이 없다
+        v = self.v()
+        left = int(v.get("waitLeft") or 0)
+        self._wait_until = time.monotonic() + left if v.get("seeking") and left else None
+        key = self.fmt + shape_of(st)
         if key != self._shape:
             self._shape = key
             self.paint()
@@ -501,13 +550,31 @@ class LeagueWindow(object):
         if not self.alive:
             return
         if self._wait_until is not None and self.st:
-            self.st["waitLeft"] = max(0, int(round(self._wait_until - time.monotonic())))
+            left = max(0, int(round(self._wait_until - time.monotonic())))
+            if self.fmt == "double" and isinstance(self.st.get("double"), dict):
+                self.st["double"]["waitLeft"] = left
+            else:
+                self.st["waitLeft"] = left
             self._paint_seek()
         self._tick_job = self.root.after(1000, self._tick)
 
+    # ---- 형식 (싱글 / 더블)
+    def v(self):
+        """고른 형식의 모습 (view_of)."""
+        return view_of(self.st, self.fmt)
+
+    def set_fmt(self, fmt):
+        fmt = "double" if fmt == "double" else "single"
+        if fmt == self.fmt or (fmt == "double" and "double" not in (self.st or {})):
+            return
+        self.fmt = self.league.fmt = fmt
+        self.say(" ")
+        self.apply(self.st)
+
     # ---- 그리기
     def paint(self):
-        st = self.st or {}
+        st = self.v()
+        double = self.fmt == "double"
         for w in self.body.winfo_children():
             w.destroy()
         self.seek_btn = self.seek_note = None
@@ -522,14 +589,33 @@ class LeagueWindow(object):
         tk.Label(top, text="독도", bg=U.BG2, fg=U.FG, font=(U.FAMILY_BLACK, U.pt(16))).pack(side="left")
         tk.Label(top, text="챔피언리그", bg=U.BG2, fg=U.ACCENT, font=U.FONT_B).pack(side="left", padx=(10, 0),
                                                                                 pady=(6, 0))
+        rule = ("두 마리씩 내보내는 더블배틀 (팀의 앞 두 마리가 먼저), 한 턴은 45초" if double else "한 턴은 30초")
         wrap(tk.Label(head, text="관장 %d곳을 모두 이긴 트레이너끼리 겨루는 실시간 배틀입니다. 포켓몬은 모두 Lv.50, "
-                                 "한 턴은 30초. 점수와 상금은 없고 전적만 남습니다 (같은 상대와는 하루 %d판까지)."
-                                 % (int(st.get("total") or 256), int(st.get("pairMax") or 3)),
+                                 "%s. 점수와 상금은 없고 전적만 남습니다 (같은 상대와는 하루 %d판까지)."
+                                 % (int(st.get("total") or 256), rule, int(st.get("pairMax") or 3)),
                       bg=U.BG2, fg=U.FG_DIM, font=U.FONT_S, anchor="w", justify="left",
                       wraplength=wl)).pack(fill="x", padx=14, pady=(4, 0))
         wrap(tk.Label(head, text=headline(st), bg=U.BG2, fg=U.FG if member else U.FG_DIM,
                       font=(U.FAMILY, U.BASE_PT + 1, "bold"), anchor="w", justify="left",
                       wraplength=wl)).pack(fill="x", padx=14, pady=(8, 10))
+
+        # [싱글 | 더블] - 상대 찾기 · 순위 · 전적 · 최근 판이 고른 형식을 따른다
+        tabs = tk.Frame(self.body, bg=U.BG)
+        tabs.pack(fill="x", pady=(10, 0))
+        self.tab_btn = {}
+        has2 = "double" in (self.st or {})
+        for fmt in ("single", "double"):
+            on = fmt == self.fmt
+            maker = U.PushButton if on else U.ghost_button
+            b = maker(tabs, FMT_KR[fmt], lambda f=fmt: self.set_fmt(f), height=30)
+            b.pack(side="left", padx=(0, 6))
+            if fmt == "double" and not has2:
+                b.configure(state="disabled")
+            self.tab_btn[fmt] = b
+        note = ("더블배틀: 두 마리씩 내보내고, 전적과 순위는 싱글과 따로 셉니다." if double else
+                "" if has2 else "더블배틀은 서버가 준비되면 열립니다.")
+        if note:
+            tk.Label(tabs, text=note, bg=U.BG, fg=U.FG_FAINT, font=U.FONT_XS, anchor="w").pack(side="left", padx=(6, 0))
 
         # [상대 찾기]
         row = tk.Frame(self.body, bg=U.BG)
@@ -561,8 +647,11 @@ class LeagueWindow(object):
         for i, o in enumerate(online):
             r = self._row(box, i)
             tag, color = (("기다리는 중", U.ACCENT) if o.get("waiting") else
-                          ("배틀 중", U.FG_FAINT) if o.get("busy") else ("", U.FG_DIM))
-            b = U.ghost_button(r, "도전", lambda u=o["id"], n=o.get("name"): self.league.challenge(u, n), height=28)
+                          ("배틀 중", U.FG_FAINT) if o.get("busy") else
+                          ("%s 대기" % FMT_KR["single" if double else "double"], U.FG_FAINT) if o.get("other")
+                          else ("", U.FG_DIM))
+            b = U.ghost_button(r, "도전", lambda u=o["id"], n=o.get("name"): self.league.challenge(u, n, fmt=self.fmt),
+                               height=28)
             b.pack(side="right")
             if o.get("busy") or my_why:
                 b.configure(state="disabled")
@@ -574,11 +663,11 @@ class LeagueWindow(object):
         # 진행 중인 판
         fights = st.get("fights") or []
         if fights:
-            box = self._section("진행 중인 판")
+            box = self._section("진행 중인 더블 판" if double else "진행 중인 판")
             for i, f in enumerate(fights):
                 r = self._row(box, i)
                 mine = self.league.me in ((f.get("a") or {}).get("id"), (f.get("b") or {}).get("id"))
-                if not mine and member:      # 관전은 참가자만 (서버도 막는다)
+                if not mine and member and not double:      # 관전은 참가자만 (서버도 막는다) · 더블 판은 관전이 없다
                     U.ghost_button(r, "관전", lambda m=f["id"]: self.league.watch(m), height=28).pack(side="right")
                 if f.get("watchers"):
                     tk.Label(r, text="관전 %d명" % int(f["watchers"]), bg=U.BG2, fg=U.FG_DIM,
@@ -589,7 +678,8 @@ class LeagueWindow(object):
 
         # 순위
         table = st.get("ranking") or []
-        box = self._section("순위 · 이긴 횟수 (참가자 %d명)" % int(st.get("members") or len(table)))
+        box = self._section("%s순위 · 이긴 횟수 (참가자 %d명)" % ("더블 " if double else "",
+                                                           int(st.get("members") or len(table))))
         if not table:
             self._empty(box, "아직 참가자가 없습니다.")
         for i, t in enumerate(table):
@@ -605,7 +695,7 @@ class LeagueWindow(object):
         # 내 최근 판
         recent = st.get("recent") or []
         if recent:
-            box = self._section("내 최근 판")
+            box = self._section("내 최근 더블 판" if double else "내 최근 판")
             for i, g in enumerate(recent):
                 r = self._row(box, i)
                 color = {"win": U.GOOD, "lose": U.DANGER}.get(g.get("outcome"), U.FG_DIM)
@@ -639,7 +729,7 @@ class LeagueWindow(object):
         """[상대 찾기] 줄만 고친다 (남은 시간이 흐를 때)."""
         if self.seek_btn is None or self.seek_note is None:
             return
-        text, can, note = seek_label(self.st)
+        text, can, note = seek_label(self.v())
         try:
             self.seek_note.configure(text=note)
             self.seek_btn.configure(text=text, state="normal" if can else "disabled")
@@ -648,8 +738,9 @@ class LeagueWindow(object):
 
     # ---- 단추
     def toggle_seek(self):
-        st = self.st or {}
+        st = self.v()
         on = not st.get("seeking")
+        fmt = self.fmt
 
         def done(r, err):
             if not self.alive:
@@ -662,5 +753,7 @@ class LeagueWindow(object):
             self.apply(r)
             if m and m.get("state") == "fighting":
                 self.app.open_live_battle(m)
-        run_async(self.root, lambda: self.app.api.champion_seek(on), done)
+        # (싱글은 예전과 같은 꼴로 부른다)
+        run_async(self.root, (lambda: self.app.api.champion_seek(on, "double")) if fmt == "double"
+                  else (lambda: self.app.api.champion_seek(on)), done)
 

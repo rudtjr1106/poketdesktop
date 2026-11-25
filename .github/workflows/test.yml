@@ -342,6 +342,10 @@ jobs:
       - name: 실시간 배틀 화면 (진짜 Tk)
         if: matrix.shard == 1
         run: python client/test_live_ui.py
+      # 더블배틀 창 (독도, 11/25): 네 자리 · 포켓몬마다 기술 -> 대상 · 둘 다 정하면 한 번에 · 쓰러진 자리 고르기 · 결과
+      - name: 더블배틀 화면 (진짜 Tk)
+        if: matrix.shard == 1
+        run: python client/test_live_double_ui.py
       # 게시판 #664 뒤 (11/19): 붙잡히면 교체 단추를 잠그고 까닭 · 이름표 꼬리표를 띄운다 (관장 · 실시간, 기본 + DP 계열 테마)
       - name: 붙잡힘 표시 · 교체 잠금 (진짜 Tk)
         if: matrix.shard == 3
