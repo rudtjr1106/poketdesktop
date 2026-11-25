@@ -129,11 +129,13 @@ class DoubleDuel(B.Battle):
         return B.Battle._use(self, who, user, target, key, ev, called, instructed, bounced)
 
     # ---- 씨뿌리기: 심은 자리로 ----
-    @property
-    def raid_index(self):
-        """battle._seed 가 seed_by 에 적는 값 - 여기서는 심은 포켓몬의 자리("a1")."""
-        d = self.double
-        return d._cur.get("at") if d is not None and d._cur else None
+    def _seed(self, target, who, tw, ev):
+        """심은 포켓몬의 자리("a1")를 seed_by 에 적는다. **who 가 앉은 자리**다 - 매직미러로 튕긴 씨앗은 튕겨 낸
+        포켓몬이 심은 것이라, '이번에 움직인 포켓몬' 으로 적으면 자기 자리가 적혀 아무도 못 빨아들인다 (검토 11/25)."""
+        had = target.seeded
+        B.Battle._seed(self, target, who, tw, ev)
+        if target.seeded and not had:
+            target.seed_by = self.double._seats.get(who)
 
     def _drain_seed(self, f, who, ev):
         d = self.double
@@ -548,9 +550,12 @@ class DoubleBattle(object):
             raise ValueError("더블배틀은 두 마리의 행동을 함께 보내야 합니다.")
         if not self.can_act(who):
             raise ValueError("지금은 고를 차례가 아닙니다.")
-        picks = [dict(x) for x in (value or []) if isinstance(x, dict)]
+        picks = [dict(x) for x in (value if isinstance(value, (list, tuple)) else []) if isinstance(x, dict)]
         try:
             out = self._check_switches(who, picks) if self.phase() == "switch" else self._check_picks(who, picks)
+        except (TypeError, OverflowError, KeyError, AttributeError, IndexError):
+            # 보내온 것을 믿지 않는다 - 꼴이 이상하면(기술 자리에 목록 · 무한대 ...) 거절한다. 서버 오류로 터지면 안 된다
+            raise ValueError("잘못된 선택입니다.")
         finally:
             pa, pb = self._default_pair()
             self._seat(pa, pb)
@@ -561,7 +566,7 @@ class DoubleBattle(object):
     def _pos(x):
         try:
             return int(x.get("pos"))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise ValueError("어느 자리의 행동인지 알 수 없습니다.")
 
     def _check_switches(self, who, picks):
@@ -575,7 +580,7 @@ class DoubleBattle(object):
         for pos in p.need:
             try:
                 slot = int(got[pos].get("slot"))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
             if slot not in p.reserves() or slot in taken:
                 raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
@@ -599,7 +604,7 @@ class DoubleBattle(object):
             if x.get("kind") == "switch":
                 try:
                     slot = int(x.get("slot"))
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
                 if slot not in p.reserves() or slot in taken:
                     raise ValueError("그 포켓몬으로는 바꿀 수 없습니다.")
@@ -613,6 +618,8 @@ class DoubleBattle(object):
                 raise ValueError("무엇을 할지 알 수 없습니다.")
             self._seat(pk, self._facing(pk))
             key = SM.locked_move(f, bt) or x.get("move") or ""
+            if not isinstance(key, str):
+                raise ValueError("그 기술은 배우지 않았습니다.")
             if key == B.STRUGGLE and bt.usable(f) != [B.STRUGGLE]:
                 raise ValueError("아직 쓸 수 있는 기술이 있습니다.")
             if key != B.STRUGGLE:
@@ -626,7 +633,11 @@ class DoubleBattle(object):
                     raise ValueError(why)
             md = bt.move_of(key)
             target = x.get("target") or None
-            if self._aim(f, key, md) != "one":
+            # Z기술(공격)은 원래 기술이 광역기여도 **고른 하나**만 때린다 (본가 · 검토 11/25)
+            z_on = bool(x.get("z")) and key in bt.z_moves(seat)
+            if not isinstance(target, str) and target is not None:
+                raise ValueError("그 대상은 고를 수 없습니다.")
+            if self._aim(f, key, md) != "one" and not (z_on and MC.attacks(md)):
                 target = None
             elif target not in (None, "foe0", "foe1", "ally"):
                 raise ValueError("그 대상은 고를 수 없습니다.")
@@ -638,7 +649,7 @@ class DoubleBattle(object):
             if x.get("tera") and not pick.get("mega") and bt.can_tera(seat) is not None:
                 pick["tera"] = True
                 flags["tera"] += 1
-            if x.get("z") and key in bt.z_moves(seat):
+            if z_on:
                 pick["z"] = True
                 flags["z"] += 1
             out.append(pick)
@@ -875,8 +886,9 @@ class DoubleBattle(object):
             key = enc["move"]
         return SM.locked_move(f, self.bt) or key
 
-    def _targets(self, pk, f, key, md, want):
-        """이 기술이 갈 자리들 (첫 자리가 주 대상). 갈 데가 없으면 ([], 까닭)."""
+    def _targets(self, pk, f, key, md, want, single=False):
+        """이 기술이 갈 자리들 (첫 자리가 주 대상). 갈 데가 없으면 ([], 까닭).
+        single = Z기술로 나간다 - 원래 기술이 광역기여도 고른 하나만."""
         who = pk[0]
         k = MC.key(md) if key != B.STRUGGLE else B.STRUGGLE
         t = md.get("target")
@@ -884,6 +896,8 @@ class DoubleBattle(object):
         ally = self._ally(pk)
         if k == "CURSE":
             t = 10 if "GHOST" in f.types() else 7
+        if single and key != B.STRUGGLE:
+            t = 10
         if key == B.STRUGGLE or t == 8:
             if not foes:
                 return [], None
@@ -993,7 +1007,12 @@ class DoubleBattle(object):
         md = bt.move_of(real)
         k = MC.key(md) if real != B.STRUGGLE else B.STRUGGLE
         self._telepathy = None
-        tgts, why = self._targets(pk, f, real, md, act.get("target"))
+        # 이 수가 Z기술로 나가나 (지금도 쓸 수 있을 때만 - 그사이 Z크리스탈을 잃었을 수 있다)
+        zed = False
+        if not instructed and self.t["zplan"].get(fk) == key and MC.attacks(md):
+            self._seat(pk, self._facing(pk) or pk)
+            zed = key in bt.z_moves(seat)
+        tgts, why = self._targets(pk, f, real, md, act.get("target"), single=zed)
         if not tgts:
             if why == "ally":
                 ev.append({"t": "msg", "who": seat, "at": pk,
@@ -1004,7 +1023,8 @@ class DoubleBattle(object):
         self._cur = {"side": who, "at": pk, "fk": fk, "target": first, "key": real}
         self._rest = {"list": tgts[1:], "count": len(tgts), "key": key, "real": real, "md": md}
         self._seat(pk, first)
-        self._set_mods(pk, first, f, (key, real), md, len(tgts))
+        # 광역기의 생명의구슬 반동은 다 때린 뒤에 한 번 (_spread_rest 가 준다) - 대상마다의 것은 끈다
+        self._set_mods(pk, first, f, (key, real), md, len(tgts), {"_noorb": True} if len(tgts) > 1 else None)
         bt.z_want = {}
         if not instructed and self.t["zplan"].get(fk) == key:
             bt.z_request(seat, key, True)
@@ -1023,7 +1043,7 @@ class DoubleBattle(object):
                 and e.get("name") == f.name]
         moved = bool(mine) and not mine[0].get("charge")
         tn = md.get("target")
-        aimed = (real == B.STRUGGLE or tn in (2, 8, 9, 10, 11) or (tn == 1 and k != "CURSE")
+        aimed = (zed or real == B.STRUGGLE or tn in (2, 8, 9, 10, 11) or (tn == 1 and k != "CURSE")
                  or (k == "CURSE" and "GHOST" in f.types()))
         if mine and aimed:
             mine[0]["to"] = first
@@ -1097,9 +1117,7 @@ class DoubleBattle(object):
             if not self._live(tp):
                 continue
             new = ev[n0:]
-            extra = {}
-            if any(e.get("t") == "chip" and "생명의구슬" in (e.get("text") or "") for e in new):
-                extra["_noorb"] = True
+            extra = {"_noorb": True}
             if r["md"].get("statSelf") and any(e.get("t") == "hit" and e.get("who") == who for e in new):
                 extra["stat"] = []
             self._seat(upk, tp)
@@ -1117,6 +1135,12 @@ class DoubleBattle(object):
         bt.last_before = last_before
         self._seat(upk, first)
         self._set_mods(upk, first, user, keys, r["md"], r["count"])
+        # 생명의구슬: 한 대라도 맞혔으면 **다 때린 뒤에** 한 번 깎인다 (held.after_hit 과 같은 조건). 대상마다 깎으면
+        # 체력이 얼마 안 남은 포켓몬이 첫 대상만 때리고 쓰러진다 (검토 11/25)
+        if user.alive() and user.held == "LIFEORB" and MC.attacks(r["md"]) and not H._sheer(user, r["md"]) \
+                and any(e.get("t") == "hit" and e.get("who") == who for e in ev[n0:]):
+            H._chip(user, who, user.maxhp // 10, ev, "%s 은(는) 생명의구슬로 체력이 조금 깎였다!" % user.name)
+            bt._check_faint(ev)
 
     def _instructed(self, f, key, ev):
         """지휘: 그 포켓몬이 방금 쓴 기술을 고른 대상에게 한 번 더 (PP 는 든다)."""
@@ -1156,7 +1180,10 @@ class DoubleBattle(object):
             t["helped"][fk] = int(t["helped"].get(fk, 0)) + 1
             return say("%s 은(는) %s 을(를) 도울 태세에 들어갔다!" % (user.name, af.name))
         if k in ("FOLLOWME", "RAGEPOWDER"):
-            t["center"][pk[0]] = {"fk": self._fk_at(pk), "k": k}
+            held = t["center"].get(pk[0])
+            at = self._where(held["fk"]) if held else None
+            if not (at and self._live(at)):           # 둘 다 쓰면 먼저 쓴 쪽이 끌어온다
+                t["center"][pk[0]] = {"fk": self._fk_at(pk), "k": k}
             return say("%s 은(는) 주목의 대상이 되었다!" % user.name)
         if k == "SPOTLIGHT":
             tp = cur["target"] if cur else None
@@ -1464,7 +1491,18 @@ class DoubleBattle(object):
                 "canSwitch": bool(self.side(who).reserves()) and not stuck, "noSwitch": stuck,
                 "canMega": bt.can_mega(seat) is not None,
                 "canTera": tera, "teraKr": dex.type_name(tera) if tera else None,
-                "zMoves": bt.z_preview(seat)}
+                # Z기술(공격)은 고른 하나만 때린다 - 원래 기술이 광역기여도 대상을 고른다
+                "zMoves": [dict(z, targets=None if z.get("status") else self._choices(pk, "one"))
+                           for z in bt.z_preview(seat)]}
+
+    def _foe_mon(self, f, who):
+        """상대 포켓몬의 보이는 모습. 조이기의 남은 턴은 **내 편이 건 것만** - 상대끼리 건 것(상대가 제 아군을
+        조였다)의 턴 수는 건 쪽의 끈기갈고리손톱을 드러낸다 (1:1 에서는 상대를 조이는 것이 늘 나였다)."""
+        out = self.view_mon(f, False)
+        b = f.cond.get("bound") if out.get("bound") else None
+        if b and b.get("by") != SIDE[who]:
+            out["bound"] = dict(out["bound"], turns=None)
+        return out
 
     def view(self, who):
         """그 사람 시점의 판 상태. me 가 늘 자기 쪽이다."""
@@ -1486,7 +1524,7 @@ class DoubleBattle(object):
                    "chosen": me.picks is not None, "need": list(me.need),
                    "left": len(me.alive_slots())},
             "foe": {"name": foe.name, "active": list(foe.active),
-                    "team": [self.view_mon(f, False) for f in foe.team],
+                    "team": [self._foe_mon(f, who) for f in foe.team],
                     "chosen": foe.picks is not None, "need": list(foe.need),
                     "left": len(foe.alive_slots())},
         }

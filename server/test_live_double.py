@@ -176,7 +176,14 @@ def main():
     r = live.tick(r, late)
     chk("제한 시간이 지나면 서버가 두 마리 몫을 대신 고른다", r["turn"] == 2, r["turn"])
 
-    body = live_routes.ActIn(kind="picks", picks=picks_of(live.public(r, a)["battle"]))
+    try:
+        live.act(a, "picks", picks_of(live.public(r, a)["battle"]), step=live.public(r, a)["step"] - 1)
+        stale = None
+    except ValueError as e:
+        stale = str(e)
+    chk("지난 턴을 보고 고른 것은 안 받는다 (제한 시간에 턴이 넘어간 뒤 도착한 것)", stale is not None
+        and live.public(live.get(r["id"]), a)["battle"]["me"]["chosen"] is False, stale)
+    body = live_routes.ActIn(kind="picks", picks=picks_of(live.public(r, a)["battle"]), step=live.public(r, a)["step"])
     out = live_routes.act(body, ctx(a))
     chk("POST /api/live/act {kind: picks, picks: [...]}", out["fmt"] == "double" and out["battle"]["me"]["chosen"] is True)
     try:
@@ -185,6 +192,15 @@ def main():
     except Exception as e:                                  # noqa: BLE001
         bad = getattr(e, "status_code", None)
     chk("  잘못 고르면 409", bad == 409, bad)
+    codes = []
+    for junk in ([{"pos": 0, "kind": "move", "move": ["x"]}, {"pos": 1, "kind": "move", "move": "TACKLE"}],
+                 [{"pos": 1e999, "kind": "move", "move": "TACKLE"}], [{"pos": 0, "kind": "switch", "slot": 1e999}]):
+        try:
+            live_routes.act(live_routes.ActIn(kind="picks", picks=junk), ctx(b))
+            codes.append(200)
+        except Exception as e:                              # noqa: BLE001
+            codes.append(getattr(e, "status_code", repr(e)[:40]))
+    chk("  이상한 꼴도 409 (서버 오류가 아니다)", codes == [409, 409, 409], codes)
 
     print("=== 옛 앱 ===")
     chk("옛 앱(GET /api/live 에 double 이 없다)에는 진행 중인 더블 판이 안 보인다",
@@ -255,10 +271,18 @@ def main():
     print("=== 기다리는 사람에게 도전 ===")
     champion.reset()
     champion.seek(b, True, fmt="double")
-    r2 = champion.challenge(a, b)                           # b 는 더블을 기다린다 - 싱글 도전은 물어본다
-    chk("더블을 기다리는 사람에게 싱글로 도전하면 바로 열리지 않고 묻는다", r2["state"] == "invited" and live.fmt_of(r2) == "single")
-    live.answer(b, r2["id"], False)
-    champion.seek(b, True, fmt="double")
+    try:
+        champion.challenge(a, b)                            # b 는 더블을 기다린다
+        cross = None
+    except ValueError as e:
+        cross = str(e)
+    chk("더블을 기다리는 사람에게 싱글로는 도전할 수 없다 (까닭에 형식이 나온다)", cross is not None and "더블" in cross, cross)
+    chk("  기다리던 사람은 대기열에 그대로다 (초대가 걸려 밀려나지 않는다)", live.my_match(b) is None
+        and champion.state(b, double=True)["double"]["seeking"] is True)
+    PUSHED[:] = []
+    champion._announce(b, 10 ** 9)
+    chk("더블을 기다린다는 알림은 옛 앱이 모르는 이름(wait2)으로 간다 - 옛 앱의 [도전] 은 싱글이다",
+        pushed(a, "wait2") and not pushed(a, "wait") and pushed(a, "wait2")[0].get("fmt") == "double", pushed(a))
     r3 = champion.challenge(a, b, fmt="double")
     chk("더블로 도전하면 바로 시작한다 (기다리던 사람이 a 자리)", r3["state"] == "fighting" and r3["a_id"] == b
         and live.fmt_of(r3) == "double")

@@ -35,6 +35,7 @@ class ActIn(BaseModel):
     tera: bool = False           # 이 턴에 테라스탈 (2.5.0)
     # 더블배틀 (11/25): kind="picks" 로 두 마리 몫을 한 번에. [{pos, kind: move|switch, move, target, slot, mega, z, tera}]
     picks: list = None
+    step: int = None             # 앱이 보고 고른 걸음 (판의 step) - 그사이 턴이 넘어갔으면 안 받는다
 
 
 def _mine(uid, tick=True):
@@ -96,7 +97,8 @@ def act(body: ActIn, ctx=Depends(deps.current)):
         int(body.slot) if kind == "switch" else (list(body.picks or []) if kind == "picks" else None))
     _mine(uid)                       # 마감이 지났으면 먼저 넘긴다
     try:
-        row = live.act(uid, kind, value, mega=bool(body.mega), z=bool(body.z), tera=bool(body.tera))
+        row = live.act(uid, kind, value, mega=bool(body.mega), z=bool(body.z), tera=bool(body.tera),
+                       step=body.step)
     except LookupError as e:
         raise HTTPException(404, str(e))
     except ValueError as e:

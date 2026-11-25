@@ -516,6 +516,80 @@ def more():
         and db.phase() == "choose", (half, db.side("b").active))
 
 
+def review():
+    """브랜치 검토(11/25)에서 나온 것들."""
+    print("\n== 검토에서 나온 것")
+    def zteam():
+        db = build([bulky("GARCHOMP", moves=["EARTHQUAKE"], held="GROUNDIUMZ"), bulky()], [bulky(), bulky("BLISSEY")])
+        db.zring["me"] = True
+        db.start()
+        return db
+    db = zteam()
+    zm = db.view("a")["me"]["acts"][0]["zMoves"]
+    chk("광역기로 만든 Z기술은 대상을 고른다 (보기에 고를 자리가 온다)", len(zm) == 1 and zm[0]["key"] == "EARTHQUAKE"
+        and zm[0].get("targets") == ["foe0", "foe1", "ally"], zm)
+    ev = go(db, [mv(0, "EARTHQUAKE", "foe1", z=True), mv(1, "TACKLE", "foe0")], None)
+    chk("  고른 하나만 맞는다 (아군 · 다른 상대는 안 맞는다)", [e["to"] for e in hits(ev, "a0")] == ["b1"]
+        and any(e["t"] == "zpower" for e in ev), [(e["t"], e.get("at"), e.get("to")) for e in ev if e.get("at") == "a0"])
+    db = zteam()
+    ev = go(db, [mv(0, "EARTHQUAKE"), mv(1, "TACKLE", "foe0")], None)
+    chk("  Z기술로 안 쓰면 예전처럼 셋을 때린다", sorted(e["to"] for e in hits(ev, "a0")) == ["a1", "b0", "b1"])
+
+    db = build([bulky(), bulky()], [bulky(), bulky()])
+    db.start()
+    bad = []
+    for picks in ([{"pos": 0, "kind": "move", "move": ["x"]}, mv(1, "TACKLE", "foe0")],
+                  [{"pos": 1e999, "kind": "move", "move": "TACKLE"}, mv(1, "TACKLE", "foe0")],
+                  [{"pos": 0, "kind": "switch", "slot": 1e999}, mv(1, "TACKLE", "foe0")],
+                  [{"pos": 0, "kind": "move", "move": "TACKLE", "target": {"a": 1}}, mv(1, "TACKLE", "foe0")],
+                  [{"pos": [0], "kind": "move", "move": "TACKLE"}, mv(1, "TACKLE", "foe0")],
+                  "TACKLE", [None, 3], [{"pos": 0, "kind": {"x": 1}}, mv(1, "TACKLE", "foe0")]):
+        try:
+            db.choose("a", "picks", picks)
+            bad.append(("받았다", picks))
+        except ValueError:
+            pass
+        except Exception as e:                              # noqa: BLE001
+            bad.append((repr(e)[:60], picks))
+    chk("이상한 꼴의 고르기는 전부 거절한다 (오류로 터지지 않는다)", not bad and db.side("a").picks is None, bad[:2])
+
+    # (심는 쪽이 풀 타입이면 튕겨 온 씨앗이 안 심긴다 - 잠만보로 본다)
+    db = build([bulky(moves=["LEECHSEED"]), bulky()], [bulky("ESPEON", ability="MAGICBOUNCE"), bulky("BLISSEY")])
+    db.start()
+    f(db, "b0").hp = f(db, "b0").maxhp // 2
+    h0 = f(db, "b0").hp
+    ev = go(db, [mv(0, "LEECHSEED", "foe0"), mv(1, "SPLASH") if "SPLASH" in f(db, "a1").pp else mv(1, "TACKLE", "foe1")],
+            [mv(0, "TACKLE", "foe1"), mv(1, "TACKLE", "foe1")])
+    heal = [e for e in ev if e["t"] == "heal" and "흡수" in (e.get("text") or "")]
+    chk("매직미러로 튕긴 씨뿌리기: 튕겨 낸 포켓몬이 회복한다", f(db, "a0").seeded and f(db, "a0").seed_by == "b0"
+        and len(heal) == 1 and heal[0].get("at") == "b0" and f(db, "b0").hp > h0,
+        (f(db, "a0").seeded, f(db, "a0").seed_by, [(e["t"], e.get("at")) for e in ev if e["t"] in ("heal", "chip")]))
+
+    db = build([bulky("GOLEM", moves=["SWIFT"], held="LIFEORB"), bulky()], [bulky(), bulky("BLISSEY")])
+    db.start()
+    f(db, "a0").hp = max(1, f(db, "a0").maxhp // 20)
+    ev = go(db, [mv(0, "SWIFT"), mv(1, "TACKLE", "foe0")], [mv(0, "TACKLE", "foe1"), mv(1, "TACKLE", "foe1")])
+    mine = [(e["t"], e.get("to")) for e in ev if e.get("at") == "a0" and e["t"] in ("hit", "chip", "faint")]
+    chk("생명의구슬 반동은 다 때린 뒤에 (체력이 얼마 없어도 둘 다 맞힌다)",
+        mine == [("hit", "b0"), ("hit", "b1"), ("chip", None), ("faint", None)], mine)
+
+    db = build([bulky(), bulky()], [bulky("CLEFABLE", moves=["FOLLOWME"], ability="MAGICGUARD"),
+                                    mon("TOGEKISS", ["FOLLOWME"], evs={"hp": 252, "spe": 252})])
+    db.start()
+    ev = go(db, [mv(0, "TACKLE", "foe0"), mv(1, "TACKLE", "foe0")], [mv(0, "FOLLOWME"), mv(1, "FOLLOWME")])
+    chk("둘 다 날따름을 쓰면 먼저 쓴 쪽으로 간다", len(hits(ev, to="b1")) == 2 and not hits(ev, to="b0"),
+        [(e.get("at"), e.get("to")) for e in ev if e["t"] in ("hit", "move")])
+
+    db = build([bulky(), bulky()], [bulky(), bulky()])
+    db.start()
+    f(db, "b0").cond["bound"] = {"by": "foe", "turns": 4, "move": "FIRESPIN"}       # 상대의 아군이 건 것
+    f(db, "b1").cond["bound"] = {"by": "me", "turns": 3, "move": "FIRESPIN"}        # 내가 건 것
+    team = db.view("a")["foe"]["team"]
+    chk("조이기의 남은 턴은 내 편이 건 것만 보인다 (상대끼리 건 것은 끈기갈고리손톱이 드러난다)",
+        team[0]["bound"]["turns"] is None and team[1]["bound"]["turns"] == 3
+        and db.view("b")["me"]["team"][0]["bound"]["turns"] is None, (team[0]["bound"], team[1]["bound"]))
+
+
 def gimmicks():
     print("\n== 메가진화는 편마다 한 번")
     db = build([mon("LUCARIO", ["TACKLE"], held="LUCARIONITE"), mon("GARCHOMP", ["TACKLE"], held="GARCHOMPITE")],
@@ -639,6 +713,7 @@ def main():
     order_and_faint()
     switching()
     more()
+    review()
     gimmicks()
     save_load()
     soak()

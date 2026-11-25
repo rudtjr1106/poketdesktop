@@ -402,10 +402,12 @@ def _save(row, lb, ev, now=None):
     return ok
 
 
-def act(uid, kind, value, now=None, mega=False, z=False, tera=False):
+def act(uid, kind, value, now=None, mega=False, z=False, tera=False, step=None):
     """이번 턴에 할 것을 적는다. 둘 다 모이면 그 자리에서 턴이 돈다.
 
     더블 판은 kind='picks', value=[두 마리 몫] 으로 한 번에 보낸다 (메가 · Z · 테라는 그 안에 적는다).
+    step = 앱이 **보고 고른 걸음** (판의 step). 주면 지금 걸음과 같을 때만 받는다 - 제한 시간에 서버가 턴을 넘긴 뒤
+    도착한 선택이 다음 턴의 것으로 들어가지 않게 (더블 창이 보낸다. 안 주면 예전처럼 그대로 받는다).
 
     **부딪히면 다시 해본다** - 둘이 같은 판을 동시에 두드리므로, rev 가
     어긋났다고 그대로 거절하면 상대가 먼저 눌렀다는 이유로 내 선택이 사라진다.
@@ -416,6 +418,8 @@ def act(uid, kind, value, now=None, mega=False, z=False, tera=False):
             raise LookupError("진행 중인 실시간 배틀이 없습니다.")
         lb = _load(row)
         who = side_of(row, uid)
+        if step is not None and kind != "forfeit" and int(step) != int(lb.step):
+            raise ValueError("그사이 턴이 넘어갔습니다. 다시 골라 주세요.")
         lb.choose(who, kind, value, mega=mega, z=z, tera=tera)
         ev = None
         if lb.ready():

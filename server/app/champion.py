@@ -56,6 +56,7 @@ live_match.kind 가 'champion' 인 것만 다르다. 배틀 창도 같은 창이
     {"t": "champion", "s": "turn", "fight": {...}}                          보고 있는 판의 새 모습 (live.spectate + watchers)
     {"t": "champion", "s": "watchers", "id": 판, "n": 수}                   내 판을 보는 사람 수가 바뀌었다
     {"t": "champion", "s": "declined", "id": 판, "why": 까닭}              내 더블 도전을 상대의 옛 앱이 받지 못했다
+    {"t": "champion", "s": "wait2", "id": 기다리는 사람, "name": 닉네임, "fmt": "double"}   독도에서 **더블** 상대를 기다린다
 
 ## 더블배틀 (11/25 사용자: "더블 배틀 만들어 본가대로 · 순위는 싱글/더블로 탭을 나눠서")
 
@@ -389,7 +390,9 @@ def _announce(uid, t, now=None):
             continue
         if social.blocked_between(uid, other):
             continue
-        _push(other, {"t": "champion", "s": "wait", "id": uid, "name": name, "fmt": fmt})
+        # 더블을 기다리는 것은 옛 앱이 모르는 이름(wait2)으로 민다 - 옛 앱의 알림 [도전] 은 싱글로 건다
+        _push(other, {"t": "champion", "s": "wait2" if fmt == "double" else "wait", "id": uid, "name": name,
+                      "fmt": fmt})
     return True
 
 
@@ -423,6 +426,13 @@ def challenge(uid, other, now=None, fmt="single"):
     why = team_why(other, mine=False)
     if why:
         raise ValueError(why)
+    with _lock:
+        theirs = _wfmt(other) if other in _wait else None
+    if theirs is not None and theirs != fmt:
+        # 다른 형식을 기다리는 사람에게 초대를 걸면, 그 사람은 초대가 걸린 채로 대기열에서 밀려난다 (같은 형식을 찾는
+        # 다음 사람이 '다른 판에 들어간 사람' 으로 걷는다 - 검토 11/25). 걸지 않고 까닭을 알린다.
+        raise ValueError("상대가 %s 상대를 기다리고 있습니다. %s으로 도전해 주세요."
+                         % (("더블배틀", "더블") if theirs == "double" else ("싱글배틀", "싱글")))
     with _lock:
         waiting = other in _wait and _wfmt(other) == fmt
         if waiting:
