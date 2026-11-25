@@ -79,10 +79,30 @@ def _expire_old(uid):
            " WHERE user_id=? AND state='active' AND updated_at < ?", (uid, cutoff))
 
 
+def _stale(row):
+    """이 판이 손 놓은 지 GYM_BATTLE_TTL 이 지났나. _expire_old 는 사용자마다 1분에 한 번만 도니 (11/24 부하 줄이기),
+    **지금 다루는 판은 여기서 따로 본다** - 1분 안에도 오래된 판에 두거나 그 판을 이어 받지 않게 (예전과 같다)."""
+    if row is None or row["state"] != "active":
+        return False
+    cutoff = (_now() - datetime.timedelta(seconds=config.GYM_BATTLE_TTL)).isoformat()
+    return (row["updated_at"] or "") < cutoff
+
+
+def _fold(row):
+    """오래된 판 하나를 접는다 (_expire_old 와 같은 결과). 접은 뒤의 줄을 돌려준다."""
+    db.run("UPDATE gym_battle SET state='done', result='expired' WHERE id=? AND state='active'", (row["id"],))
+    return db.q1("SELECT * FROM gym_battle WHERE id=?", (row["id"],))
+
+
 def _active(uid):
     _expire_old(uid)
-    return db.q1("SELECT * FROM gym_battle WHERE user_id=? AND state='active'"
-                  " ORDER BY id DESC LIMIT 1", (uid,))
+    for _ in range(3):
+        row = db.q1("SELECT * FROM gym_battle WHERE user_id=? AND state='active'"
+                    " ORDER BY id DESC LIMIT 1", (uid,))
+        if not _stale(row):
+            return row
+        _fold(row)
+    return None
 
 
 def _out(row, tb, events=None, extra=None):
@@ -221,6 +241,8 @@ def act(bid: int, body: ActIn, ctx=Depends(deps.current)):
     row = db.q1("SELECT * FROM gym_battle WHERE id=? AND user_id=?", (bid, uid))
     if not row:
         raise HTTPException(404, "그런 배틀이 없습니다.")
+    if _stale(row):
+        row = _fold(row)                     # 손 놓은 지 오래된 판에 두려 했다 - 접고 아래에서 410
     if row["state"] != "active":
         raise HTTPException(409 if row["result"] != "expired" else 410,
                             "시간이 지나 승부가 끝났습니다." if row["result"] == "expired"

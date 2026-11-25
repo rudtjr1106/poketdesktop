@@ -1027,8 +1027,15 @@ def _many(root, dex, app, win, party, box, big):
     chk("대신 박스 목록이 이름표 밑에 열린다",
         len(opened) == 1 and opened[0][0] is win.lbl_page and opened[0][2] is True,
         [(o[0], o[2]) for o in opened])
-    rows = win._box_rows()
-    chk("목록에는 박스가 다 있다", len(rows) == win.box_count(), len(rows))
+    allrows = win._box_rows()
+    # 2.5.7 (게시판 #830): 박스 목록 아래에 구분선 · '박스 안 순서' 제목 · 순서 넷이 붙는다
+    rows = allrows[:win.box_count()]
+    tail = allrows[win.box_count():]
+    chk("목록에는 박스가 다 있다", all(r and "command" in r for r in rows) and len(rows) == win.box_count(), len(rows))
+    chk("  그 아래에 '박스 안 순서' (구분선 · 제목 · 넷)", len(tail) == 6 and tail[0] is None
+        and tail[1].get("header") and tail[1]["text"] == "박스 안 순서"
+        and [r["text"] for r in tail[2:]] == ["잡은 순", "도감순", "이름순", "레벨순"],
+        [r and r.get("text") for r in tail])
     chk("줄마다 이름과 마릿수", rows[0]["text"] == "박스 1  (30/30)", rows[0]["text"])
     chk("지금 보는 박스에 표시", [i for i, r in enumerate(rows) if r["checked"]] == [0],
         [i for i, r in enumerate(rows) if r["checked"]])
