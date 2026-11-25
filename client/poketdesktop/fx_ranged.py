@@ -198,8 +198,12 @@ def thunder(fx):
             pts = K.zigzag(x0, top, g.tx, gy, 15, 8, rnd)
             if a <= hold:
                 # 벼락 뒤의 빛기둥
-                K.ribbon(p, [x0, top, (x0 + g.tx) / 2, (top + gy) / 2, g.tx, gy], [w * 3.2, w * 2.4, w * 1.2],
-                         c.dark, smooth=True)
+                if getattr(p, "raster", False):
+                    p.glow_line([x0, top, (x0 + g.tx) / 2, (top + gy) / 2, g.tx, gy], c.base, w * 7.0, 0.9)
+                    p.glow(g.tx, gy, 40 * k, c.light, 1.0, 0.5)
+                else:
+                    K.ribbon(p, [x0, top, (x0 + g.tx) / 2, (top + gy) / 2, g.tx, gy], [w * 3.2, w * 2.4, w * 1.2],
+                             c.dark, smooth=True)
                 K.bolt(p, pts, int(round(w * k)), cols)
                 for _q in range(2):                         # 가지
                     q = rnd.randrange(2, 7) * 2
@@ -543,8 +547,11 @@ def daimonji(fx):
                 wx = K.snoise(seed + n_ + int(ms / 50)) * 2.0
                 bow = (ax * 0.22 * s) if n_ >= 3 else 0.0   # 다리는 바깥으로 휜다
                 wk = wd * k * thin * flick * (0.82 if n_ < 3 else 1.0)
-                K.ribbon(p, [x1, y1, (x1 + x2) / 2 + wx - bow * 0.2, (y1 + y2) / 2 - wx - abs(bow) * 0.5, x2, y2],
-                         [wk, wk * 0.95, wk * 0.5], col)
+                line = [x1, y1, (x1 + x2) / 2 + wx - bow * 0.2, (y1 + y2) / 2 - wx - abs(bow) * 0.5, x2, y2]
+                if col == cols[0] and getattr(p, "raster", False):
+                    p.glow_line(line, cols[1], wk * 2.6, 1.0)           # (그림 바탕) 겉불은 열기로 번진다
+                    continue
+                K.ribbon(p, line, [wk, wk * 0.95, wk * 0.5], col)
         m.draw(p, ms, lambda p_, x, y, sz, rot, kk, n_: K.flame(p_, x, y, sz * (0.5 + kk), sin(rot) * 3,
                                                                  (cols[0], cols[2], cols[3])))
     sh.act(A, B, kanji)
@@ -585,7 +592,10 @@ def jet(fx):
         pts = g.path(t0, reach, N, off=lambda u_: sin(u_ * ln * 0.06 - ms * 0.035) * 3.2 * min(1.0, u_ * 4),
                      m=(mx, my))
         ws = [w * (0.6 if i == 0 else 1.0) * (1 + 0.15 * sin(i * 1.9 - ms * 0.04)) for i in range(N + 1)]
-        K.ribbon(p, pts, [v * 1.75 for v in ws], c.dark)
+        if getattr(p, "raster", False):
+            p.glow_line(pts, c.base, w * 4.6, 1.0)
+        else:
+            K.ribbon(p, pts, [v * 1.75 for v in ws], c.dark)
         K.ribbon(p, pts, [v * 1.2 for v in ws], c.base)
         K.ribbon(p, pts, [v * 0.62 for v in ws], c.light)
         K.ribbon(p, pts, [v * 0.22 for v in ws], WHITE)

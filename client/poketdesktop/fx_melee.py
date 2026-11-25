@@ -35,12 +35,17 @@ def sweep(fx, at, mirror=False, cols=None, thick=15.0, span=2.5, r=54.0, dur=190
     lo, hi = ang - span / 2.0, ang + span / 2.0
     if mirror:
         lo, hi = hi, lo
+    glowc = body if body not in (c.deep, c.dark) else (c.alt if fx.type in ("GHOST", "DARK") else c.base)
 
     def draw(p, u, ms):
+        ras = getattr(p, "raster", False)
         if u < 0.5:                                         # 그어지는 중
             a1 = lo + (hi - lo) * K.out2(u / 0.5)
-            K.crescent(p, cx, cy, r + 15 * k, ang, span, thick * 0.3, rim, a0=lo, a1=a1)
-            K.crescent(p, cx, cy, r + 4 * k, ang, span, thick * 1.25, rim, a0=lo, a1=a1)
+            if ras:                                         # (그림 바탕) 어두운 겉 대신 빛이 번진다
+                p.glow_line(_arc(cx, cy, r - thick * 0.35, lo, a1), glowc, thick * 2.0, 1.0)
+            else:
+                K.crescent(p, cx, cy, r + 15 * k, ang, span, thick * 0.3, rim, a0=lo, a1=a1)
+                K.crescent(p, cx, cy, r + 4 * k, ang, span, thick * 1.25, rim, a0=lo, a1=a1)
             K.crescent(p, cx, cy, r, ang, span, thick, body, a0=lo, a1=a1)
             K.crescent(p, cx, cy, r - 1, ang, span, thick * 0.45, core, a0=lo, a1=a1)
             K.glint(p, cx + cos(a1) * r, cy + sin(a1) * r, 13 * k, WHITE)
@@ -48,12 +53,24 @@ def sweep(fx, at, mirror=False, cols=None, thick=15.0, span=2.5, r=54.0, dur=190
             v = (u - 0.5) / 0.5
             th = thick * (1 - v) ** 1.4
             if th > 0.6:
-                K.crescent(p, cx, cy, r + 3 * k, ang, span, th * 1.3, rim)
+                if ras:
+                    p.glow_line(_arc(cx, cy, r - th * 0.35, lo, hi), glowc, th * 2.0, 1.0)
+                else:
+                    K.crescent(p, cx, cy, r + 3 * k, ang, span, th * 1.3, rim)
                 K.crescent(p, cx, cy, r, ang, span, th, body)
                 K.crescent(p, cx, cy, r - 1, ang, span, th * 0.45, core)
             a2 = lo + (hi - lo) * v
             K.glint(p, cx + cos(a2) * r, cy + sin(a2) * r, 15 * k * (1 - v * 0.5), WHITE)
     return sh.act(at, dur, draw)
+
+
+def _arc(cx, cy, r, a0, a1, n=8):
+    """호를 따라가는 점들 (빛 층에 선으로 그을 때)."""
+    pts = []
+    for i in range(n + 1):
+        a = a0 + (a1 - a0) * i / float(n)
+        pts += [cx + cos(a) * r, cy + sin(a) * r]
+    return pts
 
 
 def rips(fx, at, mirror=False, cols=None, dur=170, n=3):
@@ -72,7 +89,10 @@ def rips(fx, at, mirror=False, cols=None, dur=170, n=3):
             w = (8.0 if j == n // 2 else 6.4) * k * thin
             if w < 0.5:
                 continue
-            K.streak(p, x1, y1, x2, y2, w * 1.5, rim)
+            if getattr(p, "raster", False):                 # (그림 바탕) 자국 둘레로 빛이 번진다
+                p.glow_line([x1, y1, x2, y2], body, w * 2.6, 1.0)
+            else:
+                K.streak(p, x1, y1, x2, y2, w * 1.5, rim)
             K.streak(p, x1, y1, x2, y2, w, body)
             K.streak(p, x1, y1, x2, y2, w * 0.4, core)
     return sh.act(at, dur, draw)
