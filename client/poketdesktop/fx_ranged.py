@@ -42,7 +42,10 @@ def charge(fx, at, dur, x, y, size=1.0, typ=None, n=9):
                      2.4 * k * (1 - ph * 0.5), c.light if j % 2 else c.hot)
         K.arcs(p, x, y, (42 - 30 * K.in2(u)) * k, c.base, 2, ms * 0.9, 3, 70, 0.9)
         r = (3 + 11 * K.out2(u)) * k * (1 + 0.08 * sin(ms * 0.05))
-        K.flare(p, x, y, r * 1.9, 8, cols[0], inner=0.6, rot=ms * 0.012)
+        if getattr(p, "raster", False):
+            p.glow(x, y, r * 3.0, cols[0], 0.5 + 0.5 * u)
+        else:
+            K.flare(p, x, y, r * 1.9, 8, cols[0], inner=0.6, rot=ms * 0.012)
         K.orb(p, x, y, r, cols)
         if u > 0.8:
             K.glint(p, x, y, (22 + 34 * (u - 0.8) / 0.2) * k, WHITE)
@@ -59,6 +62,8 @@ def muzzle(fx, at, x, y, size=1.0, typ=None):
             K.ring(p, x, y, r, c.light, max(2, int(6 * (1 - u))), 0.9)
         if u < 0.5:
             K.flare(p, x, y, (30 - 20 * u) * size, 8, c.hot, inner=0.3, rot=u * 2)
+            if getattr(p, "raster", False):
+                p.glow(x, y, (34 - 20 * u) * size, c.base, 1.0 - u)
     return fx.show.act(at, 180, draw)
 
 
@@ -401,7 +406,10 @@ def rain(fx, at, n, one, gap=70, life=190, spread=30.0, lean=44.0, hit=0.7, ever
 def tail(p, x, y, ang, ln, w, cols):
     """날아가는 것 뒤에 끌리는 세 겹 꼬리."""
     bx, by = x - cos(ang) * ln, y - sin(ang) * ln
-    K.comet(p, bx, by, x, y, w, cols[0])
+    if getattr(p, "raster", False):                         # 그림 바탕: 겉 꼬리는 빛으로 번진다
+        p.glow_line([bx, by, x, y], cols[0], w * 2.4, 1.0)
+    else:
+        K.comet(p, bx, by, x, y, w, cols[0])
     K.comet(p, x - cos(ang) * ln * 0.66, y - sin(ang) * ln * 0.66, x, y, w * 0.62, cols[1])
     if cols[2]:
         K.comet(p, x - cos(ang) * ln * 0.36, y - sin(ang) * ln * 0.36, x, y, w * 0.3, cols[2])

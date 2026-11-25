@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""[시범] 그림 바탕 — 연출을 캔버스 도형이 아니라 **그림 한 장**으로 그린다.
+"""그림 바탕 — 연출을 캔버스 도형이 아니라 **그림 한 장**으로 그린다.
 
 도형 바탕(fx_kit.Pen)은 Tk 캔버스에 다각형 · 원 · 선을 올린다. 반투명도 빛 번짐도 없고, 윈도우에서는 가장자리가
 계단진다. 여기서는 장마다 PIL 로 그림 한 장을 그려 캔버스의 그림 항목 하나에 갈아 끼운다.
@@ -17,19 +17,37 @@
     stage.fx_raster = {"pixel": True}            도트풍: 무대 좌표 크기로 그려 점을 키운다 (번짐은 그대로)
     stage.fx_raster = {"k": 2.0, "present": fn}  미리보기: 그린 그림을 fn(img) 으로 받는다
 
-**시범이다.** 바탕화면 레이어(맥은 Tk 그림이 안 그려지고 윈도우는 색을 뚫는 창이라 반투명이 안 된다)는 아직
-다루지 않는다. 속도는 관장 배틀 창 크기(860x296)에서 한 장 7~9ms 를 쟀다 (이 맥, 화면에 옮기는 비용 제외).
+관장 · 실시간 · 레이드 · 더블 배틀 창이 쓴다 (ui_gym_battle._FxStage 가 wanted() 에 묻는다). 맥은 레이어(CALayer)로
+올려 초당 31~46장, Tk 그림 항목으로는 20장을 쟀다 (이 맥의 진짜 창). 윈도우는 재지 못해서 느리면 스스로 끄게 했다.
+바탕화면 레이어(야생 · 투기장 · 관전)는 아직 도형 바탕이다 - 맥은 Tk 그림이 안 그려지고(레이어로는 될 것이다)
+윈도우는 색을 뚫는 창이라 반투명이 안 된다.
 """
 import math
+import os
 import sys
+import time
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 BLOOM = 0.5                     # 도형에서 번져 나오는 빛의 세기
 VEIL = 0.16                     # 빛을 도형 위에 한 번 더 얹는 세기 (눈부심)
 LAYER_MS = 16                   # 레이어로 올릴 때의 장 간격 (초당 60장까지 - 못 따라가면 장을 건너뛴다)
+SLOW_FPS = 20.0                 # 한 편이 초당 이만큼도 못 그리면 '느렸다' 로 친다
+HEALTH = {"slow": 0, "ok": 0, "off": False}     # 이 실행 동안 그림 바탕이 버거웠나 (버거우면 도형 바탕으로 돌아간다)
 _RGB = {}
 _FONTS = {}
+
+
+def wanted():
+    """배틀 창이 그림 바탕을 쓸까. {} (쓴다) 나 None (도형 바탕).
+
+    환경 변수 POKET_FX_RASTER=0 으로 끌 수 있다. 느린 PC 에서는 **스스로 끈다**: 그림 바탕으로 튼 연출이 두 번
+    넘게 초당 SLOW_FPS 장을 못 채우면 (그리고 그런 일이 잘 돈 것보다 많으면) 그 실행 동안은 도형 바탕으로 그린다.
+    윈도우는 Tk 그림 항목으로 올리는데 그 속도를 재지 못해서 둔 안전장치다.
+    """
+    if HEALTH["off"] or os.environ.get("POKET_FX_RASTER") == "0":
+        return None
+    return {}
 
 
 def rgb(c):
@@ -191,6 +209,7 @@ class Surface(object):
         self._present, self._close = present, close
         self.base = self.light = None
         self.frames = 0
+        self.t_first = self.t_last = None
         self.how = ""                           # 화면에 올리는 길: layer(맥) / photo(Tk 그림 항목)
         self.tick_ms = 30                       # 한 장의 간격 (레이어로 올리면 더 촘촘히 - LAYER_MS)
 
@@ -218,6 +237,10 @@ class Surface(object):
         if out.size != self.size:
             out = out.resize(self.size, Image.NEAREST)
         self.frames += 1
+        now = time.monotonic()
+        if self.t_first is None:
+            self.t_first = now
+        self.t_last = now
         self._present(out)
         return out
 
@@ -228,6 +251,12 @@ class Surface(object):
         if self._close:
             self._close()
             self._close = None
+        if self.frames >= 8 and self.t_first is not None and self.t_last > self.t_first + 0.25:
+            fps = (self.frames - 1) / (self.t_last - self.t_first)       # 이 편이 실제로 그린 속도
+            self.frames = 0
+            HEALTH["slow" if fps < SLOW_FPS else "ok"] += 1
+            if HEALTH["slow"] >= 3 and HEALTH["slow"] > HEALTH["ok"]:
+                HEALTH["off"] = True
 
 
 def open_surface(fx, opts):

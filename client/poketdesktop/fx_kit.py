@@ -471,7 +471,14 @@ def ribbon(p, pts, ws, fill, outline="", smooth=True, width=1):
 
 
 def glow_ribbon(p, pts, ws, cols, k=(1.0, 0.62, 0.28), smooth=True):
-    """빛 세 겹의 띠 (테 - 몸 - 심)."""
+    """빛 세 겹의 띠 (테 - 몸 - 심). 그림 바탕에서는 테를 그리지 않고 그 빛깔로 번지게 한다."""
+    if getattr(p, "raster", False):
+        num = isinstance(ws, (int, float))
+        p.glow_line(pts, cols[0] or cols[1], (ws if num else max(ws)) * 2.6, 1.0)
+        for col, kk in ((cols[1], k[1] * 1.2), (cols[2], k[2] * 1.3)):
+            if col:
+                ribbon(p, pts, ws * kk if num else [w * kk for w in ws], col, smooth=smooth)
+        return
     for col, kk in zip(cols, k):
         if col:
             ribbon(p, pts, [w * kk for w in ws] if not isinstance(ws, (int, float)) else ws * kk, col, smooth=smooth)
@@ -499,6 +506,8 @@ def burst_star(p, x, y, r, n, fill, seed=0, inner=0.4, rot=0.0, sy=1.0, outline=
 
 def glint(p, x, y, r, fill=WHITE, rot=0.0):
     """네 갈래 반짝임."""
+    if r > 7 and getattr(p, "raster", False):
+        p.glow(x, y, r * 0.55, fill if fill != WHITE else "#fff2cc", 0.7)
     flare(p, x, y, r, 4, fill, inner=0.15, rot=rot - math.pi / 2)
 
 
@@ -536,8 +545,12 @@ def cloud(p, x, y, r, cols, seed=0, wob=0.0):
 def orb(p, x, y, r, cols, shine=True):
     """빛나는 구슬: 테 - 몸 - 심, 그리고 왼쪽 위의 빛."""
     rim, body, core = cols
-    p.oval(x, y, r, r, rim)
-    p.oval(x, y, r * 0.74, r * 0.74, body)
+    if getattr(p, "raster", False):                         # 테 대신 후광
+        p.glow(x, y, r * 2.0, rim or body, 1.0)
+        p.oval(x, y, r * 0.86, r * 0.86, body)
+    else:
+        p.oval(x, y, r, r, rim)
+        p.oval(x, y, r * 0.74, r * 0.74, body)
     if core:
         p.oval(x, y, r * 0.42, r * 0.42, core)
     if shine and r > 6:
@@ -561,9 +574,13 @@ def tongue(p, x, y, r, lean, fill, outline=""):
 
 
 def flame(p, x, y, r, lean, cols):
-    """세 겹 불꽃."""
-    tongue(p, x, y, r, lean, cols[0])
-    tongue(p, x, y + r * 0.22, r * 0.68, lean * 0.7, cols[1])
+    """세 겹 불꽃. 그림 바탕에서는 겉불이 열기로 번진다."""
+    if getattr(p, "raster", False):
+        p.glow(x, y - r * 0.35, r * 1.45, cols[0], 1.0)
+        tongue(p, x, y + r * 0.1, r * 0.86, lean * 0.85, cols[1])
+    else:
+        tongue(p, x, y, r, lean, cols[0])
+        tongue(p, x, y + r * 0.22, r * 0.68, lean * 0.7, cols[1])
     if cols[2] and r > 5:
         tongue(p, x, y + r * 0.42, r * 0.36, lean * 0.4, cols[2])
 
@@ -725,7 +742,12 @@ def zigzag(x1, y1, x2, y2, jag, n, rnd=None):
 
 
 def bolt(p, pts, w, cols):
-    """번개 한 줄: 테 - 몸 - 심."""
+    """번개 한 줄: 테 - 몸 - 심. 그림 바탕에서는 테가 빛으로 번진다."""
+    if getattr(p, "raster", False):
+        p.glow_line(pts, cols[1], (w + 5) * 1.7, 1.0)
+        p.line(pts, cols[1], w + 1, cap="round")
+        p.line(pts, cols[2] or WHITE, max(1, w - 1), cap="round")
+        return
     p.line(pts, cols[0], w + 4, cap="round")
     p.line(pts, cols[1], w + 1, cap="round")
     if cols[2]:

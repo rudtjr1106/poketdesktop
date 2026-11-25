@@ -319,6 +319,53 @@ def main():
             lag.append((s_, n, took0, took, len(st.raw.items)))
     chk("느려도 길어지지 않고 (두 장 안쪽) 끝까지 · 찌꺼기 없이 · 도트 제자리", not lag, lag[:5])
 
+    print("\n=== 2-3. 그림 바탕 (배틀 창: 도형 대신 그림 한 장) ===")
+    from poketdesktop import fx_raster as FR
+    ras_bad, shown = [], {}
+    for s_, m in sorted(styles.items()):
+        for opts in ({}, {"pixel": True}):
+            got = []
+            try:
+                st, fx, took = PV.play(m, raster=dict(opts), on_frame=lambda stg, got=got: got.append(
+                    stg.raster_img.getbbox() if getattr(stg, "raster_img", None) is not None else None))
+            except Exception as e:                           # noqa: BLE001
+                ras_bad.append((s_, "%s: %s" % (type(e).__name__, e)))
+                continue
+            drew = sum(1 for b in got if b)
+            shown[s_] = drew
+            last = st.raster_img.getbbox() if st.raster_img is not None else None
+            if (took is None or took > LIMIT_MS or not fx.dead or last is not None or not drew or st.cv.items
+                    or st.raster_img.size != (int(st.cv.w * 2), int(st.cv.h * 2))
+                    or any(abs(v) > 1e-6 for xy in st.shift.values() for v in xy)):
+                ras_bad.append((s_, sorted(opts), took, drew, last, len(st.cv.items)))
+    chk("연출 %d가지가 그림 바탕(매끈 · 도트풍)에서도 끝까지 가고, 끝나면 그림이 비고, 도트는 제자리다" % len(styles),
+        not ras_bad, ras_bad[:4])
+    st, fx, took = PV.play(kr("파괴광선"), raster={}, limit_ms=900)
+    chk("  그림 바탕에 맞춰 다시 그린 연출이 있으면 그것을 쓴다 (광선 · 불길 · 구슬)",
+        fx.surface is not None and set(("laser", "flame", "ball")) <= set(__import__(
+            "poketdesktop.fx_raster_demo", fromlist=["STYLES"]).STYLES))
+    fx.stop()
+    chk("  도중에 멈춰도 그림이 비고 닫힌다", st.raster_img.getbbox() is None and fx.surface._close is None)
+    # 느린 PC: 초당 SLOW_FPS 장을 못 채운 편이 거듭되면 그 실행 동안은 도형 바탕으로 돌아간다
+    keep = dict(FR.HEALTH)
+    try:
+        FR.HEALTH.update(slow=0, ok=0, off=False)
+        chk("배틀 창은 그림 바탕을 쓴다 (환경 변수로 끌 수 있다)", FR.wanted() == {})
+        for _i in range(3):
+            sf = FR.Surface(100, 60, 2.0, lambda im: None)
+            sf.frames, sf.t_first, sf.t_last = 9, 0.0, 1.0          # 1초에 아홉 장
+            sf.close()
+        chk("  느린 편이 세 번이면 스스로 끈다", FR.HEALTH["off"] and FR.wanted() is None, FR.HEALTH)
+        FR.HEALTH.update(slow=0, ok=0, off=False)
+        for fps in (40, 40, 40, 9, 9, 9):
+            sf = FR.Surface(100, 60, 2.0, lambda im: None)
+            sf.frames, sf.t_first, sf.t_last = fps + 1, 0.0, 1.0
+            sf.close()
+        chk("  잘 돈 편이 그만큼 있으면 안 끈다 (가끔 버벅인 것)", not FR.HEALTH["off"], FR.HEALTH)
+    finally:
+        FR.HEALTH.clear()
+        FR.HEALTH.update(keep)
+
     print("\n=== 3. 중간에 멈춘다 ===")
     bad, cut = [], 0
     for s, m in sorted(styles.items()):
