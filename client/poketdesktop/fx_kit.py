@@ -268,6 +268,7 @@ class Show(object):
         self.done = None
         self._seq = 0
         self._in_cue = False
+        self.ticks = 0                          # 그린 장 수 (미리보기가 초당 장 수를 잰다)
 
     # ---- 넣기 ----
     def now(self):
@@ -338,6 +339,7 @@ class Show(object):
     def _step(self):
         fx = self.fx
         began = time.monotonic()
+        self.ticks += 1
         now = fx.clock() - self.t0
         self.wipe()
         while self.cues:                                    # 때가 된 신호 - 시간 순서대로, 늦어도 한 번은 꼭
@@ -374,7 +376,7 @@ class Show(object):
             self.wipe()
             return (self.done or fx.finish)()
         if sf is not None:                                  # [시범] 그림 바탕: 그리는 데 쓴 시간만큼 다음 장을 당긴다
-            return fx.after(max(1, int(MS - (time.monotonic() - began) * 1000.0)), self._tick)
+            return fx.after(max(1, int(sf.tick_ms - (time.monotonic() - began) * 1000.0)), self._tick)
         fx.after(MS, self._tick)
 
     def stop(self):

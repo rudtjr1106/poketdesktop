@@ -21,11 +21,13 @@
 다루지 않는다. 속도는 관장 배틀 창 크기(860x296)에서 한 장 7~9ms 를 쟀다 (이 맥, 화면에 옮기는 비용 제외).
 """
 import math
+import sys
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 BLOOM = 0.5                     # 도형에서 번져 나오는 빛의 세기
 VEIL = 0.16                     # 빛을 도형 위에 한 번 더 얹는 세기 (눈부심)
+LAYER_MS = 16                   # 레이어로 올릴 때의 장 간격 (초당 60장까지 - 못 따라가면 장을 건너뛴다)
 _RGB = {}
 _FONTS = {}
 
@@ -189,6 +191,8 @@ class Surface(object):
         self._present, self._close = present, close
         self.base = self.light = None
         self.frames = 0
+        self.how = ""                           # 화면에 올리는 길: layer(맥) / photo(Tk 그림 항목)
+        self.tick_ms = 30                       # 한 장의 간격 (레이어로 올리면 더 촘촘히 - LAYER_MS)
 
     def begin(self):
         self.base = Image.new("RGBA", self.draw_size, (0, 0, 0, 0))
@@ -241,10 +245,19 @@ def open_surface(fx, opts):
     present = opts.get("present")
     if present is not None:
         return Surface(w, h, k, present, pixel=bool(opts.get("pixel")))
-    # 진짜 캔버스: 그림 항목 하나를 두고 장마다 갈아 끼운다
-    from PIL import ImageTk
     raw = getattr(cv, "_cv", cv)
     sf = Surface(w, h, k, None, pixel=bool(opts.get("pixel")))
+    # 맥: Tk 의 그림 항목은 큰 그림을 갈아 끼울 때마다 화면에 옮기는 데 0.03~0.05초가 걸린다 (초당 20장이 고작이다).
+    # 도트를 그리는 것과 같은 길(CALayer)로 올리면 Tk 는 아무것도 다시 그리지 않는다.
+    if sys.platform == "darwin" and opts.get("layer", True):
+        got = _mac_layer(raw, sf)
+        if got:
+            sf._present, sf._close, sf.how = got[0], got[1], "layer"
+            sf.tick_ms = int(opts.get("tick") or LAYER_MS)
+            return sf
+    # 그 밖 (윈도우 · 레이어를 못 붙인 맥): 캔버스의 그림 항목 하나를 두고 장마다 갈아 끼운다
+    from PIL import ImageTk
+    sf.how = "photo"
     photo = ImageTk.PhotoImage(Image.new("RGBA", sf.size, (0, 0, 0, 0)))
     item = raw.create_image(0, 0, image=photo, anchor="nw")
     sf._present = photo.paste
@@ -257,6 +270,56 @@ def open_surface(fx, opts):
     sf._close = close
     sf.photo = photo                            # (들고 있지 않으면 그림이 사라진다)
     return sf
+
+
+def _mac_layer(raw, sf):
+    """캔버스 자리에 CALayer 를 얹는다. (present, close) 를 돌려주고, 못 하면 None.
+
+    레이어는 창의 내용 뷰에 붙는다 - Tk 가 그린 것 위에 떠서, 연출이 도는 동안 그 자리의 글씨 · 체력바를 덮는다.
+    그림은 창 좌표(점)로 올라가고 레티나에서는 레이어가 키워 그린다 (Tk 의 그림 항목도 그렇게 보인다).
+    """
+    try:
+        from Quartz import CALayer, CATransaction
+        from . import platform_mac as PM
+        top = raw.winfo_toplevel()
+        nsw = PM.nswindow(top)
+        if nsw is None:
+            return None
+        view = nsw.contentView()
+        view.setWantsLayer_(True)
+        root = view.layer()
+        if root is None:
+            return None
+        x = raw.winfo_rootx() - top.winfo_rootx()
+        y = raw.winfo_rooty() - top.winfo_rooty()
+        w, h = sf.size
+        vh = view.bounds().size.height
+        lay = CALayer.layer()
+        lay.setFrame_(((x, y if view.isFlipped() else vh - y - h), (w, h)))
+        lay.setContentsScale_(1.0)
+        if sf.pixel:
+            lay.setMagnificationFilter_("nearest")
+        lay.setZPosition_(100.0)
+        root.addSublayer_(lay)
+    except Exception:                                       # noqa: BLE001
+        return None
+
+    def present(img):
+        cg = PM._cgimage(img.convert("RGBa"))               # (CGImage 는 알파를 미리 곱한 것을 받는다)
+        CATransaction.begin()
+        CATransaction.setDisableActions_(True)              # 안 끄면 장마다 0.2초짜리 겹침이 붙는다
+        try:
+            lay.setContents_(cg)
+        finally:
+            CATransaction.commit()
+
+    def close():
+        try:
+            lay.removeFromSuperlayer()
+        except Exception:                                   # noqa: BLE001
+            pass
+    sf.layer = lay
+    return present, close
 
 
 def blob_points(x, y, r, seed, wob, n, jag, noise):

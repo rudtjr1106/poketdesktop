@@ -13,6 +13,9 @@
 맞으면 밀리고(fx_shift) 접촉기에는 달려든다(lunge).
 
 창을 띄우지 않고 그림(GIF · 이어 붙인 PNG)으로 뽑으려면 tools/fx_preview.py 를 쓴다.
+
+    .venv/bin/python tools/fx_gallery.py --bench     # 속도 재기: 바탕(도형 / 그림 / 도트풍)마다 초당 장 수를 적는다
+                                                     # (윈도우 PC 에서 이 표를 뽑아 보면 그림 바탕을 쓸 만한지 알 수 있다)
 """
 import json
 import os
@@ -308,11 +311,12 @@ class App(object):
         def done():
             self.fx = None
             took = (time.monotonic() - t0) * 1000
-            n = getattr(fx.surface, "frames", 0)
-            self.info.configure(text="%s   [%s · %s · 위력 %s]   %d ms%s" % (
+            n = fx.show.ticks
+            how = getattr(fx.surface, "how", "") or "도형"
+            self.info.configure(text="%s   [%s · %s · 위력 %s]   %d ms   %d장 (초당 %.0f장, %s)" % (
                 move.get("kr"), fx.style, TYPE_KR.get(move.get("type"), move.get("type")), move.get("power") or "-",
-                took, ("   그림 %d장 (초당 %.0f장)" % (n, n * 1000.0 / max(1.0, took))) if n else ""))
-            self.last_stat = (took, n)
+                took, n, n * 1000.0 / max(1.0, took), how))
+            self.last_stat = (took, n, how)
             if self.queue:
                 self.root.after(260, self.next)
         fx = self.fx = FX.Effect(self.stage, move, (sx / k, sy / k), (tx / k, ty / k), done, who=who, ev=ev)
@@ -323,16 +327,45 @@ class App(object):
 def main():
     FX.DEBUG = "--debug" in sys.argv
     app = App()
+    if "--bench" in sys.argv:               # 속도 재기: 바탕마다 기술 넷을 틀고 초당 장 수를 적는다
+        modes = [("도형", None), ("그림", {}), ("그림(Tk 그림 항목)", {"layer": False}), ("도트풍", {"pixel": True})]
+        names = ["파괴광선", "화염방사", "섀도볼", "지진"]
+        todo = [(mn, mo, n) for mn, mo in modes for n in names]
+        rows = []
+
+        def step():
+            if app.fx is not None:
+                return app.root.after(40, step)
+            if getattr(app, "_running", None):
+                took, n, how = app.last_stat
+                rows.append((app._running[0], app._running[1], took, n, n * 1000.0 / max(1.0, took), how))
+            if not todo:
+                print("%-18s %-8s %7s %5s %8s  %s" % ("바탕", "기술", "ms", "장", "초당", "올리는 길"))
+                for r in rows:
+                    print("%-18s %-8s %7d %5d %8.0f  %s" % r)
+                return app.root.destroy()
+            mn, mo, name = todo.pop(0)
+            app.stage.fx_raster = mo
+            app._running = (mn, name)
+            app.play(app.moves[name])
+            app.root.after(40, step)
+        app.root.after(300, step)
+        app.root.mainloop()
+        return 0
     if "--selftest" in sys.argv:            # 창이 뜨고 한 편이 끝까지 도는지만 본다 (검사 · CI 용)
         state = {"n": 0}
         names = ["파괴광선", "지진", "칼춤"]
         if "--raster" in sys.argv or "--pixel" in sys.argv:
             app.stage.fx_raster = {"pixel": True} if "--pixel" in sys.argv else {}
+            if "--photo" in sys.argv:                       # 맥에서도 Tk 그림 항목으로 (비교용)
+                app.stage.fx_raster["layer"] = False
             names = ["파괴광선", "화염방사", "섀도볼", "지진"]
 
         def one():
             if state["n"]:
-                print("  %s  %d ms  그림 %d장" % ((names[state["n"] - 1],) + getattr(app, "last_stat", (0, 0))))
+                took, n, how = getattr(app, "last_stat", (0, 0, "-"))
+                print("  %s  %d ms  그림 %d장  초당 %.0f장  (%s)" % (names[state["n"] - 1], took, n,
+                                                                   n * 1000.0 / max(1.0, took), how))
             if state["n"] >= len(names):
                 print("GALLERY OK %d" % state["n"])
                 return app.root.destroy()
