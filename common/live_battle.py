@@ -55,6 +55,14 @@ MAX_TURNS = 150
 # 이 판에서 쓸 레벨. 양쪽 다 여기에 맞춘다 (높으면 내리고 낮으면 올린다).
 LEVEL = 50
 
+# 상대에게는 안 보이는 것 (view_mon 이 mine=True 일 때만 싣는 것). 일 목록의 '내보낸 포켓몬' 에서도 뺀다 (events_for)
+PRIVATE_KEYS = ("ability", "abilityKr", "id", "held", "heldKr", "locked")
+
+
+def public_mon(mon):
+    """상대에게 보여 줄 포켓몬 (지닌 도구 · 특성 · 번호 · 구애 잠금을 뺀 것)."""
+    return dict((k, v) for k, v in (mon or {}).items() if k not in PRIVATE_KEYS)
+
 
 def leveled(mon, level=LEVEL):
     """레벨만 맞춘 사본. 개체값·노력치·성격·도구·기술은 그대로."""
@@ -727,8 +735,18 @@ class LiveBattle(object):
         }
 
     def events_for(self, who, events):
-        """a 쪽 기준으로 만든 일을 그 사람 시점으로."""
-        return list(events) if who == "a" else flip_log(events)
+        """a 쪽 기준으로 만든 일을 그 사람 시점으로.
+
+        **상대가 내보낸 포켓몬의 지닌 도구 · 특성 · 번호는 뺀다** (2026-11-25). switch 사건에 포켓몬이 통째로
+        (view_mon(…, True)) 실려 있어서, 화면에는 안 그려도 응답을 들여다보면 상대의 도구가 보였다. 내 것은 그대로 온다.
+        특성은 드러난 뒤에 ability · mega 사건과 판 상태(view)로 온다. 저장해 둔 원본은 안 고친다.
+        """
+        out = []
+        for e in (list(events) if who == "a" else flip_log(events)):
+            if isinstance(e, dict) and e.get("t") == "switch" and e.get("who") == "foe" and isinstance(e.get("mon"), dict):
+                e = dict(e, mon=public_mon(e["mon"]))
+            out.append(e)
+        return out
 
     # ---------------- 저장 ----------------
     @staticmethod

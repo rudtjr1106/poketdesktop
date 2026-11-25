@@ -57,7 +57,6 @@ TEAM_EXTRA = {"HOWL": [("atk", 1)], "GEARUP": [("atk", 1), ("spa", 1)], "MAGNETI
               "LIFEDEW": "heal", "JUNGLEHEALING": "cure", "LUNARBLESSING": "cure"}
 DRAWS = {"ELECTRIC": "LIGHTNINGROD", "WATER": "STORMDRAIN"}      # 피뢰침 · 마중물
 CENTER = ("FOLLOWME", "RAGEPOWDER", "SPOTLIGHT")
-PUBLIC_DROP = ("ability", "abilityKr", "id", "held", "heldKr", "locked")   # 상대에게는 안 보이는 것
 
 
 class _FieldView(object):
@@ -1555,7 +1554,7 @@ class DoubleBattle(object):
             mine = x.get("who") == "me"
             if t == "switch":
                 if not mine:
-                    x["mon"] = dict((k, v) for k, v in (x.get("mon") or {}).items() if k not in PUBLIC_DROP)
+                    x["mon"] = L.public_mon(x.get("mon"))
                 x["text"] = ("가랏! %s!" if mine else "상대는 %s 을(를) 내보냈다!") % x.get("name")
             elif t == "recall" and x.get("say") == "back":
                 x["text"] = ("%s, 돌아와!" if mine else "상대는 %s 을(를) 불러들였다!") % x.get("name")

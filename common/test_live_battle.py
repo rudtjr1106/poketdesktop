@@ -292,6 +292,21 @@ def main():
     chk("내 기술만 나에게", len(va["me"]["moves"]) >= 1 and "moves" not in va["foe"])
     chk("상대 파티는 보이되 도구는 안 보인다",
         "held" not in va["foe"]["team"][0], va["foe"]["team"][0].keys())
+    # 일 목록에도 안 실린다 (11/25): 내보낸 포켓몬(switch)에 지닌 도구 · 특성 · 번호가 통째로 실려 상대에게 갔다 -
+    # 화면에는 안 그렸지만 응답을 들여다보면 보였다. 내 것은 그대로 온다.
+    lb2 = build()
+    lb2.a.team[0].held = "LEFTOVERS"
+    lb2.b.team[0].held = "LIFEORB"
+    ev2 = lb2.start()
+    for viewer in ("a", "b"):
+        got = [e for e in lb2.events_for(viewer, ev2) if e.get("t") == "switch"]
+        foe_mon = next(e["mon"] for e in got if e["who"] == "foe")
+        my_mon = next(e["mon"] for e in got if e["who"] == "me")
+        chk("%s 가 받는 일 목록: 상대가 내보낸 포켓몬의 도구 · 특성 · 번호가 없다 (내 것은 있다)" % viewer,
+            not any(k in foe_mon for k in ("held", "heldKr", "ability", "abilityKr", "id", "locked"))
+            and my_mon.get("held") in ("LEFTOVERS", "LIFEORB") and "ability" in my_mon
+            and foe_mon.get("name") and "hp" in foe_mon and "num" in foe_mon, sorted(foe_mon))
+    chk("  저장해 둔 원본은 그대로다 (보여 줄 때만 뺀다)", "held" in ev2[1]["mon"] and "held" in ev2[2]["mon"])
     raw = [{"t": "hit", "who": "me", "target": "foe", "hp": 7}]
     chk("a 에게는 그대로", lb.events_for("a", raw)[0]["who"] == "me")
     got = lb.events_for("b", raw)[0]
