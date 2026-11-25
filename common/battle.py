@@ -196,6 +196,9 @@ class Fighter(object):
         self.bide = None             # 참기: {"left": 남은 턴, "sum": 모은 데미지}
         self.stockpile = 0           # 비축하기 횟수 (0~3)
         self.item_gone = False       # 내던지기·자연의은혜로 도구를 썼다 (이 판에서만)
+        # 스케치로 **이 판에서만** 배운 기술 (실시간 · 유저 배틀 · 상대 포켓몬 - statusmoves.h_sketch). 포켓몬 자료(mon)는
+        # 안 고치므로, 저장했다 되살릴 때 이것으로 다시 입힌다 (volatile). 물러나도 안 풀린다.
+        self.sketch = None
         # 이 턴에 상대에게 맞은 데미지 (카운터·미러코트·메탈버스트, 눈사태·리벤지).
         # 턴이 시작할 때 비운다 - 저장하지 않는다.
         self.hurt = None
@@ -259,6 +262,8 @@ class Fighter(object):
             out["stockpile"] = self.stockpile
         if self.item_gone:
             out["itemGone"] = True
+        if self.sketch:
+            out["sketch"] = self.sketch
         if self.mega:
             out["mega"] = self.mega
         if self.tera:
@@ -276,6 +281,13 @@ class Fighter(object):
             self.held = None                 # 이 판에서는 도구 효과도 없다 (DB 의 도구는 그대로)
         if "heldNow" in d:
             self.held = d["heldNow"]
+        # 스케치로 이 판에서만 배운 기술을 다시 입힌다. 기술 목록은 mon 에서 새로 읽은 것이라 [스케치, …] 로 돌아와 있고,
+        # __init__ 이 스케치의 PP 도 다시 채워 두었다 (2026-11-25 - 전에는 되살릴 때마다 배운 기술이 사라졌다).
+        self.sketch = d.get("sketch")
+        if self.sketch and "SKETCH" in self.moves and self.sketch not in self.moves:
+            self.moves[self.moves.index("SKETCH")] = self.sketch
+            self.pp.pop("SKETCH", None)
+            self.pp.setdefault(self.sketch, (self._dex.move(self.sketch) or {}).get("pp", 5) or 5)
         if d.get("mega") and not self.mega:
             form = self._dex.get(d["mega"])
             if form:

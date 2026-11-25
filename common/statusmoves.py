@@ -1286,6 +1286,10 @@ def h_sketch(bt, move, who, user, target, tw, ev):
         mon_moves[mon_moves.index("SKETCH")] = last
         user.mon["moves"] = mon_moves
         user.mon["_sketched"] = True
+    elif "SKETCH" in mon_moves:
+        # 그 판에서만 배운다 (실시간 · 유저 배틀 · 상대 포켓몬). 포켓몬 자료는 안 고치고 **판에만** 적는다 - 요청마다
+        # 저장했다 되살리는 판(실시간 · 관장)이 되살릴 때 다시 입힌다 (Fighter.volatile / load_volatile, 11/25).
+        user.sketch = last
     if user.cond.get("orig"):
         orig = user.cond["orig"]
         if "SKETCH" in orig["moves"]:

@@ -366,6 +366,43 @@ def main():
         used = [e.get("move") for e in ev if e.get("t") == "move" and e.get("who") == "foe"]
         chk("  되살린 판에서 다른 기술을 골라도 묶인 기술이 나간다", used == [DEX.move_name("TACKLE")], used)
 
+    # 스케치로 배운 기술 (11/25): 실시간 배틀에서는 '그 판에서만' 배우는데, 바뀐 기술 목록이 저장되는 어디에도 없어서
+    # 되살리면 [스케치, …] 로 돌아갔다 (스케치의 PP 도 1 로 되살아났다). 포켓몬 자료(mon)는 그대로 둔다.
+    sa = mon("SMEARGLE", moves=["SKETCH", "TACKLE"])
+    sb = mon("JOLTEON", moves=["SWORDSDANCE", "TACKLE"])
+    sb["evs"]["spe"] = 252
+    lb = L.LiveBattle(DEX, (1, "가", [L.leveled(sa, 50), L.leveled(mon("SNORLAX", moves=["TACKLE"]), 50)]),
+                      (2, "나", [L.leveled(sb, 50)]), rng=random.Random(4))
+    lb.start()
+    lb.choose("a", "move", "SKETCH")
+    lb.choose("b", "move", "SWORDSDANCE")
+    lb.resolve()
+    f0 = lb.a.team[0]
+    chk("스케치: 상대가 방금 쓴 기술을 배운다", f0.moves == ["SWORDSDANCE", "TACKLE"] and "SKETCH" not in f0.pp, (f0.moves, f0.pp))
+    chk("  실시간 배틀에서는 포켓몬 자료를 안 고친다 (그 판에서만)", f0.mon["moves"] == ["SKETCH", "TACKLE"]
+        and not f0.mon.get("_sketched"), f0.mon["moves"])
+    back = L.LiveBattle.load(DEX, json.loads(json.dumps(lb.dump())))
+    f1 = back.a.team[0]
+    chk("  되살려도 배운 기술이 남는다 (스케치는 사라진 채다)", f1.moves == ["SWORDSDANCE", "TACKLE"] and f1.pp == f0.pp,
+        (f1.moves, f1.pp))
+    chk("  화면에 주는 기술 목록도 같다", [m["key"] for m in back.view("a")["me"]["moves"]] == ["SWORDSDANCE", "TACKLE"],
+        [m["key"] for m in back.view("a")["me"]["moves"]])
+    try:
+        back.choose("a", "move", "SKETCH")
+        again = True
+    except ValueError:
+        again = False
+    chk("  스케치를 다시 쓸 수 없다", not again)
+    back.choose("a", "switch", 1)
+    back.choose("b", "move", "TACKLE")
+    back.resolve()
+    back = L.LiveBattle.load(DEX, json.loads(json.dumps(back.dump())))
+    back.choose("a", "switch", 0)
+    back.choose("b", "move", "TACKLE")
+    back.resolve()
+    back = L.LiveBattle.load(DEX, json.loads(json.dumps(back.dump())))
+    chk("  물러났다 나와도, 그사이 되살려도 남는다", back.a.team[0].moves == ["SWORDSDANCE", "TACKLE"], back.a.team[0].moves)
+
     print("=== 끝까지 ===")
     wins = {"a": 0, "b": 0, "draw": 0}
     for g in range(6):
