@@ -118,7 +118,7 @@ class FakeApi(object):
         self.calls.append("live")
         return {"match": self.match(), "unseen": 0}
 
-    def live_act2(self, picks):
+    def live_act2(self, picks, step=None):
         self.calls.append("act2")
         self.sent.append([dict(p) for p in picks])
         self.lb.choose("a", "picks", picks)

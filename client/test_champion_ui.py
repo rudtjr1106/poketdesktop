@@ -597,7 +597,7 @@ def main():
     lw.close()
     root.update()
     lg.fmt = "single"
-    lg.on_event({"t": "champion", "s": "wait", "id": 104, "name": "마루", "fmt": "double"})
+    lg.on_event({"t": "champion", "s": "wait2", "id": 104, "name": "마루", "fmt": "double"})
     root.update()
     card = lg.card
     chk("'더블 상대를 기다립니다' 알림", card is not None and card.alive and "더블 상대를 기다립니다" in " ".join(label_texts(card.win)),

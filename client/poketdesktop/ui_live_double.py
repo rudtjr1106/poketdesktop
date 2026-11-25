@@ -512,6 +512,10 @@ class DoubleBattleWindow(object):
 
     # ---------------- 재생 ----------------
     def play(self, events, data):
+        # 새 걸음이다 - 고르던 것은 지난 걸음의 것이라 버린다. 안 버리면 한 마리 몫만 고른 채 제한 시간이 지났을 때
+        # 그것이 다음 턴에 섞여 나간다 (검토 11/25)
+        self.picks, self.await_target, self.switching = [], None, False
+        self.flags = {"mega": False, "tera": False, "z": False}
         self.busy = True
         self.hide_commands()
         self.queue = FX.annotate(list(events))
@@ -716,6 +720,8 @@ class DoubleBattleWindow(object):
         """서버 값이 바뀌었으면 아래 칸을 다시 그린다 (내가 고르던 것은 그대로 둔다)."""
         me = self.view.get("me") or {}
         want = self._panel_key()
+        if getattr(self, "_sending", False):
+            return
         if want != self._panel:
             if self.view.get("canAct") and not me.get("chosen"):
                 self.sent = False
@@ -890,6 +896,10 @@ class DoubleBattleWindow(object):
         """기술을 골랐다. 대상을 고를 것이 둘 이상이면 묻고, 아니면 그대로 정한다."""
         if self.busy or self.sent:
             return
+        act = self._current() or {}
+        z = self._z_of(act, m.get("key")) if self.flags["z"] else None
+        if z and z.get("targets") is not None:      # Z기술(공격)은 원래 기술이 광역기여도 고른 하나만 때린다
+            m = dict(m, aim="one", targets=list(z["targets"]))
         targets = list(m.get("targets") or [])
         if m.get("aim") == "one" and len(targets) > 1:
             self.await_target = m
@@ -1020,11 +1030,14 @@ class DoubleBattleWindow(object):
         if self.busy or self.sent:
             return
         picks, self.picks = list(self.picks), []
+        step = self.played
         self.sent = True
+        self._sending = True                    # 답이 올 때까지 폴링이 고르는 칸을 다시 열지 않는다 (_refresh)
         self.hide_commands()
         self.say("...")
 
         def done(r, err):
+            self._sending = False
             if not self.alive:
                 return
             if err:
@@ -1032,7 +1045,7 @@ class DoubleBattleWindow(object):
                 self.show_commands()            # 다시 그린 뒤에 거절한 까닭을 띄운다
                 return self.say(getattr(err, "message", str(err)))
             self._got(r)
-        run_async(self.root, lambda: self.app.api.live_act2(picks), done)
+        run_async(self.root, lambda: self.app.api.live_act2(picks, step), done)
 
     def _got(self, r):
         got = step_of(r)

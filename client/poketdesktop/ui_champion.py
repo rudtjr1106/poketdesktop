@@ -183,7 +183,7 @@ class League(object):
     # ---- 소켓 (visit.Visit.on_event 가 넘긴다)
     def on_event(self, ev):
         s = (ev or {}).get("s")
-        if s == "wait":
+        if s in ("wait", "wait2"):               # wait2 = 더블을 기다린다 (옛 앱은 이 이름을 모른다)
             uid, name = ev.get("id"), ev.get("name") or "?"
             fmt = "double" if ev.get("fmt") == "double" else "single"
             if uid != self.me and self.setting("championNotify", True) and not self._busy():
@@ -653,7 +653,7 @@ class LeagueWindow(object):
             b = U.ghost_button(r, "도전", lambda u=o["id"], n=o.get("name"): self.league.challenge(u, n, fmt=self.fmt),
                                height=28)
             b.pack(side="right")
-            if o.get("busy") or my_why:
+            if o.get("busy") or my_why or o.get("other"):   # 다른 형식을 기다리는 사람에게는 못 건다 (서버도 막는다)
                 b.configure(state="disabled")
             if tag:
                 tk.Label(r, text=tag, bg=U.BG2, fg=color, font=U.FONT_XS).pack(side="right", padx=(0, 10))

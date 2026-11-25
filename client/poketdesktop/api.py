@@ -957,10 +957,13 @@ class Api(object):
                                  "z": bool(z)}, tera),
                           timeout=RAID_TIMEOUT)
 
-    def live_act2(self, picks):
-        """더블배틀: 두 마리 몫을 한 번에 보낸다. picks = [{pos, kind: move|switch, move, target, slot, mega, z, tera}]"""
-        return self._call("POST", "/api/live/act", {"kind": "picks", "picks": list(picks or [])},
-                          timeout=RAID_TIMEOUT)
+    def live_act2(self, picks, step=None):
+        """더블배틀: 두 마리 몫을 한 번에 보낸다. picks = [{pos, kind: move|switch, move, target, slot, mega, z, tera}]
+        step = 보고 고른 걸음 (그사이 턴이 넘어갔으면 서버가 안 받는다)."""
+        body = {"kind": "picks", "picks": list(picks or [])}
+        if step is not None:
+            body["step"] = int(step)
+        return self._call("POST", "/api/live/act", body, timeout=RAID_TIMEOUT)
 
     def live_seen(self):
         return self._call("POST", "/api/live/seen", {})
