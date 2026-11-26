@@ -27,6 +27,10 @@
        막힌 공격을 다 뺀다 (WAR_ALLBLOCK_DROP). 흡수(마중물 ...)는 '상대를 키운다' 로 따로 안다.
    12. 그 판의 세 장면(동료 둘 · 혼자 남음)에서 막힌 공격을 안 고른다 - 아픔나누기는 조금이라도 오르면 쳐 준다.
    13. 쓸 만한 것이 없어도(아픔나누기가 손해) 상대를 키우는 흡수 공격은 안 쓴다 - 그냥 무효인 공격으로.
+   14. 불가사의부적에 막히는 공격은 '확실히 쓰러뜨린다'(_secure_ko)에 넣지 않는다 (2026-11-26 게시판 #606 - 체력 1 인 껍질몬은
+       어림 데미지가 조금만 나와도 KO 라, 막히는 공격이 다 뽑혀 교체 · 변화기가 선택지에서 사라졌다. WAR_KO_GUARD).
+   15. 공격이 다 막혔고 교체가 있으면 공격 쪽만 올리는 변화기(나쁜음모 ...)도 뺀다 (WAR_ALLBLOCK_IDLE_BOOST).
+   16. 판 전체: 전기 테라 껍질몬 앞의 헬가가 막히는 화염방사를 되풀이하지 않고 지진 대짱이로 바꾼다.
 """
 import os
 import sys
@@ -442,6 +446,67 @@ def t_다_막힘(dex):
     chk("13. (견줌) 끄면 하이드로펌프를 고른 적이 있다", off.get("HYDROPUMP", 0) > 0, off)
 
 
+def t_껍질몬(dex):
+    """14 · 15 · 16: 불가사의부적 껍질몬 앞에서 막히는 공격만 되풀이하지 않는다 (게시판 #606, 2026-11-26)."""
+    print("\n=== 랭크 AI: 껍질몬 (게시판 #606) ===")
+    shed = mon("SHEDINJA", ["SHADOWSNEAK", "METALCLAW", "CONFUSERAY", "SHADOWCLAW"], held="ELECTRICTERASHARD",
+               ability="WONDERGUARD")
+    hound = mon("HOUNDOOM", ["FLAMETHROWER", "DARKPULSE", "SLUDGEBOMB", "NASTYPLOT"], ability="FLASHFIRE")
+    swamp = mon("SWAMPERT", ["ICEPUNCH", "LIQUIDATION", "EARTHQUAKE", "STEALTHROCK"], held="LEFTOVERS",
+                ability="TORRENT")
+    BLOCKED = ("FLAMETHROWER", "DARKPULSE", "SLUDGEBOMB")
+
+    # 14. 체력 1 인 껍질몬 - 막히는 공격도 데미지 어림으로는 다 KO 다. '확실히 쓰러뜨린다' 에 넣지 않는다.
+    pb, bt = fresh(dex, [shed], [hound, swamp])
+    m = pb._mirror("foe")
+    m.me.tera = "ELECTRIC"                             # 운영의 그 껍질몬 (전기 테라스탈 - 약점이 땅 하나)
+    m.foe.hp = 40                                      # 껍질몬의 섀도클로가 위협이 되는 체력 (KO_FORCE_THREAT)
+    chk("14. (전제) 헬가의 공격 셋이 다 불가사의부적에 막힌다", all(m._no_effect(k) for k in BLOCKED))
+    chk("14. 막히는 공격은 '확실한 KO' 가 아니다", m._secure_ko() == [], m._secure_ko())
+    m.WAR_KO_GUARD = False
+    chk("14. (견줌) 끄면 막히는 공격이 다 '확실한 KO' 로 뽑혔다 - 선택지가 그것들로 좁혀졌다",
+        sorted(m._secure_ko()) == sorted(BLOCKED), m._secure_ko())
+    m.WAR_KO_GUARD = True
+
+    # 15. 공격이 다 막혔고 교체가 있으면 공격 쪽만 올리는 변화기(나쁜음모)도 뺀다. 버티는 능력도 올리면(명상) 둔다.
+    opts = [("move", k) for k in BLOCKED + ("NASTYPLOT",)] + [("switch", 1)]
+    chk("15. 막힌 공격 · 나쁜음모를 빼고 교체만 남긴다", m._drop_no_effect(opts) == [("switch", 1)], m._drop_no_effect(opts))
+    chk("15. 나쁜음모는 '쓸 데 없는 능력 올리기' · 명상(특수방어도 올림)은 아니다",
+        m._idle_boost("NASTYPLOT") and m._idle_boost("DRAGONDANCE") and not m._idle_boost("CALMMIND")
+        and not m._idle_boost("FLAMETHROWER"))
+    alone = [("move", k) for k in BLOCKED + ("NASTYPLOT",)]
+    chk("15. 바꿀 자리가 없으면 나쁜음모는 그대로 남는다 (빼면 막힌 공격만 남는다)",
+        ("move", "NASTYPLOT") in m._drop_no_effect(alone), m._drop_no_effect(alone))
+    m.WAR_ALLBLOCK_IDLE_BOOST = False
+    chk("15. (견줌) 끄면 나쁜음모가 남는다", ("move", "NASTYPLOT") in m._drop_no_effect(opts), m._drop_no_effect(opts))
+    m.WAR_ALLBLOCK_IDLE_BOOST = True
+
+    # 16. 판 전체: 헬가가 껍질몬을 위협하면 껍질몬이 전기 테라스탈 -> 헬가는 막히는 공격을 되풀이하지 않고 대짱이(지진)로 바꾼다
+    def play(seed, on=True):
+        keep = (TB.TrainerBattle.WAR_KO_GUARD, TB.TrainerBattle.WAR_ALLBLOCK_IDLE_BOOST)
+        TB.TrainerBattle.WAR_KO_GUARD = TB.TrainerBattle.WAR_ALLBLOCK_IDLE_BOOST = on
+        try:
+            out = PB.simulate(dex, [hound, swamp], [shed], seed=seed, keystone={"me": False, "foe": False},
+                              zring={"me": False, "foe": False}, war_ai=True, tera_orb={"me": True, "foe": True})
+        finally:
+            TB.TrainerBattle.WAR_KO_GUARD, TB.TrainerBattle.WAR_ALLBLOCK_IDLE_BOOST = keep
+        tera, cur, wasted = False, None, 0
+        for e in out["events"]:
+            if e.get("t") == "round":
+                cur = (e.get("me") or {}).get("species")
+            elif e.get("t") == "tera" and e.get("who") == "foe":
+                tera = True
+            elif e.get("t") == "move" and e.get("who") == "me" and cur == "HOUNDOOM" and tera:
+                wasted += 1                            # 테라스탈한 다음 턴부터 헬가가 쓴 기술
+        return out["winner"], tera, wasted
+    on = [play(s) for s in range(4)]
+    off = [play(s, False) for s in range(4)]
+    chk("16. (전제) 네 판 다 껍질몬이 전기 테라스탈한다", all(t for _w, t, _n in on + off), on + off)
+    chk("16. 테라스탈한 뒤 헬가는 막히는 공격을 한 번 넘게 안 쓰고 바꾼다 · 대짱이가 이긴다",
+        all(w == "me" and n <= 1 for w, _t, n in on), on)
+    chk("16. (견줌) 끄면 헬가가 막히는 공격을 판마다 다섯 번 넘게 썼다", all(n >= 5 for _w, _t, n in off), off)
+
+
 def t_묶은_쪽이_쓰러지면(dex):
     """조이기류: 묶은 쪽이 쓰러지면 묶기가 풀린다 (본가 · 관장 판과 같다). 랭크는 라운드마다 판을 새로 세워서
     묶인 쪽 cond 의 bound 가 다음 라운드까지 따라가, 새로 나온 상대에게도 데미지와 교체 봉인이 이어졌다 (11/19 #664 검토)."""
@@ -470,6 +535,7 @@ def main():
     t_무효(dex)
     t_무효_빼기(dex)
     t_다_막힘(dex)
+    t_껍질몬(dex)
     t_묶은_쪽이_쓰러지면(dex)
     print("\n합계 OK %d · FAIL %d" % (OK, FAIL))
     return 1 if FAIL else 0

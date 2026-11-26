@@ -718,6 +718,16 @@ class TrainerBattle(object):
     #   - 그것도 없으면(막힌 공격 · 헛수만) 상대를 키우는 흡수 공격만 뺀다 - 그냥 무효인 공격은 아무 일도 없다.
     # 끄면(False) 예전 그대로 (공격이 다 무효면 감점만).
     WAR_ALLBLOCK_DROP = True
+    # '확실히 쓰러뜨린다'(_secure_ko)에 막히는 공격을 넣지 않는다 (2026-11-26, 게시판 #606 TOMOONG · 석뚱 '껍질몬한테 당하고
+    # 왔어요'). 체력 1 인 껍질몬은 데미지 어림이 조금만 나와도 KO 라, 불가사의부적에 막히는 공격이 다 '확실한 KO' 로 뽑히고
+    # 선택지가 그것들로 좁혀졌다 - 교체 · 변화기가 사라져 WAR_ALLBLOCK_DROP 이 뺄 것도 남길 것도 없었다. 랭크 11/21~26
+    # 껍질몬이 마지막까지 서서 이긴 58판에 상대가 헛친 공격 710번 (판마다 12번) · 껍질몬을 칠 기술이 있는 포켓몬이 앞에 서서
+    # 그 기술을 쓴 것은 44번 중 4번. 끄면(False) 예전 그대로.
+    WAR_KO_GUARD = True
+    # 공격이 다 막혔을 때 (WAR_ALLBLOCK_DROP 의 갈래) 교체나 다른 쓸모 있는 수가 남으면 **공격 · 특수공격 · 스피드 · 명중만
+    # 올리는 변화기**도 뺀다 (2026-11-26, 같은 #606). 칠 기술이 없는데 올려 봐야 쓸 데가 없고, 바꾸면 사라진다 - 재현 판에서
+    # 헬가가 전기 테라 껍질몬 앞에서 나쁜음모를 2~8번 쓴 뒤에야 지진 대짱이로 바꿨다. 끄면(False) 예전 그대로.
+    WAR_ALLBLOCK_IDLE_BOOST = True
     # 헛수(지금 쓰면 아무 일도 없는 변화기)에 매기는 감점 (2026-11-01, 사용자 '아 멍청하네 하는 느낌이 없으면'). 깔기를
     # 또 깔기 · 벽을 또 세우기 · 방어 연달아 · 체력이 가득한데 회복 · 랭크가 꽉 찼는데 또 올리기, 그 밖에 관장 AI 가
     # '소용없다(0)' 고 보는 것 (이미 혼란인 상대에게 이상한빛 · 넘길 것 없는 배턴터치 ...). 사본에서는 한 턴을 그냥 넘긴
@@ -895,6 +905,8 @@ class TrainerBattle(object):
             md = self.bt.move_of(k)
             if not md or not MC.attacks(md) or AF.ai_mult(self.bt, MC.key(md), md, foe, me) <= 0:
                 continue
+            if self.WAR_KO_GUARD and self._no_effect(k):
+                continue                                    # 불가사의부적 · 막는 특성 - 데미지 어림은 있어도 안 들어간다
             if self._est(foe, me, k) * KO_ROLL < me.hp or self._hit_rate(md, foe, me) < 0.9:
                 continue
             if their_k and their_d * KO_ROLL >= foe.hp and not self._first(foe, me, md, their_md):
@@ -990,6 +1002,11 @@ class TrainerBattle(object):
         if not self.WAR_ALLBLOCK_DROP:
             return opts
         rest = [o for o in opts if o not in bad]
+        if self.WAR_ALLBLOCK_IDLE_BOOST:
+            # 칠 기술이 없으니 공격 쪽 능력을 올려도 쓸 데가 없다 - 다른 쓸모 있는 수가 남을 때만 뺀다
+            keep = [o for o in rest if not (o[0] == "move" and self._idle_boost(o[1]))]
+            if any(o[0] == "switch" or not self._wasted(o[1]) or self._some_gain(o[1]) for o in keep):
+                rest = keep
         if any(o[0] == "switch" or not self._wasted(o[1]) or self._some_gain(o[1]) for o in rest):
             return rest
         feeds = [o for o in bad if self._feeds_foe(o[1])]
@@ -1004,6 +1021,18 @@ class TrainerBattle(object):
         if key == "PAINSPLIT":
             return (user.hp + target.hp) // 2 > user.hp
         return (md.get("heal") or 0) > 0 and user.hp < user.maxhp and not user.cond.get("healblock")
+
+    # 칠 기술이 없을 때 올려 봐야 쓸 데가 없는 능력 (WAR_ALLBLOCK_IDLE_BOOST). 방어 · 특수방어 · 회피는 버티는 데 쓰니 넣지 않는다.
+    IDLE_BOOST_STATS = ("atk", "spa", "spe", "acc", "accuracy")
+
+    def _idle_boost(self, key):
+        """공격이 다 막혔을 때만 본다 (_drop_no_effect): 이 변화기가 자기 공격 · 특수공격 · 스피드 · 명중**만** 올리나
+        (나쁜음모 · 칼춤 · 용의춤 · 고속이동 ...). 명상 · 벌크업처럼 버티는 능력도 같이 올리면 아니다."""
+        md = self.bt.move_of(key) or {}
+        if MC.attacks(md) or not md.get("statSelf"):
+            return False
+        ups = [s for s, c in (md.get("stat") or []) if c > 0]
+        return bool(ups) and all(s in self.IDLE_BOOST_STATS for s in ups)
 
     def _feeds_foe(self, key):
         """이 공격이 지금 상대의 흡수 특성에 먹혀 **상대를 키우나** (마중물 · 피뢰침 · 저수 · 전기엔진 · 초식 · 바람타기 ...).
