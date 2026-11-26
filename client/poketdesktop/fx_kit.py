@@ -542,6 +542,32 @@ def cloud(p, x, y, r, cols, seed=0, wob=0.0):
     blob(p, x - r * 0.1, y - r * 0.1, r * 0.72, cols[1], seed + 5, wob, n=9, jag=0.22, sy=0.6)
 
 
+def ras(p):
+    """그림 바탕의 붓인가 (빛 층에 그릴 수 있다 - p.glow / glow_line / glow_poly)."""
+    return getattr(p, "raster", False)
+
+
+def glow_hoop(p, x, y, ra, rb, ang, col, w, a=1.0):
+    """(그림 바탕) 기울어진 고리 모양으로 번지는 빛."""
+    c, s = math.cos(ang), math.sin(ang)
+    pts = []
+    for i in range(13):
+        t = TAU * i / 12
+        dx, dy = math.cos(t) * ra, math.sin(t) * rb
+        pts += [x + dx * c - dy * s, y + dx * s + dy * c]
+    p.glow_line(pts, col, w, a)
+
+
+def glow_arc(p, x, y, rx, ry, start, extent, col, w, a=1.0):
+    """(그림 바탕) 호 모양으로 번지는 빛. 각도는 Tk 의 호와 같다 (도, 반시계)."""
+    n = max(4, int(abs(extent) / 18))
+    pts = []
+    for i in range(n + 1):
+        t = math.radians(start + extent * i / float(n))
+        pts += [x + math.cos(t) * rx, y - math.sin(t) * ry]
+    p.glow_line(pts, col, w, a)
+
+
 def orb(p, x, y, r, cols, shine=True):
     """빛나는 구슬: 테 - 몸 - 심, 그리고 왼쪽 위의 빛."""
     rim, body, core = cols

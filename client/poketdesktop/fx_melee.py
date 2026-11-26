@@ -126,7 +126,10 @@ def _smash(fx, at):
             y1 = g.ty - g.uy * (far + 44) * sc + g.py * off * 1.5 * k
             x2 = g.tx - g.ux * far * 0.2 + g.px * off * 0.35 * k
             y2 = g.ty - g.uy * far * 0.2 + g.py * off * 0.35 * k
-            K.streak(p, x1, y1, x2, y2, (5.5 if j == 2 else 4.2) * k, c.dark)
+            if K.ras(p):
+                p.glow_line([x1, y1, x2, y2], c.base, (5.5 if j == 2 else 4.2) * k * 2.4, 0.9)
+            else:
+                K.streak(p, x1, y1, x2, y2, (5.5 if j == 2 else 4.2) * k, c.dark)
             K.streak(p, x1, y1, x2, y2, (2.6 if j == 2 else 1.9) * k, WHITE if j in (1, 2, 3) else c.light)
     return sh.act(at, 110, draw)
 
@@ -203,6 +206,8 @@ def _frostbite(fx, at):
             a = g.ang + math.pi + (j - 2) * 0.55
             r0 = (52 - 34 * f) * k
             x, y = g.tx + cos(a) * r0, g.ty + sin(a) * r0
+            if K.ras(p):
+                p.glow(x - cos(a) * 14 * k, y - sin(a) * 14 * k, 12 * k * thin, c.base, 0.8)
             K.spike(p, x, y, 5.5 * k * thin, 30 * k * thin, a + math.pi, c.light, c.dark)
             K.spike(p, x, y, 2.2 * k * thin, 24 * k * thin, a + math.pi, WHITE)
     speedlines(fx, at, 120)
@@ -218,7 +223,10 @@ def _fist(fx, at):
         for j, (rr, th, col) in enumerate(((46, 13, c.deep), (44, 10, c.base), (42, 4.5, c.hot))):
             r = (rr - 16 * (1 - f)) * k
             cx, cy = g.tx - g.ux * (r + 12 * (1 - f)), g.ty - g.uy * (r + 12 * (1 - f))
-            K.crescent(p, cx, cy, r, g.ang, 1.9, th * k * (1 - u * 0.6), col)
+            if col == c.deep and K.ras(p):                  # (그림 바탕) 밀려드는 충격이 빛난다
+                K.glow_arc(p, cx, cy, r - th * 0.4 * k, r - th * 0.4 * k, g.deg - 54, 108, c.base, th * k * 1.9)
+            else:
+                K.crescent(p, cx, cy, r, g.ang, 1.9, th * k * (1 - u * 0.6), col)
         K.flare(p, g.tx - g.ux * 6, g.ty - g.uy * 6, (14 + 16 * f) * k, 5, c.alt, inner=0.42, rot=ms * 0.01,
                 outline=c.deep)
     speedlines(fx, at, 130, n=7, ln=58, col=c.alt)
@@ -279,6 +287,9 @@ def _mindspike(fx, at):
         for j in range(3):
             r = (50 - 38 * K.out2(K.clamp(u * 1.3 - j * 0.12))) * k
             K.ring(p, g.tx, g.ty, r, c.alt if j % 2 else c.light, 3, 0.8)
+        if K.ras(p):
+            p.glow(g.tx, g.ty, (40 - 16 * u) * k, c.dark, 0.9, 0.8)
+            p.glow(g.tx, g.ty, 16 * k, c.alt, 0.8)
         K.sigil(p, g.tx, g.ty, (30 - 14 * u) * k, ms * 0.02, c.base, 2, 0.8)
         K.glint(p, g.tx, g.ty, (10 + 22 * u) * k, WHITE, rot=ms * 0.01)
     return sh.act(at, 190, draw)
@@ -295,7 +306,10 @@ def _xscissor(fx, at):
             ln = 46 * k
             x1, y1 = g.tx - ln * 0.8, g.ty - ln * sg * 0.72
             x2, y2 = x1 + ln * 1.6 * f, y1 + ln * sg * 1.44 * f
-            K.streak(p, x1, y1, x2, y2, 7.5 * k * thin, c.deep)
+            if K.ras(p):
+                p.glow_line([x1, y1, x2, y2], c.base, 18 * k * thin + 1, 0.9)
+            else:
+                K.streak(p, x1, y1, x2, y2, 7.5 * k * thin, c.deep)
             K.streak(p, x1, y1, x2, y2, 5 * k * thin, c.base)
             K.streak(p, x1, y1, x2, y2, 1.8 * k * thin, c.hot)
         if u > 0.4:
@@ -327,6 +341,8 @@ def _haunt(fx, at):
 
     def draw(p, u, ms):
         h = (30 + 40 * K.out2(min(1.0, u / 0.5))) * k * (1.0 if u < 0.8 else (1 - u) / 0.2)
+        if K.ras(p):
+            p.glow(g.tx, g.gt - h * 0.3, h * 0.7, "#7a3cff" if c.typ == "GHOST" else c.alt, 0.7)     # 어둠 둘레의 으스스한 빛
         p.oval(g.tx, g.gt, 30 * k, 6 * k, c.deep, c.edge or c.light, 1)
         for j, (ox, kk) in enumerate(((-18, 0.7), (17, 0.76), (0, 1.0))):
             lean = 6 * sin(ms * 0.03 + j * 2)
@@ -336,6 +352,8 @@ def _haunt(fx, at):
                 K.tongue(p, g.tx + ox * k, g.gt + 6 - r * 0.8, r * 0.6, lean * 0.7, c.dark)
         if 0.2 < u < 0.85:                                  # 눈
             for ex in (-7, 7):
+                if K.ras(p):
+                    p.glow(g.tx + ex * k, g.ty - 7, 7, c.alt, 1.0)
                 K.streak(p, g.tx + ex * k - 5, g.ty - 6, g.tx + ex * k + 5, g.ty - 8 + (2 if ex > 0 else -2), 2.6, c.alt)
     return sh.act(at, 260, draw)
 
@@ -364,8 +382,14 @@ def _clang(fx, at):
     def draw(p, u, ms):
         r = (18 + 44 * K.out3(u)) * k
         th = max(0.6, 4 * (1 - u)) * k
-        K.streak(p, g.tx - r * 1.5, g.ty, g.tx + r * 1.5, g.ty, th * 1.8, c.dark)
-        K.streak(p, g.tx, g.ty - r * 1.5, g.tx, g.ty + r * 1.5, th * 1.8, c.dark)
+        if K.ras(p):
+            p.glow_line([g.tx - r * 1.5, g.ty, g.tx + r * 1.5, g.ty], c.light, th * 4.6 + 1, 0.9)
+        else:
+            K.streak(p, g.tx - r * 1.5, g.ty, g.tx + r * 1.5, g.ty, th * 1.8, c.dark)
+        if K.ras(p):
+            p.glow_line([g.tx, g.ty - r * 1.5, g.tx, g.ty + r * 1.5], c.light, th * 4.6 + 1, 0.9)
+        else:
+            K.streak(p, g.tx, g.ty - r * 1.5, g.tx, g.ty + r * 1.5, th * 1.8, c.dark)
         K.streak(p, g.tx - r * 1.5, g.ty, g.tx + r * 1.5, g.ty, th, WHITE)
         K.streak(p, g.tx, g.ty - r * 1.5, g.tx, g.ty + r * 1.5, th, WHITE)
         K.flare(p, g.tx, g.ty, r * 0.55, 4, c.light, inner=0.3, rot=math.pi / 4)
@@ -426,8 +450,12 @@ def flurry(fx):
             a = g.ang + ((j * 7) % 5 - 2) * 0.32
             f = (ms % 62) / 62.0
             x2, y2 = g.tx + cos(a) * 14, g.ty + sin(a) * 14
-            K.streak(p, x2 - cos(a) * 62 * (1 - f * 0.4), y2 - sin(a) * 62 * (1 - f * 0.4), x2, y2, 4.5 * k * (1 - f),
-                     c.deep)
+            if K.ras(p):
+                p.glow_line([x2 - cos(a) * 62 * (1 - f * 0.4), y2 - sin(a) * 62 * (1 - f * 0.4), x2, y2], c.base,
+                            11 * k * (1 - f) + 1, 0.9)
+            else:
+                K.streak(p, x2 - cos(a) * 62 * (1 - f * 0.4), y2 - sin(a) * 62 * (1 - f * 0.4), x2, y2,
+                         4.5 * k * (1 - f), c.deep)
             K.streak(p, x2 - cos(a) * 56 * (1 - f * 0.4), y2 - sin(a) * 56 * (1 - f * 0.4), x2, y2, 2.4 * k * (1 - f),
                      c.hot)
         fx.show.act(0, n * 62, lines)
@@ -455,11 +483,18 @@ def dash(fx):
                     K.streak(p, x1, y1, x2, y2, 1.5, WHITE)
             for j in range(3):                              # 잔상
                 x, y = g.at(max(0.0, head - 0.24 * (j + 1)))
-                K.ring(p, x, y, (13 - j * 3) * k, cols[0] if fx.type not in ("GHOST", "DARK") else c.light, 2)
+                if K.ras(p):
+                    p.glow(x, y, (13 - j * 3) * k, cols[0], 0.7)
+                else:
+                    K.ring(p, x, y, (13 - j * 3) * k, cols[0] if fx.type not in ("GHOST", "DARK") else c.light, 2)
         elif ms < 300:                                      # 지나간 자리에 남는 한 줄
             v = (ms - 150) / 150.0
             ln = 62 * k
-            K.streak(p, g.tx - g.ux * ln, g.ty - g.uy * ln, g.tx + g.ux * ln, g.ty + g.uy * ln, 6 * k * (1 - v), cols[0])
+            if K.ras(p):
+                p.glow_line([g.tx - g.ux * ln, g.ty - g.uy * ln, g.tx + g.ux * ln, g.ty + g.uy * ln], cols[0],
+                            15 * k * (1 - v) + 1, 1.0)
+            else:
+                K.streak(p, g.tx - g.ux * ln, g.ty - g.uy * ln, g.tx + g.ux * ln, g.ty + g.uy * ln, 6 * k * (1 - v), cols[0])
             K.streak(p, g.tx - g.ux * ln, g.ty - g.uy * ln, g.tx + g.ux * ln, g.ty + g.uy * ln, 3 * k * (1 - v), WHITE)
     sh.act(0, 300, draw)
     K.impact(fx, 150, size=1.05)
@@ -512,14 +547,21 @@ def blades(fx):
     from .fx_ranged import volley
     c, k = fx.c, fx.big
     cols = (c.deep, c.light if fx.type not in ("GHOST", "DARK") else c.dark, WHITE)
+    glowc = c.alt if fx.type in ("GHOST", "DARK") else c.base
 
     def one(p, x, y, ang, j, v, ms):
         r = 22 * k
         wob = ang + 0.35 * sin(ms * 0.03 + j)
         cx, cy = x - cos(wob) * r, y - sin(wob) * r
         for q in (2, 1):                                    # 잔상
-            K.crescent(p, cx - cos(wob) * 9 * q, cy - sin(wob) * 9 * q, r, wob, 1.9, (4.5 - q) * k, cols[0])
-        K.crescent(p, cx, cy, r + 2, wob, 2.2, 10 * k, cols[0])
+            if K.ras(p):
+                p.glow(x - cos(wob) * 9 * q, y - sin(wob) * 9 * q, (16 - 4 * q) * k, glowc, 0.6)
+            else:
+                K.crescent(p, cx - cos(wob) * 9 * q, cy - sin(wob) * 9 * q, r, wob, 1.9, (4.5 - q) * k, cols[0])
+        if K.ras(p):
+            p.glow(x, y, 17 * k, glowc, 0.9)
+        else:
+            K.crescent(p, cx, cy, r + 2, wob, 2.2, 10 * k, cols[0])
         K.crescent(p, cx, cy, r, wob, 2.2, 8 * k, cols[1])
         K.crescent(p, cx, cy, r - 1, wob, 2.2, 3.5 * k, cols[2])
     end = volley(fx, 0, 3, one, gap=110, life=240, spread=11, hit=0.7)
@@ -559,6 +601,8 @@ def bite(fx):
             gap = steps[i] - (steps[i] - steps[i + 1]) * ((ms % FX.FANG_STEP_MS) / float(FX.FANG_STEP_MS))
             if ms >= FX.FANG_STEP_MS * (len(steps) - 1):
                 gap = 0
+            if K.ras(p):
+                p.glow(tx, ty, 34, c.alt if fx.type in ("GHOST", "DARK") else c.base, 0.7)     # 덮쳐 오는 기세
             up, lo = FX.fang_rows(tx, ty, gap)
             w = (FX.FANG_TEETH - 1) * FX.FANG_GAP / 2.0 + 12
             for sg, rows in ((-1, up), (1, lo)):            # 잇몸 (타입 색 반달) - 이빨 뒤에 깔린다
@@ -579,6 +623,8 @@ def bite(fx):
             for sg in (-1, 1):
                 x = tx + sg * (44 + 10 * u)
                 p.line([x, ty - 9, x + sg * 7, ty, x, ty + 9], WHITE, 2)
+            if K.ras(p):
+                p.glow(tx, ty, 30, c.alt if fx.type in ("GHOST", "DARK") else c.base, 0.8 * (1 - u))
             p.line([tx - 30, ty, tx + 30, ty], WHITE, max(1, int(3 * (1 - u))))
         sh.act(T, FX.FANG_HOLD_MS, snap)
         # (물린 채 머무는 동안에는 도트를 밀지 않는다 - 이빨은 과녁 가운데에 물려 있어야 한다. 밀리는 것은 터질 때다)
@@ -610,8 +656,15 @@ def punch(fx):
                 a_, b_ = rot(x, y, -r - 46 + abs(off), off), rot(x, y, -r - 2, off)
                 K.streak(p, a_[0], a_[1], b_[0], b_[1], 2.4 if off == 0 else 1.7, WHITE if off == 0 else c.light)
             for q, sc in ((2, 0.6), (1, 0.8)):              # 잔상
-                fist(p, x - g.ux * r * 1.15 * q, y - g.uy * r * 1.15 * q, r * sc, c.dark, "")
-            K.burst_star(p, x, y, r * 1.75, 8, c.deep, 4, inner=0.66, rot=ms * 0.02)      # 두른 기운
+                if K.ras(p):
+                    p.glow(x - g.ux * r * 1.15 * q, y - g.uy * r * 1.15 * q, r * sc * 1.3, c.base, 0.6)
+                else:
+                    fist(p, x - g.ux * r * 1.15 * q, y - g.uy * r * 1.15 * q, r * sc, c.dark, "")
+            if K.ras(p):
+                p.glow(x, y, r * 2.1, c.dark, 1.0)                  # 두른 기운이 번진다
+                p.glow(x, y, r * 1.3, c.base, 0.9)
+            else:
+                K.burst_star(p, x, y, r * 1.75, 8, c.deep, 4, inner=0.66, rot=ms * 0.02)      # 두른 기운
             fist(p, x, y, r, c.light if fx.type not in ("GHOST", "DARK") else c.base, c.deep)
             for off in (-0.45, 0.0, 0.45):                  # 손가락 마디
                 a_, b_ = rot(x, y, r * 0.35, off * r), rot(x, y, r * 0.98, off * r)
@@ -650,7 +703,10 @@ def stab(fx):
                 off = sin(v * 12 + ms * 0.07) * 7.5 * k
                 hp += [x - g.ux * (8 + 42 * v) + g.px * off, y - g.uy * (8 + 42 * v) + g.py * off]
             p.line(hp, c.base, 2, smooth=True)
-            K.shard(p, x, y, 26 * k, g.ang, c.deep, slim=0.5)
+            if K.ras(p):
+                p.glow_line([x - g.ux * 26 * k, y - g.uy * 26 * k, x + g.ux * 34 * k, y + g.uy * 34 * k], c.base, 16 * k, 0.9)
+            else:
+                K.shard(p, x, y, 26 * k, g.ang, c.deep, slim=0.5)
             K.shard(p, x, y, 23 * k, g.ang, c.light, c.dark)
             K.shard(p, x, y, 10 * k, g.ang, WHITE)
             if u > 0.45:                                    # 꿰뚫은 끝
@@ -757,8 +813,12 @@ def recoil(fx):
 
     def aura(p, u, ms):
         grow = K.out2(min(1.0, ms / 160.0))
-        K.burst_star(p, sx, sy, (36 + 4 * sin(ms * 0.05)) * k * grow, 12, c.deep, seed + int(ms / 60), inner=0.62,
-                     rot=ms * 0.01)
+        if K.ras(p):                                        # (그림 바탕) 타오르는 기운이 번진다
+            p.glow(sx, sy, 42 * k * grow, c.dark, 1.0)
+            p.glow(sx, sy, 24 * k * grow, c.base, 0.8)
+        else:
+            K.burst_star(p, sx, sy, (36 + 4 * sin(ms * 0.05)) * k * grow, 12, c.deep, seed + int(ms / 60),
+                         inner=0.62, rot=ms * 0.01)
         for j in range(7):
             ph = ms * 0.03 + j * 0.9
             r = (10 + 4 * sin(ms * 0.04 + j)) * k * grow

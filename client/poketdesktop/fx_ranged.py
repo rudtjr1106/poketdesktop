@@ -271,7 +271,10 @@ def quake(fx):
         if ms > A - 60:
             pts = [v + K.snoise(seed + i + int(ms / 40)) * 1.2 for i, v in enumerate(pts)]
         thin = 1.0 if ms < B + 100 else max(0.2, 1.0 - (ms - B - 100) / 200.0)
-        p.line(pts, c.deep, 8 * thin, cap="butt")
+        if K.ras(p):
+            p.glow_line(pts, c.alt, 13 * thin, 0.9)               # 금 사이로 새는 빛
+        else:
+            p.line(pts, c.deep, 8 * thin, cap="butt")
         p.line(pts, c.alt, 4 * thin, cap="butt")
         p.line(pts, c.hot, max(1, 1.5 * thin), cap="butt")
     sh.act(150, B + 150, cracks, z=-2)
@@ -322,7 +325,10 @@ def nova(fx):
                 continue
             x, y = mx + (g.tx - mx) * K.in2(v) * 1.02, my + (g.ty - my) * K.in2(v) * 1.02
             r = (9 + 12 * v - j * 2) * k
-            K.hoop(p, x, y, r * 0.42, r * 1.25, g.ang, cols[0], 5)
+            if K.ras(p):
+                K.glow_hoop(p, x, y, r * 0.42, r * 1.25, g.ang, cols[0], 8)
+            else:
+                K.hoop(p, x, y, r * 0.42, r * 1.25, g.ang, cols[0], 5)
             K.hoop(p, x, y, r * 0.42, r * 1.25, g.ang, cols[1] if j else cols[2], 2)
         v = K.in2(min(1.0, u * 1.25))
         x, y = mx + (g.tx - mx) * v, my + (g.ty - my) * v
@@ -663,6 +669,8 @@ def surf(fx):
         p.poly(shape(1.0, 0), c.dark, "", 1, True)
         p.poly(shape(0.8, 8), c.base, "", 1, True)
         p.poly(shape(0.52, 16), c.light, "", 1, True)
+        if K.ras(p):
+            p.glow(x + f * ww * 0.2, y - hh * 0.9, 20 * k * grow, c.light, 0.7)
         for j in range(5):                                  # 물마루의 거품
             px = x + f * ww * (0.0 + j * 0.13)
             py = y - hh * (0.98 - j * 0.07) + 2 * sin(ms * 0.02 + j)
@@ -746,6 +754,8 @@ def leafstorm(fx):
             return
         for j in range(2):
             q = g.path(t0, t1, 12, off=lambda u_, o=j: sin(u_ * 9 - ms * 0.02 + o * math.pi) * 14 * k * K.hump(u_))
+            if K.ras(p):
+                p.glow_line(q, c.base, 7, 0.6)
             p.line(q, c.dark if j else c.light, 2, smooth=True)
     sh.act(0, total, wind, z=-1)
 
@@ -788,6 +798,8 @@ def blizzard(fx):
             u0 = (ms * 0.0026 + j * 0.27) % 1.25 - 0.15
             q = g.path(max(0.0, u0), min(1.05, u0 + 0.42), 6, off=lambda u_, o=off, jj=j: o * (0.4 + 0.6 * u_) * k
                        + 6 * sin(u_ * 7 + jj + ms * 0.01))
+            if K.ras(p):
+                p.glow_line(q, c.base, 9 * thin + 1, 0.7)
             K.ribbon(p, q, K.widths(6, (3.4 if j in (1, 2) else 2.4) * thin + 0.3, "spindle"),
                      WHITE if j in (1, 2) else c.light)
     sh.act(0, F, wind, z=-1)
@@ -806,6 +818,8 @@ def blizzard(fx):
             a = j * math.pi / 4 + 0.2
             K.spike(p, g.tx + cos(a) * 22 * k, g.ty + sin(a) * 17 * k, 4.2 * k, (8 + 12 * K.noise(seed + j)) * k * gr, a,
                     c.light if j % 2 else WHITE, c.dark)
+        if K.ras(p):
+            p.glow(g.tx, g.ty, 30 * k * gr, c.base, 0.8)        # 얼어붙는 빛
         ln = 24 * k * gr                                    # 눈 결정
         for j in range(6):
             a = j * math.pi / 3 + 0.26 + ms * 0.001
@@ -826,6 +840,8 @@ def icicles(fx):
 
     def one(p, x, y, ang, j, v, ms):
         K.streak(p, x - cos(ang) * 34, y - sin(ang) * 34, x, y, 2.0, c.light)
+        if K.ras(p):
+            p.glow(x, y, 12, c.base, 0.8)
         K.shard(p, x, y, 13 * fx.big, ang, c.light, c.dark, slim=0.36)
         K.shard(p, x, y, 6 * fx.big, ang, WHITE, slim=0.3)
     end = rain(fx, 0, 6, one, gap=75, lean=10)
@@ -840,6 +856,8 @@ def ice(fx):
 
     def one(p, x, y, ang, j, v, ms):
         K.streak(p, x - cos(ang) * 26, y - sin(ang) * 26, x, y, 2.4, c.light)
+        if K.ras(p):
+            p.glow(x, y, 11, c.base, 0.8)
         K.shard(p, x, y, 10 * k, ang, c.light, c.dark)
         K.shard(p, x, y, 4.5 * k, ang, WHITE)
     end = volley(fx, 0, 5, one, gap=80, life=180, spread=12, m=fx.geo.mouth(12))
@@ -870,7 +888,10 @@ def sludge(fx):
     def gob(p, u, ms):
         x, y = pos(u)
         r = 15 * k * (1 + 0.08 * sin(ms * 0.05))
-        K.blob(p, x, y, r * 1.18, c.deep, seed, ms * 0.03, n=9, jag=0.3)
+        if K.ras(p):
+            p.glow(x, y, r * 1.7, c.base, 0.8)                   # 독기
+        else:
+            K.blob(p, x, y, r * 1.18, c.deep, seed, ms * 0.03, n=9, jag=0.3)
         K.blob(p, x, y, r, c.dark, seed, ms * 0.03, n=9, jag=0.3, outline=c.alt, width=2)
         K.blob(p, x - r * 0.2, y - r * 0.22, r * 0.52, c.base, seed + 4, ms * 0.03, n=7, jag=0.25)
         p.oval(x + r * 0.3 * cos(ms * 0.02), y + r * 0.3 * sin(ms * 0.02), r * 0.2, r * 0.2, "", c.alt, 2)
@@ -918,7 +939,10 @@ def psy(fx):
             if 0.0 < v < 1.0:
                 x, y = g.at(0.1 + 0.8 * v)
                 r = (8 + 14 * v) * k
-                K.hoop(p, x, y, r * 0.38, r * 1.3, g.ang, c.dark, 5)
+                if K.ras(p):
+                    K.glow_hoop(p, x, y, r * 0.38, r * 1.3, g.ang, c.base, 7)
+                else:
+                    K.hoop(p, x, y, r * 0.38, r * 1.3, g.ang, c.dark, 5)
                 K.hoop(p, x, y, r * 0.38, r * 1.3, g.ang, violet if j % 2 else c.light, 2)
     sh.act(0, A + 120, cast)
 
@@ -934,7 +958,11 @@ def psy(fx):
         f = ms / float(B)
         rr = (56 - 30 * K.in2(f)) * k
         yy = g.ty - 9 * min(1.0, ms / 160.0)
-        K.sigil(p, g.tx, yy, rr, ms * 0.011, c.dark, 4)
+        if K.ras(p):
+            p.glow(g.tx, yy, rr * 1.15, c.dark, 0.9, 0.72)       # 문양 뒤로 번지는 염력
+            p.glow(g.tx, yy, rr * 0.55, violet, 0.8, 0.72)
+        else:
+            K.sigil(p, g.tx, yy, rr, ms * 0.011, c.dark, 4)
         K.sigil(p, g.tx, yy, rr, ms * 0.011, violet, 2)
         for j in range(3):                                  # 일그러지는 공간
             y0 = yy - 16 * k + j * 16 * k
@@ -976,9 +1004,15 @@ def pulse(fx):
             age = (v - b) / 0.75
             r = (7 + 26 * age) * k
             w = max(1, int(6 * (1 - age)))
-            K.hoop(p, rx, ry, r * 0.4, r, g.ang, cols[0], w + 3)
+            if K.ras(p):
+                K.glow_hoop(p, rx, ry, r * 0.4, r, g.ang, cols[0], (w + 3) * 1.8)
+            else:
+                K.hoop(p, rx, ry, r * 0.4, r, g.ang, cols[0], w + 3)
             K.hoop(p, rx, ry, r * 0.4, r, g.ang, cols[1] if fx.type not in ("GHOST", "DARK") else c.alt, w)
-        K.flare(p, x, y, 18 * k, 9, cols[0], inner=0.55, rot=ms * 0.02)
+        if K.ras(p):
+            p.glow(x, y, 24 * k, cols[0], 1.0)
+        else:
+            K.flare(p, x, y, 18 * k, 9, cols[0], inner=0.55, rot=ms * 0.02)
         K.orb(p, x, y, 10.5 * k, cols)
     sh.act(C, T, fly)
     K.impact(fx, C + T - 50, size=1.15)
@@ -1036,6 +1070,9 @@ def moon(fx):
         y = my + 16 * (1 - rise)
         if r < 2:
             return
+        if K.ras(p):
+            p.glow(mx, y, r * 2.2, c.base, 0.8)                 # 달빛
+            p.glow(mx, y, r * 1.2, pale, 0.9)
         K.arcs(p, mx, y, r + 12, gold, 2, ms * 0.25, 4, 50)        # 달무리
         K.crescent(p, mx, y, r + 2.5, tilt, 4.3, r * 0.84, c.base)
         K.crescent(p, mx, y, r, tilt, 4.3, r * 0.76, pale)
@@ -1105,6 +1142,9 @@ def flash(fx):
         ln = (18 + 66 * K.out2(min(1.0, ms / 160.0))) * k
         thin = K.fade(u, 0.1, 0.65)
         w = 0.17 * thin
+        if K.ras(p):                                        # 몸에서 터지는 빛
+            p.glow(sx, sy, ln * 0.7, c.base, 0.8 * thin)
+            p.glow(sx, sy, ln * 0.3, c.hot, thin)
         for j in range(12):
             a = j * math.pi / 6 + ms * 0.0016
             far = ln * (1.0 if j % 2 else 0.62)
@@ -1145,6 +1185,8 @@ def gem(fx):
                       0.5 + 0.5 * ms / float(A))
             elif ms < A + H + j * 80:
                 y = hy_ + 2 * sin(ms * 0.02 + j)
+                if K.ras(p) and not rocky:
+                    p.glow(hx_, y, 13 * k, c.alt, 0.8)
                 stone(p, hx_, y, j, -math.pi / 2)
                 if (int(ms / 70) + j) % 3 == 0:
                     K.glint(p, hx_ + 5, y - 6, 8, WHITE)
@@ -1196,7 +1238,10 @@ def meteor(fx):
         ca, sa = cos(ang), sin(ang)
         tail(p, x, y, ang, 58, 10 * k, (c.dark, "#ff8a3c", "#ffe27a"))
         K.streak(p, x - ca * 70 + sa * 6, y - sa * 70 - ca * 6, x - ca * 30, y - sa * 30, 1.6, c.light)
-        K.burst_star(p, x, y, 13 * k, 7, c.dark, j + int(ms / 50), inner=0.6, rot=ms * 0.02)
+        if K.ras(p):
+            p.glow(x, y, 21 * k, "#ff6a24", 1.0)                # 타는 유성
+        else:
+            K.burst_star(p, x, y, 13 * k, 7, c.dark, j + int(ms / 50), inner=0.6, rot=ms * 0.02)
         K.orb(p, x, y, 8.5 * k, ("#c8421a", "#ffd27a", WHITE), shine=False)
     _sky(fx, 5, one, gap=100, life=230, spread=28, hit=0.95, final=1.4, typ="FIRE")
 
@@ -1267,7 +1312,10 @@ def erupt(fx):
         f = K.out2(min(1.0, ms / float(A)))
         for q in cracks:
             n = max(2, int(round(len(q) / 2 * f)))
-            p.line(q[:n * 2], c.deep, 6, cap="butt")
+            if K.ras(p):
+                p.glow_line(q[:n * 2], lava[1], 10, 1.0)
+            else:
+                p.line(q[:n * 2], c.deep, 6, cap="butt")
             p.line(q[:n * 2], lava[2] if int(ms / 50) % 2 else lava[1], 2, cap="butt")
         p.oval(g.tx, gy, 30 * k * f, 6 * k * f, "", lava[1], 2)
     sh.act(0, A + B, glow, z=-2)
@@ -1392,8 +1440,11 @@ def wind(fx):
             r = 25 * k
             wob = ang + 0.3 * sin(ms * 0.03 + j)
             cx, cy = x - cos(wob) * r, y - sin(wob) * r
-            K.crescent(p, cx - cos(wob) * 9, cy - sin(wob) * 9, r, wob, 1.9, 5 * k, c.dark)
-            K.crescent(p, cx, cy, r, wob, 2.2, 10 * k, c.light, c.dark)
+            if K.ras(p):
+                p.glow(x, y, 17 * k, c.base, 0.9)
+            else:
+                K.crescent(p, cx - cos(wob) * 9, cy - sin(wob) * 9, r, wob, 1.9, 5 * k, c.dark)
+            K.crescent(p, cx, cy, r, wob, 2.2, 10 * k, c.light, "" if K.ras(p) else c.dark)
             K.crescent(p, cx, cy, r - 1, wob, 2.2, 4 * k, WHITE)
         end = volley(fx, 0, n, one, gap=gap, life=life, spread=12, hit=0.7)
         K.impact(fx, end - 50, size=1.15)
@@ -1439,7 +1490,10 @@ def tornado(fx):
             cx = g.tx + sin(ms * 0.022 + j * 0.9) * (3 + 7 * f)
             cy = base - f * 68 * k * grow
             st = (ms * 1.5 + j * 61) % 360
-            p.arc(cx, cy, rx, ry, st, 215, c.dark, 6)
+            if K.ras(p):
+                K.glow_arc(p, cx, cy, rx, ry, st, 215, c.base, 9, 0.9)
+            else:
+                p.arc(cx, cy, rx, ry, st, 215, c.dark, 6)
             p.arc(cx, cy, rx, ry, st + 8, 200, WHITE if j % 2 else c.light, 3)
         for j in range(5):                                  # 말려 오르는 것들
             f = (ms * 0.0022 + j * 0.2) % 1.0
@@ -1490,12 +1544,18 @@ def boom(fx):
         if 50 < ms < 330:                                   # 바닥을 쓸고 가는 충격파
             v = (ms - 50) / 280.0
             rr = (24 + 96 * K.out2(v)) * k
-            p.oval(x0, y0 + 16 * k, rr, rr * 0.26, "", c.deep, max(1, int(8 * (1 - v))) + 2)
+            if K.ras(p):
+                K.glow_hoop(p, x0, y0 + 16 * k, rr, rr * 0.26, 0.0, c.base, max(1, int(8 * (1 - v))) * 2.2 + 3)
+            else:
+                p.oval(x0, y0 + 16 * k, rr, rr * 0.26, "", c.deep, max(1, int(8 * (1 - v))) + 2)
             p.oval(x0, y0 + 16 * k, rr, rr * 0.26, "", c.light, max(1, int(8 * (1 - v))))
         if ms < 340:                                        # 불덩이 (겉은 남고 속이 먼저 꺼진다)
             r = (16 + 40 * K.out3(min(1.0, ms / 240.0))) * k
             shrink = 1.0 if ms < 150 else max(0.0, 1.0 - (ms - 150) / 190.0)
-            K.blob(p, x0, y0, r * 1.1, c.deep, seed, ms * 0.012, n=12, jag=0.24)
+            if K.ras(p):
+                p.glow(x0, y0, r * 1.75, c.dark, 1.0)                # 폭발의 열기
+            else:
+                K.blob(p, x0, y0, r * 1.1, c.deep, seed, ms * 0.012, n=12, jag=0.24)
             K.blob(p, x0, y0, r, c.dark if ms > 220 else c.base, seed, ms * 0.012, n=12, jag=0.24)
             if shrink > 0.1:
                 K.blob(p, x0, y0, r * 0.72 * shrink, c.light, seed + 3, ms * 0.012, n=10, jag=0.24)
@@ -1505,6 +1565,8 @@ def boom(fx):
             a = ms - t0
             if 0 <= a < 190:
                 r = (9 + 17 * K.out2(a / 110.0)) * k * (1.0 - a / 220.0)
+                if K.ras(p):
+                    p.glow(x0 + ox * k, y0 + oy * k, r * 1.6, c.base, 0.9)
                 K.blob(p, x0 + ox * k, y0 + oy * k, r, c.dark, seed + q * 5, a * 0.02, n=9)
                 K.blob(p, x0 + ox * k, y0 + oy * k, r * 0.66, c.light, seed + q * 5 + 2, a * 0.02, n=8)
                 if a < 90:
@@ -1545,7 +1607,10 @@ def sound(fx):
             v = a / float(LIFE)
             rr = 12 + v * reach * 0.98
             w = max(1, int(8 * (1 - v * 0.75)))
-            p.arc(mx, my, rr, rr, g.deg - 38, 76, c.deep, w + 4)
+            if K.ras(p):
+                K.glow_arc(p, mx, my, rr, rr, g.deg - 38, 76, c.base, (w + 4) * 1.8, 0.9)
+            else:
+                p.arc(mx, my, rr, rr, g.deg - 38, 76, c.deep, w + 4)
             p.arc(mx, my, rr, rr, g.deg - 36, 72, c.light if j % 2 else c.base, w)
             if v < 0.4:
                 p.arc(mx, my, rr, rr, g.deg - 20, 40, WHITE, 2)
@@ -1616,12 +1681,19 @@ def drain(fx):
     def sap(p, u, ms):
         if ms < 280:                                        # 빨려 나오는 자리 - 기운이 쪼그라든다
             r = 32 - ms * 0.09
-            K.burst_star(p, g.tx, g.ty, r * 1.2, 9, "", 3, inner=0.62, rot=ms * 0.012, outline=c.dark, width=2)
+            if K.ras(p):
+                p.glow(g.tx, g.ty, r * 1.3, c.dark, 0.9)
+            else:
+                K.burst_star(p, g.tx, g.ty, r * 1.2, 9, "", 3, inner=0.62, rot=ms * 0.012, outline=c.dark, width=2)
             K.ring(p, g.tx, g.ty, r, c.light, 2, 0.8)
         if 80 < ms < total - 120:                           # 흘러드는 두 줄기
             for j in range(2):
                 q = g.path(1.0, 0.0, 10, off=lambda u_, o=j: (16 if o else -16) * K.hump(u_) * cos(ms * 0.012 + o))
-                K.ribbon(p, q, K.widths(10, 2.2), c.light if j else c.dark)
+                if K.ras(p):
+                    p.glow_line(q, c.base, 7, 0.9)
+                    K.ribbon(p, q, K.widths(10, 2.2), c.light)
+                else:
+                    K.ribbon(p, q, K.widths(10, 2.2), c.light if j else c.dark)
         for j in range(n):
             a = ms - 120 - j * gap
             if a < 0 or a >= life:

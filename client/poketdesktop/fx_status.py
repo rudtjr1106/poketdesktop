@@ -28,6 +28,8 @@ def arrows(fx, at, x, y, up, cols, dur=560, n=3):
 
     def draw(p, u, ms):
         f = K.fade(u, 0.14, 0.72)
+        if K.ras(p):
+            p.glow(x, y, 30 * f, cols[1], 0.45 * f, 1.25)        # 몸을 감싸는 기운
         for j in range(8):                                  # 흐르는 빛줄기
             ph = (ms * 0.0022 + K.noise(seed + j)) % 1.0
             xx = x + (j - 3.5) * 8.5
@@ -43,7 +45,10 @@ def arrows(fx, at, x, y, up, cols, dur=560, n=3):
             s = K.back(min(1.0, a / 140.0), 2.0) * (1.0 if u < 0.8 else max(0.0, (1 - u) / 0.2))
             if s <= 0.05:
                 continue
-            K.chevron(p, x, yy, 15 * s, 12 * s, up, cols[0])
+            if K.ras(p):
+                p.glow(x, yy - d * 2, 15 * s, cols[1], 0.85)
+            else:
+                K.chevron(p, x, yy, 15 * s, 12 * s, up, cols[0])
             K.chevron(p, x, yy, 12.5 * s, 10 * s, up, cols[1])
             K.chevron(p, x, yy + d * 1.5, 7 * s, 5.5 * s, up, cols[2])
         if up and 0.25 < u < 0.7:
@@ -63,7 +68,10 @@ def cast(fx, at, dur=200, typ=None):
             if 0.0 < v < 1.0:
                 x, y = g.at(0.12 + 0.82 * v)
                 r = 7 + 9 * v
-                K.hoop(p, x, y, r * 0.4, r * 1.2, g.ang, cols[0], 4)
+                if K.ras(p):
+                    K.glow_hoop(p, x, y, r * 0.4, r * 1.2, g.ang, cols[0], 7)
+                else:
+                    K.hoop(p, x, y, r * 0.4, r * 1.2, g.ang, cols[0], 4)
                 K.hoop(p, x, y, r * 0.4, r * 1.2, g.ang, cols[1] if not c.edge else c.alt, 2)
         K.glint(p, g.sx + g.ux * 14, g.sy + g.uy * 14 - 8, 12 * K.hump(u) + 2, WHITE)
     return fx.show.act(at, dur, draw)
@@ -81,7 +89,10 @@ def swirl(fx, at, x, y, typ=None, dur=560, n=9):
             ph = (ms * 0.0018 + j / 3.0) % 1.0
             rr = (26 - 8 * ph) * f + 2
             yy = y + 22 - 50 * ph
-            p.arc(x, yy, rr, rr * 0.32, (ms * 0.9 + j * 120) % 360, 200, c.deep if not c.edge else c.edge, 4)
+            if K.ras(p):
+                K.glow_arc(p, x, yy, rr, rr * 0.32, (ms * 0.9 + j * 120) % 360, 200, c.base if not c.edge else c.alt, 7, 0.8)
+            else:
+                p.arc(x, yy, rr, rr * 0.32, (ms * 0.9 + j * 120) % 360, 200, c.deep if not c.edge else c.edge, 4)
             p.arc(x, yy, rr, rr * 0.32, (ms * 0.9 + j * 120 + 6) % 360, 185, c.light if not c.edge else c.alt, 2)
         for j in range(n):                                  # 나선으로 오르는 조각
             ph = (ms * 0.002 + j / float(n)) % 1.0
@@ -118,19 +129,27 @@ def heal(fx, at=0, where=None):
 
     def draw(p, u, ms):
         f = K.fade(u, 0.12, 0.75)
+        if K.ras(p):
+            p.glow(x, y, 32 * f, HEAL[1], 0.5 * f, 1.2)          # 몸을 감싸는 초록빛
         for j in range(3):                                  # 훑어 오르는 고리
             ph = (ms * 0.0019 + j / 3.0) % 1.0
             rr = (27 - 6 * ph) * f + 1
             yy = y + 24 - 56 * ph
-            p.oval(x, yy, rr, rr * 0.3, "", HEAL[0], int(4 * (1 - ph) * f) + 2)
+            if K.ras(p):
+                K.glow_hoop(p, x, yy, rr, rr * 0.3, 0.0, HEAL[1], (int(4 * (1 - ph) * f) + 2) * 2.0, 0.8)
+            else:
+                p.oval(x, yy, rr, rr * 0.3, "", HEAL[0], int(4 * (1 - ph) * f) + 2)
             p.oval(x, yy, rr, rr * 0.3, "", HEAL[1] if j % 2 else HEAL[2], max(1, int(3 * (1 - ph) * f)))
         for j in range(6):                                  # 피어오르는 '+'
             ph = (ms * 0.0016 + K.noise(seed + j)) % 1.0
             xx = x + (K.noise(seed + j * 3) - 0.5) * 56
             yy = y + 22 - 60 * ph
             s_ = (6 + 4 * K.noise(seed + j * 7)) * K.hump(ph) * f
-            if s_ > 1.5:
+            if s_ > 1.5 and K.ras(p):
+                p.glow(xx, yy, s_ * 1.9, HEAL[1], 0.8)
+            elif s_ > 1.5:
                 K.plus(p, xx, yy, s_ + 1.8, HEAL[0])
+            if s_ > 1.5:
                 K.plus(p, xx, yy, s_, HEAL[1] if j % 2 else HEAL[2])
         for j in range(4):
             a = ms * 0.008 + j * TAU / 4
@@ -239,6 +258,8 @@ def _ail_confuse(fx, at, x, y):
         for j in range(3):
             a = ms * 0.012 + j * TAU / 3
             back_ = sin(a) < 0
+            if K.ras(p):
+                p.glow(x + cos(a) * 24, cy + sin(a) * 7.5, 8 * f + 1, c.alt, 0.7)
             K.star(p, x + cos(a) * 24, cy + sin(a) * 7.5, (6.5 if not back_ else 5) * f + 1, c.alt, c.deep, ms * 0.01)
         for j in range(2):                                  # 어질어질한 소용돌이
             rr = (10 + j * 7) * f
@@ -270,7 +291,11 @@ def _ail_bind(fx, at, x, y):
         for j in range(3):
             rr = (40 - 18 * sq) - j * 2
             yy = y - 12 + j * 12
-            p.arc(x, yy, rr, rr * 0.3, (ms * 0.8 + j * 90) % 360, 300, c.deep, int(5 * thin) + 1)
+            if K.ras(p):
+                K.glow_arc(p, x, yy, rr, rr * 0.3, (ms * 0.8 + j * 90) % 360, 300, c.base if not c.edge else c.alt,
+                           (int(5 * thin) + 1) * 1.8, 0.8)
+            else:
+                p.arc(x, yy, rr, rr * 0.3, (ms * 0.8 + j * 90) % 360, 300, c.deep, int(5 * thin) + 1)
             p.arc(x, yy, rr, rr * 0.3, (ms * 0.8 + j * 90 + 6) % 360, 285, c.light if not c.edge else c.alt,
                   max(1, int(3 * thin)))
     return fx.show.act(at, 520, draw)
@@ -319,7 +344,10 @@ def _ail_curse(fx, at, x, y):
 
     def draw(p, u, ms):
         f = K.fade(u, 0.15, 0.75)
-        K.sigil(p, x, y + 22, 30 * f + 1, ms * 0.006, c.deep, 4, 0.3)
+        if K.ras(p):
+            p.glow(x, y + 22, 34 * f + 1, c.dark if not c.edge else c.alt, 0.8, 0.3)
+        else:
+            K.sigil(p, x, y + 22, 30 * f + 1, ms * 0.006, c.deep, 4, 0.3)
         K.sigil(p, x, y + 22, 30 * f + 1, ms * 0.006, line, 2, 0.3)
         for j in range(8):
             ph = (ms * 0.0022 + j / 8.0) % 1.0
@@ -391,6 +419,8 @@ def wisp(fx):
                 v = K.inout(K.clamp((ms - A - j * 40) / float(T)))
                 x, y = g.at(v, sin(v * 9 + j * 2) * 14 * K.hump(v))
                 y -= 14 * K.hump(v)
+            if K.ras(p):
+                p.glow(x, y - 3, 15, "#3d6cff", 0.9)
             K.flame(p, x, y, 8.5 + 1.5 * sin(ms * 0.04 + j), K.snoise(j + int(ms / 45)) * 4, cols)
     sh.act(0, A + T + 80, draw)
     _ail_burn(fx, A + T, fx.dst[0], fx.dst[1])
@@ -424,7 +454,12 @@ def shield(fx):
         if s <= 0.03:
             return
         r = 31 * s * (1 + 0.03 * sin(ms * 0.03))
-        p.poly(hexa(r + 3), "", rim, 6)
+        if K.ras(p):
+            p.glow_line(hexa(r + 2) + hexa(r + 2)[:2], light, 9, 0.75)
+            if ms < 200:
+                p.glow(cx, cy, r * 1.3, light, 0.8 * (1 - ms / 200.0))      # 튀어나오는 순간
+        else:
+            p.poly(hexa(r + 3), "", rim, 6)
         p.poly(hexa(r), "", light, 3)
         cell = r * 0.36                                     # 벌집
         for ox, oy in ((0, 0), (0, -2), (0, 2), (1.73, -1), (1.73, 1), (-1.73, -1), (-1.73, 1)):
@@ -455,7 +490,10 @@ def wall(fx):
         hh, ww = 36 * grow, 10
         sk = 7 * g.face                                     # 비스듬히 선 판
         pts = [cx - ww + sk, cy - hh, cx + ww + sk, cy - hh + 5, cx + ww - sk, cy + hh, cx - ww - sk, cy + hh - 5]
-        p.poly(pts, "", rim, 6)
+        if K.ras(p):
+            p.glow_line(pts + pts[:2], light, 9, 0.75)
+        else:
+            p.poly(pts, "", rim, 6)
         p.poly(pts, "", light, 3)
         for j in range(4):                                  # 판을 타고 오르는 빛
             v = ((ms * 0.0016 + j * 0.25) % 1.0) * 2 - 1
@@ -598,6 +636,9 @@ def weather(fx):
             w = 0.13
             p.poly([cx + cos(a - w) * r * 1.2, sy_ + sin(a - w) * r * 1.2, cx + cos(a) * far, sy_ + sin(a) * far,
                     cx + cos(a + w) * r * 1.2, sy_ + sin(a + w) * r * 1.2], "#ffd24a" if j % 2 else "#fff0a0")
+        if K.ras(p):
+            p.glow(cx, sy_, r * 3.0, "#ff9a2c", 0.8)                # 햇무리
+            p.glow(cx, sy_, r * 1.8, "#ffd24a", 1.0)
         K.orb(p, cx, sy_, r, ("#e0701a", "#ffc83c", "#fffbe0"), shine=False)
         for j in range(3):                                  # 내리쬐는 볕
             xx = cx + (j - 1) * 46
