@@ -151,6 +151,9 @@ class _FxStage(object):
         self.cv = _ScaledCanvas(win.cv, k)
         self.root = win.root
         self.hiding = getattr(win, "hiding", None)      # 숨는 기술 (battle_fx.Hiding, 2.0)
+        # 연출을 도형 대신 그림 한 장으로 그린다 (빛 번짐 · 매끈한 가장자리). 느린 PC 에서는 스스로 도형으로 돌아간다
+        from . import fx_raster
+        self.fx_raster = fx_raster.wanted()
 
     def lunge(self, who, done):
         self.win.lunge(who, done)

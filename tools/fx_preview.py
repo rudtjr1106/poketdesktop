@@ -14,6 +14,8 @@
 battle_fx 는 Tk 캔버스에 도형을 그리고 root.after 로 굴러간다. 여기서는 캔버스와
 시계를 흉내 내서(FakeCanvas / FakeRoot) **같은 코드를 그대로** 돌리고, 프레임마다
 PIL 로 옮겨 그린다. 화면을 못 찍는 환경에서도 연출을 눈으로 볼 수 있다.
+(창으로 틀어 보려면 tools/fx_gallery.py - 그쪽이 진짜 Tk 그림이다. 여기 그림은 PIL 이 흉내 낸 것이라
+가장자리가 진짜보다 매끈하다.)
 
 client/test_move_fx.py 가 같은 흉내 캔버스로 '끝까지 가는지 · 찌꺼기가 남는지 ·
 도형이 너무 많지 않은지' 를 센다 (창을 띄우지 않는다).
@@ -185,6 +187,20 @@ class FakeStage(object):
         self.pos = {"me": me, "foe": foe}
         self.off = {"me": (0.0, 0.0), "foe": (0.0, 0.0)}
         self.lunges = 0
+        self.shift = {"me": [0.0, 0.0], "foe": [0.0, 0.0]}       # 연출이 밀어 둔 만큼 (fx_shift)
+        self.pushed = {}                                         # 가장 멀리 밀렸던 만큼 (검사가 본다)
+
+    def fx_shift(self, key, dx, dy):
+        if key in self.shift:
+            self.shift[key][0] += dx
+            self.shift[key][1] += dy
+            self.pushed[key] = max(self.pushed.get(key, 0.0), abs(self.shift[key][0]) + abs(self.shift[key][1]))
+
+    def fx_box(self, key):
+        if key not in self.pos:
+            return None
+        x, y = self.pos[key]
+        return (x - 24, y - 28, x + 24, y + 28)
 
     def lunge(self, who, done):
         """달려들었다 돌아온다. 관장 배틀 창처럼 190ms 뒤에 done."""
@@ -267,6 +283,10 @@ def _font(size):
     return _FONTS[size]
 
 
+LIGHT = False                   # 밝은 배경에서도 보이는지 볼 때 (--light)
+BG_LIGHT_TOP, BG_LIGHT_BOT = (196, 226, 240), (150, 196, 132)
+
+
 def render(stage, zoom=2.0, ss=2, sprites=True):
     """지금 캔버스에 있는 것을 그림 한 장으로."""
     from PIL import Image, ImageDraw
@@ -277,12 +297,15 @@ def render(stage, zoom=2.0, ss=2, sprites=True):
     dr = ImageDraw.Draw(img)
     for y in range(H):
         t = y / float(H)
-        dr.line([(0, y), (W, y)], fill=tuple(int(BG_TOP[i] * (1 - t) + BG_BOT[i] * t) for i in range(3)))
+        top, bot = (BG_LIGHT_TOP, BG_LIGHT_BOT) if LIGHT else (BG_TOP, BG_BOT)
+        dr.line([(0, y), (W, y)], fill=tuple(int(top[i] * (1 - t) + bot[i] * t) for i in range(3)))
     if sprites:
-        for who, col in (("foe", (108, 116, 150)), ("me", (124, 134, 170))):
+        for who, col in (("foe", (88, 96, 130) if LIGHT else (108, 116, 150)),
+                         ("me", (98, 108, 146) if LIGHT else (124, 134, 170))):
             x, y = stage.pos[who]
             ox, oy = stage.off[who]
-            x, y = (x + ox) * k, (y + oy) * k
+            sx_, sy_ = stage.shift[who]
+            x, y = (x + ox + sx_) * k, (y + oy + sy_) * k
             z = k * (1.18 if who == "me" else 0.96)          # 내 도트가 조금 크다 (132px / 108px)
             dr.ellipse([x - 22 * z, y + 22 * z, x + 22 * z, y + 30 * z], fill=(18, 20, 30))      # 그림자
             dr.ellipse([x - 17 * z, y - 6 * z, x + 17 * z, y + 26 * z], fill=col)                # 몸
@@ -347,6 +370,11 @@ def render(stage, zoom=2.0, ss=2, sprites=True):
                     font=_font(size), anchor="mm")
     if ss != 1:
         img = img.resize((W // ss, H // ss), Image.LANCZOS)
+    ov = getattr(stage, "raster_img", None)                  # [시범] 그림 바탕: 연출이 낸 그림 그대로를 얹는다
+    if ov is not None:
+        if ov.size != img.size:
+            ov = ov.resize(img.size, Image.NEAREST)
+        img.paste(ov, (0, 0), ov)
     return img
 
 
@@ -366,11 +394,18 @@ def find_move(moves, name):
     raise SystemExit("기술을 못 찾았습니다: %s" % name)
 
 
-def play(move, flip=False, flat=False, limit_ms=4000, step_ms=FRAME_MS, on_frame=None, style=None, ev=None):
-    """연출 하나를 끝까지 돌린다. (stage, 걸린 ms, 끝났나) 를 돌려준다."""
+def play(move, flip=False, flat=False, limit_ms=4000, step_ms=FRAME_MS, on_frame=None, style=None, ev=None,
+         raster=None, raster_k=2.0):
+    """연출 하나를 끝까지 돌린다. (stage, 걸린 ms, 끝났나) 를 돌려준다.
+
+    raster: [시범] 그림 바탕으로 ({} = 매끈하게, {"pixel": True} = 도트풍). raster_k 는 그릴 배율 (render 의 zoom).
+    """
     from poketdesktop import battle_fx as FX
     me, foe = (FLAT_ME, FLAT_FOE) if flat else (ME, FOE)
     stage = FakeStage(me=me, foe=foe)
+    if raster is not None:
+        stage.raster_img = None
+        stage.fx_raster = dict(raster, k=raster_k, present=lambda im: setattr(stage, "raster_img", im))
     who = "foe" if flip else "me"
     src, dst = (foe, me) if flip else (me, foe)
     state = {"done": None}
@@ -394,6 +429,8 @@ def play(move, flip=False, flat=False, limit_ms=4000, step_ms=FRAME_MS, on_frame
 
 def record(move, zoom=2.0, **kw):
     frames = []
+    if kw.get("raster") is not None:
+        kw["raster_k"] = zoom
     stage, fx, took = play(move, on_frame=lambda st: frames.append(render(st, zoom=zoom)), **kw)
     return frames, fx, took
 
@@ -451,7 +488,13 @@ def main():
     ap.add_argument("--eff", type=float, default=1.0, help="효과 배율 (2 = 효과가 굉장하다)")
     ap.add_argument("--crit", action="store_true", help="급소")
     ap.add_argument("--z", action="store_true", help="Z기술 (컷인이 금빛)")
+    ap.add_argument("--miss", action="store_true", help="빗나감 (과녁 옆에 떨어진다)")
+    ap.add_argument("--light", action="store_true", help="밝은 배경 (풀밭 · 하늘)")
+    ap.add_argument("--raster", action="store_true", help="[시범] 그림 바탕으로 (빛 번짐)")
+    ap.add_argument("--pixel", action="store_true", help="[시범] 그림 바탕, 도트풍")
     a = ap.parse_args()
+    global LIGHT
+    LIGHT = bool(a.light)
 
     from poketdesktop import battle_fx as FX
     moves = load_moves()
@@ -477,8 +520,11 @@ def main():
     for m, name in todo:
         hint = {"t": "move", "move": m.get("kr"), "z": bool(a.z),
                 "_hit": {"crit": bool(a.crit), "eff": a.eff}}
+        if a.miss:
+            hint = {"t": "move", "move": m.get("kr"), "_miss": True}
         frames, fx, took = record(m, zoom=a.zoom, flip=a.flip, flat=a.flat,
-                                  style=a.style if m.get("kr") == a.style else None, ev=hint)
+                                  style=a.style if m.get("kr") == a.style else None, ev=hint,
+                                  raster=({"pixel": True} if a.pixel else {}) if (a.raster or a.pixel) else None)
         tag = "%s  [%s · %s · 위력 %s]  %s" % (
             m.get("kr"), fx.style, m.get("type"), m.get("power"),
             ("%dms" % took) if took is not None else "안 끝남!")
