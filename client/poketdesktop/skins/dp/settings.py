@@ -150,7 +150,8 @@ class SettingsWindow(ST.SettingsWindow):
                           "get": lambda: self.text_pick, "put": self._pick_text,
                           "action": ("다시 켜서 적용", self._restart_for_skin,
                                      lambda: self.text_pick != U.TEXT_SIZE)})
-        for var, label, key, note, how in (
+        # 낚시터 보이기 (다음 시즌) - 기본 창과 같은 줄을 '풀숲 띄우기' 아래에 끼운다 (ST._with_pond)
+        for var, label, key, note, how in self._with_pond((
                 (self.names, "이름표 보이기", "showNames", "포켓몬 위에 이름과 레벨을 띄웁니다.", self._toggle),
                 (self.drag, "포켓몬 들어서 옮기기", "petDrag",
                  "켜면 포켓몬과 알을 마우스로 누른 채 끌어서 원하는 자리에 내려놓을 수 있습니다. 돌아다닐 영역 안에서만 "
@@ -176,7 +177,7 @@ class SettingsWindow(ST.SettingsWindow):
                  "길드 친선전이 열리면 묻지 않고 바탕화면에서 바로 관전합니다.", self._toggle_plain),
                 (self.cl_note, "독도 챔피언리그 알림", "championNotify",
                  "관장을 전부 이긴 참가자가 독도에서 상대를 기다리면 화면 오른쪽 아래에 잠깐 알립니다 ([도전] 을 누르면 "
-                 "바로 붙습니다). 독도 창을 보고 있거나 배틀 · 구경 중일 때는 띄우지 않습니다.", self._toggle_plain)):
+                 "바로 붙습니다). 독도 창을 보고 있거나 배틀 · 구경 중일 때는 띄우지 않습니다.", self._toggle_plain))):
             self._flag(label, note, var, key, how)
         self.rows.append({"kind": "choice", "label": "야생 배틀에서 잡기",
                           "note": "체력을 조금 남기고 멈춰서 볼을 던질 틈을 줍니다. 10초 안에 안 던지거나 야생 포켓몬을 "
@@ -248,6 +249,10 @@ class SettingsWindow(ST.SettingsWindow):
 
     def show_grass(self):
         self.grass.set(bool(self.app.settings.get("showGrass", True)))
+        self._soon()
+
+    def show_pond(self):
+        ST.SettingsWindow.show_pond(self)
         self._soon()
 
     def show_boss(self):

@@ -368,6 +368,33 @@ class Api(object):
         """찍은 성장치를 전부 되돌린다 (돈이 든다)."""
         return self._call("POST", "/api/expedition/reset", {"pokemon": int(pid)})
 
+    # ---------------- 낚시 (시즌 7) ----------------
+    # 모든 응답은 서버 시계로 센 남은 초만 싣는다. 입질 전에는 언제 입질이 오는지 알려 주지 않는다
+    # (design-notes/2026-11-26-fishing.md). 낚시를 모르는 옛 서버는 404 를 준다.
+    def fish(self):
+        """낚시 카드 {open, state, ready, nibbleLeft, strikeLeft, bait, baitLeft, wild?, ballOptions?}."""
+        return self._call("GET", "/api/fish")
+
+    def fish_cast(self, bait=None):
+        """찌를 던진다. bait 는 지닌 열매 id 또는 None. 카드를 준다."""
+        return self._call("POST", "/api/fish/cast", {"bait": bait})
+
+    def fish_bite(self):
+        """앱이 지금 입질을 보여 줄 수 있다 - 입질을 연다. 카드를 준다 (아직이면 state 가 그대로)."""
+        return self._call("POST", "/api/fish/bite", {})
+
+    def fish_hook(self):
+        """챔질. {result: early|spooked|hooked|missed, card, (hooked 면) perfect, wild, ballOptions, src}."""
+        return self._call("POST", "/api/fish/hook", {"hour": _hour()})
+
+    def fish_reel(self):
+        """줄을 거둔다 (입질 전이면 미끼를 돌려받는다). 카드를 준다."""
+        return self._call("POST", "/api/fish/reel", {})
+
+    def fish_board(self, week="this"):
+        """주간 대물 순위 {week, weekStart, endsIn, top, me, last, mine}. week = this | last."""
+        return self._call("GET", "/api/fish/board?week=%s" % ("last" if week == "last" else "this"))
+
     def set_order(self, ids):
         """데리고 다니는 순서. 화면에 보이는 차례대로 넘긴다 (음수는 알)."""
         return self._call("POST", "/api/pokemon/order",

@@ -158,7 +158,7 @@ def wild_part(root):
     finally:
         shiny_fx.play = real
     src = open(wild_ui.__file__, encoding="utf-8").read()
-    body = src[src.index("    def show_wild(self, mon):"):src.index("    def sparkle(self):")]
+    body = src[src.index("    def show_wild(self, mon"):src.index("    def sparkle(self):")]
     chk("show_wild: 색이 다른 개체일 때만 반짝인다",
         'if mon.get("shiny"):' in body and "self.sparkle()" in body.split('if mon.get("shiny"):', 1)[1]
         .split("self.app.notify", 1)[0])

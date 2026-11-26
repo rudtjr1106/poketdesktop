@@ -321,7 +321,7 @@ class SettingsWindow(object):
         # 손잡이마다 하는 일이 다르다. 이름표는 이름표 창을 붙이거나 떼야
         # 하고, 풀숲은 야생 폴링을 켜고 끄고, 알림은 저장만 하면 된다.
         # 그래서 누를 때 무엇을 부를지도 같이 적는다.
-        for var, label, key, note, how in (
+        for var, label, key, note, how in self._with_pond((
                 (self.names, "이름표 보이기", "showNames",
                  "포켓몬 위에 이름과 레벨을 띄웁니다.", self._toggle),
                 # 도트는 누를 때마다 설정을 본다 (overlay.Pet.can_drag). 그래서
@@ -363,7 +363,7 @@ class SettingsWindow(object):
                 (self.arche_title, "브라우저 단서 찾기 (아르케)", "archeTitle",
                  "아르케 이벤트 동안, 윈도우에서 맨 앞에 있는 창의 제목만 3초마다 확인해 이벤트 단서와 "
                  "맞는지 봅니다. 주소 · 방문 기록 · 페이지 내용은 읽지 않고, 제목은 저장하거나 보내지 "
-                 "않습니다 (단서와 맞을 때만 그 말을 서버에 보냅니다).", self._toggle_plain)):
+                 "않습니다 (단서와 맞을 때만 그 말을 서버에 보냅니다).", self._toggle_plain))):
             c = tk.Checkbutton(
                 box, text=label, variable=var, bg=U.BG, fg=U.FG,
                 selectcolor=U.INK, activebackground=U.BG,
@@ -604,6 +604,28 @@ class SettingsWindow(object):
         """
         self.grass.set(bool(self.app.settings.get("showGrass", True)))
 
+    # 낚시 (다음 시즌) - 서버가 낚시를 열었을 때만 '풀숲 띄우기' 바로 아래에 (열리기 전엔 켤 것이 없다)
+    POND_LABEL = "낚시터 보이기"
+    POND_NOTE = ("바탕화면 한쪽에 작은 연못을 둡니다. 눌러서 찌를 던져 두면 가끔 입질이 옵니다. 끄면 연못이 "
+                 "사라지고, 던져 둔 줄은 거둡니다 (단 미끼는 돌려받습니다).")
+
+    def _with_pond(self, rows):
+        """손잡이 목록에 '낚시터 보이기' 를 끼운다 (낚시가 열렸을 때만). 화면 테마도 이것을 쓴다."""
+        rows = list(rows)
+        fz = getattr(self.app, "fishing", None)
+        if fz is None or not getattr(fz, "open", False):
+            return rows
+        self.pond = tk.BooleanVar(value=config.show_pond(self.app.settings))
+        at = next((i + 1 for i, r in enumerate(rows) if r[2] == "showGrass"), len(rows))
+        rows.insert(at, (self.pond, self.POND_LABEL, "showPond", self.POND_NOTE, self._toggle_pond))
+        return rows
+
+    def show_pond(self):
+        """트레이에서 낚시터를 켜고 껐을 때 표시를 맞춘다 (show_grass 와 같은 까닭)."""
+        v = getattr(self, "pond", None)
+        if v is not None:
+            v.set(config.show_pond(self.app.settings))
+
     def _autostart_row(self, box):
         """컴퓨터 켤 때 같이 시작.
 
@@ -720,6 +742,10 @@ class SettingsWindow(object):
         # 서버를 계속 두드린다.
         self.app.set_show_grass(var.get())
 
+    def _toggle_pond(self, _key, var):
+        # 저장하고 연못을 바로 세우거나 걷는다 (app.set_show_pond - 트레이 · 연못 메뉴와 같은 길)
+        self.app.set_show_pond(var.get())
+
     def reset(self):
         # autostart 는 화면 취향이 아니라 **윈도우에 걸어 둔 등록**이다.
         # "기본값으로" 를 눌렀다고 부팅 목록에서 조용히 빠지면(혹은 조용히
@@ -729,6 +755,8 @@ class SettingsWindow(object):
         # 한 판을 다시 물어본다.
         keep = {k: self.app.settings[k]
                 for k in ("server", "lastBall", "autostart",
+                          # 미끼 · 낚시 안내를 어디까지 했나도 기록이다 (lastBall 과 같다)
+                          "lastBait", "pondHints",
                           "lastRunVersion", "updateSkipped",
                           # '고른 포켓몬만' 에서 고른 종은 하나씩 골라 모은 것이다 - 모드만 기본(new)으로 돌아가면
                           # 쓰이지 않는다. 지우면 다시 고르려고 1025종을 또 훑어야 한다.
@@ -764,6 +792,10 @@ class SettingsWindow(object):
         # 돌아온다. 그러면 껐던 사람은 되돌렸는데도 풀숲이 안 돋는다.
         if self.app.wild:
             self.app.wild.set_enabled(self.app.settings.get("showGrass", True))
+        fz = getattr(self.app, "fishing", None)
+        if fz is not None:                      # 낚시터도 기본(풀숲을 따름) · 기본 자리로
+            fz.set_visible(config.show_pond(self.app.settings))
+            fz.reposition()
         self.app.refresh_tray()
         self._paint_catch_pick()
         self._repaint_pick_window()

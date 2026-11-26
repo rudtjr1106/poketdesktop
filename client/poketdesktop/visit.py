@@ -917,6 +917,11 @@ class Visit(object):
                 fn = getattr(self.app, "on_update_hint", None)
                 if fn is not None:
                     fn(ev.get("v"))
+            elif t == "fish":
+                # 낚시 (다음 시즌): 입질 시각이 지났다 - 앱이 보여 줄 수 있을 때 입질을 연다. 놀러 가 있든 아니든
+                fn = getattr(self.app, "on_fish_push", None)
+                if fn is not None:
+                    fn(ev)
             elif not self.active:
                 return
             elif t == "party" and self.guest:

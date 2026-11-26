@@ -536,7 +536,7 @@ class Pokedex(object):
     def bst(species):
         return sum((species.get("base") or {}).values())
 
-    def spawn_pool(self, max_level, max_bst=None, boost=None):
+    def spawn_pool(self, max_level, max_bst=None, boost=None, exclude=frozenset()):
         """해당 레벨까지 나올 수 있는 종과 누적 가중치.
 
         max_bst 는 '종족값 합' 상한이다. 이게 없으면 레벨 5 짜리 야생인데
@@ -547,8 +547,12 @@ class Pokedex(object):
         (할로윈 고스트, 서버 halloween.py). 나오는 종은 그대로고 비율만 바뀐다.
         **배수가 0 이면 그 타입 종만** 남긴다 (타입 스프레이, 서버 boosts.py). 그때는 종족값 상한을 풀지 않는다 -
         비면 빈 표를 돌려주고, 부르는 쪽이 평소 표로 다시 뽑는다.
+
+        exclude 는 표에서 뺄 종 (낚시 위주 종 - 시즌 7, 서버 fishing.grass_exclude). spawnable 을 끄지 않고 여기서
+        빼는 까닭: spawnable 이 꺼진 종은 업적의 '잠긴 종' 으로 세어져 풀숲에 거꾸로 나온다. 캐시 열쇠에 넣는다.
         """
-        key = (int(max_level), int(max_bst) if max_bst else 0, boost)
+        exclude = frozenset(exclude or ())
+        key = (int(max_level), int(max_bst) if max_bst else 0, boost, exclude)
         if key in self._pool_cache:
             return self._pool_cache[key]
         only = bool(boost) and not boost[1]
@@ -557,6 +561,8 @@ class Pokedex(object):
             if not s.get("spawnable") or s.get("minLevel", 1) > max_level:
                 continue
             if max_bst and self.bst(s) > max_bst:
+                continue
+            if s["internal"] in exclude:
                 continue
             w = s.get("weight", 0)
             hit = bool(boost) and bool(set(boost[0]) & set(s.get("types") or ()))
@@ -568,30 +574,81 @@ class Pokedex(object):
             pool.append(s)
             cum.append(total)
         if not pool and max_bst and not only:   # 너무 좁으면 상한을 풀어준다
-            return self.spawn_pool(max_level, None, boost)
+            return self.spawn_pool(max_level, None, boost, exclude)
         self._pool_cache[key] = (pool, cum, total)
         return pool, cum, total
 
-    def roll_species(self, max_level, rng=None, max_bst=None, boost=None):
+    def roll_species(self, max_level, rng=None, max_bst=None, boost=None, exclude=frozenset()):
         rng = rng or random.Random()
-        pool, cum, total = self.spawn_pool(max_level, max_bst, boost)
+        pool, cum, total = self.spawn_pool(max_level, max_bst, boost, exclude)
         if not pool or total <= 0:
             return None
         import bisect
         return pool[bisect.bisect_right(cum, rng.randrange(total))]
 
-    def roll_wild(self, min_level=2, max_level=12, rng=None, max_bst=None, boost=None, **kw):
+    def roll_wild(self, min_level=2, max_level=12, rng=None, max_bst=None, boost=None, exclude=frozenset(), **kw):
         """야생 개체 하나. 종을 먼저 뽑고, 그 종이 나올 수 있는 레벨대로 맞춘다."""
         rng = rng or random.Random()
         max_level = max(1, min(LEVEL_MAX, int(max_level)))
         min_level = max(1, min(max_level, int(min_level)))
-        s = self.roll_species(max_level, rng, max_bst, boost)
+        s = self.roll_species(max_level, rng, max_bst, boost, exclude)
         if s is None:
             return None
         lo = max(min_level, s.get("minLevel", 1))
         lo = min(lo, max_level)
         level = rng.randint(lo, max_level)
         return make_pokemon(self.grown_form(s, level, rng), level, rng, **kw)
+
+    def fish_pool(self, max_level, max_bst=None):
+        """낚시 표 (시즌 7): 물 타입 · spawnable 인 종, 낚시 위주 종(fishing.FISH_ONLY)은 가중치 x3.
+
+        레벨 · 종족값 상한은 풀숲 표(spawn_pool)와 같게 본다. 이벤트 · 해금 종 · 타입 스프레이 · 할로윈은 안 얹는다.
+        캐시는 풀숲과 같은 곳에 두되 열쇠 맨 앞이 "fish" 라 섞이지 않는다.
+        """
+        from . import fishing            # 늦게 부른다 - 낚시 표를 쓸 때만 필요하다 (위의 held 와 같은 꼴)
+        key = ("fish", int(max_level), int(max_bst) if max_bst else 0)
+        if key in self._pool_cache:
+            return self._pool_cache[key]
+        pool, cum, total = [], [], 0
+        for s in self.species:
+            if not s.get("spawnable") or s.get("minLevel", 1) > max_level:
+                continue
+            if "WATER" not in (s.get("types") or ()):
+                continue
+            if max_bst and self.bst(s) > max_bst:
+                continue
+            w = s.get("weight", 0)
+            if s["internal"] in fishing.FISH_ONLY:
+                w *= fishing.FISH_ONLY_MULT
+            total += w
+            pool.append(s)
+            cum.append(total)
+        if not pool and max_bst:            # 너무 좁으면 상한을 풀어준다 (풀숲과 같다)
+            return self.fish_pool(max_level, None)
+        self._pool_cache[key] = (pool, cum, total)
+        return pool, cum, total
+
+    def roll_fish(self, min_level, max_level, rng, max_bst=None, shiny_rate=None):
+        """낚인 포켓몬 하나 (roll_wild 의 낚시판). 물 타입만 나온다 - 없으면 None.
+
+        레벨에 맞게 진화한 모습으로 낸다(grown_form) - 다만 진화해서 물 타입이 아니게 되면(비구술 -> 비나방,
+        수레기 -> 드래캄) 진화 전 그대로 둔다. 낚싯줄 끝에 물에 안 사는 포켓몬이 달려 나오면 이상하다.
+        """
+        rng = rng or random.Random()
+        max_level = max(1, min(LEVEL_MAX, int(max_level)))
+        min_level = max(1, min(max_level, int(min_level)))
+        pool, cum, total = self.fish_pool(max_level, max_bst)
+        if not pool or total <= 0:
+            return None
+        import bisect
+        s = pool[bisect.bisect_right(cum, rng.randrange(total))]
+        lo = min(max(min_level, s.get("minLevel", 1)), max_level)
+        level = rng.randint(lo, max_level)
+        g = self.grown_form(s, level, rng)
+        if "WATER" not in (g.get("types") or ()):
+            g = s
+        kw = {} if shiny_rate is None else {"shiny_rate": shiny_rate}
+        return make_pokemon(g, level, rng, **kw)
 
     def grown_form(self, s, level, rng=None):
         """이 레벨이면 이미 진화했을 모습.

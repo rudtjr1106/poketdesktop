@@ -60,8 +60,15 @@ class GrassPatch(object):
 
         x1, y1, x2, y2 = ov.area()
         m = ov.settings["areaMargin"]
-        self.x = random.randint(x1 + m, max(x1 + m, x2 - w - m))
-        self.y = random.randint(y1 + m, max(y1 + m, y2 - h - m))
+        # 낚시터(연못) 자리는 피한다 (2026-11-26). 연못이 없으면 예전과 똑같이 한 번만 고른다
+        fz = getattr(ctl.app, "fishing", None)
+        pond = fz.rect() if fz is not None else None
+        for _ in range(12):
+            self.x = random.randint(x1 + m, max(x1 + m, x2 - w - m))
+            self.y = random.randint(y1 + m, max(y1 + m, y2 - h - m))
+            if not pond or not (self.x < pond[2] + 6 and pond[0] - 6 < self.x + w
+                                and self.y < pond[3] + 6 and pond[1] - 6 < self.y + h):
+                break
         self.win.geometry("+%d+%d" % (self.x, self.y))
         self.view.show(self.photos[0])
         PLAT.raise_above(self.win)
@@ -401,6 +408,10 @@ class WildController(object):
         self.auto_n = 0           # 이번에 이어 던진 수 (AUTO_MAX 에서 멈춘다)
         self._auto_job = None
         self.revealing = False    # 풀숲을 눌러 응답을 기다리는 중인가
+        # 지금 야생이 어디서 왔나 - 'grass' · 'fish' (낚시, 2026-11-26). 낚인 야생은 풀숲 설정과 상관없이 보인다
+        self.src = None
+        self._hooking = None      # 낚인 야생의 도트를 받는 중인 번호 (show_hooked)
+        self._fish_at = 0.0       # 낚인 야생을 띄우기 시작한 때
         self.hint = None
         self._job = None
         self._expire_job = None
@@ -480,7 +491,8 @@ class WildController(object):
         if self._busy():
             return          # 배틀이 끝나면 desktop_battle 이 check() 를 부른다
         self.stop_polling()
-        self.clear()
+        if not self.has_fish():
+            self.clear()    # 낚인 야생은 풀숲이 아니다 - 끈 사람에게도 남는다
 
     def stop_polling(self):
         """다음 확인 예약만 끈다 (화면은 그대로 둔다)."""
@@ -493,6 +505,10 @@ class WildController(object):
 
     # ---------------- 서버와 맞추기 ----------------
     def start(self):
+        # 낚시도 같이 다시 연다 (2026-11-26) - 풀숲을 끈 사람도 낚시는 한다. 멈춘 사이 낚인 야생은 카드로 되살린다
+        fz = getattr(self.app, "fishing", None)
+        if fz is not None:
+            fz.resume()
         if not self.enabled():
             return
         self.check(force=False)
@@ -506,6 +522,10 @@ class WildController(object):
                     pass
         self._job = self._expire_job = None
         self.clear()
+        # 풀숲을 멈추는 곳(친구 집 · 집중 · 올림픽 · 투기장 · 공습 · 로그아웃 · 종료)에서는 연못도 걷는다
+        fz = getattr(self.app, "fishing", None)
+        if fz is not None:
+            fz.pause()
 
     def check(self, force=False):
         """서버에 지금 상태를 물어본다.
@@ -520,7 +540,10 @@ class WildController(object):
             # 껐다. 여기서 예약을 다시 걸지 않는 것이 중요하다 - 걸면
             # 꺼 놓은 채로도 90초마다 서버를 계속 두드린다.
             if not self._busy():
-                self.clear()
+                if self.has_fish():
+                    self._fish_check()
+                else:
+                    self.clear()
             if force:
                 self.app.notify("풀숲을 껐습니다. 설정에서 다시 켤 수 있습니다.")
             return
@@ -534,7 +557,8 @@ class WildController(object):
                     self.app.notify("서버에 물어보지 못했습니다.")
                 self.schedule(POLL_SAFETY)
                 return
-            self.apply(r, tell=force)
+            self.apply(r, tell=force, asked=asked)
+        asked = time.time()
         run_async(self.app.root, lambda: self.app.api.wild(force), done)
 
     def _say_wait(self, r):
@@ -560,10 +584,11 @@ class WildController(object):
         seconds = max(5, min(3600, int(seconds)))
         self._job = self.app.root.after(seconds * 1000, self.check)
 
-    def apply(self, r, tell=False):
+    def apply(self, r, tell=False, asked=None):
         """서버가 알려준 상태대로 화면을 맞춘다.
 
         tell 이면 사용자가 직접 눌러서 온 응답이라 결과를 말로도 알려준다.
+        asked 는 그 확인을 보낸 시각 - 낚기 전에 떠난 답이 방금 낚은 야생을 지우지 않게 (2026-11-26).
         """
         self.app.balls = r.get("balls", self.app.balls)
         badge = getattr(self.app, "boost_badge", None)
@@ -574,7 +599,7 @@ class WildController(object):
         # 물어본 뒤 답이 오는 사이에 껐을 수 있다. 볼 개수만 챙기고
         # 화면은 건드리지 않는다.
         if not self.enabled():
-            if not self._busy():
+            if not self._busy() and not self.has_fish():
                 self.clear()
             return
         # 자리가 없어서 안 돋는 것이면 알려준다. 안 그러면 어느 날부터
@@ -586,6 +611,10 @@ class WildController(object):
         elif not full:
             self._said_full = None
         w = r.get("wild")
+        if not w and self.has_fish() and asked is not None and asked < self._fish_at:
+            # 낚기 전에 떠난 풀숲 확인의 답이다 - 방금 낚은 야생을 지우지 않고 곧 다시 본다
+            self.schedule(10)
+            return
         if not w:
             self.clear()
             if tell:
@@ -596,13 +625,15 @@ class WildController(object):
         if w["id"] != self.wild_id:
             self.clear()
             self.wild_id = w["id"]
+        self.src = w.get("src") or "grass"
 
         if w["state"] == "grass":
             if not self.grass:
                 self.grass = GrassPatch(self, w)
                 self.app.notify("풀숲이 흔들리고 있습니다. 눌러보세요!")
-        elif w.get("pokemon") and not self.pet:
-            self.show_wild(w["pokemon"])
+        elif w.get("pokemon") and not self.pet and self._hooking != w["id"]:
+            # 낚인 야생(src 'fish')은 연못 옆에 (2026-11-26). 다시 켠 앱이 풀숲 폴링으로 먼저 알 때
+            self.show_wild(w["pokemon"], at=self._fish_spot() if self.src == "fish" else None)
         self.set_ball_options(r.get("ballOptions"))
 
         self.arm_expiry(w.get("expiresAt"), w.get("expiresIn"))
@@ -756,9 +787,18 @@ class WildController(object):
             self.pet.destroy()
             self.pet = None
         self.wild_id = None
+        self.src = None
+        self._hooking = None
         # 야생이 사라졌으면 '보내는 중' 표시도 풀어야 한다.
         # 안 그러면 다음 풀숲을 눌러도 반응하지 않는다.
         self.revealing = False
+        # 야생 때문에 미뤄 둔 낚시 입질이 있으면 곧 다시 보게 한다 (낚시 - 시즌 7)
+        fz = getattr(self.app, "fishing", None)
+        if fz is not None:
+            try:
+                fz.nudge()
+            except Exception:                               # noqa: BLE001
+                pass
 
     def hide_wild_sprite(self):
         """볼에 들어간 순간 포켓몬을 감춘다."""
@@ -815,7 +855,8 @@ class WildController(object):
                 pass
             self.hint = None
 
-    def show_wild(self, mon):
+    def show_wild(self, mon, at=None):
+        """야생 도트를 세운다. at 은 발 자리 (x, y) - 낚인 야생은 연못 옆 (없으면 풀숲 자리 · 아무 데나)."""
         ov = self.app.overlay
         s = ov.settings
         # 걷는 도트를 먼저 쓴다. 내 포켓몬은 걸어다니는데 야생만 옛날
@@ -860,7 +901,12 @@ class WildController(object):
                 pass
             self.pet = None
         self.pet = WildPet(self, mon, anim)
-        if gx is not None:
+        if at is not None:
+            self.pet.x = at[0] - self.pet.fw / 2.0
+            self.pet.y = at[1] - self.pet.fh
+            self.pet.clamp()
+            self.pet.place()
+        elif gx is not None:
             self.pet.x, self.pet.y = gx, gy
             self.pet.clamp()
             self.pet.place()
@@ -871,6 +917,101 @@ class WildController(object):
             msg = "★ " + msg + " 색이 다르다!"
             self.sparkle()
         self.app.notify(msg)
+
+    # ---------------- 낚인 야생 (낚시, 2026-11-26) ----------------
+    def has_fish(self):
+        """지금 화면의 야생이 낚인 포켓몬인가 (띄우는 중 포함). 풀숲 설정을 끄거나 확인할 때 지우지 않는다."""
+        return self.src == "fish" and self.wild_id is not None
+
+    def _fish_spot(self):
+        fz = getattr(self.app, "fishing", None)
+        return fz.anchor() if fz is not None else None
+
+    def _fish_check(self):
+        """풀숲을 끈 사람의 낚인 야생이 아직 서버에 있는지 - 낚시 카드로 본다 (배틀이 끝난 뒤 등).
+        GET /api/wild 는 부르지 않는다 - 거기서는 풀숲이 돋는다."""
+        fz = getattr(self.app, "fishing", None)
+        if fz is not None:
+            fz.refresh()
+
+    def show_hooked(self, r, anchor=None, then=None):
+        """낚인 포켓몬을 연못 옆(anchor = 발 자리)에 띄운다. r 은 챔질 응답이나 hooked 카드 ({wild, ballOptions}).
+
+        풀숲 야생과 같은 야생(src 'fish')이라 그 뒤로는 똑같다 - 배틀 · 볼 · 두 번 클릭 · 만료.
+        **풀숲 설정(showGrass)과 상관없이 보인다** (enabled 를 안 본다). 도트는 풀숲을 누를 때(on_grass_click)처럼
+        작업 스레드에서 먼저 받아 둔다. then(pet) 은 도트가 선 뒤 한 번 (못 세웠으면 None).
+        띄우기 시작했으면(이미 떠 있어도) True.
+        """
+        w = (r or {}).get("wild") or {}
+        mon = w.get("pokemon")
+        wid = w.get("id")
+        if not mon or wid is None or self._away() or self._focusing():
+            return False
+        self.set_ball_options((r or {}).get("ballOptions"))
+        if self.wild_id == wid and self.src == "fish":
+            # 챔질 응답과 카드가 둘 다 실어 온다 - 한 번만 띄운다
+            if self.pet is not None:
+                b = getattr(self.app, "battle", None)
+                if (anchor is not None and getattr(self, "_fish_placed", None) != wid and not self.throwing
+                        and (b is None or getattr(b, "closed", False))):
+                    # 다시 켠 앱: 연못이 서기 전에 풀숲 폴링(apply)이 먼저 아무 데나 세웠다. 이제 연못을 아니
+                    # 그 옆으로 옮긴다 - **한 번만** (90초 동기화 카드마다 끌어오지 않게). 배틀 · 던지는 중엔 안 건드린다
+                    self.pet.x = anchor[0] - self.pet.fw / 2.0
+                    self.pet.y = anchor[1] - self.pet.fh
+                    self.pet.clamp()
+                    self.pet.place()
+                    self._fish_placed = wid
+                if then is not None:
+                    then(self.pet)
+                return True
+            if self._hooking == wid:
+                return True                # 도트를 받는 중이다 - 그 답(done)이 띄운다
+            # 번호만 있고 도트가 없다 (apply 때 그림이 아직 없어 show_wild 가 그냥 돌아갔다) - 아래로 내려가
+            # 그림을 받아서 띄운다. 여기서 True 만 돌려주면 그 야생은 만료까지 안 보인다
+        if self.wild_id is not None:
+            self.clear()                   # 한 번에 야생 하나 (서버도 그렇게 지킨다)
+        self.wild_id, self.src, self._hooking = wid, "fish", wid
+        self._fish_at = time.time()
+        expires_at, expires_in = w.get("expiresAt"), w.get("expiresIn")
+        t0 = time.time()
+
+        def done(res, err):
+            if self._hooking == wid:
+                self._hooking = None
+            if self.wild_id != wid or self.src != "fish":
+                return                     # 받는 사이에 치웠다 (stop · 다른 야생)
+            res = res or {}
+            path = res.get("_spritePath")
+            if path:
+                self.app.overlay.paths[(mon.get("num"), bool(mon.get("shiny")))] = path
+            sheet, meta = res.get("_walk") or (None, None)
+            if sheet and meta:
+                self.app.overlay.walks[walk_cache.key(mon.get("num"), mon.get("shiny"))] = (sheet, meta)
+            if self.pet is None:
+                self.show_wild(mon, at=anchor)
+                if anchor is not None:
+                    self._fish_placed = wid        # 연못 옆에 섰다 - 같은 번호의 카드가 다시 와도 안 옮긴다
+            left = expires_in
+            if left is not None:
+                try:
+                    left = max(1.0, float(left) - (time.time() - t0))    # 받는 동안 지난 시간을 뺀다
+                except (TypeError, ValueError):
+                    left = None
+            self.arm_expiry(expires_at, left)
+            if then is not None:
+                then(self.pet)
+
+        def work():
+            out = {}
+            if mon.get("num"):
+                out["_spritePath"] = sprite_cache.ensure(self.app.api, mon["num"], mon.get("shiny"))
+                try:
+                    out["_walk"] = walk_cache.ensure(self.app.api, mon["num"], shiny=bool(mon.get("shiny")))
+                except Exception:                          # noqa: BLE001
+                    out["_walk"] = (None, None)
+            return out
+        run_async(self.app.root, work, done)
+        return True
 
     def sparkle(self):
         """색이 다른 개체가 나왔다 - 도트 둘레에서 별이 터진다 (1.12.1, shiny_fx)."""

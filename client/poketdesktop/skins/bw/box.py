@@ -21,7 +21,7 @@ from common import legends as L
 from common import movetext as MT
 from common.korean import natural
 
-from ... import box_filter, item_icons
+from ... import box_filter, fish_text, item_icons
 from ... import ui_bond as BD
 from ... import ui_common as U
 from ..dp import box as DPX
@@ -471,6 +471,10 @@ class BoxWindow(DPX.BoxWindow):
         if d.get("sub"):
             _a, t2 = K.text(cv, x1 + s(4), y, d["sub"], font(9), fill=DIMT, tags=D, width=x2 - x1 - s(8))
             y = cv.bbox(t2)[3] + s(6)
+        fish = fish_text.line(d["m"])               # 낚아서 잡은 포켓몬의 잰 무게 (시즌 7 낚시)
+        if fish:
+            _a, t3 = K.text(cv, x1 + s(4), y, fish, font(9), fill=DIMT, tags=D, width=x2 - x1 - s(8))
+            y = cv.bbox(t3)[3] + s(6)
         cx_ = x1 + s(4)
         for label, col in d.get("chips") or []:
             f = K.tkfont_of(cv, font(9))

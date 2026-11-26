@@ -425,6 +425,39 @@ CREATE TABLE IF NOT EXISTS tower_clear (
     PRIMARY KEY (user_id, floor)
 );
 
+-- 낚시 (시즌 7, fishing.py): 사람마다 줄 하나 - 던졌나 · 입질 중인가. 낚인 포켓몬은 여기가 아니라 wild 표(src='fish')에 든다.
+-- 시각 칸은 fishing.iso (밀리초까지, 늘 같은 길이 - 글자로 견줘도 순서가 맞다). bite_at 은 앱에 절대 안 준다.
+-- state 가 hooked 인데 wild_id 의 야생이 없으면 idle 로 읽는다 (잡기 · 놓치기가 이 줄을 몰라도 된다).
+CREATE TABLE IF NOT EXISTS fish_state (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    state       TEXT NOT NULL DEFAULT 'idle',   -- idle / cast / bite / hooked
+    cast_at     TEXT,
+    bite_at     TEXT,                   -- 입질 시각 (cast)
+    nibble_end  TEXT,                   -- 콕콕이 끝나는 시각 = 쭉이 시작 (bite)
+    strike_end  TEXT,                   -- 쭉이 끝나는 시각 (bite, 서버 여유는 안 더한 값)
+    bait        TEXT,                   -- 단 미끼 (던질 때 가방에서 뺐다 - 입질 전에 거두면 돌려준다)
+    pushed      INTEGER NOT NULL DEFAULT 0,   -- 입질 준비 알림을 보냈다 (한 번만)
+    warned      INTEGER NOT NULL DEFAULT 0,   -- 콕콕 중에 한 번 눌렀다 (두 번째면 헛챔질)
+    wild_id     INTEGER                 -- hooked: 낚인 야생
+);
+CREATE INDEX IF NOT EXISTS idx_fish_state_wait ON fish_state(bite_at) WHERE state='cast' AND pushed=0;
+
+-- 낚시 기록 (주간 대물 순위). 잡았을 때(battle_routes.store_caught) 한 줄. 놓아주거나 팔아도 남는다.
+-- week = **낚은 순간**의 주 (KST 월요일 "YYYY-MM-DD") - 일 23:59 에 낚아 월요일에 잡아도 지난주. ratio 는 원래 값 그대로.
+CREATE TABLE IF NOT EXISTS fish_catch (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    week        TEXT NOT NULL,
+    species     TEXT NOT NULL,          -- 잰 때의 종
+    g           INTEGER NOT NULL,       -- 잰 무게 (그램)
+    ratio       REAL NOT NULL,          -- 표준 무게의 몇 배 (순위가 이것으로 줄을 선다)
+    shiny       INTEGER NOT NULL DEFAULT 0,
+    pokemon_id  INTEGER,
+    at          TEXT NOT NULL           -- 잡은 시각 (배율 · 그램이 같으면 먼저 잡은 사람)
+);
+CREATE INDEX IF NOT EXISTS idx_fish_catch_week ON fish_catch(week, ratio DESC, g DESC);
+CREATE INDEX IF NOT EXISTS idx_fish_catch_user ON fish_catch(user_id, species);
+
 -- 리피트볼이 "이미 잡아본 종" 을 봐야 해서 남긴다. 도감 역할도 겸한다.
 CREATE TABLE IF NOT EXISTS seen (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -1472,6 +1505,14 @@ MIGRATIONS = [
     ("guild", "flag", "ALTER TABLE guild ADD COLUMN flag TEXT"),
     ("guild", "flag_by", "ALTER TABLE guild ADD COLUMN flag_by INTEGER"),
     ("guild", "flag_at", "ALTER TABLE guild ADD COLUMN flag_at TEXT"),
+    # 이 야생이 어디서 왔나 (시즌 7 낚시): grass = 풀숲 / fish = 낚시로 낚았다. 옛 행은 'grass'.
+    # 야생이 끝날 때(deps.end_wild) fish 면 풀숲 다음 시각을 건드리지 않는다
+    ("wild", "src", "ALTER TABLE wild ADD COLUMN src TEXT NOT NULL DEFAULT 'grass'"),
+    # 낚아서 잡은 포켓몬의 잰 무게 (시즌 7 낚시): 그램 · 표준의 몇 배 · 잰 때의 종 (진화해도 그때 종으로 적는다).
+    # 낚시가 아닌 포켓몬 · 옛 행은 NULL. **배틀 · 헤비볼 · 무게 기술에는 안 쓴다** - 관리 창 한 줄과 기록뿐
+    ("pokemon", "fish_g", "ALTER TABLE pokemon ADD COLUMN fish_g INTEGER"),
+    ("pokemon", "fish_ratio", "ALTER TABLE pokemon ADD COLUMN fish_ratio REAL"),
+    ("pokemon", "fish_species", "ALTER TABLE pokemon ADD COLUMN fish_species TEXT"),
 ]
 
 
@@ -1713,7 +1754,7 @@ def _mega_stone(item):
 
 
 def _row_to_mon(r):
-    return {
+    mon = {
         "id": r["id"],
         "species": r["species"],
         "nickname": r["nickname"],
@@ -1755,6 +1796,22 @@ def _row_to_mon(r):
         # 깃발 들기 (2.5.0) - 그 포켓몬이 깃발 칸을 쓰면 주인이 지금 든 길드의 깃발 그림 (없으면 None)
         "decoFlag": _deco_flag(r),
     }
+    # 낚아서 잡았으면 잰 무게 (시즌 7). 낚시가 아니면 칸 자체가 없다 - 앱은 있을 때만 관리 창에 한 줄을 그린다
+    fish = _fish_of(r)
+    if fish:
+        mon["fish"] = fish
+    return mon
+
+
+def _fish_of(r):
+    """{g, ratio, species, kr} - 잰 때의 종 이름으로 (진화해도 '잉어킹일 때 84.2kg'). 옛 행 · 낚시가 아니면 None."""
+    if "fish_g" not in r.keys() or r["fish_g"] is None:
+        return None
+    from . import deps
+    sp = r["fish_species"] if "fish_species" in r.keys() else None
+    return {"g": int(r["fish_g"]),
+            "ratio": float(r["fish_ratio"]) if "fish_ratio" in r.keys() and r["fish_ratio"] is not None else None,
+            "species": sp, "kr": deps.dex().name(sp) if sp else None}
 
 
 def _deco_of(r):
@@ -1777,16 +1834,24 @@ def insert_mon(user_id, mon, now):
     cur = run(
         "INSERT INTO pokemon (user_id, species, nickname, level, exp, nature, ability,"
         " hidden_ability, gender, shiny, happiness, ivs, evs, moves, on_desktop, slot,"
-        " met_level, caught_at, hyper, no_evolve, luxury, held, ball)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " met_level, caught_at, hyper, no_evolve, luxury, held, ball, fish_g, fish_ratio, fish_species)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user_id, mon["species"], mon.get("nickname"), mon["level"], mon["exp"],
          mon["nature"], mon.get("ability"), int(bool(mon.get("hiddenAbility"))),
          mon.get("gender", "N"), int(bool(mon.get("shiny"))), mon.get("happiness", 70),
          json.dumps(mon["ivs"]), json.dumps(mon["evs"]), json.dumps(mon["moves"]),
          0, None, mon["level"], now,
          json.dumps(mon.get("hyper") or {}), int(bool(mon.get("noEvolve"))),
-         int(bool(mon.get("luxury"))), mon.get("held") or None, _ball_of(mon)))
+         int(bool(mon.get("luxury"))), mon.get("held") or None, _ball_of(mon)) + _fish_cols(mon))
     return cur.lastrowid
+
+
+def _fish_cols(mon):
+    """낚은 야생의 잰 무게 (fishing.hook 이 mon 에 실어 둔 fishG · fishRatio · fishSpecies). 낚시가 아니면 NULL 셋."""
+    g = mon.get("fishG")
+    if g is None:
+        return (None, None, None)
+    return (int(g), float(mon.get("fishRatio") or 0), mon.get("fishSpecies") or mon["species"])
 
 
 def _ball_of(mon):

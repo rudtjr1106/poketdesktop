@@ -109,6 +109,11 @@ def _loop():
             airraid.prune()             # 공습 각본 (2.3.0) - 7일 뒤
         except Exception as e:                              # noqa: BLE001
             print("[housekeep] 공습 기록 정리 실패: %r" % (e,))
+        try:
+            from . import fishing
+            fishing.settle()            # 낚시 주간 대물 순위 보상 (시즌 7) - 월 00:20 KST 뒤 한 번만, 그 밖엔 meta 한 번 묻고 끝
+        except Exception as e:                              # noqa: BLE001
+            print("[housekeep] 낚시 정산 실패: %r" % (e,))
         time.sleep(PERIOD)
 
 

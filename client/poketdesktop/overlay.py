@@ -1027,6 +1027,8 @@ class Overlay(object):
         self.eggs = {}
         # 포켓몬과 집중하기: 집중하는 동안 이 번호의 도트만 보인다 (set_only). None 이면 모두
         self.only = None
+        # 알이 피할 자리 - 부르면 (x1, y1, x2, y2) 나 None. 낚시터(연못)가 건다 (app.start_ui)
+        self.avoid = None
         # 부화 연출을 이미 보여 준 알. 서버는 seen 을 받을 때까지 그 알을 계속
         # 실어 보내는데, 그때마다 알을 다시 세우면 태어난 뒤에도 알이 남는다.
         self.eggs_done = set()
@@ -1161,12 +1163,37 @@ class Overlay(object):
             except Exception as ex:                        # noqa: BLE001
                 config.log("알을 못 세웠습니다: %s" % ex)
                 continue
+            self.dodge(pet)
             self.eggs[eid] = pet
             if self.hidden or self.only is not None:      # 집중하는 동안 알도 숨는다
                 try:
                     pet.win.withdraw()
                 except Exception:                          # noqa: BLE001
                     pass
+
+    def dodge(self, p, tries=12):
+        """알을 피할 자리(avoid - 낚시터) 밖으로 옮긴다. 안 겹치면 그대로 둔다 (자리를 새로 고르지 않는다)."""
+        fn = getattr(self, "avoid", None)
+        rect = fn() if fn is not None else None
+        if not rect:
+            return
+
+        def hit():
+            return (p.x < rect[2] + 6 and rect[0] - 6 < p.x + p.fw
+                    and p.y < rect[3] + 6 and rect[1] - 6 < p.y + p.fh)
+        if not hit():
+            return
+        x1, y1, x2, y2 = self.area()
+        m = self.settings["areaMargin"]
+        for _ in range(tries):
+            p.x = random.randint(x1 + m, max(x1 + m, x2 - p.fw - m))
+            p.y = random.randint(y1 + m, max(y1 + m, y2 - p.fh - m))
+            if not hit():
+                break
+        try:
+            p.place()
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def _match_look(self, pet):
         """메가 폼으로 걷기를 켜고 끈 것을 도트에 맞춘다 (1.8.0).

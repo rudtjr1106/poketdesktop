@@ -164,6 +164,9 @@ jobs:
       # 유턴 멈춤 · 저장/되살리기. 1:1 엔진에 자리를 바꿔 앉히며 돈다 (무작위 120판을 끝까지)
       - name: 더블배틀 (엔진)
         run: python common/test_double_battle.py
+      # 낚시 (시즌 7): 낚시 위주 종 · 크기 굴리기(대물 · 왕대물 비율) · 주 열쇠(한국 시각 월요일) · 풀숲 표에서 빼기 · 낚시 표(물 타입만)
+      - name: 낚시 (규칙)
+        run: python common/test_fishing_common.py
       # 게시판 #664 뒤 (11/19): 붙잡혀 있는 것(조이기류 · 검은눈빛 …)을 view 에 싣는다 - 교체 잠금의 까닭 · 남은 턴(내가 건 것만)
       - name: 붙잡힘 표시 (엔진 view)
         run: python common/test_trap_view.py
@@ -605,6 +608,14 @@ jobs:
       - name: 배틀타워 탭 (진짜 Tk)
         if: matrix.shard == 3
         run: python client/test_tower_ui.py
+      # 낚시 (시즌 7): 연못 · 던지기 · 콕콕/쭉 · 챔질 → 연못 옆 야생 · 풀숲 꺼도 보임 · 맥 오른클릭 · 옮기기 · 숨기기
+      - name: 낚시터 (진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_fishing_ui.py
+      # 낚시 기록 창 (이번 주 · 지난주 · 내 기록) · 관리 창 상세의 무게 한 줄 (테마 일곱)
+      - name: 낚시 기록 창 (진짜 Tk)
+        if: matrix.shard == 1
+        run: python client/test_fishing_records_ui.py
       # 챔피언리그 - 독도: 관장 전국 지도의 독도 · 독도 창(순위 · 상대 찾기 · 도전) · 알림 · 구경
       - name: 챔피언리그 독도 (진짜 Tk)
         if: matrix.shard == 1
@@ -742,6 +753,10 @@ jobs:
         run: python client/test_gym_ui.py
       - name: 배틀타워 탭 (진짜 Tk)
         run: python client/test_tower_ui.py
+      - name: 낚시터 · 낚시 기록 창 (진짜 Tk)
+        run: |
+          python client/test_fishing_ui.py
+          python client/test_fishing_records_ui.py
       - name: 붙잡힘 표시 · 교체 잠금 (진짜 Tk)
         run: python client/test_trap_ui.py
       - name: 챔피언리그 독도 (진짜 Tk)
@@ -889,6 +904,7 @@ jobs:
           python test_boss.py
           python test_tower_data.py      # 배틀타워 (시즌 7): 1~50층 자료 - 레벨 · 마릿수 · 겹친 종/도구 · 보상 합계 · 엔진에 올리기
           python test_tower.py           # 배틀타워: 시즌 문 · 차례로 오르기 · 처음 한 번 보상 · 길 · 관장 판에 얹기
+          python test_fishing.py         # 낚시 (시즌 7): 야생 끝내기 한 곳(풀숲 시계) · 던지기 · 입질 · 챔질 · 풀숲 보류 · 떨굼 없음 · 순위 · 주간 정산
           python test_guild_war.py
           python test_guild_war_v5.py    # 시즌 5: 조커(길드마다 3명) · 개인 기여 보상 (게시판 #373)
           python test_deco.py            # 버전 2: 꾸미기 - 위치 점 · 끼우기(한 마리만) · 선물 · 길드전 순위 보상

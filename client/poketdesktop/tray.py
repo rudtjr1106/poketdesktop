@@ -17,7 +17,7 @@ pystray 의 맥 백엔드는 `NSApplication.run()` 을 부른다. 그걸 별도
 """
 import threading
 
-from . import autostart
+from . import autostart, config
 from common.version import VERSION
 
 # ---------------------------------------------------------------- 메뉴 서술
@@ -93,6 +93,15 @@ def arche_items(tray, app):
     if a is None or not a.on():
         return []
     return [Item(lambda: a.label(), lambda: tray.call(app.open_arche))]
+
+
+def pond_items(tray, app):
+    """낚시 (다음 시즌): 서버가 낚시를 열었을 때만 '낚시터 보이기' (열리기 전엔 켤 것이 없다)."""
+    fz = getattr(app, "fishing", None)
+    if fz is None or not getattr(fz, "open", False):
+        return []
+    return [Item("낚시터 보이기", lambda: tray.call(app.toggle_pond),
+                 checked=lambda: config.show_pond(app.settings))]
 
 
 def make_icon_image(size=64):
@@ -268,7 +277,7 @@ class TrayBase(object):
                 # 하면 있는 줄도 모른다.
                 Item("풀숲 띄우기", lambda: self.call(a.toggle_grass),
                      checked=lambda: bool(s.get("showGrass", True))),
-            ]),
+            ] + pond_items(self, a)),
             Item("포켓몬 크기", submenu=size_items),
             Item("활동 범위", submenu=area_items),
             # 켜 두고 잊어버리는 프로그램이라, 켤 때마다 손으로 켜야

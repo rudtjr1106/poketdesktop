@@ -25,6 +25,7 @@ from .ui_board import BoardWindow
 from .ui_box import BoxWindow
 from .ui_dex import DexWindow
 from .ui_expedition import ExpeditionWindow
+from .ui_fishing import FishRecords
 from .ui_olympics import OlympicsPane
 from .ui_arche import ArchePane
 from .ui_friends import FriendsWindow
@@ -74,6 +75,9 @@ TABS = [
     # 마이페이지 앞에 둔다 - 묶음 차례(커뮤니티 · 이벤트 · 마이페이지)와 같게, 마이페이지는 늘 맨 끝 (test_mypage_ui)
     ("arche", "아르케", ArchePane, False),        # 아르케의 여섯 봉인 (시즌 6, 2.4.0) - 요약 + 일지 펼치기
     ("olympics", "올림픽", OlympicsPane, False),
+    # 낚시 기록 (시즌 7): 주간 대물 순위. 연못 오른쪽 클릭 '낚시 기록' 도 이 탭을 연다 (ui_fishing.open_records).
+    # 올림픽 다음에 둔다 - 묶음을 처음 누르면 첫 탭(아르케)이 뜨는 것은 그대로
+    ("fishing", "낚시", FishRecords, False),
     # 설정은 마이페이지 머리줄의 톱니바퀴 안으로 들어갔다 (1.9.0)
     ("my", "마이페이지", MyPageWindow, False),
 ]
@@ -86,7 +90,7 @@ GROUPS = [
     ("shop", "상점", ["shop"]),
     ("adventure", "모험", ["gym", "tower", "expedition", "rank"]),
     ("community", "커뮤니티", ["friends", "guild", "board"]),
-    ("event", "이벤트", ["arche", "olympics"]),
+    ("event", "이벤트", ["arche", "olympics", "fishing"]),
     ("my", "마이페이지", ["my"]),
 ]
 GROUP_OF = dict((k, g) for g, _label, keys in GROUPS for k in keys)     # 탭 열쇠 -> 묶음 열쇠

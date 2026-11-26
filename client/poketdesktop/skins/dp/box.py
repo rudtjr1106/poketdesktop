@@ -26,7 +26,7 @@ from common import pokelogic as P
 from common import tint as Tn
 from common.korean import natural
 
-from ... import box_filter, item_icons, sprite_cache, sprites
+from ... import box_filter, fish_text, item_icons, sprite_cache, sprites
 from ... import ui_bond as BD
 from ... import ui_box as BX
 from ... import ui_common as U
@@ -995,6 +995,10 @@ class BoxWindow(Scene, BX.BoxWindow):
         if d.get("sub"):
             _a, t2 = K.text(cv, x1 + s(4), y, d["sub"], font(9), fill=INK2, tags=D, width=x2 - x1 - s(8))
             y = cv.bbox(t2)[3] + s(6)
+        fish = fish_text.line(d["m"])               # 낚아서 잡은 포켓몬의 잰 무게 (시즌 7 낚시)
+        if fish:
+            _a, t3 = K.text(cv, x1 + s(4), y, fish, font(9), fill=INK2, tags=D, width=x2 - x1 - s(8))
+            y = cv.bbox(t3)[3] + s(6)
         cx = x1 + s(4)
         for label, col in d.get("chips") or []:
             f = K.tkfont_of(cv, font(9))

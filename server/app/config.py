@@ -181,6 +181,22 @@ TOWER_PATH = os.environ.get("POKET_TOWER", os.path.join(ROOT, "data", "tower.jso
 # 이 시즌부터 연다 - tower.is_open 이 부를 때마다 season.SEASON 과 견준다 (시즌을 여는 커밋이 켠다).
 # 시험 서버 · 로컬은 POKET_TOWER_FROM=6 으로 미리 열어 본다.
 TOWER_FROM = _int("POKET_TOWER_FROM", 7)
+# 낚시 (시즌 7, fishing.py) - 배틀타워와 같은 방식으로 fishing.is_open 이 부를 때마다 season.SEASON 과 견준다.
+# 열리기 전에는 풀숲 표도 지금 그대로다 (fishing.grass_exclude). 시험 서버 · 로컬은 POKET_FISH_FROM=6 으로 미리 연다.
+FISH_FROM = _int("POKET_FISH_FROM", 7)
+# 낚시 시간 (초). 입질 시각은 서버만 안다 - 앱에는 '지금 입질' 만 간다 (짧게 나올 때까지 던졌다 거두기를 막는다).
+FISH_BITE_MIN = _int("POKET_FISH_BITE_MIN", 180)            # 던지고 입질까지 3~8분
+FISH_BITE_MAX = _int("POKET_FISH_BITE_MAX", 480)
+FISH_BAIT_MIN = _int("POKET_FISH_BAIT_MIN", 90)             # 미끼를 달면 1.5~4분
+FISH_BAIT_MAX = _int("POKET_FISH_BAIT_MAX", 240)
+FISH_NIBBLE_MIN = _float("POKET_FISH_NIBBLE_MIN", 3.0)      # 콕콕 (이때 누르면 경고, 두 번이면 헛챔질)
+FISH_NIBBLE_MAX = _float("POKET_FISH_NIBBLE_MAX", 5.0)
+FISH_STRIKE = _float("POKET_FISH_STRIKE", 30.0)             # 쭉 (이 안에 누르면 챔질)
+FISH_GRACE = _float("POKET_FISH_GRACE", 5.0)                # 쭉 뒤 서버 여유 (요청이 오는 사이) - 앱에는 빼고 보낸다
+FISH_PERFECT = _float("POKET_FISH_PERFECT", 2.5)            # 쭉 하고 이 안이면 완벽한 챔질 (대물 확률 +4%)
+FISH_HOLD = _int("POKET_FISH_HOLD", 150)                    # 입질이 이만큼 안으로 다가오면 풀숲을 미룬다
+FISH_HOLD_LATE = _int("POKET_FISH_HOLD_LATE", 120)          # 입질 시각이 이만큼 지나도 아무도 안 열면 풀숲을 다시 돋운다
+FISH_PUSH = _bool("POKET_FISH_PUSH", True)                  # 입질 준비 알림 스레드 (5초마다)
 # 게시판 이미지 (버전 2). DB 에 넣지 않고 파일로 둔다 - DB 가 커지면 백업이 무거워진다 (10/28 3GB 사고).
 # 운영은 /data 볼륨(DB · 도트 캐시와 같은 곳)에 남는다.
 BOARD_IMG_DIR = os.environ.get("POKET_BOARD_IMG_DIR", "/data/board_img")

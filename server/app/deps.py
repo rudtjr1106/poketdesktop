@@ -89,6 +89,60 @@ def close_battles_of(uid, wild_id, result, how=None):
     troubles.close_active(uid, "AND wild_id=?", (wild_id,), result, how or result)
 
 
+# ---------------------------------------------------------------- 야생 끝내기 (한 곳)
+# how -> (걸린 배틀을 닫을 결과, 올릴 통계 칸, 다음 풀숲 간격). 예전 열 곳이 저마다 하던 그대로다.
+#   · 배틀 쪽(battle*)은 판을 스스로 닫는다(_save · UPDATE). 여기서 또 닫으면 troubles 에 '앱이 판을 버렸다' 로 남는다.
+#   · 간격 miss = 풀숲인 채(눌러 보지도 않고) 끝났으면 MISS_COOLDOWN 까지만, 드러낸 뒤면 보통 간격.
+#   · 이김(wins)은 battle_routes 가 경험치를 주기 전에 따로 센다.
+_END = {
+    "wild_expired": ("fled", "fled", "miss"),          # main._sweep - 시간이 다 됐다
+    "wild_flee": ("fled", "fled", "miss"),             # main.wild_flee - 보내 줬다 · 앱의 만료 타이머
+    "field_catch": ("caught", "caught", "cool"),       # main.wild_catch - 배틀 밖 볼
+    "battle_catch": (None, "caught", "cool"),          # battle_routes.throw_ball - 배틀 중 볼
+    "battle": (None, None, "cool"),                    # battle_routes - 이김 · 다 쓰러짐 · 도망 · 상대가 떠남
+}
+
+
+def wild_src(row):
+    """야생 행이 어디서 왔나 - 'grass' / 'fish'. src 칸을 모르는 행(옛 꼴)은 풀숲이다."""
+    return row["src"] if "src" in row.keys() else "grass"
+
+
+def next_grass(uid, seconds=None):
+    """다음 풀숲 시각을 지금 + seconds 로. seconds 가 없으면 보통 간격 (버닝 중이면 2~3분 - boosts.cooldown)."""
+    if seconds is None:
+        from . import boosts
+        seconds = boosts.cooldown(uid, RNG)
+    at = (datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+          + datetime.timedelta(seconds=int(seconds))).isoformat()
+    db.run("INSERT INTO wild_state (user_id, next_at) VALUES (?,?)"
+           " ON CONFLICT(user_id) DO UPDATE SET next_at=?", (uid, at, at))
+    return at
+
+
+def end_wild(uid, row, how):
+    """야생 한 마리를 끝낸다 (시즌 7 낚시 - 예전에는 열 곳이 저마다 지우고 풀숲 시각을 다시 잡았다).
+
+    row 는 **지우기 전에 읽은** wild 행 (src 를 봐야 한다). 지우기 · 걸린 배틀 닫기 · 통계는 how 대로 지금과 같다.
+    다음 풀숲은 **풀숲 야생일 때만** 다시 잡는다 - 낚은 포켓몬을 잡든 놓치든 풀숲 시계는 그대로 간다
+    (낚시를 할수록 풀숲이 밀리면 안 되고, 낚시가 풀숲을 당겨서도 안 된다).
+    """
+    close, stat, gap = _END[how]
+    db.run("DELETE FROM wild WHERE id=?", (row["id"],))
+    if close:
+        close_battles_of(uid, row["id"], close, how)
+    if stat:
+        db.run("INSERT INTO wild_state (user_id, %s) VALUES (?,1)"
+               " ON CONFLICT(user_id) DO UPDATE SET %s=%s+1" % (stat, stat, stat), (uid,))
+    if wild_src(row) != "grass":
+        return
+    from . import boosts
+    secs = boosts.cooldown(uid, RNG)
+    if gap == "miss" and row["state"] == "grass":
+        secs = min(config.MISS_COOLDOWN, secs)
+    next_grass(uid, secs)
+
+
 def current(request: Request, authorization: str = Header(default="")):
     """Bearer 토큰을 확인하고 사용자를 돌려준다."""
     if not authorization.lower().startswith("bearer "):

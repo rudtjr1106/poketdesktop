@@ -33,7 +33,7 @@ from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
 from . import (achievements, airraid, arche, arche_routes, auth, avatar, battle_routes, board, board_routes, boosts, champion, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
-               expedition, focus, item_routes, olympics, walkpts,
+               expedition, fishing, fishing_routes, focus, item_routes, olympics, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws, internal_routes,
@@ -48,6 +48,7 @@ app.include_router(tm_routes.router)
 app.include_router(gym_routes.router)
 app.include_router(boss_routes.router)          # 악당 출현 (시즌 4)
 app.include_router(tower_routes.router)         # 배틀타워 (시즌 7 - 차례로 오르는 상시 PvE, 판은 관장 배틀 그대로)
+app.include_router(fishing_routes.router)       # 낚시 (시즌 7 - 연못 · 입질 · 챔질, 주간 대물 순위)
 app.include_router(raid_routes.router)
 app.include_router(live_routes.router)
 app.include_router(board_routes.router)
@@ -130,6 +131,8 @@ def _startup():
     errors.sweep()
     # 끝난 배틀은 한 시간마다 치운다 (10/28). 처음 한 번의 큰 정리는 위 migrations 의 0330 이 했다.
     housekeep.start()
+    # 낚시 (시즌 7): 입질 시각이 지난 사람에게 '입질 준비' 를 소켓으로 한 번 (5초마다 본다, 열리기 전엔 묻지도 않는다)
+    fishing.start_pusher()
     # 1분마다 접속자 수를 세어 최대 동시 접속을 적는다 (11/17). /api/stats 가 그 수를 읽는다.
     stats.start()
     d = dex()
@@ -1493,8 +1496,25 @@ def _me_data(ctx):
         "airraid": _airraid_card(uid),
         # 아르케의 여섯 봉인 (2.4.0): 이벤트 일주일 전 ~ 끝난 하루 뒤에만. 앱이 이걸 보고 60초 폴링(/api/arche)을 켠다
         "arche": _arche_card(uid),
+        # 낚시 (시즌 7): 연못 카드. 열리기 전이면 None (앱은 연못을 안 띄운다). 입질 시각은 안 싣고 ready 만 -
+        # 알림을 못 받은 앱이 여기서 알고 입질을 연다. 재시작한 앱은 hooked 카드의 wild 로 낚인 야생을 되살린다.
+        # 카드가 터지면 칸째 뺀다 (_fish_card)
+        **_fish_card(uid, u),
         "session":{"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
+
+
+def _fish_card(uid, user_row):
+    """/api/me 에 펼쳐 넣을 낚시 칸 - {"fish": 카드} (열리기 전이면 카드가 None), 카드가 터지면 {} (칸이 없다).
+
+    여기서 터지면 모든 사람의 동기화가 멈추니 삼킨다 (공습 카드와 같다). 다만 None 으로 삼키면 안 된다 - 앱은 fish 칸이
+    있을 때만 움직이고 None 을 '시즌이 닫힘' 으로 읽어 연못을 걷는다. 한 번 터진 것으로 입질 중인 연못이 걷히지 않게,
+    칸을 빼서 '이번엔 모름' 으로 둔다 (앱은 칸이 없으면 연못을 건드리지 않는다 - app.py 의 '"fish" in me')."""
+    try:
+        return {"fish": fishing.card(uid, user_row)}
+    except Exception as e:                                  # noqa: BLE001
+        print("[fishing] 카드 실패 %s: %r" % (uid, e))
+        return {}
 
 
 def _airraid_card(uid):
@@ -2208,6 +2228,8 @@ def _wild_public(row, reveal):
     out = {"id": row["id"], "state": row["state"], "throws": row["throws"],
            "expiresAt": row["expires_at"], "createdAt": row["created_at"],
            "expiresIn": max(0, int(left)) if left is not None else None,
+           # 어디서 왔나 (시즌 7): grass = 풀숲 / fish = 낚았다. 앱은 fish 를 풀숲 끄기와 상관없이 연못 옆에 둔다
+           "src": deps.wild_src(row),
            # 이벤트 포켓몬이 숨어 있으면 풀숲에 꽃이 핀다.
            #
            # **종은 여전히 안 알려준다.** 참/거짓 하나뿐이라 "뭔가 특별한
@@ -2225,14 +2247,8 @@ def _sweep(uid):
     t = iso(now())
     gone = db.q("SELECT * FROM wild WHERE user_id=? AND expires_at < ?", (uid, t))
     for r in gone:
-        db.run("DELETE FROM wild WHERE id=?", (r["id"],))
-        deps.close_battles_of(uid, r["id"], "fled", "wild_expired")
-        if r["state"] == "grass":
-            _bump(uid, "fled")
-            _schedule_next(uid, min(config.MISS_COOLDOWN, _cooldown(uid)))
-        else:
-            _bump(uid, "fled")
-            _schedule_next(uid, _cooldown(uid))
+        # 지우기 · 걸린 배틀 닫기 · 도망 +1 · 다음 풀숲 (풀숲인 채면 MISS_COOLDOWN 까지만, 낚은 것이면 안 건드림)
+        deps.end_wild(uid, r, "wild_expired")
     return [r["id"] for r in gone]
 
 
@@ -2314,11 +2330,14 @@ def _make_grass(uid):
         lo, hi, cap = _wild_levels(uid)
         # 타입 스프레이(2.1.1)가 켜져 있으면 둘에 하나는 그 타입 종에서만 뽑는다. 그 레벨에 그 타입 종이 없으면
         # (빈 표) 평소대로. 평소 표에는 이벤트(할로윈)가 얹힌다.
+        # 낚시가 열린 뒤(시즌 7)에는 두 표 모두 낚시 위주 종을 뺀다 - 열리기 전에는 빈 것이라 지금 표 그대로.
+        skip = fishing.grass_exclude()
         lure = boosts.roll_boost(uid, RNG)
         if lure:
-            mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=lure, shiny_rate=config.SHINY_RATE)
+            mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=lure, exclude=skip,
+                                  shiny_rate=config.SHINY_RATE)
         if mon is None:
-            mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=halloween.spawn_boost(),
+            mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=halloween.spawn_boost(), exclude=skip,
                                   shiny_rate=config.SHINY_RATE)
     if mon is None:
         raise HTTPException(500, "등장 가능한 포켓몬이 없습니다.")
@@ -2353,18 +2372,26 @@ def wild_state(ctx=Depends(current), force: bool = False):
                or (next_at and auth.parse_iso(next_at) <= now())
                or not next_at)
         if due:
-            n = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=?", (uid,))["c"]
-            if n < config.MAX_BOX:
-                row = _make_grass(uid)
-                st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
-                next_at = st["next_at"] if st else None
-            else:
-                # 자리가 없어서 안 돋는다. 예전에는 여기서 그냥 지나가고
-                # next_at 도 그대로 둬서, 사용자 눈에는 어느 날부터 풀숲이
-                # 영영 안 돋는 고장으로만 보였다. 이유를 알려주고 시각도
-                # 다시 잡는다(안 그러면 지난 시각에 멈춰 있는다).
-                full = True
-                next_at = _schedule_next(uid, _cooldown(uid))
+            # 돋우기는 사람마다 잠금 안에서 (시즌 7 낚시): 입질 열기 · 챔질도 같은 잠금을 잡는다 - 풀숲과 낚인 포켓몬이
+            # 한꺼번에 둘이 되지 않게. 잠금을 기다리는 사이 다른 요청(챔질 · 같이 온 동기화)이 야생을 넣었을 수 있어 다시 본다.
+            with fishing.user_lock(uid):
+                row = _active(uid)
+                if row is None and fishing.holds_grass(uid):
+                    # 입질이 다가왔거나 · 입질 중이거나 · 낚인 포켓몬이 있다. 풀숲은 조금 뒤로 미룬다
+                    next_at = _schedule_next(uid, fishing.GRASS_RETRY)
+                elif row is None:
+                    n = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=?", (uid,))["c"]
+                    if n < config.MAX_BOX:
+                        row = _make_grass(uid)
+                        st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
+                        next_at = st["next_at"] if st else None
+                    else:
+                        # 자리가 없어서 안 돋는다. 예전에는 여기서 그냥 지나가고
+                        # next_at 도 그대로 둬서, 사용자 눈에는 어느 날부터 풀숲이
+                        # 영영 안 돋는 고장으로만 보였다. 이유를 알려주고 시각도
+                        # 다시 잡는다(안 그러면 지난 시각에 멈춰 있는다).
+                        full = True
+                        next_at = _schedule_next(uid, _cooldown(uid))
 
     out = {"wild": _wild_public(row, row["state"] == "revealed") if row else None,
            "nextAt": next_at, "balls": ctx["user"]["balls"], "expired": expired,
@@ -2532,17 +2559,17 @@ def wild_catch(wid: int, body: CatchIn, ctx=Depends(current)):
         hour = body.hour if 0 <= body.hour <= 23 else None
         exp = battle_routes.catch_exp(dex(), uid, mon, None, hour)
     got, where = battle_routes.store_caught(uid, mon, ball_id)
-    db.run("DELETE FROM wild WHERE id=?", (wid,))
     # 이 야생에 배틀이 걸려 있었으면 같이 닫는다 (1.10.4). 안 닫으면 야생은 볼에 들어갔는데
-    # 배틀 줄만 남아, 내 포켓몬이 계속 '배틀 중' 이라 도구를 못 쓴다 (게시판 #174).
-    deps.close_battles_of(uid, wid, "caught", "field_catch")
-    _bump(uid, "caught")
-    _schedule_next(uid, _cooldown(uid))
+    # 배틀 줄만 남아, 내 포켓몬이 계속 '배틀 중' 이라 도구를 못 쓴다 (게시판 #174). 잡기 +1 · 다음 풀숲도 거기서.
+    deps.end_wild(uid, row, "field_catch")
     items.mark_seen(uid, mon["species"], True, auth.now_iso())
     achievements.on_obtain(uid, mon, "catch", ball=ball_id)
     mega.on_catch(uid)                                   # 유대 미션 ③ (시즌 3)
-    drop = _drop(uid, mon, config.DROP_ON_CATCH)
-    tm_drop = _drop_tm(uid, mon, RNG)
+    # 낚은 포켓몬은 도구 · 기술머신을 떨구지 않는다 (시즌 7) - 조우가 늘어난 만큼 돈 · 도구 수입이 두 배가 되지 않게
+    drop = tm_drop = None
+    if deps.wild_src(row) != "fish":
+        drop = _drop(uid, mon, config.DROP_ON_CATCH)
+        tm_drop = _drop_tm(uid, mon, RNG)
     msg = "신난다! %s 을(를) 잡았다!" % dex().name(mon["species"])
     if where == "box":
         msg += " 자리가 없어서 PC 박스로 보냈다."
@@ -2572,11 +2599,8 @@ def wild_flee(wid: int, ctx=Depends(current)):
         st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
         return {"ok": True, "kept": True, "nextAt": st["next_at"] if st else None}
     if row:
-        db.run("DELETE FROM wild WHERE id=?", (wid,))
-        deps.close_battles_of(uid, wid, "fled", "wild_flee")
-        _bump(uid, "fled")
-        _schedule_next(uid, _cooldown(uid) if row["state"] == "revealed"
-                       else min(config.MISS_COOLDOWN, _cooldown(uid)))
+        # 걸린 배틀도 닫는다. 다음 풀숲은 드러낸 뒤면 보통 간격, 풀숲인 채면 MISS_COOLDOWN 까지만 (낚은 것이면 그대로)
+        deps.end_wild(uid, row, "wild_flee")
     st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
     return {"ok": True, "nextAt": st["next_at"] if st else None}
 

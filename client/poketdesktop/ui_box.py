@@ -26,7 +26,7 @@ from common import pokelogic as P
 from common import tint as T
 from common.korean import natural
 
-from . import box_filter, item_icons, sprite_cache, sprites
+from . import box_filter, fish_text, item_icons, sprite_cache, sprites
 from . import skins
 from . import ui_common as U
 from . import ui_loading
@@ -1014,6 +1014,9 @@ class BoxWindow(object):
         self.d_sub = tk.Label(p, text="", bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS,
                               anchor="w", justify="left", wraplength=DETAIL_W - 40)
         self.d_sub.pack(fill="x", pady=(3, 0))
+        # 낚아서 잡은 포켓몬의 잰 무게 (시즌 7 낚시) - 그런 포켓몬일 때만 분류 줄 아래에 담는다 (_fish_line)
+        self.d_fish = tk.Label(p, text="", bg=U.BG2, fg=U.FG_FAINT, font=U.FONT_XS,
+                               anchor="w", justify="left", wraplength=DETAIL_W - 40)
         self.d_types = tk.Frame(p, bg=U.BG2)
         self.d_types.pack(anchor="w", pady=(8, 0))
 
@@ -2656,6 +2659,7 @@ class BoxWindow(object):
         U.run_async(self.root, work, done)
 
     def show_detail(self, m):
+        self._fish_line(m)                          # 알 · 낚지 않은 포켓몬이면 그 줄을 뺀다
         if m.get("isEgg"):
             return self._show_egg(m)
         if self._d_egg.winfo_manager():
@@ -3233,11 +3237,21 @@ class BoxWindow(object):
         self.d_art.configure(image="", text="포켓몬을 고르세요", fg=U.FG_FAINT)
         for w in (self.d_name, self.d_gender, self.d_lv, self.d_sub):
             w.configure(text="")
+        self._fish_line(None)
         for w in self.d_types.winfo_children():
             w.destroy()
         for f in (self._d_mon, self._d_egg):        # 특성 ~ 기술 · 알 칸 (다시 고르면 show_detail 이 담는다)
             if f.winfo_manager():
                 f.pack_forget()
+
+    def _fish_line(self, m):
+        """낚아서 잡은 포켓몬이면 분류 줄 아래에 잰 무게 한 줄 (fish_text.line), 아니면 그 줄을 뺀다."""
+        text = fish_text.line(m)
+        if not text:
+            self.d_fish.pack_forget()
+            return
+        self.d_fish.configure(text=text)
+        self.d_fish.pack(fill="x", pady=(2, 0), after=self.d_sub)
 
     def _fit_note(self, e):
         """설명 폭을 라벨의 진짜 폭에 맞춘다 (지닌 도구 칸과 같은 이유)."""

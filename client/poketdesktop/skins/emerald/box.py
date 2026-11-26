@@ -28,7 +28,7 @@ from PIL import Image, ImageDraw, ImageTk
 from common import legends as L
 from common import movetext as MT
 
-from ... import box_filter, item_icons
+from ... import box_filter, fish_text, item_icons
 from ... import ui_common as U
 from ..dp import DIM, INK, INK2, font, tone
 from ..dp import box as DPB
@@ -455,6 +455,10 @@ class BoxWindow(DPB.BoxWindow):
         if d.get("sub"):
             _a, t2 = K.text(cv, x1 + s(4), y, d["sub"], font(9), fill=INK2, tags=D, width=x2 - x1 - s(8))
             y = cv.bbox(t2)[3] + s(6)
+        fish = fish_text.line(d["m"])               # 낚아서 잡은 포켓몬의 잰 무게 (시즌 7 낚시)
+        if fish:
+            _a, t3 = K.text(cv, x1 + s(4), y, fish, font(9), fill=INK2, tags=D, width=x2 - x1 - s(8))
+            y = cv.bbox(t3)[3] + s(6)
         cx = x1 + s(4)
         for label, col in d.get("chips") or []:
             cw = f9.measure(label) + s(16)

@@ -121,6 +121,7 @@ class App(object):
         self.overlay = None
         self.tray = None
         self.wild = None
+        self.fishing = None        # 낚시 (fishing.FishingController - 다음 시즌, 연못 · 찌 · 입질)
         self.expedition = None     # 탐험 파견의 바탕화면 쪽 (돌아온 보따리, 1.10.4)
         self.visit = None          # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0, visit.Visit)
         self.focus = None          # 포켓몬과 집중하기 (focus_timer.FocusController)
@@ -487,6 +488,11 @@ class App(object):
             self.refresh_tray()     # 로그인 전 메뉴를 제대로 된 것으로 바꾼다
         if self.wild is None:
             self.wild = WildController(self)
+        if getattr(self, "fishing", None) is None:
+            # 낚시 (다음 시즌). 카드가 와야(/api/me · GET /api/fish) 연못이 뜬다 - 서버가 모르면 아무것도 안 한다
+            from .fishing import FishingController
+            self.fishing = FishingController(self)
+            self.overlay.avoid = self.fishing.rect          # 알이 연못 자리를 피한다
         if self.expedition is None:
             from . import expedition_ui
             self.expedition = expedition_ui.Desk(self)
@@ -619,15 +625,28 @@ class App(object):
         창 번호로 먼저 찾고, 못 찾으면 좌표로 찾는다. 창 번호가 확실한데,
         도트를 갈아끼우는 동안(진화)에는 잠깐 어긋날 수 있다.
         """
+        fz = getattr(self, "fishing", None)
+        if fz is not None and getattr(fz, "moving", None) is not None:
+            # 낚시터 옮기기 중 (덮개가 영역을 덮고 있다). 덮개는 '오른쪽 클릭: 그만두기' 라고 적어 두었다 -
+            # 밑의 풀숲 · 도트 · 연못에 넘기면 엉뚱한 메뉴가 뜨고 덮개는 그대로 남는다
+            return fz._end_move()
         wild = self.wild
         if wild is not None and wild.grass is not None:
             if self._hit(wild.grass, x, y, num):
                 return wild.on_grass_click()
+        # 낚시터 (다음 시즌): 창 번호가 맞으면 먼저. 테두리 상자로만 맞으면 도트 다음 - 연못 창은 넓어서
+        # 그 위를 지나는 도트를 가로채면 안 된다
+        pond = getattr(fz, "pond", None) if fz is not None else None
+        if (pond is not None and num is not None
+                and getattr(getattr(pond, "view", None), "win_number", None) == num):
+            return fz.on_menu(_FakeEvent(x, y))
         for pet in self._pets():
             if self._hit(pet, x, y, num):
                 # **도트가 스스로 정하게 둔다.** 야생 포켓몬은 우클릭이
                 # 볼 던지기라 WildPet 이 on_menu 를 따로 갖고 있다.
                 return pet.on_menu(_FakeEvent(x, y))
+        if pond is not None and self._hit(pond, x, y, num):
+            return fz.on_menu(_FakeEvent(x, y))
 
     @staticmethod
     def _hit(obj, x, y, num):
@@ -815,6 +834,9 @@ class App(object):
                 # 아르케의 여섯 봉인 (2.4.0): 기간이면 일지 폴링을 켠다. 옛 서버는 칸이 없다
                 if "arche" in me and getattr(self, "arche", None) is not None:
                     self.arche.note(me.get("arche"))
+                # 낚시 (다음 시즌): 연못 · 입질 준비(ready) · 낚인 야생. 열리기 전엔 None, 옛 서버는 칸이 없다
+                if "fish" in me and getattr(self, "fishing", None) is not None:
+                    self.fishing.note(me.get("fish"))
                 quiet = self.focus_quiet()
                 # 운영자가 보낸 선물. 서버가 /api/me 에서 이미 지급했고
                 # 여기서는 알리기만 한다.
@@ -960,6 +982,7 @@ class App(object):
         self.close_olympics()
         if self.wild:
             self.wild.stop()
+        self._clear_fishing()
         if self.expedition:
             self.expedition.clear()
         if self.overlay:
@@ -2878,6 +2901,9 @@ class App(object):
         # 레이드 기둥은 영역 윗변에서 내려온다 - 영역이 바뀌면 따라간다.
         if self.raid_pillar is not None:
             self.raid_pillar.reposition()
+        # 낚시터는 영역 안 비율로 기억한다 - 같은 쪽에 다시 놓는다
+        if getattr(self, "fishing", None) is not None:
+            self.fishing.reposition()
         self.refresh_tray()
 
     def set_show_grass(self, on):
@@ -2908,6 +2934,49 @@ class App(object):
             except Exception:                               # noqa: BLE001
                 pass
         return on
+
+    # ---------------------------------------------------------------- 낚시 (다음 시즌)
+    def set_show_pond(self, on):
+        """낚시터(연못)를 켜거나 끈다 (설정 · 트레이 · 연못 메뉴의 '낚시터 숨기기').
+
+        끌 때 줄이 던져져 있으면 거둔다 (미끼는 돌아온다 - fishing.set_visible). 숨긴 줄은 아무도 입질을 못 열어
+        서버가 그동안 풀숲을 미룬다. 입질 중이면 그대로 - 곧 놓침으로 끝난다."""
+        on = bool(on)
+        if on == config.show_pond(self.settings):
+            return on
+        self.settings["showPond"] = on
+        config.save_settings(self.settings)
+        if getattr(self, "fishing", None) is not None:
+            self.fishing.set_visible(on)
+        self.refresh_tray()
+        self.notify("낚시터를 켰습니다." if on else
+                    "낚시터를 숨겼습니다. 설정이나 트레이 메뉴의 '낚시터 보이기' 로 다시 켤 수 있습니다.")
+        return on
+
+    def toggle_pond(self):
+        """트레이 메뉴에서 부른다. 설정 창이 열려 있으면 표시도 맞춘다."""
+        on = self.set_show_pond(not config.show_pond(self.settings))
+        if getattr(self, "settings_win", None):
+            try:
+                self.settings_win.show_pond()
+            except Exception:                               # noqa: BLE001
+                pass
+        return on
+
+    def on_fish_push(self, ev):
+        """알림 소켓의 {"t": "fish", "s": "ready"} (visit.Visit.on_event 가 넘긴다) - 입질 시각이 지났다."""
+        fz = getattr(self, "fishing", None)
+        if fz is not None:
+            fz.on_push(ev)
+
+    def _clear_fishing(self):
+        """로그아웃 · 세션 끊김 · 종료: 연못 · 타이머를 치운다 (서버의 줄은 그대로 - 다시 로그인하면 카드로 이어 받는다)."""
+        fz = getattr(self, "fishing", None)
+        if fz is not None:
+            try:
+                fz.clear()
+            except Exception:                               # noqa: BLE001
+                pass
 
     # ---------------------------------------------------------------- 패치노트
     def show_patchnotes(self, greet=False):
@@ -3267,6 +3336,7 @@ class App(object):
         self.close_arena()
         if self.wild:
             self.wild.stop()
+        self._clear_fishing()
         if self.expedition:
             self.expedition.clear()
         if self.overlay:
@@ -3362,6 +3432,7 @@ class App(object):
         self.close_windows()
         if self.wild:
             self.wild.stop()
+        self._clear_fishing()
         if self.expedition:
             self.expedition.clear()
         if self.overlay:

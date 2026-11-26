@@ -67,6 +67,9 @@ class AirRaidController(object):
         o = getattr(app, "olympics", None)
         if o is not None and (o.busy() or (hasattr(o, "on_air") and o.on_air())):
             return "olympics"                    # 중계 중 · 그날 중계 시간 (2시 3분 전 ~ 끝)
+        fz = getattr(app, "fishing", None)
+        if fz is not None and fz.busy():
+            return "fishing"                     # 낚시 입질 중 · 낚인 포켓몬이 나와 있다 (다음 시즌)
         w = getattr(app, "wild", None)
         if w is not None and (getattr(w, "throwing", False) or getattr(w, "pet", None) is not None):
             return "wild"                        # 야생 포켓몬이 나와 있다 (누르기 전 · 던지는 중) - 빼앗지 않는다

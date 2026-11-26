@@ -31,7 +31,7 @@ from PIL import Image, ImageDraw, ImageTk
 from common import legends as L
 from common import movetext as MT
 
-from ... import box_filter, item_icons
+from ... import box_filter, fish_text, item_icons
 from ... import ui_bond as BD
 from ... import ui_common as U
 from ..dp import box as DPX
@@ -475,6 +475,11 @@ class BoxWindow(DPX.BoxWindow):
             sub = DPX._clamp(cv, d["sub"], font(9), tw, 2)
             t2 = cv.create_text(tx1, ty, text=sub, fill="#efeaff", font=font(9), anchor="nw", tags=D)
             ty = cv.bbox(t2)[3] + s(6)
+        fish = fish_text.line(d["m"])               # 낚아서 잡은 포켓몬의 잰 무게 (시즌 7 낚시)
+        if fish:
+            t3 = cv.create_text(tx1, ty, text=DPX._clamp(cv, fish, font(9), tw, 2), fill="#efeaff", font=font(9),
+                                anchor="nw", tags=D)
+            ty = cv.bbox(t3)[3] + s(6)
         ch = s(22)
         chips = []
         cx = tx1

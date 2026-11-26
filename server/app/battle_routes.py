@@ -22,7 +22,7 @@ from common import held as HELD
 from common import pokelogic as P
 from common import statusmoves as SM
 
-from . import achievements, auth, config, db, deps, guild, items, tms, troubles, walk, mega
+from . import achievements, auth, config, db, deps, fishing, guild, items, tms, troubles, walk, mega
 
 router = APIRouter()
 
@@ -444,17 +444,43 @@ def store_caught(uid, mon, ball=None):
     else:
         where = "box"
         deps.to_box(uid, mid)            # 자리 있는 박스로 (1.9.1 - 늘 0번으로 가던 것)
+    if mon.get("fishG") is not None:
+        # 낚아서 잡았다 (시즌 7) - 주간 대물 순위에 한 줄. 잡는 길 둘(볼 · 배틀 중 볼)이 다 여기를 지난다.
+        # 여기서 터져도 잡기는 마저 끝낸다 - 포켓몬은 이미 들어갔고, 야생이 남으면 한 번 더 잡을 수 있게 된다
+        try:
+            fishing.record(uid, mon, mid)
+        except Exception as e:                              # noqa: BLE001
+            print("[fishing] 기록 실패 %s: %r" % (uid, e))
     got = db.row_to_mon(db.q1("SELECT * FROM pokemon WHERE id=?", (mid,)))
     return deps.decorate(got), where
 
 
 def reschedule(uid):
-    """다음 풀숲 시각을 다시 잡는다. 버닝 부스터가 켜져 있으면 2~3분 (2.1.1 - main._cooldown 과 같은 함수)."""
-    from . import boosts
-    secs = boosts.cooldown(uid, deps.RNG)
-    at = (_now() + datetime.timedelta(seconds=secs)).isoformat()
-    db.run("INSERT INTO wild_state (user_id, next_at) VALUES (?,?)"
-           " ON CONFLICT(user_id) DO UPDATE SET next_at=?", (uid, at, at))
+    """다음 풀숲 시각을 다시 잡는다. 버닝 부스터가 켜져 있으면 2~3분 (2.1.1 - main._cooldown 과 같은 함수).
+
+    배틀이 끝나는 곳은 이제 _end_wild 를 부른다 (낚은 야생이면 안 잡아야 해서 - 시즌 7). 이건 풀숲 시각만 잡는다.
+    """
+    deps.next_grass(uid)
+
+
+def _end_wild(uid, wild_id, how="battle"):
+    """배틀이 걸린 야생을 끝낸다 - 지우기 전에 행을 읽어 deps.end_wild 로 (src 가 fish 면 풀숲 시각 그대로).
+
+    행이 이미 없으면(만료 · 다른 앱의 놓아주기) 아무것도 안 한다 - 그 길이 이미 풀숲 시각을 잡았다.
+    지운 행을 돌려준다 (없었으면 None) - 지운 뒤에도 어디서 온 야생인지 볼 수 있게.
+    """
+    w = db.q1("SELECT * FROM wild WHERE id=?", (wild_id,))
+    if w is not None:
+        deps.end_wild(uid, w, how)
+    return w
+
+
+def _fished(w, mon):
+    """낚은 야생이었나 (시즌 7 - 낚시 야생은 도구 · 기술머신을 떨구지 않는다). w 는 _end_wild 가 돌려준 행,
+    행이 이미 없었으면 야생 자료에 실린 잰 무게(fishing.hook 이 넣는다)로 본다."""
+    if w is not None:
+        return deps.wild_src(w) == "fish"
+    return mon.get("fishG") is not None
 
 
 # ---------------------------------------------------------------- 엔드포인트
@@ -548,8 +574,7 @@ def _lost(uid, row, out):
     if not nxt:
         # 데리고 다니는 여섯을 다 썼다. 야생은 그냥 가 버린다.
         out["allDown"] = True
-        db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
-        reschedule(uid)
+        _end_wild(uid, row["wild_id"])
 
 
 @router.post("/api/battle/{bid}/move")
@@ -621,24 +646,24 @@ def use_move(bid: int, body: MoveIn, ctx=Depends(deps.current)):
         mega.on_ko(uid, row["mine_id"])                  # 유대 미션 ② (시즌 3)
         guild.note_safe(uid, "battle")                   # 길드 일일 미션 (1.10.0)
         items.mark_seen(uid, foe.mon["species"], False, auth.now_iso())
-        # 쓰러뜨려도 도구가 떨어진다. 포획보다는 덜 나온다.
-        # 볼이 다 떨어져도 배틀로는 다시 일어설 수 있어야 하기 때문이다.
-        drop = _drop(uid, foe.mon, config.DROP_ON_WIN)
-        if drop:
-            out["drop"] = drop
-        tm_drop = _drop_tm(uid, foe.mon, deps.RNG)
-        if tm_drop:
-            out["tmDrop"] = tm_drop
+        # 야생을 먼저 끝낸다 - 지운 행으로 어디서 온 야생인지 본다 (낚은 것은 떨구지 않는다, 시즌 7)
+        gone = _end_wild(uid, row["wild_id"])
+        if not _fished(gone, foe.mon):
+            # 쓰러뜨려도 도구가 떨어진다. 포획보다는 덜 나온다.
+            # 볼이 다 떨어져도 배틀로는 다시 일어설 수 있어야 하기 때문이다.
+            drop = _drop(uid, foe.mon, config.DROP_ON_WIN)
+            if drop:
+                out["drop"] = drop
+            tm_drop = _drop_tm(uid, foe.mon, deps.RNG)
+            if tm_drop:
+                out["tmDrop"] = tm_drop
         out["money"] = items.money(uid)
         out["bag"] = items.bag_get(uid)
-        db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
-        reschedule(uid)
     elif bt.over and bt.result == "lost":
         _lost(uid, row, out)
     elif bt.over and bt.result == "fled":
         # 도망쳤거나, 울부짖기·날려버리기·순간이동으로 판이 끝났다
-        db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
-        reschedule(uid)
+        _end_wild(uid, row["wild_id"])
 
     _persist_sketch(uid, row["mine_id"], me)
     _save(row["id"], bt)
@@ -743,8 +768,7 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
         out["events"] = ev
         bt.turn_no = row["turn"] + 1
         if bt.over and bt.result == "fled":
-            db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
-            reschedule(uid)
+            _end_wild(uid, row["wild_id"])
         elif not me.alive():
             bt.over, bt.result = True, "lost"
             if not any(e.get("t") == "faint" and e.get("who") == "me" for e in ev):
@@ -771,21 +795,20 @@ def throw_ball(bid: int, body: BallIn, ctx=Depends(deps.current)):
         out["exp"] = catch_exp(d, uid, foe, row["mine_id"], hour)
     caught_mon, where = store_caught(uid, foe.mon, ball)
     db.run("UPDATE battle SET state='done', result='caught' WHERE id=?", (row["id"],))
-    db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
-    db.run("INSERT INTO wild_state (user_id, caught) VALUES (?,1)"
-           " ON CONFLICT(user_id) DO UPDATE SET caught=caught+1", (uid,))
+    gone = _end_wild(uid, row["wild_id"], "battle_catch")    # 잡기 +1 · 다음 풀숲 (낚은 것이면 그대로)
     items.mark_seen(uid, foe.mon["species"], True, auth.now_iso())
     achievements.on_obtain(uid, foe.mon, "catch", ball=ball)
     mega.on_catch(uid)                                   # 유대 미션 ③ (시즌 3)
-    drop = _drop(uid, foe.mon, config.DROP_ON_CATCH)
-    tm_drop = _drop_tm(uid, foe.mon, deps.RNG)
+    drop = tm_drop = None
+    if not _fished(gone, foe.mon):                       # 낚은 포켓몬은 떨구지 않는다 (시즌 7)
+        drop = _drop(uid, foe.mon, config.DROP_ON_CATCH)
+        tm_drop = _drop_tm(uid, foe.mon, deps.RNG)
     if drop:
         out["drop"] = drop
     if tm_drop:
         out["tmDrop"] = tm_drop
     out["money"] = items.money(uid)
     out["bag"] = items.bag_get(uid)
-    reschedule(uid)
     out["pokemon"] = caught_mon
     out["where"] = where
     out["message"] = "신난다! %s 을(를) 잡았다!" % foe.name
@@ -808,8 +831,7 @@ def run_away(bid: int, ctx=Depends(deps.current)):
     if bt.try_run():
         bt.over, bt.result = True, "fled"
         _save(row["id"], bt)
-        db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
-        reschedule(uid)
+        _end_wild(uid, row["wild_id"])
         row = db.q1("SELECT * FROM battle WHERE id=?", (row["id"],))
         return {"escaped": True,
                 "events": [{"t": "flee", "who": "me", "text": "무사히 도망쳤다!"}],
@@ -819,8 +841,7 @@ def run_away(bid: int, ctx=Depends(deps.current)):
     foe_only_turn(bt, ev)
     bt.turn_no += 1
     if bt.over and bt.result == "fled":
-        db.run("DELETE FROM wild WHERE id=?", (row["wild_id"],))
-        reschedule(uid)
+        _end_wild(uid, row["wild_id"])
     elif not me.alive():
         bt.over, bt.result = True, "lost"
         if not any(e.get("t") == "faint" and e.get("who") == "me" for e in ev):
