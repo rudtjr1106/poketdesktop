@@ -73,9 +73,11 @@ RANDOM_COOLDOWN_SEC = _int("POKET_RANDOM_COOLDOWN_SEC", 0)
 MAX_DESKTOP = MAX_PARTY
 
 # PC 박스. 한 박스에 몇 마리, 박스는 몇 개까지.
-# 30 x 32 = 960마리. 본가(30 x 32)와 같게 잡았다.
+# 30 x 32 = 960마리로 본가와 같게 잡았다가, 2.5.9 에 48개(1440마리)로 늘렸다 (11/27 게시판 #1015 댕댕킴 - 특성 ·
+# 성격을 고르려면 많이 잡아야 하는데 캡슐 · 민트가 없다. 그때 900마리를 넘긴 사람이 둘). 박스 고르기 · 옮기기
+# 메뉴는 그 앱부터 굴러간다 (ui_common.ScrollMenu) - 앱을 먼저 내고 서버를 올린다.
 BOX_SIZE = _int("POKET_BOX_SIZE", 30)
-BOX_COUNT = _int("POKET_BOX_COUNT", 32)
+BOX_COUNT = _int("POKET_BOX_COUNT", 48)
 # 보유 상한. 이만큼 가지면 풀숲이 돋지 않는다 (main.wild_state).
 # **박스 용량과 같게 둔다.** 박스가 생기기 전의 300 이 남아 있어서, 300마리를 채운 사람은
 # 박스가 스물두 개 비어 있는데도 풀숲이 돋지 않았다 (제보: 빡 규·WhiteSna, 2026-10-07).

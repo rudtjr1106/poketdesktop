@@ -1017,7 +1017,7 @@ def _many(root, dex, app, win, party, box, big):
     keep_ask, keep_menu = ui_box.ask_text, win._menu
     ui_box.ask_text = lambda *a, **k: asked.append(a) or None
     opened = []
-    win._menu = lambda w, rows, below=False: opened.append((w, rows, below))
+    win._menu = lambda w, rows, below=False, scroll=None: opened.append((w, rows, below, scroll))
     try:
         win.lbl_page.event_generate("<Button-1>", x=4, y=4)
         root.update()
@@ -1027,6 +1027,12 @@ def _many(root, dex, app, win, party, box, big):
     chk("대신 박스 목록이 이름표 밑에 열린다",
         len(opened) == 1 and opened[0][0] is win.lbl_page and opened[0][2] is True,
         [(o[0], o[2]) for o in opened])
+    # 2.5.9 (#1015): 박스 줄만 굴러가는 메뉴(U.ScrollMenu)로 - '박스 안 순서' 는 아래에 고정, 지금 박스가 보이게
+    sc = opened[0][3] if opened else None
+    chk("  박스 줄만 굴러가고 '박스 안 순서' 는 아래에 고정 · 지금 박스가 보이게",
+        sc is not None and len(opened[0][1]) == win.box_count() and sc.get("focus") == win.box_no
+        and [r["text"] for r in sc.get("fixed") or []][:2] == ["박스 안 순서", "잡은 순"],
+        (len(opened[0][1]) if opened else None, sc and sc.get("focus")))
     allrows = win._box_rows()
     # 2.5.7 (게시판 #830): 박스 목록 아래에 구분선 · '박스 안 순서' 제목 · 순서 넷이 붙는다
     rows = allrows[:win.box_count()]
@@ -1053,26 +1059,26 @@ def _many(root, dex, app, win, party, box, big):
     settle_rows(root, win)
     chk("첫 박스로 돌아온다", win.box_no == 0
         and layout(win) == full_layout(party_ids, page_ids(box_ids)), win.box_no)
-    # 서른두 줄짜리 목록이다. 화면이 낮으면 한 단으로는 아래 줄이 화면 밖으로
-    # 나가 누를 수가 없다 - 단을 나눠 화면 안에 넣는다 (글자는 안 줄인다).
-    # 직접 그리는 메뉴는 맥에서만 쓴다 (윈도우는 스스로 굴러가는 tk.Menu).
-    if not PLAT.NATIVE_MENU:
-        from poketdesktop import ui_common as UC
-        real_screen = UC.screen_at
-        try:
-            for label, scr, want in (("낮은 화면(1024x640)", (0, 0, 1024, 640), 2),
-                                     ("넉넉한 화면(1920x1080)", (0, 0, 1920, 1080), 1)):
-                UC.screen_at = lambda r, x, y, s=scr: s
-                menu = UC.PopupMenu(root, win._box_rows(), 300, 100, width=220)
-                root.update()
-                chk("%s: 박스 목록이 %d단" % (label, want), menu.cols == want, menu.cols)
-                chk("  화면 안에 다 들어온다",
-                    menu.win.winfo_rooty() + menu.win.winfo_height() <= scr[3]
-                    and menu.win.winfo_rootx() + menu.win.winfo_width() <= scr[2],
-                    (menu.win.winfo_rooty(), menu.win.winfo_height(), menu.win.winfo_width()))
-                menu.close()
-        finally:
-            UC.screen_at = real_screen
+    # 박스가 마흔여덟 개다 (2.5.9). 예전에는 화면이 낮으면 단을 나눴고(1.9.2) 윈도우는 화면 높이만큼 긴 tk.Menu 였다.
+    # 이제 어느 OS 든 한 단 · 정해진 높이에서 굴러가고, 낮은 화면에서도 화면 안에 다 들어온다 (#1015).
+    from poketdesktop import ui_common as UC
+    real_screen = UC.screen_at
+    try:
+        for label, scr in (("낮은 화면(1024x640)", (0, 0, 1024, 640)), ("넉넉한 화면(1920x1080)", (0, 0, 1920, 1080))):
+            UC.screen_at = lambda r, x, y, s=scr: s
+            menu = UC.ScrollMenu(root, win._box_pick_rows(), 300, 100, width=220, fixed=win._box_order_rows(),
+                                 focus=win.box_count() - 1)
+            root.update()
+            lo, hi = menu.canvas.yview()
+            chk("%s: 한 단 · 굴러간다 · 끝 박스가 보이게 열린다" % label, menu.cols == 1 and hi - lo < 0.999
+                and hi >= 0.999, (menu.cols, lo, hi))
+            chk("  화면 안에 다 들어온다",
+                menu.win.winfo_rooty() + menu.win.winfo_height() <= scr[3]
+                and menu.win.winfo_rootx() + menu.win.winfo_width() <= scr[2],
+                (menu.win.winfo_rooty(), menu.win.winfo_height(), menu.win.winfo_width()))
+            menu.close()
+    finally:
+        UC.screen_at = real_screen
         root.update()
 
     asked = []

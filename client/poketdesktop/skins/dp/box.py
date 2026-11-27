@@ -408,8 +408,8 @@ class BoxWindow(Scene, BX.BoxWindow):
         self._move_pick = None
         self._repaint_detail(top=True)
 
-    def _menu(self, btn, rows, below=False):
-        """드롭다운 - 그 단추(판 위의 자리) 아래에."""
+    def _menu(self, btn, rows, below=False, scroll=None):
+        """드롭다운 - 그 단추(판 위의 자리) 아래에. scroll 은 기본 화면의 _menu 와 같다 (U.ScrollMenu, #1015)."""
         box = None
         if isinstance(btn, str):
             box = self._boxes.get(btn)
@@ -430,6 +430,8 @@ class BoxWindow(Scene, BX.BoxWindow):
                 x, y = self.win.winfo_rootx() + 80, self.win.winfo_rooty() + 120
             except tk.TclError:
                 return None
+        if scroll is not None:
+            return U.ScrollMenu(self.root, rows, x, y, width=220, **scroll)
         return U.PopupMenu(self.root, rows, x, y, width=220)
 
     def _open_type_menu(self):

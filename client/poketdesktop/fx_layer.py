@@ -89,6 +89,9 @@ class FxLayer(object):
         h = max(1, int((y2 + pad) - self.y))
 
         self.win = tk.Toplevel(root)
+        # 3초마다 도는 Overlay.keep_on_top 이 이 창을 늘 도트 창들 바로 위로 올린다 (11/27 게시판 #1002 -
+        # 윈도우에서 레이어보다 나중에 생긴 도트가 체력바 · 글씨를 덮었다)
+        self.win._poket_over = True
         try:
             self.win.overrideredirect(True)
             bg = PLAT.transparent_window(self.win, KEY)

@@ -843,7 +843,7 @@ class App(object):
                 # 탐험 파견 (1.10.4): 돌아온 것이 있으면 바탕화면에 보따리를 놓는다
                 if self.expedition is not None and "expedition" in me and not quiet:
                     self.expedition.note(me.get("expedition"))
-                # 타입 스프레이 남은 시간 (2.1.3): 오른쪽 아래 띠
+                # 스프레이 · 버닝 부스터 남은 시간 (2.1.3 · 2.5.9 #1016): 오른쪽 아래 띠
                 if "boosts" in me:
                     self.boost_badge.note(me.get("boosts"))
                 # 레이드 안내(announce_raid)는 1.10.0 에서 끊었다 - 레이드 탭을 뺐으므로

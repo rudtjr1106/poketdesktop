@@ -1740,7 +1740,11 @@ class BoxWindow(object):
             state="normal" if self.box_no < self.box_count() - 1 else "disabled")
 
     def _box_rows(self):
-        """박스 고르기 줄. 지금 보는 박스에 표시가 붙는다."""
+        """박스 고르기 줄 (박스들 + 구분선 + 박스 안 순서). 지금 보는 박스에 표시가 붙는다."""
+        return self._box_pick_rows() + [None] + self._box_order_rows()
+
+    def _box_pick_rows(self):
+        """박스마다 한 줄. 메뉴에서는 이 줄들만 굴러간다 (2.5.9, #1015 - U.ScrollMenu)."""
         rows = []
         for no in range(self.box_count()):
             rows.append({
@@ -1749,9 +1753,13 @@ class BoxWindow(object):
                 "checked": no == self.box_no,
                 "command": (lambda x=no: self.goto_box(x)),
             })
-        # 박스 안 순서 (2.5.7, 게시판 #830 '박스 안에서만 도감순 · 이름순'). 모든 박스에 같이, 이 PC 에 기억한다.
+        return rows
+
+    def _box_order_rows(self):
+        """박스 안 순서 (2.5.7, 게시판 #830 '박스 안에서만 도감순 · 이름순'). 모든 박스에 같이, 이 PC 에 기억한다.
+        메뉴에서는 박스 목록 아래에 늘 보인다 (굴러가지 않는다)."""
         cur = self.box_order()
-        rows += [None, {"text": "박스 안 순서", "header": True}]
+        rows = [{"text": "박스 안 순서", "header": True}]
         for key, kr in box_filter.BOX_ORDERS:
             rows.append({"text": kr, "checked": key == cur,
                          "command": (lambda k=key: self.set_box_order(k))})
@@ -1783,7 +1791,9 @@ class BoxWindow(object):
         if self.sort:
             return self.say("%s으로 보는 중입니다. '%s' 머리글을 다시 누르면 박스로 돌아갑니다."
                             % (box_filter.SORT_KR[self.sort], SORT_HEAD[self.sort][2]), U.DANGER)
-        return self._menu(self.lbl_page, self._box_rows(), below=True)
+        # 박스 줄만 굴러가고 '박스 안 순서' 는 그 아래에 늘 보인다. 열면 지금 보는 박스가 보이게 (2.5.9, #1015)
+        return self._menu(self.lbl_page, self._box_pick_rows(), below=True,
+                          scroll={"fixed": self._box_order_rows(), "focus": self.box_no})
 
     def goto_box(self, no):
         self._page(int(no) - self.box_no)
@@ -1822,13 +1832,13 @@ class BoxWindow(object):
         m = self.current()
         if not m:
             return
-        rows = [{"text": "여러 마리 골라 옮기기 · 놓아주기…", "checked": False, "command": self.enter_multi}]
+        head = [{"text": "여러 마리 골라 옮기기 · 놓아주기…", "checked": False, "command": self.enter_multi}]
         if m.get("isEgg"):
             self.say("알은 박스를 옮길 수 없습니다.", U.DANGER)
-            return self._menu(self.btn_move, rows)
-        rows.append(None)
+            return self._menu(self.btn_move, head)
         pid = m["id"]
         here = int(m.get("box") or 0)
+        rows = []
         for no in range(self.box_count()):
             used = self.box_used(no)
             full = used >= self.box_size() and no != here
@@ -1840,7 +1850,8 @@ class BoxWindow(object):
                 "command": (lambda x=no: None) if full
                 else (lambda x=no: self._do_move(pid, x)),
             })
-        self._menu(self.btn_move, rows)
+        # 박스 줄만 굴러가고 맨 위 '여러 마리' 는 늘 보인다. 지금 박스가 보이게 연다 (2.5.9, #1015 - 박스가 늘었다)
+        self._menu(self.btn_move, rows, scroll={"head": head, "focus": here})
 
     def _do_move(self, pid, no):
         def work():
@@ -1962,7 +1973,7 @@ class BoxWindow(object):
                 "checked": False,
                 "command": (lambda x=no: self._do_move_many(ids, x)) if ok else (lambda: None),
             })
-        self._menu(self.btn_multi_move, rows)
+        self._menu(self.btn_multi_move, rows, scroll={"focus": self.box_no})     # 굴러간다 (2.5.9, #1015)
 
     def _do_move_many(self, ids, no):
         ids = list(ids)
@@ -2047,12 +2058,13 @@ class BoxWindow(object):
             self.app.request_sync()
         U.run_async(self.root, work, done)
 
-    def _menu(self, btn, rows, below=False):
+    def _menu(self, btn, rows, below=False, scroll=None):
         """단추 아래 드롭다운. 맥에서는 tk.Menu 가 after 타이머와 부딪혀
         앱이 죽으므로 U.PopupMenu 를 쓴다 (_open_type_menu 와 같다).
 
         btn 은 PushButton(바깥 틀이 holder) 이거나 그냥 위젯이다. below 면
-        그 바로 밑에 연다.
+        그 바로 밑에 연다. scroll 을 주면({"fixed": 줄들, "focus": 번호}) 어느 OS 든
+        U.ScrollMenu - rows 는 정해진 높이 안에서 굴러가고 fixed 는 그 아래에 (박스 고르기, #1015).
         """
         from . import platform_os as PLAT
         w = getattr(btn, "holder", None) or btn
@@ -2062,6 +2074,8 @@ class BoxWindow(object):
                  else w.winfo_rooty() - U.h(20))
         except Exception:                                   # noqa: BLE001
             x, y = self.win.winfo_rootx() + 80, self.win.winfo_rooty() + 120
+        if scroll is not None:
+            return U.ScrollMenu(self.root, rows, x, y, width=220, **scroll)
         if not PLAT.NATIVE_MENU:
             return U.PopupMenu(self.root, rows, x, y, width=220)
         m = tk.Menu(self.root, tearoff=0, bg=U.BG2, fg=U.FG,

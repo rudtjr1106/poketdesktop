@@ -190,10 +190,11 @@ def main():
     SB.settle_rows(root, win)
     menus = []
     real_menu = win._menu
-    win._menu = lambda btn, rows, below=False: menus.append((btn, rows))
+    win._menu = lambda btn, rows, below=False, scroll=None: menus.append(
+        (btn, ((scroll or {}).get("head") or []) + ([None] if (scroll or {}).get("head") else []) + rows))
     win.move_box()
     rows = menus[-1][1]
-    chk("'박스 옮기기' 의 맨 위 줄이 '여러 마리 한꺼번에 옮기기' 다 (그 아래에 박스들)",
+    chk("'박스 옮기기' 의 맨 위 줄이 '여러 마리 한꺼번에 옮기기' 다 (그 아래에 박스들 - 2.5.9 부터 박스 줄만 굴러간다)",
         rows[0]["text"].startswith("여러 마리") and rows[1] is None and len(rows) == 2 + win.box_count()
         and menus[-1][0] is win.btn_move, rows[0]["text"])
     chk("평소에는 평소 단추만 보인다", win.bar_normal.winfo_ismapped() and not win.bar_multi.winfo_ismapped() and not win.multi)

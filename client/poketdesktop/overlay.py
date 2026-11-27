@@ -1009,6 +1009,23 @@ class Pet(object):
                 pass
 
 
+def top_order(ov, wins):
+    """Overlay.keep_on_top 이 올릴 차례 (나중에 올린 것이 위). 만든 차례 그대로, 다만 연출 레이어(창에
+    _poket_over - fx_layer)는 ov 의 마지막 도트 · 이름표 창 바로 뒤로 옮긴다 (게시판 #1002). 도트가 없으면 맨 앞."""
+    layers = [w for w in wins if getattr(w, "_poket_over", False)]
+    if not layers:
+        return list(wins)
+    rest = [w for w in wins if not getattr(w, "_poket_over", False)]
+    mine = set()
+    for p in (list((getattr(ov, "pets", None) or {}).values()) + list(getattr(ov, "extra", None) or [])
+              + list((getattr(ov, "eggs", None) or {}).values())):
+        for w in (getattr(p, "win", None), getattr(p, "name_win", None)):
+            if w is not None:
+                mine.add(str(w))
+    last = max([i for i, w in enumerate(rest) if str(w) in mine] or [-1])
+    return rest[:last + 1] + layers + rest[last + 1:]
+
+
 class Overlay(object):
     """화면에 나와 있는 포켓몬 전체를 관리한다."""
 
@@ -1547,7 +1564,15 @@ class Overlay(object):
         **어느 창인지 따로 적어 두지 않는다.** -topmost 가 걸린 창을 그대로
         찾는다 - 도트·이름표·설명·풀숲·배틀 연출이 전부 걸려 있고, 새로 생기는
         창도 여기에 저절로 들어온다. 창 몇 개뿐이라 3초에 한 번은 싸다.
+
+        **올리는 차례가 곧 쌓이는 차례다** (나중에 올린 것이 위). 기본은 만든 차례인데, 연출 레이어
+        (fx_layer - 체력바 · 기술 연출 · 떠오르는 글씨, 창에 _poket_over)는 **도트 창들 바로 위**로 옮겨 올린다.
+        레이어보다 나중에 생긴 도트(투기장 상대 · 랭크 팀이라 새로 띄운 우리 편)가 3초마다 레이어 위로 올라와
+        체력바와 '…의 약점보험이' 같은 글씨를 덮었다 (11/27 게시판 #1002 우가우가, 윈도우 - 맥은 레이어가 도트보다
+        높은 층이라 안 드러났다). 메뉴 · 설명 창처럼 마지막 도트보다 나중에 뜬 것은 그대로 레이어 위다
+        (1.0.20 - 볼 고르는 메뉴 위로 체력바가 올라오면 안 된다).
         """
+        wins = []
         for w in self.root.winfo_children():
             try:
                 if not w.winfo_exists() or not w.winfo_ismapped():
@@ -1563,6 +1588,8 @@ class Overlay(object):
                 # 올리지 않고 도로 뒤로 보낸다
                 PLAT.send_back(w)
                 continue
+            wins.append(w)
+        for w in top_order(self, wins):
             PLAT.keep_on_top(w)
         for p in list(getattr(self, "pets", {}).values()) + list(getattr(self, "extra", [])):
             t = getattr(p, "trail", None)

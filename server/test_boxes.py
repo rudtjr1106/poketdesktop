@@ -319,7 +319,7 @@ def main_():
     # 보유 상한이 박스가 생기기 전의 300 으로 남아 있었다. 300마리를 채운 사람은 박스가
     # 스물두 개 비어 있는데도 풀숲이 돋지 않았고, 까닭도 화면에 보이지 않았다.
     cap = config.BOX_SIZE * config.BOX_COUNT
-    chk("보유 상한이 박스 용량과 같다 (30 x 32 = 960)", config.MAX_BOX == cap == 960, config.MAX_BOX)
+    chk("보유 상한이 박스 용량과 같다 (30 x 48 = 1440, 2.5.9 #1015)", config.MAX_BOX == cap == 1440, config.MAX_BOX)
     many, _ids = mkuser("many300", 300)
     r = main.wild_state({"user": {"id": many, "balls": 10}})
     chk("300마리를 가져도 풀숲이 돋는다", bool(r.get("wild")) and r["wild"].get("state") == "grass"

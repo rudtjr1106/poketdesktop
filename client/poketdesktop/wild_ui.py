@@ -568,7 +568,7 @@ class WildController(object):
         self.app.balls = r.get("balls", self.app.balls)
         badge = getattr(self.app, "boost_badge", None)
         if badge is not None and "boosts" in r:
-            badge.note(r["boosts"])                        # 타입 스프레이 남은 시간 (2.1.3, 오른쪽 아래 띠)
+            badge.note(r["boosts"])                        # 스프레이 · 버닝 남은 시간 (2.1.3 · 2.5.9, 오른쪽 아래 띠)
         if self._away() or self._focusing():
             return              # 집중 전에 보낸 확인의 답이 늦게 와도 풀숲을 돋우지 않는다 (독립 검토 #5)
         # 물어본 뒤 답이 오는 사이에 껐을 수 있다. 볼 개수만 챙기고

@@ -1988,6 +1988,107 @@ def close_all():
         m.close()
 
 
+class ScrollMenu(PopupMenu):
+    """줄이 많은 메뉴 - visible 줄 높이까지만 보이고 나머지는 휠 · 스크롤바로 굴린다 (2.5.9, 게시판 #1015).
+
+        ScrollMenu(root, rows, x, y, width=220, head=[...], fixed=[...], focus=i)
+
+    rows 가 굴러가는 줄들, head 는 그 위에 · fixed 는 그 아래에 늘 보이는 줄들 (구분선을 사이에 넣는다).
+    열 때 focus 번째 줄이 가운데쯤 보이게 굴려 둔다.
+
+    박스 고르기 · 박스 옮기기가 이것을 쓴다. PopupMenu 는 한 단에 안 들어가면 옆으로 단을 늘렸고 (1.9.2), 윈도우 기본 화면은
+    tk.Menu 라 화면 높이만큼 길게 내려왔다 - 박스가 서른두 개만 돼도 '너무 길어서 잘 안 보인다' (11/27 #1015).
+    휠은 install_wheel 로 받는다. 윈도우 Tk 은 휠을 포커스 창(박스 창)으로 보내는데, 그 창도 install_wheel 을 걸어
+    두었고 그것이 마우스 밑의 위젯에서 캔버스를 찾아 올라가므로 여기 캔버스가 굴러간다.
+    """
+    VISIBLE = 12
+
+    def __init__(self, root, rows, x, y, width=None, anchor="nw", on_close=None, head=None, fixed=None,
+                 focus=None, visible=None):
+        self.head = list(head or [])
+        self.fixed = list(fixed or [])
+        self.focus = focus
+        self.visible = max(3, int(visible or self.VISIBLE))
+        self.canvas = self.inner = None
+        self._xy = (x, y)
+        PopupMenu.__init__(self, root, rows, x, y, width=width, anchor=anchor, on_close=on_close)
+        self._see_focus(len(rows))
+
+    def _columns_for(self, rows, x, y):
+        return 1                                        # 단을 늘리지 않고 굴린다
+
+    def _paint(self, win, rows):
+        win.configure(bg=BG2, highlightthickness=1, highlightbackground=LINE2)
+        body = tk.Frame(win, bg=BG2)
+        body.pack(fill="both", expand=True, padx=1, pady=6)
+        top = self._block(body, self.head, sep_after=True)
+        if top is not None:
+            top.pack(fill="x")
+        holder = tk.Frame(body, bg=BG2)
+        holder.pack(fill="x")
+        cv = tk.Canvas(holder, bg=BG2, highlightthickness=0, bd=0, width=1, height=1)
+        inner = tk.Frame(cv, bg=BG2)
+        wid = cv.create_window(0, 0, window=inner, anchor="nw")
+        for row in rows:
+            if row is None:
+                tk.Frame(inner, bg=LINE, height=h(1)).pack(fill="x", padx=8, pady=4)
+            else:
+                self._row(inner, row)
+        foot = self._block(body, self.fixed, sep_before=True)
+        inner.update_idletasks()
+        total = max(1, inner.winfo_reqheight())
+        n = len(rows) or 1
+        view = int(round(total * min(n, self.visible) / float(n)))
+        # 화면이 낮으면 거기에 맞춘다 (아래 고정 줄 · 위아래 여백까지 들어가게)
+        try:
+            _sx1, sy1, _sx2, sy2 = screen_at(self.root, *self._xy)
+            room = (sy2 - sy1) - 60 - 12 - sum(b.winfo_reqheight() for b in (top, foot) if b is not None)
+            view = max(min(total, int(self._line_height()) * 3), min(view, room))
+        except Exception:                                   # noqa: BLE001
+            pass
+        cv.configure(height=view, scrollregion=(0, 0, 1, total))
+        if total > view + 1:                                # 다 들어가면 막대가 없다
+            bar = ttk.Scrollbar(holder, orient="vertical", command=cv.yview)
+            cv.configure(yscrollcommand=bar.set)
+            bar.pack(side="right", fill="y")
+        cv.pack(side="left", fill="x", expand=True)
+        cv.bind("<Configure>", lambda e: cv.itemconfigure(wid, width=e.width), add="+")
+        inner.bind("<Configure>", lambda e: cv.configure(scrollregion=(0, 0, e.width, e.height)), add="+")
+        if foot is not None:
+            foot.pack(fill="x")
+        scrollable(cv, 60)
+        install_wheel(win)
+        self.canvas, self.inner = cv, inner
+
+    def _block(self, body, rows, sep_before=False, sep_after=False):
+        """늘 보이는 줄 묶음 (head · fixed). 없으면 None. 아직 담지 않는다 - 차례는 _paint 가 정한다."""
+        if not rows:
+            return None
+        f = tk.Frame(body, bg=BG2)
+        if sep_before:
+            tk.Frame(f, bg=LINE, height=h(1)).pack(fill="x", padx=8, pady=4)
+        for row in rows:
+            if row is None:
+                tk.Frame(f, bg=LINE, height=h(1)).pack(fill="x", padx=8, pady=4)
+            else:
+                self._row(f, row)
+        if sep_after:
+            tk.Frame(f, bg=LINE, height=h(1)).pack(fill="x", padx=8, pady=4)
+        f.update_idletasks()
+        return f
+
+    def _see_focus(self, n):
+        """focus 번째 줄이 가운데쯤 오게 굴린다."""
+        if self.canvas is None or self.focus is None or n <= self.visible:
+            return
+        try:
+            self.canvas.update_idletasks()
+            top = max(0, int(self.focus) - self.visible // 2)
+            self.canvas.yview_moveto(top / float(n))
+        except tk.TclError:
+            pass
+
+
 def screen_at(root, x, y):
     """그 점이 있는 화면의 Tk 좌표 (x1, y1, x2, y2).
 
