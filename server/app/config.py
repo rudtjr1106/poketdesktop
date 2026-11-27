@@ -197,6 +197,12 @@ FISH_PERFECT = _float("POKET_FISH_PERFECT", 2.5)            # 쭉 하고 이 안
 FISH_HOLD = _int("POKET_FISH_HOLD", 150)                    # 입질이 이만큼 안으로 다가오면 풀숲을 미룬다
 FISH_HOLD_LATE = _int("POKET_FISH_HOLD_LATE", 120)          # 입질 시각이 이만큼 지나도 아무도 안 열면 풀숲을 다시 돋운다
 FISH_PUSH = _bool("POKET_FISH_PUSH", True)                  # 입질 준비 알림 스레드 (5초마다)
+# 열매 텃밭 (시즌 7, garden.py) - 낚시와 같이 garden.is_open 이 부를 때마다 season.SEASON 과 견준다. 로컬은 POKET_GARDEN_FROM=6.
+GARDEN_FROM = _int("POKET_GARDEN_FROM", 7)
+GARDEN_SCALE = _float("POKET_GARDEN_SCALE", 1.0)            # 자라는 시간에 곱한다 (로컬 시험 0.01 = 4시간이 2.4분)
+# 하루(KST)에 거두는 열매 천장. 씨앗을 빼면 하루 15~17개 = 팔면 약 8,000원 - 도구 탐험 '1만 원 안쪽' 선 아래 (설계 수치)
+GARDEN_CAP = _int("POKET_GARDEN_CAP", 20)
+FEED_GAIN = _int("POKET_FEED_GAIN", 10)                     # 열매 먹이기 친밀도 (하루 한 번 - 걷기 하루 8시간의 약 0.4배)
 # 게시판 이미지 (버전 2). DB 에 넣지 않고 파일로 둔다 - DB 가 커지면 백업이 무거워진다 (10/28 3GB 사고).
 # 운영은 /data 볼륨(DB · 도트 캐시와 같은 곳)에 남는다.
 BOARD_IMG_DIR = os.environ.get("POKET_BOARD_IMG_DIR", "/data/board_img")

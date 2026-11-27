@@ -395,6 +395,37 @@ class Api(object):
         """주간 대물 순위 {week, weekStart, endsIn, top, me, last, mine}. week = this | last."""
         return self._call("GET", "/api/fish/board?week=%s" % ("last" if week == "last" else "this"))
 
+    # ---------------- 열매 텃밭 (시즌 7) ----------------
+    # design-notes/2026-11-26-garden.md · -garden-plan.md. 단계 · 남은 초는 서버 시계로 센 값만 싣는다. 텃밭을 모르는 옛 서버는 404.
+    def garden(self):
+        """텃밭 카드 {open, pots[3], harvested, cap, nextIn, fedToday}."""
+        return self._call("GET", "/api/garden")
+
+    def garden_plant(self, slot, berry):
+        """빈 화분(slot 0~2)에 지닌 열매 하나를 씨앗으로 심는다. 카드를 준다."""
+        return self._call("POST", "/api/garden/plant", {"slot": int(slot), "berry": berry})
+
+    def garden_water(self):
+        """물이 필요한 화분 모두에 물을 준다 (그 순간의 단계). {watered, card}."""
+        return self._call("POST", "/api/garden/water", {})
+
+    def garden_harvest(self, replant=True):
+        """익은 화분을 모두 거둔다 (하루 천장까지). replant 면 같은 열매로 다시 심는다. {got, replanted, capped, card}."""
+        return self._call("POST", "/api/garden/harvest", {"replant": bool(replant)})
+
+    def garden_pull(self, slot):
+        """화분을 비운다 (새싹 단계면 씨앗을 돌려받는다). 카드를 준다."""
+        return self._call("POST", "/api/garden/pull", {"slot": int(slot)})
+
+    def visit_water(self):
+        """놀러 간 쪽: 친구(주인)의 화분에 물을 준다 (받는 쪽 하루 한 번). {ok, bonus, garden}."""
+        return self._call("POST", "/api/visit/water", {})
+
+    def feed(self, pid, avoid=None):
+        """바탕화면 포켓몬에게 열매를 먹인다 (하루 한 번). avoid = 지금 미끼(빼고 고른다).
+        {berry, kr, gain, happiness, evolve}."""
+        return self._call("POST", "/api/pokemon/%d/feed" % int(pid), {"avoid": avoid, "hour": _hour()})
+
     def set_order(self, ids):
         """데리고 다니는 순서. 화면에 보이는 차례대로 넘긴다 (음수는 알)."""
         return self._call("POST", "/api/pokemon/order",

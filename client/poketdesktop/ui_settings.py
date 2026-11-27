@@ -321,7 +321,7 @@ class SettingsWindow(object):
         # 손잡이마다 하는 일이 다르다. 이름표는 이름표 창을 붙이거나 떼야
         # 하고, 풀숲은 야생 폴링을 켜고 끄고, 알림은 저장만 하면 된다.
         # 그래서 누를 때 무엇을 부를지도 같이 적는다.
-        for var, label, key, note, how in self._with_pond((
+        for var, label, key, note, how in self._with_garden(self._with_pond((
                 (self.names, "이름표 보이기", "showNames",
                  "포켓몬 위에 이름과 레벨을 띄웁니다.", self._toggle),
                 # 도트는 누를 때마다 설정을 본다 (overlay.Pet.can_drag). 그래서
@@ -363,7 +363,7 @@ class SettingsWindow(object):
                 (self.arche_title, "브라우저 단서 찾기 (아르케)", "archeTitle",
                  "아르케 이벤트 동안, 윈도우에서 맨 앞에 있는 창의 제목만 3초마다 확인해 이벤트 단서와 "
                  "맞는지 봅니다. 주소 · 방문 기록 · 페이지 내용은 읽지 않고, 제목은 저장하거나 보내지 "
-                 "않습니다 (단서와 맞을 때만 그 말을 서버에 보냅니다).", self._toggle_plain))):
+                 "않습니다 (단서와 맞을 때만 그 말을 서버에 보냅니다).", self._toggle_plain)))):
             c = tk.Checkbutton(
                 box, text=label, variable=var, bg=U.BG, fg=U.FG,
                 selectcolor=U.INK, activebackground=U.BG,
@@ -626,6 +626,29 @@ class SettingsWindow(object):
         if v is not None:
             v.set(config.show_pond(self.app.settings))
 
+    # 열매 텃밭 (다음 시즌) - 서버가 텃밭을 열었을 때만 '낚시터 보이기' 바로 아래에 (없으면 '풀숲 띄우기' 아래)
+    GARDEN_LABEL = "텃밭 보이기"
+    GARDEN_NOTE = ("낚시터 옆에 화분 셋이 놓인 화단을 둡니다. 지닌 열매를 심으면 몇 시간에 걸쳐 자라고, 단계마다 물을 "
+                   "주면 더 많이 거둡니다. 꺼도 화분은 그대로 자랍니다.")
+
+    def _with_garden(self, rows):
+        """손잡이 목록에 '텃밭 보이기' 를 끼운다 (텃밭이 열렸을 때만). 화면 테마도 이것을 쓴다."""
+        rows = list(rows)
+        gd = getattr(self.app, "garden", None)
+        if gd is None or not getattr(gd, "open", False):
+            return rows
+        self.garden = tk.BooleanVar(value=config.show_garden(self.app.settings))
+        at = next((i + 1 for i, r in enumerate(rows) if r[2] == "showPond"),
+                  next((i + 1 for i, r in enumerate(rows) if r[2] == "showGrass"), len(rows)))
+        rows.insert(at, (self.garden, self.GARDEN_LABEL, "showGarden", self.GARDEN_NOTE, self._toggle_garden))
+        return rows
+
+    def show_garden(self):
+        """트레이에서 텃밭을 켜고 껐을 때 표시를 맞춘다 (show_pond 와 같은 까닭)."""
+        v = getattr(self, "garden", None)
+        if v is not None:
+            v.set(config.show_garden(self.app.settings))
+
     def _autostart_row(self, box):
         """컴퓨터 켤 때 같이 시작.
 
@@ -746,6 +769,10 @@ class SettingsWindow(object):
         # 저장하고 연못을 바로 세우거나 걷는다 (app.set_show_pond - 트레이 · 연못 메뉴와 같은 길)
         self.app.set_show_pond(var.get())
 
+    def _toggle_garden(self, _key, var):
+        # 저장하고 화단을 바로 세우거나 걷는다 (app.set_show_garden - 트레이 · 화단 메뉴와 같은 길)
+        self.app.set_show_garden(var.get())
+
     def reset(self):
         # autostart 는 화면 취향이 아니라 **윈도우에 걸어 둔 등록**이다.
         # "기본값으로" 를 눌렀다고 부팅 목록에서 조용히 빠지면(혹은 조용히
@@ -755,8 +782,8 @@ class SettingsWindow(object):
         # 한 판을 다시 물어본다.
         keep = {k: self.app.settings[k]
                 for k in ("server", "lastBall", "autostart",
-                          # 미끼 · 낚시 안내를 어디까지 했나도 기록이다 (lastBall 과 같다)
-                          "lastBait", "pondHints",
+                          # 미끼 · 낚시 안내 · 텃밭 안내를 어디까지 했나도 기록이다 (lastBall 과 같다)
+                          "lastBait", "pondHints", "gardenHints",
                           "lastRunVersion", "updateSkipped",
                           # '고른 포켓몬만' 에서 고른 종은 하나씩 골라 모은 것이다 - 모드만 기본(new)으로 돌아가면
                           # 쓰이지 않는다. 지우면 다시 고르려고 1025종을 또 훑어야 한다.
@@ -796,6 +823,10 @@ class SettingsWindow(object):
         if fz is not None:                      # 낚시터도 기본(풀숲을 따름) · 기본 자리로
             fz.set_visible(config.show_pond(self.app.settings))
             fz.reposition()
+        gd = getattr(self.app, "garden", None)
+        if gd is not None:                      # 텃밭도 기본(낚시터를 따름) · 기본 자리로
+            gd.set_visible(config.show_garden(self.app.settings))
+            gd.reposition()
         self.app.refresh_tray()
         self._paint_catch_pick()
         self._repaint_pick_window()

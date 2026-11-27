@@ -76,7 +76,23 @@ ACT_KR = {"dance": "춤", "sleep": "자기", "sit": "앉기", "lie": "눕기", "
 HINT = "/춤 /자기 /앉기 /눕기 /점프 /인사 /기절 /일어나"
 TALK_HINT = "나를 누르고 Enter 를 치면 말할 수 있어요"
 GUEST_HINT = TALK_HINT + "\n우클릭: 여기에 두기 · 집으로 돌아오기"
+# 열매 텃밭 (다음 시즌): 친구 집에 텃밭이 있을 때만 '화분에 물 주기' 도 알려 준다. 시즌 6 · 옛 서버(view 에 garden 이
+# 없다)에서는 없는 메뉴를 알려 주지 않게 위 글을 그대로 쓴다 - 앱이 서버보다 먼저 나간다.
+GUEST_GARDEN_HINT = TALK_HINT + "\n우클릭: 여기에 두기 · 화분에 물 주기 · 집으로 돌아오기"
 HOST_HINT = TALK_HINT + "\n놀러 온 포켓몬 우클릭: 돌려보내기"
+WATER_ROW = "화분에 물 주기"                                # 손님 메뉴 (친구 텃밭이 있을 때만)
+# 못 주는 까닭 (서버 view.garden.why): 빈 화분뿐 · 다 익은 화분뿐 · 자라는 화분이 다 친구 물 +1 을 받음 · 오늘 이미 받음.
+# 친구 화단 오른쪽 클릭 메뉴(garden.on_menu)도 이 글을 그대로 쓴다
+WATER_WHY = {"empty": WATER_ROW + " (심은 화분 없음)", "ripe": WATER_ROW + " (다 익은 화분뿐)",
+             "bonus": WATER_ROW + " (이미 물을 받은 화분뿐)", "done": WATER_ROW + " (오늘 이미 받음)"}
+WATER_GAVE = "%s 님의 화분에 물을 줬어요"                     # 손님: 준 뒤 (붙은 화분이 있으면 ' · 열매 +n')
+WATERED = "%s 님이 화분에 물을 줬어요 +1"                     # 주인: 화단 연출을 못 할 때(숨김 · 텃밭 없음)의 말풍선
+WATER_WALK_SEC = 4.0         # 주인: 놀러 온 포켓몬이 화단까지(돌아올 때도) 이 안에 닿게 걸음을 늘린다 - 화면 끝에서
+                             # 끝이면 평소 걸음으로 30초가 넘어, 물을 준 줄도 모르고 지나간다
+WATER_STAY_MS = 1500         # 화단 앞에서 물을 주고 이만큼 서 있다가 구석으로 돌아간다
+WATER_QUEUE_MS = 30000       # 주인: 걸어 들어오는 중에 온 물은 닿은 뒤에 - 그래도 이만큼 지나면 (걸음이 끊겼다) 바로 한다
+KST_S = 9 * 3600             # 하루 한 번(친구 물)은 0시 KST 에 풀린다 (서버와 같은 날짜)
+MIDNIGHT_SLACK_S = 5         # 손님: 0시 바로 뒤에 다시 묻는다 - 서버 시계와 조금 엇갈려도 새 날을 받게
 ARRIVED = "%s 님이 놀러 왔어요!"   # 놀러 온 포켓몬이 구석에 서면 그 머리 위에 (주인 화면)
 DROP_MS = 380                # 보따리가 머리 위에서 떨어지는 시간
 # 바탕화면에서 싸우는 동안에는 못 간다 (Visit.busy)
@@ -156,6 +172,12 @@ def lead_of(pets):
     """파티 맨 앞."""
     pets = list(pets)
     return min(pets, key=party_order) if pets else None
+
+
+def kst_midnight_in(now=None):
+    """다음 0시(KST)까지 초 (0 보다 크고 하루 이하)."""
+    now = time.time() if now is None else float(now)
+    return 86400.0 - ((now + KST_S) % 86400.0)
 
 
 # ---------------------------------------------------------------- 남의 도트
@@ -594,6 +616,13 @@ class Bubble(_Floater):
             self.label.image = icon
         self.label.pack(padx=2 if gift else 1, pady=2 if gift else 1)
         self.until = time.time() + ms / 1000.0
+        # 따로 뜨는 말풍선(낚시 · 텃밭 안내 · 알람 …)은 서로 안 쌓인다 - 같은 도트 위에 겹치지 않게 언제 떴는지 ·
+        # 떠 있는 것을 도트에 적어 둔다 (garden._hint_wait 가 본다)
+        try:
+            pet._bubble_at = time.time()
+            pet._bubbles = [b for b in getattr(pet, "_bubbles", ()) if not b.dead] + [self]
+        except Exception:                                   # noqa: BLE001
+            pass
         self.follow()
 
     def close(self):
@@ -821,6 +850,10 @@ class InputBubble(_Floater):
 class Visit(object):
     """놀러 가기 하나를 맡는다. 앱에 하나 있고, 로그인해 있는 동안 소켓을 붙여 둔다."""
 
+    # 손님: 친구 화단 view 를 이만큼마다 다시 묻는다 - 주인이 심고 거둔 것 · 단계가 바뀐 것 · 0시에 풀린 '오늘 받음' 은
+    # 손님에게 밀어 주지 않을 수 있다. 안 물으면 '(심은 화분 없음)' 죽은 줄이 놀러 가 있는 내내 남았다 (검토 2 · 4 · 9 · 13)
+    GARDEN_POLL_MS = 5 * 60 * 1000
+
     def __init__(self, app):
         self.app = app
         self.root = app.root
@@ -854,6 +887,10 @@ class Visit(object):
         self._kb = None               # 키보드를 쥔 내 포켓몬 (누르면 쥔다 - 다른 창을 누르거나 새 창이 뜨면 놓는다)
         self._kb_known = set()        # 쥘 때 이미 있던 창 - 이것들이 포커스를 가져가면 되찾는다
         self._kb_job = None
+        self._watering = None         # 손님: '화분에 물 주기' 답을 기다리는 중 (그동안 또 보내지 않는다)
+        self._water_job = None        # 주인: 놀러 온 포켓몬이 화단에 물 주러 가는 중 ({who, card, pet, played, back})
+        self._arriving = None         # 주인: 걸어 들어오는 중인 놀러 온 포켓몬 (닿으면 _arrived 가 지운다)
+        self._garden_poll = None      # 손님: 친구 화단 view 를 다시 물을 예약 (after)
 
     # ---------------- 소켓 ----------------
     def start(self):
@@ -922,6 +959,10 @@ class Visit(object):
                 fn = getattr(self.app, "on_fish_push", None)
                 if fn is not None:
                     fn(ev)
+            elif t == "water":
+                # 열매 텃밭: 놀러 온 손님이 내 화분에 물을 줬다. 아래 '놀러 가 있지 않으면 버린다' 보다 앞에 둔다 -
+                # 물을 주고 바로 돌아가 '끝' 이 먼저 닿아도 실린 내 카드(친구 물 보너스)는 적용해야 한다
+                self.friend_watered(ev)
             elif not self.active:
                 return
             elif t == "party" and self.guest:
@@ -935,7 +976,14 @@ class Visit(object):
             elif t == "bundles":
                 if "canGive" in ev and self.v is not None:
                     self.v["canGive"] = ev.get("canGive")
+                if "garden" in ev and self.guest:
+                    self._take_garden(ev.get("garden"))         # 서버가 친구 화단 view 를 같이 실어 줄 수 있다
                 self.set_bundles(ev.get("bundles") or [], ev.get("carry"))
+            elif t == "watered" and self.guest:
+                # 친구 화단이 바뀌었다 (물을 줬다 · 주인이 심고 거뒀다) - 메뉴 줄과 흐린 화단을 맞춘다. 칸이 없으면 그대로
+                # (None 은 '주인 텃밭이 닫혔다' 라 걷는다 - 칸이 빠진 것과 다르다)
+                if "garden" in ev:
+                    self._take_garden(ev.get("garden"))
             elif t == "claimed":
                 self.claimed(ev.get("bundle") or {}, ev.get("from"), ev.get("by"))
             elif t == "closed":
@@ -1024,9 +1072,19 @@ class Visit(object):
         if not v or not v.get("id"):
             return
         if self.v is not None and self.v.get("id") == v.get("id"):
+            old = self.v
+            fresh = "garden" in v
+            if not fresh and "garden" in old:
+                # 서버가 친구 화단 view 를 못 만들면 칸째 뺀다 (DB 가 잠깐 터짐) - '텃밭 없음' 이 아니다. 있던 화단 · 줄을
+                # 그대로 둔다 (검토 12). 칸이 있고 None 이면 그때만 걷는다 (주인 텃밭이 닫혔다)
+                v["garden"] = old["garden"]
             self.v = v                    # 다시 붙었다 - 같은 놀러 가기
             if self.guest and v.get("party") is not None:
                 self.apply_party(v["party"], v.get("hostLead"))
+            if self.guest and fresh:
+                self._friend_garden(v.get("garden"))       # 끊긴 사이에 친구 화단이 바뀌었을 수 있다
+            if self.guest:
+                self._arm_garden_poll()
             self.set_bundles(v.get("bundles") or [], v.get("carry"), fall=False)
             return
         if v.get("role") == "guest" and self.busy():
@@ -1038,6 +1096,9 @@ class Visit(object):
         self.v, self.role = v, v.get("role")
         if self.guest:
             self._enter_guest(v)
+            # 열매 텃밭: 내 화단은 풀숲과 함께 쉬고(_enter_guest 의 wild.stop), 그 자리에 친구 화단을 흐리게
+            self._friend_garden(v.get("garden"))
+            self._arm_garden_poll()
             self.app.notify("%s 님의 집에 놀러 왔다!" % v.get("partner"))
         else:
             self._enter_host(v)
@@ -1067,7 +1128,10 @@ class Visit(object):
         """어떻게 말하는지 내 포켓몬 머리 위에 한 번 알려 준다."""
         if self.v is None or self.v.get("id") != vid:
             return
-        self.show_bubble(self.my_pet(), GUEST_HINT if self.guest else HOST_HINT, ms=HINT_MS, hint=True)
+        hint = HOST_HINT
+        if self.guest:
+            hint = GUEST_GARDEN_HINT if self._garden_view() is not None else GUEST_HINT
+        self.show_bubble(self.my_pet(), hint, ms=HINT_MS, hint=True)
 
     def leave(self, text=None, tell=True, walk=True, returned=None):
         """끝났다. walk 면 걸어 나가는 연출을 하고(손님은 그 뒤에 집으로 걸어 들어온다), 아니면 바로 치운다.
@@ -1079,6 +1143,11 @@ class Visit(object):
         role = self.role
         partner = self.v.get("partner") or "친구"
         self.v, self.role = None, None
+        self._watering = None             # 늦게 온 물 답은 놀러 가기 번호로 버린다 (Visit.water)
+        self._arriving = None
+        self._stop_garden_poll()
+        if role == "guest":
+            self._friend_garden(None)     # 친구 화단을 걷는다 - 내 화단은 풀숲과 함께 돌아온다 (_restore_guest)
         if self._job is not None:
             try:
                 self.root.after_cancel(self._job)
@@ -1088,6 +1157,7 @@ class Visit(object):
         if self.input is not None:
             self.input.close()
         self._close_bubbles()
+        self._flush_water()               # 화단에 물 주러 가던 중이면 연출 · 카드를 지금 (그 뒤 걸어 나간다)
         self.set_bundles([], None)
         for w in list(self._keyed):
             try:
@@ -1189,11 +1259,13 @@ class Visit(object):
             pass
         return right + 2
 
-    def _walk(self, pet, tx, ty, done=None):
-        """들어오고 나가는 걸음 (평소보다 조금 빠르게)."""
+    def _walk(self, pet, tx, ty, done=None, within=None):
+        """들어오고 나가는 걸음 (평소보다 조금 빠르게). within(초)을 주면 그 안에 닿게 필요한 만큼 더 빨리 (화단 심부름)."""
         s = self.app.overlay.settings
         fps = max(1, int(s.get("fps") or 30))
         speed = float(s.get("walkSpeed") or 1.2) * fps * STROLL
+        if within:
+            speed = max(speed, math.hypot(tx - pet.x, ty - pet.y) / float(within))
         return Stroll(self.root, pet, tx, ty, speed, done=done, tick_ms=int(1000 / fps))
 
     # ---- 손님 ----
@@ -1269,6 +1341,8 @@ class Visit(object):
         self.release_keys()                                  # 쥐고 있던 도트도 새 것이다
         self.mirrors = {}
         self.visitor = None
+        self._arriving = None                                # 새 도트는 걷지 않고 제자리에 선다 (_make_visitor walk=False)
+        self._flush_water()                                  # 화단으로 걷던 도트가 없어졌다 - 걸음의 끝(카드)이 안 온다
         if not self.active:
             return
         if self.guest:
@@ -1526,16 +1600,24 @@ class Visit(object):
         pet.x, pet.y = self._offstage(pet), cy             # 화면 오른쪽 밖에서 걸어 들어온다
         pet.place()
         vid = v.get("id")
+        self._arriving = pet
         self._walk(pet, cx, cy, done=lambda: self._arrived(pet, vid))
 
     def _arrived(self, pet, vid):
         """놀러 온 포켓몬이 걸어 들어와 구석에 섰다: 그 머리 위에 'OO 님이 놀러 왔어요!' (10/16 요청).
 
         알림(notify)만으로는 누가 왔는지 놓치기 쉬웠다. 다시 세울 때(크기 바꾸기·다시 붙기)는 걷지 않아서 안 뜬다.
+        걸어 들어오는 사이에 온 친구 물(friend_watered)은 줄 세워 두었다 - 이제 화단으로 간다.
         """
+        if self._arriving is pet:
+            self._arriving = None
         if self.v is None or self.v.get("id") != vid or self.visitor is not pet or self.guest:
             return None
-        return self.show_bubble(pet, ARRIVED % (self.v.get("partner") or "친구"), ms=BUBBLE_MS + 2000, gift=True)
+        b = self.show_bubble(pet, ARRIVED % (self.v.get("partner") or "친구"), ms=BUBBLE_MS + 2000, gift=True)
+        job = self._water_job
+        if job is not None and job.get("queued"):
+            self._water_go(job)
+        return b
 
     def visitor_look(self, look):
         pet = self.visitor
@@ -2031,8 +2113,244 @@ class Visit(object):
                 rows.append({"text": "여기에 두기 (친구가 오늘 이미 받음)", "enabled": False})
             else:
                 rows.append({"text": "여기에 두기...", "command": self.open_drop})
+            water = self.water_row()
+            if water is not None:
+                rows.append(water)
         rows.append({"text": self.end_label(), "command": self.end_visit})
         return rows
+
+    # ---------------- 열매 텃밭: 친구 물 ----------------
+    def _garden_view(self):
+        """손님: 친구 화단 view (view.garden). 친구 텃밭이 닫혔거나 옛 서버면 None - 그때는 메뉴 · 안내가 예전 그대로."""
+        g = (self.v or {}).get("garden")
+        return g if isinstance(g, dict) and g.get("why") != "closed" else None
+
+    def water_row(self):
+        """손님 메뉴 '화분에 물 주기' 줄. 못 주면 까닭을 단 죽은 줄, 친구 텃밭이 없으면 None (줄 자체가 없다)."""
+        g = self._garden_view()
+        if g is None:
+            return None
+        if self._watering is not None:
+            return {"text": WATER_ROW, "enabled": False}     # 답을 기다리는 중 (두 번 보내지 않는다)
+        if g.get("canWater"):
+            return {"text": WATER_ROW, "command": self.water}
+        return {"text": WATER_WHY.get(g.get("why"), WATER_ROW), "enabled": False}
+
+    def water(self):
+        """손님: 친구(주인)의 자라는 화분 모두에 물을 준다. 받는 쪽 하루 한 번은 서버가 가른다 (부계정 몰아주기 막기).
+
+        409(오늘 이미 받음 · 심은 화분 없음)면 그 글을 띄우고 놀러 가기 상태를 다시 물어 줄을 맞춘다 - 오류 답의
+        why 는 앱까지 안 온다 (api.ApiError 는 글과 상태 번호만 든다). 늦게 온 답은 놀러 가기 번호로 버린다.
+        """
+        if not self.guest or self._watering is not None:
+            return None
+        vid = self.v.get("id")
+        partner = self.v.get("partner") or "친구"
+        token = self._watering = object()
+
+        def done(r, err):
+            if self._watering is token:
+                self._watering = None
+            if self.v is None or self.v.get("id") != vid or not self.guest:
+                return                                      # 그사이 끝났다 (다시 놀러 갔어도 다른 집이다)
+            if err:
+                self.show_bubble(self.lead, getattr(err, "message", None) or str(err), hint=True)
+                if getattr(err, "status", 0) == 409:
+                    self._recheck_garden(vid)
+                return
+            r = r or {}
+            if "garden" in r:
+                self._take_garden(r.get("garden"))
+            else:                                           # view 를 안 실어 준 답 - 오늘은 받았다고만 고친다
+                self._take_garden(dict(self.v.get("garden") or {}, canWater=False, why="done"))
+            n = int(r.get("bonus") or 0)
+            text = WATER_GAVE % partner + ((" · 열매 +%d" % n) if n > 0 else "")
+            self.show_bubble(self.lead, text, gift=True)
+        run_async(self.root, self.app.api.visit_water, done)
+        return token
+
+    def _recheck_garden(self, vid):
+        """손님: 놀러 가기 상태를 다시 물어 친구 화단 view 를 맞춘다 (물 주기가 409 로 막혔을 때 · 때마다 다시 묻기)."""
+        def done(r, err):
+            if err or self.v is None or self.v.get("id") != vid or not self.guest:
+                return
+            v = (r or {}).get("visit") or {}
+            if v.get("id") == vid and "garden" in v:
+                self._take_garden(v.get("garden"))
+        run_async(self.root, self.app.api.visit_state, done)
+
+    def _garden_wait(self, now=None):
+        """손님: 다음에 친구 화단을 다시 물을 때까지 ms - GARDEN_POLL_MS, 0시(KST)가 그보다 가까우면 0시 바로 뒤
+        ('오늘 이미 받음' 이 풀린다)."""
+        return int(min(self.GARDEN_POLL_MS, (kst_midnight_in(now) + MIDNIGHT_SLACK_S) * 1000))
+
+    def _arm_garden_poll(self):
+        """손님: 친구 화단 다시 묻기를 (다시) 건다 - 들어올 때 · 다시 붙을 때 · 물을 때마다."""
+        self._stop_garden_poll()
+        if self.v is None or not self.guest:
+            return
+        vid = self.v.get("id")
+        self._garden_poll = self.root.after(self._garden_wait(), lambda: self._poll_garden(vid))
+
+    def _poll_garden(self, vid):
+        self._garden_poll = None
+        if self.v is None or self.v.get("id") != vid or not self.guest:
+            return
+        self._recheck_garden(vid)         # 답의 view.garden 을 show_friend · 메뉴 줄에 (칸이 없으면 그대로)
+        self._arm_garden_poll()
+
+    def _stop_garden_poll(self):
+        job, self._garden_poll = self._garden_poll, None
+        if job is not None:
+            try:
+                self.root.after_cancel(job)
+            except Exception:                               # noqa: BLE001
+                pass
+
+    def _take_garden(self, view):
+        """손님: 친구 화단 view 가 새로 왔다 (물 답 · watered/bundles 푸시 · 다시 물어봄) - 메뉴 줄과 흐린 화단을 맞춘다."""
+        if self.v is None or not self.guest:
+            return
+        self.v["garden"] = view
+        self._friend_garden(view)
+
+    def _friend_garden(self, view):
+        """app.garden 에 친구 화단을 그리게 한다 (None 이면 걷는다). 텃밭이 없는 앱이거나 터져도 놀러 가기는 그대로."""
+        g = getattr(self.app, "garden", None)
+        if g is None:
+            return
+        try:
+            g.show_friend(view)
+        except Exception as e:                              # noqa: BLE001
+            config.log("텃밭: 친구 화단을 못 그렸습니다: %s" % e)
+
+    def _garden_note(self, card):
+        """주인: 물 푸시에 실린 내 텃밭 카드를 화단에 적용한다 (친구 물 보너스가 보인다)."""
+        g = getattr(self.app, "garden", None)
+        if g is None or not isinstance(card, dict):
+            return
+        try:
+            g.note(card)
+        except Exception as e:                              # noqa: BLE001
+            config.log("텃밭: 친구 물 카드를 못 적용했습니다: %s" % e)
+
+    def friend_watered(self, ev):
+        """주인: 놀러 온 손님이 내 화분에 물을 줬다 ({"t": "water", "from": 손님 이름, "garden": 내 카드}).
+
+        놀러 온 포켓몬이 화단 앞(app.garden.spot - 발 자리)까지 걸어가 물을 주고(play_water) 구석으로 돌아온다.
+        카드는 닿은 뒤에 적용한다 - 물뿌리개와 함께 물방울이 차야 '친구가 줬다' 가 보인다. 화단이 숨겨져 있으면
+        (spot 이 None) · 텃밭이 없는 앱이면 말풍선만 (카드는 바로). 놀러 온 포켓몬이 없으면(이미 끝남 · 도트를
+        받는 중) 걷지 않고 화단 연출만.
+        """
+        who = ev.get("from") or (self.v or {}).get("partner") or "친구"
+        self._flush_water()                                 # 앞의 것이 아직 걷는 중이면 마무리 (카드 둘 다 적용)
+        job = {"who": who, "card": ev.get("garden"), "pet": None, "played": False, "back": None}
+        spot = None
+        g = getattr(self.app, "garden", None)
+        if g is not None:
+            try:
+                spot = g.spot()
+            except Exception as e:                          # noqa: BLE001
+                config.log("텃밭: 화단 자리를 못 물었습니다: %s" % e)
+        pet = self.visitor if (self.active and not self.guest) else None
+        if spot is None or pet is None:
+            return self._water_done(job, play=spot is not None)
+        self._water_job = job
+        if self._arriving is pet and getattr(pet, "_stroll", None) is not None:
+            # 아직 걸어 들어오는 중 - 새 걸음이 들어오는 걸음을 덮으면 _arrived 가 안 불려 '놀러 왔어요!' 가 사라졌다
+            # (검토 11). 닿은 뒤에 간다. 그사이 끝나거나 또 오면 _flush_water 가 연출 · 카드를 바로 한다 (pet 이 없어
+            # 걸려 보내지 않는다). 걸음이 끊겨 안 닿으면 WATER_QUEUE_MS 뒤에 간다
+            job["queued"] = True
+            job["back"] = self.root.after(WATER_QUEUE_MS, lambda: self._water_go(job))
+            return job
+        self._water_walk(job, pet, spot)
+        return job
+
+    def _water_go(self, job):
+        """줄 세워 둔 친구 물 (걸어 들어오는 중에 왔다) - 이제 화단으로. 그사이 화단이 숨었으면 말풍선만."""
+        if self._water_job is not job or not job.get("queued"):
+            return
+        job["queued"] = False
+        if job.get("back") is not None:
+            try:
+                self.root.after_cancel(job["back"])
+            except Exception:                               # noqa: BLE001
+                pass
+            job["back"] = None
+        spot = None
+        g = getattr(self.app, "garden", None)
+        if g is not None:
+            try:
+                spot = g.spot()
+            except Exception as e:                          # noqa: BLE001
+                config.log("텃밭: 화단 자리를 못 물었습니다: %s" % e)
+        pet = self.visitor if (self.active and not self.guest) else None
+        if spot is None or pet is None:
+            self._water_job = None
+            return self._water_done(job, play=spot is not None)
+        self._water_walk(job, pet, spot)
+
+    def _water_walk(self, job, pet, spot):
+        job["pet"] = pet
+        self._end_act(pet)                                  # 춤추던 중이면 그치고 바로 간다 (Stroll 은 동작 중에 멈춘다)
+        fx, fy = spot
+        self._walk(pet, fx - pet.fw / 2.0, fy - pet.fh, done=lambda: self._at_garden(job), within=WATER_WALK_SEC)
+
+    def _at_garden(self, job):
+        """화단 앞에 닿았다: 물 연출 · 카드, 잠깐 섰다가 구석으로."""
+        if self._water_job is not job:
+            return
+        self._water_done(job)
+        job["back"] = self.root.after(WATER_STAY_MS, lambda: self._water_back(job))
+
+    def _water_back(self, job):
+        job["back"] = None
+        if self._water_job is job:
+            self._water_job = None
+        pet = job.get("pet")
+        if pet is None or pet is not self.visitor or not self.active or self.guest:
+            return
+        cx, cy = self._corner(pet)
+
+        def face():
+            try:
+                pet.turn_to(-1, 0)          # 들어왔을 때처럼 왼쪽(화면 안쪽)을 보고 선다
+            except Exception:                               # noqa: BLE001
+                pass
+        self._walk(pet, cx, cy, done=face, within=WATER_WALK_SEC)
+
+    def _water_done(self, job, play=True):
+        """물 연출 + 카드 적용. 화단이 연출을 못 하면(숨김 · 없음 · 터짐) 말풍선으로 알린다."""
+        job["played"] = True
+        shown = False
+        g = getattr(self.app, "garden", None)
+        if play and g is not None:
+            try:
+                # 물뿌리개 + 말풍선은 화단이 띄운다. False 면 못 했다 - 걷는 사이 화단이 걷혔다 (숨기기 · 집중 · 중계 ·
+                # 공습). 그때는 아래 말풍선으로 알린다 (검토 6 · 10 · 17)
+                shown = bool(g.play_water(job["who"]))
+            except Exception as e:                          # noqa: BLE001
+                config.log("텃밭: 물 주기 연출 실패: %s" % e)
+        self._garden_note(job.get("card"))
+        if not shown:                                       # 놀러 온 포켓몬이 없으면 내 포켓몬 위에 (감춰 둔 도트 말고)
+            self.show_bubble(self.visitor or self.my_pet(), WATERED % job["who"], ms=BUBBLE_MS + 2000, gift=True)
+
+    def _flush_water(self):
+        """화단에 물 주러 가던 것을 바로 마무리한다 (놀러 가기 끝 · 도트를 새로 만듦 · 또 옴). 카드는 꼭 적용된다."""
+        job, self._water_job = self._water_job, None
+        if job is None:
+            return
+        if job.get("back") is not None:
+            try:
+                self.root.after_cancel(job["back"])
+            except Exception:                               # noqa: BLE001
+                pass
+            job["back"] = None
+        if not job.get("played"):
+            self._water_done(job)
+        # 아직 놀러 와 있으면 구석으로 돌려보낸다 - 다음 걸음(새 물 · 걸어 나가기)이 있으면 그것이 이 걸음을 덮는다.
+        # 안 그러면 화단 연출을 못 하게 된 다음 물(말풍선만)에서 화단 앞에 그대로 서 있었다
+        self._water_back(job)
 
     def open_drop(self):
         """'여기에 두기' - 들고 온 것 중 고른 만큼 보따리에 싼다 (가방 모양 창)."""
@@ -2055,7 +2373,16 @@ class Visit(object):
         anchor = self._bundle_anchor()
         right = self._corner(anchor)[0] if anchor is not None else x2 - m - U.h(70)
         gap = U.h(6)
-        return right - gap - (i + 1) * (fw + gap), y2 - fh - m
+        x, y = right - gap - (i + 1) * (fw + gap), y2 - fh - m
+        # 연못 · 화단(시즌 7)과 겹치면 그 위로 올려 놓는다 - 실제 앱 시험 11/27: 보따리가 화단 오른쪽 화분 위에 떨어졌다
+        try:
+            rects = ov.avoid_rects() if hasattr(ov, "avoid_rects") else []
+        except Exception:                                   # noqa: BLE001
+            rects = []
+        for r in rects:
+            if x < r[2] + 4 and r[0] - 4 < x + fw and y < r[3] + 4 and r[1] - 4 < y + fh:
+                y = min(y, int(r[1]) - fh - gap)
+        return x, y
 
     def set_bundles(self, bundles, carry=None, fall=True):
         """서버가 준 보따리 목록대로 바탕화면을 맞춘다 (새 것은 머리 위에서 떨어진다, 없어진 것은 치운다)."""

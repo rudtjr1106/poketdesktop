@@ -458,6 +458,43 @@ CREATE TABLE IF NOT EXISTS fish_catch (
 CREATE INDEX IF NOT EXISTS idx_fish_catch_week ON fish_catch(week, ratio DESC, g DESC);
 CREATE INDEX IF NOT EXISTS idx_fish_catch_user ON fish_catch(user_id, species);
 
+-- 열매 텃밭 (시즌 7, garden.py): 사람마다 화분 셋 (slot 0~2). 빈 화분은 줄이 없다. 단계 · 남은 초는 읽을 때 시계로 센다
+-- (planted_at + grow_sec - 스레드 없음). planted_at 은 그 작물의 열쇠이기도 하다 - 거두기 · 물 · 뽑기가 이 값을 조건에 걸어
+-- 한 작물에 두 번 거두지 않는다. grow_sec 은 심을 때 정한다 (풀 타입 빠르기). wet_mask = 물 준 단계 비트, friend_bonus 0|1.
+CREATE TABLE IF NOT EXISTS garden_pot (
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    slot         INTEGER NOT NULL,
+    berry        TEXT NOT NULL,
+    planted_at   TEXT NOT NULL,
+    grow_sec     INTEGER NOT NULL,
+    wet_mask     INTEGER NOT NULL DEFAULT 0,
+    friend_bonus INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, slot)
+);
+-- 하루(KST "YYYY-MM-DD")에 거둔 열매 수 (천장 GARDEN_CAP). 지난 날 줄은 집안일이 치운다.
+CREATE TABLE IF NOT EXISTS garden_day (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day         TEXT NOT NULL,
+    harvested   INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day)
+);
+-- 친구 물 - **받는 쪽(주인) 하루 한 번** (부계정으로 몰아받기 막기, 보따리와 같은 까닭). 열쇠가 주인 · 날이라 두 번째는 못 들어간다.
+CREATE TABLE IF NOT EXISTS garden_water (
+    host_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day         TEXT NOT NULL,
+    giver_id    INTEGER NOT NULL,
+    at          TEXT NOT NULL,
+    PRIMARY KEY (host_id, day)
+);
+-- 열매 먹이기 - 포켓몬마다 하루 한 번. 카드의 fedToday 가 user_id · day 로 읽는다.
+CREATE TABLE IF NOT EXISTS feed_day (
+    pokemon_id  INTEGER NOT NULL,
+    day         TEXT NOT NULL,
+    user_id     INTEGER NOT NULL,
+    PRIMARY KEY (pokemon_id, day)
+);
+CREATE INDEX IF NOT EXISTS idx_feed_day_user ON feed_day(user_id, day);
+
 -- 리피트볼이 "이미 잡아본 종" 을 봐야 해서 남긴다. 도감 역할도 겸한다.
 CREATE TABLE IF NOT EXISTS seen (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

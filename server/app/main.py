@@ -33,7 +33,7 @@ from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
 from common import tint as TINT            # noqa: E402
 from . import (achievements, airraid, arche, arche_routes, auth, avatar, battle_routes, board, board_routes, boosts, champion, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
-               expedition, fishing, fishing_routes, focus, item_routes, olympics, walkpts,
+               expedition, fishing, fishing_routes, focus, garden, garden_routes, item_routes, olympics, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
                raid, raid_routes,
                guild, guild_routes, guild_war_routes, guild_ws, internal_routes,
@@ -49,6 +49,7 @@ app.include_router(gym_routes.router)
 app.include_router(boss_routes.router)          # 악당 출현 (시즌 4)
 app.include_router(tower_routes.router)         # 배틀타워 (시즌 7 - 차례로 오르는 상시 PvE, 판은 관장 배틀 그대로)
 app.include_router(fishing_routes.router)       # 낚시 (시즌 7 - 연못 · 입질 · 챔질, 주간 대물 순위)
+app.include_router(garden_routes.router)        # 열매 텃밭 (시즌 7 - 화분 셋 · 물 · 거두기 · 열매 먹이기)
 app.include_router(raid_routes.router)
 app.include_router(live_routes.router)
 app.include_router(board_routes.router)
@@ -1500,6 +1501,9 @@ def _me_data(ctx):
         # 알림을 못 받은 앱이 여기서 알고 입질을 연다. 재시작한 앱은 hooked 카드의 wild 로 낚인 야생을 되살린다.
         # 카드가 터지면 칸째 뺀다 (_fish_card)
         **_fish_card(uid, u),
+        # 열매 텃밭 (시즌 7): 화분 셋 · 오늘 거둔 수 · 오늘 먹인 포켓몬 · 오늘 받은 친구 물. 열리기 전이면 None (앱은 화단을
+        # 안 띄운다). 앱이 꺼져 있던 동안 자란 것도 이 카드 하나로 맞춘다 (단계는 서버 시계). 터지면 칸째 뺀다 (_garden_card)
+        **_garden_card(uid),
         "session":{"ip": ctx["session"]["ip"], "expiresAt": ctx["session"]["expires_at"]},
     }
 
@@ -1514,6 +1518,17 @@ def _fish_card(uid, user_row):
         return {"fish": fishing.card(uid, user_row)}
     except Exception as e:                                  # noqa: BLE001
         print("[fishing] 카드 실패 %s: %r" % (uid, e))
+        return {}
+
+
+def _garden_card(uid):
+    """/api/me 에 펼쳐 넣을 텃밭 칸 - {"garden": 카드} (열리기 전이면 None), 터지면 {} (칸이 없다).
+
+    낚시 칸과 같은 까닭: None 은 앱이 '시즌이 닫힘' 으로 읽어 화단을 걷는다 - 한 번 터진 것으로 걷히지 않게 '이번엔 모름'."""
+    try:
+        return {"garden": garden.card(uid)}
+    except Exception as e:                                  # noqa: BLE001
+        print("[garden] 카드 실패 %s: %r" % (uid, e))
         return {}
 
 

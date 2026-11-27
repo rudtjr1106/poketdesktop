@@ -1027,7 +1027,8 @@ class Overlay(object):
         self.eggs = {}
         # 포켓몬과 집중하기: 집중하는 동안 이 번호의 도트만 보인다 (set_only). None 이면 모두
         self.only = None
-        # 알이 피할 자리 - 부르면 (x1, y1, x2, y2) 나 None. 낚시터(연못)가 건다 (app.start_ui)
+        # 알 · 풀숲이 피할 자리 - 부르면 (x1, y1, x2, y2) 나 None 을 주는 것 하나 또는 그 목록.
+        # 낚시터(연못) · 텃밭(화단)이 건다 (app.start_ui). avoid_rects() 로 읽는다
         self.avoid = None
         # 부화 연출을 이미 보여 준 알. 서버는 seen 을 받을 때까지 그 알을 계속
         # 실어 보내는데, 그때마다 알을 다시 세우면 태어난 뒤에도 알이 남는다.
@@ -1171,16 +1172,29 @@ class Overlay(object):
                 except Exception:                          # noqa: BLE001
                     pass
 
+    def avoid_rects(self):
+        """피할 자리 목록 [(x1, y1, x2, y2), ...] - 지금 떠 있는 연못 · 화단. avoid 가 하나여도(옛 모양) 목록으로 준다."""
+        av = getattr(self, "avoid", None)
+        fns = av if isinstance(av, (list, tuple)) else ([av] if av is not None else [])
+        out = []
+        for fn in fns:
+            try:
+                r = fn() if callable(fn) else fn
+            except Exception:                              # noqa: BLE001
+                r = None
+            if r:
+                out.append(tuple(r))
+        return out
+
     def dodge(self, p, tries=12):
-        """알을 피할 자리(avoid - 낚시터) 밖으로 옮긴다. 안 겹치면 그대로 둔다 (자리를 새로 고르지 않는다)."""
-        fn = getattr(self, "avoid", None)
-        rect = fn() if fn is not None else None
-        if not rect:
+        """알을 피할 자리(avoid - 연못 · 화단) 밖으로 옮긴다. 안 겹치면 그대로 둔다 (자리를 새로 고르지 않는다)."""
+        rects = self.avoid_rects()
+        if not rects:
             return
 
         def hit():
-            return (p.x < rect[2] + 6 and rect[0] - 6 < p.x + p.fw
-                    and p.y < rect[3] + 6 and rect[1] - 6 < p.y + p.fh)
+            return any(p.x < r[2] + 6 and r[0] - 6 < p.x + p.fw and p.y < r[3] + 6 and r[1] - 6 < p.y + p.fh
+                       for r in rects)
         if not hit():
             return
         x1, y1, x2, y2 = self.area()

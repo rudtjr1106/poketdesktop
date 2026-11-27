@@ -88,6 +88,13 @@ DEFAULTS = {
     "pondPos": None,
     # 처음 안내 말풍선을 어디까지 했나 (0 아직 · 1 '연못을 눌러…' · 2 '찌가 쏙 잠기면…')
     "pondHints": 0,
+    # 열매 텃밭(화단, 2026-11-26 다음 시즌)을 띄울지. None 이면 아직 안 정했다 - 서버가 텃밭을 처음 열 때 그때의
+    # '낚시터 보이기' 로 굳힌다 (연못을 끈 사람에게 갑자기 화단이 생기지 않게, garden._freeze_setting).
+    "showGarden": None,
+    # 옮겨 둔 화단 자리 [fx, fy] - 영역 안 비율. None 이면 연못 기본 자리 오른쪽 (낚인 포켓몬 자리 다음).
+    "gardenPos": None,
+    # 처음 안내를 어디까지 했나 (0 아직 · 1 '화분을 눌러…' · 2 '단계마다 물을…' · 3 '다 익었어요!…')
+    "gardenHints": 0,
     # 바탕화면 포켓몬이 얼마나 또렷한가 (1.9.0). 100 이면 그대로, 낮출수록
     # 뒤가 비친다. 걸어다니는 포켓몬·알·바탕화면에서 싸우는 상대에 다 적용된다.
     # 창이나 글을 가려서 불편하다는 사람이 있어서 뒀다.
@@ -229,6 +236,15 @@ def show_pond(settings):
     v = s.get("showPond")
     if v is None:
         return bool(s.get("showGrass", True))
+    return bool(v)
+
+
+def show_garden(settings):
+    """텃밭(화단)을 띄우나. 아직 안 정했으면(None) 낚시터 보이기를 따른다 (그것도 안 정했으면 풀숲 보이기)."""
+    s = settings or {}
+    v = s.get("showGarden")
+    if v is None:
+        return show_pond(s)
     return bool(v)
 
 

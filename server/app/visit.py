@@ -48,6 +48,9 @@ visitable). 놀러 가기는 POST /api/visit/start 로 하고, 그 뒤의 파티
                   {"t": "visit", "visit": {...}}    연결됐다 (role 이 host / guest)
                   {"t": "party"/"say"/"act"/"look", ...}  상대가 보낸 것 (from = host / guest)
                   {"t": "end", "by", "text"}        끝났다
+                  {"t": "water", "from", "garden"}  주인: 손님이 화분에 물을 줬다 (garden = 주인 텃밭 카드, 시즌 7)
+                  {"t": "watered", "garden"}        손님: 친구 화단 view 가 바뀌었다 (물을 준 뒤 · 주인이 심기 · 물 ·
+                                                    거두기 · 뽑기를 한 뒤 - garden._tell_guest)
 
 이 소켓이 앱이 켜져 있는 동안 늘 붙어 있어서 놀러 가기 말고 다른 알림도 같이 싣는다:
 
@@ -68,6 +71,7 @@ import threading
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
@@ -252,7 +256,20 @@ def view(v, uid):
            "carry": v["carry"], "bundles": v["bundles"], "canGive": can_give(v), "since": v["since"]}
     if role == "guest" and v.get("party") is not None:
         out["party"] = v["party"]
+    if role == "guest":
+        out.update(_garden_view(v["host"]))
     return out
+
+
+def _garden_view(host):
+    """손님 view 의 'garden' 칸 - 주인(친구)의 화단 (열매 텃밭, 시즌 7). 손님 화면이 흐리게 그리고 '화분에 물 주기' 를 켜고 끈다.
+    닫혔으면 None. 터지면 칸째 뺀다 - 화단 하나 때문에 놀러 가기가 막히지 않게."""
+    from . import garden                     # garden 이 이 모듈(today · push)을 부른다 - 쓸 때 늦게
+    try:
+        return {"garden": garden.friend_view(host)}
+    except Exception as e:                                  # noqa: BLE001
+        print("[visit] 친구 화단 실패 %s: %r" % (host, e))
+        return {}
 
 
 def _lead(uid):
@@ -438,6 +455,27 @@ def claim(uid, bundle_id, now=None):
     for u in (v["host"], v["guest"]):
         push(u, msg)
     return b
+
+
+def water(uid, now=None):
+    """손님: 주인(친구)의 자라는 화분에 물을 준다 (열매 텃밭, 시즌 7 - garden.water_by_friend). {ok, bonus, garden: 손님 view}.
+
+    보따리(drop)와 같은 모양 - 손님은 지금 그 집에 놀러 가 있는 사람만, 주인은 방문에서 안다 (몸으로 보낸 값을 안 믿는다).
+    받는 쪽 하루 한 번 · 줄 화분이 없음은 garden.Refused (why done · empty · ripe · bonus) 로 올라간다 - 라우트가 {error, why} 로
+    돌려준다 (손님 view 의 why 와 같은 말).
+    주인에게 {t: water, from, garden: 주인 카드} (손님 포켓몬이 화단까지 걸어가 물을 주는 연출), 손님에게 {t: watered, garden: view}."""
+    from . import garden
+    if not garden.is_open():
+        raise garden.Refused(404, garden.closed_text(), "closed")
+    v = _visit_of(uid)
+    if not v or v["guest"] != uid:
+        raise HTTPException(409, "친구 집에 놀러 가 있을 때만 화분에 물을 줄 수 있습니다.")
+    host = v["host"]
+    bonus = garden.water_by_friend(host, uid, now)
+    seen = garden.friend_view(host, now)
+    push(host, {"t": "water", "from": v["guestName"], "garden": garden.card(host, now)})
+    push(uid, {"t": "watered", "garden": seen})
+    return {"ok": True, "bonus": bonus, "garden": seen}
 
 
 def _return_bundle(bid, giver, items_, now=None):
@@ -641,6 +679,17 @@ def post_claim(body: ClaimIn, ctx=Depends(deps.current)):
     uid = ctx["user"]["id"]
     b = claim(uid, body.bundle)
     return dict(state(uid), bundle=b)
+
+
+@router.post("/api/visit/water")
+def post_water(ctx=Depends(deps.current)):
+    """친구 화분에 물 주기. 막히면 {error, why} - 앱이 why 로 메뉴 글을 바꾼다
+    (done 오늘 이미 받음 · empty 심은 화분 없음 · ripe 익은 화분뿐 · bonus 모두 이미 +1 · closed)."""
+    from . import garden
+    try:
+        return water(ctx["user"]["id"])
+    except garden.Refused as e:
+        return JSONResponse({"error": e.text, "why": e.why}, status_code=e.status)
 
 
 @router.post("/api/visit/end")

@@ -122,6 +122,7 @@ class App(object):
         self.tray = None
         self.wild = None
         self.fishing = None        # 낚시 (fishing.FishingController - 다음 시즌, 연못 · 찌 · 입질)
+        self.garden = None         # 열매 텃밭 (garden.GardenController - 다음 시즌, 화단 · 심기 · 물 · 먹이)
         self.expedition = None     # 탐험 파견의 바탕화면 쪽 (돌아온 보따리, 1.10.4)
         self.visit = None          # 친구 집에 놀러 가기 · 친구 채팅 (1.11.0, visit.Visit)
         self.focus = None          # 포켓몬과 집중하기 (focus_timer.FocusController)
@@ -492,7 +493,11 @@ class App(object):
             # 낚시 (다음 시즌). 카드가 와야(/api/me · GET /api/fish) 연못이 뜬다 - 서버가 모르면 아무것도 안 한다
             from .fishing import FishingController
             self.fishing = FishingController(self)
-            self.overlay.avoid = self.fishing.rect          # 알이 연못 자리를 피한다
+        if getattr(self, "garden", None) is None:
+            # 열매 텃밭 (다음 시즌). 연못 기본 자리 오른쪽에 화단 - 카드가 와야(/api/me · GET /api/garden) 뜬다
+            from .garden import GardenController
+            self.garden = GardenController(self)
+        self.overlay.avoid = [self.fishing.rect, self.garden.rect]     # 알 · 풀숲이 연못과 화단을 피한다
         if self.expedition is None:
             from . import expedition_ui
             self.expedition = expedition_ui.Desk(self)
@@ -630,6 +635,9 @@ class App(object):
             # 낚시터 옮기기 중 (덮개가 영역을 덮고 있다). 덮개는 '오른쪽 클릭: 그만두기' 라고 적어 두었다 -
             # 밑의 풀숲 · 도트 · 연못에 넘기면 엉뚱한 메뉴가 뜨고 덮개는 그대로 남는다
             return fz._end_move()
+        gd = getattr(self, "garden", None)
+        if gd is not None and getattr(gd, "moving", None) is not None:
+            return gd._end_move()                   # 텃밭 옮기기 중 - 연못과 같은 까닭
         wild = self.wild
         if wild is not None and wild.grass is not None:
             if self._hit(wild.grass, x, y, num):
@@ -640,6 +648,11 @@ class App(object):
         if (pond is not None and num is not None
                 and getattr(getattr(pond, "view", None), "win_number", None) == num):
             return fz.on_menu(_FakeEvent(x, y))
+        # 텃밭 화단 (다음 시즌): 연못과 같다 - 창 번호면 먼저, 테두리 상자로만 맞으면 도트 다음
+        planter = getattr(gd, "planter", None) if gd is not None else None
+        if (planter is not None and num is not None
+                and getattr(getattr(planter, "view", None), "win_number", None) == num):
+            return gd.on_menu(_FakeEvent(x, y))
         for pet in self._pets():
             if self._hit(pet, x, y, num):
                 # **도트가 스스로 정하게 둔다.** 야생 포켓몬은 우클릭이
@@ -647,6 +660,8 @@ class App(object):
                 return pet.on_menu(_FakeEvent(x, y))
         if pond is not None and self._hit(pond, x, y, num):
             return fz.on_menu(_FakeEvent(x, y))
+        if planter is not None and self._hit(planter, x, y, num):
+            return gd.on_menu(_FakeEvent(x, y))
 
     @staticmethod
     def _hit(obj, x, y, num):
@@ -837,6 +852,9 @@ class App(object):
                 # 낚시 (다음 시즌): 연못 · 입질 준비(ready) · 낚인 야생. 열리기 전엔 None, 옛 서버는 칸이 없다
                 if "fish" in me and getattr(self, "fishing", None) is not None:
                     self.fishing.note(me.get("fish"))
+                # 열매 텃밭 (다음 시즌): 화분 셋 · 다음 단계 시각 · 오늘 먹인 포켓몬. 열리기 전엔 None, 옛 서버는 칸이 없다
+                if "garden" in me and getattr(self, "garden", None) is not None:
+                    self.garden.note(me.get("garden"))
                 quiet = self.focus_quiet()
                 # 운영자가 보낸 선물. 서버가 /api/me 에서 이미 지급했고
                 # 여기서는 알리기만 한다.
@@ -983,6 +1001,7 @@ class App(object):
         if self.wild:
             self.wild.stop()
         self._clear_fishing()
+        self._clear_garden()
         if self.expedition:
             self.expedition.clear()
         if self.overlay:
@@ -2503,6 +2522,8 @@ class App(object):
         oly = ui_olympics.menu_row(self, pet)              # 포스크탑 올림픽 '올림픽에 출전...' (기간 밖이면 없다)
         from . import ui_arche
         arche_row = ui_arche.menu_row(self, pet)           # 아르케의 일지 (2.4.0, 기간 밖이면 없다)
+        from . import garden as garden_mod
+        feed = garden_mod.menu_row(self, pet)              # 열매 먹이기 (텃밭이 열렸을 때 · 내 포켓몬만, 하루 한 번)
         if not PLAT.NATIVE_MENU:
             # 맥. tk.Menu 는 NSMenu 라 여는 순간 앱이 죽는다.
             rows = [
@@ -2519,6 +2540,8 @@ class App(object):
                 rows.append(tint)
             if deco:
                 rows.append(deco)
+            if feed:
+                rows.append(feed)
             if focus:
                 rows.append(focus)
             if alarm_row:
@@ -2556,6 +2579,10 @@ class App(object):
             m.add_command(label=tint["text"], command=tint["command"])
         if deco:
             m.add_command(label=deco["text"], command=deco["command"])
+        if feed:
+            # 오늘 먹였으면 죽은 줄 (command 가 없다 - r["command"] 로 꺼내면 메뉴가 통째로 안 열린다, 위 visit_rows 와 같다)
+            m.add_command(label=feed["text"], command=feed.get("command"),
+                          state="normal" if feed.get("enabled", True) else "disabled")
         if focus:
             m.add_command(label=focus["text"], command=focus["command"])
         if alarm_row:
@@ -2904,6 +2931,9 @@ class App(object):
         # 낚시터는 영역 안 비율로 기억한다 - 같은 쪽에 다시 놓는다
         if getattr(self, "fishing", None) is not None:
             self.fishing.reposition()
+        # 텃밭 화단도 (옮겨 두지 않았으면 연못 기본 자리 오른쪽 · 좁으면 연못 위 줄)
+        if getattr(self, "garden", None) is not None:
+            self.garden.reposition()
         self.refresh_tray()
 
     def set_show_grass(self, on):
@@ -2975,6 +3005,40 @@ class App(object):
         if fz is not None:
             try:
                 fz.clear()
+            except Exception:                               # noqa: BLE001
+                pass
+
+    # ---------------------------------------------------------------- 열매 텃밭 (다음 시즌)
+    def set_show_garden(self, on):
+        """텃밭(화단)을 켜거나 끈다 (설정 · 트레이 · 화단 메뉴의 '텃밭 숨기기'). 꺼도 화분은 서버에서 그대로 자란다."""
+        on = bool(on)
+        if on == config.show_garden(self.settings):
+            return on
+        self.settings["showGarden"] = on
+        config.save_settings(self.settings)
+        if getattr(self, "garden", None) is not None:
+            self.garden.set_visible(on)
+        self.refresh_tray()
+        self.notify("텃밭을 켰습니다." if on else
+                    "텃밭을 숨겼습니다. 화분은 그대로 자랍니다. 설정이나 트레이 메뉴의 '텃밭 보이기' 로 다시 켤 수 있습니다.")
+        return on
+
+    def toggle_garden(self):
+        """트레이 메뉴에서 부른다. 설정 창이 열려 있으면 표시도 맞춘다."""
+        on = self.set_show_garden(not config.show_garden(self.settings))
+        if getattr(self, "settings_win", None):
+            try:
+                self.settings_win.show_garden()
+            except Exception:                               # noqa: BLE001
+                pass
+        return on
+
+    def _clear_garden(self):
+        """로그아웃 · 세션 끊김 · 종료: 화단 · 타이머를 치운다 (화분은 서버에서 그대로 자란다 - 다시 로그인하면 카드로)."""
+        gd = getattr(self, "garden", None)
+        if gd is not None:
+            try:
+                gd.clear()
             except Exception:                               # noqa: BLE001
                 pass
 
@@ -3337,6 +3401,7 @@ class App(object):
         if self.wild:
             self.wild.stop()
         self._clear_fishing()
+        self._clear_garden()
         if self.expedition:
             self.expedition.clear()
         if self.overlay:
@@ -3433,6 +3498,7 @@ class App(object):
         if self.wild:
             self.wild.stop()
         self._clear_fishing()
+        self._clear_garden()
         if self.expedition:
             self.expedition.clear()
         if self.overlay:

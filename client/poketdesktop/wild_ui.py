@@ -27,6 +27,21 @@ POLL_SAFETY = 300          # 아무 일 없어도 이 주기로는 한 번 확�
 BADGE_BLINK = 500          # 야생 표식 깜빡임 (ms)
 
 
+def _avoid_rects(app, ov):
+    """풀숲이 피할 자리 - overlay.avoid 목록(연못 · 화단)에, 그것을 안 건 앱(검사의 가짜 앱)이면 앱의 연못 · 화단을 더한다."""
+    fn = getattr(ov, "avoid_rects", None)
+    out = list(fn()) if fn is not None else []
+    for name in ("fishing", "garden"):
+        ctl = getattr(app, name, None)
+        try:
+            r = ctl.rect() if ctl is not None else None
+        except Exception:                                   # noqa: BLE001
+            r = None
+        if r and tuple(r) not in out:
+            out.append(tuple(r))
+    return out
+
+
 class GrassPatch(object):
     """흔들리는 풀숲 창."""
 
@@ -60,14 +75,13 @@ class GrassPatch(object):
 
         x1, y1, x2, y2 = ov.area()
         m = ov.settings["areaMargin"]
-        # 낚시터(연못) 자리는 피한다 (2026-11-26). 연못이 없으면 예전과 똑같이 한 번만 고른다
-        fz = getattr(ctl.app, "fishing", None)
-        pond = fz.rect() if fz is not None else None
+        # 낚시터(연못) · 텃밭(화단) 자리는 피한다 (2026-11-26). 둘 다 없으면 예전과 똑같이 한 번만 고른다
+        avoid = _avoid_rects(ctl.app, ov)
         for _ in range(12):
             self.x = random.randint(x1 + m, max(x1 + m, x2 - w - m))
             self.y = random.randint(y1 + m, max(y1 + m, y2 - h - m))
-            if not pond or not (self.x < pond[2] + 6 and pond[0] - 6 < self.x + w
-                                and self.y < pond[3] + 6 and pond[1] - 6 < self.y + h):
+            if not any(self.x < r[2] + 6 and r[0] - 6 < self.x + w and self.y < r[3] + 6 and r[1] - 6 < self.y + h
+                       for r in avoid):
                 break
         self.win.geometry("+%d+%d" % (self.x, self.y))
         self.view.show(self.photos[0])
@@ -509,6 +523,9 @@ class WildController(object):
         fz = getattr(self.app, "fishing", None)
         if fz is not None:
             fz.resume()
+        gd = getattr(self.app, "garden", None)          # 텃밭(화단)도 - 쉬는 사이 바뀐 단계는 카드로 맞춘다
+        if gd is not None:
+            gd.resume()
         if not self.enabled():
             return
         self.check(force=False)
@@ -522,10 +539,13 @@ class WildController(object):
                     pass
         self._job = self._expire_job = None
         self.clear()
-        # 풀숲을 멈추는 곳(친구 집 · 집중 · 올림픽 · 투기장 · 공습 · 로그아웃 · 종료)에서는 연못도 걷는다
+        # 풀숲을 멈추는 곳(친구 집 · 집중 · 올림픽 · 투기장 · 공습 · 로그아웃 · 종료)에서는 연못 · 화단도 걷는다
         fz = getattr(self.app, "fishing", None)
         if fz is not None:
             fz.pause()
+        gd = getattr(self.app, "garden", None)
+        if gd is not None:
+            gd.pause()
 
     def check(self, force=False):
         """서버에 지금 상태를 물어본다.

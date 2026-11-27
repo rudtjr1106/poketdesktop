@@ -96,6 +96,21 @@ def baits(bag_resp):
     return out
 
 
+def default_home(ov, w, h):
+    """연못의 기본 자리 (옮겨 두기 전) - 탐험 보따리 바로 오른쪽 · 바닥에 맞춰.
+
+    텃밭(garden)이 이 자리를 기준으로 선다 - 연못을 옮기거나 숨겨도 텃밭 자리는 그대로여야 해서 지금 자리가 아니라
+    기본 자리를 따로 알려 준다."""
+    x1, y1, x2, y2 = ov.area()
+    m = ov.settings["areaMargin"]
+    lo_x, hi_x = x1 + m, max(x1 + m, x2 - w - m)
+    hi_y = max(y1 + m, y2 - h - m)
+    # 탐험 보따리 폭 - expedition_ui.Bundle 과 같은 셈 (보따리가 없어도 그 자리는 비워 둔다)
+    bw = int(max(30, int(ov.settings["targetHeight"] * 0.9)) * 1.1)
+    x = min(hi_x, x1 + m + 10 + bw + BUNDLE_GAP)
+    return (int(max(lo_x, x)), int(hi_y))
+
+
 def overlaps(a, b, pad=0):
     """두 상자 (x1, y1, x2, y2) 가 겹치나. 하나라도 None 이면 아니다."""
     if not a or not b:
@@ -364,10 +379,7 @@ class FishingController(object):
                 return (int(round(lo_x + fx * (hi_x - lo_x))), int(round(lo_y + fy * (hi_y - lo_y))))
             except (TypeError, ValueError):
                 pass
-        # 탐험 보따리 폭 - expedition_ui.Bundle 과 같은 셈 (보따리가 없어도 그 자리는 비워 둔다)
-        bw = int(max(30, int(ov.settings["targetHeight"] * 0.9)) * 1.1)
-        x = min(hi_x, x1 + m + 10 + bw + BUNDLE_GAP)
-        return (int(max(lo_x, x)), int(hi_y))
+        return default_home(ov, w, h)
 
     def _ratio(self, x, y, w, h):
         ov = self.app.overlay
@@ -986,6 +998,7 @@ class FishingController(object):
         except Exception as e:                              # noqa: BLE001
             config.log("낚시 안내 말풍선 실패: %s" % e)
             return
+        s["pondHintAt"] = time.time()            # 텃밭 안내는 이 뒤 10분을 기다린다 (garden._hint_wait)
         s["pondHints"] = stage
         try:
             config.save_settings(s)

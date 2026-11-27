@@ -625,6 +625,18 @@ def guest_part(root, ov, app):
     chk("  내 포켓몬 왼쪽 바닥에 놓인다", bo.y == gy and bo.x + bo.fw <= lead.x and abs(bo.y + bo.fh - (y1 + H)) < 12,
         (bo.x, bo.y, lead.x))
     chk("  들고 온 것은 그만큼 준다", vis.v["carry"] == [{"id": "BLACKBELT", "kr": "검은띠", "count": 1}])
+    # 연못 · 화단(시즌 7)과 겹치는 자리면 그 위로 올린다 (실제 앱 시험 11/27: 보따리가 화분 위에 떨어졌다)
+    ov = app.overlay
+    old_avoid = getattr(ov, "avoid", None)
+    bx, by = vis._bundle_spot(0)
+    ov.avoid = [lambda: (bx - 10, by - 20, bx + 60, by + 80)]
+    try:
+        nx, ny = vis._bundle_spot(0)
+        chk("  피할 자리(화단)와 겹치면 그 위로 올라간다", nx == bx and ny + 1 <= by - 20, (bx, by, nx, ny))
+        ov.avoid = [lambda: (bx + 500, by, bx + 600, by + 40)]
+        chk("  안 겹치면 자리 그대로", vis._bundle_spot(0) == (bx, by), vis._bundle_spot(0))
+    finally:
+        ov.avoid = old_avoid
     texts_, _r = menu_of(app, lead)
     chk("친구가 오늘 받았으면(안 받고 놓인 것도) '여기에 두기' 는 못 누른다 (하루 한 번)",
         "여기에 두기 (친구가 오늘 이미 받음)" in texts_ and "여기에 두기..." not in texts_, texts_)

@@ -114,6 +114,11 @@ def _loop():
             fishing.settle()            # 낚시 주간 대물 순위 보상 (시즌 7) - 월 00:20 KST 뒤 한 번만, 그 밖엔 meta 한 번 묻고 끝
         except Exception as e:                              # noqa: BLE001
             print("[housekeep] 낚시 정산 실패: %r" % (e,))
+        try:
+            from . import garden
+            garden.prune()              # 열매 텃밭 (시즌 7) - 지난 날의 거둔 수 · 친구 물 · 먹이 줄 (어제까지는 남긴다)
+        except Exception as e:                              # noqa: BLE001
+            print("[housekeep] 텃밭 지난 날 정리 실패: %r" % (e,))
         time.sleep(PERIOD)
 
 

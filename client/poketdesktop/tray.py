@@ -104,6 +104,20 @@ def pond_items(tray, app):
                  checked=lambda: config.show_pond(app.settings))]
 
 
+def garden_items(tray, app):
+    """열매 텃밭 (다음 시즌): 서버가 텃밭을 열었을 때만 '텃밭 보이기' (열리기 전엔 켤 것이 없다)."""
+    gd = getattr(app, "garden", None)
+    if gd is None or not getattr(gd, "open", False):
+        return []
+    return [Item("텃밭 보이기", lambda: tray.call(app.toggle_garden),
+                 checked=lambda: config.show_garden(app.settings))]
+
+
+def with_garden(tray, app, rows):
+    """'바탕화면' 하위 메뉴 끝에 '텃밭 보이기' 를 붙인다 (낚시터 보이기 다음 - 설정 창과 같은 차례)."""
+    return list(rows) + garden_items(tray, app)
+
+
 def make_icon_image(size=64):
     """트레이 아이콘 — 컴퓨터 화면 안의 몬스터볼.
 
@@ -266,7 +280,7 @@ class TrayBase(object):
             # 1.9.0: 내 글·댓글에 달린 새 댓글 수와 새 패치노트도 여기에 남는다.
             Item(lambda: board_label(a), lambda: self.call(a.open_board)),
             SEP,
-            Item("바탕화면", submenu=[
+            Item("바탕화면", submenu=with_garden(self, a, [
                 Item("모두 거두기", lambda: self.call(a.recall_all)),
                 Item("무작위로 내보내기", lambda: self.call(a.send_random)),
                 SEP,
@@ -277,7 +291,7 @@ class TrayBase(object):
                 # 하면 있는 줄도 모른다.
                 Item("풀숲 띄우기", lambda: self.call(a.toggle_grass),
                      checked=lambda: bool(s.get("showGrass", True))),
-            ] + pond_items(self, a)),
+            ] + pond_items(self, a))),
             Item("포켓몬 크기", submenu=size_items),
             Item("활동 범위", submenu=area_items),
             # 켜 두고 잊어버리는 프로그램이라, 켤 때마다 손으로 켜야
