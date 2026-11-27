@@ -41,7 +41,7 @@ def t_장_표():
     keys = [c["key"] for c in A.CHAPTERS]
     chk("여섯 장 · 장소 열쇠", keys == ["cave", "volcano", "abyss", "sky", "castle", "throne"], keys)
     chk("장 번호 1~6", [c["n"] for c in A.CHAPTERS] == [1, 2, 3, 4, 5, 6])
-    chk("장 길이 2·2·2·3·2·3", [c["days"] for c in A.CHAPTERS] == [2, 2, 2, 3, 2, 3])
+    chk("장 길이 2·2·2·3·2·4 (6장은 11/27 에 하루 늘렸다 - #1010)", [c["days"] for c in A.CHAPTERS] == [2, 2, 2, 3, 2, 4])
     chk("자리 수 3·1·1·1·2·1", [c["slots"] for c in A.CHAPTERS] == [3, 1, 1, 1, 2, 1])
     chk("시작 날 차이는 앞 장들의 길이 합", [c["offset"] for c in A.CHAPTERS] == [0, 2, 4, 6, 9, 11])
     chk("이름 · 장소 이름은 한국어", all(c["kr"] and c["placeKr"] for c in A.CHAPTERS))
@@ -63,14 +63,15 @@ def t_시각():
     print("[장 경계]")
     chk("시작 날 기본 2026-11-16", A.start_day() == datetime.date(2026, 11, 16), A.start_day())
     chk("1장 = 11/15 15:00Z ~ 11/17 15:00Z", A.window(1) == (at(2026, 11, 15, 15), at(2026, 11, 17, 15)), A.window(1))
-    chk("6장 닫힘 = 11/29 15:00Z (11/30 0시 KST)", A.window(6)[1] == at(2026, 11, 29, 15), A.window(6))
+    chk("6장 닫힘 = 11/30 15:00Z (12/1 0시 KST)", A.window(6)[1] == at(2026, 11, 30, 15), A.window(6))
     chk("이벤트 = 1장 열림 ~ 6장 닫힘", A.event_window() == (A.window(1)[0], A.window(6)[1]))
     chk("열리기 1초 전은 0", A.chapter_at(at(2026, 11, 15, 14, 59, 59)) == 0)
     chk("열린 순간은 1장", A.chapter_at(at(2026, 11, 15, 15)) == 1)
     chk("1장 마지막 초는 1장", A.chapter_at(at(2026, 11, 17, 14, 59, 59)) == 1)
     chk("1장 닫힌 순간은 2장", A.chapter_at(at(2026, 11, 17, 15)) == 2)
     chk("4장(3일)은 11/22 ~ 11/25", A.window(4) == (at(2026, 11, 21, 15), at(2026, 11, 24, 15)), A.window(4))
-    chk("끝난 순간은 0", A.chapter_at(at(2026, 11, 29, 15)) == 0)
+    chk("11/30 0시 KST 는 아직 6장", A.chapter_at(at(2026, 11, 29, 15)) == 6)
+    chk("끝난 순간은 0", A.chapter_at(at(2026, 11, 30, 15)) == 0)
     chk("모르는 장의 창은 None", A.window(0) is None and A.window(7) is None)
     os.environ["POKET_ARCHE_START"] = "2026-11-10"
     try:
