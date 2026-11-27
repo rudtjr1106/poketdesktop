@@ -321,7 +321,7 @@ class SettingsWindow(object):
         # 손잡이마다 하는 일이 다르다. 이름표는 이름표 창을 붙이거나 떼야
         # 하고, 풀숲은 야생 폴링을 켜고 끄고, 알림은 저장만 하면 된다.
         # 그래서 누를 때 무엇을 부를지도 같이 적는다.
-        for var, label, key, note, how in self._with_garden(self._with_pond((
+        for var, label, key, note, how in self._with_hide(self._with_garden(self._with_pond((
                 (self.names, "이름표 보이기", "showNames",
                  "포켓몬 위에 이름과 레벨을 띄웁니다.", self._toggle),
                 # 도트는 누를 때마다 설정을 본다 (overlay.Pet.can_drag). 그래서
@@ -363,18 +363,22 @@ class SettingsWindow(object):
                 (self.arche_title, "브라우저 단서 찾기 (아르케)", "archeTitle",
                  "아르케 이벤트 동안, 윈도우에서 맨 앞에 있는 창의 제목만 3초마다 확인해 이벤트 단서와 "
                  "맞는지 봅니다. 주소 · 방문 기록 · 페이지 내용은 읽지 않고, 제목은 저장하거나 보내지 "
-                 "않습니다 (단서와 맞을 때만 그 말을 서버에 보냅니다).", self._toggle_plain)))):
+                 "않습니다 (단서와 맞을 때만 그 말을 서버에 보냅니다).", self._toggle_plain))))):
+            sub = key == "hideSeek"           # 풀숲 띄우기의 하위 칸 - 들여 쓰고, 풀숲을 끄면 죽는다 (_paint_hide)
             c = tk.Checkbutton(
                 box, text=label, variable=var, bg=U.BG, fg=U.FG,
                 selectcolor=U.INK, activebackground=U.BG,
                 activeforeground=U.FG, font=U.FONT_S, anchor="w",
                 highlightthickness=0, bd=0,
                 command=(lambda k=key, v=var, f=how: f(k, v)))
-            c.pack(fill="x")
+            c.pack(fill="x", padx=(22 if sub else 0, 0))
             lbl = tk.Label(box, text=note, bg=U.BG, fg=U.FG_FAINT,
                            font=U.FONT_XS, anchor="w", justify="left",
                            wraplength=W - 60)
-            lbl.pack(fill="x", padx=(22, 0), pady=(0, 6))
+            lbl.pack(fill="x", padx=(44 if sub else 22, 0), pady=(0, 6))
+            if sub:
+                self.hide_check = c
+                self._paint_hide()
             # 긴 설명은 상수 폭으로는 스크롤바 옆에서 끝이 잘린다 (_catch_row)
             U.wrap_to_width(lbl)
         self._area_row(box, s)
@@ -603,6 +607,46 @@ class SettingsWindow(object):
         (부팅 손잡이도 같은 이유로 show_autostart 를 둔다).
         """
         self.grass.set(bool(self.app.settings.get("showGrass", True)))
+        self._paint_hide()
+
+    # 숨바꼭질 (시즌 7) - '풀숲 띄우기' 의 하위 칸. 낚시터 · 텃밭 줄 다음에 들여 써서 (풀숲 바로 아래는 낚시터 자리다 -
+    # 낚시 · 텃밭이 먼저 그 자리를 잡았다). 시즌 7 이 열렸을 때만 (WildController.hide_open).
+    HIDE_LABEL = "숨바꼭질"
+    HIDE_NOTE = ("가끔 풀숲 대신 야생 포켓몬이 창 뒤 · 작업표시줄 뒤 · 바탕화면 가장자리에 반쯤 숨어 있습니다. 찾아서 누르면 "
+                 "숨겨진 특성이 잘 나오는 만남이 됩니다. 소리 · 알림은 없고, 일하는 창을 덮지 않습니다. 풀숲 띄우기를 끄면 "
+                 "같이 꺼집니다.")
+
+    def _with_hide(self, rows):
+        """손잡이 목록에 '숨바꼭질' 을 끼운다 (열렸을 때만) - 텃밭 · 낚시터 · 풀숲 줄 다음. 화면 테마도 이것을 쓴다."""
+        rows = list(rows)
+        wild = getattr(self.app, "wild", None)
+        if wild is None or not getattr(wild, "hide_open", lambda: False)():
+            return rows
+        self.hide = tk.BooleanVar(value=config.hide_pref(self.app.settings))
+        at = max([i + 1 for i, r in enumerate(rows) if r[2] in ("showGrass", "showPond", "showGarden")]
+                 or [len(rows)])
+        rows.insert(at,(self.hide, self.HIDE_LABEL, "hideSeek", self.HIDE_NOTE, self._toggle_hide))
+        return rows
+
+    def hide_alive(self):
+        """하위 칸을 누를 수 있나 - 풀숲 띄우기가 켜져 있을 때만."""
+        return bool(self.app.settings.get("showGrass", True))
+
+    def _paint_hide(self):
+        c = getattr(self, "hide_check", None)
+        if c is None:
+            return
+        try:
+            c.configure(state="normal" if self.hide_alive() else "disabled")
+        except tk.TclError:
+            pass
+
+    def show_hide(self):
+        """트레이에서 숨바꼭질을 켜고 껐을 때 표시를 맞춘다 (show_grass 와 같은 까닭)."""
+        v = getattr(self, "hide", None)
+        if v is not None:
+            v.set(config.hide_pref(self.app.settings))
+        self._paint_hide()
 
     # 낚시 (다음 시즌) - 서버가 낚시를 열었을 때만 '풀숲 띄우기' 바로 아래에 (열리기 전엔 켤 것이 없다)
     POND_LABEL = "낚시터 보이기"
@@ -764,6 +808,11 @@ class SettingsWindow(object):
         # 바꾸면 이미 돋아 있는 풀숲이 그대로 남고, 껐는데도 90초마다
         # 서버를 계속 두드린다.
         self.app.set_show_grass(var.get())
+        self._paint_hide()                  # 하위 칸 '숨바꼭질' 은 풀숲을 따라 살고 죽는다
+
+    def _toggle_hide(self, _key, var):
+        # 저장하고 떠 있는 숨은 포켓몬을 맞춘다 (app.set_hide_seek - 트레이와 같은 길)
+        self.app.set_hide_seek(var.get())
 
     def _toggle_pond(self, _key, var):
         # 저장하고 연못을 바로 세우거나 걷는다 (app.set_show_pond - 트레이 · 연못 메뉴와 같은 길)
@@ -783,7 +832,7 @@ class SettingsWindow(object):
         keep = {k: self.app.settings[k]
                 for k in ("server", "lastBall", "autostart",
                           # 미끼 · 낚시 안내 · 텃밭 안내를 어디까지 했나도 기록이다 (lastBall 과 같다)
-                          "lastBait", "pondHints", "gardenHints",
+                          "lastBait", "pondHints", "gardenHints", "hideHints",
                           "lastRunVersion", "updateSkipped",
                           # '고른 포켓몬만' 에서 고른 종은 하나씩 골라 모은 것이다 - 모드만 기본(new)으로 돌아가면
                           # 쓰이지 않는다. 지우면 다시 고르려고 1025종을 또 훑어야 한다.

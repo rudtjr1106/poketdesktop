@@ -282,6 +282,10 @@ def test_end_paths_keep_grass_timer():
         pin(uid)
         wid = mkwild(uid, "grass", state="grass")
         if how == "flee":
+            # 앱의 만료 타이머처럼 만료 뒤에 놓아준다 - 숨바꼭질(시즌 7)부터 만료 전에 이르게 놓아주면 보통 간격이다
+            # (deps._truly_expired, server/test_hide.py test_early_flee)
+            db.run("UPDATE wild SET expires_at=? WHERE id=?",
+                   ((datetime.datetime.now(UTC) - datetime.timedelta(seconds=1)).isoformat(), wid))
             main.wild_flee(wid, ctx(uid))
         else:
             db.run("UPDATE wild SET expires_at=? WHERE id=?",

@@ -1590,6 +1590,10 @@ class Overlay(object):
         창도 여기에 저절로 들어온다. 창 몇 개뿐이라 3초에 한 번은 싸다.
         """
         for w in self.root.winfo_children():
+            if getattr(w, "_poket_hider", False):
+                # 숨은 포켓몬 (숨바꼭질, hide.Hider) - '항상 위' 가 아니다. 윈도우 작업표시줄 뒤 자리는 작업표시줄 바로 뒤에
+                # 넣어서 정말로 topmost 이지만 맨 위로 올리면 작업표시줄을 덮는다. 제 겹침 순서는 Hider 가 1초마다 다시 건다
+                continue
             try:
                 if not w.winfo_exists() or not w.winfo_ismapped():
                     continue

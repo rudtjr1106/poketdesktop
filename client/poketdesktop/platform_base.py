@@ -16,6 +16,13 @@
     show_again(win)                  숨긴 창을 다시 보여준다 (항상 위를 다시 건다 - win._poket_behind 면 뒤로)
     send_back(win)                   항상 위를 풀고 다른 창 뒤에 둔다 (설정 petBehind, 2.5.0)
     bind_right(widget, fn)           오른쪽 클릭을 건다 (버튼 번호가 OS 마다 다르다)
+    other_windows()                  창 목록 (겹침 순서 앞에서부터, 위치 · 크기만 - 숨바꼭질 시즌 7). 이 앱의 테두리 있는
+                                     창(own) · 남의 '항상 위' 창(top)은 가리는 창으로만 든다
+    order_just_below(win, id, strip) win 을 그 창 바로 뒤로 (strip: 보일 띠 - 걸고 보니 덮였으면 False) /
+    order_below_bar(win)             작업표시줄 바로 아래 층 /
+    order_above_desktop(win)         모든 보통 창 뒤 (바탕화면 바로 위) - 숨은 포켓몬 (HIDE_KINDS 가 쓸 수 있는 자리)
+    monitor_dpi_mismatch(rect)       그 자리 모니터의 DPI 가 시스템 DPI 와 다른가 (윈도우 - 창 뒤 · 가장자리 자리를 안 쓴다)
+    fullscreen_busy()                전체 화면 · 발표 중인가 (숨은 포켓몬을 청하지 않는다)
     single_lock(dir) / single_release(h)   중복 실행 막기
     data_dir(app_name)               설정을 두는 자리 (None 이면 기본 자리)
     machine_raw()                    기기 ID 의 재료 (None 이면 MAC 주소로 간다)
@@ -107,10 +114,28 @@ def show_again(win):
     포켓몬이 다른 창 뒤로 숨는다.
     """
     win.deiconify()
+    if hider_again(win):
+        return
     if getattr(win, "_poket_behind", False):
         send_back(win)              # 다른 창 뒤로 다니는 포켓몬 (설정 petBehind) - 다시 보일 때도 뒤로
         return
     raise_above(win)
+
+
+def hider_again(win):
+    """숨은 포켓몬 창(숨바꼭질, win._poket_hider)이면 '항상 위' 를 걸지 않고 제 겹침 순서(창 뒤 · 작업표시줄 아래 ·
+    바탕화면 위)를 다시 건다 - 긴급 숨기기를 되돌릴 때 등. 그런 창이면 True (부르는 쪽은 더 하지 않는다).
+
+    deiconify 는 부르는 쪽이 이미 했다. 걸 함수(win._poket_reorder)는 hide.Hider 가 단다."""
+    if not getattr(win, "_poket_hider", False):
+        return False
+    fn = getattr(win, "_poket_reorder", None)
+    if fn is not None:
+        try:
+            fn()
+        except Exception:                                   # noqa: BLE001
+            pass
+    return True
 
 
 def send_back(win):
@@ -125,6 +150,46 @@ def send_back(win):
             win.geometry("+%d+%d" % before)
     except Exception:                                       # noqa: BLE001
         pass
+
+
+# ---------------------------------------------------------------- 숨바꼭질 (시즌 7)
+# 이 OS 에서 쓸 수 있는 숨는 자리 (hide_spots.KINDS 가운데). 기본 구현은 겹침 순서를 못 걸어서 **아무것도 없다** -
+# 그러면 앱이 hide=1 을 안 보내 숨은 포켓몬을 받지 않는다. '항상 위' 로 숨은 척하지 않는다 (일하는 창을 덮는다).
+HIDE_KINDS = ()
+
+
+def other_windows():
+    """보이는 보통 창 [{"rect": (x1, y1, x2, y2), "id": 창 손잡이/번호, "max": bool, "top": bool, "odd": bool,
+    "own": bool, "pid"?: 주인}] 겹침 순서 앞에서부터. own(이 앱의 테두리 있는 창) · top(남의 '항상 위' 창)은 숨은 포켓몬을
+    가리는 창으로만 든다 - 걸지 않는다 (hide_spots.anchor_for). **제목은 안 읽는다.** 못 읽으면 []."""
+    return []
+
+
+def order_just_below(win, other_id, strip=None):
+    """win 을 그 창(other_id) 바로 뒤로. '항상 위' 는 푼다. 됐으면 True. strip(보일 띠 x1, y1, x2, y2)을 주면 걸고 나서
+    그 창 말고 다른 창이 띠를 덮었을 때 False (맥 - 자식 창 · 시트는 부모 뒤로 간다)."""
+    return False
+
+
+def order_below_bar(win):
+    """win 을 작업표시줄/Dock 바로 아래 층으로 (보통 창보다는 위). 됐으면 True."""
+    return False
+
+
+def order_above_desktop(win):
+    """win 을 모든 보통 창 뒤 · 바탕화면 바로 위로. 됐으면 True."""
+    return False
+
+
+def fullscreen_busy():
+    """전체 화면 앱 · 발표 중인가 (그동안은 숨은 포켓몬을 청하지 않는다)."""
+    return False
+
+
+def monitor_dpi_mismatch(rect):
+    """rect(활동 영역)가 있는 모니터의 DPI 가 시스템 DPI 와 다른가 - 다르면 그 모니터의 창 좌표를 믿을 수 없어서 창 뒤 ·
+    가장자리 자리를 안 쓴다 (hide.kinds_at). 기본은 False (윈도우만 다를 수 있다)."""
+    return False
 
 
 def make_click_through(win):

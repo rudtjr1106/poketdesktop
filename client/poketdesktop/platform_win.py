@@ -147,6 +147,410 @@ def order_below(win, ref):
         return False
 
 
+# ---------------------------------------------------------------- 숨바꼭질 (시즌 7, 2026-11-27)
+# 창 뒤 · 작업표시줄 뒤 · 바탕화면 가장자리 - 셋 다 SetWindowPos 의 '이 창 뒤에 넣기' 로 된다 (send_back 과 같은 꼴).
+# 이 맥에서는 돌려 볼 수 없어서 창을 거르는 셈(_keep_window) · 좌표 고르기(_frame_rect) · 전체 화면 판정(_busy_state)은
+# 순수 함수로 떼고, 창 목록 · 모니터 DPI 는 가짜 Win32(_HIDE · _DPI 자리)로 검사한다 (test_hide_ui.FakeWin32).
+#
+# 좌표 (검토 #3 · #7): 이 앱은 '시스템 DPI' 앱이다 (dpi_aware - SetProcessDpiAwareness(1)). 그래서 Tk · screens() ·
+# 활동 영역 · GetWindowRect 는 시스템 DPI 로 바꿔 준(가상화한) 논리 좌표고, 배율이 시스템 DPI 와 다른 모니터에서는 물리
+# 픽셀과 어긋난다. 창 목록도 같은 논리 좌표로 맞춘다 (_frame_rect). 그런 모니터의 창은 odd (걸지 않는다), 활동 영역이 그런
+# 모니터에 있으면 창 뒤 · 가장자리 자리를 아예 안 쓴다 (monitor_dpi_mismatch - hide.kinds_at).
+HIDE_KINDS = ("window", "bar", "edge")
+
+_SWP = 0x0001 | 0x0002 | 0x0010 | 0x0200         # NOSIZE | NOMOVE | NOACTIVATE | NOOWNERZORDER
+_SKIP_CLASSES = ("Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd")
+_BARS = ("Shell_TrayWnd", "Shell_SecondaryTrayWnd")
+_HIDE = None
+_DPI = None
+_PER_MONITOR = -3          # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE
+_MONITOR_NEAREST = 2       # MONITOR_DEFAULTTONEAREST
+
+
+def _hide_fns():
+    """창 목록 · 겹침 순서에 쓰는 함수들 (한 번만 만든다). 핸들이 64비트라 타입을 정해 둔다 - 안 정하면 잘린다."""
+    global _HIDE
+    if _HIDE is None:
+        from ctypes import wintypes
+        u = ctypes.WinDLL("user32")
+        proc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        u.EnumWindows.argtypes = [proc, wintypes.LPARAM]
+        u.EnumWindows.restype = wintypes.BOOL
+        for nm in ("IsWindowVisible", "IsIconic", "IsZoomed"):
+            getattr(u, nm).argtypes = [wintypes.HWND]
+            getattr(u, nm).restype = wintypes.BOOL
+        u.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+        u.GetWindowLongW.restype = ctypes.c_long
+        u.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        u.GetWindowThreadProcessId.restype = wintypes.DWORD
+        u.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        u.GetClassNameW.restype = ctypes.c_int
+        u.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        u.GetWindowRect.restype = wintypes.BOOL
+        u.GetParent.argtypes = [wintypes.HWND]
+        u.GetParent.restype = wintypes.HWND
+        u.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+        u.GetWindow.restype = wintypes.HWND
+        u.FindWindowExW.argtypes = [wintypes.HWND, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR]
+        u.FindWindowExW.restype = wintypes.HWND
+        u.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                   ctypes.c_int, wintypes.UINT]
+        u.SetWindowPos.restype = wintypes.BOOL
+        u.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+        u.MonitorFromWindow.restype = wintypes.HMONITOR
+        u.MonitorFromPoint.argtypes = [wintypes.POINT, wintypes.DWORD]
+        u.MonitorFromPoint.restype = wintypes.HMONITOR
+        u.GetDC.argtypes = [wintypes.HWND]
+        u.GetDC.restype = wintypes.HDC
+        u.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+        u.ReleaseDC.restype = ctypes.c_int
+        sysdpi = getattr(u, "GetDpiForSystem", None)            # 윈도 10 1607 부터
+        if sysdpi is not None:
+            sysdpi.argtypes = []
+            sysdpi.restype = wintypes.UINT
+        ctx = getattr(u, "SetThreadDpiAwarenessContext", None)  # 윈도 10 1607 부터 - DPI_AWARENESS_CONTEXT 는 손잡이(포인터)
+        if ctx is not None:
+            ctx.argtypes = [ctypes.c_void_p]
+            ctx.restype = ctypes.c_void_p
+        try:
+            dwm = ctypes.WinDLL("dwmapi")
+            dwm.DwmGetWindowAttribute.argtypes = [wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD]
+            dwm.DwmGetWindowAttribute.restype = ctypes.c_long
+        except Exception:                                   # noqa: BLE001
+            dwm = None
+        _HIDE = (u, dwm, proc)
+    return _HIDE
+
+
+def _dpi_fns():
+    """(shcore, gdi32) - 모니터 DPI · 시스템 DPI 를 묻는 함수 (한 번만). 없는 윈도(8.1 앞 shcore 없음)는 그 칸이 None."""
+    global _DPI
+    if _DPI is None:
+        from ctypes import wintypes
+        try:
+            sh = ctypes.WinDLL("shcore")
+            sh.GetDpiForMonitor.argtypes = [wintypes.HMONITOR, ctypes.c_int, ctypes.POINTER(wintypes.UINT),
+                                            ctypes.POINTER(wintypes.UINT)]
+            sh.GetDpiForMonitor.restype = ctypes.c_long         # HRESULT
+        except Exception:                                   # noqa: BLE001
+            sh = None
+        try:
+            gdi = ctypes.WinDLL("gdi32")
+            gdi.GetDeviceCaps.argtypes = [wintypes.HDC, ctypes.c_int]
+            gdi.GetDeviceCaps.restype = ctypes.c_int
+        except Exception:                                   # noqa: BLE001
+            gdi = None
+        _DPI = (sh, gdi)
+    return _DPI
+
+
+def _sys_dpi(u, gdi):
+    """시스템 DPI - 이 프로세스의 논리 좌표가 맞는 DPI. GetDpiForSystem 이 없는 윈도는 화면 DC 의 LOGPIXELSX
+    (시스템 DPI 앱에게는 시스템 DPI 다). 모르면 0."""
+    fn = getattr(u, "GetDpiForSystem", None)
+    if fn is not None:
+        try:
+            v = int(fn())
+            if v > 0:
+                return v
+        except Exception:                                   # noqa: BLE001
+            pass
+    if gdi is not None:
+        try:
+            dc = u.GetDC(None)
+            try:
+                return int(gdi.GetDeviceCaps(dc, 88) or 0)      # LOGPIXELSX
+            finally:
+                u.ReleaseDC(None, dc)
+        except Exception:                                   # noqa: BLE001
+            pass
+    return 0
+
+
+def _monitor_dpi(u, sh, hmon):
+    """그 모니터의 실제 배율 DPI (MDT_EFFECTIVE_DPI). 모르면 0 (= 다르지 않다고 본다).
+
+    **GetDpiForMonitor 는 부르는 쪽의 DPI 인식을 따른다** - 우리 같은 시스템 DPI 앱이 그냥 부르면 어느 모니터든
+    시스템 DPI 를 돌려준다 (문서의 표). 그래서 이 스레드만 잠깐 '모니터마다' 로 바꿔 묻고 바로 되돌린다 (그 사이 창을
+    만들지 않으니 다른 것은 안 바뀐다). 그 함수가 없는 윈도(10 1607 앞)는 물어도 시스템 DPI 라 0 으로 둔다."""
+    from ctypes import wintypes
+    setctx = getattr(u, "SetThreadDpiAwarenessContext", None)
+    if sh is None or setctx is None or not hmon:
+        return 0
+    old = setctx(_PER_MONITOR)
+    if not old:
+        return 0                                            # 못 바꿨다 - 물으면 시스템 DPI 가 온다
+    try:
+        x, y = wintypes.UINT(0), wintypes.UINT(0)
+        if sh.GetDpiForMonitor(hmon, 0, ctypes.byref(x), ctypes.byref(y)) != 0:     # MDT_EFFECTIVE_DPI
+            return 0
+        return int(x.value)
+    finally:
+        setctx(old)
+
+
+def _dpi_differs(mon_dpi, sys_dpi):
+    """모니터 DPI 가 시스템 DPI 와 다른가 (둘 중 하나라도 모르면 다르지 않다고 본다)."""
+    return bool(mon_dpi and sys_dpi and int(mon_dpi) != int(sys_dpi))
+
+
+def _frame_rect(win_rect, dwm_rect, sys_dpi=96):
+    """창 사각형을 Tk · screens() 와 같은 논리 좌표로 -> (rect, 배율이 다름).
+
+    GetWindowRect 는 이 스레드(시스템 DPI)에 맞춰 바꿔 준 논리 좌표다. DWM EXTENDED_FRAME_BOUNDS 는 DPI 를 안 맞춘
+    물리 픽셀이다 (문서). 둘은 시스템 DPI 와 배율이 같은 모니터에서만 같은 공간이고, 그때 DWM 쪽이 안 보이는 크기 조절
+    테두리(윈 10 - 100% 에서 7px)를 뺀 눈에 보이는 테두리다. 그래서 **네 변이 다 테두리 폭 안으로만 다르면** DWM 을 쓰고,
+    아니면(배율이 달라 크기 · 자리가 어긋남) GetWindowRect 를 쓰고 '배율이 다름' 을 알린다. DWM 칸이 창 안에 들어가는지만
+    보면 안 된다 - 배율이 시스템보다 낮은 모니터의 물리 칸은 더 커진 논리 칸 안에 들어가 버린다 (모니터 왼쪽 위 근처).
+    테두리 폭은 시스템 배율을 따라 커진다 (300% 에서 21px 쯤) - 16px 를 시스템 배율만큼 늘려 잰다.
+    (검토 #3: DWM 칸을 그대로 쓰면 1/1.5 크기 · 어긋난 자리로 덮임을 봐서, 덮인 가장자리를 '보인다' 고 골랐다)"""
+    w = tuple(int(v) for v in win_rect)
+    if not dwm_rect:
+        return w, False
+    d = tuple(int(v) for v in dwm_rect)
+    if d[2] <= d[0] or d[3] <= d[1]:
+        return w, False
+    tol = 16 * max(96, int(sys_dpi or 96)) // 96
+    if all(abs(a - b) <= tol for a, b in zip(d, w)):
+        return d, False
+    return w, True
+
+
+def _keep_window(visible, iconic, style, exstyle, pid, me, cls, cloaked, rect, zoomed, mon_dpi, sys_dpi, scaled=False):
+    """창 하나를 숨바꼭질 창 목록에 넣을까 - 넣으면 {rect, max, top, odd, own}, 빼면 None. **제목은 안 본다.**
+
+    빼는 것: 안 보임 · 최소화 · 자식 창 · 도구 창(WS_EX_TOOLWINDOW) · 눌러도 안 앞으로 오는 창(WS_EX_NOACTIVATE) ·
+    바탕화면(Progman / WorkerW) · 작업표시줄 · 클로킹(다른 가상 데스크톱 · 숨긴 UWP) · 크기 0.
+    own: 이 앱의 창 - 빼지 않고 남긴다 (검토 #4). 테두리 없는 우리 창(도트 · 이름표 · 숨은 포켓몬)은 Tk 가 도구 창으로
+    만들어서 위에서 빠지고, 남는 것은 포켓몬 관리 · PC 박스 · 설정 같은 테두리 있는 창뿐이다 - 그 밑의 가장자리 · 창 뒤
+    자리는 진짜로 가려진다. 걸지는 않는다 (hide_spots.anchor_for).
+    odd: 그 창이 있는 **모니터**의 DPI 가 시스템 DPI 와 다르거나(mon_dpi) 좌표 배율이 어긋났다(scaled, _frame_rect) -
+    그 창의 DPI 인식(GetDpiForWindow)으로 보면 시스템 DPI 앱 창은 어느 모니터에 있든 시스템 DPI 라 놓친다 (검토 #7)."""
+    if not visible or iconic:
+        return None
+    if style & 0x40000000:                                  # WS_CHILD
+        return None
+    if exstyle & (0x00000080 | 0x08000000):                 # WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE
+        return None
+    if cls in _SKIP_CLASSES or cloaked:
+        return None
+    x1, y1, x2, y2 = (int(v) for v in rect)
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return {"rect": (x1, y1, x2, y2), "max": bool(zoomed), "top": bool(exstyle & 0x00000008),   # WS_EX_TOPMOST
+            "odd": bool(scaled) or _dpi_differs(mon_dpi, sys_dpi), "own": pid == me}
+
+
+def _busy_state(n):
+    """SHQueryUserNotificationState 값 -> 전체 화면/발표 중인가 (QUNS_BUSY 2 · RUNNING_D3D_FULL_SCREEN 3 ·
+    PRESENTATION_MODE 4). 방해 금지(5 QUNS_QUIET_TIME)나 보통(5 · 6 · 1)은 아니다."""
+    return int(n) in (2, 3, 4)
+
+
+def _cls(u, hwnd):
+    buf = ctypes.create_unicode_buffer(64)
+    u.GetClassNameW(hwnd, buf, 64)
+    return buf.value
+
+
+def _rect_of(u, dwm, hwnd, sys_dpi):
+    """(논리 좌표 사각형, 배율이 다름) - GetWindowRect 와 DWM 눈에 보이는 테두리를 둘 다 읽어 _frame_rect 로 고른다."""
+    from ctypes import wintypes
+    r = wintypes.RECT()
+    u.GetWindowRect(hwnd, ctypes.byref(r))
+    d = None
+    if dwm is not None:
+        f = wintypes.RECT()
+        try:
+            if dwm.DwmGetWindowAttribute(hwnd, 9, ctypes.byref(f), ctypes.sizeof(f)) == 0:   # EXTENDED_FRAME_BOUNDS
+                d = (f.left, f.top, f.right, f.bottom)
+        except Exception:                                   # noqa: BLE001
+            d = None
+    return _frame_rect((r.left, r.top, r.right, r.bottom), d, sys_dpi)
+
+
+def other_windows():
+    """보이는 보통 창 - EnumWindows 는 앞에서부터 준다. 위치 · 크기 · 손잡이만 (제목은 안 읽는다).
+
+    이 앱의 테두리 있는 창도 own 으로 든다 (가리는 창으로만), 좌표는 Tk 와 같은 논리 좌표 (_frame_rect), odd 는 그 창이
+    있는 모니터의 DPI 가 시스템 DPI 와 다르거나 좌표 배율이 어긋난 창."""
+    import os
+    from ctypes import wintypes
+    try:
+        u, dwm, proc = _hide_fns()
+        sh, gdi = _dpi_fns()
+        me = os.getpid()
+        sysdpi = _sys_dpi(u, gdi)
+        mons = {}                                           # 모니터 손잡이 -> DPI (창마다 묻지 않는다)
+        out = []
+
+        def each(hwnd, _l):
+            try:
+                if not u.IsWindowVisible(hwnd):
+                    return True
+                pid = wintypes.DWORD(0)
+                u.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                cloaked = wintypes.DWORD(0)
+                if dwm is not None:
+                    dwm.DwmGetWindowAttribute(hwnd, 14, ctypes.byref(cloaked), ctypes.sizeof(cloaked))   # CLOAKED
+                rect, scaled = _rect_of(u, dwm, hwnd, sysdpi)
+                hmon = u.MonitorFromWindow(hwnd, _MONITOR_NEAREST)
+                key = int(hmon or 0)
+                if key not in mons:
+                    mons[key] = _monitor_dpi(u, sh, hmon)
+                got = _keep_window(
+                    True, bool(u.IsIconic(hwnd)), u.GetWindowLongW(hwnd, -16) & 0xFFFFFFFF,
+                    u.GetWindowLongW(hwnd, -20) & 0xFFFFFFFF, int(pid.value), me, _cls(u, hwnd),
+                    int(cloaked.value), rect, bool(u.IsZoomed(hwnd)), mons[key], sysdpi, scaled)
+                if got is not None:
+                    got["id"] = int(hwnd)
+                    out.append(got)
+            except Exception:                               # noqa: BLE001
+                pass
+            return True
+        cb = proc(each)
+        u.EnumWindows(cb, 0)
+        return out
+    except Exception:                                       # noqa: BLE001
+        return []
+
+
+def monitor_dpi_mismatch(rect):
+    """활동 영역(rect)이 있는 모니터의 DPI 가 시스템 DPI 와 다른가. 다르면 그 모니터의 창 · 화면 좌표가 물리 픽셀과
+    어긋나서(가상화 배율) 창 뒤 · 가장자리 자리를 믿을 수 없다 - 부르는 쪽(hide.kinds_at)이 작업표시줄 자리만 쓴다
+    (검토 #3 · #7). 모니터는 hide_spots.monitor_for 처럼 영역의 오른쪽 아래 모서리로 고른다. 모르면 False."""
+    from ctypes import wintypes
+    try:
+        u = _hide_fns()[0]
+        sh, gdi = _dpi_fns()
+        hmon = u.MonitorFromPoint(wintypes.POINT(int(rect[2]) - 1, int(rect[3]) - 1), _MONITOR_NEAREST)
+        return _dpi_differs(_monitor_dpi(u, sh, hmon), _sys_dpi(u, gdi))
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
+def _me(u, win):
+    return u.GetParent(win.winfo_id()) or win.winfo_id()
+
+
+def _unpin(win):
+    """'항상 위' 를 푼다 - 테두리 없는 창이 (0, 0) 으로 튀면 제자리로 (_send_back 과 같다). 이미 풀려 있으면 그대로."""
+    if not int(win.attributes("-topmost")):
+        return
+    win.update_idletasks()
+    before = (win.winfo_x(), win.winfo_y())
+    win.attributes("-topmost", False)
+    win.update_idletasks()
+    if (win.winfo_x(), win.winfo_y()) != before:
+        win.geometry("+%d+%d" % before)
+
+
+def order_just_below(win, other_id, strip=None):
+    """win 을 그 창 바로 뒤로 (SetWindowPos 의 '이 창 뒤에 넣기'). 포커스는 안 가져간다.
+
+    strip(보일 띠)은 안 본다 - 윈도우는 부탁한 그 자리에 넣는다 (주인 있는 창 뒤라도 그 창과 주인 사이에 들어간다).
+    맥은 자식 창이면 부모 뒤로 가서 걸고 나서 본다 (platform_mac.order_just_below)."""
+    from . import focus_guard
+
+    def go():
+        try:
+            if not win.winfo_viewable():
+                return False
+            u = _hide_fns()[0]
+            _unpin(win)
+            return bool(u.SetWindowPos(_me(u, win), other_id, 0, 0, 0, 0, _SWP))
+        except Exception:                                   # noqa: BLE001
+            return False
+    return bool(focus_guard.quiet(win, go))
+
+
+def _bar_for(u, win):
+    """win 이 있는 모니터의 작업표시줄 (주 화면 Shell_TrayWnd · 다른 화면 Shell_SecondaryTrayWnd). 없으면 None."""
+    from ctypes import wintypes
+    cx = win.winfo_rootx() + win.winfo_width() // 2
+    cy = win.winfo_rooty() + win.winfo_height() // 2
+    best, bd = None, None
+    for name in _BARS:
+        h = u.FindWindowExW(None, None, name, None)
+        while h:
+            r = wintypes.RECT()
+            if u.GetWindowRect(h, ctypes.byref(r)) and u.IsWindowVisible(h):
+                dx = max(r.left - cx, 0, cx - r.right)
+                dy = max(r.top - cy, 0, cy - r.bottom)
+                d = dx * dx + dy * dy
+                if bd is None or d < bd:
+                    best, bd = h, d
+            h = u.FindWindowExW(None, h, name, None)
+    return best
+
+
+def order_below_bar(win):
+    """win 을 작업표시줄 바로 뒤로 - 작업표시줄은 '항상 위' 라 그 뒤에 넣으면 우리도 '항상 위' 무리에 들어가 보통 창보다
+    위, 작업표시줄보다 아래가 된다. Overlay.keep_on_top 은 _poket_hider 를 보고 이 창을 맨 위로 안 올린다."""
+    from . import focus_guard
+
+    def go():
+        try:
+            if not win.winfo_viewable():
+                return False
+            u = _hide_fns()[0]
+            bar = _bar_for(u, win)
+            if not bar:
+                return False
+            return bool(u.SetWindowPos(_me(u, win), bar, 0, 0, 0, 0, _SWP))
+        except Exception:                                   # noqa: BLE001
+            return False
+    return bool(focus_guard.quiet(win, go))
+
+
+def _desktop_host(u):
+    """바탕화면 아이콘을 그리는 맨 위 창 (SHELLDLL_DefView 를 품은 Progman 이나 WorkerW)."""
+    for name in ("Progman", "WorkerW"):
+        h = u.FindWindowExW(None, None, name, None)
+        while h:
+            if u.FindWindowExW(h, None, "SHELLDLL_DefView", None):
+                return h
+            h = u.FindWindowExW(None, h, name, None)
+    return None
+
+
+def order_above_desktop(win):
+    """win 을 모든 보통 창 뒤 · 바탕화면 바로 위로. **HWND_BOTTOM 으로 보내지 않는다** - 바탕화면(Progman) 뒤로 들어가
+    아예 안 보인다 (send_back 의 설명). 바탕화면 창 바로 위 창의 뒤에 넣는다."""
+    from . import focus_guard
+
+    def go():
+        try:
+            if not win.winfo_viewable():
+                return False
+            u = _hide_fns()[0]
+            desk = _desktop_host(u)
+            if not desk:
+                return False
+            me = _me(u, win)
+            _unpin(win)
+            prev = u.GetWindow(desk, 3)                     # GW_HWNDPREV - 바탕화면 바로 위 창
+            if not prev:
+                return False
+            if int(prev) == int(me):
+                return True                                 # 이미 그 자리
+            return bool(u.SetWindowPos(me, prev, 0, 0, 0, 0, _SWP))
+        except Exception:                                   # noqa: BLE001
+            return False
+    return bool(focus_guard.quiet(win, go))
+
+
+def fullscreen_busy():
+    """전체 화면 앱 · 게임 · 발표 중 (SHQueryUserNotificationState). 그동안은 숨은 포켓몬을 청하지 않는다."""
+    try:
+        n = ctypes.c_int(0)
+        if ctypes.windll.shell32.SHQueryUserNotificationState(ctypes.byref(n)) != 0:
+            return False
+        return _busy_state(n.value)
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 NAME = "poketdesktop-single-instance"
 
 

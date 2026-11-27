@@ -95,6 +95,12 @@ DEFAULTS = {
     "gardenPos": None,
     # 처음 안내를 어디까지 했나 (0 아직 · 1 '화분을 눌러…' · 2 '단계마다 물을…' · 3 '다 익었어요!…')
     "gardenHints": 0,
+    # 숨바꼭질(시즌 7, 2026-11-27) - 가끔 풀숲 대신 창 뒤 · 작업표시줄 뒤 · 바탕화면 가장자리에 숨은 포켓몬. None 이면
+    # 아직 안 정했다 - 처음 켤 때 '풀숲 보이기 · 이벤트 화면' 이 둘 다 켜져 있으면 켬으로 굳힌다 (wild_ui._freeze_hide).
+    # 풀숲을 끄면 같이 꺼진다 (hide_seek). 끈 사람은 서버에 hide=1 을 안 보내서 숨은 포켓몬을 받지 않는다.
+    "hideSeek": None,
+    # 처음 안내를 무엇까지 했나 - 칸(비트): 1 '어디선가 누가 훔쳐보고 있어…' · 2 처음 찾음 · 4 처음 놓침 (hide.HINT_BIT_*)
+    "hideHints": 0,
     # 바탕화면 포켓몬이 얼마나 또렷한가 (1.9.0). 100 이면 그대로, 낮출수록
     # 뒤가 비친다. 걸어다니는 포켓몬·알·바탕화면에서 싸우는 상대에 다 적용된다.
     # 창이나 글을 가려서 불편하다는 사람이 있어서 뒀다.
@@ -246,6 +252,21 @@ def show_garden(settings):
     if v is None:
         return show_pond(s)
     return bool(v)
+
+
+def hide_pref(settings):
+    """숨바꼭질을 고른 값 (풀숲과 상관없이). 아직 안 정했으면(None) 풀숲 보이기 · 이벤트 화면이 둘 다 켜져 있을 때 켬."""
+    s = settings or {}
+    v = s.get("hideSeek")
+    if v is None:
+        return bool(s.get("showGrass", True)) and bool(s.get("eventPopups", True))
+    return bool(v)
+
+
+def hide_seek(settings):
+    """지금 숨바꼭질을 하나 - 고른 값이 켜짐이고 풀숲 보이기도 켜짐 (풀숲을 끄면 같이 꺼진다)."""
+    s = settings or {}
+    return bool(s.get("showGrass", True)) and hide_pref(s)
 
 
 def pet_alpha(settings):

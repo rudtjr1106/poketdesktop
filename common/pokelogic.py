@@ -333,15 +333,19 @@ def default_moveset(species, level):
 
 
 def make_pokemon(species, level, rng=None, shiny_rate=SHINY_RATE,
-                 force_shiny=None, ivs=None):
-    """야생 개체 하나를 규칙대로 굴려 만든다."""
+                 force_shiny=None, ivs=None, hidden_rate=HIDDEN_ABILITY_RATE):
+    """야생 개체 하나를 규칙대로 굴려 만든다.
+
+    hidden_rate 는 숨겨진 특성 1/N (숨바꼭질 시즌 7 - 숨은 포켓몬만 1/4, common/hide.py). 안 주면 지금처럼 1/128 이고
+    난수를 쓰는 순서 · 횟수도 같다 - 다른 모든 길(풀숲 · 낚시 · 공습 · 알 …)은 바이트 단위로 그대로.
+    """
     rng = rng or random.Random()
     level = max(1, min(LEVEL_MAX, int(level)))
     if ivs is None:
         ivs = dict((s, rng.randint(0, IV_MAX)) for s in STATS)
     evs = dict((s, 0) for s in STATS)
     nature = rng.choice(NATURES)[0]
-    ability, is_hidden = roll_ability(species, rng)
+    ability, is_hidden = roll_ability(species, rng, hidden_rate)
     shiny = force_shiny if force_shiny is not None else (rng.randrange(shiny_rate) == 0)
     return {
         "species": species["internal"],
@@ -649,6 +653,63 @@ class Pokedex(object):
             g = s
         kw = {} if shiny_rate is None else {"shiny_rate": shiny_rate}
         return make_pokemon(g, level, rng, **kw)
+
+    def hide_pool(self, max_level, max_bst=None, exclude=frozenset()):
+        """숨는 종 표 (숨바꼭질 시즌 7): common/hide.HIDERS 가운데 spawnable 인 종, 가중치는 도감 그대로.
+
+        레벨 · 종족값 상한 · 뺄 종(낚시 위주 종)은 풀숲 표(spawn_pool)와 같게 본다. 할로윈 · 타입 스프레이는 안 얹는다.
+        캐시는 풀숲과 같은 곳에 두되 열쇠 맨 앞이 "hide" 이고 **숨는 종 목록 자체도 열쇠에 넣는다** - 목록이 바뀌면
+        (검사 · 다음 시즌) 옛 표가 남아 섞이지 않게. frozenset 은 해시를 한 번만 재므로 열쇠가 무겁지 않다.
+        """
+        from . import hide               # 늦게 부른다 - 숨는 표를 쓸 때만 필요하다 (fish_pool 과 같은 꼴)
+        exclude = frozenset(exclude or ())
+        key = ("hide", int(max_level), int(max_bst) if max_bst else 0, exclude, hide.HIDERS)
+        if key in self._pool_cache:
+            return self._pool_cache[key]
+        pool, cum, total = [], [], 0
+        for s in self.species:
+            if s["internal"] not in hide.HIDERS or s["internal"] in exclude:
+                continue
+            if not s.get("spawnable") or s.get("minLevel", 1) > max_level:
+                continue
+            if max_bst and self.bst(s) > max_bst:
+                continue
+            total += s.get("weight", 0)
+            pool.append(s)
+            cum.append(total)
+        if not pool and max_bst:            # 너무 좁으면 상한을 풀어준다 (풀숲과 같다)
+            return self.hide_pool(max_level, None, exclude)
+        self._pool_cache[key] = (pool, cum, total)
+        return pool, cum, total
+
+    def roll_hide(self, min_level, max_level, rng=None, max_bst=None, exclude=frozenset(),
+                  hidden_rate=None, shiny_rate=SHINY_RATE):
+        """숨은 포켓몬 하나 (roll_wild 의 숨바꼭질판). 없으면 None (평소 표도 빈 때뿐).
+
+        HIDE_SHARE 몫은 숨는 종 표(hide_pool)에서, 나머지는 평소 풀숲 표(할로윈 · 스프레이 없이)에서 뽑는다. 숨는 표가
+        비면(그 레벨에 숨는 종이 없다) 평소 표로. 레벨 · 진화한 모습(grown_form)은 풀숲과 같은 규칙.
+        숨겨진 특성은 hidden_rate (기본 hide.HIDE_HIDDEN_RATE = 1/4), 이로치는 부르는 쪽이 준 shiny_rate 그대로.
+        """
+        from . import hide
+        import bisect
+        if hidden_rate is None:
+            hidden_rate = hide.HIDE_HIDDEN_RATE
+        rng = rng or random.Random()
+        max_level = max(1, min(LEVEL_MAX, int(max_level)))
+        min_level = max(1, min(max_level, int(min_level)))
+        s = None
+        if rng.random() < hide.HIDE_SHARE:
+            pool, cum, total = self.hide_pool(max_level, max_bst, exclude)
+            if pool and total > 0:
+                s = pool[bisect.bisect_right(cum, rng.randrange(total))]
+        if s is None:
+            s = self.roll_species(max_level, rng, max_bst, None, exclude)
+        if s is None:
+            return None
+        lo = min(max(min_level, s.get("minLevel", 1)), max_level)
+        level = rng.randint(lo, max_level)
+        return make_pokemon(self.grown_form(s, level, rng), level, rng, shiny_rate=shiny_rate,
+                            hidden_rate=hidden_rate)
 
     def grown_form(self, s, level, rng=None):
         """이 레벨이면 이미 진화했을 모습.

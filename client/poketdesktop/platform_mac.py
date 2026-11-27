@@ -274,11 +274,214 @@ def show_again(win):
     해도 그렇다. 그래서 부른 직후에 다시 걸어 준다.
     """
     win.deiconify()
+    if getattr(win, "_poket_hider", False):
+        # 숨은 포켓몬 (숨바꼭질) - '항상 위' 가 아니라 제 겹침 순서로 (hide.Hider.reorder)
+        fn = getattr(win, "_poket_reorder", None)
+        if fn is not None:
+            try:
+                fn()
+            except Exception:                               # noqa: BLE001
+                pass
+        return
     if getattr(win, "_poket_behind", False):
         send_back(win)              # 다른 창 뒤로 다니는 포켓몬 (설정 petBehind, 2.5.0)
     else:
         raise_above(win)
     keep_click_through(win)
+
+
+# ---------------------------------------------------------------- 숨바꼭질 (시즌 7, 2026-11-27)
+# Step 0 시험 (이 맥, macOS 26.5 · Tk 8.6 · pyobjc 12.2, 화면 기록 권한 없음 - scratchpad/hide_spike):
+#   · CGWindowListCopyWindowInfo 로 남의 앱 창의 위치 · 크기 · 층 · 주인 pid · 창 번호가 권한 없이 읽힌다 (제목은 비어 온다).
+#     좌표는 Tk 와 같다 (주 화면 왼쪽 위 원점, y 아래로 - 뒤집지 않는다). Dock 은 화면 전체 크기의 층 20 창 하나다.
+#   · orderWindow_relativeTo_(NSWindowBelow, 남의 창 번호) + 층 0 이면 우리 도트 창이 그 창 **바로 뒤** 에 놓인다
+#     (다른 프로세스의 Tk 창 · Claude 앱 창 둘 다 창 목록 차례로 확인, 1초 뒤에도 그대로). 겹친 자리가 진짜로 가려지는 것은
+#     같은 프로세스의 보통 창으로 화면을 떠서 확인했다 (권한이 없으면 남의 창은 캡처에 안 찍힌다).
+#   · 층을 Dock - 2 로 두면 모든 보통 창보다 위, Dock 보다 아래 (창 목록 차례). Dock 은 반투명 유리라 뒤가 흐리게
+#     비칠 수 있다 - 그래서 Hider 는 가려질 쪽을 아예 안 그린다 (보이는 칸만 그린다).
+#   · 층 0 에서 orderBack_ 이면 보통 창 가운데 맨 뒤 (바탕화면 바로 위).
+#   · **숨긴(withdraw) Tk 창에 orderWindow 를 부르면 NSWindow 가 도로 화면에 뜬다** (Tk 은 숨긴 줄 안다) - 보이는 창에만 건다.
+#   · 테두리 없는 Tk 창은 화면 밖에 반쯤 걸쳐 놓을 수 있다 (가장자리 자리).
+# 그래서 맥도 세 자리를 다 쓴다.
+HIDE_KINDS = ("window", "bar", "edge")
+
+
+def _dock_level():
+    try:
+        return int(Quartz.CGWindowLevelForKey(Quartz.kCGDockWindowLevelKey))
+    except Exception:                                       # noqa: BLE001
+        return 20
+
+
+def _own_titled():
+    """이 앱의 보이는 테두리 있는 창(제목 막대 - 포켓몬 관리 · PC 박스 · 설정) 번호들. 테두리 없는 우리 창(도트 · 이름표 ·
+    숨은 포켓몬 · 글 창)은 안 든다 - 그것들은 숨은 포켓몬을 가리는 창으로 치지 않는다."""
+    if not _ok:
+        return set()
+    try:
+        app = AppKit.NSApplication.sharedApplication()
+        return set(int(w.windowNumber()) for w in (app.windows() or [])
+                   if w.isVisible() and int(w.styleMask()) & AppKit.NSWindowStyleMaskTitled)
+    except Exception:                                       # noqa: BLE001
+        return set()
+
+
+def _rows(info, me, titled, dock):
+    """CGWindowList 줄 -> 숨바꼭질 창 목록 (앞에서부터). 넣는 것:
+        · 남의 보통 창 (층 0) - 창 뒤 자리를 걸 수 있는 창
+        · 남의 '항상 위' 창 (0 < 층 < Dock - 떠 있는 패널 · 위에 둔 동영상 창) top - 층 0 인 숨은 포켓몬보다 늘 앞이다
+        · 이 앱의 테두리 있는 창 (titled 에 든 번호) own - 우리 창도 층 0 이라 orderBack 한 가장자리 자리를 덮는다
+    top · own 은 가리는 창으로만 쓴다 (hide_spots.anchor_for 가 걸지 않는다, 검토 #4 · #6). Dock · 메뉴 막대 · 제어 센터
+    (층 >= Dock)는 화면 전체 크기 창이라 넣으면 모든 자리를 덮는다 - 뺀다 (작업표시줄 자리는 그 바로 아래 층이다).
+    pid 는 같은 앱의 자식 창 · 시트를 가려내는 데 쓴다 (검토 #5, hide_spots.nested)."""
+    out = []
+    for w in info or []:
+        try:
+            layer = int(w.get("kCGWindowLayer", 0))
+            pid = int(w.get("kCGWindowOwnerPID", 0))
+            num = int(w["kCGWindowNumber"])
+            own = pid == me
+            if not (0 <= layer < dock) or (own and num not in titled):
+                continue
+            if float(w.get("kCGWindowAlpha", 1.0)) <= 0.01:
+                continue
+            b = w.get("kCGWindowBounds") or {}
+            x, y = int(round(b.get("X", 0))), int(round(b.get("Y", 0)))
+            ww, hh = int(round(b.get("Width", 0))), int(round(b.get("Height", 0)))
+            if ww < 40 or hh < 40:
+                continue                    # 작은 띠 · 아이콘 (창 뒤 자리를 걸 수도 없고 가리지도 않는다)
+            out.append({"rect": (x, y, x + ww, y + hh), "id": num, "pid": pid, "max": False,
+                        "top": layer > 0, "odd": False, "own": own})
+        except Exception:                                   # noqa: BLE001
+            continue
+    return out
+
+
+def other_windows():
+    """보이는 창 앞에서부터 - 위치 · 크기 · 창 번호 · 주인 pid 만 (_rows). 제목은 안 읽는다 (읽으려면 화면 기록 권한이 든다)."""
+    if not _ok:
+        return []
+    try:
+        opts = Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements
+        info = Quartz.CGWindowListCopyWindowInfo(opts, Quartz.kCGNullWindowID) or []
+    except Exception:                                       # noqa: BLE001
+        return []
+    return _rows(info, os.getpid(), _own_titled(), _dock_level())
+
+
+def monitor_dpi_mismatch(rect):
+    """맥은 늘 False - Tk 좌표 · CGWindow 좌표가 모두 포인트라 모니터 배율(레티나)이 달라도 어긋나지 않는다."""
+    return False
+
+
+def _overlaps(a, b):
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def _strip_covered(w, anchor_id, strip):
+    """방금 건 자리에서 보일 띠(strip)를 그 창(anchor_id) 말고 다른 창이 덮었나 (검토 #5).
+
+    창 서버는 자식 창 · 시트를 부모와 붙여 두어서 '자식 바로 뒤' 를 부탁해도 부모 뒤로 넣는다 - 부탁한 대로 됐다고
+    믿으면 띠가 부모에 통째로 가린 채 4분을 보낸다. 그래서 우리 창보다 앞의 창(kCGWindowListOptionOnScreenAboveWindow)을
+    다시 읽어 본다. 순서 바꿈은 CA 트랜잭션이 끝나야 창 서버에 들어간다 - 바로 물으면 옛 순서가 온다 (이 맥에서 확인,
+    macOS 26.5) - 그래서 먼저 flush 한다. 못 물으면 False (덮였다고 단정하지 않는다)."""
+    try:
+        CATransaction.flush()
+        info = Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenAboveWindow,
+                                                 int(w.windowNumber())) or []
+    except Exception:                                       # noqa: BLE001
+        return False
+    for r in _rows(info, os.getpid(), _own_titled(), _dock_level()):
+        if r["id"] != int(anchor_id) and _overlaps(r["rect"], strip):
+            return True
+    return False
+
+
+def _hider_level(win, level):
+    """'항상 위' 를 풀고 그 층으로. NSWindow 를 돌려준다 (못 찾았거나 숨긴 창이면 None)."""
+    try:
+        if not win.winfo_viewable():
+            return None                 # 숨긴 창에 순서를 걸면 도로 뜬다 (Step 0)
+        win.update_idletasks()
+        if int(win.attributes("-topmost")):
+            win.attributes("-topmost", False)
+    except Exception:                                       # noqa: BLE001
+        return None
+    w = nswindow(win)
+    if w is None:
+        return None
+    try:
+        if w.level() != level:
+            w.setLevel_(level)
+    except Exception:                                       # noqa: BLE001
+        return None
+    return w
+
+
+def order_just_below(win, other_id, strip=None):
+    """win 을 그 앱 창 바로 뒤로 (층 0, NSWindowBelow). 앱을 앞으로 꺼내지 않는다.
+
+    strip(보일 띠)을 주면 걸고 나서 그 창 말고 다른 창이 띠를 덮었는지 본다 - 덮였으면 False, 부르는 쪽(hide.Hider.make ·
+    repick)이 다른 자리를 고른다 (자식 창 · 시트는 부모 뒤로 간다 - _strip_covered)."""
+    from . import focus_guard
+
+    def go():
+        w = _hider_level(win, 0)
+        if w is None:
+            return False
+        try:
+            w.orderWindow_relativeTo_(-1, int(other_id))           # NSWindowBelow
+        except Exception:                                   # noqa: BLE001
+            return False
+        if strip is not None and _strip_covered(w, other_id, strip):
+            return False
+        return True
+    return bool(focus_guard.quiet(win, go))
+
+
+def bar_level():
+    """Dock 바로 아래 층 - 보통 창(0) · 떠 있는 창보다 위, Dock(20) 보다 아래. 우리 '항상 위' 창(설명 · 글)보다는 아래."""
+    try:
+        return int(Quartz.CGWindowLevelForKey(Quartz.kCGDockWindowLevelKey)) - 2
+    except Exception:                                       # noqa: BLE001
+        return 18
+
+
+def order_below_bar(win):
+    """win 을 Dock 바로 아래 층으로 (그 층의 맨 앞)."""
+    from . import focus_guard
+
+    def go():
+        w = _hider_level(win, bar_level())
+        if w is None:
+            return False
+        try:
+            w.orderFrontRegardless()
+            return True
+        except Exception:                                   # noqa: BLE001
+            return False
+    return bool(focus_guard.quiet(win, go))
+
+
+def order_above_desktop(win):
+    """win 을 보통 창 층(0)의 맨 뒤로 - 바탕화면(아이콘 층)은 그보다 아래라 바탕화면 바로 위다 (send_back 과 같은 자리)."""
+    from . import focus_guard
+
+    def go():
+        w = _hider_level(win, 0)
+        if w is None:
+            return False
+        try:
+            w.orderBack_(None)
+            return True
+        except Exception:                                   # noqa: BLE001
+            return False
+    return bool(focus_guard.quiet(win, go))
+
+
+def fullscreen_busy():
+    """맥은 늘 거짓 - 전체 화면 앱은 다른 Space 라 우리 창이 거기 뜨지 않는다."""
+    return False
 
 
 def send_back(win):
@@ -461,6 +664,10 @@ class SpriteView(object):
         self.win_number = None      # 이 창의 NSWindow 번호
         self._acc = {}              # {(w,h): 알파를 전부 합친 것}
         self._solid = {}            # {(w,h): 그 바이트}
+        # 지금 그림의 몸만 클릭을 받는다 (숨바꼭질 Hider). 기본은 장을 전부 합친 것 - 걷는 도트는 자리마다 몸이었다
+        # 빈칸이었다 해서 클릭이 씹혔다. 숨은 포켓몬은 보이는 칸이 바뀌므로 합치면 안 그린 몸 자리(내밀 때만 보이는 띠)가
+        # 그 밑 창의 클릭을 먹는다 - 작업표시줄 뒤 자리는 보통 창보다 위 층이라 그대로 가로챈다.
+        self.exact_hit = False
         if not _ok:
             # pyobjc 가 없다. 투명도 CALayer 도 못 쓰니 평범한 Label 에
             # 평범하게 그린다 - 네모난 판 위에 뜨겠지만 게임은 된다.
@@ -567,7 +774,7 @@ class SpriteView(object):
         fr = self._cur
         if lx is not None and fr is not None:
             w, h = fr.width(), fr.height()
-            m = self._solid.get((w, h)) or fr.mask
+            m = (fr.mask if self.exact_hit else None) or self._solid.get((w, h)) or fr.mask
             if m is not None and 0 <= lx < w and 0 <= ly < h:
                 want = not _near_solid(m, w, h, lx, ly)
         if want == self._ignoring:

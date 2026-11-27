@@ -170,6 +170,9 @@ jobs:
       # 열매 텃밭 (시즌 7): 지닌 열매 47종이 한 묶음씩(4 · 8 · 16시간) · 단계 1/3씩 · 열매 수 · 풀 타입 빠르기
       - name: 열매 텃밭 (규칙)
         run: python common/test_garden_common.py
+      # 숨바꼭질 (시즌 7): 숨는 종 표가 도감에 있고 나올 수 있는 종인가
+      - name: 숨바꼭질 (규칙)
+        run: python common/test_hide_common.py
       # 게시판 #664 뒤 (11/19): 붙잡혀 있는 것(조이기류 · 검은눈빛 …)을 view 에 싣는다 - 교체 잠금의 까닭 · 남은 턴(내가 건 것만)
       - name: 붙잡힘 표시 (엔진 view)
         run: python common/test_trap_view.py
@@ -626,6 +629,10 @@ jobs:
         run: |
           python client/test_garden_ui.py
           python client/test_garden_visit_ui.py
+      # 숨바꼭질 (시즌 7): 숨을 자리 규칙(가짜 화면 · 창 목록) · 창 목록/겹침 순서(진짜 Win32) · 숨은 포켓몬 창 · 찾기 · 놓침 · 안내 · 설정
+      - name: 숨바꼭질 (진짜 Tk)
+        if: matrix.shard == 3
+        run: python client/test_hide_ui.py
       # 챔피언리그 - 독도: 관장 전국 지도의 독도 · 독도 창(순위 · 상대 찾기 · 도전) · 알림 · 구경
       - name: 챔피언리그 독도 (진짜 Tk)
         if: matrix.shard == 1
@@ -763,12 +770,13 @@ jobs:
         run: python client/test_gym_ui.py
       - name: 배틀타워 탭 (진짜 Tk)
         run: python client/test_tower_ui.py
-      - name: 낚시터 · 낚시 기록 창 · 열매 텃밭 (진짜 Tk)
+      - name: 낚시터 · 낚시 기록 창 · 열매 텃밭 · 숨바꼭질 (진짜 Tk)
         run: |
           python client/test_fishing_ui.py
           python client/test_fishing_records_ui.py
           python client/test_garden_ui.py
           python client/test_garden_visit_ui.py
+          python client/test_hide_ui.py
       - name: 붙잡힘 표시 · 교체 잠금 (진짜 Tk)
         run: python client/test_trap_ui.py
       - name: 챔피언리그 독도 (진짜 Tk)
@@ -918,6 +926,7 @@ jobs:
           python test_tower.py           # 배틀타워: 시즌 문 · 차례로 오르기 · 처음 한 번 보상 · 길 · 관장 판에 얹기
           python test_fishing.py         # 낚시 (시즌 7): 야생 끝내기 한 곳(풀숲 시계) · 던지기 · 입질 · 챔질 · 풀숲 보류 · 떨굼 없음 · 순위 · 주간 정산
           python test_garden.py          # 열매 텃밭 (시즌 7): 심기 · 단계마다 물 · 거두기(하루 20개 · 다시 심기) · 뽑기 · 친구 물(받는 쪽 하루 한 번) · 먹이(+10 · 진화)
+          python test_hide.py            # 숨바꼭질 (시즌 7): hide=1 일 때만 4.2% · 숨는 종 절반 · 숨겨진 특성 1/4 · peek · 만료 10초 · 이른 도망은 보통 쿨다운
           python test_guild_war.py
           python test_guild_war_v5.py    # 시즌 5: 조커(길드마다 3명) · 개인 기여 보상 (게시판 #373)
           python test_deco.py            # 버전 2: 꾸미기 - 위치 점 · 끼우기(한 마리만) · 선물 · 길드전 순위 보상

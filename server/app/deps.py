@@ -92,7 +92,8 @@ def close_battles_of(uid, wild_id, result, how=None):
 # ---------------------------------------------------------------- 야생 끝내기 (한 곳)
 # how -> (걸린 배틀을 닫을 결과, 올릴 통계 칸, 다음 풀숲 간격). 예전 열 곳이 저마다 하던 그대로다.
 #   · 배틀 쪽(battle*)은 판을 스스로 닫는다(_save · UPDATE). 여기서 또 닫으면 troubles 에 '앱이 판을 버렸다' 로 남는다.
-#   · 간격 miss = 풀숲인 채(눌러 보지도 않고) 끝났으면 MISS_COOLDOWN 까지만, 드러낸 뒤면 보통 간격.
+#   · 간격 miss = 풀숲인 채(눌러 보지도 않고) **진짜 만료로** 끝났으면 MISS_COOLDOWN 까지만 (못 찾은 숨은 포켓몬은
+#     HIDE_MISS_NEXT), 드러낸 뒤 · 만료 전에 놓아준 것이면 보통 간격 (end_wild · _truly_expired).
 #   · 이김(wins)은 battle_routes 가 경험치를 주기 전에 따로 센다.
 _END = {
     "wild_expired": ("fled", "fled", "miss"),          # main._sweep - 시간이 다 됐다
@@ -104,8 +105,29 @@ _END = {
 
 
 def wild_src(row):
-    """야생 행이 어디서 왔나 - 'grass' / 'fish'. src 칸을 모르는 행(옛 꼴)은 풀숲이다."""
+    """야생 행이 어디서 왔나 - 'grass' / 'fish' / 'hide' (숨은 포켓몬). src 칸을 모르는 행(옛 꼴)은 풀숲이다."""
     return row["src"] if "src" in row.keys() else "grass"
+
+
+# 풀숲 시계를 다시 잡는 야생 - 숨은 포켓몬은 풀숲 차례를 바꾼 것이라 풀숲과 같다 (낚은 것만 시계를 안 건드린다)
+GRASS_SRCS = ("grass", "hide")
+
+
+def _truly_expired(row):
+    """이 야생이 정말 시간이 다 됐나 (만료 MISS_SLACK 초 전부터 참). 만료 시각을 모르는 행(옛 꼴)은 지금처럼 참.
+
+    공개 전에 이르게 놓아주는(flee) 것으로 다음 풀숲을 당기지 못하게 한다 - 그러면 스크립트가 풀숲을 버려 가며 숨은
+    포켓몬만 골라 받을 수 있다. 정직한 앱은 만료 뒤에만 놓아준다 (wild_ui.on_expired = 남은 초 + 1초).
+    """
+    exp = row["expires_at"] if "expires_at" in row.keys() else None
+    if not exp:
+        return True
+    try:
+        t = auth.parse_iso(exp)
+    except Exception:                                       # noqa: BLE001
+        return True
+    now = datetime.datetime.now(datetime.timezone.utc)
+    return now >= t - datetime.timedelta(seconds=config.MISS_SLACK)
 
 
 def next_grass(uid, seconds=None):
@@ -125,7 +147,10 @@ def end_wild(uid, row, how):
 
     row 는 **지우기 전에 읽은** wild 행 (src 를 봐야 한다). 지우기 · 걸린 배틀 닫기 · 통계는 how 대로 지금과 같다.
     다음 풀숲은 **풀숲 야생일 때만** 다시 잡는다 - 낚은 포켓몬을 잡든 놓치든 풀숲 시계는 그대로 간다
-    (낚시를 할수록 풀숲이 밀리면 안 되고, 낚시가 풀숲을 당겨서도 안 된다).
+    (낚시를 할수록 풀숲이 밀리면 안 되고, 낚시가 풀숲을 당겨서도 안 된다). 숨은 포켓몬(hide, 시즌 7)은 풀숲과 같다.
+
+    눌러 보지도 않은 채 끝난 것(miss)의 짧은 간격은 **진짜 만료일 때만** - 풀숲은 MISS_COOLDOWN, 숨은 포켓몬은
+    HIDE_MISS_NEXT (240초나 숨어 있던 시간을 메운다). 만료 전에 놓아준 것은 보통 간격 (_truly_expired).
     """
     close, stat, gap = _END[how]
     db.run("DELETE FROM wild WHERE id=?", (row["id"],))
@@ -134,12 +159,13 @@ def end_wild(uid, row, how):
     if stat:
         db.run("INSERT INTO wild_state (user_id, %s) VALUES (?,1)"
                " ON CONFLICT(user_id) DO UPDATE SET %s=%s+1" % (stat, stat, stat), (uid,))
-    if wild_src(row) != "grass":
+    src = wild_src(row)
+    if src not in GRASS_SRCS:
         return
     from . import boosts
     secs = boosts.cooldown(uid, RNG)
-    if gap == "miss" and row["state"] == "grass":
-        secs = min(config.MISS_COOLDOWN, secs)
+    if gap == "miss" and row["state"] == "grass" and _truly_expired(row):
+        secs = min(config.HIDE_MISS_NEXT if src == "hide" else config.MISS_COOLDOWN, secs)
     next_grass(uid, secs)
 
 

@@ -28,6 +28,7 @@ for _p in (os.path.dirname(_HERE), os.path.dirname(os.path.dirname(_HERE))):
 
 from typing import Optional                # noqa: E402
 
+from common import hide as HIDE            # noqa: E402
 from common import korean                  # noqa: E402
 from common import pokelogic as P          # noqa: E402
 from common import sprite_fix as SF        # noqa: E402
@@ -35,7 +36,7 @@ from common import tint as TINT            # noqa: E402
 from . import (achievements, airraid, arche, arche_routes, auth, avatar, battle_routes, board, board_routes, boosts, champion, mega, config, db, deco_routes, deps, eggs,  # noqa: E402
                expedition, fishing, fishing_routes, focus, garden, garden_routes, item_routes, olympics, walkpts,
                errors, friendly, halloween, housekeep, items, live, live_routes, migrations, mypage, party, pvp, pvp_routes,
-               raid, raid_routes,
+               raid, raid_routes, season,
                guild, guild_routes, guild_war_routes, guild_ws, internal_routes,
                boss_routes, gym_routes, social, social_routes, stats, tm_routes, tms, tower_routes, troubles, visit, walk)
 
@@ -2233,6 +2234,15 @@ def _cooldown(uid=None):
     return boosts.cooldown(uid, RNG)
 
 
+def _peek(mon):
+    """숨은 포켓몬의 도트 열쇠 {num, form}. num 은 그릴 그림 번호 - 폼이 있으면 그 폼의 번호(decorate 의 formNum 과 같다),
+    form 은 폼 열쇠(formKey) 또는 None. 야생은 지닌 도구 · 바꾼 폼이 없어 거의 늘 도감 번호 · None 이다."""
+    d = dex()
+    sp = d.get(mon.get("species")) or {}
+    form = d.form_for(mon) if sp else None
+    return {"num": int((form or sp).get("num") or 0), "form": form.get("form") if form else None}
+
+
 def _wild_public(row, reveal):
     """풀숲 상태에서는 어떤 포켓몬인지 알려주지 않는다."""
     mon = json.loads(row["data"])
@@ -2243,13 +2253,18 @@ def _wild_public(row, reveal):
     out = {"id": row["id"], "state": row["state"], "throws": row["throws"],
            "expiresAt": row["expires_at"], "createdAt": row["created_at"],
            "expiresIn": max(0, int(left)) if left is not None else None,
-           # 어디서 왔나 (시즌 7): grass = 풀숲 / fish = 낚았다. 앱은 fish 를 풀숲 끄기와 상관없이 연못 옆에 둔다
+           # 어디서 왔나 (시즌 7): grass = 풀숲 / fish = 낚았다 / hide = 숨은 포켓몬 (숨바꼭질 - 풀숲 차례 대신, peek 를 같이).
+           # 앱은 fish 를 풀숲 끄기와 상관없이 연못 옆에 둔다
            "src": deps.wild_src(row),
            # 이벤트 포켓몬이 숨어 있으면 풀숲에 꽃이 핀다.
            #
            # **종은 여전히 안 알려준다.** 참/거짓 하나뿐이라 "뭔가 특별한
            # 것이 있다" 까지만 전해지고, 무엇인지는 눌러 봐야 안다.
            "bloom": row["species"] == config.EVENT_SPECIES}
+    if row["state"] == "grass" and out["src"] == "hide":
+        # 숨은 포켓몬 (숨바꼭질 시즌 7): 앱이 창 뒤에 반쯤 보이게 그릴 도트만 미리 준다 - 그림 번호 · 폼뿐이다.
+        # 특성 · 이로치 · 레벨 · 종 이름은 **찾은 뒤에** (reveal). 도트가 곧 종이지만 '진짜 종의 모습' 은 설계가 고른 것.
+        out["peek"] = _peek(mon)
     if reveal:
         mon["id"] = row["id"]
         mon["wild"] = True
@@ -2262,7 +2277,8 @@ def _sweep(uid):
     t = iso(now())
     gone = db.q("SELECT * FROM wild WHERE user_id=? AND expires_at < ?", (uid, t))
     for r in gone:
-        # 지우기 · 걸린 배틀 닫기 · 도망 +1 · 다음 풀숲 (풀숲인 채면 MISS_COOLDOWN 까지만, 낚은 것이면 안 건드림)
+        # 지우기 · 걸린 배틀 닫기 · 도망 +1 · 다음 풀숲 (풀숲인 채면 MISS_COOLDOWN 까지만 · 못 찾은 숨은 포켓몬이면
+        # HIDE_MISS_NEXT, 낚은 것이면 안 건드림)
         deps.end_wild(uid, r, "wild_expired")
     return [r["id"] for r in gone]
 
@@ -2335,41 +2351,83 @@ def _event_mon(uid):
     return make()
 
 
-def _make_grass(uid):
-    """풀숲을 만들면서 어떤 포켓몬이 숨어 있을지 미리 정해둔다."""
+def _hide_open():
+    """숨바꼭질이 열렸나. 시즌 번호를 그때그때 본다 (fishing.is_open 과 같다)."""
+    return season.SEASON >= config.HIDE_FROM
+
+
+def _may_hide(uid):
+    """이번 풀숲 차례를 숨은 포켓몬으로 굴려 봐도 되나 (앱이 hide=1 을 보냈을 때만 묻는다). **난수를 쓰지 않는다** -
+    안 되는 때의 풀숲이 지금과 바이트 단위로 같게.
+
+      · 열리기 전 - 시즌 6 은 지금 그대로.
+      · 타입 스프레이 · 버닝 부스터가 켜져 있다 - 돈 주고 산 효과(그 타입 · 짧은 간격)를 숨은 차례가 갉아먹지 않게.
+      · 낚시 줄을 던져 두었다 (cast · bite) - 숨은 포켓몬이 4분 떠 있는 동안 입질이 막히지 않게.
+    """
+    if not _hide_open():
+        return False
+    b = boosts.state(uid)
+    if b["lureLeft"] > 0 or b["burnLeft"] > 0:
+        return False
+    return not fishing.line_cast(uid)
+
+
+def _make_grass(uid, hide=False):
+    """풀숲을 만들면서 어떤 포켓몬이 숨어 있을지 미리 정해둔다.
+
+    hide 는 앱이 '지금 숨은 포켓몬을 보여 줄 수 있다' 고 했나 (GET /api/wild?hide=1, 숨바꼭질 시즌 7). 그러면 이 차례를
+    HIDE_CHANCE 로 숨은 포켓몬(src='hide')으로 바꾼다 - 따로 더 내지 않고 **풀숲 차례를 바꾼다** (조우 · 수입이 늘지 않게).
+    이벤트 · 업적 종이 나올 차례는 늘 보통 풀숲이다 (꽃 핀 풀숲 · 해금 종을 숨겨서 놓치게 하지 않는다).
+    """
     mon = _event_mon(uid)
     if mon is None:
         # 도감 업적으로 풀린 울트라비스트·패러독스 (시즌 3)
         mon = achievements.unlock_mon(uid, RNG)
+    src, ttl = "grass", config.GRASS_TTL
     if mon is None:
         lo, hi, cap = _wild_levels(uid)
         # 타입 스프레이(2.1.1)가 켜져 있으면 둘에 하나는 그 타입 종에서만 뽑는다. 그 레벨에 그 타입 종이 없으면
         # (빈 표) 평소대로. 평소 표에는 이벤트(할로윈)가 얹힌다.
         # 낚시가 열린 뒤(시즌 7)에는 두 표 모두 낚시 위주 종을 뺀다 - 열리기 전에는 빈 것이라 지금 표 그대로.
         skip = fishing.grass_exclude()
-        lure = boosts.roll_boost(uid, RNG)
-        if lure:
-            mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=lure, exclude=skip,
-                                  shiny_rate=config.SHINY_RATE)
+        # 숨은 포켓몬: 절반은 숨는 종 표, 나머지는 평소 표 (할로윈 · 스프레이 없이), 숨겨진 특성 1/4, 이로치는 그대로.
+        # 막힌 때(_may_hide)를 **먼저** 보고 굴린다 - hide 가 없거나 막혔으면 난수를 한 번도 더 안 쓴다.
+        if hide and _may_hide(uid) and RNG.random() < config.HIDE_CHANCE:
+            mon = dex().roll_hide(lo, hi, RNG, max_bst=cap, exclude=skip,
+                                  hidden_rate=HIDE.HIDE_HIDDEN_RATE, shiny_rate=config.SHINY_RATE)
+            if mon is not None:
+                src, ttl = "hide", config.HIDE_TTL
+        if mon is None:
+            lure = boosts.roll_boost(uid, RNG)
+            if lure:
+                mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=lure, exclude=skip,
+                                      shiny_rate=config.SHINY_RATE)
         if mon is None:
             mon = dex().roll_wild(lo, hi, RNG, max_bst=cap, boost=halloween.spawn_boost(), exclude=skip,
                                   shiny_rate=config.SHINY_RATE)
     if mon is None:
         raise HTTPException(500, "등장 가능한 포켓몬이 없습니다.")
     t = now()
+    # 숨은 포켓몬도 state 는 'grass' - 공개 · 잡기 · 끝내기 길을 그대로 탄다. 다른 것은 src 와 만료(HIDE_TTL)뿐.
     cur = db.run(
-        "INSERT INTO wild (user_id, state, species, data, created_at, expires_at)"
-        " VALUES (?,?,?,?,?,?)",
+        "INSERT INTO wild (user_id, state, species, data, created_at, expires_at, src)"
+        " VALUES (?,?,?,?,?,?,?)",
         (uid, "grass", mon["species"], json.dumps(mon), iso(t),
-         iso(t + datetime.timedelta(seconds=config.GRASS_TTL))))
+         iso(t + datetime.timedelta(seconds=ttl)), src))
     _bump(uid, "encounters")
-    _schedule_next(uid, config.GRASS_TTL + _cooldown(uid))
+    # 다음 풀숲은 이것이 사라진 뒤 + 보통 간격 (숨은 것은 240초 떠 있으니 그만큼 뒤 - 놓치면 end_wild 가 10초 뒤로 당긴다)
+    _schedule_next(uid, ttl + _cooldown(uid))
     return db.q1("SELECT * FROM wild WHERE id=?", (cur.lastrowid,))
 
 
 @app.get("/api/wild")
-def wild_state(ctx=Depends(current), force: bool = False):
-    """지금 상태를 알려주고, 시간이 됐으면 풀숲을 돋운다."""
+def wild_state(ctx=Depends(current), force: bool = False, hide: bool = False):
+    """지금 상태를 알려주고, 시간이 됐으면 풀숲을 돋운다.
+
+    hide (?hide=1, 숨바꼭질 시즌 7): 앱이 지금 숨은 포켓몬을 보여 줄 수 있다 (설정을 켰고 · 놀러 가 있지 않고 · 집중 ·
+    올림픽 · 공습 · 긴급 숨기기 · 전체 화면이 아니다). 이것이 있을 때만 풀숲 차례를 숨은 포켓몬으로 굴린다 - 옛 앱 ·
+    끈 사람은 보내지 않으니 받지 않는다 (끄는 쪽이 이득이 되지 않게 '보여 줄 수 있을 때만').
+    """
     uid = ctx["user"]["id"]
     expired = _sweep(uid)
     row = _active(uid)
@@ -2397,7 +2455,7 @@ def wild_state(ctx=Depends(current), force: bool = False):
                 elif row is None:
                     n = db.q1("SELECT COUNT(*) c FROM pokemon WHERE user_id=?", (uid,))["c"]
                     if n < config.MAX_BOX:
-                        row = _make_grass(uid)
+                        row = _make_grass(uid, hide=hide)
                         st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
                         next_at = st["next_at"] if st else None
                     else:
@@ -2614,7 +2672,8 @@ def wild_flee(wid: int, ctx=Depends(current)):
         st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
         return {"ok": True, "kept": True, "nextAt": st["next_at"] if st else None}
     if row:
-        # 걸린 배틀도 닫는다. 다음 풀숲은 드러낸 뒤면 보통 간격, 풀숲인 채면 MISS_COOLDOWN 까지만 (낚은 것이면 그대로)
+        # 걸린 배틀도 닫는다. 다음 풀숲은 드러낸 뒤면 보통 간격, 풀숲 · 숨은 것인 채면 **진짜 만료 때만** 짧게
+        # (MISS_COOLDOWN · HIDE_MISS_NEXT - 이르게 놓아주면 보통 간격, deps.end_wild). 낚은 것이면 그대로
         deps.end_wild(uid, row, "wild_flee")
     st = db.q1("SELECT * FROM wild_state WHERE user_id=?", (uid,))
     return {"ok": True, "nextAt": st["next_at"] if st else None}

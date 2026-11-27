@@ -17,6 +17,7 @@ import tkinter as tk
 from common.korean import natural
 
 from . import ball_menu, config, effects, item_icons, sprite_cache, sprites
+from . import hide as HIDE
 from . import platform_os as PLAT
 from . import shiny_fx, walk_cache
 from . import ui_common as U
@@ -430,6 +431,13 @@ class WildController(object):
         self._job = None
         self._expire_job = None
         self._balls_fetched = set()
+        # 숨바꼭질 (시즌 7, 2026-11-27) - 숨은 포켓몬(hide.Hider)은 풀숲 칸(self.grass)에 들어간다
+        self._row = None           # 지금 야생의 서버 행 (숨바꼭질을 끄면 그 자리에 풀숲으로 바꿀 때)
+        self._peeking = None       # 숨은 포켓몬의 도트를 받는 중인 번호
+        self._hide_seen = False    # 숨은 포켓몬을 받아 봤다 (시즌 7 이 열렸다 - 설정 줄을 보인다)
+        self._hide_jobs = {}       # 안내 예약 (처음 60초 · 그 뒤 2분 '?' · '숨겨진 특성!')
+        self._leaping = None       # 찾아서 뛰어나오는 중인 Hider
+        self._say = None           # '찾았다!' 글 창
 
     def set_ball_options(self, opts):
         """던질 수 있는 볼 목록을 받아 두고, 그림을 미리 받아 둔다.
@@ -519,6 +527,7 @@ class WildController(object):
 
     # ---------------- 서버와 맞추기 ----------------
     def start(self):
+        self._freeze_hide()
         # 낚시도 같이 다시 연다 (2026-11-26) - 풀숲을 끈 사람도 낚시는 한다. 멈춘 사이 낚인 야생은 카드로 되살린다
         fz = getattr(self.app, "fishing", None)
         if fz is not None:
@@ -579,7 +588,18 @@ class WildController(object):
                 return
             self.apply(r, tell=force, asked=asked)
         asked = time.time()
-        run_async(self.app.root, lambda: self.app.api.wild(force), done)
+        hide = self.can_hide()
+        run_async(self.app.root, lambda: self._ask(force, hide), done)
+
+    def _ask(self, force, hide):
+        """GET /api/wild (작업 스레드). hide 면 '지금 숨은 포켓몬을 보여 줄 수 있다' (?hide=1, 숨바꼭질)."""
+        api = self.app.api
+        if not hide:
+            return api.wild(force)
+        try:
+            return api.wild(force, hide=True)
+        except TypeError:
+            return api.wild(force)          # hide 를 모르는 api (검사의 가짜 api 들)
 
     def _say_wait(self, r):
         """아직 때가 아니면 얼마나 남았는지 알려준다."""
@@ -646,11 +666,18 @@ class WildController(object):
             self.clear()
             self.wild_id = w["id"]
         self.src = w.get("src") or "grass"
+        self._row = w
 
         if w["state"] == "grass":
-            if not self.grass:
-                self.grass = GrassPatch(self, w)
-                self.app.notify("풀숲이 흔들리고 있습니다. 눌러보세요!")
+            if self.src == "hide":
+                self._hide_seen = True
+            if not self.grass and self._peeking != w["id"]:
+                if self.src == "hide" and (w.get("peek") or {}).get("num") and self.hide_on() and HIDE.kinds():
+                    # 숨은 포켓몬 - 알림 없이 (설계 '알림 없이 발견하는 재미'). 도트를 먼저 받고 숨긴다
+                    self._start_hide(w)
+                else:
+                    self.grass = GrassPatch(self, w)
+                    self.app.notify("풀숲이 흔들리고 있습니다. 눌러보세요!")
         elif w.get("pokemon") and not self.pet and self._hooking != w["id"]:
             # 낚인 야생(src 'fish')은 연못 옆에 (2026-11-26). 다시 켠 앱이 풀숲 폴링으로 먼저 알 때
             self.show_wild(w["pokemon"], at=self._fish_spot() if self.src == "fish" else None)
@@ -707,9 +734,14 @@ class WildController(object):
         if self.wild_id and not self.throwing:
             was_wild = self.pet is not None
             wid = self.wild_id
+            g = self.grass
+            hid = getattr(g, "is_hider", False) and not was_wild
+            gx = g.center()[0] if hid else None
             self.clear()
             self.app.notify("야생 포켓몬이 도망가 버렸습니다..." if was_wild
-                            else "풀숲이 잠잠해졌습니다.")
+                            else ("숨어 있던 포켓몬이 어디론가 가 버렸습니다." if hid else "풀숲이 잠잠해졌습니다."))
+            if hid:
+                self._hide_bubble(HIDE.HINT_MISS, HIDE.HINT_BIT_MISS, at_x=gx)    # 처음 놓쳤을 때만
             run_async(self.app.root, lambda: self.app.api.wild_flee(wid),
                       lambda r, e: self.check())
         else:
@@ -800,6 +832,13 @@ class WildController(object):
         # 만료 타이머도 같이 끈다. 안 끄면 이미 사라진 야생을 두고
         # 나중에 한 번 더 깨어나 쓸데없이 서버를 부른다.
         self.arm_expiry(None)
+        self._hide_cancel()
+        if self._leaping is not None:
+            self._leaping.destroy()             # 뛰어나오는 도중 (stop - 집중 · 놀러 가기 …)
+            self._leaping = None
+        self._say_close()
+        self._peeking = None                    # 받는 중이던 도트의 답은 버린다 (done 이 번호로도 거른다)
+        self._row = None
         if self.grass:
             self.grass.destroy()
             self.grass = None
@@ -860,8 +899,12 @@ class WildController(object):
                      font=U.FONT_TIP, justify="center",
                      padx=7, pady=3).pack()
             w.update_idletasks()
-            w.geometry("+%d+%d" % (near.x + near.fw // 2 - w.winfo_width() // 2,
-                                   near.y - w.winfo_height() - 4))
+            at = getattr(near, "tip_at", None)          # 숨은 포켓몬은 보이는 칸 바깥 화면 쪽으로
+            if at is not None:
+                x, y = at(w.winfo_width(), w.winfo_height())
+            else:
+                x, y = near.x + near.fw // 2 - w.winfo_width() // 2, near.y - w.winfo_height() - 4
+            w.geometry("+%d+%d" % (x, y))
             PLAT.raise_above(w)
             self.hint = w
         except Exception:
@@ -937,6 +980,232 @@ class WildController(object):
             msg = "★ " + msg + " 색이 다르다!"
             self.sparkle()
         self.app.notify(msg)
+
+    # ---------------- 숨바꼭질 (시즌 7, 2026-11-27) ----------------
+    HIDE_PEEK_MS = 60000       # 처음 숨은 포켓몬이 나오고 이만큼 뒤 '어디선가 누가 훔쳐보고 있어…'
+    HIDE_Q_MS = 120000         # 그 뒤로는 이만큼 뒤 선두 포켓몬의 '?' (이벤트 화면을 끈 사람은 없음)
+    HIDE_BUBBLE_MS = 7000
+
+    def hide_on(self):
+        """숨바꼭질 설정이 켜져 있나 (풀숲 보이기도 켜져 있어야 - config.hide_seek)."""
+        return config.hide_seek(self.app.settings)
+
+    def hide_open(self):
+        """설정 · 트레이에 '숨바꼭질' 줄을 보일 때. 앱은 시즌을 따로 모른다 - 숨바꼭질은 낚시 · 텃밭과 같은 시즌 7 에
+        열리므로 (서버 HIDE_FROM = FISH_FROM = GARDEN_FROM = 7) 그 둘이 열렸거나, 숨은 포켓몬을 받아 봤으면 연다.
+        이 OS 가 숨길 수 없으면(겹침 순서를 못 건다) 줄도 없다."""
+        if not HIDE.kinds():
+            return False
+        if self._hide_seen:
+            return True
+        return any(getattr(getattr(self.app, n, None), "open", False) for n in ("fishing", "garden"))
+
+    def can_hide(self):
+        """지금 숨은 포켓몬을 **보여 줄 수 있나** - 그때만 서버에 hide=1 을 보낸다 (그래야 끄는 쪽이 이득이 아니다).
+        설정 켬 · 놀러 가 있지 않음 · 집중/올림픽/공습 아님 · 긴급 숨기기 아님 · 전체 화면/발표 중 아님 · 이 OS 가 숨길 수 있음."""
+        if not self.hide_on() or self._away() or self._focusing():
+            return False
+        if getattr(self.app, "overlay", None) is None or not HIDE.kinds():
+            return False
+        try:
+            from . import stealth
+            if stealth.active():
+                return False
+        except Exception:                                   # noqa: BLE001
+            pass
+        try:
+            if HIDE.plat("fullscreen_busy", lambda: False)():
+                return False
+        except Exception:                                   # noqa: BLE001
+            pass
+        return True
+
+    def _freeze_hide(self):
+        """'숨바꼭질' 의 처음 값은 처음 켤 때의 '풀숲 보이기 · 이벤트 화면' 을 따른다 (둘 다 켜져 있으면 켬). 그 값으로 굳힌다."""
+        s = self.app.settings
+        if s.get("hideSeek") is None:
+            s["hideSeek"] = config.hide_pref(s)
+            try:
+                config.save_settings(s)
+            except Exception:                               # noqa: BLE001
+                pass
+
+    def set_hide(self, on):
+        """설정이 바뀌었다 (저장은 부르는 쪽이 했다). 끄면 떠 있는 숨은 포켓몬을 그 서버 행의 풀숲으로 바꾼다 -
+        야생은 그대로 있고 숨지만 않는다. 켜면 다음 확인부터 hide=1 을 보낸다."""
+        g = self.grass
+        if on or not getattr(g, "is_hider", False) or self._row is None:
+            return
+        row = self._row
+        self._hide_cancel()
+        self.hide_hint()
+        g.destroy()
+        self.grass = None
+        if self.enabled() and not self._away() and not self._focusing():
+            self.grass = GrassPatch(self, row)
+
+    def _start_hide(self, w):
+        """숨은 포켓몬 행이 왔다 - 종(peek)의 걷는 도트 · 배틀 도트를 작업 스레드에서 받고, 받으면 숨긴다.
+        못 받았거나 숨을 자리가 없으면 그 자리에 풀숲처럼 (설계 '앱은 도트를 먼저 받고 보여 준다')."""
+        wid = w["id"]
+        num = int((w.get("peek") or {}).get("num") or 0)
+        self._peeking = wid
+        api = self.app.api
+
+        def work():
+            out = {}
+            try:
+                out["walk"] = walk_cache.ensure(api, num, shiny=False)
+            except Exception:                               # noqa: BLE001
+                out["walk"] = (None, None)
+            try:
+                out["path"] = sprite_cache.ensure(api, num, False)
+            except Exception:                               # noqa: BLE001
+                out["path"] = None
+            return out
+
+        def done(res, err):
+            if self._peeking == wid:
+                self._peeking = None
+            if (self.wild_id != wid or self.grass is not None or self.pet is not None or self.revealing
+                    or self._away() or self._focusing() or not self.enabled()):
+                return                              # 받는 사이에 치웠다 · 다른 야생 · 놀러 갔다 · 껐다
+            # 긴급 숨기기 중에는 겹침 순서를 걸 수 없다 (숨긴 창) - 풀숲으로 바꾸지 말고 풀릴 때까지 1초마다 기다린다
+            # (실제 앱 시험 11/27: 숨긴 사이에 온 숨은 포켓몬이 풀숲이 되어 버렸다)
+            try:
+                from . import stealth
+                hidden = stealth.active()
+            except Exception:                               # noqa: BLE001
+                hidden = False
+            if hidden:
+                self._peeking = wid
+                try:
+                    self.app.root.after(1000, lambda: done(res, err))
+                except Exception:                           # noqa: BLE001
+                    self._peeking = None
+                return
+            res = res or {}
+            body = None
+            if err is None:
+                body = HIDE.load_look(self.app.overlay, num, res.get("walk"), res.get("path"))
+            hider = None
+            if body is not None and self.hide_on():
+                try:
+                    hider = HIDE.Hider.make(self, w, body)
+                except Exception as e:                      # noqa: BLE001
+                    config.log("숨은 포켓몬을 못 띄웠습니다: %s" % e)
+                    hider = None
+            if hider is None:
+                self.grass = GrassPatch(self, w)
+                return
+            self.grass = hider
+            if not self._hints() & HIDE.HINT_BIT_PEEK:
+                self._hide_after("hint", self.HIDE_PEEK_MS,
+                                 lambda: self._hide_bubble(HIDE.HINT_PEEK, HIDE.HINT_BIT_PEEK, near=hider))
+            elif self.app.settings.get("eventPopups", True):
+                self._hide_after("hint", self.HIDE_Q_MS, lambda: self._hide_bubble(HIDE.HINT_Q, 0, near=hider))
+        run_async(self.app.root, work, done)
+
+    def _found(self, g, mon):
+        """숨은 포켓몬을 찾았다 - '찾았다!', 숨은 자리에서 활동 영역 가장자리로 뛰어 들어와 평소 야생이 된다."""
+        self._hide_cancel()
+        self.hide_hint()
+        ov = self.app.overlay
+        wid = self.wild_id
+        self._say_close()
+        try:
+            self._say = HIDE.Say(self.app.root, HIDE.SAY_FOUND, g.tip_at)
+        except Exception as e:                              # noqa: BLE001
+            config.log("'찾았다!' 를 못 띄웠습니다: %s" % e)
+        target = HIDE.edge_point(ov.area(), ov.settings["areaMargin"], g.sprite_rect(), g.bw, g.bh)
+        self.grass = None
+        self._leaping = g
+        hidden = bool(mon.get("hiddenAbility") or (mon.get("info") or {}).get("hiddenAbility"))
+
+        def land():
+            if self._leaping is g:
+                self._leaping = None
+            if self.wild_id != wid or self.pet is not None:
+                return
+            self.show_wild(mon, at=target)
+            pet = self.pet
+            if pet is not None and hidden:
+                self._hide_after("ability", 450, lambda: self._say_hidden(pet))
+            self._hide_bubble(HIDE.HINT_FOUND, HIDE.HINT_BIT_FOUND)
+        g.leap(target, land)
+
+    def _say_hidden(self, pet):
+        """숨겨진 특성이면 찾은 포켓몬 머리 위(표식 위)에 '숨겨진 특성!' (이로치 반짝임처럼 찾은 뒤에 보인다)."""
+        if self.pet is not pet:
+            return
+        fn = getattr(self.app, "float_at", None)
+        if fn is not None:
+            try:
+                fn(pet.x + pet.fw / 2.0, pet.y - 26, HIDE.SAY_HIDDEN, HIDE.GOLD, ms=2200)
+            except Exception:                               # noqa: BLE001
+                pass
+
+    def _say_close(self):
+        s, self._say = self._say, None
+        if s is not None:
+            s.close()
+
+    def _hints(self):
+        try:
+            return int(self.app.settings.get("hideHints") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def _hide_bubble(self, text, bit, near=None, at_x=None):
+        """선두 포켓몬이 숨은 쪽을 보며 말풍선 (낚시 · 텃밭 안내와 같은 방식). bit 이 있으면 한 번만 - 설정 hideHints 에
+        **말풍선이 뜬 뒤에** 남긴다."""
+        if bit and self._hints() & bit:
+            return False
+        ov = self.app.overlay
+        pet = next(iter(ov.pets.values()), None) if ov is not None else None
+        if pet is None:
+            return False
+        if near is not None:
+            try:
+                at_x = near.center()[0]
+            except Exception:                               # noqa: BLE001
+                pass
+        if at_x is not None:
+            try:
+                pet.face_towards(at_x)
+            except Exception:                               # noqa: BLE001
+                pass
+        try:
+            from .visit import Bubble
+            Bubble(self.app.root, pet, text, ms=self.HIDE_BUBBLE_MS)
+        except Exception as e:                              # noqa: BLE001
+            config.log("숨바꼭질 안내 말풍선 실패: %s" % e)
+            return False
+        if bit:
+            s = self.app.settings
+            s["hideHints"] = self._hints() | bit
+            try:
+                config.save_settings(s)
+            except Exception:                               # noqa: BLE001
+                pass
+        return True
+
+    def _hide_after(self, name, ms, fn):
+        self._hide_cancel(name)
+
+        def run():
+            self._hide_jobs.pop(name, None)
+            fn()
+        self._hide_jobs[name] = self.app.root.after(max(1, int(ms)), run)
+
+    def _hide_cancel(self, *names):
+        for name in (names or tuple(self._hide_jobs)):
+            job = self._hide_jobs.pop(name, None)
+            if job is not None:
+                try:
+                    self.app.root.after_cancel(job)
+                except Exception:                           # noqa: BLE001
+                    pass
 
     # ---------------- 낚인 야생 (낚시, 2026-11-26) ----------------
     def has_fish(self):
@@ -1074,7 +1343,11 @@ class WildController(object):
                 if sheet and meta:
                     self.app.overlay.walks[walk_cache.key(
                         mon.get("num"), mon.get("shiny"))] = (sheet, meta)
-                self.show_wild(mon)
+                g = self.grass
+                if getattr(g, "is_hider", False):
+                    self._found(g, mon)
+                else:
+                    self.show_wild(mon)
                 self.arm_expiry(w.get("expiresAt"), w.get("expiresIn"))
 
         def work():

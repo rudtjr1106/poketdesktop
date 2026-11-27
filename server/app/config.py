@@ -203,6 +203,18 @@ GARDEN_SCALE = _float("POKET_GARDEN_SCALE", 1.0)            # 자라는 시간�
 # 하루(KST)에 거두는 열매 천장. 씨앗을 빼면 하루 15~17개 = 팔면 약 8,000원 - 도구 탐험 '1만 원 안쪽' 선 아래 (설계 수치)
 GARDEN_CAP = _int("POKET_GARDEN_CAP", 20)
 FEED_GAIN = _int("POKET_FEED_GAIN", 10)                     # 열매 먹이기 친밀도 (하루 한 번 - 걷기 하루 8시간의 약 0.4배)
+# 숨바꼭질 (시즌 7, main._make_grass) - 낚시와 같이 부를 때마다 season.SEASON 과 견준다 (main._hide_open). 열리기 전에는
+# 앱이 hide=1 을 보내도 무시하고 풀숲은 바이트 단위로 지금과 같다. 로컬 시험은 POKET_HIDE_FROM=6 · POKET_HIDE_CHANCE=1.0.
+HIDE_FROM = _int("POKET_HIDE_FROM", 7)
+# 풀숲 차례마다 숨길 확률. 부지런히 잡는 사람의 풀숲은 약 400초마다 = 8시간 72번 x 0.042 ≈ 3번
+# (11/27 사용자: "하루 8시간에 3번 나오는 확률로"). 앱이 '지금 보여 줄 수 있다'(hide=1) 고 할 때만 굴린다.
+HIDE_CHANCE = _float("POKET_HIDE_CHANCE", 0.042)
+HIDE_TTL = _int("POKET_HIDE_TTL", 240)                      # 숨은 포켓몬이 못 찾고 사라지기까지 (초) - 풀숲 90초보다 길다
+HIDE_MISS_NEXT = 10                                          # 못 찾고 만료되면 다음 풀숲까지 (초) - 오래 숨어 있던 시간을 메운다
+# 공개 전 '도망'(놓아주기)이 진짜 만료로 치는 여유 (초). 이보다 이르게 놓아주면 짧은 간격(MISS_COOLDOWN · HIDE_MISS_NEXT)을
+# 주지 않고 보통 간격 - 스크립트가 풀숲을 버려 가며 숨은 포켓몬만 골라 받지 못하게. 정직한 앱은 만료 + 1초 뒤에 부른다
+# (wild_ui.on_expired) - 서버가 준 남은 초(expiresIn)를 정수로 끊어 보내는 1초 남짓을 넉넉히 덮는다.
+MISS_SLACK = 5
 # 게시판 이미지 (버전 2). DB 에 넣지 않고 파일로 둔다 - DB 가 커지면 백업이 무거워진다 (10/28 3GB 사고).
 # 운영은 /data 볼륨(DB · 도트 캐시와 같은 곳)에 남는다.
 BOARD_IMG_DIR = os.environ.get("POKET_BOARD_IMG_DIR", "/data/board_img")

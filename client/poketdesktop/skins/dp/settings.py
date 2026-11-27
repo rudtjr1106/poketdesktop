@@ -51,6 +51,12 @@ def _is_act(key):
     return isinstance(key, str) and key.startswith("act:")
 
 
+def _off(row):
+    """그 줄이 죽었나 - disabled 는 값이거나 (자동 시작) 그때그때 묻는 함수다 (숨바꼭질 - 풀숲을 끄면 죽는다)."""
+    d = row.get("disabled")
+    return bool(d() if callable(d) else d)
+
+
 class SettingsWindow(ST.SettingsWindow):
 
     def _build(self, s, header):
@@ -151,7 +157,8 @@ class SettingsWindow(ST.SettingsWindow):
                           "action": ("다시 켜서 적용", self._restart_for_skin,
                                      lambda: self.text_pick != U.TEXT_SIZE)})
         # 낚시터 · 텃밭 보이기 (다음 시즌) - 기본 창과 같은 줄을 '풀숲 띄우기' 아래에 끼운다 (ST._with_pond · _with_garden)
-        for var, label, key, note, how in self._with_garden(self._with_pond((
+        # 숨바꼭질 (시즌 7) - 그 다음, 풀숲을 끄면 죽는 줄 (ST._with_hide · hide_alive)
+        for var, label, key, note, how in self._with_hide(self._with_garden(self._with_pond((
                 (self.names, "이름표 보이기", "showNames", "포켓몬 위에 이름과 레벨을 띄웁니다.", self._toggle),
                 (self.drag, "포켓몬 들어서 옮기기", "petDrag",
                  "켜면 포켓몬과 알을 마우스로 누른 채 끌어서 원하는 자리에 내려놓을 수 있습니다. 돌아다닐 영역 안에서만 "
@@ -177,8 +184,10 @@ class SettingsWindow(ST.SettingsWindow):
                  "길드 친선전이 열리면 묻지 않고 바탕화면에서 바로 관전합니다.", self._toggle_plain),
                 (self.cl_note, "독도 챔피언리그 알림", "championNotify",
                  "관장을 전부 이긴 참가자가 독도에서 상대를 기다리면 화면 오른쪽 아래에 잠깐 알립니다 ([도전] 을 누르면 "
-                 "바로 붙습니다). 독도 창을 보고 있거나 배틀 · 구경 중일 때는 띄우지 않습니다.", self._toggle_plain)))):
+                 "바로 붙습니다). 독도 창을 보고 있거나 배틀 · 구경 중일 때는 띄우지 않습니다.", self._toggle_plain))))):
             self._flag(label, note, var, key, how)
+            if key == "hideSeek":
+                self.rows[-1]["disabled"] = lambda: not self.hide_alive()
         self.rows.append({"kind": "choice", "label": "야생 배틀에서 잡기",
                           "note": "체력을 조금 남기고 멈춰서 볼을 던질 틈을 줍니다. 10초 안에 안 던지거나 야생 포켓몬을 "
                                   "왼쪽 클릭하면 끝까지 싸웁니다. 색이 다른 포켓몬은 잡은 적이 있거나 고르지 않았어도 "
@@ -259,6 +268,14 @@ class SettingsWindow(ST.SettingsWindow):
         ST.SettingsWindow.show_garden(self)
         self._soon()
 
+    def show_hide(self):
+        ST.SettingsWindow.show_hide(self)
+        self._soon()
+
+    def _toggle_grass(self, key, var):
+        ST.SettingsWindow._toggle_grass(self, key, var)
+        self._soon()                    # 하위 줄 '숨바꼭질' 이 살고 죽는 것을 다시 그린다
+
     def show_boss(self):
         if self.boss is not None:
             from ... import hotkey as HOTKEY
@@ -284,7 +301,7 @@ class SettingsWindow(ST.SettingsWindow):
             nv = max(r["lo"], min(r["hi"], round((v + d * s) / r["step"]) * r["step"]))
             if abs(nv - v) > 1e-9:
                 r["put"](nv)
-        elif r["kind"] == "choice" and not r.get("disabled"):
+        elif r["kind"] == "choice" and not _off(r):
             keys = [k for k, _l in r["choices"]]
             cur = r["get"]()
             i = keys.index(cur) if cur in keys else 0
@@ -339,7 +356,7 @@ class SettingsWindow(ST.SettingsWindow):
             m = (ry1 + ry2) // 2
             if r["kind"] in ("num", "choice"):
                 bw = U.h(28)
-                dis = r.get("disabled")
+                dis = _off(r)
                 for side, d, bx in (("l", -1, vx1), ("r", 1, vx2 - bw)):
                     btg = ("arr", "arr%d%s" % (i, side))
                     K.rrect(cv, bx, m - U.h(12), bx + bw, m + U.h(12), 6, fill="#eef2f7" if not dis else "#f4f5f7",

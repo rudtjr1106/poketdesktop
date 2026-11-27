@@ -197,6 +197,22 @@ def holds_grass(uid, now=None):
     return _live_wild(uid, now, "fish") is not None
 
 
+def line_cast(uid, now=None):
+    """찌를 던져 둔 채인가 (cast · bite). 숨바꼭질(main._make_grass)이 이때는 숨기지 않는다 - 숨은 포켓몬은 최대 4분
+    떠 있어서, 그동안 입질을 막으면(야생이 있으면 입질이 안 열린다) 낚시가 숨바꼭질에 밀린다.
+    열리기 전에는 남은 줄이 있어도 거짓 (holds_grass 와 같다). 잠금을 잡지 않는다 - 부르는 쪽(wild_state)이 이미 쥐고 있다."""
+    if not is_open():
+        return False
+    now = now or _now()
+    row = _row(uid)
+    st = _state(row, now)
+    if st == "bite":
+        return True
+    # 아무도 안 여는 줄(연못을 숨긴 다른 PC · 앱을 끔)이 숨바꼭질을 영영 끄지 않게, 풀숲 보류(holds_grass)와 같은 끝을 둔다:
+    # 입질 시각이 FISH_HOLD_LATE 초 넘게 지났으면 '던져 둔 채' 로 치지 않는다 (검토 11/27).
+    return st == "cast" and (_t(row["bite_at"]) - now).total_seconds() > -config.FISH_HOLD_LATE
+
+
 # ---------------------------------------------------------------- 던지기 · 입질 · 챔질 · 거두기
 def is_bait(item_id):
     """미끼가 되나 - 지닌 열매만 (cat 'held' + 이름이 BERRY 로 끝남). 노력치 내리는 열매(cat 'ev')는 상점 80원이라 뺀다."""

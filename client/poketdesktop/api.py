@@ -531,8 +531,11 @@ class Api(object):
         return self._call("POST", "/api/pokemon/%d/exp" % pid, {"amount": int(amount)})
 
     # ---------------- 야생 조우 ----------------
-    def wild(self, force=False):
-        return self._call("GET", "/api/wild" + ("?force=true" if force else ""))
+    def wild(self, force=False, hide=False):
+        # hide: 숨바꼭질(시즌 7) - 이 앱이 지금 숨은 포켓몬을 보여 줄 수 있다. 서버는 이것이 있을 때만 숨긴다
+        # (옛 앱 · 끈 사람 · 집중/놀러 가기 중에는 안 보낸다). 모르는 서버는 이 값을 그냥 무시한다.
+        q = [k for k, on in (("force=true", force), ("hide=1", hide)) if on]
+        return self._call("GET", "/api/wild" + ("?" + "&".join(q) if q else ""))
 
     def wild_reveal(self, wid):
         return self._call("POST", "/api/wild/%d/reveal" % wid, {})

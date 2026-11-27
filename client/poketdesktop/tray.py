@@ -113,9 +113,19 @@ def garden_items(tray, app):
                  checked=lambda: config.show_garden(app.settings))]
 
 
+def hide_items(tray, app):
+    """숨바꼭질 (시즌 7): 열렸을 때만 '숨바꼭질' (WildController.hide_open). 풀숲 띄우기를 끄면 죽는다 (설정 창의 하위 칸)."""
+    w = getattr(app, "wild", None)
+    if w is None or not getattr(w, "hide_open", lambda: False)():
+        return []
+    return [Item("숨바꼭질", lambda: tray.call(app.toggle_hide_seek),
+                 checked=lambda: config.hide_pref(app.settings),
+                 enabled=lambda: bool(app.settings.get("showGrass", True)))]
+
+
 def with_garden(tray, app, rows):
-    """'바탕화면' 하위 메뉴 끝에 '텃밭 보이기' 를 붙인다 (낚시터 보이기 다음 - 설정 창과 같은 차례)."""
-    return list(rows) + garden_items(tray, app)
+    """'바탕화면' 하위 메뉴 끝에 '텃밭 보이기' · '숨바꼭질' 을 붙인다 (낚시터 보이기 다음 - 설정 창과 같은 차례)."""
+    return list(rows) + garden_items(tray, app) + hide_items(tray, app)
 
 
 def make_icon_image(size=64):

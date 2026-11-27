@@ -639,7 +639,9 @@ class App(object):
         if gd is not None and getattr(gd, "moving", None) is not None:
             return gd._end_move()                   # 텃밭 옮기기 중 - 연못과 같은 까닭
         wild = self.wild
-        if wild is not None and wild.grass is not None:
+        # 숨은 포켓몬(숨바꼭질 - wild.grass 의 Hider)은 왼쪽 클릭으로만 찾는다. 테두리 상자로 맞추면 그 창 뒤에 가려진
+        # 몸 자리(남의 창 위)에서 누른 오른쪽 클릭까지 찾기가 된다
+        if wild is not None and wild.grass is not None and not getattr(wild.grass, "is_hider", False):
             if self._hit(wild.grass, x, y, num):
                 return wild.on_grass_click()
         # 낚시터 (다음 시즌): 창 번호가 맞으면 먼저. 테두리 상자로만 맞으면 도트 다음 - 연못 창은 넓어서
@@ -2961,6 +2963,31 @@ class App(object):
         if self.settings_win:
             try:
                 self.settings_win.show_grass()
+            except Exception:                               # noqa: BLE001
+                pass
+        return on
+
+    # ---------------------------------------------------------------- 숨바꼭질 (시즌 7)
+    def set_hide_seek(self, on):
+        """숨바꼭질을 켜거나 끈다 (설정 · 트레이). 끄면 떠 있는 숨은 포켓몬은 그 자리 풀숲으로 바뀌고, 다음 확인부터
+        서버에 hide=1 을 안 보낸다 (숨은 포켓몬을 받지 않는다). 풀숲 보이기가 꺼져 있으면 값만 바꾼다."""
+        on = bool(on)
+        if on == config.hide_pref(self.settings) and self.settings.get("hideSeek") is not None:
+            return on
+        self.settings["hideSeek"] = on
+        config.save_settings(self.settings)
+        if getattr(self, "wild", None) is not None:
+            self.wild.set_hide(config.hide_seek(self.settings))
+        self.refresh_tray()
+        self.notify("숨바꼭질을 켰습니다." if on else "숨바꼭질을 껐습니다. 야생은 풀숲으로만 나옵니다.")
+        return on
+
+    def toggle_hide_seek(self):
+        """트레이 메뉴에서 부른다. 설정 창이 열려 있으면 표시도 맞춘다."""
+        on = self.set_hide_seek(not config.hide_pref(self.settings))
+        if getattr(self, "settings_win", None):
+            try:
+                self.settings_win.show_hide()
             except Exception:                               # noqa: BLE001
                 pass
         return on
